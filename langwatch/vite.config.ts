@@ -248,6 +248,18 @@ export default defineConfig(async (): Promise<UserConfig> => {
     // production server (start.ts) listens on a single port so this
     // splitting is dev-only.
     proxy: {
+      // The tRPC WS transport enforces a same-origin allowlist (built from
+      // NEXTAUTH_URL) and fail-closes on a missing/mismatched Origin. The
+      // catch-all `/api` proxy below sets `changeOrigin: true`, which rewrites
+      // the WS handshake Origin so the backend sees a null/foreign origin and
+      // rejects every upgrade — silently breaking all WS-backed workbench
+      // state. A dedicated, earlier entry keeps the browser's real Origin.
+      "/api/trpc-ws": {
+        target: API_TARGET,
+        changeOrigin: false,
+        ws: true,
+        secure: false,
+      },
       "/api": {
         target: API_TARGET,
         changeOrigin: true,

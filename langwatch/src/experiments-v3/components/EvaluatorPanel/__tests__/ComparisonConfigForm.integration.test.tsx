@@ -2,29 +2,44 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { FormProvider, useForm } from "react-hook-form";
+import { FormProvider, useForm, useWatch } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ComparisonEvaluatorConfig, TargetConfig } from "../../../types";
-import { ComparisonConfigForm } from "../ComparisonConfigForm";
+import {
+  ComparisonConfigForm,
+  pickDefaultJudgePrompt,
+} from "../ComparisonConfigForm";
 
 // The variant multiselect's menu items resolve display names via
 // useTargetName, which reaches through useOrganizationTeamProject to
 // tRPC — the full tRPC context is out of scope for a component
 // integration test. Mock the hook to return the target's id so the
 // dropdown still renders with a stable label.
-vi.mock("../../../hooks/useTargetName", () => {
-  const useTargetName = (target: { id: string }) => target.id;
-  return {
-    useTargetName,
-    // Batched variant lookup used by the comparison scoreboard.
-    useTargetNames: (targets: ({ id: string } | undefined)[]) =>
-      targets.map((target) => (target ? useTargetName(target) : "")),
-  };
+const { useTargetNameMock, useTargetNamesMock } = vi.hoisted(() => {
+  const useTargetNameMock = vi.fn((target: { id: string }) => target.id);
+  const useTargetNamesMock = vi.fn(
+    (targets: ({ id: string } | undefined)[]) =>
+      targets.map((target) => (target ? useTargetNameMock(target) : "")),
+  );
+  return { useTargetNameMock, useTargetNamesMock };
 });
+// Resolves a variant's outputs through to its prompt via tRPC. These tests
+// hand the form fully-formed targets, so the target's own outputs are the
+// answer and no fetch is needed.
+vi.mock("../../../hooks/useTargetOutputs", () => ({
+  useTargetOutputs: (targets: ({ outputs?: unknown } | undefined)[]) =>
+    targets.map((target) => target?.outputs),
+}));
+vi.mock("../../../hooks/useTargetName", () => ({
+  useTargetName: useTargetNameMock,
+  // Batched variant lookup used by the comparison scoreboard AND the config
+  // picker; the picker disambiguates the returned set with disambiguateNames.
+  useTargetNames: useTargetNamesMock,
+}));
 
 // Same rationale as PairwiseConfigForm's integration test: the metrics
 // section reads its "source of truth" via useFormContext + useWatch
@@ -111,6 +126,48 @@ const renderForm = (
 describe("ComparisonConfigForm", () => {
   afterEach(() => {
     cleanup();
+    // Reset to the default id-as-name behavior so a disambiguation override
+    // in one test cannot leak into the next.
+    useTargetNameMock.mockImplementation((target) => target.id);
+    useTargetNamesMock.mockImplementation((targets) =>
+      targets.map((target) => (target ? useTargetNameMock(target) : "")),
+    );
+  });
+
+  describe("given two selected variants that resolve to the same name", () => {
+    it("numbers the picker cards (1) and (2) in variant order", () => {
+      // A duplicated prompt: both variants resolve to one name. The picker
+      // must disambiguate them the same way the verdict column does, keyed on
+      // variant order, so "(2)" here is the same column as "(2)" in results.
+      useTargetNamesMock.mockImplementation((targets) =>
+        targets.map((target) => (target ? "Prompt A" : "")),
+      );
+
+      renderForm({
+        value: baseConfig({ variants: ["t1", "t2"] }),
+        targets: [target("t1"), target("t2")],
+      });
+
+      expect(screen.getByText("Prompt A (1)")).toBeInTheDocument();
+      expect(screen.getByText("Prompt A (2)")).toBeInTheDocument();
+      expect(screen.queryByText("Prompt A")).not.toBeInTheDocument();
+    });
+
+    it("leaves a uniquely-named variant unnumbered", () => {
+      useTargetNamesMock.mockImplementation((targets) =>
+        targets.map((target) =>
+          target ? (target.id === "t1" ? "Prompt A" : "Prompt B") : "",
+        ),
+      );
+
+      renderForm({
+        value: baseConfig({ variants: ["t1", "t2"] }),
+        targets: [target("t1"), target("t2")],
+      });
+
+      expect(screen.getByText("Prompt A")).toBeInTheDocument();
+      expect(screen.getByText("Prompt B")).toBeInTheDocument();
+    });
   });
 
   // The too-few-variants case is enforced by disabling Save and Apply in the
@@ -157,11 +214,11 @@ describe("ComparisonConfigForm", () => {
     });
   });
 
-  describe("when the user picks a golden field", () => {
-    it("writes it into goldenField and calls onChange", async () => {
+  describe("when the user picks a golden column from the field picker", () => {
+    it("writes it into goldenField and turns golden answer on", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
-      renderForm({ onChange });
+      renderForm({ value: baseConfig({ hasGoldenAnswer: false }), onChange });
 
       await user.click(screen.getByTestId("comparison-golden-field"));
       await user.click(
@@ -171,42 +228,147 @@ describe("ComparisonConfigForm", () => {
       expect(onChange).toHaveBeenCalledWith(
         expect.objectContaining({ goldenField: "expected_output" }),
       );
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ hasGoldenAnswer: true }),
+      );
     });
   });
 
-  // #5378: golden answer is opt-in. The Golden field picker is gated behind
-  // the "Has golden answer" toggle (comparison.feature:175, :180). The deleted
-  // PairwiseConfigForm test covered this; it must not go uncovered in the
-  // merged form.
-  describe("the has-golden-answer toggle", () => {
-    it("shows the golden field picker when on (the default)", () => {
-      renderForm({ value: baseConfig({ hasGoldenAnswer: true }) });
-
-      expect(screen.getByTestId("comparison-golden-field")).toBeInTheDocument();
-    });
-
-    it("hides the golden field picker when the user turns it off", async () => {
+  describe("when the user picks None from the field picker", () => {
+    it("clears goldenField and turns golden answer off", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
       renderForm({
-        value: baseConfig({ hasGoldenAnswer: true }),
+        value: baseConfig({
+          hasGoldenAnswer: true,
+          goldenField: "expected_output",
+        }),
         onChange,
       });
 
-      // Picker visible before the toggle.
-      expect(screen.getByTestId("comparison-golden-field")).toBeInTheDocument();
+      await user.click(screen.getByTestId("comparison-golden-field"));
+      await user.click(
+        screen.getByTestId("comparison-golden-field-option-none"),
+      );
 
-      await user.click(screen.getByTestId("comparison-has-golden-answer"));
-
-      // Turning it off both clears goldenField and hides the picker.
       expect(onChange).toHaveBeenCalledWith(
         expect.objectContaining({ hasGoldenAnswer: false, goldenField: "" }),
       );
-      await waitFor(() => {
-        expect(
-          screen.queryByTestId("comparison-golden-field"),
-        ).not.toBeInTheDocument();
+    });
+  });
+
+  // #5378: golden answer is opt-in. The separate "Has golden answer" toggle
+  // was folded into the Golden field picker ("None — judge on merits" turns
+  // it off). Golden and Input now render together as a two-column row, and the
+  // golden picker is always visible.
+  describe("the golden field and input field", () => {
+    it("renders both pickers together, with no separate toggle", () => {
+      renderForm({ value: baseConfig({ hasGoldenAnswer: true }) });
+
+      expect(screen.getByTestId("comparison-golden-field")).toBeInTheDocument();
+      expect(screen.getByTestId("comparison-input-field")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("comparison-has-golden-answer"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("labels the golden trigger None once golden answer is off", () => {
+      renderForm({ value: baseConfig({ hasGoldenAnswer: false }) });
+
+      expect(screen.getByTestId("comparison-golden-field")).toHaveTextContent(
+        "None — judge on merits",
+      );
+    });
+  });
+
+  // The judge prompt tracks the golden setting while it is still an untouched
+  // shipped default: switching golden on/off swaps it to the matching default.
+  // hasInput is always true at config time, so both swaps land on the *_INPUT
+  // defaults; the no-input variants are chosen per row at runtime in Python.
+  describe("when golden changes and the prompt is an untouched default", () => {
+    const PromptProbe = () => {
+      const prompt = useWatch({ name: "settings.prompt" }) as
+        | string
+        | undefined;
+      return <div data-testid="prompt-probe">{prompt}</div>;
+    };
+
+    const renderWithPrompt = ({
+      hasGolden,
+      value,
+    }: {
+      hasGolden: boolean;
+      value: ComparisonEvaluatorConfig;
+    }) => {
+      const Wrapper = ({ children }: { children: ReactNode }) => {
+        const methods = useForm({
+          defaultValues: {
+            settings: {
+              has_golden_answer: hasGolden,
+              prompt: pickDefaultJudgePrompt({ hasGolden, hasInput: true }),
+              include_metrics: [] as string[],
+            },
+          },
+        });
+        return (
+          <ChakraProvider value={defaultSystem}>
+            <FormProvider {...methods}>{children}</FormProvider>
+          </ChakraProvider>
+        );
+      };
+      return render(
+        <Wrapper>
+          <PromptProbe />
+          <ComparisonConfigForm
+            value={value}
+            onChange={vi.fn()}
+            targets={[target("t1"), target("t2")]}
+            datasetColumns={[{ id: "col-1", name: "expected_output" }]}
+          />
+        </Wrapper>,
+      );
+    };
+
+    it("swaps to the no-golden default when None is picked", async () => {
+      const user = userEvent.setup();
+      renderWithPrompt({
+        hasGolden: true,
+        value: baseConfig({
+          hasGoldenAnswer: true,
+          goldenField: "expected_output",
+          variants: ["t1", "t2"],
+        }),
       });
+
+      await user.click(screen.getByTestId("comparison-golden-field"));
+      await user.click(
+        screen.getByTestId("comparison-golden-field-option-none"),
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("prompt-probe").textContent).toBe(
+          pickDefaultJudgePrompt({ hasGolden: false, hasInput: true }),
+        ),
+      );
+    });
+
+    it("swaps to the golden default when a column is picked", async () => {
+      const user = userEvent.setup();
+      renderWithPrompt({
+        hasGolden: false,
+        value: baseConfig({ hasGoldenAnswer: false, variants: ["t1", "t2"] }),
+      });
+
+      await user.click(screen.getByTestId("comparison-golden-field"));
+      await user.click(
+        screen.getByTestId("comparison-golden-field-option-expected_output"),
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("prompt-probe").textContent).toBe(
+          pickDefaultJudgePrompt({ hasGolden: true, hasInput: true }),
+        ),
+      );
     });
   });
 
@@ -261,11 +423,13 @@ describe("ComparisonConfigForm", () => {
         );
       });
 
-      // The corrected state also keeps the golden field picker hidden,
-      // matching what the toggle already displayed.
-      expect(
-        screen.queryByTestId("comparison-golden-field"),
-      ).not.toBeInTheDocument();
+      // The picker is always visible now; once golden is corrected to off it
+      // reads "None — judge on merits" rather than a stale column.
+      await waitFor(() =>
+        expect(screen.getByTestId("comparison-golden-field")).toHaveTextContent(
+          "None — judge on merits",
+        ),
+      );
     });
 
     it("leaves goldenField untouched when the form says golden answer is on", async () => {
@@ -545,9 +709,15 @@ describe("ComparisonConfigForm", () => {
         opensWith: /those scores are passed to the judge/i,
       },
       {
-        name: "has golden answer",
-        testId: "comparison-has-golden-answer-info",
-        opensWith: /compare each candidate against a reference answer/i,
+        name: "golden field",
+        testId: "comparison-golden-field-info",
+        opensWith:
+          /the reference answer the judge compares each candidate against/i,
+      },
+      {
+        name: "input field",
+        testId: "comparison-input-field-info",
+        opensWith: /gives the judge task context/i,
       },
       {
         name: "shuffle candidate order",
@@ -597,6 +767,175 @@ describe("ComparisonConfigForm", () => {
 
         await waitFor(() => expect(screen.getByText(opensWith)).toBeVisible());
       });
+    });
+  });
+
+  // A bare "expected_output" / "answer" doesn't say WHICH dataset or variant it
+  // came from. Qualify both with their source — the same "Test Data.input" shape
+  // the prompt variable mapping chips use — so every field label reads the same
+  // way across the form. Display only: the stored goldenField / output path stay
+  // the bare names the backend reads.
+  describe("given a dataset name is known", () => {
+    it("qualifies the golden column options as Dataset.column", async () => {
+      const user = userEvent.setup();
+      renderForm({
+        datasetName: "Test Data",
+        datasetColumns: [
+          { id: "col-1", name: "expected_output" },
+          { id: "col-2", name: "input" },
+        ],
+      });
+
+      await user.click(screen.getByTestId("comparison-golden-field"));
+
+      await waitFor(() =>
+        expect(screen.getByText("Test Data.expected_output")).toBeVisible(),
+      );
+    });
+
+    it("qualifies the chosen golden column on the trigger too", () => {
+      renderForm({
+        datasetName: "Test Data",
+        value: baseConfig({
+          hasGoldenAnswer: true,
+          goldenField: "expected_output",
+        }),
+      });
+
+      expect(
+        within(screen.getByTestId("comparison-golden-field")).getByText(
+          "Test Data.expected_output",
+        ),
+      ).toBeVisible();
+    });
+
+    it("qualifies the input column options as Dataset.column", async () => {
+      const user = userEvent.setup();
+      renderForm({
+        datasetName: "Test Data",
+        datasetColumns: [{ id: "col-2", name: "input" }],
+      });
+
+      await user.click(screen.getByTestId("comparison-input-field"));
+
+      await waitFor(() =>
+        expect(screen.getByText("Test Data.input")).toBeVisible(),
+      );
+    });
+
+    // The dataset name is absent until the store hydrates; a bare column name is
+    // the correct fallback rather than a stray leading dot.
+    it("falls back to the bare column when the dataset name is unknown", async () => {
+      const user = userEvent.setup();
+      renderForm({ datasetColumns: [{ id: "col-1", name: "expected_output" }] });
+
+      await user.click(screen.getByTestId("comparison-golden-field"));
+
+      await waitFor(() =>
+        expect(screen.getByText("expected_output")).toBeVisible(),
+      );
+    });
+  });
+
+  describe("given a variant with a json_schema output", () => {
+    it("qualifies each field option as Variant.field", async () => {
+      const user = userEvent.setup();
+      useTargetNameMock.mockImplementation((t: { id: string }) =>
+        t.id === "t1" ? "support-detailed" : "support-concise",
+      );
+      renderForm({
+        targets: [jsonSchemaTarget("t1"), target("t2")],
+        value: baseConfig({ variants: ["t1", "t2"] }),
+      });
+
+      await user.click(screen.getByTestId("comparison-variant-output-t1"));
+
+      await waitFor(() =>
+        expect(
+          screen.getByText("support-detailed.output.document_type"),
+        ).toBeVisible(),
+      );
+      expect(
+        screen.getByText("support-detailed.output.confidence"),
+      ).toBeVisible();
+      expect(
+        screen.getByText("support-detailed.output.reasoning"),
+      ).toBeVisible();
+    });
+
+    // The label names the full path ("…output.answer") but the PATH stored for
+    // a single "output" field must stay unwrapped (["answer"]): the backend
+    // unwraps that field before walking the object, so a ["output","answer"]
+    // path would hand the judge an empty candidate. This pins the divergence so
+    // a later "cleanup" can't quietly align them and break the judge.
+    it("stores the unwrapped path even though the label shows the full one", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      useTargetNameMock.mockImplementation((t: { id: string }) =>
+        t.id === "t1" ? "support-detailed" : "support-concise",
+      );
+      renderForm({
+        targets: [jsonSchemaTarget("t1"), target("t2")],
+        value: baseConfig({ variants: ["t1", "t2"] }),
+        onChange,
+      });
+
+      await user.click(screen.getByTestId("comparison-variant-output-t1"));
+      // The option reads "support-detailed.output.document_type"…
+      expect(
+        screen.getByText("support-detailed.output.document_type"),
+      ).toBeVisible();
+      await user.click(
+        screen.getByTestId("comparison-variant-output-t1-option-document_type"),
+      );
+
+      // …but what gets stored is the unwrapped path the backend expects.
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variantOutputPaths: { t1: ["document_type"] },
+        }),
+      );
+    });
+
+    // CodeRabbit (PR #5789): an explicitly-chosen "Whole output" stores path [],
+    // which matches no option, so the label fell through to `path.join(".")` —
+    // an empty string. `??` only falls through on null/undefined, never "", so
+    // the "Whole output" fallback never fired and the button rendered BLANK.
+    it("labels an explicitly empty path as Whole output, not blank", () => {
+      useTargetNameMock.mockImplementation(() => "support-detailed");
+      renderForm({
+        targets: [jsonSchemaTarget("t1"), target("t2")],
+        value: baseConfig({
+          variants: ["t1", "t2"],
+          variantOutputPaths: { t1: [] },
+        }),
+      });
+
+      expect(
+        within(screen.getByTestId("comparison-variant-output-t1")).getByText(
+          "Whole output",
+        ),
+      ).toBeVisible();
+    });
+
+    // "Whole output" is a mode, not a field, so it stays unqualified.
+    it("leaves the whole-output option unqualified", async () => {
+      const user = userEvent.setup();
+      useTargetNameMock.mockImplementation((t: { id: string }) =>
+        t.id === "t1" ? "support-detailed" : "support-concise",
+      );
+      renderForm({
+        targets: [jsonSchemaTarget("t1"), target("t2")],
+        value: baseConfig({ variants: ["t1", "t2"] }),
+      });
+
+      await user.click(screen.getByTestId("comparison-variant-output-t1"));
+
+      await waitFor(() =>
+        expect(
+          screen.getByTestId("comparison-variant-output-t1-option-whole"),
+        ).toBeVisible(),
+      );
     });
   });
 });

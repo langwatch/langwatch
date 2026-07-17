@@ -8,16 +8,18 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ChevronDown, Plus, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
 
-import { useTargetName } from "../../hooks/useTargetName";
+import { useTargetName, useTargetNames } from "../../hooks/useTargetName";
+import { useTargetOutputs } from "../../hooks/useTargetOutputs";
 import type { ComparisonEvaluatorConfig, TargetConfig } from "../../types";
 import { balancedColumns } from "../../utils/balancedColumns";
+import { disambiguateNames } from "../../utils/variantDisambiguation";
 
 type Metric = "cost" | "duration";
 type VariantOutputOption = {
@@ -26,21 +28,50 @@ type VariantOutputOption = {
 };
 
 /**
- * Default judge prompt when Has Golden Answer is ON — mirrors the langevals
- * evaluator schema's default verbatim (including whitespace). Kept in sync
- * with DEFAULT_SELECT_BEST_PROMPT in select_best_compare.py so the auto-
- * swap equality check recognizes an untouched prompt.
+ * The four default judge prompts, one per (golden × input) presence combo.
+ * Each mirrors the langevals evaluator's shipped default VERBATIM (including
+ * whitespace) — kept in sync with select_best_compare.py so the auto-swap
+ * equality check below recognizes an untouched prompt. When the reference
+ * answer or the task context is absent, its framing is dropped entirely
+ * rather than left as an empty "Reference: " / "Task: " line, which confuses
+ * the judge more than removing it.
  */
-const GOLDEN_AWARE_JUDGE_PROMPT =
+const JUDGE_PROMPT_GOLDEN_INPUT =
   'Pick the best of N candidate replies to the task.\n\nTask:       {input}\nReference:  {golden}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n';
 
-/**
- * Default judge prompt when Has Golden Answer is OFF — no {golden} slot,
- * comparison is candidates on their own merits given the task. Kept in
- * sync with DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN on the Python side.
- */
-const GOLDEN_FREE_JUDGE_PROMPT =
+const JUDGE_PROMPT_GOLDEN_NO_INPUT =
+  'Pick the best of N candidate replies.\n\nReference:  {golden}\n\nCandidates:\n{candidates}\n\nCompare each candidate against the reference answer and decide which one\nis closest. Briefly explain WHY it\'s better than the others, then pick the\nwinning slot label. Use "tie" only when no candidate is clearly better.\n';
+
+const JUDGE_PROMPT_NO_GOLDEN_INPUT =
   'Pick the best of N candidate replies to the task — there is no reference\nanswer, so compare them on their own merits.\n\nTask:  {input}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n';
+
+const JUDGE_PROMPT_NO_GOLDEN_NO_INPUT =
+  'Pick the best of N candidate replies — there is no task description or\nreference answer, so compare them on their own merits.\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n';
+
+/** Every shipped default, so an untouched prompt can be detected regardless
+ * of which combo it was last defaulted to (hand-tuned prompts never match). */
+const ALL_DEFAULT_JUDGE_PROMPTS = [
+  JUDGE_PROMPT_GOLDEN_INPUT,
+  JUDGE_PROMPT_GOLDEN_NO_INPUT,
+  JUDGE_PROMPT_NO_GOLDEN_INPUT,
+  JUDGE_PROMPT_NO_GOLDEN_NO_INPUT,
+];
+
+/** The default prompt for a given presence combo — the judge prompt adapts
+ * to what the row actually gives it (a reference answer, task context, both,
+ * or neither). */
+export function pickDefaultJudgePrompt({
+  hasGolden,
+  hasInput,
+}: {
+  hasGolden: boolean;
+  hasInput: boolean;
+}): string {
+  if (hasGolden) {
+    return hasInput ? JUDGE_PROMPT_GOLDEN_INPUT : JUDGE_PROMPT_GOLDEN_NO_INPUT;
+  }
+  return hasInput ? JUDGE_PROMPT_NO_GOLDEN_INPUT : JUDGE_PROMPT_NO_GOLDEN_NO_INPUT;
+}
 
 /**
  * Configuration form for the langevals/select_best_compare evaluator — the one
@@ -70,13 +101,30 @@ export type ComparisonConfigFormProps = {
   targets: TargetConfig[];
   /** Active dataset columns the user can pick the golden field from. */
   datasetColumns: DatasetColumn[];
+  /** Active dataset's name, used only to qualify column labels. */
+  datasetName?: string;
 };
+
+/**
+ * Qualify a field with the source it comes from, e.g. "Test Data.expected_output"
+ * or "support-detailed.answer" — the same `Source.field` shape the prompt
+ * variable mapping chips use, so a name on its own is never ambiguous about
+ * which dataset or variant it belongs to.
+ *
+ * Display only: the stored value stays the bare field/path the backend reads.
+ * Falls back to the bare field when the source is unknown (still loading).
+ */
+export const qualifyFieldLabel = (
+  source: string | undefined,
+  field: string,
+): string => (source ? `${source}.${field}` : field);
 
 export function ComparisonConfigForm({
   value,
   onChange,
   targets,
   datasetColumns,
+  datasetName,
 }: ComparisonConfigFormProps) {
   // Local-draft + ref pattern so back-to-back picks against a stale `value`
   // prop don't stomp each other. Parent-pushed value changes still resync
@@ -102,17 +150,21 @@ export function ComparisonConfigForm({
     <VStack align="stretch" gap={3}>
       <VariantsMultiSelect draft={draft} update={update} targets={targets} />
 
-      <GoldenAnswerSection
-        draft={draft}
-        update={update}
-        datasetColumns={datasetColumns}
-      />
+      <SimpleGrid columns={{ base: 1, md: 2 }} gap={3}>
+        <GoldenAnswerSection
+          draft={draft}
+          update={update}
+          datasetColumns={datasetColumns}
+          datasetName={datasetName}
+        />
 
-      <InputContextSection
-        draft={draft}
-        update={update}
-        datasetColumns={datasetColumns}
-      />
+        <InputContextSection
+          draft={draft}
+          update={update}
+          datasetColumns={datasetColumns}
+          datasetName={datasetName}
+        />
+      </SimpleGrid>
 
       <RandomizeOrderSection draft={draft} update={update} />
 
@@ -139,6 +191,30 @@ function VariantsMultiSelect({
   const selected = draft.variants ?? [];
   const remaining = targets.filter((t) => !selected.includes(t.id));
   const outputPaths = draft.variantOutputPaths ?? {};
+
+  // Same-name variants (e.g. a duplicated prompt whose model was changed) must
+  // read as "Name (1)", "Name (2)" so the picker card, its verdict column, and
+  // the scoreboard all line up one-to-one. Disambiguate over the SELECTED set
+  // in variant order — the exact order ComparisonColumnHeader numbers by — so
+  // "(2)" here is the same column as "(2)" there. Batched via useTargetNames
+  // (shared query cache) since a hook can't be called once per card in a loop.
+  const selectedTargets = useMemo(
+    () => selected.map((id) => targets.find((t) => t.id === id)),
+    [selected, targets],
+  );
+  const variantNames = useTargetNames(selectedTargets);
+  // Resolved through to the prompt when the target's own copy lost its
+  // json_schema, so variants saved before that fix still offer their fields.
+  const variantOutputs = useTargetOutputs(selectedTargets);
+  const variantDisplayNames = useMemo(
+    () =>
+      disambiguateNames(
+        variantNames.map(
+          (name, i) => name || selected[i] || `Variant ${i + 1}`,
+        ),
+      ),
+    [variantNames, selected],
+  );
 
   const add = (id: string) => update({ variants: [...selected, id] });
 
@@ -185,13 +261,19 @@ function VariantsMultiSelect({
         data-testid="comparison-variants-grid"
         data-columns={columns}
       >
-        {selected.map((id) => {
+        {selected.map((id, index) => {
           const target = targets.find((t) => t.id === id);
           if (!target) return null;
           return (
             <VariantCard
               key={id}
               target={target}
+              name={variantDisplayNames[index] ?? ""}
+              // No `?? target.outputs` fallback: undefined means "not resolved
+              // yet", and the target's own copy is exactly the schema-less one
+              // whose field paths would be wrong. Better a picker that appears
+              // a beat late than one that persists a broken path.
+              outputs={variantOutputs[index]}
               path={outputPaths[id]}
               onPathChange={(path) => setOutputPath(id, path)}
               onRemove={() => remove(id)}
@@ -257,22 +339,34 @@ const WHOLE_OUTPUT = "__whole_output__";
  */
 function VariantCard({
   target,
+  name,
+  outputs,
   path,
   onPathChange,
   onRemove,
 }: {
   target: TargetConfig;
+  /** Already disambiguated by the parent so same-name variants read as
+   * "Name (1)" / "Name (2)"; the card must not re-resolve it per-target. */
+  name: string;
+  /** Effective output fields (resolved through to the prompt when the target's
+   * own copy is missing its schema) — resolved by the parent so the batched
+   * query runs at a stable hook position. */
+  outputs: TargetConfig["outputs"] | undefined;
   path: string[] | undefined;
   onPathChange: (path: string[]) => void;
   onRemove: () => void;
 }) {
-  const name = useTargetName(target) ?? target.id;
-  const outputOptions = getVariantOutputOptions(target);
+  const label = name || target.id;
+  const outputOptions = getVariantOutputOptions(outputs ?? []);
+  // Qualify each field with the variant it belongs to ("support-detailed.answer"),
+  // the same Source.field shape the dataset pickers and mapping chips use.
+  const qualify = (optionLabel: string) => qualifyFieldLabel(label, optionLabel);
   const selectedLabel =
     outputOptions.find((option) => pathsEqual(option.path, path ?? []))
       ?.label ??
     path?.join(".") ??
-    "Whole output";
+    null;
 
   return (
     <VStack
@@ -286,8 +380,8 @@ function VariantCard({
       data-testid={`comparison-variant-card-${target.id}`}
     >
       <HStack justify="space-between" gap={1}>
-        <Text fontSize="13px" fontWeight="medium" lineClamp={1} title={name}>
-          {name}
+        <Text fontSize="13px" fontWeight="medium" lineClamp={1} title={label}>
+          {label}
         </Text>
         <Button
           variant="ghost"
@@ -296,7 +390,7 @@ function VariantCard({
           padding={0}
           height="18px"
           onClick={onRemove}
-          aria-label={`Remove ${name}`}
+          aria-label={`Remove ${label}`}
           data-testid={`comparison-variant-chip-${target.id}-remove`}
         >
           <X size={12} />
@@ -320,8 +414,9 @@ function VariantCard({
                 fontFamily="mono"
                 color={path?.length ? "fg" : "fg.subtle"}
                 truncate
+                title={selectedLabel ? qualify(selectedLabel) : "Whole output"}
               >
-                {selectedLabel}
+                {selectedLabel ? qualify(selectedLabel) : "Whole output"}
               </Text>
               <ChevronDown size={12} color="var(--chakra-colors-fg-muted)" />
             </Button>
@@ -337,14 +432,18 @@ function VariantCard({
               </Text>
             </Menu.Item>
             {outputOptions.map((option) => (
+              // Keyed on the PATH, not the label: the path is this option's
+              // stable identity, while the label is display copy that has
+              // already been reworded once — and a test id that moves when copy
+              // changes is a test id that breaks for no reason.
               <Menu.Item
-                key={option.label}
-                value={option.label}
+                key={option.path.join(".")}
+                value={option.path.join(".")}
                 onClick={() => onPathChange(option.path)}
-                data-testid={`comparison-variant-output-${target.id}-option-${option.label}`}
+                data-testid={`comparison-variant-output-${target.id}-option-${option.path.join(".")}`}
               >
-                <Text fontSize="12px" fontFamily="mono">
-                  {option.label}
+                <Text fontSize="12px" fontFamily="mono" title={qualify(option.label)}>
+                  {qualify(option.label)}
                 </Text>
               </Menu.Item>
             ))}
@@ -374,8 +473,10 @@ function getObjectSchemaProperties(schema: unknown): string[] {
   return Object.keys(properties);
 }
 
-function getVariantOutputOptions(target: TargetConfig): VariantOutputOption[] {
-  const fields = target.outputs ?? [];
+function getVariantOutputOptions(
+  outputs: TargetConfig["outputs"],
+): VariantOutputOption[] {
+  const fields = outputs ?? [];
   const singleOutput = fields.length === 1;
 
   return fields.flatMap((field) => {
@@ -388,11 +489,19 @@ function getVariantOutputOptions(target: TargetConfig): VariantOutputOption[] {
       return [{ label: field.identifier, path: [field.identifier] }];
     }
 
+    // Label and path deliberately diverge for a single "output" field.
+    //
+    // Label names the whole path from the output field down, so a structured
+    // variant reads "support-detailed.output.answer" — the same Source.field
+    // shape as the dataset pickers and the prompt mapping chips, and it says
+    // plainly WHICH output the field came from.
+    //
+    // The stored path must stay UNWRAPPED though: the backend's
+    // extractTargetOutput unwraps a single "output" field before pickOutputPath
+    // walks the object, so persisting ["output", "answer"] would leave the
+    // judge comparing an empty candidate. Never "simplify" these two to match.
     const nested = properties.map((property) => ({
-      label:
-        singleOutput && field.identifier === "output"
-          ? property
-          : `${field.identifier}.${property}`,
+      label: `${field.identifier}.${property}`,
       path:
         singleOutput && field.identifier === "output"
           ? [property]
@@ -430,9 +539,10 @@ function VariantMenuItem({
 }
 
 /**
- * "Has golden answer" toggle plus the Golden field picker it gates.
- * Golden-answer is opt-in (#5378): source of truth is the parent form's
- * `settings.has_golden_answer` (the field the judge reads);
+ * Golden field picker. Golden-answer is opt-in (#5378) and is now driven
+ * entirely by this picker: choosing a dataset column turns golden ON,
+ * choosing "None — judge on merits" turns it OFF. Source of truth is the
+ * parent form's `settings.has_golden_answer` (the field the judge reads);
  * `comparison.hasGoldenAnswer` is mirrored on every write so the
  * orchestrator's cell-generation guard and the missing-mappings validator
  * — which only see `evaluator.comparison`, not the evaluator's Python
@@ -443,10 +553,12 @@ function GoldenAnswerSection({
   draft,
   update,
   datasetColumns,
+  datasetName,
 }: {
   draft: ComparisonEvaluatorConfig;
   update: (patch: Partial<ComparisonEvaluatorConfig>) => void;
   datasetColumns: DatasetColumn[];
+  datasetName?: string;
 }) {
   const formContext = useFormContext<{
     settings?: { has_golden_answer?: boolean; prompt?: string };
@@ -462,47 +574,37 @@ function GoldenAnswerSection({
   const hasGoldenAnswer =
     (watchedHasGoldenAnswer ?? draft.hasGoldenAnswer) !== false;
 
-  // Keep the judge prompt in sync with has_golden_answer reactively — on
-  // every change of either field, not just the toggle click — so the
-  // correct prompt is enforced regardless of HOW state changed (click,
-  // form init, external setValue, load from persistence). Only swap when
-  // the current prompt exactly matches a shipped default so hand-tuned
-  // prompts survive toggling.
-  const isDefaultPrompt = useCallback(
-    ({
-      value,
-      target,
-    }: {
-      value: string | undefined;
-      target: string;
-    }): boolean => typeof value === "string" && value.trim() === target.trim(),
+  // Keep the judge prompt in sync with the golden setting reactively — on
+  // every change of either field, not just a click — so the correct default
+  // is enforced regardless of HOW state changed (form init, external
+  // setValue, load from persistence). Only swap when the current prompt is
+  // still an untouched shipped default (matches ANY of the four defaults,
+  // trimmed) so hand-tuned prompts survive. hasInput is always true at config
+  // time; the input axis is resolved per row at runtime in Python.
+  const isUntouchedDefault = useCallback(
+    (value: string | undefined): boolean =>
+      typeof value === "string" &&
+      ALL_DEFAULT_JUDGE_PROMPTS.some(
+        (candidate) => value.trim() === candidate.trim(),
+      ),
     [],
   );
   useEffect(() => {
     if (!formContext) return;
     if (typeof watchedHasGoldenAnswer !== "boolean") return;
     if (typeof watchedPrompt !== "string") return;
-    const shouldBeGoldenAware = watchedHasGoldenAnswer !== false;
-    const nextPrompt = shouldBeGoldenAware
-      ? isDefaultPrompt({
-          value: watchedPrompt,
-          target: GOLDEN_FREE_JUDGE_PROMPT,
-        })
-        ? GOLDEN_AWARE_JUDGE_PROMPT
-        : null
-      : isDefaultPrompt({
-            value: watchedPrompt,
-            target: GOLDEN_AWARE_JUDGE_PROMPT,
-          })
-        ? GOLDEN_FREE_JUDGE_PROMPT
-        : null;
-    if (nextPrompt && nextPrompt !== watchedPrompt) {
+    if (!isUntouchedDefault(watchedPrompt)) return;
+    const nextPrompt = pickDefaultJudgePrompt({
+      hasGolden: watchedHasGoldenAnswer !== false,
+      hasInput: true,
+    });
+    if (nextPrompt !== watchedPrompt) {
       formContext.setValue("settings.prompt", nextPrompt, {
         shouldDirty: true,
         shouldTouch: true,
       });
     }
-  }, [formContext, watchedHasGoldenAnswer, watchedPrompt, isDefaultPrompt]);
+  }, [formContext, watchedHasGoldenAnswer, watchedPrompt, isUntouchedDefault]);
 
   const setHasGoldenAnswer = (on: boolean) => {
     formContext?.setValue("settings.has_golden_answer", on, {
@@ -540,89 +642,77 @@ function GoldenAnswerSection({
     // once draft.hasGoldenAnswer matches the form).
   }, [watchedHasGoldenAnswer, draft.hasGoldenAnswer]);
 
+  // Trigger label: the chosen column, else "None — judge on merits" once
+  // golden has been explicitly turned off, else the unselected placeholder.
+  const goldenTriggerLabel = draft.goldenField
+    ? qualifyFieldLabel(datasetName, draft.goldenField)
+    : hasGoldenAnswer === false
+      ? "None — judge on merits"
+      : "Select a dataset column…";
+
   return (
     <Box>
-      <HStack justify="space-between" align="start">
-        <HStack gap={0} align="center">
-          <Text fontSize="13px" fontWeight="medium">
-            Has golden answer
-          </Text>
+      <Field.Root required flex="1">
+        <Field.Label fontSize="13px" color="fg.muted" marginBottom={1}>
+          Golden field
           <FieldInfoTooltip
-            testId="comparison-has-golden-answer-info"
+            testId="comparison-golden-field-info"
             trigger="hover"
-            description="Compare each candidate against a reference answer. Turn off to let the judge compare the candidates directly on their own merits, with no reference answer involved."
+            description="The dataset column holding the reference answer the judge compares each candidate against — usually expected_output. Pick None to judge on merits alone."
           />
-        </HStack>
-        <Switch
-          checked={hasGoldenAnswer}
-          onCheckedChange={({ checked }) => setHasGoldenAnswer(checked)}
-          inputProps={{ "aria-label": "Has golden answer" }}
-          data-testid="comparison-has-golden-answer"
-        />
-      </HStack>
-
-      {hasGoldenAnswer && (
-        <Box paddingTop={3}>
-          <Field.Root required flex="1">
-            <Field.Label fontSize="13px" color="fg.muted" marginBottom={1}>
-              Golden field
-            </Field.Label>
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <Button
-                  variant="outline"
-                  colorPalette="gray"
-                  size="sm"
-                  fontWeight="normal"
-                  justifyContent="space-between"
-                  width="full"
-                  data-testid="comparison-golden-field"
-                >
-                  <Text
-                    fontSize="13px"
-                    color={draft.goldenField ? "fg" : "fg.subtle"}
-                    truncate
-                  >
-                    {draft.goldenField || "Select a dataset column…"}
-                  </Text>
-                  <ChevronDown
-                    size={14}
-                    color="var(--chakra-colors-fg-muted)"
-                  />
-                </Button>
-              </Menu.Trigger>
-              <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
-                {datasetColumns.length === 0 ? (
-                  <Menu.Item value="__empty__" disabled>
-                    <Text fontSize="13px" color="fg.subtle">
-                      No options available
-                    </Text>
-                  </Menu.Item>
-                ) : (
-                  datasetColumns.map((c) => (
-                    <Menu.Item
-                      key={c.id}
-                      value={c.name}
-                      onClick={() => update({ goldenField: c.name })}
-                      data-testid={`comparison-golden-field-option-${c.name}`}
-                    >
-                      <Text fontSize="13px">{c.name}</Text>
-                    </Menu.Item>
-                  ))
-                )}
-              </Menu.Content>
-            </Menu.Root>
-            <Text fontSize="xs" color="fg.muted" marginTop={2}>
-              The dataset column that holds the ground-truth answer — usually{" "}
-              <Text as="span" fontFamily="mono">
-                expected_output
+        </Field.Label>
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button
+              variant="outline"
+              colorPalette="gray"
+              size="sm"
+              fontWeight="normal"
+              justifyContent="space-between"
+              width="full"
+              data-testid="comparison-golden-field"
+            >
+              <Text
+                fontSize="13px"
+                color={draft.goldenField ? "fg" : "fg.subtle"}
+                truncate
+              >
+                {goldenTriggerLabel}
               </Text>
-              . The judge compares each candidate against it and picks the
-              closest.
-            </Text>
-          </Field.Root>
-        </Box>
-      )}
+              <ChevronDown size={14} color="var(--chakra-colors-fg-muted)" />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
+            <Menu.Item
+              value="__none__"
+              onClick={() => {
+                setHasGoldenAnswer(false);
+                update({ goldenField: "" });
+              }}
+              data-testid="comparison-golden-field-option-none"
+            >
+              <Text fontSize="13px" color="fg.subtle">
+                None — judge on merits
+              </Text>
+            </Menu.Item>
+            {datasetColumns.map((c) => (
+              <Menu.Item
+                key={c.id}
+                value={c.name}
+                onClick={() => {
+                  setHasGoldenAnswer(true);
+                  update({ goldenField: c.name });
+                }}
+                data-testid={`comparison-golden-field-option-${c.name}`}
+              >
+                <Text fontSize="13px" fontFamily="mono">
+                  {qualifyFieldLabel(datasetName, c.name)}
+                </Text>
+              </Menu.Item>
+            ))}
+          </Menu.Content>
+        </Menu.Root>
+      </Field.Root>
     </Box>
   );
 }
@@ -631,16 +721,23 @@ function InputContextSection({
   draft,
   update,
   datasetColumns,
+  datasetName,
 }: {
   draft: ComparisonEvaluatorConfig;
   update: (patch: Partial<ComparisonEvaluatorConfig>) => void;
   datasetColumns: DatasetColumn[];
+  datasetName?: string;
 }) {
   return (
     <Box>
       <Field.Root flex="1">
         <Field.Label fontSize="13px" color="fg.muted" marginBottom={1}>
           Input field
+          <FieldInfoTooltip
+            testId="comparison-input-field-info"
+            trigger="hover"
+            description="The dataset column that gives the judge task context. Leave on auto to use an input column when one exists."
+          />
         </Field.Label>
         <Menu.Root>
           <Menu.Trigger asChild>
@@ -658,7 +755,9 @@ function InputContextSection({
                 color={draft.inputField ? "fg" : "fg.subtle"}
                 truncate
               >
-                {draft.inputField || "Auto-detect input context"}
+                {draft.inputField
+                  ? qualifyFieldLabel(datasetName, draft.inputField)
+                  : "Auto-detect input context"}
               </Text>
               <ChevronDown size={14} color="var(--chakra-colors-fg-muted)" />
             </Button>
@@ -680,19 +779,13 @@ function InputContextSection({
                 onClick={() => update({ inputField: c.name })}
                 data-testid={`comparison-input-field-option-${c.name}`}
               >
-                <Text fontSize="13px">{c.name}</Text>
+                <Text fontSize="13px" fontFamily="mono">
+                  {qualifyFieldLabel(datasetName, c.name)}
+                </Text>
               </Menu.Item>
             ))}
           </Menu.Content>
         </Menu.Root>
-        <Text fontSize="xs" color="fg.muted" marginTop={2}>
-          The dataset column that gives the judge task context. When left on
-          auto, Comparison uses an{" "}
-          <Text as="span" fontFamily="mono">
-            input
-          </Text>{" "}
-          column when one exists.
-        </Text>
       </Field.Root>
     </Box>
   );

@@ -32,6 +32,7 @@ import {
 } from "recharts";
 
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
+import { axisLabelProps, truncateLabel } from "./chartAxisLabels";
 
 import type { BatchComparisonColumn } from "./types";
 
@@ -64,10 +65,10 @@ export type WinRateChartProps = {
   targetColors?: Record<string, string>;
 };
 
-// Truncate the variant name so the axis label doesn't wrap or overflow the
-// narrow 280px column. Recharts doesn't tick-wrap by default; the sibling
-// charts trim at ~10 chars, so we match that.
-const trimAxisLabel = (s: string) => (s.length > 10 ? `${s.slice(0, 9)}…` : s);
+// Label trimming/rotation is shared with the Cost and Latency charts
+// (chartAxisLabels.ts) so the same variant reads identically on every chart of
+// the results page. This chart used to hand-roll its own 10-char trim and never
+// rotate, which is why its axis was the least readable of the three.
 
 export function WinRateChart({
   column,
@@ -100,23 +101,34 @@ export function WinRateChart({
   // colliding once truncated to the same prefix (truncation is deterministic),
   // so collision detection is unaffected — but disambiguating first and
   // trimming second would truncate the " (1)"/" (2)" suffix right back off
-  // for any name within a few characters of the 10-char budget (e.g.
-  // "gpt-5-mini (1)" and "gpt-5-mini (2)" both collapse to the identical
-  // "gpt-5-min…", silently reintroducing the exact bug this fixes).
+  // for any name within a few characters of the budget (e.g. "gpt-5-mini (1)"
+  // and "gpt-5-mini (2)" both collapse to the identical "gpt-5-min…",
+  // silently reintroducing the exact bug this fixes).
+  //
+  // The bar count includes the Tie bar, so the rotation threshold is judged on
+  // what's actually rendered.
+  const axis = axisLabelProps(column.variants.length + 1);
+  const trimAxisLabel = (s: string) => truncateLabel(s, axis.maxLabelLength);
   const variantNames = disambiguateNames(
     column.variants.map((v) => trimAxisLabel(v.name)),
   );
+  // Untruncated counterpart of the axis labels, for the hover tooltip — the
+  // axis stays elided so it can't eat the chart, and the full name is one
+  // hover away. Disambiguated the same way so "(1)"/"(2)" still identify the
+  // same bar in both places.
+  const variantFullNames = disambiguateNames(column.variants.map((v) => v.name));
 
   const chartData = [
     ...column.variants.map((variant, index) => ({
       key: variant.id ?? `variant-${index}`,
       name: variantNames[index] ?? trimAxisLabel(variant.name),
+      fullName: variantFullNames[index] ?? variant.name,
       wins: variant.id ? (winsByVariantId.get(variant.id) ?? 0) : 0,
       color:
         (variant.id ? targetColors?.[variant.id] : undefined) ??
         VARIANT_COLORS[index % VARIANT_COLORS.length]!,
     })),
-    { key: "tie", name: "Tie", wins: ties, color: TIE_COLOR },
+    { key: "tie", name: "Tie", fullName: "Tie", wins: ties, color: TIE_COLOR },
   ];
 
   const yMax = Math.max(1, ...chartData.map((d) => d.wins));
@@ -151,9 +163,18 @@ export function WinRateChart({
             stroke="var(--chakra-colors-border)"
             strokeDasharray="0"
           />
+          {/* Same axis treatment as the Cost / Latency charts on this page —
+              slanted once there are enough bars, with the height reserved for
+              the diagonal. `interval={0}` keeps every bar labelled (a dropped
+              tick here would leave a bar with no variant name at all). */}
           <XAxis
             dataKey="name"
             interval={0}
+            axisLine={false}
+            tickLine={false}
+            angle={axis.angle}
+            textAnchor={axis.textAnchor}
+            height={axis.height}
             style={{ fontSize: "11px" }}
             tick={{ fill: "var(--chakra-colors-fg-muted)" }}
           />
@@ -173,6 +194,13 @@ export function WinRateChart({
               fontSize: 12,
             }}
             formatter={(value) => [`${value}`, "Wins"]}
+            // The axis label is elided; the tooltip is where the full variant
+            // name lives, so hovering a bar always tells you exactly which
+            // variant it is.
+            labelFormatter={(label, payload) =>
+              (payload?.[0]?.payload as { fullName?: string } | undefined)
+                ?.fullName ?? label
+            }
           />
           <Bar dataKey="wins" name="Wins" radius={[4, 4, 0, 0]}>
             <LabelList

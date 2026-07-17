@@ -15,7 +15,10 @@ import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { scrollToTargetColumn } from "../hooks/useOpenTargetEditor";
 import { useTargetName } from "../hooks/useTargetName";
 import type { TargetConfig } from "../types";
-import { explainEvaluatorDomainError } from "../utils/explainEvaluatorDomainError";
+import {
+  explainEvaluatorDomainError,
+  MISSING_MODEL_API_KEY_EXPLANATION,
+} from "../utils/explainEvaluatorDomainError";
 import {
   labelNamesVariant,
   resolveVerdictLabel,
@@ -74,11 +77,7 @@ function friendlyError(details: string | undefined): {
     lower.includes("api key") ||
     lower.includes("api_key")
   ) {
-    return {
-      headline: "Missing or invalid model API key",
-      hint: "Add the provider key in Settings → AI Gateway, then re-run.",
-      raw,
-    };
+    return { ...MISSING_MODEL_API_KEY_EXPLANATION, raw };
   }
   if (
     lower.includes("rate limit") ||
@@ -309,7 +308,11 @@ export function ComparisonCell({
                 <Popover.Positioner>
                   <Popover.Content maxWidth="460px">
                     <Popover.Arrow />
-                    <Popover.Body fontSize="12px" whiteSpace="pre-wrap">
+                    <Popover.Body
+                      fontSize="12px"
+                      whiteSpace="pre-wrap"
+                      data-testid="comparison-error-details"
+                    >
                       {raw}
                     </Popover.Body>
                   </Popover.Content>

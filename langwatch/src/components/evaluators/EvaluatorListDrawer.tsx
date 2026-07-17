@@ -199,11 +199,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
                   <Spinner size="md" />
                 </HStack>
               ) : evaluators?.length === 0 ? (
-                <EmptyState
-                  onCreateNew={onCreateNew}
-                  itemLabel={itemLabel}
-                  createLabel={createLabel}
-                />
+                <EmptyState onCreateNew={onCreateNew} itemLabel={itemLabel} />
               ) : (
                 evaluators?.map((evaluator) => (
                   <EvaluatorCard
@@ -261,17 +257,19 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
 // Empty State Component
 // ============================================================================
 
+/**
+ * The button here deliberately ignores the header's `createLabel` and derives
+ * its own wording from `itemLabel`, so it always agrees with the heading right
+ * above it ("Create your first X to get started"). The header button is the
+ * caller's to word; this one belongs to the empty state.
+ */
 function EmptyState({
   onCreateNew,
   itemLabel,
-  createLabel,
 }: {
   onCreateNew: () => void;
   itemLabel: string;
-  createLabel: string;
 }) {
-  const capitalizedItemLabel =
-    itemLabel.slice(0, 1).toUpperCase() + itemLabel.slice(1);
   return (
     <VStack paddingY={24} gap={4} textAlign="center">
       <Box padding={4} borderRadius="full" bg="green.subtle" color="green.fg">
@@ -291,9 +289,7 @@ function EmptyState({
         data-testid="create-first-evaluator-button"
       >
         <Plus size={16} />
-        {createLabel === `New ${capitalizedItemLabel}`
-          ? `Create your first ${itemLabel}`
-          : createLabel}
+        {`Create your first ${itemLabel}`}
       </Button>
     </VStack>
   );

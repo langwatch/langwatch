@@ -604,7 +604,7 @@ const DynamicZodForm = ({
           <React.Fragment key="llm-config">
             <HorizontalFormControl
               label="Model"
-              helper="The model to use for evaluation"
+              tooltip="The model to use for evaluation"
             >
               <EvaluatorLLMConfigField prefix={prefix} />
             </HorizontalFormControl>
@@ -665,8 +665,8 @@ const DynamicZodForm = ({
                 label={
                   camelCaseToTitleCase(key) + (isOptional ? " (Optional)" : "")
                 }
-                helper={helperOverride?.helper ?? helperText}
-                tooltip={helperOverride?.tooltip}
+                helper={helperOverride?.helper}
+                tooltip={helperOverride?.tooltip ?? helperText}
                 invalid={isInvalid}
               >
                 {renderField(

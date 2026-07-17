@@ -17,12 +17,35 @@ import pytest
 from langevals_langevals.select_best_compare import (
     CandidateInput,
     DEFAULT_SELECT_BEST_PROMPT,
+    DEFAULT_SELECT_BEST_PROMPT_GOLDEN_NO_INPUT,
     DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN,
+    DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN_NO_INPUT,
     SelectBestCompareEntry,
     SelectBestCompareEvaluator,
     SelectBestCompareSettings,
     _slot_label,
 )
+
+
+def _capture_rendered_prompt(evaluator, entry) -> str:
+    """Run one evaluation with the LLM mocked and return the user-message
+    (rendered judge prompt) the evaluator sent to `completion`."""
+    captured: list[str] = []
+
+    def capture(**kwargs):
+        captured.append(kwargs["messages"][1]["content"])
+        return _mock_completion_response("ok", "A")
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=capture,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    return captured[0]
 
 
 def _mock_completion_response(reasoning: str, winner: str):
@@ -440,6 +463,119 @@ def test_default_prompt_carries_golden_slot_and_no_golden_variant_drops_it():
     assert "{candidates}" in DEFAULT_SELECT_BEST_PROMPT
     assert "{golden}" not in DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN
     assert "{candidates}" in DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN
+
+
+# The four shipped defaults form a (golden × input) grid. When the user hasn't
+# customized the prompt, the runtime picks the one matching what THIS row
+# actually provides: the golden axis is the has_golden_answer setting, the
+# input axis is whether the row has a non-empty input. A missing axis drops its
+# framing (no empty "Task: " / "Reference: " line).
+def test_runtime_selects_golden_input_default_when_row_has_both():
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(has_golden_answer=True)
+    )
+    entry = _make_entry(num_candidates=3, input="what is 2+2?", golden="4")
+
+    rendered = _capture_rendered_prompt(evaluator, entry)
+
+    assert "Task:" in rendered
+    assert "Reference:" in rendered
+
+
+def test_runtime_selects_golden_no_input_default_when_row_lacks_input():
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(has_golden_answer=True)
+    )
+    entry = _make_entry(num_candidates=3, input=None, golden="4")
+
+    rendered = _capture_rendered_prompt(evaluator, entry)
+
+    # Reference framing stays; the Task line is dropped entirely.
+    assert "Reference:" in rendered
+    assert "Task:" not in rendered
+    assert "Compare each candidate against the reference answer" in rendered
+
+
+# Opting into golden answers says "compare against a reference", not "every row
+# has one". A dataset with a blank expected_output on some rows would otherwise
+# render "Reference:" with nothing after it — the exact empty-slot framing the
+# per-row prompt selection exists to prevent.
+def test_runtime_drops_golden_framing_when_row_has_no_golden_despite_setting_on():
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(has_golden_answer=True)
+    )
+    entry = _make_entry(num_candidates=3, input="what is 2+2?", golden="")
+
+    rendered = _capture_rendered_prompt(evaluator, entry)
+
+    assert "Reference:" not in rendered
+    assert "Task:" in rendered
+    assert "there is no reference" in rendered.lower()
+
+
+def test_runtime_drops_golden_framing_when_row_golden_is_whitespace():
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(has_golden_answer=True)
+    )
+    entry = _make_entry(num_candidates=3, input="what is 2+2?", golden="   ")
+
+    rendered = _capture_rendered_prompt(evaluator, entry)
+
+    assert "Reference:" not in rendered
+
+
+def test_runtime_selects_no_golden_input_default_when_golden_off_with_input():
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(has_golden_answer=False)
+    )
+    entry = _make_entry(num_candidates=3, input="what is 2+2?", golden=None)
+
+    rendered = _capture_rendered_prompt(evaluator, entry)
+
+    # Task framing stays; the reference framing is dropped and the judge is
+    # told to compare on merits.
+    assert "Task:" in rendered
+    assert "Reference:" not in rendered
+    assert "there is no reference" in rendered.lower()
+
+
+def test_runtime_selects_no_golden_no_input_default_when_row_has_neither():
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(has_golden_answer=False)
+    )
+    entry = _make_entry(num_candidates=3, input=None, golden=None)
+
+    rendered = _capture_rendered_prompt(evaluator, entry)
+
+    # Neither Task nor Reference framing; judge compares on merits.
+    assert "Task:" not in rendered
+    assert "Reference:" not in rendered
+    assert "no task description" in rendered.lower()
+
+
+@pytest.mark.parametrize("has_golden", [True, False])
+@pytest.mark.parametrize(
+    "entry_kwargs",
+    [dict(input="q", golden="g"), dict(input=None, golden=None)],
+)
+def test_customized_prompt_is_never_swapped_by_runtime_selection(
+    has_golden, entry_kwargs
+):
+    """A hand-tuned prompt matches none of the four shipped defaults, so the
+    runtime leaves it untouched across every (golden × input) combination."""
+    custom_prompt = (
+        "SENTINEL judge prompt\nTask: {input}\nRef: {golden}\n{candidates}"
+    )
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(
+            has_golden_answer=has_golden, prompt=custom_prompt
+        )
+    )
+    entry = _make_entry(num_candidates=3, **entry_kwargs)
+
+    rendered = _capture_rendered_prompt(evaluator, entry)
+
+    assert "SENTINEL judge prompt" in rendered
 
 
 def test_custom_prompt_with_unknown_braces_does_not_crash():

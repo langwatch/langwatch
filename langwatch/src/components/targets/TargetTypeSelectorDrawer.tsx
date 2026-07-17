@@ -37,6 +37,7 @@ export type TargetTypeSelectorDrawerProps = {
     initialComparison?: ComparisonEvaluatorConfig;
     targets: TargetConfig[];
     datasetColumns: { id: string; name: string }[];
+    datasetName?: string;
   };
 };
 
