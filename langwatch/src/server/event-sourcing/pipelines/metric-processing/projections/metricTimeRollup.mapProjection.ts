@@ -3,11 +3,12 @@ import {
   type MapEventHandlers,
 } from "../../../projections/abstractMapProjection";
 import type { AppendStore } from "../../../projections/mapProjection.types";
-import type { CanonicalMetricDataPoint } from "../schemas/metricDataPoint";
+import { METRIC_MAP_COALESCE_MAX_BATCH } from "../schemas/constants";
 import {
-  metricDataPointReceivedEventSchema,
   type MetricDataPointReceivedEvent,
+  metricDataPointReceivedEventSchema,
 } from "../schemas/events";
+import type { CanonicalMetricDataPoint } from "../schemas/metricDataPoint";
 
 const events = [metricDataPointReceivedEventSchema] as const;
 
@@ -19,8 +20,8 @@ export class MetricTimeRollupMapProjection
   readonly store: AppendStore<CanonicalMetricDataPoint>;
   protected readonly events = events;
   override options = {
-    groupKeyFn: (event: MetricDataPointReceivedEvent) =>
-      `rollup:${event.data.seriesId}`,
+    groupKeyFn: () => "tenant-batch",
+    coalesceMaxBatch: METRIC_MAP_COALESCE_MAX_BATCH,
   };
 
   constructor(deps: { store: AppendStore<CanonicalMetricDataPoint> }) {

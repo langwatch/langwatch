@@ -4,27 +4,31 @@ import type { RecordMetricCorrelationCommandData } from "~/server/event-sourcing
 import { MetricRequestCollectionService } from "../metric-request-collection.service";
 
 function makeService(
-  recordDataPointImpl: (data: CanonicalMetricDataPoint) => Promise<void> = async () => {},
+  recordDataPointsImpl: (
+    data: CanonicalMetricDataPoint[],
+  ) => Promise<void> = async () => {},
 ) {
-  const recordDataPoint = vi.fn<
-    (data: CanonicalMetricDataPoint) => Promise<void>
-  >(recordDataPointImpl);
-  const recordMetricCorrelation = vi.fn<
-    (data: RecordMetricCorrelationCommandData) => Promise<void>
+  const recordDataPoints =
+    vi.fn<(data: CanonicalMetricDataPoint[]) => Promise<void>>(
+      recordDataPointsImpl,
+    );
+  const recordMetricCorrelations = vi.fn<
+    (data: RecordMetricCorrelationCommandData[]) => Promise<void>
   >(async () => {});
   const piiRedactionService = {
     redactMetricAttributes: async () => {},
   };
   const service = new MetricRequestCollectionService({
-    recordDataPoint,
-    recordMetricCorrelation,
+    recordDataPoints,
+    recordMetricCorrelations,
     piiRedactionService,
   });
-  return { service, recordDataPoint, recordMetricCorrelation };
+  return { service, recordDataPoints, recordMetricCorrelations };
 }
 
 function gaugeRequest(args: {
   value?: number;
+  values?: number[];
   resourceAttributes?: Array<Record<string, unknown>>;
   pointAttributes?: Array<Record<string, unknown>>;
 }) {
@@ -40,13 +44,15 @@ function gaugeRequest(args: {
                 name: "requests.active",
                 unit: "{request}",
                 gauge: {
-                  dataPoints: [
-                    {
-                      timeUnixNano: "1700000000000000000",
-                      asInt: args.value ?? 1,
+                  dataPoints: (args.values ?? [args.value ?? 1]).map(
+                    (value, index) => ({
+                      timeUnixNano: String(
+                        1_700_000_000_000_000_000n + BigInt(index),
+                      ),
+                      asInt: value,
                       attributes: args.pointAttributes ?? [],
-                    },
-                  ],
+                    }),
+                  ),
                 },
               },
             ],
@@ -65,7 +71,8 @@ const requestContext = {
 
 describe("MetricRequestCollectionService", () => {
   it("keeps a standalone gauge as one canonical integer data point", async () => {
-    const { service, recordDataPoint, recordMetricCorrelation } = makeService();
+    const { service, recordDataPoints, recordMetricCorrelations } =
+      makeService();
 
     const result = await service.handleOtlpMetricRequest({
       ...requestContext,
@@ -73,8 +80,8 @@ describe("MetricRequestCollectionService", () => {
     });
 
     expect(result).toEqual({ acceptedDataPoints: 1, rejectedDataPoints: 0 });
-    expect(recordDataPoint).toHaveBeenCalledTimes(1);
-    expect(recordDataPoint.mock.calls[0]![0]).toMatchObject({
+    expect(recordDataPoints).toHaveBeenCalledTimes(1);
+    expect(recordDataPoints.mock.calls[0]![0][0]).toMatchObject({
       tenantId: requestContext.tenantId,
       organizationId: requestContext.organizationId,
       metricName: "requests.active",
@@ -83,11 +90,24 @@ describe("MetricRequestCollectionService", () => {
       valueInt: "42",
       timeUnixNano: "1700000000000000000",
     });
-    expect(recordMetricCorrelation).not.toHaveBeenCalled();
+    expect(recordMetricCorrelations).not.toHaveBeenCalled();
+  });
+
+  it("enqueues all accepted points in one batch", async () => {
+    const { service, recordDataPoints } = makeService();
+
+    const result = await service.handleOtlpMetricRequest({
+      ...requestContext,
+      metricRequest: gaugeRequest({ values: [1, 2, 3] }),
+    });
+
+    expect(result).toEqual({ acceptedDataPoints: 3, rejectedDataPoints: 0 });
+    expect(recordDataPoints).toHaveBeenCalledTimes(1);
+    expect(recordDataPoints.mock.calls[0]![0]).toHaveLength(3);
   });
 
   it("makes identity independent of attribute order and acceptance time", async () => {
-    const { service, recordDataPoint } = makeService();
+    const { service, recordDataPoints } = makeService();
     const a = { key: "a", value: { stringValue: "one" } };
     const b = { key: "b", value: { intValue: "2" } };
 
@@ -104,9 +124,9 @@ describe("MetricRequestCollectionService", () => {
       metricRequest: gaugeRequest({ value: 2, pointAttributes: [a, b] }),
     });
 
-    const first = recordDataPoint.mock.calls[0]![0];
-    const retry = recordDataPoint.mock.calls[1]![0];
-    const changedValue = recordDataPoint.mock.calls[2]![0];
+    const first = recordDataPoints.mock.calls[0]![0][0]!;
+    const retry = recordDataPoints.mock.calls[1]![0][0]!;
+    const changedValue = recordDataPoints.mock.calls[2]![0][0]!;
     expect(retry.seriesId).toBe(first.seriesId);
     expect(retry.pointId).toBe(first.pointId);
     expect(changedValue.seriesId).toBe(first.seriesId);
@@ -114,7 +134,8 @@ describe("MetricRequestCollectionService", () => {
   });
 
   it("rejects an oversized sibling while accepting and correlating a valid point", async () => {
-    const { service, recordDataPoint, recordMetricCorrelation } = makeService();
+    const { service, recordDataPoints, recordMetricCorrelations } =
+      makeService();
     const traceId = "0123456789abcdef0123456789abcdef";
     const spanId = "0123456789abcdef";
 
@@ -187,9 +208,9 @@ describe("MetricRequestCollectionService", () => {
     expect(result.acceptedDataPoints).toBe(1);
     expect(result.rejectedDataPoints).toBe(1);
     expect(result.errorMessage).toContain("maximum 262144");
-    expect(recordDataPoint).toHaveBeenCalledTimes(1);
-    expect(recordMetricCorrelation).toHaveBeenCalledTimes(1);
-    expect(recordMetricCorrelation.mock.calls[0]![0]).toMatchObject({
+    expect(recordDataPoints).toHaveBeenCalledTimes(1);
+    expect(recordMetricCorrelations).toHaveBeenCalledTimes(1);
+    expect(recordMetricCorrelations.mock.calls[0]![0][0]).toMatchObject({
       traceId,
       spanId,
       exemplarValue: 2.5,
@@ -212,7 +233,7 @@ describe("MetricRequestCollectionService", () => {
       expect(result.acceptedDataPoints).toBe(0);
       expect(result.rejectedDataPoints).toBe(1);
       expect(result.errorMessage).toBe(
-        "requests.active: failed to record data point",
+        "canonical metric batch: failed to record data point",
       );
       expect(result.errorMessage).not.toContain("clickhouse-shard-3");
       expect(result.errorMessage).not.toContain("INSERT INTO");
