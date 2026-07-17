@@ -57,6 +57,7 @@ import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-project
 import type { TraceListRepository } from "~/server/app-layer/traces/repositories/trace-list.repository";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
+  SPAN_READ_CONCURRENCY,
   type TraceListBlobResolutionDeps,
   TraceListService,
 } from "~/server/app-layer/traces/trace-list.service";
@@ -356,6 +357,59 @@ describe("TraceListService read-time offload resolution (#5835)", () => {
         // pre-#5835 behaviour.
         expect(page.items[0]!.output).toBe(PREVIEW_OUTPUT);
         expect(page.items[0]!.input).toBe(PREVIEW_INPUT);
+      });
+    });
+  });
+
+  describe("given resolveFullIO is true over a page far larger than the span-read concurrency bound", () => {
+    describe("when getList fans out the per-row span reads", () => {
+      /** @scenario A large conversation page bounds its concurrent ClickHouse span reads */
+      it("never exceeds SPAN_READ_CONCURRENCY span reads in flight at once", async () => {
+        const rowCount = SPAN_READ_CONCURRENCY * 3;
+        const rows = Array.from({ length: rowCount }, (_, i) =>
+          makeRow({ traceId: `trace-${i}` }),
+        );
+        const spansByTrace: Record<string, NormalizedSpan[]> = {};
+        for (let i = 0; i < rowCount; i++) {
+          spansByTrace[`trace-${i}`] = [makePlainRootSpan(`trace-${i}`)];
+        }
+
+        let inFlight = 0;
+        let maxInFlight = 0;
+        const spansReader: TraceSpansReader = {
+          getNormalizedSpansByTraceId: vi.fn(
+            async ({ traceId }: { traceId: string }) => {
+              inFlight++;
+              maxInFlight = Math.max(maxInFlight, inFlight);
+              // Yield so sibling reads overlap — an unbounded Promise.all would
+              // start all `rowCount` reads at once, driving maxInFlight to
+              // rowCount (3× the bound) and failing the assertion below.
+              await new Promise((resolve) => setTimeout(resolve, 1));
+              inFlight--;
+              return spansByTrace[traceId] ?? [];
+            },
+          ),
+        };
+        const deps: TraceListBlobResolutionDeps = {
+          blobStore: makeBlobStore({}),
+          ioExtractionService: new TraceIOExtractionService(),
+          spansReader,
+        };
+
+        const page = await makeService(rows, deps).getList({
+          ...BASE_LIST_PARAMS,
+          pageSize: rowCount,
+          resolveFullIO: true,
+        });
+
+        expect(page.items).toHaveLength(rowCount);
+        // Every row's spans were read exactly once, in row order...
+        expect(spansReader.getNormalizedSpansByTraceId).toHaveBeenCalledTimes(
+          rowCount,
+        );
+        // ...but never more than the bound were ever in flight at one instant.
+        expect(maxInFlight).toBeGreaterThan(0);
+        expect(maxInFlight).toBeLessThanOrEqual(SPAN_READ_CONCURRENCY);
       });
     });
   });

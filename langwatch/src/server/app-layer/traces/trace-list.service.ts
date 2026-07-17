@@ -3,6 +3,8 @@ import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topics/topic.service";
+import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { pMapLimited } from "~/server/event-sourcing/replay/pMapLimited";
 import { overlayResolvedIO } from "~/server/traces/offload-truncation-detection";
 import { resolveOffloadedTracesBatch } from "~/server/traces/resolve-offloaded-traces-batch";
 import { TtlCache } from "~/server/utils/ttlCache";
@@ -32,6 +34,16 @@ import type { SpanReadBlobResolutionDeps } from "./span-storage.service";
 import type { TraceSpansReader } from "./trace-summary.service";
 import type { TraceSummaryData } from "./types";
 import { teaserOf } from "./visibility-window.service";
+
+/**
+ * Max concurrent per-row span reads while restoring full IO on the
+ * `resolveFullIO` path (#5835). Bounds ClickHouse load so a large conversation
+ * page streams its span reads instead of firing one per row at once — mirrors
+ * the event_log fan-out bound the downstream batch resolver already applies
+ * (`EVENT_LOG_RESOLVE_CONCURRENCY`). Sized to keep the CH client's pool busy
+ * without saturating it.
+ */
+export const SPAN_READ_CONCURRENCY = 25;
 
 export interface TraceListEvent {
   spanId: string;
@@ -619,15 +631,21 @@ export class TraceListService {
     // Fetch each row's raw normalized spans — the eventref pointers live on span
     // attributes, not on the summary row. `occurredAtMs` hints the span read for
     // partition pruning (the summary row already knows when the trace occurred).
-    const spansPerTrace = await Promise.all(
-      rows.map((row) =>
-        deps.spansReader.getNormalizedSpansByTraceId({
+    // Bounded at SPAN_READ_CONCURRENCY (not an unbounded `Promise.all`) so a
+    // large page can't fire up to `pageSize` concurrent ClickHouse reads at once.
+    // Results are written back by index to preserve row order for the overlay.
+    const spansPerTrace: NormalizedSpan[][] = new Array(rows.length);
+    await pMapLimited({
+      items: rows.map((row, i) => ({ row, i })),
+      concurrency: SPAN_READ_CONCURRENCY,
+      fn: async ({ row, i }) => {
+        spansPerTrace[i] = await deps.spansReader.getNormalizedSpansByTraceId({
           tenantId: params.tenantId,
           traceId: row.traceId,
           occurredAtMs: row.occurredAt,
-        }),
-      ),
-    );
+        });
+      },
+    });
 
     const resolvedPerTrace = await resolveOffloadedTracesBatch({
       projectId: params.tenantId,
