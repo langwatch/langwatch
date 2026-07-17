@@ -33,11 +33,15 @@ export async function queryMetricUsageEstimates({
   const selectDimensions = dimensions.join(", ");
   const identityWhere = [
     "OrganizationId = {organizationId:String}",
-    // Upper bound only. A point is billed at its FIRST acceptance, so the
-    // min() below must see every earlier retry of the same PointId — a
-    // `AcceptedAt >= {from}` predicate here would hide the original row and
-    // re-bill a point whose first acceptance predates the window. The 13-month
-    // TTL bounds what the missing lower bound can scan.
+    // Upper bound only, deliberately. A point is billed at its FIRST
+    // acceptance, and this GROUP BY is the only thing that dedups a PointId
+    // across months — the table partitions by AcceptedAt, so ReplacingMergeTree
+    // cannot collapse the same point's rows across two months (see the KNOWN
+    // TENSION note in migration 00042). An `AcceptedAt >= {from}` predicate here
+    // would therefore hide the original row from the min() and re-bill a point
+    // whose first acceptance predates the window. OrganizationId leads the sort
+    // key and the TTL is 13 months, so the missing lower bound costs this org's
+    // rows across at most 13 partitions, not a table scan.
     "AcceptedAt < {to:DateTime64(3)}",
     query.tenantId ? "TenantId = {tenantId:String}" : "",
     query.metricName ? "MetricName = {metricName:String}" : "",

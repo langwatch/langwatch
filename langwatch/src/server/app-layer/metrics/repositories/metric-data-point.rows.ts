@@ -7,8 +7,15 @@ import type {
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 
-/** ReplacingMergeTree keeps the largest version, so inverting the acceptance
- *  millisecond makes the first accepted retry win. */
+/**
+ * ReplacingMergeTree keeps the largest version, so inverting the acceptance
+ * millisecond makes the first accepted retry win.
+ *
+ * On metric_usage_estimates this only holds within a month: that table
+ * partitions by AcceptedAt, which is not part of a PointId's identity, and a
+ * merge never crosses partitions. Cross-month dedup happens at query time
+ * instead — see the KNOWN TENSION note in migration 00042.
+ */
 const MAX_UINT64 = 18_446_744_073_709_551_615n;
 
 export function firstAcceptanceWinsVersion(acceptedAt: number): string {

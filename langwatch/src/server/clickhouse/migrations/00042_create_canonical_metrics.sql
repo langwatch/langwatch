@@ -143,6 +143,27 @@ SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 
 -- Physically separate, non-billable shadow ledger. It contains identifiers
 -- and source-byte counts only: never attributes, values, buckets or payloads.
+--
+-- KNOWN TENSION — the partition key and the dedup key disagree here, unlike
+-- every other table in this migration. ReplacingMergeTree only collapses rows
+-- within a partition, and AcceptedAt is NOT part of a PointId's identity: the
+-- same canonical point re-sent in a later month lands in a different partition
+-- and its two rows never merge. So DedupVersion's "first acceptance wins" only
+-- holds within one month, and cross-month dedup is done at query time instead
+-- (GROUP BY PointId + min(AcceptedAt), see metric-data-point.usage.ts). That is
+-- also why that query cannot put a lower AcceptedAt bound in its WHERE and
+-- prune partitions — the min() has to see every earlier row of a PointId, or a
+-- point first accepted before the window gets billed twice.
+--
+-- metric_data_points does not have this problem: it partitions on
+-- toYearWeek(TimeUnixMs), and TimeUnixMs IS part of a PointId's identity, so a
+-- given PointId always lands in exactly one partition.
+--
+-- Revisit when storage metering actually reads this table (it has no callers
+-- yet): partitioning by month buys cheap TTL partition drops but forces the
+-- unbounded GROUP BY; dropping the time partition would let FINAL dedup
+-- globally and make an AcceptedAt WHERE bound exact, at the cost of TTL
+-- rewriting parts rather than dropping them. Decide against real cardinality.
 -- +goose StatementBegin
 CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.metric_usage_estimates
 (
