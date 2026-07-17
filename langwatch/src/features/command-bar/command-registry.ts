@@ -37,6 +37,7 @@ import {
   ToggleLeft,
   TrendingUp,
   UserCog,
+  UserPlus,
   Users,
   Workflow,
 } from "lucide-react";
@@ -515,6 +516,23 @@ export const actionCommands: Command[] = [
       "send",
       "span",
       "anvil",
+    ],
+  },
+  {
+    id: "action-invite-member",
+    label: "Invite teammate",
+    description: "Invite someone to your organization",
+    icon: UserPlus,
+    category: "actions",
+    keywords: [
+      "invite",
+      "member",
+      "teammate",
+      "add",
+      "user",
+      "people",
+      "organization",
+      "team",
     ],
   },
   {

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { Lightbulb } from "lucide-react";
+import { useEffect, useState } from "react";
 import { HINTS } from "../constants";
 
 /**
@@ -20,10 +20,10 @@ export function HintsSection() {
   return (
     <HStack
       borderTop="1px solid"
-      borderColor="border.muted"
-      px={4}
-      py={2}
-      gap={2}
+      borderColor="border.subtle"
+      px={{ base: 4, md: 5 }}
+      py={2.5}
+      gap={2.5}
       fontSize="12px"
       color="fg.muted"
     >
