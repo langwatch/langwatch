@@ -1,0 +1,274 @@
+# Langy agent pod image — the OpenCode "manager" plus the LangWatch CLI the
+# per-session workers shell out to.
+#
+# Built by the `langyagent` matrix entry in
+# .github/workflows/publish-docker-app.yml on `langwatch@*` releases, and
+# usable locally for the Minikube scenario loop:
+#   docker build -f Dockerfile.langyagent -t langyagent:dev .
+#
+# Build context is the repo root (context: .), so the COPYs below reach
+# into services/langyagent/.
+#
+# Two-stage build: stage one compiles the Go manager binary from the
+# repo's mono-binary (services/langyagent/ is the package, dispatched via
+# cmd/service). Stage two is the runtime image with all the tooling the
+# workers shell out to (opencode, gh, langwatch CLI).
+
+# -----------------------------------------------------------------------------
+# Stage 1: build the Go manager binary.
+# -----------------------------------------------------------------------------
+# Pin an explicit Go toolchain patch (1.26.4) at or above the go.mod language
+# floor (`go 1.26.2`) so every build uses the same compiler. Bump this tag when
+# raising the go.mod floor.
+FROM --platform=$BUILDPLATFORM golang:1.26.4-bookworm AS builder
+
+WORKDIR /src
+
+# Cache go module downloads in a layer that only invalidates when go.mod/
+# go.sum changes — the rest of the source tree is a churnier input.
+COPY go.mod go.sum ./
+COPY sdk-go ./sdk-go
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go mod download
+
+# Bring in everything the mono-binary needs to compile. We only ship the
+# `service langyagent` codepath out the other side, but cmd/service
+# imports all three services so we need their packages present at build
+# time. The aigateway + nlpgo subtrees are tree-shaken by the linker —
+# only references reachable from `langyagent` survive.
+COPY cmd ./cmd
+COPY pkg ./pkg
+COPY services ./services
+
+# Overlay the FULL compiled skill directory into the embed dir BEFORE `go build`,
+# so the shipped binary embeds the complete set via //go:embed
+# (services/langyagent/internal/assets). The complete production set, including
+# Langy-only skills, is compiled from canonical sources under root skills/. The
+# checked-in service copy keeps local Go builds honest and is verified to match
+# that root output. AGENTS.md is already embedded from the checked-in
+# internal/assets/AGENTS.md (identical dev + prod), so no overlay is needed for
+# it.
+COPY skills/_compiled/native/ ./services/langyagent/internal/assets/skills/
+
+# CGO disabled so the produced binary is statically linked and runs on
+# any glibc the Ubuntu base ships with no surprise dynamic-link issues.
+# -trimpath drops the host build path from binary metadata for cleaner
+# diffs across reproducible builds.
+#
+# TARGETOS/TARGETARCH are left WITHOUT defaults on purpose: BuildKit fills them
+# from the target platform (`--platform`), and the builder runs on the native
+# BUILDPLATFORM (above) to cross-compile. A hardcoded `=amd64` default here
+# silently overrode BuildKit's value, so `--platform linux/arm64` (the
+# Graviton/gVisor publish matrix, which passes NO build-args) produced an amd64
+# binary in an arm64 image — dead on arrival with `exec format error`.
+ARG TARGETOS
+ARG TARGETARCH
+ARG SERVICE_VERSION=dev
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+        go build -trimpath \
+        -ldflags "-s -w -X main.Version=${SERVICE_VERSION}" \
+        -o /out/langyagent ./cmd/service
+
+# -----------------------------------------------------------------------------
+# Stage 1b: compile the `langwatch` CLI into a single native binary with Bun.
+# -----------------------------------------------------------------------------
+# WHY THIS EXISTS: the agent's ONLY interface to LangWatch is shelling out to
+# the `langwatch` CLI, so every tool call the model makes is a fresh process
+# spawn. Installed from npm it runs under Node, which costs ~220ms per
+# invocation (measured: mean 222ms, min 125ms) just to boot the interpreter and
+# evaluate the module graph — before a single line of our code runs. A
+# Bun-compiled binary embeds a bytecode snapshot of the whole bundle and starts
+# in ~87ms (mean; min 59ms) — 2.6x faster, ~135ms saved on EVERY CLI call, and
+# an agent turn makes several.
+#
+# This replaces `npm install -g langwatch@X` below. The trade is image size:
+# the binary is ~99MB (it embeds the Bun runtime) against a much smaller npm
+# package — but it removes a network install from the build and a Node boot
+# from every tool call.
+#
+# The npm/tsup build is untouched and remains how the public `langwatch`
+# package is produced; this stage only compiles an extra artifact for this
+# image. See typescript-sdk/scripts/build-cli-binary.ts.
+FROM oven/bun:1.3.13-debian AS cli-builder
+
+WORKDIR /src
+
+# pnpm resolves the CLI's lockfile + the `../packages/cli-cards` workspace link;
+# the bun image ships no Node, and pnpm needs one.
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g pnpm@10.24.0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# typescript-sdk/pnpm-workspace.yaml declares `.` + `../packages/cli-cards`, so
+# both trees must be present for `workspace:*` to resolve. cli-cards is
+# source-only (its `main` points at src/index.ts) and is bundled into the binary.
+COPY packages/cli-cards ./packages/cli-cards
+COPY typescript-sdk ./typescript-sdk
+
+WORKDIR /src/typescript-sdk
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+# The CLI imports types GENERATED from the platform source: copy-types.sh copies
+# the Zod-first modules out of langwatch/ + langevals/ and derives
+# default-prompt-model.generated.ts from llmModels.json, and the OpenAPI client is
+# generated from the app's OpenAPI json. Those sources live OUTSIDE typescript-sdk/
+# and the install ran with --ignore-scripts, so the generated tree is absent and
+# the Bun compile fails to resolve `internal/generated/*`. Bring in exactly the
+# files the generators read (at the ../langwatch, ../langevals paths copy-types.sh
+# expects relative to /src/typescript-sdk), then run the generators. These are
+# written INTO the image, so .dockerignore's `*.generated.*` filter (a host→context
+# rule) does not strip them.
+COPY langwatch/src/server/tracer/types.ts             /src/langwatch/src/server/tracer/types.ts
+COPY langwatch/src/server/filters/types.ts            /src/langwatch/src/server/filters/types.ts
+COPY langwatch/src/server/evaluations/types.ts        /src/langwatch/src/server/evaluations/types.ts
+COPY langwatch/src/server/modelProviders/llmModels.json /src/langwatch/src/server/modelProviders/llmModels.json
+COPY langwatch/src/app/api/openapiLangWatch.json      /src/langwatch/src/app/api/openapiLangWatch.json
+COPY langevals/ts-integration/evaluators.generated.ts /src/langevals/ts-integration/evaluators.generated.ts
+RUN pnpm run prepare
+
+# BuildKit fills TARGETARCH from the target platform. Map it to Bun's target
+# triple so `--platform linux/arm64` (Graviton/gVisor) produces an arm64 binary
+# rather than silently emitting the builder's native arch — the same trap the Go
+# stage above documents.
+ARG TARGETARCH
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) bun_target=bun-linux-x64 ;; \
+      arm64) bun_target=bun-linux-arm64 ;; \
+      *) echo "unsupported TARGETARCH for the CLI binary: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    mkdir -p /out; \
+    bun run scripts/build-cli-binary.ts --target="${bun_target}" --outfile=/out/langwatch; \
+    chmod 0755 /out/langwatch
+
+# -----------------------------------------------------------------------------
+# Stage 2: runtime image.
+# -----------------------------------------------------------------------------
+# Keep the runtime on glibc: the pinned OpenCode release and the Bun-compiled
+# LangWatch CLI are glibc binaries. Debian slim removes Ubuntu's userland
+# overhead without introducing Alpine/musl compatibility surprises.
+FROM debian:bookworm-slim
+
+# Pin the CLI version the agent was validated against. Bump it in lockstep with
+# a tested release rather than tracking `latest`. The CLI is the agent's ONLY
+# LangWatch interface — the skills and AGENTS.md are written against this exact
+# grammar, so a bump means re-checking the command table in
+# services/langyagent/internal/assets/AGENTS.md.
+ARG LANGWATCH_CLI_VERSION=0.31.0
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl git ca-certificates python3 \
+    && rm -rf /var/lib/apt/lists/*
+# NOTE: `iptables` is no longer installed. The old loopback OWNER-match DROP
+# rule (services/langyagent/iptables.go) that closed the sibling-worker
+# exfiltration path is removed under ADR-033 Fix A′ — sibling isolation is
+# now enforced by opencode's own per-worker OPENCODE_SERVER_PASSWORD, which
+# needs no netfilter (and works under gVisor, where netfilter is absent).
+
+# GitHub CLI (`gh`) is what Langy's github.md skill uses to open PRs
+# attributed to the requesting user. The user's short-lived user-to-server
+# token rides into the worker as GH_TOKEN; gh reads it from env, and
+# `gh auth git-credential` proxies it to git pushes so nothing is ever
+# written to disk. Issue #4747, spec specs/assistant/langy-github-prs.feature.
+# Pinned via the GitHub releases .deb rather than the apt repo: the apt repo
+# only carries the LATEST gh, so `apt-get install gh` ships unreviewed gh
+# behavior changes on every rebuild (and an exact apt pin breaks on every gh
+# release). Release assets persist per version; arm64 + amd64 both published.
+ARG GH_CLI_VERSION=2.94.0
+RUN curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_CLI_VERSION}/gh_${GH_CLI_VERSION}_linux_$(dpkg --print-architecture).deb" \
+        -o /tmp/gh.deb \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends /tmp/gh.deb \
+    && rm -f /tmp/gh.deb \
+    && rm -rf /var/lib/apt/lists/* \
+    && gh --version
+
+# There is no Node runtime dependency here: OpenCode is shipped as its pinned
+# standalone binary and the LangWatch CLI is the Bun-compiled binary above.
+
+# Pin opencode to a specific release artifact + verify sha256. The previous
+# `curl https://opencode.ai/install | bash` shape installed whatever was
+# `latest` at build time — every rebuild silently re-evaluated trust in
+# opencode upstream. opencode runs in every worker with the user's API
+# keys + GitHub user-to-server token in env, so it sits on the same
+# supply-chain surface as gh (already pinned above) and the npm packages.
+#
+# Bump procedure when raising OPENCODE_VERSION:
+#   v=NEW_VERSION
+#   curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${v}/opencode-linux-x64.tar.gz"  | sha256sum
+#   curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${v}/opencode-linux-arm64.tar.gz" | sha256sum
+# Paste both values below. Dev-cluster nodes are arm64 (Graviton) and CI
+# builds amd64 — both must verify.
+ARG OPENCODE_VERSION=1.17.11
+ARG OPENCODE_SHA256_AMD64=6aefcbbb7f04cdb4642be5208ddbfabb3c3d274f816bf42bff72eea5c244dca2
+ARG OPENCODE_SHA256_ARM64=6c0ae8212401c78f9dcddead35d385953c7a44eb1616309365b58503dbd1b4cd
+
+RUN set -eux; \
+    arch=$(dpkg --print-architecture); \
+    case "$arch" in \
+      amd64) target=linux-x64; sha=${OPENCODE_SHA256_AMD64} ;; \
+      arm64) target=linux-arm64; sha=${OPENCODE_SHA256_ARM64} ;; \
+      *) echo "Unsupported architecture for opencode pin: $arch" >&2; exit 1 ;; \
+    esac; \
+    url="https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-${target}.tar.gz"; \
+    curl -fsSL "$url" -o /tmp/opencode.tar.gz; \
+    echo "${sha}  /tmp/opencode.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/opencode.tar.gz -C /tmp; \
+    install -m0755 /tmp/opencode /usr/local/bin/opencode; \
+    rm -f /tmp/opencode /tmp/opencode.tar.gz; \
+    opencode --version
+
+# The `langwatch` CLI as a single self-contained native binary, compiled from
+# THIS repo's typescript-sdk/ by the cli-builder stage — no longer
+# `npm install -g langwatch@<pinned>`. Two consequences worth knowing:
+#
+#   1. SPEED. Every tool call the model makes spawns this process; a Node boot
+#      cost ~222ms, the binary ~87ms. See the cli-builder stage for the numbers.
+#   2. VERSION. The CLI is now built from source in lockstep with the rest of
+#      the repo, so it can no longer drift behind (or ahead of) the manager and
+#      the skills. LANGWATCH_CLI_VERSION is retained only as the version string
+#      the binary reports; the code is whatever this commit contains. The
+#      AGENTS.md command grammar is now validated against the same tree.
+COPY --from=cli-builder /out/langwatch /usr/local/bin/langwatch
+
+# Fail the build here rather than at 2am in a worker: a binary that compiles but
+# dies on first invocation (a missing compile-time define, an unbundled dynamic
+# require) is worse than the npm install it replaced.
+RUN langwatch --version
+
+# Drop the Go mono-binary in place; it is the image ENTRYPOINT (below), invoked
+# with the `langyagent` subcommand so it runs the manager as PID 1 DIRECTLY — no
+# shell wrapper. PID 1 is required for the orphan reaper: opencode's children
+# (gh/git/npm) reparent to the manager on a worker kill, and only PID 1 may reap
+# them.
+COPY --from=builder /out/langyagent /usr/local/bin/langyagent
+
+# NOTE: there is nothing to seed at startup. AGENTS.md + the skills tree are
+# EMBEDDED in the Go binary (services/langyagent/internal/assets, //go:embed) and
+# the manager materializes the skills onto disk itself at boot. This replaced both
+# the old /opt-into-/workspace seeding AND the exec-only entrypoint.sh that used to
+# wrap the binary — the exec form of ENTRYPOINT makes the binary PID 1 on its own.
+
+# The manager process runs as root so it can chown per-session directories
+# to per-worker UIDs and exec into them with syscall.Credential. See the
+# SecurityContext block in charts/langyagent/values.yaml for the cap set
+# that keeps the blast radius small (CAP_SETUID, CAP_SETGID, CAP_CHOWN,
+# CAP_DAC_OVERRIDE). Workers spawned by the manager enter unique UIDs
+# (2000+hash(conversationId)%60000) — no static user records needed
+# because setuid(N) doesn't require /etc/passwd to resolve N. Keep
+# /workspace root-owned at image build time; the manager re-chowns
+# per-session subdirs as workers spawn.
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    mkdir -p /workspace && \
+    chown root:root /workspace && \
+    chmod 0755 /workspace
+
+ENV HOME=/root
+WORKDIR /workspace
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/langyagent"]
+CMD ["langyagent"]
