@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
@@ -28,7 +28,7 @@ export const createTriggerCommand = async (
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
-  const spinner = ora(`Creating trigger "${name}"...`).start();
+  const spinner = createSpinner(`Creating trigger "${name}"...`).start();
 
   try {
     let filters: Record<string, unknown> = {};
@@ -80,7 +80,7 @@ export const createTriggerCommand = async (
     if (error instanceof SyntaxError) {
       spinner.fail(chalk.red("--filters must be valid JSON"));
     } else {
-      failSpinner({ spinner, error, action: "create trigger" });
+      failSpinner({ spinner, error, action: "create trigger", format: options?.format });
     }
     process.exit(1);
   }

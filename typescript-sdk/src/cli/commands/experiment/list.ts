@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import {
   ExperimentsApiService,
   type ExperimentSummary,
@@ -29,7 +29,7 @@ export const experimentListCommand = async (
   })();
 
   const service = new ExperimentsApiService();
-  const spinner = ora("Fetching experiments...").start();
+  const spinner = createSpinner("Fetching experiments...").start();
 
   try {
     const result = await service.listExperiments({ pageSize: limit });
@@ -85,7 +85,7 @@ export const experimentListCommand = async (
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch experiments" });
+    failSpinner({ spinner, error, action: "fetch experiments", format: options?.format });
     process.exit(1);
   }
 };

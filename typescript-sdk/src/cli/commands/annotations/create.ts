@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { AnnotationsApiService } from "@/client-sdk/services/annotations/annotations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -11,7 +11,7 @@ export const createAnnotationCommand = async (
   checkApiKey();
 
   const service = new AnnotationsApiService();
-  const spinner = ora(`Creating annotation for trace "${traceId}"...`).start();
+  const spinner = createSpinner(`Creating annotation for trace "${traceId}"...`).start();
 
   try {
     const isThumbsUp =
@@ -38,7 +38,7 @@ export const createAnnotationCommand = async (
       console.log(JSON.stringify(annotation, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "create annotation" });
+    failSpinner({ spinner, error, action: "create annotation", format: options?.format });
     process.exit(1);
   }
 };

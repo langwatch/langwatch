@@ -11,8 +11,8 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import {
   ApiKeysApiService,
-  ApiKeysApiError,
 } from "../api-keys-api.service";
+import { LangWatchDomainError } from "@/internal/api/errors";
 
 const TEST_ENDPOINT = "http://localhost:5560";
 
@@ -110,8 +110,8 @@ describe("ApiKeysApiService", () => {
         );
       });
 
-      it("throws ApiKeysApiError", async () => {
-        await expect(service.list()).rejects.toThrow(ApiKeysApiError);
+      it("throws LangWatchDomainError", async () => {
+        await expect(service.list()).rejects.toThrow(LangWatchDomainError);
       });
     });
   });
@@ -187,10 +187,10 @@ describe("ApiKeysApiService", () => {
         );
       });
 
-      it("throws ApiKeysApiError", async () => {
+      it("throws LangWatchDomainError", async () => {
         await expect(
           service.create({ name: "Nope", keyType: "personal" }),
-        ).rejects.toThrow(ApiKeysApiError);
+        ).rejects.toThrow(LangWatchDomainError);
       });
     });
   });
@@ -223,8 +223,8 @@ describe("ApiKeysApiService", () => {
         );
       });
 
-      it("throws ApiKeysApiError", async () => {
-        await expect(service.revoke("nonexistent")).rejects.toThrow(ApiKeysApiError);
+      it("throws LangWatchDomainError", async () => {
+        await expect(service.revoke("nonexistent")).rejects.toThrow(LangWatchDomainError);
       });
     });
 
@@ -240,8 +240,8 @@ describe("ApiKeysApiService", () => {
         );
       });
 
-      it("throws ApiKeysApiError", async () => {
-        await expect(service.revoke("key_revoked")).rejects.toThrow(ApiKeysApiError);
+      it("throws LangWatchDomainError", async () => {
+        await expect(service.revoke("key_revoked")).rejects.toThrow(LangWatchDomainError);
       });
     });
   });

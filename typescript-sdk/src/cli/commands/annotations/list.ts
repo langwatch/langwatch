@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { AnnotationsApiService } from "@/client-sdk/services/annotations/annotations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
@@ -15,7 +15,7 @@ export const listAnnotationsCommand = async (options: {
   const label = options.traceId
     ? `Fetching annotations for trace "${options.traceId}"...`
     : "Fetching annotations...";
-  const spinner = ora(label).start();
+  const spinner = createSpinner(label).start();
 
   try {
     const result = options.traceId
@@ -74,7 +74,7 @@ export const listAnnotationsCommand = async (options: {
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch annotations" });
+    failSpinner({ spinner, error, action: "fetch annotations", format: options?.format });
     process.exit(1);
   }
 };

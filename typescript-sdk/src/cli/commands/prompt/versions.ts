@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
@@ -13,7 +13,7 @@ export const promptVersionsCommand = async (
 
   const service = new PromptsApiService();
 
-  const spinner = ora(`Fetching versions for "${handle}"...`).start();
+  const spinner = createSpinner(`Fetching versions for "${handle}"...`).start();
 
   try {
     const versions = await service.getVersions(handle);
@@ -64,7 +64,7 @@ export const promptVersionsCommand = async (
     );
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch prompt versions" });
+    failSpinner({ spinner, error, action: "fetch prompt versions", format: options?.format });
     process.exit(1);
   }
 };

@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../utils/spinner";
 import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import { checkApiKey } from "../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../utils/formatting";
@@ -14,7 +14,7 @@ export const listCommand = async (options?: { format?: string }): Promise<void> 
     // Get prompts API service
     const promptsApiService = new PromptsApiService();
 
-    const spinner = ora("Fetching prompts from server...").start();
+    const spinner = createSpinner("Fetching prompts from server...").start();
 
     try {
       // Fetch all prompts
@@ -82,7 +82,7 @@ export const listCommand = async (options?: { format?: string }): Promise<void> 
         ),
       );
     } catch (error) {
-      failSpinner({ spinner, error, action: "fetch prompts" });
+      failSpinner({ spinner, error, action: "fetch prompts", format: options?.format });
       process.exit(1);
     }
   } catch (error) {

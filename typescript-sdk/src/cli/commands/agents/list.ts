@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
@@ -9,7 +9,7 @@ export const listAgentsCommand = async (options?: { format?: string }): Promise<
   checkApiKey();
 
   const service = new AgentsApiService();
-  const spinner = ora("Fetching agents...").start();
+  const spinner = createSpinner("Fetching agents...").start();
 
   try {
     const result = await service.list({ limit: 100 });
@@ -62,7 +62,7 @@ export const listAgentsCommand = async (options?: { format?: string }): Promise<
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch agents" });
+    failSpinner({ spinner, error, action: "fetch agents", format: options?.format });
     process.exit(1);
   }
 };

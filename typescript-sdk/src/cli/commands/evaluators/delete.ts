@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -12,7 +12,7 @@ export const deleteEvaluatorCommand = async (
 
   const service = new EvaluatorsApiService();
 
-  const resolveSpinner = ora(`Finding evaluator "${idOrSlug}"...`).start();
+  const resolveSpinner = createSpinner(`Finding evaluator "${idOrSlug}"...`).start();
 
   let evaluatorId: string;
   let evaluatorName: string;
@@ -30,7 +30,7 @@ export const deleteEvaluatorCommand = async (
     process.exit(1);
   }
 
-  const deleteSpinner = ora(`Archiving evaluator "${evaluatorName}"...`).start();
+  const deleteSpinner = createSpinner(`Archiving evaluator "${evaluatorName}"...`).start();
 
   try {
     await service.delete(evaluatorId);

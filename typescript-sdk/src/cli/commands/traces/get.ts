@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -11,7 +11,7 @@ export const getTraceCommand = async (
   checkApiKey();
 
   const service = new TracesApiService();
-  const spinner = ora(`Fetching trace "${traceId}"...`).start();
+  const spinner = createSpinner(`Fetching trace "${traceId}"...`).start();
 
   try {
     const format = (options.format as "digest" | "json") ?? "digest";
@@ -35,7 +35,7 @@ export const getTraceCommand = async (
       }
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch trace" });
+    failSpinner({ spinner, error, action: "fetch trace", format: options?.format });
     process.exit(1);
   }
 };

@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 
 import {
   type ModelDefaultScopeType,
@@ -65,7 +65,7 @@ export const setModelDefaultCommand = async (
   checkApiKey();
 
   const service = new ModelDefaultsApiService();
-  const spinner = ora(
+  const spinner = createSpinner(
     `Setting ${chalk.cyan(key)} → ${chalk.green(model)}...`,
   ).start();
 
@@ -120,7 +120,7 @@ export const setModelDefaultCommand = async (
       );
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "set default model" });
+    failSpinner({ spinner, error, action: "set default model", format: options?.format });
     process.exit(1);
   }
 };

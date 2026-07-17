@@ -1,4 +1,4 @@
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
@@ -14,7 +14,7 @@ export const deleteGraphCommand = async (
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
-  const spinner = ora(`Deleting graph "${id}"...`).start();
+  const spinner = createSpinner(`Deleting graph "${id}"...`).start();
 
   try {
     const response = await fetch(`${endpoint}/api/graphs/${encodeURIComponent(id)}`, {
@@ -35,7 +35,7 @@ export const deleteGraphCommand = async (
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete graph" });
+    failSpinner({ spinner, error, action: "delete graph", format: options?.format });
     process.exit(1);
   }
 };

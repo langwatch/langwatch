@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
@@ -30,7 +30,7 @@ export const updateGraphCommand = async (
   const endpoint =
     resolveControlPlaneUrl();
 
-  const spinner = ora(`Updating graph "${id}"...`).start();
+  const spinner = createSpinner(`Updating graph "${id}"...`).start();
 
   try {
     const body: Record<string, unknown> = {};
@@ -76,7 +76,7 @@ export const updateGraphCommand = async (
     if (error instanceof SyntaxError) {
       spinner.fail(chalk.red("--graph and --filters must be valid JSON"));
     } else {
-      failSpinner({ spinner, error, action: "update graph" });
+      failSpinner({ spinner, error, action: "update graph", format: options?.format });
     }
     process.exit(1);
   }

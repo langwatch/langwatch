@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { AnnotationsApiService } from "@/client-sdk/services/annotations/annotations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -8,7 +8,7 @@ export const deleteAnnotationCommand = async (id: string, options?: { format?: s
   checkApiKey();
 
   const service = new AnnotationsApiService();
-  const spinner = ora(`Deleting annotation "${id}"...`).start();
+  const spinner = createSpinner(`Deleting annotation "${id}"...`).start();
 
   try {
     await service.delete(id);
@@ -18,7 +18,7 @@ export const deleteAnnotationCommand = async (id: string, options?: { format?: s
       console.log(JSON.stringify({ id, deleted: true }, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete annotation" });
+    failSpinner({ spinner, error, action: "delete annotation", format: options?.format });
     process.exit(1);
   }
 };

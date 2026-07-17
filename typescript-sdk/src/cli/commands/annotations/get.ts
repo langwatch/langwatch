@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { AnnotationsApiService } from "@/client-sdk/services/annotations/annotations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -8,7 +8,7 @@ export const getAnnotationCommand = async (id: string, options?: { format?: stri
   checkApiKey();
 
   const service = new AnnotationsApiService();
-  const spinner = ora(`Fetching annotation "${id}"...`).start();
+  const spinner = createSpinner(`Fetching annotation "${id}"...`).start();
 
   try {
     const annotation = await service.get(id);
@@ -49,7 +49,7 @@ export const getAnnotationCommand = async (id: string, options?: { format?: stri
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch annotation" });
+    failSpinner({ spinner, error, action: "fetch annotation", format: options?.format });
     process.exit(1);
   }
 };

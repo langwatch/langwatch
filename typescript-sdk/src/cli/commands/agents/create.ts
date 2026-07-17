@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -11,7 +11,7 @@ export const createAgentCommand = async (
   checkApiKey();
 
   const service = new AgentsApiService();
-  const spinner = ora(`Creating agent "${name}"...`).start();
+  const spinner = createSpinner(`Creating agent "${name}"...`).start();
 
   try {
     const config = options.config
@@ -37,7 +37,7 @@ export const createAgentCommand = async (
     if (error instanceof SyntaxError) {
       spinner.fail(chalk.red("--config must be valid JSON"));
     } else {
-      failSpinner({ spinner, error, action: "create agent" });
+      failSpinner({ spinner, error, action: "create agent", format: options?.format });
     }
     process.exit(1);
   }
