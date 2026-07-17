@@ -28,9 +28,10 @@ export type BillableStorageTable = (typeof BILLABLE_STORAGE_TABLES)[number];
 
 /**
  * Retention-managed tables deliberately OUTSIDE storage billing (ADR-039 v5):
- * - trace_analytics / trace_analytics_rollup: system-derived projections of
- *   already-billed trace data (billing them double-charges) and they carry no
- *   `_size_bytes` column to measure.
+ * - trace_analytics / trace_analytics_rollup and evaluation_analytics /
+ *   evaluation_analytics_rollup: system-derived projections (ADR-034) of data
+ *   that is already billed at its source (billing them double-charges), and
+ *   they carry no `_size_bytes` column to measure.
  * - evaluation_runs: its billing-age axis (mutable `UpdatedAt`) is decoupled
  *   from its partition axis (`ScheduledAt`), breaking both boundary edges;
  *   excluded by decision owner — revisit after the partition rework (#5209).
@@ -38,5 +39,7 @@ export type BillableStorageTable = (typeof BILLABLE_STORAGE_TABLES)[number];
 export const EXCLUDED_RETENTION_TABLES = [
   "trace_analytics",
   "trace_analytics_rollup",
+  "evaluation_analytics",
+  "evaluation_analytics_rollup",
   "evaluation_runs",
 ] as const satisfies readonly RetentionManagedTable[];
