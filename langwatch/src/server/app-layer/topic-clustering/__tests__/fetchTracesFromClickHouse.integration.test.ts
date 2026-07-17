@@ -26,8 +26,8 @@ import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClien
 import {
   cleanupTestData,
   getTestClickHouseClient,
-} from "../../event-sourcing/__tests__/integration/testContainers";
-import { fetchTracesFromClickHouse } from "../topicClustering";
+} from "../../../event-sourcing/__tests__/integration/testContainers";
+import { fetchTracesFromClickHouse } from "../clustering";
 
 const TENANT_ID = "topic-fetch-test";
 // A bit more than one page (2000) so a second page exists for the cursor test.

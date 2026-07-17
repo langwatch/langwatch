@@ -2,19 +2,19 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { env } from "../../env.mjs";
-import { OPENAI_EMBEDDING_DIMENSION } from "../../utils/constants";
+import { env } from "../../../env.mjs";
+import { OPENAI_EMBEDDING_DIMENSION } from "../../../utils/constants";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
-} from "../api/routers/modelProviders.utils";
-import { getApp } from "../app-layer/app";
-import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
-import { prisma } from "../db";
-import { getProjectEmbeddingsModel } from "../embeddings";
-import { stagedLangevalsFetch } from "../langevals/stagedFetch";
-import { getPayloadSizeHistogram } from "../metrics";
-import { resolveModelForFeature } from "../modelProviders/resolveModelForFeature";
+} from "../../api/routers/modelProviders.utils";
+import { getApp } from "../app";
+import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
+import { prisma } from "../../db";
+import { getProjectEmbeddingsModel } from "../../embeddings";
+import { stagedLangevalsFetch } from "../../langevals/stagedFetch";
+import { getPayloadSizeHistogram } from "../../metrics";
+import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import type {
   BatchClusteringParams,
   IncrementalClusteringParams,
@@ -23,7 +23,7 @@ import type {
   TopicClusteringTopic,
   TopicClusteringTrace,
   TopicClusteringTraceTopicMap,
-} from "./types";
+} from "./clustering.types";
 
 const logger = createLogger("langwatch:topicClustering");
 

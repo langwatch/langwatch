@@ -39,6 +39,9 @@ export interface TopicClusteringRunStatusData {
   LastRunMode: string | null;
   LastRunSkippedReason: string | null;
   LastRunError: string | null;
+  LastRunErrorCode: string | null;
+  /** True when the customer can resolve the failure themselves. */
+  LastRunErrorUserActionable: boolean;
   LastRunTracesProcessed: number;
   LastRunTopicsCount: number;
   LastRunSubtopicsCount: number;
@@ -91,6 +94,8 @@ export class TopicClusteringRunStatusFoldProjection
       LastRunMode: null,
       LastRunSkippedReason: null,
       LastRunError: null,
+      LastRunErrorCode: null,
+      LastRunErrorUserActionable: false,
       LastRunTracesProcessed: 0,
       LastRunTopicsCount: 0,
       LastRunSubtopicsCount: 0,
@@ -145,6 +150,8 @@ export class TopicClusteringRunStatusFoldProjection
       LastRunMode: data.mode,
       LastRunSkippedReason: data.skippedReason ?? null,
       LastRunError: null,
+      LastRunErrorCode: null,
+      LastRunErrorUserActionable: false,
       LastRunTracesProcessed: tracesSoFar,
       LastRunTopicsCount: data.topicsCount,
       LastRunSubtopicsCount: data.subtopicsCount,
@@ -165,6 +172,8 @@ export class TopicClusteringRunStatusFoldProjection
       LastRunAt: event.occurredAt,
       LastRunOutcome: TOPIC_CLUSTERING_RUN_OUTCOME.FAILED,
       LastRunError: event.data.error,
+      LastRunErrorCode: event.data.errorCode ?? null,
+      LastRunErrorUserActionable: event.data.userActionable ?? false,
       LastRunSkippedReason: null,
       InProgressRunId: null,
       InProgressTraces: 0,

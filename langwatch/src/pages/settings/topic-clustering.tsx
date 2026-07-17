@@ -175,11 +175,32 @@ function ClusteringStatusCard({ projectId }: { projectId: string }) {
                 </Text>
               )}
             {status.data.lastRunOutcome === "failed" &&
-              status.data.lastRunError && (
+              (status.data.lastRunErrorUserActionable &&
+              status.data.lastRunError ? (
+                <Alert.Root status="warning">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>
+                      {status.data.lastRunErrorCode === "model_not_configured"
+                        ? "No model is set up for topic clustering"
+                        : status.data.lastRunErrorCode ===
+                            "model_provider_quota"
+                          ? "Your model provider refused the request for quota or billing reasons"
+                          : "Your model provider rejected the credentials"}
+                    </Alert.Title>
+                    <Alert.Description>
+                      {status.data.lastRunErrorCode === "model_not_configured"
+                        ? "Choose a default model and embeddings for topic clustering in Settings → Model Providers → Default Models, then run it again."
+                        : `Check your keys and limits in Settings → Model Providers, then run topic clustering again. Provider response: ${status.data.lastRunError}`}
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
+              ) : (
                 <Text fontSize="sm" color="red.fg">
-                  {status.data.lastRunError}
+                  The last run failed on our side. It will retry automatically
+                  at the next scheduled run.
                 </Text>
-              )}
+              ))}
             <HStack gap={3}>
               <Text fontWeight="medium">Next scheduled run</Text>
               <Text color="fg.muted">

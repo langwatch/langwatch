@@ -95,6 +95,10 @@ export const topicClusteringRunFailedEventDataSchema = z.object({
   runId: z.string(),
   page: z.number(),
   error: z.string(),
+  /** Stable failure classification, e.g. `model_provider_auth`. */
+  errorCode: z.string().optional(),
+  /** True when the customer can resolve it (credentials, quota, config). */
+  userActionable: z.boolean().optional(),
 });
 export type TopicClusteringRunFailedEventData = z.infer<
   typeof topicClusteringRunFailedEventDataSchema

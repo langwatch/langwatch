@@ -57,11 +57,11 @@ vi.mock("../../langevals/stagedFetch", () => ({
 
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import { stagedLangevalsFetch } from "../../langevals/stagedFetch";
+import { stagedLangevalsFetch } from "../../../langevals/stagedFetch";
 import {
   clusterTopicsForProject,
   fetchTracesFromClickHouse,
-} from "../topicClustering";
+} from "../clustering";
 
 function makeProject(overrides: Record<string, unknown> = {}) {
   return {

@@ -215,6 +215,33 @@ event-derived fact a projection could fold. The page keeps its manual
 trigger button. This turns the old "click trigger, nothing visibly
 happens" into "skipped: clustered 2 days ago".
 
+### 8. Failures are classified; raw errors never reach the product
+
+The effect classifies a final-attempt failure before recording it
+(`classifyClusteringError`), grounded in the failure classes production
+Loki actually shows: `model_not_configured` (the dominant one — thrown
+as `No model configured for "analytics.topic_clustering_llm" …`),
+`model_provider_auth`, `model_provider_quota` — all user-actionable —
+versus `clustering_service` (langevals-side) and `internal`, which are
+ours. The `run_failed` event and projection carry the code, the
+user-actionable flag, and the full error text for operators; the status
+service returns the raw text ONLY when the customer can act on it. The
+settings page renders actionable failures as guidance ("set a default
+model in Settings → Model Providers") and internal ones as "failed on
+our side, retries automatically" with no detail.
+
+**Deferred (own spec, follow-up):** a stackable home-notice surface and
+an opt-out email (default off) for user-actionable clustering failures.
+The classification here is their data source; nothing in this ADR blocks
+them.
+
+### 9. Code home and identifiers
+
+The whole domain lives in `app-layer/topic-clustering/` (clustering
+core, process manager, repositories, status service) — the legacy
+`server/topicClustering/` module is gone. New row identifiers use KSUIDs
+(`topicrun_…`) per platform convention, not nanoid.
+
 ## Implementation and validation
 
 Acceptance gates:

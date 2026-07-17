@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS "TopicClusteringRunProjection" (
   "lastRunMode" TEXT,
   "lastRunSkippedReason" TEXT,
   "lastRunError" TEXT,
+  "lastRunErrorCode" TEXT,
+  "lastRunErrorUserActionable" BOOLEAN NOT NULL DEFAULT false,
   "lastRunTracesProcessed" INTEGER NOT NULL DEFAULT 0,
   "lastRunTopicsCount" INTEGER NOT NULL DEFAULT 0,
   "lastRunSubtopicsCount" INTEGER NOT NULL DEFAULT 0,

@@ -1,7 +1,7 @@
 import {
   clusterTopicsForProject,
   type ClusteringPageOutcome,
-} from "../server/topicClustering/topicClustering";
+} from "../server/app-layer/topic-clustering/clustering";
 
 export default async function execute(projectId: string) {
   let searchAfter: ClusteringPageOutcome["nextSearchAfter"];

@@ -9,6 +9,9 @@ export interface TopicClusteringStatus {
   lastRunMode: string | null;
   lastRunSkippedReason: string | null;
   lastRunError: string | null;
+  lastRunErrorCode: string | null;
+  /** True when the customer can resolve the failure themselves. */
+  lastRunErrorUserActionable: boolean;
   lastRunTracesProcessed: number;
   lastRunTopicsCount: number;
   lastRunSubtopicsCount: number;
@@ -35,7 +38,15 @@ export class TopicClusteringStatusService {
       lastRunOutcome: projection?.LastRunOutcome ?? null,
       lastRunMode: projection?.LastRunMode ?? null,
       lastRunSkippedReason: projection?.LastRunSkippedReason ?? null,
-      lastRunError: projection?.LastRunError ?? null,
+      // The raw provider error is only returned when the customer can act on
+      // it. Internal failure detail stays in the projection for operators —
+      // it never reaches the product surface.
+      lastRunError: projection?.LastRunErrorUserActionable
+        ? (projection.LastRunError ?? null)
+        : null,
+      lastRunErrorCode: projection?.LastRunErrorCode ?? null,
+      lastRunErrorUserActionable:
+        projection?.LastRunErrorUserActionable ?? false,
       lastRunTracesProcessed: projection?.LastRunTracesProcessed ?? 0,
       lastRunTopicsCount: projection?.LastRunTopicsCount ?? 0,
       lastRunSubtopicsCount: projection?.LastRunSubtopicsCount ?? 0,

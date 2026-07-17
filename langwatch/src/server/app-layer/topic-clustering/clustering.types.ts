@@ -1,4 +1,4 @@
-import type { Money } from "../../utils/types";
+import type { Money } from "../../../utils/types";
 
 export type ModelOption = {
   value: string;

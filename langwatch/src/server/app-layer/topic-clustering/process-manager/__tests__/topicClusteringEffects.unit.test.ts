@@ -132,7 +132,33 @@ describe("createTopicClusteringIntentHandlers", () => {
         runId: "20260717",
         page: 1,
         error: "langevals unavailable",
+        errorCode: "clustering_service",
+        userActionable: false,
       });
+    });
+
+    it("classifies provider credential failures as user-actionable", async () => {
+      const commands = makeCommands();
+      const handlers = createTopicClusteringIntentHandlers({
+        runPort: {
+          runClusteringPage: vi
+            .fn()
+            .mockRejectedValue(new Error("401 Unauthorized: invalid api key")),
+        },
+        commands,
+        clock: () => 999,
+      });
+
+      await handlers["topic_clustering.run"]!({
+        message: makeMessage({ attempt: 3 }),
+      });
+
+      expect(commands.recordClusteringRunFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          errorCode: "model_provider_auth",
+          userActionable: true,
+        }),
+      );
     });
   });
 });
