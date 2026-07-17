@@ -5,7 +5,7 @@ import { z } from "zod";
  * place that turns it into words the agent can act on.
  *
  * One definition, imported by BOTH ends:
- *   - the chat route (`routes/langy.ts`) spreads it into `chatRequestSchema`;
+ *   - the tRPC Langy router validates the turn input with it;
  *   - the panel builds the request body from the inferred types.
  *
  * ── WHY THIS FILE EXISTS ───────────────────────────────────────────────────
