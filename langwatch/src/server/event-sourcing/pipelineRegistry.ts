@@ -85,7 +85,7 @@ import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-pr
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 import type { TriggerActionDispatchDeps } from "./pipelines/shared/triggerActionDispatch";
-import { resolveMetricCommandShardCount } from "./pipelines/metric-processing/canonicalMetric";
+import { resolveMetricCommandShardCount } from "./pipelines/metric-processing/canonical/shards";
 import { createMetricProcessingPipeline } from "./pipelines/metric-processing/pipeline";
 import {
   MetricDataPointAppendStore,

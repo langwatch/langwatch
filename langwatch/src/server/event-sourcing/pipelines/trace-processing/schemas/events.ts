@@ -15,6 +15,7 @@ import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
 } from "./constants";
+import { metricCorrelationFields } from "./metricCorrelationFields";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
 /**
@@ -155,23 +156,9 @@ export const metricDataPointCorrelatedEventMetadataSchema = z
   })
   .passthrough();
 
-export const metricDataPointCorrelatedEventDataSchema = z.object({
-  traceId: z.string(),
-  spanId: z.string(),
-  pointId: z.string(),
-  seriesId: z.string(),
-  metricName: z.string(),
-  metricUnit: z.string(),
-  metricKind: z.enum([
-    "gauge",
-    "sum",
-    "histogram",
-    "exponential_histogram",
-    "summary",
-  ]),
-  exemplarValue: z.number().nullable(),
-  exemplarTimeUnixMs: z.number(),
-});
+export const metricDataPointCorrelatedEventDataSchema = z.object(
+  metricCorrelationFields,
+);
 
 export const metricDataPointCorrelatedEventSchema = EventSchema.extend({
   type: z.literal(METRIC_DATA_POINT_CORRELATED_EVENT_TYPE),

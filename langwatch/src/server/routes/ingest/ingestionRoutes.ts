@@ -43,6 +43,7 @@ import type {
   IExportLogsServiceRequest,
   IExportMetricsServiceRequest,
   IExportTraceServiceRequest,
+  IKeyValue,
 } from "@opentelemetry/otlp-transformer";
 import type { IngestionSource } from "@prisma/client";
 import type { Context } from "hono";
@@ -93,16 +94,38 @@ function buildOriginAttrs(source: IngestionSource) {
   ];
 }
 
+const RESERVED_ORIGIN_PREFIXES = [
+  "langwatch.origin.",
+  "langwatch.ingestion_source.",
+] as const;
+
+/**
+ * Receiver-authoritative origin attributes REPLACE any the payload supplied
+ * under a reserved key. Appending would leave two entries under one key and
+ * make governance attribution depend on which one a downstream flattener
+ * happens to keep — i.e. let a payload forge its own origin.
+ */
+function withOriginAttrs(
+  existing: IKeyValue[] | undefined,
+  source: IngestionSource,
+): IKeyValue[] {
+  const caller = (existing ?? []).filter(
+    (attribute) =>
+      !RESERVED_ORIGIN_PREFIXES.some((prefix) =>
+        attribute.key?.startsWith(prefix),
+      ),
+  );
+  return [...caller, ...buildOriginAttrs(source)];
+}
+
 function stampOriginAttrs(
   request: IExportTraceServiceRequest,
   source: IngestionSource,
 ): void {
-  const originAttrs = buildOriginAttrs(source);
   for (const rs of request.resourceSpans ?? []) {
     for (const ss of rs.scopeSpans ?? []) {
       for (const span of ss.spans ?? []) {
-        const existing = span.attributes ?? [];
-        span.attributes = [...existing, ...originAttrs];
+        span.attributes = withOriginAttrs(span.attributes, source);
       }
     }
   }
@@ -112,28 +135,28 @@ function stampLogOriginAttrs(
   request: IExportLogsServiceRequest,
   source: IngestionSource,
 ): void {
-  const originAttrs = buildOriginAttrs(source);
   for (const rl of request.resourceLogs ?? []) {
     for (const sl of rl.scopeLogs ?? []) {
       for (const record of sl.logRecords ?? []) {
-        const existing = record.attributes ?? [];
-        record.attributes = [...existing, ...originAttrs];
+        record.attributes = withOriginAttrs(record.attributes, source);
       }
     }
   }
 }
 
-function stampMetricOriginAttrs(
-  request: IExportMetricsServiceRequest,
-  source: IngestionSource,
-): void {
-  const originAttrs = buildOriginAttrs(source);
+function stampMetricOriginAttrs({
+  request,
+  source,
+}: {
+  request: IExportMetricsServiceRequest;
+  source: IngestionSource;
+}): void {
   for (const resourceMetrics of request.resourceMetrics ?? []) {
     const resource = resourceMetrics.resource ?? {
       attributes: [],
       droppedAttributesCount: 0,
     };
-    resource.attributes = [...(resource.attributes ?? []), ...originAttrs];
+    resource.attributes = withOriginAttrs(resource.attributes, source);
     resourceMetrics.resource = resource;
   }
 }
@@ -878,12 +901,20 @@ secured
             ),
           0,
         );
-        if (metricCount > 0) {
+        // Gate on the payload carrying metrics at all, not on its datapoint
+        // arrays being well-formed: a request whose metrics all have malformed
+        // dataPoints has a zero pre-count, and skipping validation would ack it
+        // as fully accepted with nothing rejected.
+        const resourceMetrics = parsed.request.resourceMetrics;
+        const hasMetricPayload = Array.isArray(resourceMetrics)
+          ? resourceMetrics.length > 0
+          : resourceMetrics != null;
+        if (hasMetricPayload) {
           const govProject = await ensureHiddenGovernanceProject(
             prisma,
             source.organizationId,
           );
-          stampMetricOriginAttrs(parsed.request, source);
+          stampMetricOriginAttrs({ request: parsed.request, source });
           const result =
             await getApp().traces.metricCollection.handleOtlpMetricRequest({
               tenantId: govProject.id,

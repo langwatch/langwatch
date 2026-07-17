@@ -96,7 +96,9 @@ export class StorageMeterService {
   }
 
   /**
-   * Total stored bytes for a tenant across all retention-managed tables, served
+   * Total stored bytes for a tenant across the production-metered tables
+   * ({@link PRODUCTION_STORAGE_METER_TABLES} — every retention-managed table
+   * except the shadow-only canonical metric ones), served
    * stale-while-revalidate: a cached value is returned immediately, and if it
    * has aged past {@link STORAGE_FRESH_MS} a single-flighted background refresh
    * is kicked (see {@link refreshInBackground}). Only the first read for a
@@ -247,8 +249,9 @@ export class StorageMeterService {
 
   /**
    * Sums per-table `_size_bytes` totals for a tenant in a single query. Each
-   * table is pre-aggregated inside a UNION ALL so only one scalar subtotal per
-   * managed table (not every row's `_size_bytes`) reaches the outer sum.
+   * production-metered table is pre-aggregated inside a UNION ALL so only one
+   * scalar subtotal per table (not every row's `_size_bytes`) reaches the
+   * outer sum.
    *
    * On parts where `_size_bytes` was never materialized this still recomputes
    * `byteSize(...)` over the heavy payload columns, which for the largest
@@ -266,7 +269,7 @@ export class StorageMeterService {
     if (!this.resolveClickHouseClient) return 0;
 
     const client = await this.resolveClickHouseClient(tenantId);
-    // Aggregate per-table first, then sum the scalar subtotals. The naive
+    // Aggregate per-table first, then sum one scalar per table. The naive
     // UNION ALL on raw rows materializes every _size_bytes value into the
     // intermediate set before summing — explodes memory for tenants with
     // tens of millions of rows.

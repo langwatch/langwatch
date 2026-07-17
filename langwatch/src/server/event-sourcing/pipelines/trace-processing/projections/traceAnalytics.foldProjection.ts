@@ -35,6 +35,7 @@ import {
   topicAssignedEventSchema,
   traceNameChangedEventSchema,
 } from "../schemas/events";
+import { METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE } from "../schemas/constants";
 import type { NormalizedSpan } from "../schemas/spans";
 import {
   liftCanonicalAttributesFromLogRecord,
@@ -788,13 +789,16 @@ export class TraceAnalyticsFoldProjection
           : Math.min(timeToFirstTokenMs, ttftMs);
     }
 
+    // Counts exemplar correlations, not metric data points: the canonical
+    // datapoint stream is a separate pipeline this fold never sees, so it
+    // cannot know how many points a trace's metrics produced.
     const mergedAttributes = { ...state.attributes };
-    const metricCount = parseInt(
-      mergedAttributes["langwatch.reserved.metric_record_count"] ?? "0",
+    const correlationCount = parseInt(
+      mergedAttributes[METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE] ?? "0",
       10,
     );
-    mergedAttributes["langwatch.reserved.metric_record_count"] = String(
-      metricCount + 1,
+    mergedAttributes[METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE] = String(
+      correlationCount + 1,
     );
 
     return {
