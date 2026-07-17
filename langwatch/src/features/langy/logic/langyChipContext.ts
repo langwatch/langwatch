@@ -21,9 +21,9 @@ import { shortenChipId } from "./langyContextChips";
  *   selection  -> THE ROWS.   "Langy gets exactly these traces, and nothing else."
  *
  * That mapping is not a decision imposed on the data, it is a description of
- * it: `filterContextChip` already puts the query text in `ref`, and
- * `selectionContextChip` already puts the trace ids in `ref`. Each chip was
- * already the thing it naturally is. What was missing was anyone saying so.
+ * it: filter chips put the query text in `ref`, and selection chips put the
+ * trace ids in `ref`. Each chip was already the thing it naturally is. What was
+ * missing was anyone saying so.
  *
  * THE HOVER IS DERIVED FROM `ref`, NOT WRITTEN ALONGSIDE IT. `ref` is the field
  * that rides to the server, so describing anything else would be describing a

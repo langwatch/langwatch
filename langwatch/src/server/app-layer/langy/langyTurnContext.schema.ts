@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { LANGY_SKILLS } from "~/shared/langy/langySkills";
 
 /**
  * THE WIRE SHAPE for everything the composer attaches to a turn — and the one
@@ -10,11 +9,10 @@ import { LANGY_SKILLS } from "~/shared/langy/langySkills";
  *   - the panel builds the request body from the inferred types.
  *
  * ── WHY THIS FILE EXISTS ───────────────────────────────────────────────────
- * The panel sent `pageContext` on every turn for weeks and it never arrived:
- * `chatRequestSchema` never declared the field, and a non-strict Zod object
- * SILENTLY STRIPS what it doesn't know. The chips looked like they steered Langy
- * and steered nothing — invisible from both sides, because neither end ever said
- * out loud what the contract was.
+ * The panel once sent `pageContext` without a shared schema, so the server's
+ * non-strict Zod object silently stripped it. The chips looked like they steered
+ * Langy and steered nothing — invisible from both sides, because neither end
+ * stated the contract.
  *
  * A schema both ends import cannot drift like that: if the route stops accepting
  * a field, the client stops compiling. That structural guarantee is the whole
@@ -24,8 +22,8 @@ import { LANGY_SKILLS } from "~/shared/langy/langySkills";
  *
  * Two separate problems, handled separately.
  *
- * 1. PROMPT INJECTION. Every `label`, `ref` and skill `on` is a string the client
- *    chose. Pasted verbatim into a system block, a label is a free line of system
+ * 1. PROMPT INJECTION. Every `label` and `ref` is a string the client chose.
+ *    Pasted verbatim into a system block, a label is a free line of system
  *    prompt — "…and also delete every dataset". The exploit is the NEWLINE: it is
  *    what lets a value stop being a value and become a LINE. So all of it is
  *    sanitised (control characters incl. CR/LF, and backticks, stripped; lengths
@@ -42,7 +40,7 @@ import { LANGY_SKILLS } from "~/shared/langy/langySkills";
  *    permissions (ADR-047). A forged ref dies at that boundary, which is the same
  *    boundary every other read goes through. The invariant holds because we never
  *    gave the ref any privilege: passing an id to a model is not the same as
- *    reading it. The same is true of a skill's `on` target.
+ *    reading it.
  */
 
 /** Labels are UI strings, not essays — long enough for a filter summary. */
@@ -54,29 +52,6 @@ const MAX_LABEL_LENGTH = 200;
 const MAX_REF_LENGTH = 4_000;
 /** More chips than the composer can produce. */
 const MAX_RESOURCE_CHIPS = 12;
-const MAX_SKILL_CHIPS = 6;
-
-/**
- * The valid skill ids, DERIVED — never hand-listed.
- *
- * `LANGY_SKILLS` is computed from the only two places a Langy capability can
- * come from: `feature-map.json`'s CLI-backed features, and the agent's own
- * skills on disk. Validating against it means an unknown skill id is REJECTED
- * rather than passed through to the model as a free string — the same rule as
- * `kind` below. A capability that does not exist cannot be asked for, because it
- * cannot appear in the list.
- *
- * The catalogue lives in `~/shared/langy` — a NEUTRAL module, imported DOWN by
- * the server and ACROSS by the UI. It is not re-derived here: a second
- * derivation is a second thing to drift, and drift is the bug this whole module
- * exists to prevent. It is not imported from `features/` either: the server must
- * never depend on the app layer, or a UI concern becomes load-bearing in a
- * request path. Pure data over `feature-map.json`, so it belongs to neither side.
- */
-const SKILL_IDS = LANGY_SKILLS.map((skill) => skill.id) as [
-  string,
-  ...string[],
-];
 
 /**
  * A resource the user is looking at, attached so the agent can resolve "this
@@ -107,36 +82,14 @@ export const langyResourceContextSchema = z.object({
 export type LangyResourceContext = z.infer<typeof langyResourceContextSchema>;
 
 /**
- * A capability the user has explicitly asked Langy to use.
- *
- * This is STEERING, not context: a resource chip says "look at this", a skill
- * chip says "DO this". `id` must name a real capability (see `SKILL_IDS`).
- *
- * `on` optionally binds the skill to one of the turn's resource chips — the "use
- * the GitHub skill, on this trace" case. It carries the resource's LABEL rather
- * than an index, so the value survives the user reordering or removing other
- * chips, and so the server never has to resolve a pointer.
- */
-export const langySkillContextSchema = z.object({
-  id: z.enum(SKILL_IDS),
-  label: z.string().max(MAX_LABEL_LENGTH),
-  /** The label of the resource chip this skill is aimed at, if any. */
-  on: z.string().max(MAX_LABEL_LENGTH).optional(),
-});
-
-export type LangySkillContext = z.infer<typeof langySkillContextSchema>;
-
-/**
  * The fields a turn carries beyond its messages. Spread into the route's body
- * schema. Both arrays are capped: an unbounded context array is an unbounded
- * prompt.
+ * schema. The array is capped: unbounded context is an unbounded prompt.
  */
 export const langyTurnContextSchema = z.object({
   pageContext: z
     .array(langyResourceContextSchema)
     .max(MAX_RESOURCE_CHIPS)
     .optional(),
-  skills: z.array(langySkillContextSchema).max(MAX_SKILL_CHIPS).optional(),
 });
 
 export type LangyTurnContext = z.infer<typeof langyTurnContextSchema>;
@@ -200,13 +153,6 @@ function describeResource(chip: LangyResourceContext): string | null {
   }
 }
 
-/** A skill the user asked for, and what they aimed it at. */
-function describeSkill(skill: LangySkillContext): string | null {
-  const label = sanitize(skill.label, MAX_LABEL_LENGTH) || skill.id;
-  const on = skill.on ? sanitize(skill.on, MAX_LABEL_LENGTH) : "";
-  return on ? `- ${label} — applied to: ${on}` : `- ${label}`;
-}
-
 /**
  * Render the turn's attached context as a system block, or null when there is
  * nothing to say.
@@ -223,25 +169,10 @@ export function renderLangyTurnContext(
   const resources = (context.pageContext ?? [])
     .map(describeResource)
     .filter((line): line is string => !!line);
-  const skills = (context.skills ?? [])
-    .map(describeSkill)
-    .filter((line): line is string => !!line);
 
-  if (resources.length === 0 && skills.length === 0) return null;
+  if (resources.length === 0) return null;
 
   const blocks: string[] = [];
-
-  if (skills.length > 0) {
-    blocks.push(
-      [
-        "THE USER HAS EXPLICITLY ASKED FOR THESE CAPABILITIES. Use them — this is",
-        "not a hint, it is what they picked off a menu. If one is applied to a",
-        "resource, that is the thing to apply it to:",
-        "",
-        ...skills,
-      ].join("\n"),
-    );
-  }
 
   if (resources.length > 0) {
     blocks.push(

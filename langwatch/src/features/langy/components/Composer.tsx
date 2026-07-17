@@ -61,10 +61,8 @@ const COMPOSER_PLACEHOLDER = "Ask Langy or describe what you want…";
  * the seam: when one gets wiring it grows an `onClick` and drops out of the
  * placeholder path, and the layout does not change to accommodate it.
  *
- * "Skills" USED to sit here as a third greyed-out button. It is gone because
- * skills are now real — they have a catalogue, a chip, and a `/` to summon them
- * — and leaving a dead button next to a live feature is how a UI teaches people
- * that its buttons are decoration.
+ * Skills are ambient agent capabilities, so they do not need a second,
+ * user-managed control in the composer.
  */
 function ComposerImpl({
   model,
@@ -143,8 +141,7 @@ function ComposerImpl({
    *
    * The trigger key is NEVER inserted into the draft — we intercept it on
    * keydown and open the palette instead. That is why there is no "strip the
-   * token" step anywhere in this file: there is no token. A half-typed `/git`
-   * cannot leak into a prompt because it never lived in the textarea.
+   * token" step anywhere in this file: there is no token.
    *
    * Only fires at a word boundary (start of the message, or after whitespace),
    * so a URL's `https://` and a `#tag` mid-sentence are left alone.
@@ -252,7 +249,7 @@ function ComposerImpl({
           transition="border-color 150ms ease, box-shadow 150ms ease"
           overflow="hidden"
         >
-          {/* `/` or `#` turns the top of the card into a real combobox. It is
+          {/* `#` turns the top of the card into a real combobox. It is
               the SAME rounded surface — the composer becomes a command bar
               rather than sprouting a popup beside one. */}
           {palette ? (
@@ -317,7 +314,7 @@ function ComposerImpl({
               affordances on the left, send / stop on the right.
 
               The rail is built to GROW — one primitive, one array — but it only
-              ever shows what is real. Effort, skills and attachments have no
+              ever shows what is real. Effort and file attachments have no
               wiring behind them today, so they render as explicitly disabled
               placeholders rather than buttons that lie: a greyed glyph with a
               "Coming soon" tooltip, quiet enough that they never compete with
@@ -437,7 +434,7 @@ function RailButton({
   );
 }
 
-/** One quiet summary replaces the old wrapping pile of context/skill pills. */
+/** One quiet summary replaces the old wrapping pile of context chips. */
 function ContextSummaryMenu({
   contextChips,
   addableChips,

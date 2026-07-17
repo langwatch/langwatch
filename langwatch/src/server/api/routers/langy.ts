@@ -127,7 +127,7 @@ const langyTurnInputShape = {
   trigger: z
     .enum(["submit-message", "regenerate-message", "resume-stream"])
     .optional(),
-  // Composer context chips (page context + skills) — bounded + sanitised in
+  // Composer page-context chips — bounded and sanitised in
   // renderLangyTurnContext; refs are never resolved by the control plane.
   ...langyTurnContextSchema.shape,
 } as const;
@@ -207,7 +207,6 @@ async function acceptTurn({
     modelOverride?: string;
     trigger?: "submit-message" | "regenerate-message" | "resume-stream";
     pageContext?: LangyTurnContext["pageContext"];
-    skills?: LangyTurnContext["skills"];
   };
   session: Session;
 }): Promise<{ conversationId: string; turnId: string }> {
@@ -219,7 +218,7 @@ async function acceptTurn({
     messages: input.messages,
     ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
     isRetry: input.trigger === "regenerate-message",
-    turnContext: { pageContext: input.pageContext, skills: input.skills },
+    turnContext: { pageContext: input.pageContext },
   });
 }
 

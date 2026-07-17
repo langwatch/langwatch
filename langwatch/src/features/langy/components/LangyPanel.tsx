@@ -909,7 +909,7 @@ function LangyPanel({
     setDraft("");
     try {
       // No per-send body: the custom transport sources projectId + conversation
-      // + model + page-context + skills from `turnContextRef` (getContext) at
+      // + model + page context from `turnContextRef` (getContext) at
       // send time, so both a fresh send AND regenerate() carry the full context.
       await sendMessage({ role: "user", parts: [{ type: "text", text }] });
     } catch {
