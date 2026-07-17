@@ -2,39 +2,10 @@ import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import type { TargetConfig } from "../types";
-
-/** What a name query yields, whichever entity it fetched. */
-type NamedEntity = { name?: string | null; handle?: string | null };
-
-/**
- * Pick a target's display name from its already-fetched entity. Pure, so the
- * single-target and batched hooks below cannot drift apart.
- *
- * Prompts prefer the globally-unique handle, then the plain name (always
- * present on LlmPromptConfig), then "New Prompt" — a placeholder prompt with
- * no handle yet should still render a label. An empty string means "loading".
- */
-const pickTargetName = ({
-  target,
-  entity,
-  isLoading,
-}: {
-  target: TargetConfig | undefined;
-  entity: NamedEntity | undefined;
-  isLoading: boolean;
-}): string => {
-  if (!target) return "";
-  if (target.type === "prompt") {
-    if (!target.promptId) return "New Prompt";
-    if (isLoading) return "";
-    return entity?.handle ?? entity?.name ?? "New Prompt";
-  }
-  if (target.type === "agent" || target.type === "evaluator") {
-    if (isLoading) return "";
-    return entity?.name ?? "";
-  }
-  return "";
-};
+import {
+  pickTargetName,
+  type NamedEntity,
+} from "../utils/targetDisplayName";
 
 /**
  * Hook to fetch the display name for a target from the database.

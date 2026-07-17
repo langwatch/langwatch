@@ -95,6 +95,92 @@ describe("TargetHeader", () => {
       expect(screen.getByText("my-assistant")).toBeInTheDocument();
     });
 
+    // Regression (bugbash 2026-07-14): duplicating a prompt gives two columns
+    // that resolve to the same handle, and the header rendered both as a bare
+    // "support-detailed" — indistinguishable on screen, even though the
+    // comparison config's variant cards numbered them (1)/(2).
+    describe("when another column resolves to the same name", () => {
+      const duplicate = (id: string): TargetConfig => ({
+        id,
+        type: "prompt",
+        promptId: "prompt-shared",
+        inputs: [],
+        outputs: [],
+        mappings: {},
+      });
+
+      const seedSameNamedColumns = () => {
+        vi.mocked(useTargetName).mockImplementation((t: { id: string }) =>
+          t.id.startsWith("dup-") ? "support-detailed" : t.id,
+        );
+        const store = useEvaluationsV3Store.getState();
+        store.reset();
+        store.addTarget(duplicate("dup-1"));
+        store.addTarget(duplicate("dup-2"));
+      };
+
+      it("numbers this column by its position among the columns", () => {
+        seedSameNamedColumns();
+
+        renderWithProviders(
+          <TargetHeader
+            target={duplicate("dup-1")}
+            onEdit={mockOnEdit}
+            onRemove={mockOnRemove}
+          />,
+        );
+
+        expect(screen.getByText("support-detailed (1)")).toBeInTheDocument();
+      });
+
+      it("gives the second column the next ordinal", () => {
+        seedSameNamedColumns();
+
+        renderWithProviders(
+          <TargetHeader
+            target={duplicate("dup-2")}
+            onEdit={mockOnEdit}
+            onRemove={mockOnRemove}
+          />,
+        );
+
+        expect(screen.getByText("support-detailed (2)")).toBeInTheDocument();
+      });
+    });
+
+    // Regression (bugbash 2026-07-14): the header row is a flex row, and a flex
+    // item's default min-width:auto meant the name and the "<winner> wins"
+    // summary refused to shrink — the row grew past the column and the run
+    // button slid under the next column. The button must be the one thing that
+    // never shrinks; everything else absorbs the squeeze.
+    it("keeps the play button from being squeezed out of its column", () => {
+      renderWithProviders(
+        <TargetHeader
+          target={promptTarget}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      expect(screen.getByTestId("target-play-button")).toHaveStyle({
+        flexShrink: "0",
+      });
+    });
+
+    it("lets the name shrink so it truncates instead of pushing siblings out", () => {
+      renderWithProviders(
+        <TargetHeader
+          target={promptTarget}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      expect(screen.getByTestId("target-header-button")).toHaveStyle({
+        minWidth: "0",
+      });
+    });
+
     it("shows play button on the far right", () => {
       renderWithProviders(
         <TargetHeader

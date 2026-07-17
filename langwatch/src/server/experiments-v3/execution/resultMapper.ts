@@ -10,6 +10,7 @@
  */
 
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import { EvaluatorExecutionError } from "~/server/app-layer/evaluations/errors";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { EvaluationV3Event } from "./types";
 
@@ -82,6 +83,19 @@ export const coercePassed = (value: unknown): boolean | undefined => {
     if (lower === "false") return false;
   }
   return undefined;
+};
+
+const HTTP_STATUS_PREFIX_PATTERN = /^\s*(\d{3})\b/;
+
+const classifyEvaluatorExecutionError = (
+  rawMessage: string,
+): EvaluatorExecutionError | undefined => {
+  const status = Number(rawMessage.match(HTTP_STATUS_PREFIX_PATTERN)?.[1]);
+  if (status !== 401 && status !== 403) return undefined;
+
+  return new EvaluatorExecutionError(rawMessage, {
+    meta: { httpStatus: status },
+  });
 };
 
 /**
@@ -212,16 +226,25 @@ export const mapEvaluatorResult = (
   const hasExecutionError = !!executionState.error;
   const hasEvaluatorError = executionState.outputs?.status === "error";
 
-  const result: SingleEvaluationResult =
+  const rawErrorDetails =
+    executionState.error ??
+    (executionState.outputs?.details as string | undefined) ??
+    "Unknown evaluator error";
+  const classifiedDomainError =
+    classifyEvaluatorExecutionError(rawErrorDetails);
+
+  const result: SingleEvaluationResult & {
+    domainError?: ReturnType<EvaluatorExecutionError["serialize"]>;
+  } =
     hasExecutionError || hasEvaluatorError
       ? {
           status: "error",
           error_type: "EvaluatorError",
-          details:
-            executionState.error ??
-            (executionState.outputs?.details as string | undefined) ??
-            "Unknown evaluator error",
+          details: rawErrorDetails,
           traceback: [],
+          ...(classifiedDomainError
+            ? { domainError: classifiedDomainError.serialize() }
+            : {}),
         }
       : {
           status: "processed",

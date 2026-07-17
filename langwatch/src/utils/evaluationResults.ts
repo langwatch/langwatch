@@ -1,3 +1,6 @@
+import { z } from "zod";
+import type { SerializedHandledError } from "~/server/app-layer/handled-error";
+
 /**
  * Parsed evaluation result with status information.
  * Used for rendering evaluation results in UI components.
@@ -23,7 +26,59 @@ export type ParsedEvaluationResult = {
   score?: number;
   label?: string;
   details?: string;
+  domainError?: SerializedHandledError;
 };
+
+// `code` is HandledError's real discriminant; `kind` is a deprecated
+// back-compat alias (see handled-error.ts). Older serialised payloads may
+// carry only one of the two, so at least one is required and the other is
+// derived from it.
+const serializedReasonSchema: z.ZodType<{
+  code: string;
+  kind: string;
+  meta?: Record<string, unknown>;
+  reasons?: unknown[];
+}> = z.lazy(() =>
+  z.object({
+    code: z.string(),
+    kind: z.string(),
+    meta: z.record(z.unknown()).optional(),
+    reasons: z.array(serializedReasonSchema).optional(),
+  }),
+);
+
+const serializedHandledErrorSchema = z
+  .object({
+    code: z.string().optional(),
+    kind: z.string().optional(),
+    meta: z.record(z.unknown()).optional(),
+    traceId: z.string().optional(),
+    spanId: z.string().optional(),
+    traceUrl: z.string().optional(),
+    httpStatus: z.number(),
+    reasons: z.array(serializedReasonSchema).optional(),
+  })
+  .refine((value) => value.code !== undefined || value.kind !== undefined)
+  .transform((value): SerializedHandledError => {
+    const code = value.code ?? value.kind!;
+    return {
+      code,
+      kind: value.kind ?? code,
+      httpStatus: value.httpStatus,
+      meta: value.meta ?? {},
+      traceId: value.traceId,
+      spanId: value.spanId,
+      traceUrl: value.traceUrl,
+      reasons: (value.reasons ?? []) as SerializedHandledError["reasons"],
+    };
+  });
+
+function readSerializedDomainError(
+  candidate: unknown,
+): SerializedHandledError | undefined {
+  const result = serializedHandledErrorSchema.safeParse(candidate);
+  return result.success ? result.data : undefined;
+}
 
 /**
  * Parses an unknown evaluation result into a typed structure.
@@ -62,6 +117,7 @@ export const parseEvaluationResult = (
       parsed.status = "error";
       parsed.details =
         typeof obj.error === "string" ? obj.error : JSON.stringify(obj.error);
+      parsed.domainError = readSerializedDomainError(obj.domainError);
       return parsed;
     }
 
@@ -71,6 +127,7 @@ export const parseEvaluationResult = (
       if ("details" in obj && typeof obj.details === "string") {
         parsed.details = obj.details;
       }
+      parsed.domainError = readSerializedDomainError(obj.domainError);
       return parsed;
     }
 
@@ -290,7 +347,9 @@ function normalizeEvalStatus(
 
 /** Same score formatter used by the trace table EvalChip — share so the
  *  drawer chip never disagrees on rounding. */
-export function formatEvalScoreText(score: number | boolean | null | undefined): string | null {
+export function formatEvalScoreText(
+  score: number | boolean | null | undefined,
+): string | null {
   if (typeof score !== "number") return null;
   return score <= 1 ? score.toFixed(2) : score.toFixed(1);
 }
@@ -315,10 +374,8 @@ export function getEvalChipDisplay(input: EvalChipInput): EvalChipDisplay {
   // pure boolean verdict (no numeric score to show in its place).
   let passLabel: EvalChipDisplay["passLabel"] = null;
   if (scoreText == null && !noVerdict) {
-    if (status === "passed")
-      passLabel = { text: "Pass", color: "green.fg" };
-    else if (status === "failed")
-      passLabel = { text: "Fail", color: "red.fg" };
+    if (status === "passed") passLabel = { text: "Pass", color: "green.fg" };
+    else if (status === "failed") passLabel = { text: "Fail", color: "red.fg" };
   }
 
   return {

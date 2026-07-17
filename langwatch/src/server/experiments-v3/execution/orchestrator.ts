@@ -28,12 +28,14 @@ import {
 } from "~/experiments-v3/types";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
+import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
+import { HandledError } from "~/server/app-layer/handled-error";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { RecordTargetResultCommandData } from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
@@ -105,6 +107,42 @@ export type OrchestratorInput = {
 };
 
 /**
+ * The dataset rows a run is actually allowed to touch, given its scope.
+ *
+ * Every phase must agree on this. Phase 2 (comparison) used to loop over EVERY
+ * dataset row regardless of scope, so running one row's comparison emitted a
+ * "waiting on …" skip for all the OTHER rows — overwriting their existing
+ * verdicts with an error the user never asked for (bugbash 2026-07-14).
+ *
+ * `full`/`target`/`evaluator-all-rows` span the dataset; the rest are pinned to
+ * the rows the user picked.
+ */
+export const resolveScopedRowIndices = ({
+  scope,
+  rowCount,
+}: {
+  scope: ExecutionScope;
+  rowCount: number;
+}): number[] => {
+  const allRows = () => Array.from({ length: rowCount }, (_, i) => i);
+  const inRange = (i: number) => i >= 0 && i < rowCount;
+
+  switch (scope.type) {
+    case "full":
+    case "target":
+    case "evaluator-all-rows":
+      return allRows();
+    case "rows":
+      return scope.rowIndices.filter(inRange);
+    case "cell":
+    case "evaluator":
+      return [scope.rowIndex].filter(inRange);
+    default:
+      return [];
+  }
+};
+
+/**
  * Generates all cells to execute based on the scope.
  */
 export const generateCells = (
@@ -114,6 +152,12 @@ export const generateCells = (
   >,
   datasetRows: Array<Record<string, unknown>>,
   scope: ExecutionScope,
+  options: {
+    seedTargetOutputs?: Record<
+      string,
+      { output: unknown; cost?: number; duration?: number }
+    >;
+  } = {},
 ): ExecutionCell[] => {
   const cells: ExecutionCell[] = [];
   const datasetId =
@@ -201,17 +245,12 @@ export const generateCells = (
     return cells;
   }
 
-  // Determine which rows to process
-  const rowIndices =
-    scope.type === "full"
-      ? datasetRows.map((_, i) => i)
-      : scope.type === "rows"
-        ? scope.rowIndices.filter((i) => i >= 0 && i < datasetRows.length)
-        : scope.type === "target"
-          ? datasetRows.map((_, i) => i)
-          : scope.type === "cell"
-            ? [scope.rowIndex]
-            : [];
+  // Determine which rows to process. Shared with Phase 2's comparison cells so
+  // the two phases can never disagree about what's in scope.
+  const rowIndices = resolveScopedRowIndices({
+    scope,
+    rowCount: datasetRows.length,
+  });
 
   // Determine which targets to process.
   //
@@ -244,6 +283,22 @@ export const generateCells = (
             ? expandComparisonDeps(scope.targetId)
             : [];
 
+  const scopedComparisonDeps =
+    scope.type === "target" || scope.type === "cell"
+      ? new Set(
+          (() => {
+            const scopedTarget = state.targets.find(
+              (target) => target.id === scope.targetId,
+            );
+            if (!scopedTarget) return [];
+
+            return (toComparisonConfig(scopedTarget)?.variants ?? []).filter(
+              (variant): variant is string => !!variant,
+            );
+          })(),
+        )
+      : new Set<string>();
+
   // Generate cells, skipping empty rows
   for (const rowIndex of rowIndices) {
     const datasetEntry = datasetRows[rowIndex];
@@ -256,6 +311,13 @@ export const generateCells = (
     }
 
     for (const targetId of targetIds) {
+      if (
+        scopedComparisonDeps.has(targetId) &&
+        options.seedTargetOutputs?.[`${rowIndex}:${targetId}`]
+      ) {
+        continue;
+      }
+
       const targetConfig = state.targets.find(
         (t: TargetConfig) => t.id === targetId,
       );
@@ -345,35 +407,53 @@ export const formatList = (names: string[]): string => {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 };
 
-export const generateComparisonCells = (
+export const generateComparisonCells = ({
+  state,
+  datasetRows,
+  completedTargetOutputs,
+  completedTargetEvaluatorScores,
+  loadedPrompts,
+  loadedEvaluators,
+  scopedRowIndices,
+}: {
   state: Pick<
     EvaluationsV3State,
     "datasets" | "activeDatasetId" | "targets" | "evaluators"
-  >,
-  datasetRows: Array<Record<string, unknown>>,
+  >;
+  datasetRows: Array<Record<string, unknown>>;
   completedTargetOutputs: Map<
     string,
     { output: unknown; cost?: number; duration?: number }
-  >,
+  >;
   completedTargetEvaluatorScores?: Map<
     string,
     Array<{ name: string; score?: number; label?: string; passed?: boolean }>
-  >,
-  loadedPrompts?: Map<string, VersionedPrompt>,
+  >;
+  loadedPrompts?: Map<string, VersionedPrompt>;
   /**
    * DB evaluators, keyed by id — used to detect a column-target whose backing
    * evaluator row is still the legacy `pairwise_compare` judge (see
-   * `isLegacyPairwiseBacked` below). Optional so every existing call
-   * site (including every test in this file) keeps compiling unchanged; when
-   * omitted, column-targets are treated as current-shape comparisons, same as
-   * before this parameter existed.
+   * `isLegacyPairwiseBacked` below). When omitted, column-targets are treated
+   * as current-shape comparisons.
    */
-  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
-): { cells: ExecutionCell[]; skipReasons: ComparisonSkipReason[] } => {
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+  /**
+   * Rows this run is scoped to; omit to mean every row.
+   *
+   * Required rather than optional-with-a-default, because the failure mode of
+   * forgetting it is silent and destructive: comparison cells for out-of-scope
+   * rows emit "waiting on …" skips that overwrite verdicts the user never asked
+   * to re-run. An explicit `undefined` at the call site is a decision; a missing
+   * argument is an oversight, and the two should not look the same.
+   */
+  scopedRowIndices: number[] | undefined;
+}): { cells: ExecutionCell[]; skipReasons: ComparisonSkipReason[] } => {
   const cells: ExecutionCell[] = [];
   const skipReasons: ComparisonSkipReason[] = [];
   const datasetId =
     state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+  const rowsInScope =
+    scopedRowIndices ?? datasetRows.map((_, rowIndex) => rowIndex);
 
   /**
    * Structured-output narrowing: when the comparison config carries an output
@@ -416,7 +496,10 @@ export const generateComparisonCells = (
    * serializing the output a second time itself — `toCandidateText` is the one
    * place that turns an output into judge-readable text, structured or not.
    */
-  const evaluatorScoresBlock = (rowIndex: number, variantId: string): string => {
+  const evaluatorScoresBlock = (
+    rowIndex: number,
+    variantId: string,
+  ): string => {
     const scores = completedTargetEvaluatorScores?.get(
       `${rowIndex}:${variantId}`,
     );
@@ -507,6 +590,40 @@ export const generateComparisonCells = (
   };
 
   /**
+   * A variant's human-readable display name — the same label the workbench
+   * column header and the comparison config cards show (prompt handle, then
+   * name; evaluator name), NOT the collision-safe identifier the judge slots
+   * are keyed on. buildVariantIdentifiers falls back to the raw target id for
+   * same-handle variants, which is correct for the judge but leaks
+   * `target_17841…`-style ids into any user-facing copy that reuses it (e.g. the
+   * "Waiting on …" skip message). Mirrors the frontend's pickTargetName so the
+   * two never drift.
+   */
+  const variantDisplayNameFor = (t: TargetConfig): string => {
+    if (t.type === "prompt") {
+      if (!t.promptId) return "New Prompt";
+      const loaded = loadedPrompts?.get(t.promptId);
+      return loaded?.handle ?? loaded?.name ?? "New Prompt";
+    }
+    if (t.type === "evaluator" && t.targetEvaluatorId) {
+      return loadedEvaluators?.get(t.targetEvaluatorId)?.name ?? t.id;
+    }
+    // Agents/workflows: no loaded entity map is threaded into this function, so
+    // fall back to the collision-safe identifier — same as before this helper.
+    return variantIdentifierFor(t);
+  };
+
+  /**
+   * Display names for a comparison's variants, with the same "(1)/(2)" suffixing
+   * the config UI applies to same-name variants — so "support-detailed" run
+   * twice reads as "support-detailed (1)" / "(2)" in the skip message, matching
+   * the variant cards, instead of two identical names or two raw ids.
+   */
+  const buildVariantDisplayNames = (
+    resolvedVariants: TargetConfig[],
+  ): string[] => disambiguateNames(resolvedVariants.map(variantDisplayNameFor));
+
+  /**
    * Resolve configured variant ids to their TargetConfigs, or null if
    * unusable. Applies the same "is this comparison usable" gate to every
    * comparison carrier — chip-style (evaluator.comparison) and column-style
@@ -573,7 +690,9 @@ export const generateComparisonCells = (
    * (no `loadedEvaluators`, or the id isn't in it) — the safe default that
    * matches this function's pre-existing behavior.
    */
-  const isLegacyPairwiseBacked = (dbEvaluatorId: string | undefined): boolean => {
+  const isLegacyPairwiseBacked = (
+    dbEvaluatorId: string | undefined,
+  ): boolean => {
     if (!dbEvaluatorId) return false;
     const dbConfig = loadedEvaluators?.get(dbEvaluatorId)?.config as
       | { evaluatorType?: string }
@@ -591,16 +710,23 @@ export const generateComparisonCells = (
     cfg: ComparisonEvaluatorConfig,
     resolvedVariants: TargetConfig[],
     variantIds: string[],
+    variantDisplayNames: string[],
     rowIndex: number,
   ):
-    | { candidates: ExecutionCell["comparison"]; missing?: never; empty?: never }
+    | {
+        candidates: ExecutionCell["comparison"];
+        missing?: never;
+        empty?: never;
+      }
     | { candidates?: never; missing: string[]; empty?: never }
     | { candidates?: never; missing?: never; empty: string[] } => {
     const outputs = cfg.variants.map((id) =>
       completedTargetOutputs.get(`${rowIndex}:${id}`),
     );
 
-    const missing = variantIds.filter((_, i) => !outputs[i]);
+    // Report the friendly display name (not the judge's collision-safe id) for
+    // any variant we're waiting on — this list is only ever shown to the user.
+    const missing = variantDisplayNames.filter((_, i) => !outputs[i]);
     if (missing.length > 0) return { missing };
 
     const candidates = cfg.variants.map((variantId, i) => {
@@ -628,7 +754,9 @@ export const generateComparisonCells = (
     // skip the row silently; surface it as a skip reason instead, so a renamed
     // output field doesn't turn into a verdict computed from one fewer
     // candidate (or a bare "no verdict" for a two-way).
-    const empty = variantIds.filter((_, i) => candidates[i]!.output === "");
+    const empty = variantDisplayNames.filter(
+      (_, i) => candidates[i]!.output === "",
+    );
     if (empty.length > 0) return { empty };
 
     return { candidates: { candidates } };
@@ -644,13 +772,20 @@ export const generateComparisonCells = (
     if (!resolvedVariants) continue;
 
     const variantIds = buildVariantIdentifiers(resolvedVariants);
+    const variantDisplayNames = buildVariantDisplayNames(resolvedVariants);
     const anchorVariant = resolvedVariants[0]!;
 
-    for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
+    for (const rowIndex of rowsInScope) {
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
 
-      const built = buildCandidates(cfg, resolvedVariants, variantIds, rowIndex);
+      const built = buildCandidates(
+        cfg,
+        resolvedVariants,
+        variantIds,
+        variantDisplayNames,
+        rowIndex,
+      );
       if (built.missing || built.empty) {
         skipReasons.push({
           rowIndex,
@@ -699,19 +834,27 @@ export const generateComparisonCells = (
     if (!resolvedVariants) continue;
 
     const variantIds = buildVariantIdentifiers(resolvedVariants);
+    const variantDisplayNames = buildVariantDisplayNames(resolvedVariants);
 
     // Resolved once per target (not per row): whether the DB evaluator this
     // column dispatches to is still the legacy 2-slot judge. See
     // isLegacyPairwiseBacked's JSDoc for why this can't just read
     // COMPARISON_EVALUATOR_TYPE off the target/cfg.
     const legacyPairwise =
-      isLegacyPairwiseBacked(target.targetEvaluatorId) && variantIds.length === 2;
+      isLegacyPairwiseBacked(target.targetEvaluatorId) &&
+      variantIds.length === 2;
 
-    for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
+    for (const rowIndex of rowsInScope) {
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
 
-      const built = buildCandidates(cfg, resolvedVariants, variantIds, rowIndex);
+      const built = buildCandidates(
+        cfg,
+        resolvedVariants,
+        variantIds,
+        variantDisplayNames,
+        rowIndex,
+      );
       if (built.missing || built.empty) {
         skipReasons.push({
           rowIndex,
@@ -730,6 +873,7 @@ export const generateComparisonCells = (
       // log it so a silently-empty judge prompt is at least diagnosable
       // instead of indistinguishable from "row has no input, by design."
       const resolvedInput =
+        (cfg.inputField ? datasetEntry[cfg.inputField] : undefined) ??
         datasetEntry.input ??
         (cfg.goldenField ? datasetEntry[cfg.goldenField] : undefined);
       if (
@@ -1121,8 +1265,14 @@ export async function* executeCell(
             result: {
               status: "error",
               error_type: "EvaluatorError",
-              details: (evalError as Error).message,
+              details:
+                evalError instanceof Error
+                  ? evalError.message
+                  : "Evaluator execution failed",
               traceback: [],
+              ...(HandledError.isHandled(evalError)
+                ? { domainError: evalError.serialize() }
+                : {}),
             },
           };
         }
@@ -1642,7 +1792,9 @@ export async function* runOrchestrator(
   const runId = providedRunId ?? generateHumanReadableId();
 
   // Generate cells to execute
-  const cells = generateCells(state, datasetRows, scope);
+  const cells = generateCells(state, datasetRows, scope, {
+    seedTargetOutputs,
+  });
   // Phase-1 count only; grows by the Phase-2 (comparison) cell count once
   // those are generated after Phase 1 finishes, so the final summary's
   // completedCells (which counts both phases) never exceeds totalCells.
@@ -1686,6 +1838,14 @@ export async function* runOrchestrator(
       completedTargetOutputs.set(key, value);
     }
   }
+
+  /**
+   * `${rowIndex}:${targetId}` keys this run actually executed, as opposed to
+   * inherited via seedTargetOutputs. Lets the Phase-2 block tell "we computed
+   * this" from "we reused this", so only the reused ones need back-filling
+   * into the run's stored results.
+   */
+  const producedTargetKeys = new Set<string>();
 
   // Track per-(row, target) evaluator results so the Phase 2 pairwise judge
   // can read each variant's existing evaluator scores (relevance, factuality,
@@ -1762,6 +1922,7 @@ export async function* runOrchestrator(
         cost: event.cost ?? undefined,
         duration: event.duration ?? undefined,
       });
+      producedTargetKeys.add(`${event.rowIndex}:${event.targetId}`);
     }
 
     // Dispatch to evaluation processing pipeline for per-trace eval CH writes.
@@ -2116,15 +2277,35 @@ export async function* runOrchestrator(
       // select-best are generated by independent sibling functions
       // (they're two separate evaluators in the catalog) but share the
       // same execution loop, since the loop is per-cell not per-mode.
-      if (!aborted) {
-        const { cells: phase2Cells, skipReasons } = generateComparisonCells(
+      // Phase 2 is only meaningful for a run that (re)produces variant outputs.
+      //
+      // An `evaluator` / `evaluator-all-rows` scope re-runs ONE evaluator over
+      // outputs that already exist: its cells carry skipTarget + a precomputed
+      // output and never yield a target_result, and the client seeds nothing for
+      // them — so completedTargetOutputs is empty by construction. Running
+      // Phase 2 anyway cannot produce a single verdict; every variant reads as
+      // missing, and the only thing it emits is a "waiting on …" error written
+      // over comparison verdicts the user never asked to re-run. Scoping its
+      // ROWS (below) doesn't save it — for evaluator-all-rows every row is in
+      // scope. The scope simply has no comparison work in it.
+      const scopeCanProduceVariantOutputs =
+        scope.type !== "evaluator" && scope.type !== "evaluator-all-rows";
+
+      if (!aborted && scopeCanProduceVariantOutputs) {
+        const { cells: phase2Cells, skipReasons } = generateComparisonCells({
           state,
           datasetRows,
           completedTargetOutputs,
           completedTargetEvaluatorScores,
           loadedPrompts,
           loadedEvaluators,
-        );
+          // Only the rows this run owns. Without this, re-running row 1 alone
+          // wrote "waiting on …" over every other row's verdict.
+          scopedRowIndices: resolveScopedRowIndices({
+            scope,
+            rowCount: datasetRows.length,
+          }),
+        });
 
         // Fold Phase-2 cells into the run total now that we know how many
         // there are, so progress and the final summary stay consistent.
@@ -2172,6 +2353,54 @@ export async function* runOrchestrator(
           };
           pushEvent(skipEvent);
           await processEventForStorage(skipEvent);
+        }
+
+        // Back-fill the candidate outputs this run REUSED rather than executed.
+        //
+        // Since #5789 fix 2, a comparison re-run deliberately does NOT re-run
+        // variants whose output the client already has — it seeds them instead.
+        // The upshot is that such a run stores only the judge's verdict: no
+        // predicted output, no dataset entry, because no target cell ran. The
+        // Results view builds its rows from target results, so a
+        // comparison-only run rendered "No results to display" with $0 cost,
+        // even though the judge had compared everything. Re-record what was
+        // actually compared so a run's stored result stands on its own.
+        //
+        //
+        // The seeded cost/duration are carried over rather than nulled. They
+        // describe the output being compared, and the results table keys its
+        // per-target header metrics off them — omitting them left every prompt
+        // header on the Results page blank, which is how this surfaced. The
+        // trade-off is that a run's cost total includes outputs it reused
+        // rather than paid for, so summing cost ACROSS runs over-counts real
+        // spend; describing the run's own results wins over that here, and it
+        // matches what the workbench shows for the same cells.
+        if (phase2Cells.length > 0 && seedTargetOutputs) {
+          const rowsThisRunOwns = new Set(
+            resolveScopedRowIndices({ scope, rowCount: datasetRows.length }),
+          );
+          for (const [key, seeded] of Object.entries(seedTargetOutputs)) {
+            if (producedTargetKeys.has(key)) continue;
+            const separator = key.indexOf(":");
+            if (separator < 0) continue;
+            const rowIndex = Number(key.slice(0, separator));
+            const targetId = key.slice(separator + 1);
+            if (!Number.isInteger(rowIndex)) continue;
+            if (!rowsThisRunOwns.has(rowIndex)) continue;
+            if (!datasetRows[rowIndex]) continue;
+            if (seeded.output === null || seeded.output === undefined) continue;
+
+            await processEventForStorage({
+              type: "target_result",
+              rowIndex,
+              targetId,
+              output: seeded.output,
+              ...(seeded.cost !== undefined && { cost: seeded.cost }),
+              ...(seeded.duration !== undefined && {
+                duration: seeded.duration,
+              }),
+            } as EvaluationV3Event);
+          }
         }
 
         if (phase2Cells.length > 0) {

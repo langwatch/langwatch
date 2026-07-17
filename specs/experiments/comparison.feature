@@ -175,29 +175,44 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
   # Issue: #5378
   # Golden answer is opt-in, not mandatory — some datasets have no reference
   # answer, and picking a fake golden field (like "input") misframes the
-  # judge prompt as golden-aware when it isn't.
-  Scenario: Has Golden Answer is on by default
+  # judge prompt as golden-aware when it isn't. The choice lives in the
+  # Golden field picker itself: it defaults to "None — judge on merits", or
+  # pick a dataset column to compare candidates against it instead.
+  Scenario: Judging candidates on their own merits is the default
     When I add a Comparison evaluator
-    Then Has Golden Answer is toggled on
-    And a Golden field picker is shown
-
-  Scenario: Turning off Has Golden Answer hides the Golden field picker
-    Given a Comparison evaluator is configured with default settings
-    When I toggle Has Golden Answer off
-    Then no Golden field picker is shown
+    Then the comparison judges candidates on their own merits
+    And a Golden field picker is shown, defaulted to "None — judge on merits"
     And the evaluator can be saved without a golden field selected
 
-  Scenario: Judge prompt drops golden framing when Has Golden Answer is off
-    Given Has Golden Answer is toggled off
+  Scenario: Choosing a golden field compares candidates against it
+    Given a Comparison evaluator is configured with default settings
+    When I choose a dataset column for the Golden field
+    Then the comparison expects a golden answer
+    And the judge compares each candidate against that golden answer
+
+  Scenario: Comparison judges candidates on their own merits without a golden answer
+    Given the comparison is set to judge on merits, with no golden answer
     And the prompt has not been customized by the user
     When a row is evaluated
-    Then the rendered judge prompt contains no "golden answer" framing
-    And the judge compares the candidates on their own merits
+    Then the judge picks a winning candidate on quality alone, with no reference answer involved
 
-  Scenario: Judge prompt keeps golden framing when Has Golden Answer is on
-    Given Has Golden Answer is toggled on (default)
+  Scenario: Comparison uses the golden answer when one is set
+    Given the comparison compares against a golden answer
+    And the prompt has not been customized by the user
     When a row is evaluated
-    Then the rendered judge prompt asks the judge to compare the candidates against the golden answer
+    Then the judge picks a winning candidate based on how well it matches the golden answer
+
+  # The judge also adapts to whether the row itself carries task context: a
+  # row that hands the judge a task is framed around it, while a row with no
+  # task context is judged without it, so the judge is never handed an empty
+  # instruction. This is decided per row at run time, independently of the
+  # golden-answer choice above.
+  Scenario: Comparison evaluates rows with or without task context
+    Given a Comparison evaluator whose prompt the user has not customized
+    When a row provides task context
+    Then the judge compares the candidates against that task and picks a winner
+    When a row provides no task context
+    Then the judge still compares the candidates and picks a winner
 
   Scenario: Structured outputs can be narrowed to a single field per variant
     Given "variant_1" produces a structured output with fields "answer" and "confidence"

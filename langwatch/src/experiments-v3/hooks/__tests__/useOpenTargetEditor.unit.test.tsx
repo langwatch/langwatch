@@ -292,4 +292,44 @@ describe("useOpenTargetEditor", () => {
       expect(mockOpenDrawer).not.toHaveBeenCalled();
     });
   });
+
+  // Re-editing an existing comparison column-target must qualify its Golden
+  // and Input field chips with the real dataset name ("Test Dataset.input"),
+  // not a generic fallback — the same info the add-flow already gets right.
+  describe("comparison target editing", () => {
+    it("passes the active dataset's name into comparisonContext", async () => {
+      const comparisonTarget: TargetConfig = {
+        id: "comparison-target-1",
+        type: "evaluator",
+        targetEvaluatorId: "eval-1",
+        inputs: [],
+        outputs: [],
+        mappings: {},
+        comparison: {
+          variants: ["target-a", "target-b"],
+          hasGoldenAnswer: true,
+          goldenField: "input",
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+      };
+
+      const { result } = renderHook(() => useOpenTargetEditor());
+
+      await act(async () => {
+        await result.current.openTargetEditor(comparisonTarget);
+      });
+
+      await waitFor(() => {
+        expect(mockOpenDrawer).toHaveBeenCalledWith(
+          "evaluatorEditor",
+          expect.objectContaining({
+            comparisonContext: expect.objectContaining({
+              datasetName: "Test Dataset",
+            }),
+          }),
+        );
+      });
+    });
+  });
 });
