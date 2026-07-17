@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-20
 
-**Status:** Proposed
+**Status:** Proposed — amended by [ADR-046](./046-groupqueue-blob-leases.md): the holder-set reference counting and eager reclaim described here were replaced by blob leases; the tiered store, content addressing, caps, and tenant isolation stand.
 
 **Extends / supersedes in part:** [ADR-026](./026-groupqueue-payload-envelope.md) (GroupQueue payload envelope). The versioned-envelope + header-only routing decision stands. This ADR supersedes ADR-026's §"Blob lifecycle" — random blob ids, best-effort delete, and the 7-day pure-backstop TTL — for offloaded bodies.
 

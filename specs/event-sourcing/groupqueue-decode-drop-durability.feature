@@ -31,7 +31,9 @@ Feature: GroupQueue decode-drop durability and attribution
   #     it). Wrong here: a missing blob never returns, so parking freezes that
   #     aggregate forever on a job that can never succeed. At 100+/day those
   #     accumulate into an availability incident.
-  #   - DO NOT release() A BODY THAT IS STILL THERE. release() "reclaim[s] the
+  #   - (Historic, pre-ADR-046) DO NOT release() A BODY THAT IS STILL THERE:
+  #     under leases nothing releases at all — a preserved body simply lives
+  #     to its lease. The original rationale: release() "reclaim[s] the
   #     blob ... deleting an s3 object out-of-band" — this module's
   #     retired-forever signal. handleTransientDecode already refuses it
   #     (:1492-1494 "releasing here would risk reclaiming the blob the re-stage
@@ -72,15 +74,14 @@ Feature: GroupQueue decode-drop durability and attribution
   Scenario: a body-present decode failure does not destroy the body it could not read
     Given a staged job whose body is present but cannot be decoded
     When a worker claims the group and the decode fails
-    Then the staged value's blob holder is not released
+    Then no code path deletes the blob (ADR-046: nothing releases; lifetime is the lease)
     And the body is still readable from the blob store afterwards
 
   @integration
-  Scenario: a missing-blob drop releases the absent blob's holder
+  Scenario: a missing-blob drop is recorded as an irreducible loss
     Given a staged job whose referenced blob is genuinely gone
     When a worker claims the group and the decode fails
-    Then the staged value's blob holder is released
-    And the drop is recorded as an irreducible loss rather than a preserved body
+    Then the drop is recorded as an irreducible loss rather than a preserved body
 
   @integration
   Scenario: a drop names which pipeline and job lost the event
@@ -186,7 +187,7 @@ Feature: GroupQueue decode-drop durability and attribution
       | transient exhaustion    | yes                           |
       | sibling-drain decode    | no — needs fault injection on the coalesced-batch harness |
       | sibling re-stage        | no — same                     |
-      | retry re-encode         | yes — releases unconditionally, correctly: the body was already read |
+      | retry re-encode         | body left to its lease: already read, nothing to preserve for later  |
 
   # --- AC8: a drop is not counted as a success
 
@@ -206,9 +207,9 @@ Feature: GroupQueue decode-drop durability and attribution
 # AC1 "drop log includes a safe envelope descriptor (header.e/header.v + blob hash), never raw payload or tenant PII"
 #   -> Scenario: a non-transient decode failure names the envelope it could not read
 #
-# AC2(a) "body-present failures do NOT call release() — recoverable bodies are not destroyed"
+# AC2(a) "body-present failures do not destroy the body (ADR-046: nothing releases)"
 #   -> Scenario: a body-present decode failure does not destroy the body it could not read
-#   -> Scenario: a missing-blob drop releases the absent blob's holder   (the stated exemption)
+#   -> Scenario: a missing-blob drop is recorded as an irreducible loss
 # AC2(b) "every drop counted, labelled {queue_name, pipeline_name, job_type, job_name, reason}"
 #   -> Scenario: a drop names which pipeline and job lost the event
 # AC2(c) "liveness preserved — the group is not blocked"

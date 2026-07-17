@@ -31,7 +31,7 @@ Feature: GroupQueue payload envelope
   # complete, dedup-squash reclaim, the TTL safety net — describe the GQ1
   # mechanism (a private random-id blob per job, best-effort delete, 7-day
   # backstop). They are SUPERSEDED for envelope v2 by content-addressed sharing
-  # + holder-set eager reclaim; see
+  # + lease-based reclaim (ADR-046); see
   # specs/event-sourcing/payload-store-content-addressed.feature.
 
   Scenario: Very large payloads are offloaded out of the queue hash
@@ -40,16 +40,18 @@ Feature: GroupQueue payload envelope
     And the queued value is a tiny envelope referencing the blob
     And the handler receives the payload intact
 
-  Scenario: Offloaded blobs are cleaned up when the job completes
+  # ADR-046: completion no longer deletes blobs; lifetime is a lease
+  # (see payload-store-blob-lease.feature). Historic GQ1 delete-on-complete
+  # behaviour applies only to values staged before the cutover.
+  Scenario: Offloaded blobs expire via their lease after the job completes
     Given an offloaded job has been processed successfully
-    Then its blob key is deleted
-    And any blob that escapes deletion expires via its TTL safety net
+    Then its blob key expires when its lease elapses
 
-  Scenario: Offloaded blobs displaced by a dedup squash are reclaimed
+  Scenario: Offloaded blobs displaced by a dedup squash are left to their lease
     Given a staged offloaded job
     When a later job with the same dedup id squashes it in place
-    Then the displaced payload's blob key is deleted
-    And only the surviving payload's blob remains
+    Then the surviving payload's blob resolves for the handler
+    And the displaced payload's blob expires via its lease
 
   Scenario: A missing blob does not wedge the group
     Given an offloaded job whose blob has expired or been deleted
@@ -57,13 +59,14 @@ Feature: GroupQueue payload envelope
     Then the job is completed without invoking the handler
     And the group continues processing subsequent jobs
 
-  # Two-phase format rollout
+  # Format rollout — the two-phase write gate was retired by ADR-046: writes
+  # are unconditionally GQ2 envelopes, and the dual readers keep accepting
+  # every format ever written (GQ2, GQ1, bare JSON).
 
-  Scenario: Envelope writes stay off until the whole fleet reads envelopes
-    Given envelope writes have not been enabled for the deployment
+  Scenario: Writes are always envelopes; readers accept every historic format
     When a job is staged
-    Then the stored value is legacy bare JSON readable by the previous release
-    And dispatch and the ops dashboard read it through the dual readers
+    Then the stored value is a GQ2 envelope
+    And dispatch and the ops dashboard still read GQ1 and bare-JSON values staged by earlier releases
 
   Scenario: A staged payload round-trips through the envelope unchanged
     When a job is staged and later dispatched to its handler

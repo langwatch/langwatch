@@ -13,11 +13,10 @@ Feature: GroupQueue blob-handling hardening
   # contract there stands; these are the edge cases a tests/security/code review
   # surfaced. Where a scenario here REFINES a core-feature AC, the core states
   # the behaviour and this states the hardened mechanism — they don't duplicate:
-  #   - the squash transfer (Track 4) refines core AC3.2 (dedup-squash reclaim),
-  #     making it crash-atomic;
-  #   - the TTL-coordination / access-refresh scenarios (Track 3) refine core
-  #     AC3.5/AC3.8 (TTL backstop + survive-dispatch), making the holder TTL
-  #     outlive the blob and refresh on access.
+  #   - Tracks 3+4 (holder TTL coordination, atomic hold transfer) were
+  #     superseded by ADR-046: the holder-set refcount was removed and blob
+  #     lifetime is a lease (see payload-store-blob-lease.feature). The
+  #     scenarios kept in those tracks state the guarantees that survive.
   #
   # Decision (ADR-030):
   #   - Buffered offload throughout; MAX_BLOB_BYTES (50 MiB) rejects the truly
@@ -60,9 +59,9 @@ Feature: GroupQueue blob-handling hardening
     And the producer surfaces the error rather than the worker OOMing
 
   @unit @track1 @unimplemented
-  Scenario: A sub-inline payload stays inline and acquires no hold
+  Scenario: A sub-inline payload stays inline and writes no blob
     When a job whose payload is under the inline ceiling is staged
-    Then no blob and no holder set are written for it
+    Then no blob is written for it
 
   # ===========================================================================
   # Track 2 — missing vs transient store errors
@@ -83,85 +82,28 @@ Feature: GroupQueue blob-handling hardening
     And the job is retried rather than completed without the handler
 
   # ===========================================================================
-  # Track 3 — coordinated TTLs and premature reclaim
+  # Tracks 3 + 4 — superseded by ADR-046 (blob leases)
   # ===========================================================================
+  # The coordinated holder/blob TTL pair and the atomic hold-transfer eval were
+  # removed with the holder-set refcount itself. Blob lifetime is now a lease:
+  # set at PUT, renewed on read, extended by block/DLQ. The scenarios that used
+  # to live here (holder TTL ordering, atomic transfer, phantom-hold squashes —
+  # the 2026-07-09 incident class) are impossible by construction under leases;
+  # the lease contract is specified in payload-store-blob-lease.feature.
 
-  @integration @track3 @unimplemented
-  Scenario: The holder-set TTL is never shorter than the blob TTL
-    When a blob and its holder set are created
-    Then the holder set's TTL is greater than or equal to the blob's TTL
-
-  @integration @track3 @unimplemented
-  Scenario: Dispatch refreshes the holder set as well as the blob
-    Given a blob referenced by several still-staged jobs
-    When one referenced job is dispatched near the backstop window
-    Then both the blob and its holder set have their TTL refreshed
-    And a later completion does not reclaim a blob the other jobs still reference
-
-  @integration @track3 @unimplemented
-  Scenario: A long-lived fan-out does not prematurely reclaim a referenced blob
-    Given a fan-out whose jobs remain staged close to the backstop window
+  @integration @track3
+  Scenario: A long-lived fan-out never loses its blob to another job's completion
+    Given a fan-out whose jobs remain staged close to the lease window
     When some jobs are dispatched and complete while others are still staged
-    Then the blob survives until the last referencing job retires
-    And no still-staged job is left pointing at a reclaimed blob
+    Then no completion deletes the shared blob
+    And each dispatch read renews the blob's lease for the still-staged jobs
 
-  # ===========================================================================
-  # Track 4 — atomic hold transfer (no reclaim gap)
-  # ===========================================================================
-
-  @integration @track4 @unimplemented
-  Scenario: A retry transfers the hold to the new token in a single atomic step
-    Given an offloaded job that fails with a retryable error
-    When it is re-staged on the same content hash
-    Then the new token is added and the old token removed atomically
-    And the blob is never observable at zero holders during the transfer
-
-  @integration @track4 @unimplemented
-  Scenario: A partial failure during the transfer cannot reclaim a referenced blob
-    Given a hold transfer where the release half would otherwise run before the acquire
-    When the transfer eval runs
-    Then the old blob is reclaimed only if its holder set is empty after the transfer
-    And a still-needed blob is never reclaimed
-
-  # The 2026-07-09 incident: send() fired the squash's hold transfer after the
-  # stage eval returned, fire-and-forget. Concurrent squashes of the same dedup
-  # id could reorder at Redis — a later transfer re-added a token an earlier
-  # transfer had already displaced — leaving a phantom hold that pinned the
-  # blob until its TTL. At prod fan-out rates that left ~279k orphaned blobs
-  # (~1.9 GB, ~90% of Redis growth). The transfer now happens INSIDE the stage
-  # eval, atomic with the displacement it accounts for.
   @integration @track4
-  Scenario: A dedup squash leaves no phantom hold and reclaims only unreferenced blobs
+  Scenario: A dedup squash needs no hold bookkeeping
     Given a staged offloaded job with a dedup id
     When a second send with the same dedup id squashes it in place
-    Then the replacement's hold is added and the displaced hold is removed
-    And a displaced blob with no remaining holders is reclaimed immediately
-
-  @integration @track4
-  Scenario: A squash chain never leaves a phantom hold
-    Given a job squashed twice in succession under one dedup id
-    When both squashes have completed
-    Then only the final value's hold remains in its holder set
-    And every displaced blob with no other referents is gone
-
-  # A squash configured not to replace the payload discards the NEW value, not
-  # the stored one. The discarded value was never staged, so nothing may
-  # acquire a hold for it — the old code self-transferred (new == old) and
-  # minted exactly such a phantom hold. Its blob, when content-unique, is left
-  # to the TTL backstop; when shared, the surviving job's hold keeps it alive.
-  @integration @track4
-  Scenario: A squash that keeps the stored payload acquires no hold for the discarded value
-    Given a staged offloaded job whose dedup is configured to keep the stored payload
-    When a second send with the same dedup id is squashed
-    Then the stored job's hold is untouched
-    And no hold is recorded for the discarded value
-
-  @integration @track4
-  Scenario: A post-dispatch survive-dispatch squash acquires no hold for the discarded value
-    Given a dedup id whose job was already dispatched but whose survive-dispatch TTL is alive
-    When a late re-trigger is squashed against it
-    Then no hold is recorded for the discarded value
-    And the discarded value's blob is left to the TTL backstop
+    Then the displaced value's blob is left to its lease
+    And the replacement's blob (same content, same key) carries a fresh lease from its PUT
 
   # ===========================================================================
   # Track 5 — tamper resistance and tenant isolation
@@ -211,9 +153,8 @@ Feature: GroupQueue blob-handling hardening
   #   AC2.1 missing -> fail-safe      -> A genuinely missing s3 blob completes the slot via the fail-safe
   #   AC2.2 transient -> retry        -> A transient s3 error retries instead of dropping to replay
   # Track 3 — coordinated TTLs
-  #   AC3.1 holder TTL ≥ blob TTL     -> The holder-set TTL is never shorter than the blob TTL
-  #   AC3.2 dispatch refreshes both   -> Dispatch refreshes the holder set as well as the blob
-  #   AC3.3 no premature reclaim      -> A long-lived fan-out does not prematurely reclaim a referenced blob
+  #   AC3.x (holder TTL pair)         -> superseded by ADR-046 leases; see payload-store-blob-lease.feature
+  #   AC3.3 no premature reclaim      -> A long-lived fan-out never loses its blob to another job's completion
   # Track 4 — atomic transfer
   #   AC4.1 atomic retry transfer     -> A retry transfers the hold ... in a single atomic step
   #   AC4.2 no reclaim on partial     -> A partial failure during the transfer cannot reclaim a referenced blob

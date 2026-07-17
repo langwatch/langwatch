@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-20
 
-**Status:** Proposed
+**Status:** Proposed — amended by [ADR-046](./046-groupqueue-blob-leases.md): the holder-set reference counting and eager reclaim described here were replaced by blob leases; the tiered store, content addressing, caps, and tenant isolation stand.
 
 **Amends:** [ADR-029](./029-groupqueue-content-addressed-payload-store.md) (GroupQueue content-addressed tiered payload store). ADR-029's tiered store, GQ2 envelope, holder-set reclaim, and queue wiring stand; this ADR hardens the blob lifecycle against the correctness, security, and design gaps a three-pass review (tests / security / code) surfaced after the implementation landed.
 
