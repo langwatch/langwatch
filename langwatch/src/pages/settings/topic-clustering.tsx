@@ -1,4 +1,14 @@
-import { Alert, Button, Card, Heading, Text, VStack } from "@chakra-ui/react";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  HStack,
+  Heading,
+  Skeleton,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
@@ -35,13 +45,17 @@ export default withPermissionGuard("project:manage", {
 })(TopicClusteringSettings);
 
 function TopicClusteringCard({ project }: { project: { id: string } }) {
+  const utils = api.useContext();
   const triggerClustering = api.project.triggerTopicClustering.useMutation({
     onSuccess: () => {
       toaster.create({
         title: "Topic clustering started",
         description:
-          "The topic clustering job has been queued and will run shortly.",
+          "The topic clustering run has been requested and will start shortly.",
         type: "success",
+      });
+      void utils.topics.getClusteringStatus.invalidate({
+        projectId: project.id,
       });
     },
     onError: (error) => {
@@ -56,6 +70,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
 
   return (
     <VStack gap={6} width="full" align="start" paddingBottom={12}>
+      <ClusteringStatusCard projectId={project.id} />
       <Card.Root width="full">
         <Card.Header>
           <Heading>Manual Topic Clustering</Heading>
@@ -92,5 +107,92 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
         </Card.Body>
       </Card.Root>
     </VStack>
+  );
+}
+
+const SKIP_REASON_COPY: Record<string, string> = {
+  recently_clustered:
+    "Skipped — topics were rebuilt recently, so this run wasn't needed yet",
+  not_enough_traces: "Skipped — not enough new traces to cluster yet",
+  not_configured: "Skipped — no topic clustering model is configured",
+};
+
+function outcomeBadge(outcome: string | null, inProgress: boolean) {
+  if (inProgress) return <Badge colorPalette="blue">Running</Badge>;
+  switch (outcome) {
+    case "completed":
+      return <Badge colorPalette="green">Completed</Badge>;
+    case "skipped":
+      return <Badge colorPalette="gray">Skipped</Badge>;
+    case "failed":
+      return <Badge colorPalette="red">Failed</Badge>;
+    default:
+      return <Badge colorPalette="gray">Never run</Badge>;
+  }
+}
+
+function ClusteringStatusCard({ projectId }: { projectId: string }) {
+  const status = api.topics.getClusteringStatus.useQuery(
+    { projectId },
+    { refetchInterval: 30_000 },
+  );
+
+  return (
+    <Card.Root width="full">
+      <Card.Header>
+        <Heading>Schedule</Heading>
+      </Card.Header>
+      <Card.Body width="full">
+        {status.isLoading ? (
+          <VStack align="start" gap={2} width="full">
+            <Skeleton height="20px" width="60%" />
+            <Skeleton height="20px" width="40%" />
+          </VStack>
+        ) : status.data ? (
+          <VStack align="start" gap={3}>
+            <HStack gap={3}>
+              <Text fontWeight="medium">Last run</Text>
+              {outcomeBadge(status.data.lastRunOutcome, status.data.inProgress)}
+              {status.data.lastRunAt && (
+                <Text color="fg.muted">
+                  {new Date(status.data.lastRunAt).toLocaleString()}
+                </Text>
+              )}
+            </HStack>
+            {status.data.lastRunOutcome === "completed" && (
+              <Text fontSize="sm" color="fg.muted">
+                Organized {status.data.lastRunTracesProcessed} traces into{" "}
+                {status.data.lastRunTopicsCount} topics and{" "}
+                {status.data.lastRunSubtopicsCount} subtopics.
+              </Text>
+            )}
+            {status.data.lastRunOutcome === "skipped" &&
+              status.data.lastRunSkippedReason && (
+                <Text fontSize="sm" color="fg.muted">
+                  {SKIP_REASON_COPY[status.data.lastRunSkippedReason] ??
+                    "Skipped"}
+                  .
+                </Text>
+              )}
+            {status.data.lastRunOutcome === "failed" &&
+              status.data.lastRunError && (
+                <Text fontSize="sm" color="red.fg">
+                  {status.data.lastRunError}
+                </Text>
+              )}
+            <HStack gap={3}>
+              <Text fontWeight="medium">Next scheduled run</Text>
+              <Text color="fg.muted">
+                {status.data.nextRunAt
+                  ? new Date(status.data.nextRunAt).toLocaleString()
+                  : "Scheduled after your project receives its first traces"}
+              </Text>
+            </HStack>
+          </VStack>
+        ) : (
+          <Text color="fg.muted">Clustering status is unavailable.</Text>
+        )}
+      </Card.Body>
+    </Card.Root>
   );
 }

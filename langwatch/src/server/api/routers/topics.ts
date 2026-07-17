@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { PrismaTopicClusteringStatusRepository } from "../../app-layer/topic-clustering/repositories/topic-clustering-status.repository";
+import { TopicClusteringStatusService } from "../../app-layer/topic-clustering/topic-clustering-status.service";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -21,5 +23,15 @@ export const topicsRouter = createTRPCRouter({
       });
 
       return topics;
+    }),
+
+  getClusteringStatus: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("project:view"))
+    .query(async ({ input, ctx }) => {
+      const service = new TopicClusteringStatusService(
+        new PrismaTopicClusteringStatusRepository(ctx.prisma),
+      );
+      return await service.getByProjectId({ projectId: input.projectId });
     }),
 });
