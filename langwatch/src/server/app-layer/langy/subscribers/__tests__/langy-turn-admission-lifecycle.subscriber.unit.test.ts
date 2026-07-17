@@ -24,7 +24,7 @@ function event(
     type,
     version: "1",
     data: { conversationId: "conversation-1", ...data },
-  } as LangyConversationProcessingEvent;
+  } as unknown as LangyConversationProcessingEvent;
 }
 
 function makeDeps() {

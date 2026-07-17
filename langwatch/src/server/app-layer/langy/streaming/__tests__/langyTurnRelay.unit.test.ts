@@ -56,16 +56,17 @@ function makeRelay(
   const buffer = fakeBuffer();
   const conversations = over.conversations ?? fakeConversations();
   const reserveFrameNonce = vi.fn(async () => over.fresh ?? true);
-  const relay = new LangyTurnRelay({ buffer, conversations, reserveFrameNonce });
+  const relay = new LangyTurnRelay({
+    buffer,
+    conversations,
+    reserveFrameNonce,
+  });
   return { relay, buffer, conversations, reserveFrameNonce };
 }
 
 /** A real signed envelope for a payload object. */
-const frame = (
-  payload: unknown,
-  identity = IDENTITY,
-  runToken = RUN_TOKEN,
-) => signFrame(runToken, identity, JSON.stringify(payload));
+const frame = (payload: unknown, identity = IDENTITY, runToken = RUN_TOKEN) =>
+  signFrame(runToken, identity, JSON.stringify(payload));
 
 describe("LangyTurnRelay", () => {
   describe("given ephemeral frames", () => {
@@ -228,7 +229,13 @@ describe("LangyTurnRelay", () => {
     it("records a tool start as both a card and a durable event", async () => {
       const { relay, buffer, conversations } = makeRelay();
       await relay.handle(
-        frame({ type: "tool", id: "tc-1", name: "bash", phase: "start", command: "ls" }),
+        frame({
+          type: "tool",
+          id: "tc-1",
+          name: "bash",
+          phase: "start",
+          command: "ls",
+        }),
       );
       expect(buffer.appendTool).toHaveBeenCalledWith(
         expect.objectContaining({ id: "tc-1", name: "bash", phase: "start" }),
@@ -257,15 +264,21 @@ describe("LangyTurnRelay", () => {
         }),
       );
 
-      // The live card gets the capability, the reduced document, and the
-      // digest the browser hydrates fresh rows from.
+      // The live card gets the capability, the canonical result envelope, and
+      // the digest the browser hydrates fresh rows from.
       expect(buffer.appendTool).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "tc-2",
           name: "langwatch.trace.search",
           phase: "end",
-          output:
-            '{"traces":[{"trace_id":"trace_1"},{"trace_id":"trace_2"}],"pagination":{"totalHits":34}}',
+          output: JSON.stringify({
+            kind: "card",
+            card: "traces",
+            payload: {
+              traces: [{ trace_id: "trace_1" }, { trace_id: "trace_2" }],
+              pagination: { totalHits: 34 },
+            },
+          }),
           digest: expect.objectContaining({
             resource: "trace",
             verb: "search",
@@ -312,7 +325,11 @@ describe("LangyTurnRelay", () => {
     it("marks the stream end and ingests the durable completed result", async () => {
       const { relay, buffer, conversations } = makeRelay();
       const out = await relay.handle(
-        frame({ type: "final", text: "the answer", toolCalls: [{ id: "t", name: "bash" }] }),
+        frame({
+          type: "final",
+          text: "the answer",
+          toolCalls: [{ id: "t", name: "bash" }],
+        }),
       );
       expect(out).toEqual({ status: "terminal" });
       expect(buffer.markEnd).toHaveBeenCalledWith({
@@ -327,14 +344,22 @@ describe("LangyTurnRelay", () => {
     it("marks the stream error with the CLASSIFIED domain error, not the raw prose", async () => {
       const { relay, buffer, conversations } = makeRelay();
       const out = await relay.handle(
-        frame({ type: "error", error: "Langy is unavailable", code: "at-capacity" }),
+        frame({
+          type: "error",
+          error: "Langy is unavailable",
+          code: "at-capacity",
+        }),
       );
       expect(out).toEqual({ status: "terminal" });
       // The live edge must carry the same JSON domain error the browser parses
       // (readLangyStreamError) — a raw string collapses every named failure into
       // the generic "Something went wrong". Classified from the vetted `code`.
       const markErrorArg = (buffer.markError as ReturnType<typeof vi.fn>).mock
-        .calls[0]![0] as { conversationId: string; turnId: string; error: string };
+        .calls[0]![0] as {
+        conversationId: string;
+        turnId: string;
+        error: string;
+      };
       expect(markErrorArg.conversationId).toBe("conv-1");
       expect(markErrorArg.turnId).toBe("turn-1");
       expect(JSON.parse(markErrorArg.error)).toMatchObject({
@@ -386,7 +411,10 @@ describe("LangyTurnRelay", () => {
     it("rejects a tampered signature and applies nothing", async () => {
       const { relay, buffer } = makeRelay();
       const good = frame({ type: "delta", text: "hi" });
-      const tampered = { ...good, payload: JSON.stringify({ type: "delta", text: "HACKED" }) };
+      const tampered = {
+        ...good,
+        payload: JSON.stringify({ type: "delta", text: "HACKED" }),
+      };
       const out = await relay.handle(tampered);
       expect(out).toEqual({ status: "rejected", reason: "bad-signature" });
       expect(buffer.appendChunk).not.toHaveBeenCalled();
@@ -402,7 +430,10 @@ describe("LangyTurnRelay", () => {
       const { relay, buffer } = makeRelay();
       await relay.handle(frame({ type: "delta", text: "one" })); // pins turn-1
       const out = await relay.handle(
-        frame({ type: "delta", text: "two" }, { ...IDENTITY, turnId: "turn-2" }),
+        frame(
+          { type: "delta", text: "two" },
+          { ...IDENTITY, turnId: "turn-2" },
+        ),
       );
       expect(out).toEqual({ status: "rejected", reason: "wrong-turn" });
       expect(buffer.appendChunk).toHaveBeenCalledTimes(1);

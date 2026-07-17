@@ -68,7 +68,9 @@ describe("buildFinalAssistantParts", () => {
           {
             id: "t1",
             name: "bash",
-            input: { command: "langwatch trace search --limit 2 --format json" },
+            input: {
+              command: "langwatch trace search --limit 2 --format json",
+            },
             output:
               '✔ Found 2\n{"traces":[{"trace_id":"trace_1"},{"trace_id":"trace_2"}],"pagination":{"totalHits":34}}',
           },
@@ -79,9 +81,16 @@ describe("buildFinalAssistantParts", () => {
         type: "tool-langwatch.trace.search",
         toolCallId: "t1",
         state: "output-available",
-        // Output reduced to the document — the reduced/text fallback tier.
-        output:
-          '{"traces":[{"trace_id":"trace_1"},{"trace_id":"trace_2"}],"pagination":{"totalHits":34}}',
+        // Output is the canonical card envelope used by both live and durable
+        // tool parts, rather than the pre-envelope raw document.
+        output: JSON.stringify({
+          kind: "card",
+          card: "traces",
+          payload: {
+            traces: [{ trace_id: "trace_1" }, { trace_id: "trace_2" }],
+            pagination: { totalHits: 34 },
+          },
+        }),
         // The digest — the reference the card hydrates fresh data from.
         digest: {
           resource: "trace",

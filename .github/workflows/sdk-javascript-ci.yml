@@ -198,6 +198,10 @@ jobs:
 
       - name: Seed test project
         working-directory: langwatch
+        env:
+          # Seed the credential the SDK test process receives without putting
+          # LANGWATCH_API_KEY on the platform process itself.
+          HAVEN_SEED_LANGWATCH_API_KEY: sk-lw-1234567890
         run: pnpm prisma:seed
 
       - name: Install goose

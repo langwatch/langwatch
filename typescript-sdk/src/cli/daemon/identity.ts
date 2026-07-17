@@ -80,7 +80,8 @@ export function daemonSocketDir(): string {
   if (override) return override;
 
   const runtimeDir = process.env.XDG_RUNTIME_DIR;
-  const base = runtimeDir && runtimeDir.trim() !== "" ? runtimeDir : os.tmpdir();
+  const base =
+    runtimeDir && runtimeDir.trim() !== "" ? runtimeDir : os.tmpdir();
   // The uid is in the directory name so two users on one box never contend for
   // the same directory (whose 0700 mode would make the loser fail to enter).
   const uid = typeof process.getuid === "function" ? process.getuid() : 0;
@@ -109,9 +110,9 @@ export function resolveIdentity(
   // API keys are high-entropy identity material, not user passwords. This
   // digest is a deterministic, non-reversible namespace key shared by the CLI
   // and daemon; a password KDF would add latency without improving that model.
+  const hasher = crypto.createHash("sha256");
   // lgtm[js/insufficient-password-hash]
-  const fingerprint = crypto
-    .createHash("sha256")
+  const fingerprint = hasher
     .update(`${endpoint}\0${apiKey}\0${uid}\0${configPath}`)
     .digest("hex");
 

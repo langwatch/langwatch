@@ -161,6 +161,7 @@ vi.mock("~/server/app-layer/app", () => {
               conversationId,
               turnId,
             }),
+            confirmAccepted: async () => undefined,
             commit: async () => undefined,
             abort: async () => undefined,
             release: async () => undefined,

@@ -14,14 +14,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import type { ChatTransport, UIMessage } from "ai";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mocks (hoisted by vi.mock — must precede the LangyDrawer import)
@@ -84,7 +77,11 @@ vi.mock("@paper-design/shaders-react", () => ({
 }));
 
 const mutation = vi.fn();
-const subscription = vi.fn(() => ({ unsubscribe: vi.fn() }));
+const subscription = vi.fn(
+  (_path: string, _input: unknown, _options: unknown) => ({
+    unsubscribe: vi.fn(),
+  }),
+);
 
 vi.mock("~/utils/api", () => ({
   trpcClient: {
@@ -187,7 +184,10 @@ vi.mock("~/utils/api", () => ({
     },
     ops: {
       getScope: {
-        useQuery: () => ({ data: { scope: { kind: "none" } }, isLoading: false }),
+        useQuery: () => ({
+          data: { scope: { kind: "none" } },
+          isLoading: false,
+        }),
       },
     },
   },
@@ -284,7 +284,9 @@ describe("Langy conversation threading", () => {
           await transportRef.current!.sendMessages(transportSendOptions);
         });
         expect(mutation.mock.calls[0]?.[0]).toBe("langy.createConversation");
-        expect(mutation.mock.calls[0]?.[1]).not.toHaveProperty("conversationId");
+        expect(mutation.mock.calls[0]?.[1]).not.toHaveProperty(
+          "conversationId",
+        );
         await waitFor(() => {
           expect(useLangyStore.getState().activeConversationId).toBe(
             "conv-created-by-server",

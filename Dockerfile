@@ -34,6 +34,7 @@ COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration
 COPY packages ./packages
 COPY skills ./skills
 COPY Dockerfile.langyagent ./Dockerfile.langyagent
+COPY feature-map.json ./feature-map.json
 
 COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.yaml ./langwatch/
 # The `packages/*` workspace members (e.g. @langwatch/observability, @langwatch/api)
