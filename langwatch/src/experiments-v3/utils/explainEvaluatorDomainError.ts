@@ -1,4 +1,4 @@
-import type { SerializedDomainError } from "~/server/app-layer/domain-error";
+import type { SerializedHandledError } from "~/server/app-layer/handled-error";
 
 export type EvaluatorDomainErrorExplanation = {
   headline: string;
@@ -18,7 +18,7 @@ export const MISSING_MODEL_API_KEY_EXPLANATION = {
 } as const satisfies EvaluatorDomainErrorExplanation;
 
 export function explainEvaluatorDomainError(
-  domain: SerializedDomainError,
+  domain: SerializedHandledError,
 ): EvaluatorDomainErrorExplanation | null {
   switch (domain.kind) {
     case "evaluator_execution_error": {

@@ -1,4 +1,4 @@
-import type { SerializedDomainError } from "~/server/app-layer/domain-error";
+import type { SerializedHandledError } from "~/server/app-layer/handled-error";
 
 /**
  * Parsed evaluation result with status information.
@@ -25,54 +25,43 @@ export type ParsedEvaluationResult = {
   score?: number;
   label?: string;
   details?: string;
-  domainError?: SerializedDomainError;
+  domainError?: SerializedHandledError;
 };
 
 function readSerializedDomainError(
   candidate: unknown,
-): SerializedDomainError | undefined {
+): SerializedHandledError | undefined {
   if (!candidate || typeof candidate !== "object") return undefined;
 
   const value = candidate as {
+    code?: unknown;
     kind?: unknown;
     meta?: unknown;
-    telemetry?: unknown;
+    traceId?: unknown;
+    spanId?: unknown;
+    traceUrl?: unknown;
     httpStatus?: unknown;
     reasons?: unknown;
   };
 
-  if (typeof value.kind !== "string") return undefined;
+  const code = typeof value.code === "string" ? value.code : value.kind;
+  if (typeof code !== "string") return undefined;
   if (typeof value.httpStatus !== "number") return undefined;
 
   return {
-    kind: value.kind,
+    code,
+    kind: typeof value.kind === "string" ? value.kind : code,
     httpStatus: value.httpStatus,
     meta:
       value.meta && typeof value.meta === "object"
         ? (value.meta as Record<string, unknown>)
         : {},
-    telemetry:
-      value.telemetry && typeof value.telemetry === "object"
-        ? {
-            traceId:
-              typeof (value.telemetry as { traceId?: unknown }).traceId ===
-              "string"
-                ? (value.telemetry as { traceId: string }).traceId
-                : undefined,
-            spanId:
-              typeof (value.telemetry as { spanId?: unknown }).spanId ===
-              "string"
-                ? (value.telemetry as { spanId: string }).spanId
-                : undefined,
-            traceUrl:
-              typeof (value.telemetry as { traceUrl?: unknown }).traceUrl ===
-              "string"
-                ? (value.telemetry as { traceUrl: string }).traceUrl
-                : undefined,
-          }
-        : { traceId: undefined, spanId: undefined },
+    traceId: typeof value.traceId === "string" ? value.traceId : undefined,
+    spanId: typeof value.spanId === "string" ? value.spanId : undefined,
+    traceUrl:
+      typeof value.traceUrl === "string" ? value.traceUrl : undefined,
     reasons: Array.isArray(value.reasons)
-      ? (value.reasons as SerializedDomainError["reasons"])
+      ? (value.reasons as SerializedHandledError["reasons"])
       : [],
   };
 }

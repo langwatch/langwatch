@@ -8,7 +8,7 @@ import {
   targetConfigSchema,
 } from "~/experiments-v3/types";
 import type { Workflow } from "~/optimization_studio/types/dsl";
-import type { SerializedDomainError } from "~/server/app-layer/domain-error";
+import type { SerializedHandledError } from "~/server/app-layer/handled-error";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 
 // ============================================================================
@@ -202,7 +202,7 @@ export type ExecutionSummary = {
 };
 
 export type EvaluationV3EvaluatorResult = SingleEvaluationResult & {
-  domainError?: SerializedDomainError;
+  domainError?: SerializedHandledError;
 };
 
 /**
