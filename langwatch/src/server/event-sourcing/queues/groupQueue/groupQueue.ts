@@ -450,7 +450,7 @@ export class GroupQueueProcessor<
       groupId,
     });
 
-    const { isNew, orphanedValue } = await this.scripts.stage({
+    const { isNew } = await this.scripts.stage({
       stagedJobId,
       groupId,
       dispatchAfterMs,
@@ -461,17 +461,6 @@ export class GroupQueueProcessor<
       shouldReplace,
       shouldSurviveDispatch,
     });
-
-    // Blob leases for a dedup squash move INSIDE the stage eval, atomic with
-    // the displacement — a post-eval transfer can reorder against a concurrent
-    // squash of the same dedup id and leave a phantom lifecycle entry. A genuine
-    // new stage still takes its lease here. When the squash DISCARDED the new
-    // value instead (replace off or a post-dispatch survive-dispatch squash), it
-    // was never staged and gets no lease. A discarded GQ1 private blob was
-    // already UNLINKed inside the eval; a GQ2 blob is left to lazy backstop reclaim.
-    if (!orphanedValue) {
-      await this.blobLifecycle.takeLease(jobDataJson);
-    }
 
     if (isNew) {
       gqJobsStagedTotal.inc({ queue_name: this.queueName });
@@ -587,20 +576,7 @@ export class GroupQueueProcessor<
       }),
     );
 
-    const { newStagedCount, orphanedValues } =
-      await this.scripts.stageBatch(jobsToStage);
-
-    // Dedup-squash leases move inside the stage eval (see send()); here we take
-    // leases only for genuinely new stages. A squash that discarded the NEW
-    // value (orphan === the job's own value) staged nothing and gets no lease.
-    await Promise.all(
-      jobsToStage.map(async (job, i) => {
-        const orphan = orphanedValues[i];
-        if (!orphan || orphan.length === 0) {
-          await this.blobLifecycle.takeLease(job.jobDataJson);
-        }
-      }),
-    );
+    const { newStagedCount } = await this.scripts.stageBatch(jobsToStage);
 
     const dedupedCount = payloads.length - newStagedCount;
     if (newStagedCount > 0) {
@@ -866,9 +842,13 @@ export class GroupQueueProcessor<
               this.parseDrainedPayload({ sibling, groupId }),
             ),
           );
+          const liveSiblings = drainedSiblings.filter(
+            (_, index) => parsedSiblings[index] !== null,
+          );
           const siblingPayloads = parsedSiblings.filter(
             (parsed) => parsed !== null,
           ) as Payload[];
+          drainedSiblings = liveSiblings;
           if (siblingPayloads.length > 0) {
             batchPayloads = [payload, ...siblingPayloads];
           }
@@ -917,7 +897,10 @@ export class GroupQueueProcessor<
     const heartbeat = this.startActiveKeyHeartbeat({
       groupId,
       stagedJobId,
-      jobDataJson,
+      jobDataValues: [
+        jobDataJson,
+        ...drainedSiblings.map((sibling) => sibling.jobDataJson),
+      ],
     });
     this.activeJobCount++;
 
@@ -1320,11 +1303,14 @@ export class GroupQueueProcessor<
         err,
         reason: dropReasonOf(err),
         message: "Failed to parse drained sibling job data — dropping",
-        // We do not release a sibling's value, so the body outlives the drop
-        // unless it was already gone.
+        // Lease release is non-destructive; bytes remain until lazy reclaim.
         bodyPreserved: !(err instanceof DecodeFailureError
           ? err.reason === "missing_blob"
           : false),
+      });
+      await this.blobLifecycle.releaseLease({
+        values: [sibling.jobDataJson],
+        groupId,
       });
       return null;
     }
@@ -1350,9 +1336,6 @@ export class GroupQueueProcessor<
           dedupTtlMs: 0,
           jobDataJson: sibling.jobDataJson,
         });
-        // Renew the sibling's lease (idempotent: it kept the same holder
-        // identity through the drain).
-        await this.blobLifecycle.takeLease(sibling.jobDataJson);
       } catch (err) {
         // The sibling never made it back into staging, so nothing will dispatch
         // it again — that is a discard, whatever the re-stage intended (#5538).
@@ -1378,11 +1361,11 @@ export class GroupQueueProcessor<
   private startActiveKeyHeartbeat({
     groupId,
     stagedJobId,
-    jobDataJson,
+    jobDataValues,
   }: {
     groupId: string;
     stagedJobId: string;
-    jobDataJson: string;
+    jobDataValues: string[];
   }): ReturnType<typeof setInterval> {
     const intervalMs = (GROUP_QUEUE_CONFIG.activeTtlSec * 1000) / 3;
     return setInterval(() => {
@@ -1403,7 +1386,9 @@ export class GroupQueueProcessor<
             "Failed to heartbeat active key during processing",
           );
         });
-      void this.blobLifecycle.renewLease(jobDataJson);
+      for (const jobDataValue of jobDataValues) {
+        void this.blobLifecycle.renewLease(jobDataValue);
+      }
     }, intervalMs);
   }
 
@@ -1452,10 +1437,6 @@ export class GroupQueueProcessor<
       errorMessage: lastError?.message,
       errorStack: lastError?.stack,
     });
-
-    // Take the re-staged value's lease; the caller releases the dispatched one
-    // after this returns (take-before-release preserves continuous liveness).
-    await this.blobLifecycle.takeLease(jobDataJson);
 
     gqGroupsBlockedTotal.inc(routingLabels);
     gqJobsExhaustedTotal.inc(routingLabels);
@@ -1718,7 +1699,6 @@ export class GroupQueueProcessor<
       jobDataJson,
       backoffMs,
     });
-    await this.blobLifecycle.renewLease(jobDataJson);
     this.logger.warn(
       {
         queueName: this.queueName,

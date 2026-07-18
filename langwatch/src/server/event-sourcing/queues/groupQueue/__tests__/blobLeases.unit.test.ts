@@ -67,5 +67,34 @@ describe("BlobLeases", () => {
         );
       });
     });
+
+    describe("when a Redis-tier lease is renewed", () => {
+      it("refreshes the lease and blob in one script", async () => {
+        const run = vi
+          .spyOn(CachedLuaScript.prototype, "run")
+          .mockResolvedValue(1);
+        const redis = {} as ConstructorParameters<
+          typeof BlobLeases
+        >[0]["redis"];
+        const leases = new BlobLeases({ redis, queueName: "{queue}" });
+
+        await leases.renew({
+          projectId: PROJECT,
+          hash: "hash-1",
+          holderId: "holder-1",
+          tier: "redis",
+        });
+
+        expect(run).toHaveBeenCalledWith(
+          redis,
+          3,
+          "{queue}:gq:blobleases:project-1/hash-1",
+          "{queue}:gq:blobholders:project-1/hash-1",
+          "{queue}:gq:blob:project-1/hash-1",
+          "holder-1",
+          expect.any(String),
+        );
+      });
+    });
   });
 });
