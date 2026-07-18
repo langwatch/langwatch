@@ -91,6 +91,7 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Hydrate(&cfg); err != nil {
 		return Config{}, err
 	}
+	cfg.OTel.SampleRatioSet = os.Getenv("OTEL_SAMPLE_RATIO") != ""
 	applyLegacyEnvAliases(&cfg)
 	if cfg.CustomerTraceBridge.BaseURL == "" {
 		cfg.CustomerTraceBridge.BaseURL = cfg.ControlPlane.BaseURL

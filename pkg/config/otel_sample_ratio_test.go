@@ -15,7 +15,7 @@ func TestResolveSampleRatio_HonoursExplicitFullSampling(t *testing.T) {
 
 	o.ResolveSampleRatio("production")
 
-	assert.Equal(t, 1.0, o.SampleRatio, "an explicit 100% must survive in production")
+	assert.InDelta(t, 1.0, o.SampleRatio, 0, "an explicit 100% must survive in production")
 }
 
 func TestResolveSampleRatio_HonoursExplicitPartialSampling(t *testing.T) {
@@ -23,7 +23,7 @@ func TestResolveSampleRatio_HonoursExplicitPartialSampling(t *testing.T) {
 
 	o.ResolveSampleRatio("production")
 
-	assert.Equal(t, 0.25, o.SampleRatio)
+	assert.InDelta(t, 0.25, o.SampleRatio, 0)
 }
 
 func TestResolveSampleRatio_DefaultsOutsideLocal(t *testing.T) {
@@ -31,7 +31,7 @@ func TestResolveSampleRatio_DefaultsOutsideLocal(t *testing.T) {
 
 	o.ResolveSampleRatio("production")
 
-	assert.Equal(t, DefaultNonLocalSampleRatio, o.SampleRatio)
+	assert.InDelta(t, DefaultNonLocalSampleRatio, o.SampleRatio, 0)
 }
 
 func TestResolveSampleRatio_DefaultsToFullLocally(t *testing.T) {
@@ -39,5 +39,13 @@ func TestResolveSampleRatio_DefaultsToFullLocally(t *testing.T) {
 
 	o.ResolveSampleRatio("local")
 
-	assert.Equal(t, 1.0, o.SampleRatio, "local development traces everything")
+	assert.InDelta(t, 1.0, o.SampleRatio, 0, "local development traces everything")
+}
+
+func TestResolveSampleRatio_HonoursExplicitZeroSampling(t *testing.T) {
+	o := OTel{SampleRatioSet: true, SampleRatio: 0}
+
+	o.ResolveSampleRatio("production")
+
+	assert.Zero(t, o.SampleRatio, "an explicit 0% must not become the default")
 }

@@ -2,7 +2,6 @@ package gatewaytracer
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,7 +13,7 @@ import (
 )
 
 const (
-	secretPrompt     = "my database password is hunter2, summarise the attached patient record"
+	secretPrompt     = "my database password is hunter2, summarize the attached patient record"
 	secretCompletion = "Certainly — the patient record for Jane Doe indicates a diagnosis of"
 	secretSystem     = "You are an assistant for ACME Corp. The internal API key is sk-live-abc123."
 )
@@ -145,7 +144,7 @@ func TestStampInternalGenAI_ErrorTypeCarriesNoProviderText(t *testing.T) {
 		if string(kv.Key) != AttrErrorType {
 			continue
 		}
-		assert.False(t, strings.Contains(kv.Value.Emit(), " "),
+		assert.NotContains(t, kv.Value.Emit(), " ",
 			"error.type must stay a classifier token, not a message")
 	}
 }

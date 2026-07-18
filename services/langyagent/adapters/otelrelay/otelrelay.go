@@ -35,10 +35,12 @@
 package otelrelay
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -48,6 +50,10 @@ import (
 	"time"
 
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
@@ -64,12 +70,25 @@ const maxOTLPBodyBytes = 16 * 1024 * 1024
 // a slow customer ingest must not pile up relay handlers.
 const forwardTimeout = 30 * time.Second
 
+// Internal exports are deliberately small and bounded. At the maximum accepted
+// OTLP body size this caps retained queued payloads at 128 MiB, plus at most two
+// in-flight requests. When full, internal observability is dropped so customer
+// forwarding keeps its memory and latency budget.
+const (
+	internalExportQueueSize = 8
+	internalExportWorkers   = 2
+)
+
 // WorkerInfo is everything the relay needs to mediate one worker's telemetry
 // and LLM traffic. Captured at spawn (the only moment the manager sees the
 // credentials) and dropped at Unregister.
 type WorkerInfo struct {
 	ConversationID    string
 	LangwatchEndpoint string
+	// Model comes from manager-owned worker configuration. The relay uses this
+	// trusted value in LangWatch's internal trace instead of the worker-supplied
+	// OTLP model attribute, which is an arbitrary string and may carry content.
+	Model string
 	// LangwatchAPIKey authenticates the trace forward into the customer's
 	// project. Held by the relay, never by the worker.
 	LangwatchAPIKey string
@@ -144,9 +163,21 @@ type Relay struct {
 	// entirely — the customer path is unaffected either way.
 	internalEndpoint string
 	internalHeaders  map[string]string
+	internalCtx      context.Context
+	internalCancel   context.CancelFunc
+	internalJobs     chan internalExportJob
+	internalWG       sync.WaitGroup
+	internalDropped  metric.Int64Counter
 
 	mu      sync.Mutex
 	workers map[string]*workerEntry
+}
+
+type internalExportJob struct {
+	conversationID string
+	model          string
+	turn           trace.SpanContext
+	payload        []byte
 }
 
 // Options configures the relay. The zero value is valid: no internal export.
@@ -179,6 +210,16 @@ func New(ctx context.Context, opts Options) (*Relay, error) {
 				IdleConnTimeout:     60 * time.Second,
 			},
 		},
+	}
+	if r.internalEndpoint != "" {
+		// The cancel function is invoked by Shutdown after the workers stop.
+		r.internalCtx, r.internalCancel = context.WithCancel(ctx) //nolint:gosec // lifecycle-owned by Relay.Shutdown
+		r.internalJobs = make(chan internalExportJob, internalExportQueueSize)
+		r.internalDropped = newInternalDropCounter()
+		for range internalExportWorkers {
+			r.internalWG.Add(1)
+			go r.runInternalExporter()
+		}
 	}
 
 	mux := http.NewServeMux()
@@ -216,7 +257,24 @@ func (r *Relay) Port() int { return r.port }
 // Shutdown stops the listener. In-flight forwards are cut; telemetry is
 // best-effort by design.
 func (r *Relay) Shutdown(ctx context.Context) error {
-	return r.srv.Shutdown(ctx)
+	if r.internalCancel != nil {
+		r.internalCancel()
+	}
+	serverErr := r.srv.Shutdown(ctx)
+	if r.internalCancel == nil {
+		return serverErr
+	}
+	done := make(chan struct{})
+	go func() {
+		r.internalWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return serverErr
+	case <-ctx.Done():
+		return errors.Join(serverErr, ctx.Err())
+	}
 }
 
 // Register mints an unguessable routing token for a worker and retains its
@@ -331,7 +389,7 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 	// LangWatch's own copy, content-stripped, built from the batch BEFORE it is
 	// re-parented in place for the customer. Best-effort and detached: our
 	// observability must never delay or fail the customer's telemetry.
-	r.exportInternal(conversationID, turn, td)
+	r.exportInternal(conversationID, entry.info.Model, turn, body)
 
 	ReparentTraces(td, conversationID, turn)
 	out, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
@@ -375,31 +433,98 @@ func readOTLPBody(req *http.Request) ([]byte, error) {
 // exportInternal ships LangWatch's content-stripped copy of a worker batch to
 // its own collector. No-op when no internal endpoint is configured.
 //
-// Detached on purpose: this is LangWatch's operational telemetry, and the
-// customer's export must not wait on it or fail with it. The copy is built
-// synchronously (it reads td, which the caller mutates immediately after) and
-// only the HTTP round trip is deferred.
-func (r *Relay) exportInternal(conversationID string, turn trace.SpanContext, td ptrace.Traces) {
+// The original immutable protobuf body is queued rather than the mutable pdata
+// tree. Copying, sanitizing, marshaling, and HTTP all happen behind the bounded
+// worker pool, so internal observability never delays customer forwarding.
+func (r *Relay) exportInternal(
+	conversationID string,
+	model string,
+	turn trace.SpanContext,
+	payload []byte,
+) {
 	if r.internalEndpoint == "" {
 		return
 	}
+	if r.internalCtx.Err() != nil {
+		return
+	}
+	job := internalExportJob{
+		conversationID: conversationID,
+		model:          model,
+		turn:           turn,
+		payload:        payload,
+	}
+	select {
+	case r.internalJobs <- job:
+	default:
+		r.internalDropped.Add(r.baseCtx, 1, metric.WithAttributes(
+			attribute.String("reason", "queue_full"),
+		))
+		clog.Get(r.baseCtx).Warn("otelrelay internal trace dropped",
+			zap.String("conversation", conversationID),
+			zap.String("reason", "queue_full"),
+		)
+	}
+}
+
+func (r *Relay) runInternalExporter() {
+	defer r.internalWG.Done()
+	defer clog.HandlePanic(r.baseCtx, false)
+	for {
+		select {
+		case <-r.internalCtx.Done():
+			return
+		case job := <-r.internalJobs:
+			if r.internalCtx.Err() != nil {
+				return
+			}
+			r.processInternalJobSafely(job)
+		}
+	}
+}
+
+// processInternalJobSafely contains a panic to one best-effort batch. Recovering
+// at the worker-loop boundary alone would keep the process alive but permanently
+// shrink the fixed-size pool after a single malformed batch.
+func (r *Relay) processInternalJobSafely(job internalExportJob) {
+	defer clog.HandlePanic(r.baseCtx, false)
+	r.processInternalJob(job)
+}
+
+func (r *Relay) processInternalJob(job internalExportJob) {
+	td, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(job.payload)
+	if err != nil {
+		clog.Get(r.baseCtx).Warn("otelrelay internal copy unmarshal failed",
+			zap.String("conversation", job.conversationID), zap.Error(err))
+		return
+	}
 	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(
-		langyotel.InternalCopy(td, conversationID, turn),
+		langyotel.InternalCopy(td, job.conversationID, job.model, job.turn),
 	)
 	if err != nil {
 		clog.Get(r.baseCtx).Warn("otelrelay internal copy marshal failed",
-			zap.String("conversation", conversationID), zap.Error(err))
+			zap.String("conversation", job.conversationID), zap.Error(err))
 		return
 	}
-	go func() {
-		defer clog.HandlePanic(r.baseCtx, false)
-		ctx, cancel := context.WithTimeout(r.baseCtx, forwardTimeout)
-		defer cancel()
-		if err := r.postInternal(ctx, payload); err != nil {
-			clog.Get(r.baseCtx).Warn("otelrelay internal trace forward failed",
-				zap.String("conversation", conversationID), zap.Error(err))
-		}
-	}()
+	ctx, cancel := context.WithTimeout(r.internalCtx, forwardTimeout)
+	defer cancel()
+	if err := r.postInternal(ctx, payload); err != nil && r.internalCtx.Err() == nil {
+		clog.Get(r.baseCtx).Warn("otelrelay internal trace forward failed",
+			zap.String("conversation", job.conversationID), zap.Error(err))
+	}
+}
+
+func newInternalDropCounter() metric.Int64Counter {
+	const name = "langwatch.langy.internal_trace.batches_dropped"
+	counter, err := otel.Meter("langwatch-langyagent").Int64Counter(
+		name,
+		metric.WithDescription("Internal worker trace batches dropped before export."),
+	)
+	if err == nil {
+		return counter
+	}
+	fallback, _ := noop.NewMeterProvider().Meter("langwatch-langyagent").Int64Counter(name)
+	return fallback
 }
 
 func (r *Relay) postInternal(ctx context.Context, payload []byte) error {
@@ -407,7 +532,7 @@ func (r *Relay) postInternal(ctx context.Context, payload []byte) error {
 	if !strings.HasSuffix(url, "/v1/traces") {
 		url += "/v1/traces"
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(string(payload)))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
@@ -431,7 +556,7 @@ func (r *Relay) postInternal(ctx context.Context, payload []byte) error {
 // LangWatch OTLP ingest, authenticated with the session key.
 func (r *Relay) forwardTraces(ctx context.Context, info WorkerInfo, payload []byte) error {
 	url := strings.TrimRight(info.LangwatchEndpoint, "/") + "/api/otel/v1/traces"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(string(payload)))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
@@ -442,9 +567,9 @@ func (r *Relay) forwardTraces(ctx context.Context, info WorkerInfo, payload []by
 		return err
 	}
 	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
 	if resp.StatusCode >= 300 {
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("ingest answered %d: %s", resp.StatusCode, string(b))
+		return fmt.Errorf("ingest answered %d: %s", resp.StatusCode, string(body))
 	}
 	return nil
 }

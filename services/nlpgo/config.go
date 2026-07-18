@@ -7,6 +7,7 @@ package nlpgo
 
 import (
 	"context"
+	"os"
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
@@ -82,6 +83,7 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Hydrate(&cfg); err != nil {
 		return Config{}, err
 	}
+	cfg.OTel.SampleRatioSet = os.Getenv("OTEL_SAMPLE_RATIO") != ""
 	cfg.OTel.ResolveSampleRatio(cfg.Environment)
 	if err := config.Validate(ctx, cfg); err != nil {
 		return Config{}, err

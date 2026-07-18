@@ -46,9 +46,14 @@ type ConfigFetcher interface {
 // listens for. Kept as a sealed string set so callers can switch
 // exhaustively without leaking control-plane internals into this package.
 const (
-	ChangeKindProviderBindingUpdated = "PROVIDER_BINDING_UPDATED"
+	ChangeKindProviderBindingUpdated = "MODEL_PROVIDER_UPDATED"
+	ChangeKindBudgetCreated          = "BUDGET_CREATED"
 	ChangeKindBudgetUpdated          = "BUDGET_UPDATED"
-	ChangeKindVirtualKeyUpdated      = "VIRTUAL_KEY_UPDATED"
+	ChangeKindBudgetDeleted          = "BUDGET_DELETED"
+	ChangeKindVirtualKeyCreated      = "VK_CREATED"
+	ChangeKindVirtualKeyConfigUpdate = "VK_CONFIG_UPDATED"
+	ChangeKindVirtualKeyRotated      = "VK_ROTATED"
+	ChangeKindVirtualKeyRevoked      = "VK_REVOKED"
 )
 
 // CacheChange is one cache-invalidation hint surfaced by ChangePoller.
@@ -58,6 +63,7 @@ type CacheChange struct {
 	VirtualKeyID         string
 	BudgetID             string
 	ProviderCredentialID string
+	ModelProviderID      string
 	ProjectID            string
 	Revision             string
 }
@@ -555,18 +561,22 @@ func (s *Service) changeFeedLoop(ctx context.Context) {
 func (s *Service) applyChange(ch CacheChange) {
 	switch ch.Kind {
 	case ChangeKindProviderBindingUpdated:
-		if ch.ProviderCredentialID == "" {
+		providerID := ch.ModelProviderID
+		if providerID == "" {
+			providerID = ch.ProviderCredentialID
+		}
+		if providerID == "" {
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			for _, c := range b.Config.Credentials {
-				if c.ID == ch.ProviderCredentialID {
+				if c.ID == providerID {
 					return true
 				}
 			}
 			return false
-		}, "provider_binding_updated", ch.ProviderCredentialID)
-	case ChangeKindBudgetUpdated:
+		}, "model_provider_updated", providerID)
+	case ChangeKindBudgetCreated, ChangeKindBudgetUpdated, ChangeKindBudgetDeleted:
 		// BUDGET_UPDATED's project_id is the only stable join key
 		// (budget_id alone doesn't appear in the bundle; budgets nest
 		// under scopes). Evicting all bundles for the affected project
@@ -578,13 +588,13 @@ func (s *Service) applyChange(ch CacheChange) {
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.ProjectID == ch.ProjectID
 		}, "budget_updated", ch.ProjectID)
-	case ChangeKindVirtualKeyUpdated:
+	case ChangeKindVirtualKeyConfigUpdate, ChangeKindVirtualKeyRotated, ChangeKindVirtualKeyRevoked:
 		if ch.VirtualKeyID == "" {
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.VirtualKeyID == ch.VirtualKeyID
-		}, "virtual_key_updated", ch.VirtualKeyID)
+		}, "virtual_key_config_updated", ch.VirtualKeyID)
 	}
 }
 

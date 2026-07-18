@@ -1,147 +1,215 @@
-// Package otel builds LangWatch's OWN copy of a Langy worker's telemetry.
-//
-// A worker's OTLP batch goes to the customer's project verbatim — it is their
-// agent, their prompts, their project. That path is untouched by this package.
-//
-// LangWatch also needs operational visibility into workers it runs: which model,
-// how many tokens, how long, what failed. It must NOT receive the content. The
-// worker is an opencode subprocess and its spans are the highest-density
-// prompt/completion surface in the system — the relay already accepts-and-drops
-// worker LOGS and METRICS for exactly that reason, but spans were never filtered
-// because they only ever went to the customer.
-//
-// InternalCopy is the boundary. It deep-copies the batch, keeps a strict
-// allowlist of shape-and-cost attributes, drops every span event (the classic
-// carrier: exception.message, exception.stacktrace, gen_ai prompt/completion
-// events), clears status descriptions (provider error text), and replaces the
-// worker's resource with LangWatch's own service identity.
-//
-// The allowlist is deliberate: a denylist fails open on the next key opencode's
-// instrumentation invents, and the whole point is that unknown keys are assumed
-// to carry content.
+// Package otel builds LangWatch's own content-free copy of Langy worker traces.
 package otel
 
 import (
+	"strings"
+
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/otel/trace"
 )
 
-// Resource keys stamped on LangWatch's copy. The worker's own resource
-// attributes are discarded wholesale rather than filtered — they describe the
-// customer's agent, and we are re-attributing this batch to our own service.
 const (
 	attrServiceName  = "service.name"
 	attrOrigin       = "langwatch.origin"
 	attrConversation = "langy.conversation_id"
 
-	serviceName  = "langwatch-langyworker"
-	originWorker = "langy_worker"
+	serviceName       = "langwatch-langyworker"
+	originWorker      = "langy_worker"
+	internalScopeName = "langwatch.langyworker"
+	internalSpanName  = "langy.worker"
 )
 
-// spanAttributeAllowlist is the complete set of span attributes LangWatch's
-// copy may carry. Everything absent here is dropped, including keys that look
-// harmless — an unrecognised key is assumed to carry content until someone
-// deliberately adds it, with a test.
-//
-// Note what is NOT here: gen_ai.input.messages, gen_ai.output.messages,
-// gen_ai.system_instructions, gen_ai.prompt, gen_ai.completion, and every tool
-// argument or result key. Those are the customer's.
-var spanAttributeAllowlist = map[string]struct{}{
-	// Shape of the call.
-	"gen_ai.operation.name":  {},
-	"gen_ai.system":          {},
-	"gen_ai.request.model":   {},
-	"gen_ai.response.model":  {},
-	"gen_ai.conversation.id": {},
-
-	// Cost and size. Counts, never content.
+// Numeric attributes cannot carry customer text. Their values are copied only
+// when the worker used the expected numeric type and supplied a non-negative
+// value. Everything else is omitted from LangWatch's copy.
+var safeIntSpanAttributes = map[string]struct{}{
 	"gen_ai.usage.input_tokens":                {},
 	"gen_ai.usage.output_tokens":               {},
 	"gen_ai.usage.total_tokens":                {},
 	"gen_ai.usage.cache_read.input_tokens":     {},
 	"gen_ai.usage.cache_creation.input_tokens": {},
-
-	// Outcome. finish_reasons is a fixed vocabulary ("stop", "length", ...);
-	// error.type is a classifier token, not a message.
-	"gen_ai.response.finish_reasons": {},
-	"error.type":                     {},
-
-	// Tool identity — which tool ran, never what it was called with or returned.
-	"gen_ai.tool.name":    {},
-	"gen_ai.tool.type":    {},
-	"gen_ai.tool.call.id": {},
-
-	// Transport shape. url.full and query strings are excluded on purpose:
-	// agent traffic routinely carries content in them.
-	"http.request.method":       {},
-	"http.response.status_code": {},
-	"server.address":            {},
+	"http.response.status_code":                {},
 }
 
-// InternalCopy returns LangWatch's content-stripped copy of a worker OTLP
-// batch, re-parented under the turn so it joins the manager's own trace.
+// String metadata is retained only when it belongs to a closed operational
+// vocabulary. Open-ended strings such as model ids and tool names are never
+// trusted from the worker; the model is stamped from manager-owned config.
+var safeEnumSpanAttributes = map[string]map[string]struct{}{
+	"gen_ai.operation.name": enumSet(
+		"chat", "text_completion", "embeddings", "execute_tool", "generate_content",
+	),
+	"gen_ai.system": enumSet(
+		"anthropic", "aws.bedrock", "azure.ai.openai", "gcp.vertex_ai", "openai",
+	),
+	"gen_ai.tool.type": enumSet("datastore", "extension", "function"),
+	"http.request.method": enumSet(
+		"CONNECT", "DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT", "TRACE",
+	),
+}
+
+var safeFinishReasons = enumSet(
+	"content_filter", "error", "length", "stop", "tool_calls", "unknown",
+)
+
+func enumSet(values ...string) map[string]struct{} {
+	out := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		out[value] = struct{}{}
+	}
+	return out
+}
+
+// InternalCopy returns a new trace batch containing only operational metadata
+// that is safe for LangWatch's collector. It deliberately constructs a blank
+// OTLP tree instead of cloning the worker payload: newly-added pdata string
+// fields therefore stay empty until explicitly reviewed here.
 //
-// td is NOT modified — the caller's batch stays intact for the customer path.
-// Re-parenting onto the turn is legitimate here in a way it is not for the
-// customer copy: this trace lives in LangWatch's backend, where the turn's
-// parent span actually exists.
-func InternalCopy(td ptrace.Traces, conversationID string, turn trace.SpanContext) ptrace.Traces {
+// trustedModel and conversationID come from manager-owned worker registration,
+// never from the worker's OTLP payload. td is not modified.
+func InternalCopy(
+	td ptrace.Traces,
+	conversationID string,
+	trustedModel string,
+	turn trace.SpanContext,
+) ptrace.Traces {
 	out := ptrace.NewTraces()
-	td.CopyTo(out)
+	sourceResources := td.ResourceSpans()
+	for i := 0; i < sourceResources.Len(); i++ {
+		sourceResource := sourceResources.At(i)
+		destinationResource := out.ResourceSpans().AppendEmpty()
+		stampInternalResource(destinationResource.Resource().Attributes(), conversationID)
 
-	rss := out.ResourceSpans()
-	for i := 0; i < rss.Len(); i++ {
-		rs := rss.At(i)
-		stampInternalResource(rs.Resource().Attributes(), conversationID)
+		sourceScopes := sourceResource.ScopeSpans()
+		for j := 0; j < sourceScopes.Len(); j++ {
+			sourceScope := sourceScopes.At(j)
+			destinationScope := destinationResource.ScopeSpans().AppendEmpty()
+			destinationScope.Scope().SetName(internalScopeName)
 
-		sss := rs.ScopeSpans()
-		for j := 0; j < sss.Len(); j++ {
-			spans := sss.At(j).Spans()
-			for k := 0; k < spans.Len(); k++ {
-				sanitizeSpan(spans.At(k), turn)
+			sourceSpans := sourceScope.Spans()
+			for k := 0; k < sourceSpans.Len(); k++ {
+				copySafeSpan(
+					sourceSpans.At(k),
+					destinationScope.Spans().AppendEmpty(),
+					trustedModel,
+					turn,
+				)
 			}
 		}
 	}
 	return out
 }
 
-// stampInternalResource discards the worker's resource attributes and replaces
-// them with LangWatch's service identity. Clearing rather than filtering keeps
-// customer-set resource attributes (which opencode lets the agent influence)
-// out of our backend entirely.
 func stampInternalResource(attrs pcommon.Map, conversationID string) {
-	attrs.Clear()
 	attrs.PutStr(attrServiceName, serviceName)
 	attrs.PutStr(attrOrigin, originWorker)
 	attrs.PutStr(attrConversation, conversationID)
 }
 
-func sanitizeSpan(span ptrace.Span, turn trace.SpanContext) {
-	span.Attributes().RemoveIf(func(k string, _ pcommon.Value) bool {
-		_, allowed := spanAttributeAllowlist[k]
-		return !allowed
-	})
+func copySafeSpan(source, destination ptrace.Span, trustedModel string, turn trace.SpanContext) {
+	destination.SetName(internalSpanName)
+	destination.SetTraceID(source.TraceID())
+	destination.SetSpanID(source.SpanID())
+	destination.SetParentSpanID(source.ParentSpanID())
+	destination.SetStartTimestamp(source.StartTimestamp())
+	destination.SetEndTimestamp(source.EndTimestamp())
+	destination.SetKind(source.Kind())
+	destination.SetFlags(source.Flags())
+	destination.Status().SetCode(source.Status().Code())
 
-	// Events carry exception.message / exception.stacktrace and, in several
-	// gen_ai instrumentations, the prompt and completion bodies themselves.
-	// None of it is worth the risk operationally.
-	span.Events().RemoveIf(func(ptrace.SpanEvent) bool { return true })
-
-	// Link attributes are attacker-influenced the same way span attributes are;
-	// the link's trace/span ids are the useful part.
-	links := span.Links()
-	for i := 0; i < links.Len(); i++ {
-		links.At(i).Attributes().Clear()
-	}
-
-	// Status descriptions are raw provider/runtime error text. Keep the code.
-	span.Status().SetMessage("")
+	copySafeAttributes(source.Attributes(), destination.Attributes(), trustedModel)
+	copySafeLinks(source.Links(), destination.Links())
 
 	if turn.IsValid() {
-		span.SetTraceID(pcommon.TraceID(turn.TraceID()))
-		if span.ParentSpanID().IsEmpty() {
-			span.SetParentSpanID(pcommon.SpanID(turn.SpanID()))
+		destination.SetTraceID(pcommon.TraceID(turn.TraceID()))
+		if destination.ParentSpanID().IsEmpty() {
+			destination.SetParentSpanID(pcommon.SpanID(turn.SpanID()))
 		}
+	}
+}
+
+func copySafeAttributes(source, destination pcommon.Map, trustedModel string) {
+	source.Range(func(key string, value pcommon.Value) bool {
+		if _, ok := safeIntSpanAttributes[key]; ok {
+			copySafeInt(destination, key, value)
+			return true
+		}
+		if vocabulary, ok := safeEnumSpanAttributes[key]; ok {
+			copySafeEnum(destination, key, value, vocabulary)
+			return true
+		}
+		if key == "gen_ai.response.finish_reasons" {
+			copySafeEnumSlice(destination, key, value, safeFinishReasons)
+			return true
+		}
+		if (key == "gen_ai.request.model" || key == "gen_ai.response.model") && trustedModel != "" {
+			destination.PutStr(key, trustedModel)
+		}
+		return true
+	})
+}
+
+func copySafeInt(destination pcommon.Map, key string, value pcommon.Value) {
+	if value.Type() != pcommon.ValueTypeInt || value.Int() < 0 {
+		return
+	}
+	if key == "http.response.status_code" && (value.Int() < 100 || value.Int() > 599) {
+		return
+	}
+	destination.PutInt(key, value.Int())
+}
+
+func copySafeEnum(
+	destination pcommon.Map,
+	key string,
+	value pcommon.Value,
+	vocabulary map[string]struct{},
+) {
+	if value.Type() != pcommon.ValueTypeStr {
+		return
+	}
+	canonical := strings.TrimSpace(value.Str())
+	if _, ok := vocabulary[canonical]; ok {
+		destination.PutStr(key, canonical)
+	}
+}
+
+func copySafeEnumSlice(
+	destination pcommon.Map,
+	key string,
+	value pcommon.Value,
+	vocabulary map[string]struct{},
+) {
+	if value.Type() != pcommon.ValueTypeSlice {
+		return
+	}
+	source := value.Slice()
+	safe := make([]string, 0, source.Len())
+	for i := 0; i < source.Len(); i++ {
+		item := source.At(i)
+		if item.Type() != pcommon.ValueTypeStr {
+			return
+		}
+		if _, ok := vocabulary[item.Str()]; !ok {
+			return
+		}
+		safe = append(safe, item.Str())
+	}
+	if len(safe) == 0 {
+		return
+	}
+	destinationSlice := destination.PutEmptySlice(key)
+	for _, item := range safe {
+		destinationSlice.AppendEmpty().SetStr(item)
+	}
+}
+
+func copySafeLinks(source, destination ptrace.SpanLinkSlice) {
+	for i := 0; i < source.Len(); i++ {
+		sourceLink := source.At(i)
+		destinationLink := destination.AppendEmpty()
+		destinationLink.SetTraceID(sourceLink.TraceID())
+		destinationLink.SetSpanID(sourceLink.SpanID())
+		destinationLink.SetFlags(sourceLink.Flags())
 	}
 }

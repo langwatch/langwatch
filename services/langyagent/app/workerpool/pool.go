@@ -667,6 +667,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 			ConversationID:    conversationID,
 			LangwatchEndpoint: creds.LangwatchEndpoint,
 			LangwatchAPIKey:   creds.LangwatchAPIKey,
+			Model:             creds.Model,
 			GatewayBaseURL:    creds.GatewayBaseURL,
 			LLMVirtualKey:     creds.LLMVirtualKey,
 		})

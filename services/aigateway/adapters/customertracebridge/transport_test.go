@@ -2,6 +2,7 @@ package customertracebridge
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -17,21 +19,55 @@ import (
 // spans are stored under.
 type ingest struct {
 	*httptest.Server
-	mu     sync.Mutex
-	tokens []string
+	mu       sync.Mutex
+	tokens   []string
+	projects []string
 }
 
 func newIngest(t *testing.T) *ingest {
 	t.Helper()
 	in := &ingest{}
 	in.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read OTLP body: %v", err)
+			http.Error(w, "read body", http.StatusBadRequest)
+			return
+		}
+		traces, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(body)
+		if err != nil {
+			t.Errorf("unmarshal OTLP body: %v", err)
+			http.Error(w, "unmarshal body", http.StatusBadRequest)
+			return
+		}
+
 		in.mu.Lock()
 		in.tokens = append(in.tokens, r.Header.Get("X-Auth-Token"))
+		resources := traces.ResourceSpans()
+		for i := 0; i < resources.Len(); i++ {
+			scopes := resources.At(i).ScopeSpans()
+			for j := 0; j < scopes.Len(); j++ {
+				spans := scopes.At(j).Spans()
+				for k := 0; k < spans.Len(); k++ {
+					projectID := ""
+					if value, ok := spans.At(k).Attributes().Get(string(attrProjectID)); ok {
+						projectID = value.Str()
+					}
+					in.projects = append(in.projects, projectID)
+				}
+			}
+		}
 		in.mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(in.Close)
 	return in
+}
+
+func (i *ingest) receivedProjects() []string {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return append([]string(nil), i.projects...)
 }
 
 func (i *ingest) received() []string {
@@ -54,9 +90,9 @@ func (c *captureExporter) Shutdown(context.Context) error { return nil }
 // with no langwatch.project_id attribute at all.
 func spansFor(t *testing.T, projectIDs ...string) []sdktrace.ReadOnlySpan {
 	t.Helper()
-	cap := &captureExporter{}
+	collector := &captureExporter{}
 	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithSyncer(cap),
+		sdktrace.WithSyncer(collector),
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
 	tr := tp.Tracer("test")
@@ -68,7 +104,7 @@ func spansFor(t *testing.T, projectIDs ...string) []sdktrace.ReadOnlySpan {
 		span.End()
 	}
 	require.NoError(t, tp.Shutdown(context.Background()))
-	return cap.spans
+	return collector.spans
 }
 
 func TestRouterExporter_RoutesEachProjectToItsOwnIngestOnly(t *testing.T) {
@@ -85,6 +121,10 @@ func TestRouterExporter_RoutesEachProjectToItsOwnIngestOnly(t *testing.T) {
 		"alpha's ingest must only ever be handed alpha's token")
 	assert.Equal(t, []string{"tok-beta"}, beta.received(),
 		"beta's ingest must only ever be handed beta's token")
+	assert.Equal(t, []string{"proj-alpha", "proj-alpha"}, alpha.receivedProjects(),
+		"alpha must receive only alpha's span bodies")
+	assert.Equal(t, []string{"proj-beta"}, beta.receivedProjects(),
+		"beta must receive only beta's span bodies")
 }
 
 // The regression that matters: before this, exporterFor returned the cached
@@ -174,6 +214,21 @@ func TestRouterExporter_SurfacesExportFailure(t *testing.T) {
 	err := router.ExportSpans(context.Background(), spansFor(t, "proj-1"))
 
 	assert.Error(t, err, "a rejected export must not be silently discarded")
+}
+
+func TestRouterExporter_SurfacesExporterBuildFailure(t *testing.T) {
+	in := newIngest(t)
+	reg := NewRegistry()
+	require.NoError(t, reg.Set("proj-1", in.URL, map[string]string{"X-Auth-Token": "tok"}))
+	router := newRouterExporter(context.Background(), reg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := router.ExportSpans(ctx, spansFor(t, "proj-1"))
+
+	require.Error(t, err)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Empty(t, in.received(), "a failed exporter build must not report a successful delivery")
 }
 
 func TestHeadersEqual(t *testing.T) {

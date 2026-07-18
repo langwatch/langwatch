@@ -12,6 +12,10 @@ type OTel struct {
 	OTLPEndpoint string  `env:"OTLP_ENDPOINT"`
 	OTLPHeaders  string  `env:"OTLP_HEADERS"`
 	SampleRatio  float64 `env:"SAMPLE_RATIO"`
+	// SampleRatioSet distinguishes an explicit 0 from an omitted environment
+	// variable. It is set by service LoadConfig after Hydrate, because the
+	// generic env hydrator intentionally skips empty values.
+	SampleRatioSet bool
 
 	// DebugCollectorEndpoint is an OPTIONAL second OTLP/HTTP endpoint —
 	// typically a developer's local observability stack (OTel Collector
@@ -29,12 +33,9 @@ type OTel struct {
 	DebugCollectorHeaders string `env:"DEBUG_COLLECTOR_HEADERS"`
 }
 
-// UnsetSampleRatio is the zero value meaning no SAMPLE_RATIO was configured.
-// Telling "unset" apart from an explicit value is the whole point: services
-// previously defaulted the field to 1.0 and then rewrote it with
-// `if SampleRatio == 1.0 && environment != "local"`, which cannot distinguish an
-// operator who deliberately asked for 100% in production from one who asked for
-// nothing — and silently gave both of them 10%.
+// UnsetSampleRatio is retained for default configuration literals. Use
+// SampleRatioSet to distinguish it from an explicit 0 read from the
+// OTEL_SAMPLE_RATIO environment variable.
 const UnsetSampleRatio = 0
 
 // DefaultNonLocalSampleRatio is the trace sample ratio applied outside local
@@ -42,10 +43,10 @@ const UnsetSampleRatio = 0
 const DefaultNonLocalSampleRatio = 0.1
 
 // ResolveSampleRatio fills in the environment-aware default when no ratio was
-// configured, and otherwise honours exactly what was asked for. Call once,
+// configured, and otherwise honors exactly what was asked for. Call once,
 // before Validate.
 func (o *OTel) ResolveSampleRatio(environment string) {
-	if o.SampleRatio != UnsetSampleRatio {
+	if o.SampleRatioSet || o.SampleRatio != UnsetSampleRatio {
 		return
 	}
 	if environment == "local" {

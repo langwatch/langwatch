@@ -55,7 +55,7 @@ type BundleConfig struct {
 	// not scoped to exactly one project, so this can name a different project on
 	// a different team than Bundle.ProjectID.
 	//
-	// It is materialised in the SAME config payload as ProjectOTLPToken, so the
+	// It is materialized in the SAME config payload as ProjectOTLPToken, so the
 	// two always describe one project. Pair the token with THIS field and never
 	// with Bundle.ProjectID: that one is carried on the auth JWT, refreshed on a
 	// different clock, and a skew between the two clocks exports one project's

@@ -150,6 +150,7 @@ type Change struct {
 	VirtualKeyID         string
 	BudgetID             string
 	ProviderCredentialID string
+	ModelProviderID      string
 	ProjectID            string
 	Revision             string
 }
@@ -157,9 +158,14 @@ type Change struct {
 // Change kinds — keep in sync with the control-plane ChangeEventKind enum
 // in langwatch/src/server/gateway/changeEvent.repository.ts.
 const (
-	ChangeKindProviderBindingUpdated = "PROVIDER_BINDING_UPDATED"
+	ChangeKindProviderBindingUpdated = "MODEL_PROVIDER_UPDATED"
+	ChangeKindBudgetCreated          = "BUDGET_CREATED"
 	ChangeKindBudgetUpdated          = "BUDGET_UPDATED"
-	ChangeKindVirtualKeyUpdated      = "VIRTUAL_KEY_UPDATED"
+	ChangeKindBudgetDeleted          = "BUDGET_DELETED"
+	ChangeKindVirtualKeyCreated      = "VK_CREATED"
+	ChangeKindVirtualKeyConfigUpdate = "VK_CONFIG_UPDATED"
+	ChangeKindVirtualKeyRotated      = "VK_ROTATED"
+	ChangeKindVirtualKeyRevoked      = "VK_REVOKED"
 )
 
 // PollChanges does one /changes long-poll. Returns the events the control
@@ -231,6 +237,7 @@ func (c *Client) PollChanges(ctx context.Context, organizationID, since string) 
 			VirtualKeyID         string `json:"virtual_key_id"`
 			BudgetID             string `json:"budget_id"`
 			ProviderCredentialID string `json:"provider_credential_id"`
+			ModelProviderID      string `json:"model_provider_id"`
 			ProjectID            string `json:"project_id"`
 			Revision             string `json:"revision"`
 		} `json:"changes"`
@@ -245,6 +252,7 @@ func (c *Client) PollChanges(ctx context.Context, organizationID, since string) 
 			VirtualKeyID:         ch.VirtualKeyID,
 			BudgetID:             ch.BudgetID,
 			ProviderCredentialID: ch.ProviderCredentialID,
+			ModelProviderID:      ch.ModelProviderID,
 			ProjectID:            ch.ProjectID,
 			Revision:             ch.Revision,
 		}

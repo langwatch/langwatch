@@ -34,6 +34,7 @@ package langyagent
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -191,6 +192,7 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Hydrate(&cfg); err != nil {
 		return Config{}, err
 	}
+	cfg.OTel.SampleRatioSet = os.Getenv("OTEL_SAMPLE_RATIO") != ""
 	// Derive the listen address from PORT (kept as its own env var). Set after
 	// Hydrate so PORT always wins over any stray SERVER_ADDR.
 	cfg.Server.Addr = fmt.Sprintf(":%d", cfg.Port)

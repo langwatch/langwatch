@@ -69,7 +69,7 @@ func TraceRegistryMiddleware(registry *customertracebridge.Registry, defaultEndp
 			}
 			if registry != nil {
 				// Both halves come from Config so they are always the pair the
-				// control plane materialised together. Bundle.ProjectID rides the
+				// control plane materialized together. Bundle.ProjectID rides the
 				// auth JWT on a slower refresh clock; pairing it with the config's
 				// token exports one project's traces under another's ingest token.
 				traceProjectID := bundle.Config.TraceProjectID

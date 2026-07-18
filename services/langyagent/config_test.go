@@ -132,6 +132,21 @@ func TestLoadConfig_NonLocalLowersSampleRatio(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_ExplicitZeroSampleRatioIsPreserved(t *testing.T) {
+	clearLangyEnv(t)
+	t.Setenv("LANGY_INTERNAL_SECRET", "secret")
+	t.Setenv("ENVIRONMENT", "production")
+	t.Setenv("OTEL_SAMPLE_RATIO", "0")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.OTel.SampleRatio != 0 || !cfg.OTel.SampleRatioSet {
+		t.Fatalf("explicit zero sample ratio = %v (set=%v), want 0 (set=true)", cfg.OTel.SampleRatio, cfg.OTel.SampleRatioSet)
+	}
+}
+
 func TestLoadConfig_UnsafeDevDisableIsolationAllowedInLocalEnvs(t *testing.T) {
 	for _, env := range []string{"local", "dev", "development", "test", "LOCAL", "  dev  "} {
 		t.Run(env, func(t *testing.T) {

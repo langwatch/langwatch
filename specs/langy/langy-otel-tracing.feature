@@ -89,40 +89,38 @@ Feature: Langy agent activity is traced into the user's project
   # shape and cost data is the operational signal.
   # ============================================================================
 
-  Scenario: LangWatch keeps an operational copy of worker telemetry
-    Given the manager is configured with its own OTLP collector
-    When the worker exports a span batch
-    Then the batch is forwarded to the customer's project unchanged
-    And a second copy is delivered to LangWatch's own collector
+  Scenario: Worker telemetry remains complete for the customer
+    Given the manager is running a worker for a customer conversation
+    When the worker reports its activity
+    Then the customer's trace contains the worker's complete activity
+    And the worker's prompts, completions and tool output remain visible there
 
-  Scenario: LangWatch's copy carries no prompt or completion content
-    When the worker exports a span batch containing prompts, completions and tool output
-    Then LangWatch's copy contains none of that content
-    And LangWatch's copy still reports the model and token usage
+  Scenario: Operators retain useful worker health signals without customer content
+    Given the worker reports model usage and an upstream failure
+    When LangWatch records operational worker telemetry
+    Then operators can see the model, token usage and failure outcome
+    And LangWatch cannot see the customer's prompts, completions or tool output
 
-  Scenario: An unrecognised span attribute is dropped from LangWatch's copy
-    Given the worker emits a span attribute LangWatch does not recognise
-    When the batch is copied for LangWatch's collector
-    Then the unrecognised attribute is dropped
-    # Fail closed: a new key from the agent's instrumentation is assumed to
-    # carry content until it is deliberately allowlisted.
+  Scenario: Newly introduced worker metadata cannot expose customer content
+    Given the worker reports an unrecognised metadata value
+    When LangWatch records operational worker telemetry
+    Then the unrecognised value is absent from LangWatch's operational view
 
-  Scenario: Span events and status descriptions are removed from LangWatch's copy
-    Given a worker span carries an exception event and a status description
-    When the batch is copied for LangWatch's collector
-    Then the copy carries no span events
-    And the copy carries no status description
+  Scenario: Worker diagnostics do not expose raw error text
+    Given a worker reports an exception and a provider error description
+    When LangWatch records operational worker telemetry
+    Then operators can see that the worker failed
+    And raw exception and provider error text is absent
 
-  Scenario: The worker's resource identity is replaced in LangWatch's copy
-    When the batch is copied for LangWatch's collector
-    Then the resource names LangWatch's own worker service and the conversation
-    And no worker-set resource attribute survives
+  Scenario: Worker identity is not presented as customer identity
+    When LangWatch records operational worker telemetry
+    Then it identifies the LangWatch worker and conversation
+    And customer-controlled worker resource metadata is absent
 
-  Scenario: The customer's export is unaffected by the second copy
-    Given the manager has no OTLP collector of its own configured
-    When the worker exports a span batch
-    Then the batch still reaches the customer's project
-    And no second copy is sent anywhere
+  Scenario: Customer telemetry is unaffected when operational recording is unavailable
+    Given LangWatch cannot record operational worker telemetry
+    When the worker reports its activity
+    Then the customer's trace still contains the worker's complete activity
 
   # ============================================================================
   # Manager-mediated LLM calls (phase 2)

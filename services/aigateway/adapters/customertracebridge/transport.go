@@ -112,7 +112,14 @@ func (r *routerExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadO
 
 	var errs []error
 	for pid, batch := range buckets {
-		exp := r.exporterFor(ctx, pid)
+		exp, buildErr := r.exporterFor(ctx, pid)
+		if buildErr != nil {
+			r.dropped(ctx, "exporter_build_failed", len(batch))
+			clog.Get(r.baseCtx).Warn("customer_trace_exporter_build_failed",
+				zap.String("project_id", pid), zap.Int("spans", len(batch)), zap.Error(buildErr))
+			errs = append(errs, fmt.Errorf("project %s: %w", pid, buildErr))
+			continue
+		}
 		if exp == nil {
 			r.dropped(ctx, "no_endpoint", len(batch))
 			clog.Get(r.baseCtx).Warn("customer_trace_no_endpoint",
@@ -156,15 +163,18 @@ func (r *routerExporter) Shutdown(ctx context.Context) error {
 // exporter without checking the registry means an endpoint or auth-token change
 // never takes effect: a rotated key keeps 401-ing with the old token, and a
 // token corrected after a mispairing keeps shipping to the wrong project.
-func (r *routerExporter) exporterFor(ctx context.Context, projectID string) *otlptrace.Exporter {
+func (r *routerExporter) exporterFor(
+	ctx context.Context,
+	projectID string,
+) (*otlptrace.Exporter, error) {
 	endpoint, headers, ok := r.registry.Lookup(projectID)
 	if !ok || endpoint == "" {
-		return nil
+		return nil, nil
 	}
 	endpoint = normalizeEndpoint(endpoint)
 
 	if c, hit := r.byProject.Get(projectID); hit && c.serves(endpoint, headers) {
-		return c.exp
+		return c.exp, nil
 	}
 
 	r.mu.Lock()
@@ -172,7 +182,7 @@ func (r *routerExporter) exporterFor(ctx context.Context, projectID string) *otl
 	// Double-check after lock: another goroutine may have rebuilt it.
 	if c, hit := r.byProject.Get(projectID); hit {
 		if c.serves(endpoint, headers) {
-			return c.exp
+			return c.exp, nil
 		}
 		// Destination changed under us — retire the stale exporter. Remove fires
 		// the evict callback, which detaches the shutdown.
@@ -188,12 +198,10 @@ func (r *routerExporter) exporterFor(ctx context.Context, projectID string) *otl
 	}
 	exp, err := otlptracehttp.New(ctx, copts...)
 	if err != nil {
-		clog.Get(r.baseCtx).Warn("customer_trace_exporter_build_failed",
-			zap.String("project_id", projectID), zap.Error(err))
-		return nil
+		return nil, fmt.Errorf("build OTLP exporter: %w", err)
 	}
 	r.byProject.Add(projectID, cachedExporter{exp: exp, endpoint: endpoint, headers: headers})
-	return exp
+	return exp, nil
 }
 
 func headersEqual(a, b map[string]string) bool {

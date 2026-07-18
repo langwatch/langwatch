@@ -264,9 +264,12 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	res := buildResource(serviceName, serviceVersion, environment, opts.NodeID)
 
 	var rootSampler sdktrace.Sampler
-	if opts.SampleRatio > 0 && opts.SampleRatio < 1.0 {
+	switch {
+	case opts.SampleRatio == 0:
+		rootSampler = sdktrace.NeverSample()
+	case opts.SampleRatio > 0 && opts.SampleRatio < 1.0:
 		rootSampler = sdktrace.TraceIDRatioBased(opts.SampleRatio)
-	} else {
+	default:
 		rootSampler = sdktrace.AlwaysSample()
 	}
 

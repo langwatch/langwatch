@@ -6,9 +6,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
@@ -21,15 +24,21 @@ type signallingIngest struct {
 	srv  *httptest.Server
 	got  chan []byte
 	auth chan string
+	path chan string
 }
 
 func startSignallingIngest(t *testing.T) *signallingIngest {
 	t.Helper()
-	si := &signallingIngest{got: make(chan []byte, 4), auth: make(chan string, 4)}
+	si := &signallingIngest{
+		got:  make(chan []byte, 4),
+		auth: make(chan string, 4),
+		path: make(chan string, 4),
+	}
 	si.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		body, _ := io.ReadAll(req.Body)
 		si.got <- body
 		si.auth <- req.Header.Get("X-Auth-Token")
+		si.path <- req.URL.Path
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(si.srv.Close)
@@ -68,7 +77,12 @@ func contentBatch(t *testing.T) []byte {
 
 func relayWithInternal(t *testing.T, internalURL string) *Relay {
 	t.Helper()
-	r, err := New(context.Background(), Options{InternalOTLPEndpoint: internalURL})
+	return relayWithOptions(t, Options{InternalOTLPEndpoint: internalURL})
+}
+
+func relayWithOptions(t *testing.T, options Options) *Relay {
+	t.Helper()
+	r, err := New(context.Background(), options)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -84,12 +98,16 @@ func TestDualExport(t *testing.T) {
 	t.Run("when a worker exports spans carrying prompt content", func(t *testing.T) {
 		customer := startSignallingIngest(t)
 		internal := startSignallingIngest(t)
-		relay := relayWithInternal(t, internal.srv.URL)
+		relay := relayWithOptions(t, Options{
+			InternalOTLPEndpoint: internal.srv.URL,
+			InternalOTLPHeaders:  map[string]string{"X-Auth-Token": "internal-secret"},
+		})
 
 		token, err := relay.Register(WorkerInfo{
 			ConversationID:    "conv-1",
 			LangwatchEndpoint: customer.srv.URL,
 			LangwatchAPIKey:   "sk-session",
+			Model:             "gpt-5-mini",
 		})
 		if err != nil {
 			t.Fatalf("Register: %v", err)
@@ -122,6 +140,12 @@ func TestDualExport(t *testing.T) {
 			if !bytes.Contains(body, []byte("gpt-5-mini")) {
 				t.Fatal("operational metadata was stripped along with the content")
 			}
+			if got := <-internal.auth; got != "internal-secret" {
+				t.Fatalf("internal auth header = %q", got)
+			}
+			if got := <-internal.path; got != "/v1/traces" {
+				t.Fatalf("internal path = %q", got)
+			}
 		})
 	})
 
@@ -133,6 +157,7 @@ func TestDualExport(t *testing.T) {
 			ConversationID:    "conv-2",
 			LangwatchEndpoint: customer.srv.URL,
 			LangwatchAPIKey:   "sk-session",
+			Model:             "gpt-5-mini",
 		})
 		if err != nil {
 			t.Fatalf("Register: %v", err)
@@ -152,4 +177,63 @@ func TestDualExport(t *testing.T) {
 			t.Fatal("the customer path must be unaffected by the second export being off")
 		}
 	})
+}
+
+func TestInternalExportIsBoundedDuringCollectorOutage(t *testing.T) {
+	started := make(chan struct{}, internalExportWorkers+1)
+	release := make(chan struct{})
+	internal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		started <- struct{}{}
+		select {
+		case <-release:
+			w.WriteHeader(http.StatusOK)
+		case <-req.Context().Done():
+		}
+	}))
+	t.Cleanup(internal.Close)
+
+	var customerRequests atomic.Int64
+	customer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		customerRequests.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(customer.Close)
+
+	relay := relayWithInternal(t, internal.URL)
+	token, err := relay.Register(WorkerInfo{
+		ConversationID:    "conv-outage",
+		LangwatchEndpoint: customer.URL,
+		LangwatchAPIKey:   "sk-session",
+		Model:             "gpt-5-mini",
+	})
+	require.NoError(t, err)
+
+	total := internalExportWorkers + internalExportQueueSize + 6
+	payload := contentBatch(t)
+	for range total {
+		resp, postErr := http.Post(
+			relay.OTLPEndpointFor(token)+"/v1/traces",
+			"application/x-protobuf",
+			bytes.NewReader(payload),
+		)
+		require.NoError(t, postErr)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.NoError(t, resp.Body.Close())
+	}
+
+	for range internalExportWorkers {
+		select {
+		case <-started:
+		case <-time.After(3 * time.Second):
+			t.Fatal("internal export worker did not start")
+		}
+	}
+	select {
+	case <-started:
+		t.Fatalf("more than %d internal exports ran concurrently", internalExportWorkers)
+	case <-time.After(100 * time.Millisecond):
+	}
+	assert.Equal(t, int64(total), customerRequests.Load(), "internal outage delayed customer forwarding")
+	assert.LessOrEqual(t, len(relay.internalJobs), internalExportQueueSize)
+	close(release)
 }

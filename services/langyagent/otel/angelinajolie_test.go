@@ -1,7 +1,7 @@
 package otel
 
 import (
-	"strings"
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,14 +12,12 @@ import (
 )
 
 const (
-	userPrompt = "here is my AWS secret AKIAIOSFODNN7EXAMPLE, deploy the staging stack"
-	modelReply = "I have deployed the stack. The admin password is correct-horse-battery."
-	toolOutput = "cat /etc/passwd -> root:x:0:0:root:/root:/bin/bash"
+	userPrompt   = "here is my AWS secret AKIAIOSFODNN7EXAMPLE, deploy the staging stack"
+	modelReply   = "I have deployed the stack. The admin password is correct-horse-battery."
+	toolOutput   = "cat /etc/passwd -> root:x:0:0:root:/root:/bin/bash"
+	trustedModel = "gpt-5-mini"
 )
 
-// workerBatch is a realistic opencode export: a gen_ai span carrying prompt and
-// completion bodies, a tool span carrying its arguments and result, an exception
-// event, a status description, and worker-set resource attributes.
 func workerBatch(t *testing.T) ptrace.Traces {
 	t.Helper()
 	td := ptrace.NewTraces()
@@ -28,20 +26,22 @@ func workerBatch(t *testing.T) ptrace.Traces {
 	rs.Resource().Attributes().PutStr("customer.internal.hostname", "acme-laptop-01")
 
 	spans := rs.ScopeSpans().AppendEmpty().Spans()
-
 	chat := spans.AppendEmpty()
-	chat.SetName("chat gpt-5-mini")
+	chat.SetName("chat worker-supplied-model")
 	chat.SetTraceID(pcommon.TraceID([16]byte{9}))
 	chat.SetSpanID(pcommon.SpanID([8]byte{1}))
-	chat.Attributes().PutStr("gen_ai.request.model", "gpt-5-mini")
+	chat.Attributes().PutStr("gen_ai.operation.name", "chat")
+	chat.Attributes().PutStr("gen_ai.system", "openai")
+	chat.Attributes().PutStr("gen_ai.request.model", "worker-supplied-model")
 	chat.Attributes().PutInt("gen_ai.usage.input_tokens", 42)
 	chat.Attributes().PutStr("gen_ai.input.messages", userPrompt)
 	chat.Attributes().PutStr("gen_ai.output.messages", modelReply)
 	chat.Attributes().PutStr("gen_ai.system_instructions", "You are ACME's agent.")
+	chat.Status().SetCode(ptrace.StatusCodeError)
 	chat.Status().SetMessage("upstream said: " + modelReply)
-	ev := chat.Events().AppendEmpty()
-	ev.SetName("exception")
-	ev.Attributes().PutStr("exception.message", "failed processing "+userPrompt)
+	event := chat.Events().AppendEmpty()
+	event.SetName("exception")
+	event.Attributes().PutStr("exception.message", "failed processing "+userPrompt)
 
 	tool := spans.AppendEmpty()
 	tool.SetName("tool.bash")
@@ -49,6 +49,7 @@ func workerBatch(t *testing.T) ptrace.Traces {
 	tool.SetSpanID(pcommon.SpanID([8]byte{2}))
 	tool.SetParentSpanID(pcommon.SpanID([8]byte{1}))
 	tool.Attributes().PutStr("gen_ai.tool.name", "bash")
+	tool.Attributes().PutStr("gen_ai.tool.type", "function")
 	tool.Attributes().PutStr("gen_ai.tool.arguments", "cat /etc/passwd")
 	tool.Attributes().PutStr("gen_ai.tool.result", toolOutput)
 
@@ -63,169 +64,148 @@ func turnContext(t *testing.T) trace.SpanContext {
 	})
 }
 
-// allValues returns every attribute value in the batch, flattened, so a test
-// can assert on content regardless of which key it hid under.
-func allValues(td ptrace.Traces) []string {
-	var out []string
-	rss := td.ResourceSpans()
-	for i := 0; i < rss.Len(); i++ {
-		rs := rss.At(i)
-		rs.Resource().Attributes().Range(func(_ string, v pcommon.Value) bool {
-			out = append(out, v.AsString())
-			return true
-		})
-		sss := rs.ScopeSpans()
-		for j := 0; j < sss.Len(); j++ {
-			spans := sss.At(j).Spans()
-			for k := 0; k < spans.Len(); k++ {
-				span := spans.At(k)
-				out = append(out, span.Name(), span.Status().Message())
-				span.Attributes().Range(func(_ string, v pcommon.Value) bool {
-					out = append(out, v.AsString())
-					return true
-				})
-				evs := span.Events()
-				for e := 0; e < evs.Len(); e++ {
-					evs.At(e).Attributes().Range(func(_ string, v pcommon.Value) bool {
-						out = append(out, v.AsString())
-						return true
-					})
-				}
-			}
-		}
-	}
-	return out
-}
-
-func spanAttrs(td ptrace.Traces, name string) map[string]string {
+func spanAttrsAt(td ptrace.Traces, index int) map[string]string {
 	got := map[string]string{}
-	rss := td.ResourceSpans()
-	for i := 0; i < rss.Len(); i++ {
-		sss := rss.At(i).ScopeSpans()
-		for j := 0; j < sss.Len(); j++ {
-			spans := sss.At(j).Spans()
-			for k := 0; k < spans.Len(); k++ {
-				if spans.At(k).Name() != name {
-					continue
-				}
-				spans.At(k).Attributes().Range(func(key string, v pcommon.Value) bool {
-					got[key] = v.AsString()
-					return true
-				})
-			}
-		}
-	}
+	span := td.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(index)
+	span.Attributes().Range(func(key string, value pcommon.Value) bool {
+		got[key] = value.AsString()
+		return true
+	})
 	return got
 }
 
-func TestInternalCopy_StripsPromptCompletionAndToolContent(t *testing.T) {
-	out := InternalCopy(workerBatch(t), "conv-1", turnContext(t))
+func marshalTraces(t *testing.T, td ptrace.Traces) []byte {
+	t.Helper()
+	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
+	require.NoError(t, err)
+	return payload
+}
 
-	for _, value := range allValues(out) {
-		for _, secret := range []string{userPrompt, modelReply, toolOutput} {
-			assert.NotContains(t, value, secret,
-				"worker content reached LangWatch's own copy")
-		}
+func TestInternalCopy_StripsPromptCompletionAndToolContent(t *testing.T) {
+	out := InternalCopy(workerBatch(t), "conv-1", trustedModel, turnContext(t))
+	payload := marshalTraces(t, out)
+
+	for _, secret := range []string{userPrompt, modelReply, toolOutput} {
+		assert.NotContains(t, string(payload), secret, "worker content reached LangWatch's copy")
 	}
 }
 
-// The fail-closed property. A key nobody anticipated must be dropped, not kept:
-// a denylist would ship it.
 func TestInternalCopy_DropsUnrecognisedAttributes(t *testing.T) {
 	td := workerBatch(t)
 	td.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0).
 		Attributes().PutStr("gen_ai.some.future.key", userPrompt)
 
-	out := InternalCopy(td, "conv-1", turnContext(t))
+	out := InternalCopy(td, "conv-1", trustedModel, turnContext(t))
 
-	assert.NotContains(t, spanAttrs(out, "chat gpt-5-mini"), "gen_ai.some.future.key",
-		"an unrecognised key must be dropped, not forwarded")
+	assert.NotContains(t, spanAttrsAt(out, 0), "gen_ai.some.future.key")
 }
 
-func TestInternalCopy_KeepsOperationalMetadata(t *testing.T) {
-	out := InternalCopy(workerBatch(t), "conv-1", turnContext(t))
+func TestInternalCopy_KeepsOnlyTrustedOperationalMetadata(t *testing.T) {
+	out := InternalCopy(workerBatch(t), "conv-1", trustedModel, turnContext(t))
 
-	chat := spanAttrs(out, "chat gpt-5-mini")
-	assert.Equal(t, "gpt-5-mini", chat["gen_ai.request.model"])
+	chat := spanAttrsAt(out, 0)
+	assert.Equal(t, trustedModel, chat["gen_ai.request.model"])
 	assert.Equal(t, "42", chat["gen_ai.usage.input_tokens"])
+	assert.Equal(t, "chat", chat["gen_ai.operation.name"])
+	assert.Equal(t, "openai", chat["gen_ai.system"])
 
-	tool := spanAttrs(out, "tool.bash")
-	assert.Equal(t, "bash", tool["gen_ai.tool.name"], "which tool ran is operational")
-	assert.NotContains(t, tool, "gen_ai.tool.arguments", "what it ran is content")
-	assert.NotContains(t, tool, "gen_ai.tool.result", "what it returned is content")
+	tool := spanAttrsAt(out, 1)
+	assert.Equal(t, "function", tool["gen_ai.tool.type"])
+	assert.NotContains(t, tool, "gen_ai.tool.name", "worker-controlled tool names are content carriers")
+	assert.NotContains(t, tool, "gen_ai.tool.arguments")
+	assert.NotContains(t, tool, "gen_ai.tool.result")
 }
 
-func TestInternalCopy_DropsAllSpanEvents(t *testing.T) {
-	out := InternalCopy(workerBatch(t), "conv-1", turnContext(t))
+func TestInternalCopy_RejectsEveryFreeFormOTLPCarrier(t *testing.T) {
+	const secret = "customer-secret-abcdef"
+	td := workerBatch(t)
+	rs := td.ResourceSpans().At(0)
+	rs.SetSchemaUrl("https://" + secret + "/resource")
+	rs.Resource().Attributes().PutStr("secret.resource", secret)
 
-	spans := out.ResourceSpans().At(0).ScopeSpans().At(0).Spans()
-	for i := 0; i < spans.Len(); i++ {
-		assert.Zero(t, spans.At(i).Events().Len(),
-			"span events carry exception text and prompt bodies")
-	}
-}
+	ss := rs.ScopeSpans().At(0)
+	ss.SetSchemaUrl("https://" + secret + "/scope")
+	ss.Scope().SetName(secret)
+	ss.Scope().SetVersion(secret)
+	ss.Scope().Attributes().PutStr("secret.scope", secret)
 
-func TestInternalCopy_ClearsStatusMessage(t *testing.T) {
-	out := InternalCopy(workerBatch(t), "conv-1", turnContext(t))
+	span := ss.Spans().At(0)
+	span.SetName(secret)
+	span.TraceState().FromRaw("vendor=" + secret)
+	span.Attributes().PutStr("gen_ai.request.model", secret)
+	span.Attributes().PutStr("gen_ai.system", secret)
+	span.Status().SetMessage(secret)
+	event := span.Events().AppendEmpty()
+	event.SetName(secret)
+	event.Attributes().PutStr("secret.event", secret)
+	link := span.Links().AppendEmpty()
+	link.SetTraceID(pcommon.TraceID([16]byte{3}))
+	link.SetSpanID(pcommon.SpanID([8]byte{4}))
+	link.TraceState().FromRaw("vendor=" + secret)
+	link.Attributes().PutStr("secret.link", secret)
 
-	spans := out.ResourceSpans().At(0).ScopeSpans().At(0).Spans()
-	for i := 0; i < spans.Len(); i++ {
-		assert.Empty(t, spans.At(i).Status().Message(),
-			"status descriptions are raw provider text")
-	}
+	out := InternalCopy(td, "conv-safe", trustedModel, turnContext(t))
+	payload := marshalTraces(t, out)
+	assert.False(t, bytes.Contains(payload, []byte(secret)), "a worker-controlled string survived the boundary")
+
+	outRS := out.ResourceSpans().At(0)
+	outSS := outRS.ScopeSpans().At(0)
+	outSpan := outSS.Spans().At(0)
+	assert.Empty(t, outRS.SchemaUrl())
+	assert.Empty(t, outSS.SchemaUrl())
+	assert.Equal(t, internalScopeName, outSS.Scope().Name())
+	assert.Empty(t, outSS.Scope().Version())
+	assert.Zero(t, outSS.Scope().Attributes().Len())
+	assert.Equal(t, internalSpanName, outSpan.Name())
+	assert.Empty(t, outSpan.TraceState().AsRaw())
+	assert.Zero(t, outSpan.Events().Len())
+	assert.Empty(t, outSpan.Status().Message())
+	require.Equal(t, 1, outSpan.Links().Len())
+	assert.Empty(t, outSpan.Links().At(0).TraceState().AsRaw())
+	assert.Zero(t, outSpan.Links().At(0).Attributes().Len())
 }
 
 func TestInternalCopy_ReplacesWorkerResourceWithOurIdentity(t *testing.T) {
-	out := InternalCopy(workerBatch(t), "conv-1", turnContext(t))
+	out := InternalCopy(workerBatch(t), "conv-1", trustedModel, turnContext(t))
 
 	attrs := out.ResourceSpans().At(0).Resource().Attributes()
 	got := map[string]string{}
-	attrs.Range(func(k string, v pcommon.Value) bool { got[k] = v.AsString(); return true })
+	attrs.Range(func(key string, value pcommon.Value) bool {
+		got[key] = value.AsString()
+		return true
+	})
 
 	assert.Equal(t, serviceName, got[attrServiceName])
 	assert.Equal(t, originWorker, got[attrOrigin])
 	assert.Equal(t, "conv-1", got[attrConversation])
-	assert.NotContains(t, got, "customer.internal.hostname",
-		"worker-set resource attributes must not reach our backend")
+	assert.NotContains(t, got, "customer.internal.hostname")
 }
 
-// The customer's batch must be byte-for-byte what it was before — their path is
-// not degraded by our copy existing.
 func TestInternalCopy_DoesNotMutateTheCustomerBatch(t *testing.T) {
 	td := workerBatch(t)
-	before, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
-	require.NoError(t, err)
+	before := marshalTraces(t, td)
 
-	_ = InternalCopy(td, "conv-1", turnContext(t))
+	_ = InternalCopy(td, "conv-1", trustedModel, turnContext(t))
 
-	after, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
-	require.NoError(t, err)
-	assert.Equal(t, before, after, "the customer-bound batch was mutated by our copy")
+	assert.Equal(t, before, marshalTraces(t, td))
 }
 
 func TestInternalCopy_ReparentsOntoTheTurn(t *testing.T) {
 	turn := turnContext(t)
-
-	out := InternalCopy(workerBatch(t), "conv-1", turn)
+	out := InternalCopy(workerBatch(t), "conv-1", trustedModel, turn)
 
 	spans := out.ResourceSpans().At(0).ScopeSpans().At(0).Spans()
 	for i := 0; i < spans.Len(); i++ {
 		assert.Equal(t, pcommon.TraceID(turn.TraceID()), spans.At(i).TraceID())
 	}
-	// The root span adopts the turn span; the child keeps its own parent.
 	assert.Equal(t, pcommon.SpanID(turn.SpanID()), spans.At(0).ParentSpanID())
-	assert.Equal(t, pcommon.SpanID([8]byte{1}), spans.At(1).ParentSpanID(),
-		"the worker's internal hierarchy must survive")
+	assert.Equal(t, pcommon.SpanID([8]byte{1}), spans.At(1).ParentSpanID())
 }
 
 func TestInternalCopy_LeavesIDsAloneWithoutATurn(t *testing.T) {
-	out := InternalCopy(workerBatch(t), "conv-1", trace.SpanContext{})
+	out := InternalCopy(workerBatch(t), "conv-1", trustedModel, trace.SpanContext{})
 
 	span := out.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0)
 	assert.Equal(t, pcommon.TraceID([16]byte{9}), span.TraceID())
-	// Stripping still happened even though re-parenting did not.
-	for _, value := range allValues(out) {
-		assert.False(t, strings.Contains(value, userPrompt),
-			"content must be stripped regardless of turn validity")
-	}
+	assert.NotContains(t, string(marshalTraces(t, out)), userPrompt)
 }
