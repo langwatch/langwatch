@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   incrementEsFoldStoreMissRefoldTotal,
   observeEsFoldStoreMissRefoldEvents,
@@ -54,6 +54,10 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
     aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
     tenantId,
   };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   function ev(id: string, createdAt: number, idempotencyKey?: string): Event {
     const base = createTestEvent(
@@ -145,6 +149,8 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
           projectionName: "slim",
           eventCount: 5,
         });
+        expect(incrementEsFoldStoreMissRefoldTotal).toHaveBeenCalledTimes(1);
+        expect(observeEsFoldStoreMissRefoldEvents).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -165,6 +171,8 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
           projectionName: "slim",
           eventCount: 1,
         });
+        expect(incrementEsFoldStoreMissRefoldTotal).toHaveBeenCalledTimes(1);
+        expect(observeEsFoldStoreMissRefoldEvents).toHaveBeenCalledTimes(1);
       });
     });
 

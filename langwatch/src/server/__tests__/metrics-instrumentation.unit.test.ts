@@ -6,7 +6,9 @@ import {
   incrementEsCommandTotal,
   observeEsCommandDuration,
   incrementEsFoldProjectionTotal,
+  incrementEsFoldStoreMissRefoldTotal,
   observeEsFoldProjectionDuration,
+  observeEsFoldStoreMissRefoldEvents,
   incrementEsMapProjectionTotal,
   observeEsMapProjectionDuration,
   incrementEsReactorTotal,
@@ -44,6 +46,20 @@ describe("ES pipeline metrics", () => {
     it("registers es_fold_projection_duration_milliseconds histogram", () => {
       const metric = register.getSingleMetric(
         "es_fold_projection_duration_milliseconds",
+      );
+      expect(metric).toBeDefined();
+    });
+
+    it("registers es_fold_store_miss_refold_total counter", () => {
+      const metric = register.getSingleMetric(
+        "es_fold_store_miss_refold_total",
+      );
+      expect(metric).toBeDefined();
+    });
+
+    it("registers es_fold_store_miss_refold_events histogram", () => {
+      const metric = register.getSingleMetric(
+        "es_fold_store_miss_refold_events",
       );
       expect(metric).toBeDefined();
     });
@@ -170,6 +186,51 @@ describe("ES pipeline metrics", () => {
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('projection_name="traceSummary"');
     });
+
+    it("increments store-miss re-fold totals with kind labels", async () => {
+      incrementEsFoldStoreMissRefoldTotal({
+        projectionName: "traceAnalytics",
+        kind: "first_touch",
+      });
+      incrementEsFoldStoreMissRefoldTotal({
+        projectionName: "traceAnalytics",
+        kind: "resumed",
+      });
+
+      const lines = await register.getSingleMetricAsString(
+        "es_fold_store_miss_refold_total",
+      );
+      expect(lines).toContain('projection_name="traceAnalytics"');
+      expect(lines).toContain('kind="first_touch"');
+      expect(lines).toContain('kind="resumed"');
+    });
+
+    it("records store-miss replay counts in the configured buckets", async () => {
+      observeEsFoldStoreMissRefoldEvents({
+        projectionName: "traceAnalytics",
+        eventCount: 5,
+      });
+
+      const lines = await register.getSingleMetricAsString(
+        "es_fold_store_miss_refold_events",
+      );
+      expect(lines).toContain('projection_name="traceAnalytics"');
+      const buckets = [...lines.matchAll(/_bucket\{le="([^"]+)"/g)].map(
+        (match) => match[1],
+      );
+      expect(buckets).toEqual([
+        "1",
+        "2",
+        "5",
+        "10",
+        "25",
+        "50",
+        "100",
+        "250",
+        "1000",
+        "+Inf",
+      ]);
+    });
   });
 
   describe("when map projection metrics are recorded", () => {
@@ -263,6 +324,7 @@ describe("ES pipeline metrics", () => {
     it("increments redis error total with operation labels", async () => {
       incrementEsFoldCacheRedisError("traceSummary", "get");
       incrementEsFoldCacheRedisError("traceSummary", "set");
+      incrementEsFoldCacheRedisError("traceSummary", "del");
 
       const lines = await register.getSingleMetricAsString(
         "es_fold_cache_redis_error_total",
@@ -270,6 +332,7 @@ describe("ES pipeline metrics", () => {
       expect(lines).toContain('projection_name="traceSummary"');
       expect(lines).toContain('operation="get"');
       expect(lines).toContain('operation="set"');
+      expect(lines).toContain('operation="del"');
     });
   });
 
