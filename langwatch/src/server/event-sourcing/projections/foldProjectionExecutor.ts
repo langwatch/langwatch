@@ -66,15 +66,15 @@ function withOccurredAtHint(
 function recordStoreMissRefoldMetrics({
   projectionName,
   refoldEventCount,
-  deliveredCount,
+  sawPreExisting,
 }: {
   projectionName: string;
   refoldEventCount: number;
-  deliveredCount: number;
+  sawPreExisting: boolean;
 }): void {
   incrementEsFoldStoreMissRefoldTotal({
     projectionName,
-    kind: refoldEventCount > deliveredCount ? "resumed" : "first_touch",
+    kind: sawPreExisting ? "resumed" : "first_touch",
   });
   observeEsFoldStoreMissRefoldEvents({
     projectionName,
@@ -387,10 +387,14 @@ export class FoldProjectionExecutor {
     });
     if (history.length === 0) return null;
 
+    const deliveredIds = new Set(delivered.map((event) => event.id));
+    const sawPreExisting = history.some(
+      (event) => !deliveredIds.has(event.id),
+    );
     recordStoreMissRefoldMetrics({
       projectionName: projection.name,
       refoldEventCount: history.length,
-      deliveredCount: delivered.length,
+      sawPreExisting,
     });
 
     logger.info(
@@ -407,8 +411,8 @@ export class FoldProjectionExecutor {
     // Merge delivered events the history read missed back into the fold's
     // declared order before folding — a tail append could let an event that
     // belongs in the middle overwrite last-write-wins fields.
-    const seen = new Set(history.map((e) => e.id));
-    const missing = delivered.filter((e) => !seen.has(e.id));
+    for (const event of history) deliveredIds.delete(event.id);
+    const missing = delivered.filter((event) => deliveredIds.has(event.id));
     const combined = [...(history as E[]), ...missing].sort((a, b) =>
       compareFoldEvents(projection, a, b),
     );
@@ -451,10 +455,14 @@ export class FoldProjectionExecutor {
     // instead of hanging the fold worker for the aggregate indefinitely.
     // 100k pages * 1000/page default covers a 100M-event aggregate.
     const MAX_PAGES = 100_000;
+    const deliveredDedupKeys = new Set(
+      delivered.map((event) => event.idempotencyKey || event.id),
+    );
     const seen = new Set<string>();
     let state = projection.init();
     let after: { timestamp: number; eventId: string } | undefined;
     let refoldEventCount = 0;
+    let sawPreExisting = false;
     let pageCount = 0;
 
     for (;;) {
@@ -477,6 +485,7 @@ export class FoldProjectionExecutor {
         const dedupKey = event.idempotencyKey || event.id;
         if (seen.has(dedupKey)) continue;
         seen.add(dedupKey);
+        if (!deliveredDedupKeys.has(dedupKey)) sawPreExisting = true;
         state = projection.apply(state, event as E);
         refoldEventCount++;
       }
@@ -491,7 +500,7 @@ export class FoldProjectionExecutor {
     recordStoreMissRefoldMetrics({
       projectionName: projection.name,
       refoldEventCount,
-      deliveredCount: delivered.length,
+      sawPreExisting,
     });
 
     logger.info(

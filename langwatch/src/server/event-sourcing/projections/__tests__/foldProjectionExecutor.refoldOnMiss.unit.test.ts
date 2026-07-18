@@ -162,6 +162,10 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       )) as CountState;
 
       expect(result.ids).toEqual(["e1", "e2"]);
+      expect(incrementEsFoldStoreMissRefoldTotal).toHaveBeenCalledWith({
+        projectionName: "slim",
+        kind: "resumed",
+      });
     });
 
     it("falls through to plain init+apply when the history read returns nothing", async () => {

@@ -25,7 +25,7 @@ Feature: Redis write-through cache for fold projections
   Scenario: Store commits to ClickHouse first then updates the Redis cache
     When the fold stores new state for aggregate "trace-1"
     Then the state is written to ClickHouse first (throwing on failure so the event is retried)
-    And only then must be cached in Redis with a 300-second TTL
+    And the state is cached in Redis only after the durable write succeeds
 
   Scenario: Redis write failure discards stale cache state and retries the fold
     Given the fold stores new state for aggregate "trace-1" in ClickHouse

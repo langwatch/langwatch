@@ -130,7 +130,7 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
         );
       }
 
-      logger.warn(
+      logger.error(
         { aggregateId, error: String(error) },
         "Redis SET failed after CH write — fold will retry",
       );
