@@ -12,20 +12,9 @@ import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
 
-export interface RedisCachedFoldStoreOptions<State = unknown> {
+export interface RedisCachedFoldStoreOptions {
   keyPrefix: string;
   ttlSeconds?: number;
-  /**
-   * Optional projection applied to the fold state before it is cached in Redis.
-   * The inner store still receives the FULL state (ClickHouse is the durable
-   * source of truth); only the Redis cache entry is leaned. Use this to keep
-   * carried-but-not-folded payload (e.g. computed input/output text) out of the
-   * hot cache — the Redis-clog + O(N²)-serialize root cause for large traces.
-   * The next fold step reads this shape back on a cache hit, so the projection
-   * MUST preserve every field the fold's `apply` reads (reductions + winner
-   * pointers + nullness markers).
-   */
-  toCacheable?: (state: State) => unknown;
 }
 
 /**
@@ -36,12 +25,12 @@ export interface RedisCachedFoldStoreOptions<State = unknown> {
  * queue's activeTtlSec — the upper bound on how long one aggregate stays
  * in-flight.
  *
- * Overridable via LANGWATCH_FOLD_CACHE_TTL_SECONDS (read at call time, like
- * LANGWATCH_DISPATCH_TENANT_CAP) so operators can dial residency down without a
- * redeploy: the fold-cache key set is one entry per aggregate touched within
- * the TTL window, so a longer TTL trades Redis memory for fewer ClickHouse
- * fallback reads. Group-coalescing already collapses an aggregate's in-flight
- * reads to one per batch, so this is a secondary lever, not the primary fix.
+ * Overridable via LANGWATCH_FOLD_CACHE_TTL_SECONDS when the wrapper is
+ * constructed so operators can dial residency down without a redeploy: the
+ * fold-cache key set is one entry per aggregate touched within the TTL window,
+ * so a longer TTL trades Redis memory for fewer ClickHouse fallback reads.
+ * Group-coalescing already collapses an aggregate's in-flight reads to one per
+ * batch, so this is a secondary lever, not the primary fix.
  */
 function defaultFoldCacheTtlSeconds(): number {
   const raw = process.env.LANGWATCH_FOLD_CACHE_TTL_SECONDS;
@@ -55,27 +44,23 @@ function defaultFoldCacheTtlSeconds(): number {
  * Wraps any FoldProjectionStore with a Redis write-through cache.
  *
  * - get(): Redis first, ClickHouse fallback on miss.
- * - store(): ClickHouse first (throws on failure), then Redis SET (cache).
+ * - store(): ClickHouse first (throws on failure), then mandatory Redis SET.
  *
- * Ordering guarantees correctness without transactions:
+ * Ordering and cleanup keep both stores consistent across queue retries:
  * - CH fails → throw → no Redis update → event retried by queue
- * - CH succeeds, Redis fails → next read falls back to CH
+ * - CH succeeds, Redis fails → DEL stale cache entry → throw → retry
  */
-export class RedisCachedFoldStore<State>
-  implements FoldProjectionStore<State>
-{
+export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
   private readonly ttlSeconds: number;
   private readonly keyPrefix: string;
-  private readonly toCacheable?: (state: State) => unknown;
 
   constructor(
     private readonly inner: FoldProjectionStore<State>,
     private readonly redis: Redis,
-    options: RedisCachedFoldStoreOptions<State>,
+    options: RedisCachedFoldStoreOptions,
   ) {
     this.keyPrefix = options.keyPrefix;
     this.ttlSeconds = options.ttlSeconds ?? defaultFoldCacheTtlSeconds();
-    this.toCacheable = options.toCacheable;
   }
 
   async get(
@@ -94,7 +79,11 @@ export class RedisCachedFoldStore<State>
       const innerStartTime = performance.now();
       const result = await this.inner.get(aggregateId, context);
       const innerDurationMs = performance.now() - innerStartTime;
-      observeEsFoldCacheGetDuration(this.keyPrefix, "clickhouse", innerDurationMs);
+      observeEsFoldCacheGetDuration(
+        this.keyPrefix,
+        "clickhouse",
+        innerDurationMs,
+      );
       return result;
     }
 
@@ -109,38 +98,57 @@ export class RedisCachedFoldStore<State>
     const innerStartTime = performance.now();
     const result = await this.inner.get(aggregateId, context);
     const innerDurationMs = performance.now() - innerStartTime;
-    observeEsFoldCacheGetDuration(this.keyPrefix, "clickhouse", innerDurationMs);
+    observeEsFoldCacheGetDuration(
+      this.keyPrefix,
+      "clickhouse",
+      innerDurationMs,
+    );
     return result;
   }
 
-  async store(
-    state: State,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
+  async store(state: State, context: ProjectionStoreContext): Promise<void> {
     const aggregateId = context.key ?? context.aggregateId;
     const storeStartTime = performance.now();
 
     // 1. ClickHouse first — throws on failure, event retried by queue
     await this.inner.store(state, context);
 
-    // 2. Redis second — cache for fast reads on next fold step
+    // 2. Redis second — mandatory cache write for the next fold step
+    const key = this.redisKey(aggregateId, context);
     try {
-      const key = this.redisKey(aggregateId, context);
-      const cacheable = this.toCacheable ? this.toCacheable(state) : state;
-      await this.redis.set(key, JSON.stringify(cacheable), "EX", this.ttlSeconds);
+      await this.redis.set(key, JSON.stringify(state), "EX", this.ttlSeconds);
     } catch (error) {
       incrementEsFoldCacheRedisError(this.keyPrefix, "set");
+
+      try {
+        await this.redis.del(key);
+      } catch (deleteError) {
+        logger.warn(
+          { aggregateId, error: String(deleteError) },
+          "Redis DEL failed after SET failure",
+        );
+      }
+
       logger.warn(
         { aggregateId, error: String(error) },
-        "Redis SET failed after CH write — next read will fall back to CH",
+        "Redis SET failed after CH write — fold will retry",
       );
+
+      // Retrying is safe even if DEL failed and the old cache entry survives:
+      // apply() is deterministic, the ReplacingMergeTree fold write is
+      // idempotent replace-by-key, and per-aggregate FIFO makes the retry
+      // re-read state, re-apply the same event, and converge on the same result.
+      throw error;
     }
 
     const storeDurationMs = performance.now() - storeStartTime;
     observeEsFoldCacheStoreDuration(this.keyPrefix, storeDurationMs);
   }
 
-  private redisKey(aggregateId: string, context: ProjectionStoreContext): string {
+  private redisKey(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): string {
     return `fold:${this.keyPrefix}:${String(context.tenantId)}:${aggregateId}`;
   }
 }
