@@ -15,6 +15,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../__tests__/integration/testContainers";
+import { BlobLeases } from "../blobLeases";
 import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle";
 import { readEnvelopeLease } from "../jobEnvelope";
 import { InMemoryObjectStore, incompressible } from "./blobTestDoubles";
@@ -35,6 +36,7 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
   let redis: Redis;
   let objectStore: InMemoryObjectStore;
   let lifecycle: EnvelopeBlobLifecycle;
+  let leases: BlobLeases;
   let queueName: string;
 
   beforeAll(async () => {
@@ -55,6 +57,7 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
         bucket: "test-bucket",
       }),
     });
+    leases = new BlobLeases({ redis, queueName });
   });
 
   afterEach(async () => {
@@ -71,6 +74,18 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
   const leaseKey = (hash: string) => `${queueName}:gq:blobleases:proj1/${hash}`;
   const blobKey = (hash: string) => `${queueName}:gq:blob:proj1/${hash}`;
   const hashOf = (value: string) => readEnvelopeLease(value)!.ref.hash;
+  const seedLease = async (value: string) => {
+    const lease = readEnvelopeLease(value)!;
+    await leases.take({
+      projectId: lease.ref.projectId,
+      hash: lease.ref.hash,
+      holderId: lease.holderId,
+    });
+  };
+  const redisNowMs = async () => {
+    const [seconds, microseconds] = await redis.time();
+    return Number(seconds) * 1000 + Math.floor(Number(microseconds) / 1000);
+  };
 
   describe("given an offloaded value whose lease deadline was shortened", () => {
     describe("when it is decoded", () => {
@@ -79,10 +94,10 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
           jobData: REDIS_TIER_PAYLOAD,
           groupId: TENANT_GROUP,
         });
-        await lifecycle.takeLease(value);
+        await seedLease(value);
         const lease = readEnvelopeLease(value)!;
         const key = leaseKey(hashOf(value));
-        await redis.zadd(key, Date.now() + 100, lease.holderId);
+        await redis.zadd(key, (await redisNowMs()) + 100, lease.holderId);
 
         const decoded = await lifecycle.decode({
           value,
@@ -92,7 +107,7 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
         expect(decoded).toEqual(REDIS_TIER_PAYLOAD);
         await vi.waitFor(async () => {
           const deadline = Number(await redis.zscore(key, lease.holderId));
-          expect(deadline).toBeGreaterThan(Date.now() + 100);
+          expect(deadline).toBeGreaterThan((await redisNowMs()) + 100);
         });
       });
     });
@@ -105,16 +120,16 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
           jobData: REDIS_TIER_PAYLOAD,
           groupId: TENANT_GROUP,
         });
-        await lifecycle.takeLease(value);
+        await seedLease(value);
         const lease = readEnvelopeLease(value)!;
         const key = leaseKey(lease.ref.hash);
-        await redis.zadd(key, Date.now() + 100, lease.holderId);
+        await redis.zadd(key, (await redisNowMs()) + 100, lease.holderId);
         await redis.expire(blobKey(lease.ref.hash), 1);
 
         await lifecycle.renewLease(value);
 
         const deadline = Number(await redis.zscore(key, lease.holderId));
-        expect(deadline).toBeGreaterThan(Date.now() + 100);
+        expect(deadline).toBeGreaterThan((await redisNowMs()) + 100);
         expect(await redis.ttl(blobKey(lease.ref.hash))).toBeGreaterThan(1);
       });
     });
@@ -142,7 +157,7 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
           jobData: REDIS_TIER_PAYLOAD,
           groupId: TENANT_GROUP, // tenant proj1
         });
-        await lifecycle.takeLease(value);
+        await seedLease(value);
         const key = leaseKey(hashOf(value));
         expect(await redis.zcard(key)).toBe(1);
 
@@ -172,7 +187,7 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
         });
         const newHash = hashOf(newValue);
         const newLeaseKey = `${queueName}:gq:blobleases:proj2/${newHash}`;
-        await lifecycle.takeLease(oldValue);
+        await seedLease(oldValue);
         const oldKey = leaseKey(hashOf(oldValue));
         expect(await redis.zcard(oldKey)).toBe(1);
 
@@ -204,7 +219,7 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
         });
         const hash = hashOf(v1);
         expect(hashOf(v2)).toBe(hash); // same content → same blob
-        await lifecycle.takeLease(v1);
+        await seedLease(v1);
         expect(await redis.zcard(leaseKey(hash))).toBe(1);
 
         await lifecycle.transferLease({
@@ -235,7 +250,7 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
         });
 
         expect(hashOf(v2)).toBe(hashOf(v1));
-        await lifecycle.takeLease(v1);
+        await seedLease(v1);
         const key = leaseKey(hashOf(v1));
         expect(await redis.zcard(key)).toBe(1);
 
@@ -265,7 +280,7 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
         const oldHash = hashOf(vOld);
         const newHash = hashOf(vNew);
         expect(newHash).not.toBe(oldHash);
-        await lifecycle.takeLease(vOld);
+        await seedLease(vOld);
         expect(await redis.zcard(leaseKey(oldHash))).toBe(1);
 
         await lifecycle.transferLease({
@@ -290,7 +305,7 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
         });
         expect(readEnvelopeLease(value)!.ref.tier).toBe("s3");
         expect(objectStore.store.size).toBe(1);
-        await lifecycle.takeLease(value);
+        await seedLease(value);
 
         await lifecycle.releaseLease({
           values: [value],

@@ -620,7 +620,7 @@ end
 redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
 redis.call("HSET", dataKey, stagedJobId, jobDataJson)
 local stagedLease = gqParseLease(jobDataJson)
-if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
+if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == parkTenantOf(groupId) then
   gqTakeLease(parkKeyPrefixOf(readyKey), stagedLease, gqRedisNowMs())
 end
 refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)

@@ -212,6 +212,8 @@ export class BlobLeases {
     projectId: TenantId;
     hash: string;
   }): Promise<number> {
+    // Test-only inspection seam. This is deliberately not a passive read: the
+    // Lua script prunes expired members and deletes an empty lease set.
     return Number(
       await countLiveScript.run(
         this.redis,
