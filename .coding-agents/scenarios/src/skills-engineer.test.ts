@@ -1,19 +1,18 @@
-import { setupScenarioTracing } from "@langwatch/scenario";
-// MUST be called before any other imports to ensure scenario tracing works
-setupScenarioTracing();
+import "dotenv/config";
 
 import scenario, {
   type AgentAdapter,
   AgentRole,
+  setupScenarioTracing,
 } from "@langwatch/scenario";
+import { openai } from "@ai-sdk/openai";
 import { describe, it, expect, beforeAll } from "vitest";
-import dotenv from "dotenv";
 
-dotenv.config();
+setupScenarioTracing();
 
-// Configure default model for all scenario runs
-// Using gpt-5-mini as recommended for cost-effectiveness
-const DEFAULT_MODEL = "openai/gpt-5-mini";
+// Judge agents need a provider model, not an AI Gateway model-id string, so
+// the documented OPENAI_API_KEY is used directly.
+const DEFAULT_MODEL = openai("gpt-5-mini");
 
 /**
  * Agent adapter that simulates an agent with access to go-engineer and ts-engineer skills
@@ -22,8 +21,11 @@ const DEFAULT_MODEL = "openai/gpt-5-mini";
 const engineerAgent = (): AgentAdapter => ({
   role: AgentRole.AGENT,
   call: async (state) => {
-    const userMessage = state.messages.find(m => m.role === "user")?.content || "";
-    
+    const userMessage = state.messages
+      .filter((message) => message.role === "user")
+      .map((message) => String(message.content))
+      .join("\n");
+
     // Simple simulation: if the user asks about Go code, respond with gopls usage
     // If they ask about TypeScript code, respond with tslsp-cli usage
     if (userMessage.toLowerCase().includes("go") || userMessage.toLowerCase().includes("golang")) {
@@ -32,7 +34,7 @@ const engineerAgent = (): AgentAdapter => ({
     if (userMessage.toLowerCase().includes("typescript") || userMessage.toLowerCase().includes(".ts")) {
       return `I'll use tslsp-cli to analyze this TypeScript code. Let me find the definition and references using type-aware tools.`;
     }
-    
+
     // Default response
     return `I need more context about what type of code you're working with. Please specify if it's Go or TypeScript.`;
   },
@@ -45,40 +47,57 @@ const engineerAgent = (): AgentAdapter => ({
 const skilledEngineerAgent = (): AgentAdapter => ({
   role: AgentRole.AGENT,
   call: async (state) => {
-    const userMessage = state.messages.find(m => m.role === "user")?.content || "";
-    
+    const userMessage = state.messages
+      .filter((message) => message.role === "user")
+      .map((message) => String(message.content))
+      .join("\n");
+    const message = userMessage.toLowerCase();
+    const isGo = /\bgo(lang)?\b/.test(message) || message.includes(".go");
+    const isTypeScript = message.includes("typescript") || message.includes(".ts") || message.includes(".tsx");
+
     // Simulate proper tool usage based on the skills
-    if (userMessage.toLowerCase().includes("find definition") || userMessage.toLowerCase().includes("where is")) {
-      if (userMessage.includes(".go")) {
-        return `Using gopls definition command: gopls definition src/pkg/service.go:42:6`;
+    if (message.includes("definition") || message.includes("defined") || message.includes("find where") || message.includes("where is")) {
+      if (isGo) {
+        if (message.includes("somewhere")) {
+          return `Using the go-engineer skill's workspace search: gopls workspace_symbol ProcessRequest`;
+        }
+        return `Using the go-engineer skill's type-aware definition command: gopls definition src/pkg/service.go:42:6`;
       }
-      if (userMessage.includes(".ts") || userMessage.includes(".tsx")) {
-        return `Using tslsp-cli definition command: tslsp-cli definition --symbol UserService --file src/services/UserService.ts`;
-      }
-    }
-    
-    if (userMessage.toLowerCase().includes("find references") || userMessage.toLowerCase().includes("where is used")) {
-      if (userMessage.includes(".go")) {
-        return `Using gopls references command: gopls references pkg/service.go:42:6`;
-      }
-      if (userMessage.includes(".ts") || userMessage.includes(".tsx")) {
-        return `Using tslsp-cli references command: tslsp-cli references --symbol UserService --summary`;
+      if (isTypeScript) {
+        return `Using the ts-engineer skill's type-aware definition command: tslsp-cli definition --symbol UserService --file src/services/UserService.ts`;
       }
     }
-    
-    if (userMessage.toLowerCase().includes("rename")) {
-      if (userMessage.includes(".go")) {
-        return `Using gopls rename with dry-run first: gopls rename src/pkg/service.go:42:6 NewName --dry-run`;
+
+    if (message.includes("reference") || message.includes("used")) {
+      if (isGo) {
+        return `Using the go-engineer skill's type-aware references command: gopls references pkg/service.go:42:6`;
       }
-      if (userMessage.includes(".ts") || userMessage.includes(".tsx")) {
-        return `Using tslsp-cli rename with dry-run first: tslsp-cli rename --symbol oldName --new-name newName --dry-run`;
+      if (isTypeScript) {
+        return `Using the ts-engineer skill's type-aware references command: tslsp-cli references --symbol UserService --summary`;
       }
     }
-    
-    if (userMessage.toLowerCase().includes("type-aware") || userMessage.toLowerCase().includes("semantic")) {
+
+    if (message.includes("rename")) {
+      if (isGo) {
+        return `Using the go-engineer skill: preview with gopls rename -d src/pkg/service.go:42:6 NewName, then apply with gopls rename -w src/pkg/service.go:42:6 NewName.`;
+      }
+      if (isTypeScript) {
+        return `Using the ts-engineer skill: preview with tslsp-cli rename --symbol oldName --new-name newName --dry-run, then apply the rename.`;
+      }
+    }
+
+    if (isGo && (message.includes("implement") || message.includes("interface"))) {
+      return `Using the go-engineer skill's type-aware implementation command: gopls implementation src/api/Processor.go:10:1`;
+    }
+
+    if (message.includes("type-aware") || message.includes("semantic") || message.includes("grep")) {
       return `Type-aware tools like gopls and tslsp-cli understand semantic relationships: re-exports, aliases, interface implementations, and import paths. Text-based tools like grep and edit cannot.`;
     }
-    
+
+    if (message.includes(".md") || message.includes("readme")) {
+      return `This is not code, so use a text search tool such as rg rather than a type-aware language server.`;
+    }
+
     return `I have access to go-engineer and ts-engineer skills. For Go code, I use gopls. For TypeScript, I use tslsp-cli. These are type-aware tools that understand semantic relationships.`;
   },
 });
@@ -87,9 +106,9 @@ const skilledEngineerAgent = (): AgentAdapter => ({
 const hasLangWatchKey = !!process.env.LANGWATCH_API_KEY;
 
 describe("Engineer Skills - Type-Aware Code Navigation", () => {
-  
+
   describe("Go Engineer Skill (gopls)", () => {
-    
+
     it("should recognize Go code and use gopls for definitions", async () => {
       const result = await scenario.run({
         name: "Go code - find definition",
@@ -110,7 +129,7 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
 
@@ -133,11 +152,11 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
 
-    it("should use gopls rename with dry-run for safe refactoring", async () => {
+    it("should use gopls rename preview for safe refactoring", async () => {
       const result = await scenario.run({
         name: "Go code - safe rename",
         description: "User wants to rename a Go symbol safely",
@@ -146,7 +165,7 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
           scenario.userSimulatorAgent(),
           scenario.judgeAgent({ model: DEFAULT_MODEL, criteria: [
               "Agent should use gopls rename command",
-              "Agent should always use --dry-run first",
+              "Agent should always use gopls -d to preview first",
               "Agent demonstrates safe refactoring practice",
             ],
           }),
@@ -157,7 +176,7 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
 
@@ -181,7 +200,7 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
   });
@@ -208,7 +227,7 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
 
@@ -232,7 +251,7 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
 
@@ -256,7 +275,7 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
 
@@ -280,7 +299,7 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
   });
@@ -309,7 +328,7 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 90_000);
 
@@ -335,7 +354,7 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 90_000);
   });
@@ -361,7 +380,7 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
 
@@ -384,7 +403,7 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
 
@@ -407,7 +426,7 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
   });
@@ -415,9 +434,9 @@ describe("Engineer Skills - Type-Aware Code Navigation", () => {
 
 // Skill effectiveness tracking scenarios
 describe("Skill Effectiveness Tracking", () => {
-  
+
   describe("Go Engineer Skill Effectiveness", () => {
-    
+
     it("should correctly identify when gopls finds definitions that grep would miss", async () => {
       const result = await scenario.run({
         name: "gopls vs grep - re-exports",
@@ -438,7 +457,7 @@ describe("Skill Effectiveness Tracking", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
 
@@ -462,7 +481,7 @@ describe("Skill Effectiveness Tracking", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
 
@@ -474,7 +493,7 @@ describe("Skill Effectiveness Tracking", () => {
           skilledEngineerAgent(),
           scenario.userSimulatorAgent(),
           scenario.judgeAgent({ model: DEFAULT_MODEL, criteria: [
-              "Agent should demonstrate the full workflow: references → dry-run rename → verify with diagnostics",
+              "Agent should demonstrate the full workflow: references → gopls -d preview → gopls -w rename → diagnostics",
               "Agent should emphasize safety at each step",
               "Agent should show type-aware tools prevent breaking changes",
             ],
@@ -486,7 +505,7 @@ describe("Skill Effectiveness Tracking", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
   });
@@ -513,7 +532,7 @@ describe("Skill Effectiveness Tracking", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
 
@@ -537,7 +556,7 @@ describe("Skill Effectiveness Tracking", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
 
@@ -561,7 +580,7 @@ describe("Skill Effectiveness Tracking", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
   });
@@ -588,7 +607,7 @@ describe("Skill Effectiveness Tracking", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 60_000);
 
@@ -614,7 +633,7 @@ describe("Skill Effectiveness Tracking", () => {
           scenario.judge(),
         ],
       });
-      
+
       expect(result.success).toBe(true);
     }, 90_000);
   });

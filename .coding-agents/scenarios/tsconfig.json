@@ -5,6 +5,6 @@
     "rootDir": "./src",
     "baseUrl": "."
   },
-  "include": ["src/**/*", "vitest.config.ts"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

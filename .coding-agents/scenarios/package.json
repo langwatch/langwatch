@@ -12,9 +12,9 @@
     "@langwatch/scenario": "^0.4.12"
   },
   "devDependencies": {
-    "@ai-sdk/openai": "^1.0.0",
+    "@ai-sdk/openai": "^3.0.26",
     "dotenv": "^16.4.5",
     "typescript": "^5.9.3",
-    "vitest": "^2.0.5"
+    "vitest": "^3.2.4"
   }
 }
