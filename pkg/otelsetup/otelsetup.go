@@ -119,21 +119,52 @@ var AutoStampedBaggageKeys = []string{
 // This stays BATCH export (async, no per-span latency) — NOT synchronous export.
 const BatchScheduledDelay = 2 * time.Second
 
+// AttrLangWatchOrigin marks telemetry that belongs to LangWatch's own
+// operational planes, so a payload arriving at the wrong destination is
+// identifiable as ours by inspection. This is the one guard that survives a
+// valid-but-wrong endpoint: it rides in the data, not in the config. The
+// Langy relay stamps the same key (value "langy_worker") on its
+// content-stripped internal copies; ingest-side enforcement can key on the
+// attribute's presence.
+const AttrLangWatchOrigin = "langwatch.origin"
+
+// OriginPlatformInternal is the AttrLangWatchOrigin value for a service's own
+// spans, metrics, and logs. It is NEVER stamped on a multi-tenant pipeline:
+// nlpgo's provider resource reaches customer projects through the tenant
+// router, so marking it would brand legitimate customer traces as internal.
+const OriginPlatformInternal = "platform_internal"
+
+// SamplerChoice is the resolved sampling decision, collapsed from the official
+// OTEL_TRACES_SAMPLER vocabulary: always_on ≡ Ratio 1, always_off ≡ Ratio 0,
+// traceidratio carries its argument, and the parentbased_* variants set
+// ParentBased so a sampled upstream parent keeps its children.
+type SamplerChoice struct {
+	// ParentBased wraps the root sampler so the parent span's sampled flag
+	// wins for child spans.
+	ParentBased bool
+	// Ratio is the root sampling fraction in [0,1]. >=1 samples everything;
+	// 0 — including the zero value — samples nothing.
+	Ratio float64
+}
+
 // Options configures the telemetry provider. Fields left empty are filled from
 // the context's ServiceInfo when available.
 type Options struct {
 	NodeID       string
-	OTLPEndpoint string            // OTLP HTTP endpoint (empty = noop)
+	OTLPEndpoint string            // FULL OTLP/HTTP traces URL (empty = no primary span exporter)
 	OTLPHeaders  map[string]string // auth headers for the collector
-	BatchTimeout time.Duration
-	MaxQueueSize int
-	// SampleRatio controls the fraction of traces sampled, 0.0–1.0. 0 means
-	// sample nothing; 1 means sample everything. The environment-aware default
-	// for an unset ratio is applied upstream by config.OTel.ResolveSampleRatio,
-	// which is also where out-of-range values are rejected — by the time a
-	// ratio reaches here it is expected to be in range, and anything outside
-	// it is clamped to NeverSample rather than assumed to mean "all".
-	SampleRatio float64
+	// MetricsEndpoint is the FULL /v1/metrics URL for the primary metric
+	// reader. Empty = derived from OTLPEndpoint (strip /v1/traces, append
+	// /v1/metrics), which is correct whenever both signals share a collector.
+	MetricsEndpoint string
+	BatchTimeout    time.Duration
+	MaxQueueSize    int
+	// Sampler selects the trace sampler. The zero value samples nothing —
+	// callers are expected to pass the choice resolved by config.OTel.Resolve,
+	// which maps the official OTEL_TRACES_SAMPLER / OTEL_TRACES_SAMPLER_ARG
+	// pair (or the deprecated OTEL_SAMPLE_RATIO, or the environment-aware
+	// default) onto this struct and rejects out-of-range values at boot.
+	Sampler SamplerChoice
 	// MultiTenant=true installs a per-request, per-tenant span router
 	// (TenantRouter) instead of the standard static-headers exporter.
 	// Required for nlpgo: each Studio event arrives with its own
@@ -193,7 +224,7 @@ func (p *Provider) LoggerProvider() *sdklog.LoggerProvider {
 // resource attributes used by both the static and multi-tenant span
 // pipelines. Kept as a helper so the two branches in New() stay in
 // lockstep without copy-paste drift.
-func buildResourceAttrs(serviceName, serviceVersion, environment, nodeID string) []attribute.KeyValue {
+func buildResourceAttrs(serviceName, serviceVersion, environment, nodeID string, internalOrigin bool) []attribute.KeyValue {
 	attrs := []attribute.KeyValue{
 		semconv.ServiceName(serviceName),
 		semconv.ServiceVersion(serviceVersion),
@@ -204,6 +235,9 @@ func buildResourceAttrs(serviceName, serviceVersion, environment, nodeID string)
 	if nodeID != "" {
 		attrs = append(attrs, attribute.String("node.id", nodeID))
 	}
+	if internalOrigin {
+		attrs = append(attrs, attribute.String(AttrLangWatchOrigin, OriginPlatformInternal))
+	}
 	return attrs
 }
 
@@ -213,13 +247,24 @@ func buildResourceAttrs(serviceName, serviceVersion, environment, nodeID string)
 // signal. Merge failure (schema-URL mismatch) is impossible here — all
 // attrs use the same semconv schema — so the error is discarded, matching
 // the existing trace-path call sites.
-func buildResource(serviceName, serviceVersion, environment, nodeID string) *resource.Resource {
-	attrs := buildResourceAttrs(serviceName, serviceVersion, environment, nodeID)
+func buildResource(serviceName, serviceVersion, environment, nodeID string, internalOrigin bool) *resource.Resource {
+	attrs := buildResourceAttrs(serviceName, serviceVersion, environment, nodeID, internalOrigin)
 	res, _ := resource.Merge(
 		resource.Default(),
 		resource.NewWithAttributes(semconv.SchemaURL, attrs...),
 	)
 	return res
+}
+
+// sameCollectorBase reports whether the primary traces endpoint (a full
+// per-signal URL or a base) and a debug-collector base URL address the same
+// collector — compared as base URLs, modulo the /v1/traces suffix and
+// trailing slashes.
+func sameCollectorBase(primaryTracesEndpoint, debugBase string) bool {
+	a := strings.TrimRight(primaryTracesEndpoint, "/")
+	a = strings.TrimRight(strings.TrimSuffix(a, "/v1/traces"), "/")
+	b := strings.TrimRight(debugBase, "/")
+	return a != "" && strings.EqualFold(a, b)
 }
 
 // withSignalPath appends the OTLP per-signal path (e.g. "/v1/traces")
@@ -265,29 +310,37 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 		return &Provider{}, nil
 	}
 
-	res := buildResource(serviceName, serviceVersion, environment, opts.NodeID)
+	// The internal-origin marker goes on every single-tenant resource: those
+	// providers carry exclusively LangWatch's own telemetry. Multi-tenant
+	// providers (nlpgo) are excluded — their resource reaches customer
+	// projects through the tenant router.
+	res := buildResource(serviceName, serviceVersion, environment, opts.NodeID, !opts.MultiTenant)
 
 	// Ordered so that only a ratio of 1.0 or above means "sample everything".
 	// The previous arrangement made AlwaysSample the default branch, which put
 	// every out-of-range value — a negative typo, or 10 meaning "10%" — onto
 	// full export, maximising exactly what the operator was trying to reduce.
-	// config.OTel.Validate rejects those at boot; this fails toward exporting
+	// config.OTel.Resolve rejects those at boot; this fails toward exporting
 	// nothing for callers that construct Options directly. NaN lands here too:
 	// it compares false against both bounds.
 	var rootSampler sdktrace.Sampler
 	switch {
-	case opts.SampleRatio >= 1.0:
+	case opts.Sampler.Ratio >= 1.0:
 		rootSampler = sdktrace.AlwaysSample()
-	case opts.SampleRatio > 0:
-		rootSampler = sdktrace.TraceIDRatioBased(opts.SampleRatio)
+	case opts.Sampler.Ratio > 0:
+		rootSampler = sdktrace.TraceIDRatioBased(opts.Sampler.Ratio)
 	default:
 		rootSampler = sdktrace.NeverSample()
+	}
+	sampler := rootSampler
+	if opts.Sampler.ParentBased {
+		sampler = sdktrace.ParentBased(rootSampler)
 	}
 
 	tpOpts := []sdktrace.TracerProviderOption{
 		sdktrace.WithResource(res),
 		sdktrace.WithSpanProcessor(NewBaggageAttributeProcessor(AutoStampedBaggageKeys...)),
-		sdktrace.WithSampler(sdktrace.ParentBased(rootSampler)),
+		sdktrace.WithSampler(sampler),
 		sdktrace.WithIDGenerator(NewIDGenerator()),
 	}
 
@@ -353,7 +406,16 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	// Additive debug-collector span exporter — dual export. Every span
 	// (on both paths) is also batched to the developer's local collector.
 	// This never diverts spans from the primary pipeline above.
-	if opts.DebugCollectorEndpoint != "" {
+	//
+	// Skipped when the debug collector IS the primary collector: with the
+	// official env vars a dev shell exports OTEL_EXPORTER_OTLP_ENDPOINT and
+	// OTEL_DEBUG_COLLECTOR_ENDPOINT both at the local stack, and a second
+	// processor would just duplicate every span. (The debug LOG pipeline
+	// below is NOT skipped — there is no primary log pipeline to duplicate.)
+	debugDuplicatesPrimary := opts.OTLPEndpoint != "" &&
+		opts.DebugCollectorEndpoint != "" &&
+		sameCollectorBase(opts.OTLPEndpoint, opts.DebugCollectorEndpoint)
+	if opts.DebugCollectorEndpoint != "" && !debugDuplicatesPrimary {
 		debugProc, err := newDebugSpanProcessor(ctx, opts.DebugCollectorEndpoint, opts.DebugCollectorHeaders)
 		if err != nil {
 			return nil, err
@@ -407,18 +469,29 @@ func installDebugLogs(ctx context.Context, opts Options, res *resource.Resource,
 func installMetrics(ctx context.Context, opts Options, res *resource.Resource, provider *Provider) error {
 	var readers []sdkmetric.Reader
 	if opts.OTLPEndpoint != "" && !opts.MultiTenant {
-		r, err := newMetricReader(ctx, metricsEndpointFromTraces(opts.OTLPEndpoint), opts.OTLPHeaders)
+		metricsURL := opts.MetricsEndpoint
+		if metricsURL == "" {
+			metricsURL = metricsEndpointFromTraces(opts.OTLPEndpoint)
+		}
+		r, err := newMetricReader(ctx, metricsURL, opts.OTLPHeaders)
 		if err != nil {
 			return err
 		}
 		readers = append(readers, r)
 	}
 	if opts.DebugCollectorEndpoint != "" {
-		r, err := newMetricReader(ctx, withSignalPath(opts.DebugCollectorEndpoint, "/v1/metrics"), opts.DebugCollectorHeaders)
-		if err != nil {
-			return err
+		// When the primary reader above already targets the same collector,
+		// a debug reader would double every metric. Multi-tenant services
+		// install no primary reader, so their debug reader always survives.
+		primaryCoversDebug := len(readers) > 0 &&
+			sameCollectorBase(opts.OTLPEndpoint, opts.DebugCollectorEndpoint)
+		if !primaryCoversDebug {
+			r, err := newMetricReader(ctx, withSignalPath(opts.DebugCollectorEndpoint, "/v1/metrics"), opts.DebugCollectorHeaders)
+			if err != nil {
+				return err
+			}
+			readers = append(readers, r)
 		}
-		readers = append(readers, r)
 	}
 	if len(readers) == 0 {
 		return nil

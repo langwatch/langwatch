@@ -96,9 +96,7 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if cfg.CustomerTraceBridge.BaseURL == "" {
 		cfg.CustomerTraceBridge.BaseURL = cfg.ControlPlane.BaseURL
 	}
-	// Apply environment-aware sample ratio default when not explicitly set.
-	cfg.OTel.ResolveSampleRatio(cfg.Environment)
-	if err := cfg.OTel.Validate(); err != nil {
+	if err := cfg.OTel.Resolve(cfg.Environment); err != nil {
 		return Config{}, err
 	}
 	if err := config.Validate(ctx, cfg); err != nil {

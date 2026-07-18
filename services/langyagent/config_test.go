@@ -16,7 +16,13 @@ func clearLangyEnv(t *testing.T) {
 		"LANGY_WORKER_IDLE_MS", "LANGY_REAPER_INTERVAL_MS", "LANGY_READINESS_TIMEOUT_MS", "SESSIONS_ROOT",
 		"LANGY_WORKSPACE_ROOT", "LANGY_UNSAFE_DEV_DISABLE_ISOLATION",
 		"LOG_LEVEL", "LOG_FORMAT",
-		"OTEL_OTLP_ENDPOINT", "OTEL_SAMPLE_RATIO",
+		"OTEL_OTLP_ENDPOINT", "OTEL_OTLP_HEADERS", "OTEL_SAMPLE_RATIO",
+		"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS",
+		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_TRACES_HEADERS",
+		"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_PROTOCOL", "OTEL_TRACES_SAMPLER", "OTEL_TRACES_SAMPLER_ARG",
+		"OTEL_TRACES_EXPORTER", "OTEL_SDK_DISABLED",
+		"OTEL_DEBUG_COLLECTOR_ENDPOINT", "OTEL_DEBUG_COLLECTOR_HEADERS",
 		"LANGY_SHUTDOWN_HANDOFF_DEADLINE_MS", "LANGY_SHUTDOWN_DRAIN_BUDGET_MS",
 	} {
 		t.Setenv(k, "")
@@ -127,8 +133,8 @@ func TestLoadConfig_NonLocalLowersSampleRatio(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	if cfg.OTel.SampleRatio != 0.1 {
-		t.Errorf("non-local SampleRatio = %v, want 0.1", cfg.OTel.SampleRatio)
+	if got := cfg.OTel.SamplerChoice().Ratio; got != 0.1 {
+		t.Errorf("non-local sampler ratio = %v, want 0.1", got)
 	}
 }
 
@@ -142,8 +148,39 @@ func TestLoadConfig_ExplicitZeroSampleRatioIsPreserved(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	if cfg.OTel.SampleRatio != 0 || !cfg.OTel.SampleRatioSet {
-		t.Fatalf("explicit zero sample ratio = %v (set=%v), want 0 (set=true)", cfg.OTel.SampleRatio, cfg.OTel.SampleRatioSet)
+	if got := cfg.OTel.SamplerChoice().Ratio; got != 0 {
+		t.Fatalf("explicit zero sample ratio resolved to %v, want 0", got)
+	}
+}
+
+func TestLoadConfig_OfficialSamplerVarsAreHonoured(t *testing.T) {
+	clearLangyEnv(t)
+	t.Setenv("LANGY_INTERNAL_SECRET", "secret")
+	t.Setenv("ENVIRONMENT", "production")
+	t.Setenv("OTEL_TRACES_SAMPLER", "parentbased_traceidratio")
+	t.Setenv("OTEL_TRACES_SAMPLER_ARG", "0.25")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if got := cfg.OTel.SamplerChoice().Ratio; got != 0.25 {
+		t.Fatalf("official sampler ratio = %v, want 0.25", got)
+	}
+}
+
+func TestLoadConfig_OfficialEndpointNameIsHonoured(t *testing.T) {
+	clearLangyEnv(t)
+	t.Setenv("LANGY_INTERNAL_SECRET", "secret")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	base, _ := cfg.OTel.PrimaryOTLP()
+	if base != "http://localhost:4318" {
+		t.Fatalf("PrimaryOTLP base = %q, want the official env var's value", base)
 	}
 }
 

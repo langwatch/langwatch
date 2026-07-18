@@ -196,8 +196,7 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	// Derive the listen address from PORT (kept as its own env var). Set after
 	// Hydrate so PORT always wins over any stray SERVER_ADDR.
 	cfg.Server.Addr = fmt.Sprintf(":%d", cfg.Port)
-	cfg.OTel.ResolveSampleRatio(cfg.Environment)
-	if err := cfg.OTel.Validate(); err != nil {
+	if err := cfg.OTel.Resolve(cfg.Environment); err != nil {
 		return Config{}, err
 	}
 	if err := cfg.Log.Validate(); err != nil {

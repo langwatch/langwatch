@@ -21,11 +21,14 @@ import (
 // can't end up in one another's traces even when the same Lambda
 // container handles both.
 //
-// Endpoint resolution mirrors the legacy Python service: read
-// `LANGWATCH_ENDPOINT` (the universal LangWatch URL env var), append
-// the OTLP traces path. Falls back to the generic `OTEL_OTLP_ENDPOINT`
-// only when LANGWATCH_ENDPOINT is unset, for environments that wire
-// OTel via the standard OTel env vars.
+// The router's destination is CUSTOMER trace routing, which is product
+// configuration — `LANGWATCH_ENDPOINT` (the universal LangWatch URL env
+// var) + the OTLP ingest path — and deliberately NOT the official
+// OTEL_EXPORTER_OTLP_* namespace: in a dev shell that namespace points
+// every service's OWN telemetry at the local observability stack, and
+// reading it here would silently divert customer studio traces into it.
+// The deprecated `OTEL_OTLP_ENDPOINT` fallback is kept for environments
+// that predate LANGWATCH_ENDPOINT wiring.
 func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelsetup.Provider, error) {
 	endpoint := strings.TrimSpace(os.Getenv("LANGWATCH_ENDPOINT"))
 	if endpoint != "" {
@@ -35,6 +38,12 @@ func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelse
 		if endpoint != "" && !strings.HasSuffix(endpoint, "/v1/traces") {
 			endpoint = strings.TrimRight(endpoint, "/") + "/v1/traces"
 		}
+	}
+	if cfg.OTel.ExporterEndpoint != "" || cfg.OTel.ExporterTracesEndpoint != "" {
+		// Loud, not silent: the official exporter vars have no effect on
+		// nlpgo until it grows an ops-span pipeline with a content
+		// allowlist (like aigateway's). Tracked as follow-up work.
+		clog.Get(ctx).Warn("nlpgo ignores OTEL_EXPORTER_OTLP_ENDPOINT: spans are routed per-tenant to the LangWatch ingest derived from LANGWATCH_ENDPOINT; the debug collector still applies for local development")
 	}
 	// NLPGO_SPAN_SYNC=1 swaps the per-tenant BatchSpanProcessor for a
 	// SimpleSpanProcessor — every span.End() blocks on the OTLP
@@ -50,7 +59,7 @@ func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelse
 	return otelsetup.New(ctx, otelsetup.Options{
 		NodeID:                 nodeID,
 		OTLPEndpoint:           endpoint,
-		SampleRatio:            cfg.OTel.SampleRatio,
+		Sampler:                cfg.OTel.SamplerChoice(),
 		MultiTenant:            true,
 		SyncExport:             syncExport,
 		DebugCollectorEndpoint: debugEndpoint,
