@@ -76,8 +76,12 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 const mockModelMetadata = {
   "openai/gpt-4o": {
     name: "gpt-4o",
-    max_tokens: 128000,
-    max_output_tokens: 16384,
+    // Real ModelMetadataForFrontend field names — getMaxTokenLimit reads
+    // these two specifically. Wrong names here would make the backfill
+    // test silently pass via FALLBACK_MAX_TOKENS instead of exercising
+    // the actual extraction path.
+    contextLength: 128000,
+    maxCompletionTokens: 16384,
   },
 };
 
