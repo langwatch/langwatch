@@ -21,6 +21,7 @@ import {
   type WidgetSpec,
   aggAlias,
   aggLabel,
+  isAdditiveAgg,
   metricMeta,
 } from "./model";
 
@@ -338,7 +339,7 @@ export const runStubQuery = (spec: WidgetSpec, win: StubWindow): StubResult => {
   }
 
   // Single-stat total: primary aggregation collapsed across groups.
-  const isAdditive = primaryAgg.op === "count" || primaryAgg.op === "sum";
+  const isAdditive = isAdditiveAgg(primaryAgg.op);
   const totalValue = isAdditive
     ? groups.reduce((s, g) => s + (g.values[primaryKey] ?? 0), 0)
     : groups.length

@@ -5,10 +5,10 @@
  * title, and an overflow menu (edit / duplicate / resize / delete). Sortable via
  * @dnd-kit so cards rearrange on the grid — the "dashboard composition" feel.
  */
-import { Box, Card, Heading, HStack, IconButton, Spacer } from "@chakra-ui/react";
+import { Badge, Box, Card, Heading, HStack, IconButton, Spacer, Spinner, Text } from "@chakra-ui/react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   BarChart2,
   Copy,
@@ -20,7 +20,9 @@ import {
 } from "react-feather";
 import { LuTable } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
+import { api } from "~/utils/api";
 import type { WidgetSpec } from "./model";
+import { buildTraceQueryRequest, rowsToWidgetResult } from "./realData";
 import { runStubQuery, type StubWindow } from "./stubData";
 import { WidgetRenderer } from "./WidgetRenderer";
 
@@ -59,6 +61,7 @@ const vizIcon = (kind: WidgetSpec["visualization"]) => {
 interface Props {
   spec: WidgetSpec;
   window: StubWindow;
+  projectId: string | undefined;
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -68,6 +71,7 @@ interface Props {
 export function WidgetCard({
   spec,
   window: win,
+  projectId,
   onEdit,
   onDuplicate,
   onDelete,
@@ -76,7 +80,35 @@ export function WidgetCard({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: spec.id });
 
-  const result = useMemo(() => runStubQuery(spec, win), [spec, win]);
+  const stubResult = useMemo(() => runStubQuery(spec, win), [spec, win]);
+
+  // Real data: no time-bucket dimension exists on the real engine yet, so Line
+  // is a known gap, not a bug -- surface it honestly instead of rendering a
+  // broken/empty chart.
+  const realUnsupported = spec.useRealData && spec.visualization === "line";
+  const realActive = spec.useRealData && !realUnsupported;
+
+  const realRequest = useMemo(() => buildTraceQueryRequest(spec, win), [spec, win]);
+  const requestKey = useMemo(() => JSON.stringify(realRequest), [realRequest]);
+  const realRun = api.traceQuery.run.useMutation();
+  const lastRunKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!realActive || !projectId) return;
+    if (lastRunKeyRef.current === requestKey) return;
+    lastRunKeyRef.current = requestKey;
+    realRun.mutate({ projectId, query: realRequest });
+    // realRun.mutate is intentionally excluded -- re-running on its identity
+    // rather than on requestKey would re-fire the real query every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realActive, projectId, requestKey]);
+
+  const realResult = useMemo(
+    () => (realRun.data ? rowsToWidgetResult(spec, realRun.data.rows) : null),
+    [spec, realRun.data],
+  );
+
+  const result = realActive && realResult ? realResult : stubResult;
 
   const rendererHeight =
     spec.rowSpan * GRID_ROW_HEIGHT +
@@ -114,6 +146,11 @@ export function WidgetCard({
             <Heading size="sm" lineClamp={1}>
               {spec.title}
             </Heading>
+            {spec.useRealData ? (
+              <Badge colorPalette="green" variant="subtle" size="xs" flexShrink={0}>
+                Real data
+              </Badge>
+            ) : null}
             <Spacer />
             <Menu.Root>
               <Menu.Trigger asChild>
@@ -180,11 +217,27 @@ export function WidgetCard({
           </HStack>
         </Card.Header>
         <Card.Body paddingTop={0} paddingX={3} paddingBottom={3} overflow="hidden">
-          <WidgetRenderer
-            spec={spec}
-            result={result}
-            height={Math.max(70, rendererHeight)}
-          />
+          {realUnsupported ? (
+            <Text fontSize="sm" color="fg.muted" padding={2}>
+              Line isn't supported for real data yet — the real query engine has
+              no time-bucket dimension. Pick Table, Bar, or Single-stat.
+            </Text>
+          ) : realActive && realRun.error ? (
+            <Text fontSize="sm" color="fg.error" padding={2}>
+              Real query failed: {realRun.error.message}
+            </Text>
+          ) : realActive && !realResult ? (
+            <HStack padding={2} color="fg.muted" fontSize="sm">
+              <Spinner size="sm" />
+              <Text>Querying real trace data…</Text>
+            </HStack>
+          ) : (
+            <WidgetRenderer
+              spec={spec}
+              result={result}
+              height={Math.max(70, rendererHeight)}
+            />
+          )}
         </Card.Body>
       </Card.Root>
     </Box>

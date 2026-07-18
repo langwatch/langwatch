@@ -25,6 +25,7 @@ import { GRID_GAP, GRID_ROW_HEIGHT, WidgetCard } from "./WidgetCard";
 interface Props {
   widgets: WidgetSpec[];
   window: StubWindow;
+  projectId: string | undefined;
   onReorder: (fromId: string, toId: string) => void;
   onEdit: (id: string) => void;
   onDuplicate: (id: string) => void;
@@ -35,6 +36,7 @@ interface Props {
 export function DashboardGrid({
   widgets,
   window: win,
+  projectId,
   onReorder,
   onEdit,
   onDuplicate,
@@ -78,6 +80,7 @@ export function DashboardGrid({
               key={widget.id}
               spec={widget}
               window={win}
+              projectId={projectId}
               onEdit={() => onEdit(widget.id)}
               onDuplicate={() => onDuplicate(widget.id)}
               onDelete={() => onDelete(widget.id)}

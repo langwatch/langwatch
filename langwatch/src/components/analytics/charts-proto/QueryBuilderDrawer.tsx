@@ -19,6 +19,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Plus, X } from "react-feather";
 import { Drawer } from "~/components/ui/drawer";
+import { LabeledSwitch } from "~/components/ui/LabeledSwitch";
 import { SegmentedControl } from "~/components/ui/segmented-control";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
@@ -164,6 +165,27 @@ export function QueryBuilderDrawer({
                     patch({ visualization: e.value as Visualization })
                   }
                 />
+              </VStack>
+
+              <VStack align="stretch" gap={2}>
+                <FieldLabel>Data source</FieldLabel>
+                <LabeledSwitch
+                  left={{ label: "Sample data", value: "stub" }}
+                  right={{ label: "Real data (this project)", value: "real" }}
+                  value={draft.useRealData ? "real" : "stub"}
+                  onChange={(v) => patch({ useRealData: v === "real" })}
+                />
+                {draft.useRealData && draft.visualization === "line" ? (
+                  <Text fontSize="xs" color="orange.500">
+                    Line isn't supported for real data yet — no time-bucket
+                    dimension exists on the real query engine. Pick Table, Bar,
+                    or Single-stat.
+                  </Text>
+                ) : draft.useRealData ? (
+                  <Text fontSize="xs" color="fg.subtle">
+                    This widget will query this project's real traces once saved.
+                  </Text>
+                ) : null}
               </VStack>
 
               <VStack align="stretch" gap={2}>
@@ -323,8 +345,9 @@ export function QueryBuilderDrawer({
                 </Box>
               </Box>
               <Text fontSize="xs" color="fg.subtle" marginTop={3}>
-                Preview uses sampled data. Wiring to the real tenant-isolated
-                trace-query engine is post-pick.
+                {draft.useRealData
+                  ? "This live preview always uses sample data to avoid querying on every keystroke. The saved widget on the dashboard will query real data."
+                  : "Preview uses sampled data. Wiring to the real tenant-isolated trace-query engine is post-pick."}
               </Text>
             </VStack>
           </HStack>

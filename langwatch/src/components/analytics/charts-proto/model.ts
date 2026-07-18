@@ -37,6 +37,10 @@ export const AGGREGATIONS = [
 
 export type AggregationOp = (typeof AGGREGATIONS)[number]["op"];
 
+/** `count`/`sum` collapse across groups by summing; every other op averages (mean of means). */
+export const isAdditiveAgg = (op: AggregationOp): boolean =>
+  op === "count" || op === "sum";
+
 // ── Metric columns (METRIC_COLUMNS) — schema.ts:50-58 ───────────────────────
 // `polarity`: 1 when a higher value is an improvement (throughput), -1 when a
 // higher value is worse (cost, latency, volume). Drives delta colouring for
@@ -79,6 +83,8 @@ export interface WidgetSpec {
   groupBy: DimensionColumn[]; // 0..MAX_GROUP_BY
   filter: string; // liqe string, e.g. "cost:>0.1"
   timeRangeMode: "inherit" | "custom";
+  /** When true, the widget queries this project's real traces via the trace-query engine instead of sample data. Table/Bar/Single-stat only -- no time-bucket dimension exists yet for Line. */
+  useRealData?: boolean;
   /** grid footprint, in grid cells (prototype grid is 12-col) */
   colSpan: number;
   rowSpan: number;

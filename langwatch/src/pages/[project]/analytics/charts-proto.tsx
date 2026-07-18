@@ -109,6 +109,7 @@ function ChartsProtoContent() {
           <DashboardGrid
             widgets={dashboard.widgets}
             window={win}
+            projectId={project?.id}
             onReorder={dashboard.reorderWidgets}
             onEdit={openEdit}
             onDuplicate={dashboard.duplicateWidget}
