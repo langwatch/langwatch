@@ -4,6 +4,8 @@
 
 **Status:** Proposed
 
+> **Lifecycle amendment (2026-07-18):** WP4 replaced the holder-set eager-reclaim design below with per-holder renewable leases and lazy reclaim. The content-addressed tiers, tenant namespacing, and GQ2 envelope remain unchanged. See the current [GroupQueue architecture](../../../langwatch/src/server/event-sourcing/queues/groupQueue/ARCHITECTURE.md#per-holder-renewable-leases); the holder-set sections in this ADR are retained as the historical decision being superseded.
+
 **Extends / supersedes in part:** [ADR-026](./026-groupqueue-payload-envelope.md) (GroupQueue payload envelope). The versioned-envelope + header-only routing decision stands. This ADR supersedes ADR-026's §"Blob lifecycle" — random blob ids, best-effort delete, and the 7-day pure-backstop TTL — for offloaded bodies.
 
 **Reuses:** the `stored-objects` object store — `StorageDriver` / `StorageRegistry` / content-addressed URI minting / `resolveProjectStorageDestination` (`src/server/stored-objects/`, the codebase's single pluggable object-store abstraction; behavioural contract in [externalize-event-byte-content.feature](../../../specs/features/scenarios/externalize-event-byte-content.feature)). The S3/file tier delegates to it. This is *not* [ADR-022](./022-event-log-source-of-truth.md)'s `BlobStore`, which is event_log-centric (it reads full content back out of ClickHouse) and is not a general object store; that one is not reused here.
