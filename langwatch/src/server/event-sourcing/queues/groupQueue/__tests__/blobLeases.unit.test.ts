@@ -1,0 +1,71 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { BlobLeases } from "../blobLeases";
+import { CachedLuaScript } from "../cachedLuaScript";
+
+const PROJECT = createTenantId("project-1");
+
+describe("BlobLeases", () => {
+  describe("given a queue-scoped lease primitive", () => {
+    describe("when a lease is taken", () => {
+      it("uses tenant-namespaced lease and rolling-deploy guard keys", async () => {
+        const run = vi
+          .spyOn(CachedLuaScript.prototype, "run")
+          .mockResolvedValue(1);
+        const redis = {} as ConstructorParameters<
+          typeof BlobLeases
+        >[0]["redis"];
+        const leases = new BlobLeases({
+          redis,
+          queueName: "{queue}",
+          leaseTtlSeconds: 30,
+        });
+
+        await leases.take({
+          projectId: PROJECT,
+          hash: "hash-1",
+          holderId: "holder-1",
+        });
+
+        expect(run).toHaveBeenCalledWith(
+          redis,
+          2,
+          "{queue}:gq:blobleases:project-1/hash-1",
+          "{queue}:gq:blobholders:project-1/hash-1",
+          "holder-1",
+          "30",
+        );
+      });
+    });
+
+    describe("when a lease is released", () => {
+      it("does not pass a blob key to the release script", async () => {
+        const run = vi
+          .spyOn(CachedLuaScript.prototype, "run")
+          .mockResolvedValue(0);
+        const redis = {} as ConstructorParameters<
+          typeof BlobLeases
+        >[0]["redis"];
+        const leases = new BlobLeases({ redis, queueName: "{queue}" });
+
+        await leases.release({
+          projectId: PROJECT,
+          hash: "hash-1",
+          holderId: "holder-1",
+        });
+
+        expect(run).toHaveBeenCalledWith(
+          redis,
+          2,
+          "{queue}:gq:blobleases:project-1/hash-1",
+          "{queue}:gq:blobholders:project-1/hash-1",
+          "holder-1",
+        );
+        expect(run.mock.calls[0]).not.toContain(
+          "{queue}:gq:blob:project-1/hash-1",
+        );
+      });
+    });
+  });
+});
