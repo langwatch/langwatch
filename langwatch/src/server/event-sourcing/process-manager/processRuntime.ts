@@ -70,7 +70,11 @@ export class ProcessRuntime {
         eventTypes: definition.config.eventTypes,
         handle: async (event, context) => {
           const envelope: ProcessEventEnvelope = {
-            eventId: event.id,
+            // The event log can briefly expose two physical rows before its
+            // ReplacingMergeTree merges a redelivered command. The inbox owns
+            // logical consumption, so use the command's deterministic key
+            // when present and fall back to the physical event id otherwise.
+            eventId: event.idempotencyKey ?? event.id,
             eventType: event.type,
             occurredAt: event.occurredAt,
             tenantId: context.tenantId,
