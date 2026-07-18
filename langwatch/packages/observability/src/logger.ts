@@ -256,7 +256,7 @@ function buildOtelTransport(level: string): pino.TransportTargetOptions {
       serviceVersion: process.env.npm_package_version ?? "1.0.0",
       resourceAttributes: {
         "service.name": process.env.OTEL_SERVICE_NAME ?? DEFAULT_SERVICE_NAME,
-        "deployment.environment": process.env.ENVIRONMENT ?? "development",
+        "deployment.environment.name": process.env.ENVIRONMENT ?? "development",
       },
     },
     level,

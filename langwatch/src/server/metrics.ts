@@ -361,6 +361,59 @@ type ESStatus = "completed" | "failed";
 /** Reactors additionally skip pre-enqueue when shouldReact returns false. */
 type ReactorStatus = ESStatus | "skipped";
 
+// --- Unified projection metrics ---
+// Keep the existing kind-specific metrics below for backwards compatibility,
+// while giving dashboards one complete view across every projection lane.
+register.removeSingleMetric("es_projection_total");
+const esProjectionTotal = new Counter({
+  name: "es_projection_total",
+  help: "Total number of event-sourcing projection executions",
+  labelNames: [
+    "pipeline_name",
+    "projection_kind",
+    "projection_name",
+    "status",
+  ] as const,
+});
+
+export const incrementEsProjectionTotal = ({
+  pipelineName,
+  projectionKind,
+  projectionName,
+  status,
+}: {
+  pipelineName: string;
+  projectionKind: "fold" | "map" | "state";
+  projectionName: string;
+  status: ESStatus;
+}) =>
+  esProjectionTotal
+    .labels(pipelineName, projectionKind, projectionName, status)
+    .inc();
+
+register.removeSingleMetric("es_projection_duration_milliseconds");
+const esProjectionDuration = new Histogram({
+  name: "es_projection_duration_milliseconds",
+  help: "Duration of event-sourcing projection execution in milliseconds",
+  labelNames: ["pipeline_name", "projection_kind", "projection_name"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+});
+
+export const observeEsProjectionDuration = ({
+  pipelineName,
+  projectionKind,
+  projectionName,
+  durationMs,
+}: {
+  pipelineName: string;
+  projectionKind: "fold" | "map" | "state";
+  projectionName: string;
+  durationMs: number;
+}) =>
+  esProjectionDuration
+    .labels(pipelineName, projectionKind, projectionName)
+    .observe(durationMs);
+
 // --- Command metrics ---
 register.removeSingleMetric("es_command_total");
 const esCommandTotal = new Counter({
@@ -397,11 +450,23 @@ const esFoldProjectionTotal = new Counter({
   labelNames: ["pipeline_name", "projection_name", "status"] as const,
 });
 
-export const incrementEsFoldProjectionTotal = (
-  pipelineName: string,
-  projectionName: string,
-  status: ESStatus,
-) => esFoldProjectionTotal.labels(pipelineName, projectionName, status).inc();
+export const incrementEsFoldProjectionTotal = ({
+  pipelineName,
+  projectionName,
+  status,
+}: {
+  pipelineName: string;
+  projectionName: string;
+  status: ESStatus;
+}) => {
+  esFoldProjectionTotal.labels(pipelineName, projectionName, status).inc();
+  incrementEsProjectionTotal({
+    pipelineName,
+    projectionKind: "fold",
+    projectionName,
+    status,
+  });
+};
 
 register.removeSingleMetric("es_fold_projection_duration_milliseconds");
 const esFoldProjectionDuration = new Histogram({
@@ -411,14 +476,25 @@ const esFoldProjectionDuration = new Histogram({
   buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
 });
 
-export const observeEsFoldProjectionDuration = (
-  pipelineName: string,
-  projectionName: string,
-  durationMs: number,
-) =>
+export const observeEsFoldProjectionDuration = ({
+  pipelineName,
+  projectionName,
+  durationMs,
+}: {
+  pipelineName: string;
+  projectionName: string;
+  durationMs: number;
+}) => {
   esFoldProjectionDuration
     .labels(pipelineName, projectionName)
     .observe(durationMs);
+  observeEsProjectionDuration({
+    pipelineName,
+    projectionKind: "fold",
+    projectionName,
+    durationMs,
+  });
+};
 
 register.removeSingleMetric("es_fold_refold_total");
 const esFoldRefoldTotal = new Counter({
@@ -465,11 +541,23 @@ const esMapProjectionTotal = new Counter({
   labelNames: ["pipeline_name", "projection_name", "status"] as const,
 });
 
-export const incrementEsMapProjectionTotal = (
-  pipelineName: string,
-  projectionName: string,
-  status: ESStatus,
-) => esMapProjectionTotal.labels(pipelineName, projectionName, status).inc();
+export const incrementEsMapProjectionTotal = ({
+  pipelineName,
+  projectionName,
+  status,
+}: {
+  pipelineName: string;
+  projectionName: string;
+  status: ESStatus;
+}) => {
+  esMapProjectionTotal.labels(pipelineName, projectionName, status).inc();
+  incrementEsProjectionTotal({
+    pipelineName,
+    projectionKind: "map",
+    projectionName,
+    status,
+  });
+};
 
 register.removeSingleMetric("es_map_projection_duration_milliseconds");
 const esMapProjectionDuration = new Histogram({
@@ -479,14 +567,25 @@ const esMapProjectionDuration = new Histogram({
   buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
 });
 
-export const observeEsMapProjectionDuration = (
-  pipelineName: string,
-  projectionName: string,
-  durationMs: number,
-) =>
+export const observeEsMapProjectionDuration = ({
+  pipelineName,
+  projectionName,
+  durationMs,
+}: {
+  pipelineName: string;
+  projectionName: string;
+  durationMs: number;
+}) => {
   esMapProjectionDuration
     .labels(pipelineName, projectionName)
     .observe(durationMs);
+  observeEsProjectionDuration({
+    pipelineName,
+    projectionKind: "map",
+    projectionName,
+    durationMs,
+  });
+};
 
 // --- Reactor metrics ---
 register.removeSingleMetric("es_reactor_total");
@@ -515,6 +614,121 @@ export const observeEsReactorDuration = (
   reactorName: string,
   durationMs: number,
 ) => esReactorDuration.labels(pipelineName, reactorName).observe(durationMs);
+
+// --- Event subscriber metrics ---
+register.removeSingleMetric("es_subscriber_total");
+const esSubscriberTotal = new Counter({
+  name: "es_subscriber_total",
+  help: "Total number of event-sourcing subscriber executions",
+  labelNames: ["pipeline_name", "subscriber_name", "status"] as const,
+});
+
+export const incrementEsSubscriberTotal = ({
+  pipelineName,
+  subscriberName,
+  status,
+}: {
+  pipelineName: string;
+  subscriberName: string;
+  status: ESStatus;
+}) => esSubscriberTotal.labels(pipelineName, subscriberName, status).inc();
+
+register.removeSingleMetric("es_subscriber_duration_milliseconds");
+const esSubscriberDuration = new Histogram({
+  name: "es_subscriber_duration_milliseconds",
+  help: "Duration of event-sourcing subscriber execution in milliseconds",
+  labelNames: ["pipeline_name", "subscriber_name"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+});
+
+export const observeEsSubscriberDuration = ({
+  pipelineName,
+  subscriberName,
+  durationMs,
+}: {
+  pipelineName: string;
+  subscriberName: string;
+  durationMs: number;
+}) =>
+  esSubscriberDuration.labels(pipelineName, subscriberName).observe(durationMs);
+
+// --- Process manager metrics ---
+register.removeSingleMetric("es_process_manager_total");
+const esProcessManagerTotal = new Counter({
+  name: "es_process_manager_total",
+  help: "Total number of process-manager evolutions",
+  labelNames: ["process_name", "input_kind", "outcome"] as const,
+});
+
+export const incrementEsProcessManagerTotal = ({
+  processName,
+  inputKind,
+  outcome,
+}: {
+  processName: string;
+  inputKind: "event" | "wake";
+  outcome:
+    | "committed"
+    | "duplicate_event"
+    | "stale_wake"
+    | "revision_conflict"
+    | "failed";
+}) => esProcessManagerTotal.labels(processName, inputKind, outcome).inc();
+
+register.removeSingleMetric("es_process_manager_duration_milliseconds");
+const esProcessManagerDuration = new Histogram({
+  name: "es_process_manager_duration_milliseconds",
+  help: "Duration of process-manager evolutions in milliseconds",
+  labelNames: ["process_name", "input_kind"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+});
+
+export const observeEsProcessManagerDuration = ({
+  processName,
+  inputKind,
+  durationMs,
+}: {
+  processName: string;
+  inputKind: "event" | "wake";
+  durationMs: number;
+}) =>
+  esProcessManagerDuration.labels(processName, inputKind).observe(durationMs);
+
+register.removeSingleMetric("es_process_outbox_total");
+const esProcessOutboxTotal = new Counter({
+  name: "es_process_outbox_total",
+  help: "Total number of process-manager outbox delivery attempts",
+  labelNames: ["process_name", "intent_type", "status"] as const,
+});
+
+export const incrementEsProcessOutboxTotal = ({
+  processName,
+  intentType,
+  status,
+}: {
+  processName: string;
+  intentType: string;
+  status: "dispatched" | "retried" | "dead";
+}) => esProcessOutboxTotal.labels(processName, intentType, status).inc();
+
+register.removeSingleMetric("es_process_outbox_duration_milliseconds");
+const esProcessOutboxDuration = new Histogram({
+  name: "es_process_outbox_duration_milliseconds",
+  help: "Duration of process-manager outbox delivery attempts in milliseconds",
+  labelNames: ["process_name", "intent_type"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000],
+});
+
+export const observeEsProcessOutboxDuration = ({
+  processName,
+  intentType,
+  durationMs,
+}: {
+  processName: string;
+  intentType: string;
+  durationMs: number;
+}) =>
+  esProcessOutboxDuration.labels(processName, intentType).observe(durationMs);
 
 // --- Fold cache metrics ---
 register.removeSingleMetric("es_fold_cache_total");

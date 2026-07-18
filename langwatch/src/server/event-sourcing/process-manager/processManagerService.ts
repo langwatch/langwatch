@@ -1,12 +1,18 @@
+import { performance } from "node:perf_hooks";
+import { createLogger } from "@langwatch/observability";
 import {
+  type Attributes,
   context,
   propagation,
   SpanKind,
   SpanStatusCode,
-  trace,
-  type Attributes,
   type Tracer,
+  trace,
 } from "@opentelemetry/api";
+import {
+  incrementEsProcessManagerTotal,
+  observeEsProcessManagerDuration,
+} from "~/server/metrics";
 
 import { ensureJsonSafe } from "./json";
 import type {
@@ -31,6 +37,8 @@ export type HandleResult =
   | { outcome: "staleWake" }
   | { outcome: "revisionConflict"; actualRevision: number };
 
+const SLOW_PROCESS_MANAGER_OPERATION_MS = 1_000;
+
 export interface ProcessManagerServiceOptions<State> {
   definition: ProcessDefinition<State>;
   store: ProcessStore;
@@ -51,6 +59,9 @@ export class ProcessManagerService<State> {
   private readonly definition: ProcessDefinition<State>;
   private readonly store: ProcessStore;
   private readonly tracer: Tracer;
+  private readonly logger = createLogger(
+    "langwatch:event-sourcing:process-manager",
+  );
 
   constructor(options: ProcessManagerServiceOptions<State>) {
     this.definition = options.definition;
@@ -71,11 +82,22 @@ export class ProcessManagerService<State> {
     };
 
     return await this.inEvolveSpan({
+      inputKind: "event",
+      // Intentionally retain this opaque operational ID for event-delivery diagnostics.
+      logContext: {
+        processKey: ref.processKey,
+        projectId: envelope.projectId,
+        tenantId: envelope.tenantId,
+        userId: envelope.userId,
+        sourceEventId: envelope.eventId,
+        eventType: envelope.eventType,
+      },
       attributes: {
         "process.name": ref.processName,
         "process.key": ref.processKey,
         "process.source_event_id": envelope.eventId,
         "process.input_kind": "event",
+        "event.type": envelope.eventType,
         "tenant.id": envelope.tenantId,
         "project.id": envelope.projectId,
         ...(envelope.userId ? { "user.id": envelope.userId } : {}),
@@ -107,6 +129,12 @@ export class ProcessManagerService<State> {
     const { wake, now } = params;
 
     return await this.inEvolveSpan({
+      inputKind: "wake",
+      logContext: {
+        processKey: wake.ref.processKey,
+        projectId: wake.ref.projectId,
+        wakeRevision: wake.revision,
+      },
       attributes: {
         "process.name": wake.ref.processName,
         "process.key": wake.ref.processKey,
@@ -194,7 +222,9 @@ export class ProcessManagerService<State> {
     return carrier;
   }
 
-  private async inEvolveSpan<T>(params: {
+  private async inEvolveSpan<T extends HandleResult>(params: {
+    inputKind: "event" | "wake";
+    logContext: Record<string, string | number | undefined>;
     attributes: Attributes;
     run: () => Promise<T>;
   }): Promise<T> {
@@ -202,13 +232,85 @@ export class ProcessManagerService<State> {
       `process ${this.definition.name} evolve`,
       { kind: SpanKind.INTERNAL, attributes: params.attributes },
       async (span) => {
+        const startedAt = performance.now();
         try {
-          return await params.run();
+          const result = await params.run();
+          const outcome =
+            (result as HandleResult).outcome === "duplicateEvent"
+              ? "duplicate_event"
+              : (result as HandleResult).outcome === "staleWake"
+                ? "stale_wake"
+                : (result as HandleResult).outcome === "revisionConflict"
+                  ? "revision_conflict"
+                  : "committed";
+          incrementEsProcessManagerTotal({
+            processName: this.definition.name,
+            inputKind: params.inputKind,
+            outcome,
+          });
+          if (outcome === "revision_conflict") {
+            this.logger.warn(
+              {
+                processName: this.definition.name,
+                inputKind: params.inputKind,
+                outcome,
+                ...params.logContext,
+              },
+              "Process-manager evolution hit a revision conflict",
+            );
+          }
+          return result;
         } catch (error) {
-          span.recordException(error as Error);
+          incrementEsProcessManagerTotal({
+            processName: this.definition.name,
+            inputKind: params.inputKind,
+            outcome: "failed",
+          });
+          const errorType =
+            error instanceof Error ? error.name : "NonErrorThrown";
+          const errorMessage =
+            error instanceof Error
+              ? error.message
+                  .replace(
+                    /\b(api[_-]?key|token|password|secret|authorization)\b\s*[:=]\s*\S+/gi,
+                    "$1=[REDACTED]",
+                  )
+                  .slice(0, 500)
+              : "A non-Error value was thrown";
+          span.recordException({
+            name: errorType,
+            message: errorMessage,
+          });
           span.setStatus({ code: SpanStatusCode.ERROR });
+          this.logger.error(
+            {
+              processName: this.definition.name,
+              inputKind: params.inputKind,
+              errorType,
+              errorMessage,
+              ...params.logContext,
+            },
+            "Process-manager evolution failed",
+          );
           throw error;
         } finally {
+          const durationMs = performance.now() - startedAt;
+          observeEsProcessManagerDuration({
+            processName: this.definition.name,
+            inputKind: params.inputKind,
+            durationMs,
+          });
+          if (durationMs >= SLOW_PROCESS_MANAGER_OPERATION_MS) {
+            this.logger.warn(
+              {
+                processName: this.definition.name,
+                inputKind: params.inputKind,
+                durationMs: Math.round(durationMs),
+                ...params.logContext,
+              },
+              "Process-manager evolution is slow",
+            );
+          }
           span.end();
         }
       },

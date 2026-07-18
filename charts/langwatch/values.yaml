@@ -1698,6 +1698,14 @@ gateway:
   secrets:
     existingSecretName: langwatch-app-secrets
 
+  ## @param gateway.security.blockLocalHTTPCalls [default: false] Reject tenant-supplied provider endpoints resolving to local/private networks. Keep false for local/self-hosted installs that intentionally use private services; set true for SaaS together with a restrictive gateway NetworkPolicy.
+  ## @param gateway.security.requireHTTPSCustomEndpoints [default: false] Require HTTPS for customer-configured provider endpoints. Hosted-cloud hardening; disabled by default for self-hosted compatibility.
+  ## @param gateway.security.allowedProxyHosts [array, default: []] Exact private endpoint hostnames allowed when blockLocalHTTPCalls is enabled. Cloud metadata remains blocked.
+  security:
+    blockLocalHTTPCalls: false
+    requireHTTPSCustomEndpoints: false
+    allowedProxyHosts: []
+
   # Trace export is OFF by default to keep the chart safe to install
   # without out-of-band auth-token plumbing. Earlier defaults pointed
   # at /api/otel without an auth token — the 401 storm from that

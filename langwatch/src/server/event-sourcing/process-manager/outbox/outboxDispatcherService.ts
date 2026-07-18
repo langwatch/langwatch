@@ -1,11 +1,17 @@
+import { performance } from "node:perf_hooks";
+import { createLogger, type Logger } from "@langwatch/observability";
 import {
   propagation,
   ROOT_CONTEXT,
   SpanKind,
   SpanStatusCode,
-  trace,
   type Tracer,
+  trace,
 } from "@opentelemetry/api";
+import {
+  incrementEsProcessOutboxTotal,
+  observeEsProcessOutboxDuration,
+} from "~/server/metrics";
 
 import type { JsonValue } from "../json";
 import type {
@@ -48,6 +54,7 @@ export interface OutboxDispatcherServiceOptions {
   /** How long a leased message stays invisible to other loops. Default 30s. */
   leaseDurationMs?: number;
   tracer?: Tracer;
+  logger?: Logger;
 }
 
 export interface DispatchReport {
@@ -58,6 +65,7 @@ export interface DispatchReport {
 
 const DEFAULT_MAX_ATTEMPTS = 10;
 const DEFAULT_LEASE_DURATION_MS = 30_000;
+const SLOW_OUTBOX_DELIVERY_MS = 10_000;
 
 function defaultRetryDelayMs({ attempt }: { attempt: number }): number {
   return Math.min(1_000 * 2 ** (attempt - 1), 60_000);
@@ -76,6 +84,7 @@ export class OutboxDispatcherService {
   private readonly retryDelayMs: (params: { attempt: number }) => number;
   private readonly leaseDurationMs: number;
   private readonly tracer: Tracer;
+  private readonly logger: Logger;
 
   constructor(options: OutboxDispatcherServiceOptions) {
     this.store = options.store;
@@ -85,9 +94,14 @@ export class OutboxDispatcherService {
     this.leaseDurationMs = options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
     this.tracer =
       options.tracer ?? trace.getTracer("langwatch.process-manager");
+    this.logger =
+      options.logger ?? createLogger("langwatch:event-sourcing:process-outbox");
   }
 
-  async runOnce(params: { now: number; limit?: number }): Promise<DispatchReport> {
+  async runOnce(params: {
+    now: number;
+    limit?: number;
+  }): Promise<DispatchReport> {
     const leased = await this.store.leaseDueMessages({
       now: params.now,
       limit: params.limit ?? 10,
@@ -113,7 +127,10 @@ export class OutboxDispatcherService {
       projectId: message.projectId,
       messageKey: message.messageKey,
     };
-    const remoteParent = propagation.extract(ROOT_CONTEXT, message.traceCarrier);
+    const remoteParent = propagation.extract(
+      ROOT_CONTEXT,
+      message.traceCarrier,
+    );
 
     await this.tracer.startActiveSpan(
       `process ${message.processName} dispatch ${message.intentType}`,
@@ -133,6 +150,7 @@ export class OutboxDispatcherService {
       },
       remoteParent,
       async (span) => {
+        const startedAt = performance.now();
         try {
           const handler = this.handlers[message.intentType];
           if (!handler) {
@@ -160,8 +178,27 @@ export class OutboxDispatcherService {
             now,
           });
           report.dispatched.push(message.messageKey);
+          incrementEsProcessOutboxTotal({
+            processName: message.processName,
+            intentType: message.intentType,
+            status: "dispatched",
+          });
         } catch (error) {
-          span.recordException(error as Error);
+          const errorType =
+            error instanceof Error ? error.name : "NonErrorThrown";
+          const errorMessage =
+            error instanceof Error
+              ? error.message
+                  .replace(
+                    /\b(api[_-]?key|token|password|secret|authorization)\b\s*[:=]\s*\S+/gi,
+                    "$1=[REDACTED]",
+                  )
+                  .slice(0, 500)
+              : "A non-Error value was thrown";
+          span.recordException({
+            name: errorType,
+            message: errorMessage,
+          });
           span.setStatus({ code: SpanStatusCode.ERROR });
           const dead = attempt >= this.maxAttempts;
           await this.store.markFailed({
@@ -172,7 +209,64 @@ export class OutboxDispatcherService {
             dead,
           });
           (dead ? report.dead : report.retried).push(message.messageKey);
+          incrementEsProcessOutboxTotal({
+            processName: message.processName,
+            intentType: message.intentType,
+            status: dead ? "dead" : "retried",
+          });
+          if (dead || attempt === 1) {
+            // Intentionally retain this opaque operational ID for delivery diagnostics.
+            const fields = {
+              processName: message.processName,
+              processKey: message.processKey,
+              projectId: message.projectId,
+              tenantId: message.tenantId,
+              userId: message.userId,
+              messageKey: message.messageKey,
+              sourceEventId: message.sourceEventId,
+              intentType: message.intentType,
+              attempt,
+              outcome: dead ? "dead" : "retry_scheduled",
+              errorType,
+              errorMessage,
+            };
+            if (dead) {
+              this.logger.error(
+                fields,
+                "Process-manager outbox message exhausted delivery attempts",
+              );
+            } else {
+              this.logger.warn(
+                fields,
+                "Process-manager outbox delivery failed; retry scheduled",
+              );
+            }
+          }
         } finally {
+          const durationMs = performance.now() - startedAt;
+          observeEsProcessOutboxDuration({
+            processName: message.processName,
+            intentType: message.intentType,
+            durationMs,
+          });
+          if (durationMs >= SLOW_OUTBOX_DELIVERY_MS) {
+            // Intentionally retain this opaque operational ID for slow-delivery diagnostics.
+            this.logger.warn(
+              {
+                processName: message.processName,
+                processKey: message.processKey,
+                projectId: message.projectId,
+                tenantId: message.tenantId,
+                userId: message.userId,
+                messageKey: message.messageKey,
+                sourceEventId: message.sourceEventId,
+                intentType: message.intentType,
+                attempt,
+                durationMs: Math.round(durationMs),
+              },
+              "Process-manager outbox delivery is slow",
+            );
+          }
           span.end();
         }
       },

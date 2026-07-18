@@ -3,6 +3,7 @@ package aigateway
 import (
 	"context"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/pkg/clog"
@@ -11,13 +12,16 @@ import (
 
 // Config is the top-level service configuration.
 type Config struct {
-	Environment         string                    `env:"ENVIRONMENT"`
-	Server              config.Server             `env:"SERVER"`
-	Log                 clog.Config               `env:"LOG"`
-	ControlPlane        ControlPlaneConfig        `env:"LW_GATEWAY"`
-	AuthCache           AuthCacheConfig           `env:"LW_GATEWAY_AUTH_CACHE"`
-	CustomerTraceBridge CustomerTraceBridgeConfig `env:"CUSTOMER_TRACE_BRIDGE"`
-	OTel                config.OTel               `env:"OTEL"`
+	Environment                   string                    `env:"ENVIRONMENT"`
+	BlockLocalHTTPCalls           bool                      `env:"BLOCK_LOCAL_HTTP_CALLS"`
+	RequireHTTPSCustomerEndpoints bool                      `env:"REQUIRE_HTTPS_CUSTOM_ENDPOINTS"`
+	AllowedProxyHosts             string                    `env:"ALLOWED_PROXY_HOSTS"`
+	Server                        config.Server             `env:"SERVER"`
+	Log                           clog.Config               `env:"LOG"`
+	ControlPlane                  ControlPlaneConfig        `env:"LW_GATEWAY"`
+	AuthCache                     AuthCacheConfig           `env:"LW_GATEWAY_AUTH_CACHE"`
+	CustomerTraceBridge           CustomerTraceBridgeConfig `env:"CUSTOMER_TRACE_BRIDGE"`
+	OTel                          config.OTel               `env:"OTEL"`
 }
 
 // ControlPlaneConfig holds control plane connection settings.
@@ -70,6 +74,13 @@ func defaultConfig() Config {
 			SampleRatio: 1.0, // overridden to 0.1 for non-local in LoadConfig
 		},
 	}
+}
+
+func splitAllowedHosts(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	return strings.Split(value, ",")
 }
 
 // LoadConfig hydrates configuration from environment variables and validates it.

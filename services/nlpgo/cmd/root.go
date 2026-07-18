@@ -36,13 +36,17 @@ func Root(ctx context.Context, _ []string) error {
 	// Override the OTel-facing service.name. The mono-binary subcommand
 	// is `nlpgo` (Helm chart, Lambda task, dev shell invoke `service
 	// nlpgo`), but everywhere operators look at this service — charts,
-	// architecture diagrams, deployment names — it's "langwatch_nlp".
+	// architecture diagrams, deployment names — it's "langwatch-service-nlp".
 	// Studio's trace drawer reads `service.name` for its SERVICE column,
 	// so the "nlpgo" label there leaked an implementation detail of the
 	// Python→Go migration (rchaves dogfood 2026-05-14). Keep the binary
 	// command name as-is and rename only the public-facing identity.
-	info.Service = "langwatch_nlp"
+	info.Service = "langwatch-service-nlp"
 	ctx = contexts.SetServiceInfo(ctx, *info)
+	allowedProxyHosts := splitCSV(cfg.AllowedProxyHosts)
+	if len(allowedProxyHosts) == 0 {
+		allowedProxyHosts = splitCSV(cfg.Engine.AllowedProxyHosts)
+	}
 
 	ctx, deps, err := nlpgo.NewDeps(ctx, cfg)
 	if err != nil {
@@ -51,7 +55,7 @@ func Root(ctx context.Context, _ []string) error {
 
 	httpExec := httpblock.New(httpblock.Options{
 		SSRF: httpblock.SSRFOptions{
-			AllowedHosts: splitCSV(cfg.Engine.AllowedProxyHosts),
+			AllowedHosts: allowedProxyHosts,
 		},
 	})
 	codeExec, err := codeblock.New(codeblock.Options{
@@ -66,7 +70,12 @@ func Root(ctx context.Context, _ []string) error {
 	// Go process and dispatches directly to providers using the
 	// per-request credentials llmexecutor builds from the workflow's
 	// litellm_params. No HMAC, no fourth server, no public hop.
-	disp, err := dispatcher.New(ctx, dispatcher.Options{Logger: deps.Logger})
+	disp, err := dispatcher.New(ctx, dispatcher.Options{
+		Logger:                        deps.Logger,
+		BlockLocalHTTPCalls:           cfg.BlockLocalHTTPCalls,
+		RequireHTTPSCustomerEndpoints: cfg.RequireHTTPSCustomerEndpoints,
+		AllowedEndpointHosts:          allowedProxyHosts,
+	})
 	if err != nil {
 		return err
 	}
@@ -91,7 +100,7 @@ func Root(ctx context.Context, _ []string) error {
 		// Remote prompt attachments are fetched under the same SSRF policy
 		// (and customer allow-list) as the HTTP block.
 		SSRF: httpblock.SSRFOptions{
-			AllowedHosts: splitCSV(cfg.Engine.AllowedProxyHosts),
+			AllowedHosts: allowedProxyHosts,
 		},
 		Code:             codeExec,
 		LLM:              llm,

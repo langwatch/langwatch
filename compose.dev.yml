@@ -44,8 +44,8 @@ x-common-env: &common-env
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
   NODE_ENV: development
   SKIP_TIKTOKEN: 'true'
-  # Prod-like dev: IS_SAAS=true (from langwatch/.env) requires SSRF blocking.
-  BLOCK_LOCAL_HTTP_CALLS: "true"
+  # Customer-egress policy is sourced from langwatch/.env. Do not override it
+  # here: local/self-hosted setups may intentionally use private HTTP endpoints.
   # NOTE: infrastructure URLs (DATABASE_URL, REDIS_URL, CLICKHOUSE_URL,
   # LANGWATCH_NLP_SERVICE, LANGEVALS_ENDPOINT) are NOT set here. The
   # contributor's `langwatch/.env` is the source of truth — `quickstart`

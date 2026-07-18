@@ -20,6 +20,9 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	if cfg.ControlPlane.BaseURL != "http://localhost:5560" {
 		t.Errorf("ControlPlane.BaseURL default = %q, want http://localhost:5560", cfg.ControlPlane.BaseURL)
 	}
+	if cfg.BlockLocalHTTPCalls {
+		t.Error("BlockLocalHTTPCalls default = true, want false for local/self-hosted compatibility")
+	}
 }
 
 // Canonical env vars (post-Hydrate) should land on the right struct fields.
@@ -30,6 +33,9 @@ func TestLoadConfig_CanonicalEnv(t *testing.T) {
 	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
 	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
 	t.Setenv("OTEL_OTLP_ENDPOINT", "http://canon.otel.example.com")
+	t.Setenv("BLOCK_LOCAL_HTTP_CALLS", "true")
+	t.Setenv("REQUIRE_HTTPS_CUSTOM_ENDPOINTS", "true")
+	t.Setenv("ALLOWED_PROXY_HOSTS", "llm.internal,10.0.0.5")
 
 	cfg, err := LoadConfig(context.Background())
 	if err != nil {
@@ -43,6 +49,15 @@ func TestLoadConfig_CanonicalEnv(t *testing.T) {
 	}
 	if cfg.OTel.OTLPEndpoint != "http://canon.otel.example.com" {
 		t.Errorf("OTel.OTLPEndpoint = %q, want http://canon.otel.example.com", cfg.OTel.OTLPEndpoint)
+	}
+	if !cfg.BlockLocalHTTPCalls {
+		t.Error("BlockLocalHTTPCalls = false, want true from canonical env")
+	}
+	if !cfg.RequireHTTPSCustomerEndpoints {
+		t.Error("RequireHTTPSCustomerEndpoints = false, want true from hosted-cloud env")
+	}
+	if cfg.AllowedProxyHosts != "llm.internal,10.0.0.5" {
+		t.Errorf("AllowedProxyHosts = %q, want configured exact-host list", cfg.AllowedProxyHosts)
 	}
 }
 
@@ -120,6 +135,9 @@ func clearGatewayEnv(t *testing.T) {
 		"OTEL_OTLP_HEADERS",
 		"OTEL_SAMPLE_RATIO",
 		"ENVIRONMENT",
+		"BLOCK_LOCAL_HTTP_CALLS",
+		"REQUIRE_HTTPS_CUSTOM_ENDPOINTS",
+		"ALLOWED_PROXY_HOSTS",
 		"GATEWAY_LISTEN_ADDR",
 		"GATEWAY_CONTROL_PLANE_URL",
 		"GATEWAY_LOG_LEVEL",
