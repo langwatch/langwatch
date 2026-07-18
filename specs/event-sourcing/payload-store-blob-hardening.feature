@@ -91,7 +91,7 @@ Feature: GroupQueue blob-handling hardening
     Given a holder takes a lease and dies without releasing it
     When its lease and the Redis backstop TTL elapse without renewal
     Then the lease expires
-    And the blob is reclaimed no later than the lease TTL plus the sweep interval
+    And the blob is reclaimed no later than the Redis backstop TTL
 
   @integration @track3 @unimplemented
   Scenario: Dispatch refreshes the holder lease as well as the blob

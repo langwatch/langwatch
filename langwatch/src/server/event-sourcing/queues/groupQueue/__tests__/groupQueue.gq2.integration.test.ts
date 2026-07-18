@@ -32,7 +32,13 @@ const hasTestcontainers = !!(
   process.env.CI_REDIS_URL
 );
 
-type TestPayload = { id: string; groupId: string; value: string };
+type TestPayload = {
+  id: string;
+  groupId: string;
+  value: string;
+  __jobType?: string;
+  __jobName?: string;
+};
 
 // > the 4 KiB inline ceiling, < the 256 KiB s3 threshold → redis tier (inspectable).
 const OFFLOADED_VALUE = "x".repeat(8 * 1024);
@@ -185,6 +191,8 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
             id: "same-payload",
             groupId: TENANT_GROUP,
             value: OFFLOADED_VALUE,
+            __jobType: "reactor",
+            __jobName: `shared-payload-${i}`,
           });
         }
 
@@ -193,6 +201,9 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
           const keys = await leaseKeys(name);
           expect(keys).toHaveLength(1);
           expect(await redis.zcard(keys[0]!)).toBe(3);
+          expect(
+            await redis.zcard(`${name}:gq:group:${TENANT_GROUP}:jobs`),
+          ).toBe(3);
         });
       });
     });
