@@ -1,6 +1,6 @@
 import { TriggerAction } from "@prisma/client";
 import { z } from "zod";
-import { NOTIFICATION_CADENCES } from "~/automations/cadences";
+import { NOTIFICATION_CADENCES } from "~/shared/automations/cadences";
 
 import { EventSchema } from "../../../domain/types";
 import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "./constants";

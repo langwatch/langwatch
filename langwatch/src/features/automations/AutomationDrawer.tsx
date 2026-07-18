@@ -17,15 +17,15 @@ import {
   MIN_TRACE_DEBOUNCE_MS,
   NOTIFICATION_CADENCES,
   type NotificationCadence,
-} from "~/automations/cadences";
+} from "~/shared/automations/cadences";
 import {
   CLIENT_PROVIDERS,
   type NotifyPreview,
-} from "~/automations/providers/client";
+} from "~/features/automations/providers/registry";
 import {
   type ConfigFormCtx,
   isNotifyEntry,
-} from "~/automations/providers/types";
+} from "~/features/automations/providers/types";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";

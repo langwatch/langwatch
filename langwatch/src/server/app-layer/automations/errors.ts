@@ -70,6 +70,39 @@ export class InvalidEmailRecipientError extends HandledError {
   }
 }
 
+export class MissingSlackBotTokenError extends HandledError {
+  declare readonly code: "missing_slack_bot_token";
+
+  constructor() {
+    super(
+      "missing_slack_bot_token",
+      "A Slack bot token is required for a bot connection.",
+      { meta: { field: "slackBotToken" }, httpStatus: 422 },
+    );
+    this.name = "MissingSlackBotTokenError";
+  }
+}
+
+/**
+ * A provider's `persistActionParams` hook rejected the wire payload — e.g.
+ * webhook kept-header sentinels after the destination URL changed. Carries
+ * the offending field so the drawer can target it.
+ */
+export class InvalidActionParamsError extends HandledError {
+  declare readonly code: "invalid_action_params";
+
+  constructor(
+    message: string,
+    public readonly field?: string,
+  ) {
+    super("invalid_action_params", message, {
+      meta: { field },
+      httpStatus: 422,
+    });
+    this.name = "InvalidActionParamsError";
+  }
+}
+
 export class MissingSlackWebhookError extends HandledError {
   declare readonly code: "missing_slack_webhook";
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CADENCE_WINDOW_MS,
   NOTIFICATION_CADENCES,
-} from "~/automations/cadences";
+} from "~/shared/automations/cadences";
 import {
   computeScheduledFor,
   NOTIFY_TRIGGER_ACTIONS,

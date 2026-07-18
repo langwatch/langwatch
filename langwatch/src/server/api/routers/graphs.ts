@@ -1,8 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { redactSlackActionParams } from "~/automations/providers/definitions/slack/secret";
-import { type SlackActionParams } from "~/automations/providers/definitions/slack/shared";
+import { redactSlackActionParams } from "~/server/app-layer/automations/providers/slack/server";
+import { type SlackActionParams } from "~/shared/automations/providers/slack";
 import { type FilterField, filterFieldsEnum } from "../../filters/types";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";

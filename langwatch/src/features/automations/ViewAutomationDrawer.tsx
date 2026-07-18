@@ -14,7 +14,7 @@ import { TriggerKind } from "@prisma/client";
 import { differenceInMinutes, differenceInSeconds } from "date-fns";
 import { useState } from "react";
 import { Calendar, TrendingUp } from "react-feather";
-import { CLIENT_PROVIDERS } from "~/automations/providers/client";
+import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "~/components/ui/tooltip";

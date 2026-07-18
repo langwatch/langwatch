@@ -2,7 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import {
   NOTIFICATION_CADENCES,
   type NotificationCadence,
-} from "~/automations/cadences";
+} from "~/shared/automations/cadences";
 import type { TriggerFilters } from "~/server/filters/types";
 import {
   graphAlertIncidentKey,

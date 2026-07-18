@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { CADENCE_LABELS } from "~/automations/cadences";
+import { CADENCE_LABELS } from "~/shared/automations/cadences";
 import {
   GRAPH_ALERT_TIME_PERIODS,
   type GraphAlertOperator,

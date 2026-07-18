@@ -1,9 +1,9 @@
 import { useShallow } from "zustand/react/shallow";
-import { CLIENT_PROVIDERS } from "~/automations/providers/client";
+import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import {
   isNotifyEntry,
   type NotifyClientEntry,
-} from "~/automations/providers/types";
+} from "~/features/automations/providers/types";
 import {
   cadenceIsSet,
   conditionsAreSet,

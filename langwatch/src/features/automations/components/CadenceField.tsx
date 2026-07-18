@@ -4,7 +4,7 @@ import {
   CADENCE_LABELS,
   NOTIFICATION_CADENCES,
   type NotificationCadence,
-} from "~/automations/cadences";
+} from "~/shared/automations/cadences";
 import { Select } from "~/components/ui/select";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";

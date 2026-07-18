@@ -26,11 +26,11 @@
 import type { CustomGraph, Project, Trigger } from "@prisma/client";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
-import { decryptSlackBotToken } from "~/automations/providers/definitions/slack/secret";
+import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import {
   type SlackActionParams,
   slackDeliveryMethodOf,
-} from "~/automations/providers/definitions/slack/shared";
+} from "~/shared/automations/providers/slack";
 import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
 import {
   aggregateSeriesValues,

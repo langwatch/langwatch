@@ -3,7 +3,7 @@ import { TriggerAction } from "@prisma/client";
 import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
-} from "~/automations/cadences";
+} from "~/shared/automations/cadences";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import { queryNeeds } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";

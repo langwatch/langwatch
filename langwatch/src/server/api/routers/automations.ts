@@ -8,9 +8,13 @@ import {
   MIN_TRACE_DEBOUNCE_MS,
   NOTIFICATION_CADENCES,
   type NotificationCadence,
-} from "~/automations/cadences";
-import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
-import { actionParamsSchemaFor } from "~/automations/providers/server";
+} from "~/shared/automations/cadences";
+import { EMAIL_RX } from "~/shared/automations/providers/email";
+import {
+  actionParamsSchemaFor,
+  persistActionParamsFor,
+  redactActionParamsFor,
+} from "~/server/app-layer/automations/providers/registry";
 import { getApp } from "~/server/app-layer/app";
 import { HandledError } from "~/server/app-layer/handled-error";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
@@ -22,26 +26,13 @@ import {
   ProjectNotFoundError,
 } from "~/server/app-layer/automations/errors";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
-import {
-  decryptSlackBotToken,
-  persistSlackActionParams,
-  redactSlackActionParams,
-  slackBotTokenMissing,
-} from "~/automations/providers/definitions/slack/secret";
-import {
-  type SlackActionParams,
-  slackDeliveryMethodOf,
-} from "~/automations/providers/definitions/slack/shared";
+import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
+import { type SlackActionParams } from "~/shared/automations/providers/slack";
 import {
   decryptWebhookHeaders,
-  persistWebhookActionParams,
-  redactWebhookActionParams,
   type WebhookStoredActionParams,
-} from "~/automations/providers/definitions/webhook/secret";
-import {
-  WEBHOOK_HEADER_VALUE_KEPT,
-  type WebhookActionParams,
-} from "~/automations/providers/definitions/webhook/shared";
+} from "~/server/app-layer/automations/providers/webhook/server";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "~/shared/automations/providers/webhook";
 import {
   buildGraphAlertTriggerData,
   type GraphAlertActionParams,
@@ -73,30 +64,20 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
 import { buildRetryAfterMessage } from "./rateLimitMessage";
 
-/** Strip secrets from a trigger row before it leaves the server: the
- *  encrypted Slack bot token (ADR-041) and webhook header values (ADR-040 §3
- *  — names echo with the kept sentinel, values never return). No-op for every
- *  other action. */
+/** Strip secrets from a trigger row before it leaves the server via the
+ *  provider registry's redact hook: the encrypted Slack bot token (ADR-041)
+ *  and webhook header values (ADR-040 §3 — names echo with the kept
+ *  sentinel, values never return). Identity for every other action. */
 function redactTriggerForRead<
   T extends { action: TriggerAction; actionParams: unknown },
 >(trigger: T): T {
-  if (trigger.action === TriggerAction.SEND_SLACK_MESSAGE) {
-    return {
-      ...trigger,
-      actionParams: redactSlackActionParams(
-        (trigger.actionParams ?? {}) as SlackActionParams,
-      ),
-    };
-  }
-  if (trigger.action === TriggerAction.SEND_WEBHOOK) {
-    return {
-      ...trigger,
-      actionParams: redactWebhookActionParams(
-        (trigger.actionParams ?? {}) as WebhookStoredActionParams,
-      ),
-    };
-  }
-  return trigger;
+  return {
+    ...trigger,
+    actionParams: redactActionParamsFor(
+      trigger.action,
+      trigger.actionParams ?? {},
+    ),
+  };
 }
 
 const templateDraftSchema = z.object({
@@ -1082,58 +1063,22 @@ export const automationRouter = createTRPCRouter({
       // keep the stored ciphertext when the field was left blank on edit), and
       // reject a bot connection saved with no token at all. The token is never
       // returned to the client, so honouring "kept" means reading the saved row.
-      let slackActionParams: SlackActionParams | null = null;
-      if (input.action === TriggerAction.SEND_SLACK_MESSAGE) {
-        const incoming = input.actionParams as SlackActionParams;
-        const existing =
-          input.triggerId && slackDeliveryMethodOf(incoming) === "bot"
-            ? ((
+      // Provider persist hooks (ADR-041 / ADR-040 §3): encrypt secrets,
+      // resolve kept sentinels against the saved row (loaded lazily only
+      // when a provider needs it), and reject invalid payloads (missing bot
+      // token, kept headers after a URL change) as typed HandledErrors.
+      const storedActionParams = await persistActionParamsFor(input.action, {
+        incoming: parsedActionParams,
+        loadExisting: async () =>
+          input.triggerId
+            ? (
                 await ctx.prisma.trigger.findUnique({
                   where: { id: input.triggerId, projectId: input.projectId },
                   select: { actionParams: true },
                 })
-              )?.actionParams as SlackActionParams | undefined)
-            : undefined;
-        if (slackBotTokenMissing({ incoming, existing })) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "A Slack bot token is required for a bot connection.",
-          });
-        }
-        slackActionParams = persistSlackActionParams({ incoming, existing });
-      }
-
-      // ADR-040 §3 webhook header secrets: resolve kept sentinels against the
-      // saved row, then encrypt the record — plaintext header values never
-      // persist and never return to the client (same discipline as the Slack
-      // bot token above).
-      let webhookActionParams: WebhookStoredActionParams | null = null;
-      if (input.action === TriggerAction.SEND_WEBHOOK) {
-        const incoming = parsedActionParams as unknown as WebhookActionParams;
-        const hasKept = Object.values(incoming.headers ?? {}).some(
-          (v) => v === WEBHOOK_HEADER_VALUE_KEPT,
-        );
-        const existing =
-          input.triggerId && hasKept
-            ? ((
-                await ctx.prisma.trigger.findUnique({
-                  where: { id: input.triggerId, projectId: input.projectId },
-                  select: { actionParams: true },
-                })
-              )?.actionParams as WebhookStoredActionParams | undefined)
-            : undefined;
-        if (hasKept && existing?.url !== incoming.url) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              "Re-enter webhook header values after changing the destination URL.",
-          });
-        }
-        webhookActionParams = persistWebhookActionParams({
-          incoming,
-          existing,
-        });
-      }
+              )?.actionParams
+            : undefined,
+      });
 
       // Annotation-queue dispatch attributes created queue items to a user
       // and skips the action when `createdByUserId` is absent. The drawer's
@@ -1146,14 +1091,10 @@ export const automationRouter = createTRPCRouter({
       let actionParams: Record<string, unknown> =
         input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE
           ? {
-              ...parsedActionParams,
+              ...(storedActionParams as Record<string, unknown>),
               createdByUserId: ctx.session?.user.id,
             }
-          : slackActionParams
-            ? { ...slackActionParams }
-            : webhookActionParams
-              ? { ...webhookActionParams }
-              : { ...parsedActionParams };
+          : { ...(storedActionParams as Record<string, unknown>) };
 
       // Graph alerts: route the row shape through the SSOT builder so it's
       // byte-identical to what `graphs.updateById` writes on the dashboard

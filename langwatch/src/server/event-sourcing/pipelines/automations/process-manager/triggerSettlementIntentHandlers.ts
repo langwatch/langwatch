@@ -1,10 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "@prisma/client";
 import { createHash } from "crypto";
-import { decryptSlackBotToken } from "~/automations/providers/definitions/slack/secret";
-import { slackDeliveryMethodOf } from "~/automations/providers/definitions/slack/shared";
-import { decryptWebhookHeaders } from "~/automations/providers/definitions/webhook/secret";
-import type { WebhookMethod } from "~/automations/providers/definitions/webhook/shared";
+import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
+import { slackDeliveryMethodOf } from "~/shared/automations/providers/slack";
+import { decryptWebhookHeaders } from "~/server/app-layer/automations/providers/webhook/server";
+import type { WebhookMethod } from "~/shared/automations/providers/webhook";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";

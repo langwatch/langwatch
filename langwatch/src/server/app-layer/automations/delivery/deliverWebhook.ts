@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   redactHeadersForLog,
   type WebhookMethod,
-} from "~/automations/providers/definitions/webhook/shared";
+} from "~/shared/automations/providers/webhook";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { WebhookDeliveryInput } from "~/server/app-layer/automations/repositories/webhook-delivery.repository";
 import {

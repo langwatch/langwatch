@@ -1,5 +1,5 @@
 import type { AlertType, TriggerAction, TriggerKind } from "@prisma/client";
-import type { NotificationCadence } from "~/automations/cadences";
+import type { NotificationCadence } from "~/shared/automations/cadences";
 import type { TriggerFilters } from "~/server/filters/types";
 
 export interface TriggerSummary {

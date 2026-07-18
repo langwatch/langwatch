@@ -4,7 +4,7 @@ import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import {
   decryptWebhookHeaders,
   type WebhookStoredActionParams,
-} from "~/automations/providers/definitions/webhook/secret";
+} from "~/server/app-layer/automations/providers/webhook/server";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import type { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import type { sendWebhook } from "~/server/app-layer/automations/delivery/sendWebhook";
