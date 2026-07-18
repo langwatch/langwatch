@@ -1,6 +1,9 @@
 # ADR-039: Outbox heartbeat primitive
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-052](./052-automations-on-process-manager-substrate.md)
+
+> ⚠️ The heartbeat scheduler, registry and Redis leader lock described here were deleted.
+> Scheduled work now runs as an ADR-052 process manager.
 - **Date:** 2026-07-07
 - **Related:** ADR-030 (transactional outbox), ADR-034 (event-sourced analytics materialization — the consumer that motivated this primitive)
 - **Behavioural contract:** [specs/triggers/event-sourced-graph-triggers.feature](../../../specs/triggers/event-sourced-graph-triggers.feature)

@@ -12,7 +12,7 @@
 
 Sixteen event-sourcing ADRs have accumulated over five months. They contradict each other, and the contradictions are load-bearing rather than cosmetic.
 
-- **ADR-007, the document every other ADR cites as the foundation, is substantially false.** It describes fold projections on "a GroupQueue (BullMQ + Redis)" and map projections on "a SimpleQueue (BullMQ)". There are zero `bullmq` imports under `event-sourcing/` and no `SimpleQueue` module. It states "fold state = stored data" and "the fold state serves as both data store and checkpoint", but two folds return `null` from `get()` unconditionally (`pipelines/shared/analyticsStoreBase.ts:153-158`, `traceAnalytics.store.ts:99-104`). It states "reactors only fire on success", which ADR-039's heartbeat contradicts by dispatching with no triggering event. Its status still reads `Accepted`, with no amendment block.
+- **ADR-007, the document every other ADR cites as the foundation, is substantially false.** It describes fold projections on "a GroupQueue (BullMQ + Redis)" and map projections on "a SimpleQueue (BullMQ)". There are zero `bullmq` imports under `event-sourcing/` and no `SimpleQueue` module. It states "fold state = stored data" and "the fold state serves as both data store and checkpoint", but two folds return `null` from `get()` unconditionally (`pipelines/shared/analyticsStoreBase.ts:153-158`, `traceAnalytics.store.ts:99-104`). It states "reactors only fire on success", which ADR-039's heartbeat contradicts by dispatching with no triggering event. 
 - **"Source of truth" is asserted four times with four referents** — fold state (`007:37,65`), `event_log` (`022:24,140`), the GroupQueue and the PG audit row (`030b:38`).
 - **Numbering collisions force ad-hoc disambiguation.** Two ADR-022s both govern ClickHouse durability of trace data; `040-durable-stored-object-offload:7` cites both in one sentence and invents a naming scheme to tell them apart. Three ADR-026s, two in this subsystem, same date, same status. Two ADR-030s, both event-sourcing.
 - **Two `Proposed` ADRs (029, 030a) are fully shipped**, and `029:7` supersedes an `Accepted` ADR's Decision section while itself remaining `Proposed`.
@@ -61,67 +61,29 @@ Every prior attempt picked a corner and patched around the cost. The escape is n
 
 ## Decision
 
-**The fold cache entry is evicted when ClickHouse is confirmed to hold the state — not when a timer expires.**
+**The fold cache stays a cache. Redelivery is closed at the event level instead.**
 
-Today a TTL removes the entry on a schedule unrelated to durability, so a miss carries no information: the row might be present, might be inside the ~200ms `async_insert` flush window, might be lossy. Under this decision the only thing that removes a cache entry is confirmation that the durable tier has the state.
+Durability-gated eviction — releasing a cached entry only once every ClickHouse
+replica is confirmed to hold the state, so that a miss *proves* the durable
+store authoritative — was built and then removed. It does not survive the
+deployment reality: the npx installer ships Redis with `allkeys-lru`, Redis is a
+single instance shared with the queues, and the chart default is one
+non-replicated ClickHouse node. Its probe was also inert, reading `UpdatedAt`
+(a `DateTime64(3)`) raw so every comparison parsed to `NaN`. Recorded here as
+considered-and-rejected so it is not rediscovered as a good idea.
 
-**Therefore a cache miss is a proof that ClickHouse holds the state, and reading the durable row on a miss is correct by construction.**
+What ships instead: the cache entry carries the ids of the events folded into
+it, scoped to a retry chain. A fresh delivery replaces that set — the queue
+holds one active batch per group, so a fresh delivery means the previous batch
+acked and its ids can never return. A retry merges into it. The chain is
+identified by a group-scoped attempt counter, because a re-staged sibling
+carries no attempt of its own.
 
-Everything else falls out. No `wait_for_async_insert=1`. No `insert_quorum`. No `select_sequential_consistency`. No refold on the steady-state path. No checkpoint column, and no per-aggregate sequence number — which is fortunate, because none exists for traces, analytics, or logs: their events carry a KSUID `id` and an `occurredAt`, both creation-ordered rather than per-aggregate, and both defeated by late delivery.
-
-### The confirmation processor
-
-**Registration.** On `store()`, alongside the Redis `SET`, the fold `ZADD`s the aggregate id into a pending-confirmation sorted set scored `now + checkDelay`. One extra Redis op on a path already performing a SET.
-
-**Draining.** A processor takes due entries via `ZRANGEBYSCORE`, groups them by tenant, and issues one batched query per group.
-
-**The check MUST establish the row is on every replica, not on whichever replica answered.** Reads are load-balanced across replicas behind an NLB, so confirming against one node and deleting the cache would let a later read land on a laggard and see stale or absent state — exactly the loss the cache exists to prevent. Confirmation takes the **laggard's** position, not the leader's:
-
-```sql
-SELECT TraceId, min(mx) AS slowest, uniqExact(host) AS replicas_seen FROM (
-  SELECT TraceId, hostName() AS host, max(UpdatedAt) AS mx
-  FROM clusterAllReplicas({cluster}, {db}.trace_summaries)
-  WHERE TenantId = {tenantId:String} AND TraceId IN ({ids:Array(String)})
-  GROUP BY TraceId, host
-) GROUP BY TraceId
-```
-
-Confirmed requires **both** `slowest >= cached.UpdatedAt` **and** `replicas_seen` equal to the expected replica count — a replica missing the row entirely contributes no group, so the count guard is what distinguishes "all replicas have it" from "the replicas that answered have it". Confirmed → `DEL` the cache key and `ZREM` the entry. Unconfirmed → re-score with backoff. One query per batch, never per aggregate.
-
-Where `CLICKHOUSE_CLUSTER` is unset the table is unreplicated and the check is trivially satisfied by a plain `max(UpdatedAt)`.
-
-`UpdatedAt` is reused deliberately: it already exists on every fold row and is already the `ReplacingMergeTree` dedup key, so no new column and no version bump.
-
-The ADR-039 outbox heartbeat is a periodic, Redis-locked, worker-only scheduler and is the natural host.
-
-**`checkDelay`** must clear the `async_insert` flush window (~200ms) comfortably so the first check usually succeeds. A few seconds suffices and keeps re-checks rare.
-
-**Hot aggregates need no special handling.** A trace still folding re-`ZADD`s on every write, updating its score and pushing the check out. Active aggregates are never considered, and the key survives exactly as long as it is needed — the opposite of today's behaviour, where a 300s TTL evicts mid-flight on precisely the longest traces.
-
-### Failure modes are all conservative
-
-| Failure | Effect |
-|---|---|
-| Read hits a stale replica, under-reporting `max(UpdatedAt)` | key retained |
-| Processor down | keys retained |
-| ClickHouse slow or lagging | keys retained |
-| Backstop TTL fires | degrades to today's behaviour, and is instrumented |
-
-Every path fails toward *keep the cache*, which is the safe direction. The one unsafe path is Redis evicting these keys under memory pressure before confirmation, which reintroduces today's hole — so `maxmemory-policy` becomes load-bearing and must not evict them.
-
-### Memory
-
-The working set **shrinks**. Redis holds one state per aggregate either way; today it is retained for 300s after the last write, whereas confirmation removes it seconds after. The retained set under this decision is a strict subset of the retained set today. The backstop TTL therefore stops being a working-set parameter and becomes purely a leak guard, so it can be generous. The only new memory is the pending-confirmation sorted set — ids and scores.
-
-### The retry hole, and its closure
-
-If the processor confirms and deletes between a fold's durable write and a **retry** of that fold, the retry reads already-applied state from ClickHouse and double-counts. Retry backoff runs to 600s (`queues/shared.ts:17-21`), so this is not hypothetical.
-
-**Closure: the processor skips aggregates with in-flight queue jobs.** The GroupQueue already tracks active, staged and blocked groups; the processor consults that and leaves those keys alone. No new lifecycle state.
-
-Rejected alternative: shrink the entry to a marker carrying only the applied-event-ids on a TTL exceeding max retry backoff. It works and costs a few hundred bytes per recently-confirmed aggregate, but it introduces a second entry shape for a case the liveness check already covers.
-
-Independently, `__attempt` must survive sibling restaging (`groupQueue.ts:1318-1325`) so the 25-attempt budget cannot reset. That is a retry-accounting bug on its own merits.
+This closes the warm path — the overwhelmingly common redelivery — and leaves
+the cold path open: the set lives in the cache entry, so eviction or Redis loss
+takes it too, degrading to the behaviour that existed before it rather than to
+something worse. Closing the cold path means making the folds idempotent, which
+is the real work and is sequenced in `dev/docs/plans/fold-idempotency-plan.md`.
 
 ### What stays refold-only
 
@@ -135,7 +97,7 @@ They keep `refoldOnStoreMiss: true`, which is their behaviour today — so this 
 
 1. **`event_log` is the sole durable source of truth.** Every other store — ClickHouse projection tables, the fold cache, the PG outbox audit projection, queue payload blobs — is derived and may be discarded and rebuilt. Where a component must hold state that cannot be reconstructed (a dispatch that reached a customer), it is an *anchor*, not a projection, and must be named as one. Replaces the four competing claims in `007:37,65`, `022:24,140`, `030b:38`.
 
-2. **A fold cache entry is evicted only on confirmed durability.** A cache miss therefore proves the durable tier holds the state, and reading it is correct. Time-based expiry survives solely as a leak backstop.
+2. **The fold cache is an optimisation, and a miss carries no durability information.** It expires on a TTL (300s default, `LANGWATCH_FOLD_CACHE_TTL_SECONDS`); a miss falls through to the durable store. Nothing may be built on the assumption that a miss proves anything — that assumption was tried and does not survive the deployment reality (see the Decision).
 
 3. **`apply` MUST be idempotent per `(aggregate, event id)` where redelivery can reach it.** Determinism is not sufficient and never was. Under invariant 2 the steady-state paths are closed structurally; the applied-event-id set in the cache entry closes redelivery against a live entry, and the processor's liveness check closes it against a confirmed-and-deleted one.
 
@@ -147,7 +109,7 @@ They keep `refoldOnStoreMiss: true`, which is their behaviour today — so this 
 
 4. **Refold from the event log is the exception path, not the miss path.** If it fires in steady state, that is a defect. The two analytics folds are the known exception, pending the ADR-034 follow-up.
 
-5. **Replication consistency is established asynchronously, off the write path.** `wait_for_async_insert=1`, `insert_quorum` and `select_sequential_consistency` stay out of the fold write path — measured-bad in #2751 and #2899, and re-proposing any of them requires new measurement rather than new argument (the `experiment_runs` exception is deliberate and documented). The *same guarantee* is instead obtained by the confirmation processor, which must establish that every replica holds the row before the cache entry is released. This is the identical consistency property moved to where it is free: the fold never waits, and a slow or lagging replica merely retains a cache entry.
+5. **Replication consistency is established asynchronously, off the write path.** `wait_for_async_insert=1`, `insert_quorum` and `select_sequential_consistency` stay out of the fold write path — measured-bad in #2751 and #2899, and re-proposing any of them requires new measurement rather than new argument (the `experiment_runs` exception is deliberate and documented). No equivalent guarantee is obtained elsewhere: a fold that misses its cache and reads a lagging replica can still fold onto stale state. That exposure is pre-existing, unclosed, and the reason invariant 3 exists — closing it properly means idempotent folds, not a cleverer cache.
 
 6. **Reactors are at-least-once and MUST be idempotent.** `007:98` ("reactors only fire on success") is retired: ADR-039's heartbeat dispatches with no triggering fold, and reactor failure re-runs a batch whose rows are already committed. Reactor idempotency remains the outbox's job (ADR-030b).
 
@@ -194,7 +156,7 @@ The design rests on assumptions that are currently unmeasured. These metrics are
 - `es_fold_store_duration_seconds{projection, tier}`, split Redis vs ClickHouse.
 - `es_fold_cache_entry_bytes` histogram — at 40k spans the full-state GET/SET round-trip is its own O(N²) cost and is currently invisible.
 
-PR #5909 already adds `es_fold_store_miss_refold_total` and `_events`; that work carries over.
+Refold visibility today is `es_fold_refold_total{projection_name, outcome}`; there is no events histogram.
 
 ---
 
@@ -225,7 +187,7 @@ No ADR in this subsystem may remain `Proposed` while shipped.
 | 002-event-sourcing | Superseded | Keep as history. Its rule 4 ("projections are derived") is restated as invariant 1 — ADR-007 dropped it without retiring it. |
 | **007-event-sourcing-architecture** | **Accepted** | **Superseded by this ADR.** Banner required. Four normative claims describe a deleted queue substrate; three more are contradicted by 021/022/034. Most-cited and least-accurate document in the corpus. Its "Decision — No Checkpoints" is retained, since this ADR reaches correctness without checkpoints. |
 | 015-projection-replay-coordination | Accepted | Keep. Amend to record that rollup replay needs a truncate step (`034:34`) absent from its 7-phase protocol. |
-| 021-lean-fold-cache | **Proposed** | **Retire.** Already carries a superseded banner; its mechanism (`toCacheable`, `blobref`, permanent S3, 32 KB) is dead in code. Stop citing it as normative — `034:114` does. |
+| 021-lean-fold-cache | **Proposed** | **Retire.** Carries no superseded banner despite ADR-022 superseding its Decision §1 — add one; its mechanism (`toCacheable`, `blobref`, permanent S3, 32 KB) is dead in code. Stop citing it as normative — `034:114` does. |
 | 022-event-log-source-of-truth | **Proposed** | **Promote to Accepted and renumber.** Shipped, load-bearing, cited as authority by five documents, colliding with `022-data-retention` over the same data. |
 | 023 / 025 orphan sweep | Superseded / Accepted | Clean. |
 | 026-groupqueue-payload-envelope | Accepted | **Renumber.** Mark its §"Blob lifecycle" superseded by 029 rather than leaving it reading as live. |

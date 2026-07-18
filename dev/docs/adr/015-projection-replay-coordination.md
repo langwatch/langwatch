@@ -67,7 +67,6 @@ The replay logic lives in `src/server/event-sourcing/replay/` as a first-class s
 - `replayDrain` — GroupQueue pause/unpause/wait
 - `replayConstants` — shared key prefixes and comparison function
 
-Fold projections are discovered via `PipelineRegistry.buildFoldProjections()` — single source of truth. The CLI package (`packages/projection-replay/`) is a thin TUI shell that calls the service.
 
 ### Batch inserts
 
@@ -190,4 +189,4 @@ so a re-run still skips completed aggregates (resume). Cleanup is best-effort
   - [ADR-034: Event-Sourced Analytics Materialization](./034-event-sourced-analytics-materialization.md) — analytics projections rebuilt via this replay mechanism
 - Spec: `specs/event-sourcing/projection-replay.feature` — behavioural scenarios for the replay coordination this ADR decides
 - ClickHouse ReplacingMergeTree: https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/replacingmergetree
-- BullMQ GroupQueue pause mechanism: internal `{event-sourcing/jobs}:gq:paused-jobs` set
+- GroupQueue pause mechanism (in-house, not BullMQ): internal `{event-sourcing/jobs}:gq:paused-jobs` set

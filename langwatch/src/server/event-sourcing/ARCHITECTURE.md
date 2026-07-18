@@ -75,7 +75,7 @@ A reactor is tied to a specific fold projection. It fires **after** the fold's `
 2. Reactor's `handle(event, { foldState, tenantId, aggregateId })` is invoked
 3. Reactor performs side effects (trigger evaluations, broadcast updates, sync to Elasticsearch, etc.)
 
-Reactors fire on every fold completion (no `eventTypes` filter). Downstream deduplication is handled via `makeJobId` + `delay` in reactor options.
+Reactors fire on fold completion unless a `shouldReact` predicate filters the event out before enqueue (ADR-026). Downstream deduplication is handled via `makeJobId` + `delay` in reactor options.
 
 See: [`reactors/reactor.types.ts`](./reactors/reactor.types.ts)
 
@@ -102,7 +102,7 @@ graph TB
     end
 
     subgraph "Global Projections (SaaS)"
-        ES --> |"GroupQueue"| GP[Global Fold Projections<br/>Billing]
+        ES --> |"GroupQueue"| GP[Global Map Projections<br/>Billing]
         GP --> GPS[(Global Stores)]
     end
 
@@ -142,7 +142,7 @@ The tiered storage in one line: a payload's serialized size picks where it lives
 
 ## Process Roles
 
-The system supports two process roles, configured via the `processRole` option:
+The system supports four process roles (`web`, `worker`, `migration`, `all`) — whether a role runs the worker stack is `roleRunsWorkers()`, never a direct comparison against `"worker"`, configured via the `processRole` option:
 
 - **`web`**: Dispatches commands and stages events. The dispatcher loop and local processor are NOT started, so the web process can create events and stage queue jobs but never processes them.
 - **`worker`**: Stages AND dispatches — runs the BRPOP signal loop, the local concurrency processor, and the metrics collector for every registered queue.
@@ -156,11 +156,11 @@ Unlike traditional event sourcing systems that use checkpoint stores to track pr
 - **GroupQueue provides ordering**: per-aggregate FIFO is enforced inside the staging Lua — events for the same aggregate are dispatched in stage-order without a sequence-number tracker.
 - **Fold state is the implicit checkpoint**: the last persisted fold state tells the system where it is. If processing fails, the queue retries the event with backoff (in front of the same group, preserving FIFO) and the fold re-applies from current state.
 - **Map projections are stateless**: each event is independently appended — no position tracking needed.
-- **Reactors are idempotent**: they fire after fold success. If they fail, the queue retries them. Downstream deduplication is handled via `makeJobId`.
+- **Reactors must tolerate retry**: the queue redelivers them. `makeJobId` plus `delay` collapse duplicates but do not guarantee single execution. If they fail, the queue retries them. Downstream deduplication is handled via `makeJobId`.
 
 ## Global Projection Registry
 
-In SaaS mode, the system registers **global fold projections** that span all pipelines. These projections (billing events) are registered in a virtual `global` pipeline and receive events from all pipelines.
+In SaaS mode, the system registers a **global map projection** that spans all pipelines. It is registered in a virtual `global` pipeline and receives events from all of them.
 
 See: [`projections/global/`](./projections/global/) for SaaS-only projections, [`projections/projectionRegistry.ts`](./projections/projectionRegistry.ts) for the registry.
 
@@ -174,7 +174,7 @@ All operations are scoped to `tenantId`. Events, projections, and stores enforce
 
 ## Failure Handling
 
-- **Fold failures**: GroupQueue retries the job with exponential backoff in front of the same group (FIFO is preserved). On retry, the fold loads current state and re-applies the event. If state was already stored, the fold is effectively idempotent.
+- **Fold failures**: GroupQueue retries the job with exponential backoff in front of the same group (FIFO is preserved). On retry, the fold loads current state and re-applies the event. Folds are NOT idempotent in general — they accumulate (span counts, token and cost sums, id appends), so re-applying an event double-counts. The cache entry's applied-event-id set suppresses a redelivery while that entry is live; the cold path is still open. See `dev/docs/plans/fold-idempotency-plan.md`.
 - **Map failures**: GroupQueue retries the job. Append stores should be idempotent or tolerate duplicates.
 - **Reactor failures**: GroupQueue retries the reactor independently. The fold state is already persisted, so the reactor can safely retry.
 - **Transient blob-store failures** (offloaded body temporarily unreachable — network blip, 5xx): GroupQueue re-stages the SAME envelope without re-encoding, so the body stays referenced through the retry. Distinguished from "missing" so a transient store outage can't mass-drop every in-flight offloaded job.
@@ -204,4 +204,4 @@ All operations are scoped to `tenantId`. Events, projections, and stores enforce
 ## Next Steps
 
 - **Implementation guide:** See [README.md](./README.md) for code examples and patterns
-- **Pipeline implementations:** See [`pipelines/`](./pipelines/) for trace, evaluation, experiment-run, and simulation pipelines
+- **Pipeline implementations:** See [`pipelines/`](./pipelines/) for trace, evaluation, experiment-run, simulation, suite-run, automations, billing-reporting and langy-conversation pipelines

@@ -4,9 +4,9 @@
  * The entry carries more than the state because releasing it safely needs two
  * extra facts:
  *
- * - `u` — the state's own `UpdatedAt`. The confirmation processor compares it
- *   against what the durable store reports on every replica; the entry is
- *   released only once the slowest replica has caught up to it.
+ * - `u` — the state's own `UpdatedAt`, carried for debugging. Nothing reads it
+ *   back today: it was the comparison key for a durability-confirmation
+ *   processor that is no longer part of the design.
  * - `e` — the ids of the events folded into this state. A queue redelivery
  *   re-applies the same events on top of state that already contains them, so
  *   the executor uses this set to recognise and skip them.
@@ -15,7 +15,7 @@
  * for every aggregate; for a 40k-span trace the key is rewritten ~80 times.
  */
 export interface FoldCacheEntry<State> {
-  /** Schema marker. Absent on entries written before durability gating. */
+  /** Schema marker. Absent on entries written before the applied-set existed. */
   v: 1;
   /** The fold state. */
   s: State;
@@ -39,10 +39,9 @@ export const MAX_APPLIED_EVENT_IDS = 1_000;
  * Reads an entry written by `encodeFoldCacheEntry`, or a bare state written
  * before durability gating existed.
  *
- * Legacy entries yield a null `updatedAt` and an empty applied-set, which makes
- * them unconfirmable — the processor leaves them to the backstop TTL rather
- * than releasing something it cannot verify. They disappear within one backstop
- * period of the deploy.
+ * Legacy entries yield a null `updatedAt` and an empty applied-set, so a
+ * redelivery against one is not suppressed — the same behaviour as before the
+ * set existed. They age out with the cache TTL.
  */
 export function decodeFoldCacheEntry<State>(raw: string): {
   state: State;

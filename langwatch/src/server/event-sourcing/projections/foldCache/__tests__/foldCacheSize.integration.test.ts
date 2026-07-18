@@ -123,7 +123,7 @@ describe.skipIf(!hasTestcontainers)("fold cache size and cost", () => {
     return new RedisCachedFoldStore<ReturnType<typeof traceLikeState>>(
       noopDurable as FoldProjectionStore<ReturnType<typeof traceLikeState>>,
       redis,
-      { keyPrefix, checkDelayMs: 3_600_000 },
+      { keyPrefix },
     );
   }
 

@@ -27,7 +27,7 @@ The dispatch endpoints know which is which (they see the response). The worker d
 Define a typed error class in the outbox framework:
 
 ```ts
-// src/server/event-sourcing/outbox/dispatchError.ts
+// src/server/event-sourcing/queues/dispatchError.ts
 export class DispatchError extends Error {
   readonly retryable: boolean;
   readonly cause?: unknown;

@@ -33,11 +33,11 @@ Every job sent to a GroupQueue lands first in the **staging layer** — a set of
 | `{queue}:gq:group:{groupId}:error` | string | last error recorded for the group |
 | `{queue}:gq:group:{groupId}:strikes` | string | poison-guard strike count |
 | `{queue}:gq:blocked` | **set** | groupIds blocked after exhausting retries — ONE set per queue, not a per-group marker |
-| `{queue}:gq:paused` | set | groupIds paused for replay coordination |
+| `{queue}:gq:paused-jobs` | set | groupIds paused for replay coordination |
 | `{queue}:gq:signal` | list | wake-up signals consumed by `BRPOP` (one entry per stage) |
 | `{queue}:gq:dedup:{dedupId}` | string | dedup window — staged-job ID currently occupying this dedup slot |
 | `{queue}:gq:tenant_active_z:*` | sorted set | per-tenant in-flight counts, for the fair-dispatch soft cap |
-| `{queue}:gq:stats:{total,completed,failed}` | string | counters for the ops dashboard |
+| `{queue}:gq:stats:{total-pending,completed,failed}` | string | counters for the ops dashboard |
 
 Every key carries the `gq:` namespace after the queue name. An earlier version
 of this table omitted it on every row, named `jobs` a list with RPUSH/LPOP
@@ -54,12 +54,12 @@ The `{queue}` prefix is a Redis Cluster hash tag (`{...}`), so every key for a g
 ```
 producer.send(payload)
   │
-  ▼  STAGE_LUA: RPUSH job id, HSET envelope, ZADD group → active, dedup write,
+  ▼  STAGE_LUA: ZADD job id, HSET envelope, ZADD group → active, dedup write,
   │             LPUSH a signal
   │
   ▼  signals list  ──BRPOP──▶  dispatcher loop  (idle workers wake up here)
   │
-  ▼  DISPATCH_LUA: pick next eligible group (weighted RR), LPOP its job,
+  ▼  DISPATCH_LUA: pick next eligible group by due score, ZRANGEBYSCORE + ZREM its job,
   │                read envelope, mark group active with TTL
   │
   ▼  fastq processing slot (local node concurrency)
@@ -85,13 +85,13 @@ A failure anywhere in this chain takes one of three paths:
 
 The dispatcher pulls one signal at a time off `BRPOP` and then runs `DISPATCH_LUA`, which:
 
-1. Picks the next eligible group from the `active` sorted set (`ZRANGEBYSCORE 0 now`).
+1. Picks the next eligible group from the `ready` sorted set (`ZRANGEBYSCORE 0 now`).
 2. Takes the first eligible group by due score (`ZRANGEBYSCORE ... LIMIT offset 200`). There is no weighting function — fairness comes from a per-tenant soft cap (`DEFAULT_TENANT_CAP`) plus park/unpark, not from a score formula.
 3. Per dispatch call, drains up to `MAX_BATCH_SIZE` jobs across groups, bounding script execution time.
 
 Each dispatched job becomes a `fastq` task on the local node, capped at `GLOBAL_QUEUE_CONCURRENCY` (default 100). `fastq` is just a local concurrency limiter — multiple worker nodes share the same Redis-side staging, so horizontal scale is `nodes × per-node-concurrency`.
 
-Tenant rate tracking ([`TenantRateTracker`](../../../observability/tenantRateTracker.ts)) records throughput per tenant; the score formula keeps a high-throughput tenant from monopolizing the dispatcher.
+Tenant rate tracking ([`TenantRateTracker`](../../../observability/tenantRateTracker.ts)) records throughput per tenant; the per-tenant soft cap plus park/unpark keeps a high-throughput tenant from monopolizing the dispatcher.
 
 ---
 
@@ -123,7 +123,7 @@ serialized payload size
 
 - **Inline raw (≤ 1 KiB)** — gzip+base64 of sub-kilobyte JSON is usually *larger* than the input. Skip compression entirely.
 - **Inline gzip (1–4 KiB)** — gzip wins for most real payloads in this range; the encoder verifies (`gzip+base64 < raw`) and falls back to raw if not. The inline ceiling (`INLINE_CEILING_BYTES = 4 KiB`) is set low so ordinary fan-out events cross into the dedup tier rather than inlining N× across reactors. Tighter than the GQ1 32 KiB threshold (`BLOB_OFFLOAD_THRESHOLD_BYTES`), which only offloaded for the very-large case.
-- **Redis blob (4–256 KiB)** — bigger than we want repeated in the staged value (every fan-out copy would replicate), but small enough that round-trip latency through a standalone Redis key is fine. Holds for ~3 days by default, refreshed on every read (GETEX); reclaimed atomically when the last referencing job completes.
+- **Redis blob (4–256 KiB)** — bigger than we want repeated in the staged value (every fan-out copy would replicate), but small enough that round-trip latency through a standalone Redis key is fine. Holds for 4 days by default (`BLOB_BACKSTOP_TTL_SECONDS`), refreshed on every read (GETEX); reclaimed atomically when the last referencing job completes.
 - **S3 / object-store (> 256 KiB)** — large bodies are the worst-case for Redis: memory pressure, replication lag, eviction risk. Push them to the durable object store the rest of the platform already runs on (`StorageRegistry`, projectId-scoped so each tenant's BYOC bucket is honored). No TTL on s3 objects — the lifecycle takes care of reclaim via the holder set; a bucket lifecycle policy is the operational backstop for missed reclaims.
 
 All thresholds live in [`jobEnvelope.ts`](./jobEnvelope.ts) and [`tieredBlobStore.ts`](./tieredBlobStore.ts). The 4 KiB inline ceiling and 256 KiB S3 threshold are conservative — tighten them under load if metrics show too much inline bloat or too many Redis-tier blobs.
@@ -219,7 +219,7 @@ Three modes, configured per-job or per-queue:
 - **`"aggregate"`** — dedup ID is `${tenantId}:${aggregateType}:${aggregateId}`; only the latest event per aggregate is processed within the dedup window (default 200 ms).
 - **Custom `DeduplicationConfig`** — caller-supplied `makeId` + `ttlMs`, with `extend` (reset TTL on each new send) and `replace` (overwrite the staged value) flags.
 
-Dedup is implemented inside `STAGE_LUA`: a write to `{queue}:dedup:{dedupId}` with the staged-job ID; subsequent sends within the TTL either coalesce, replace, or extend. The orphaned staged value (when `replace: true`) has its hold transferred atomically to the new envelope — see "Holder Set" above for why this matters.
+Dedup is implemented inside `STAGE_LUA`: a write to `{queue}:gq:dedup:{dedupId}` with the staged-job ID; subsequent sends within the TTL either coalesce, replace, or extend. The orphaned staged value (when `replace: true`) has its hold transferred atomically to the new envelope — see "Holder Set" above for why this matters.
 
 ---
 
@@ -233,14 +233,14 @@ Coalesced batches go through the same envelope decoder and the same lifecycle: e
 
 ## Pause / Resume
 
-The `{queue}:group:{groupId}:blocked` marker is set by:
+Membership of the `{queue}:gq:blocked` set is set by:
 
 - A retry (`RESTAGE_AND_BLOCK_LUA`) — briefly blocks the group so the retry is next out.
 - An explicit pause from the queue-pausing pipeline (see [`specs/queue-pausing/queue-pausing.feature`](../../../../../../specs/queue-pausing/queue-pausing.feature)).
 
 `DISPATCH_LUA` skips blocked groups when picking the next eligible group; the active sorted set is unchanged but the group is invisible to the dispatcher until unblocked. Unblock is just deleting the marker.
 
-The active key (`{queue}:active:{groupId}`) is a separate safety net: a TTL'd marker that says "this group is being processed by someone right now." On crash, the TTL expires (default 5 min) and the group becomes dispatchable again — a stuck job is recoverable without manual intervention.
+The active key (`{queue}:gq:group:{groupId}:active`) is a separate safety net: a TTL'd marker that says "this group is being processed by someone right now." On crash, the TTL expires (default 5 min) and the group becomes dispatchable again — a stuck job is recoverable without manual intervention.
 
 ---
 

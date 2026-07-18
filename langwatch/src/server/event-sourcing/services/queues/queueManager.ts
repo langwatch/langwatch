@@ -118,8 +118,7 @@ export class QueueManager<EventType extends Event = Event> {
 
   /**
    * Builds a hierarchical group key function, delegating the format to
-   * {@link composeGroupKey} so the fold-cache confirmation processor can derive
-   * the identical key when it asks whether an aggregate still has work queued.
+   * {@link composeGroupKey} so the group-key shape has a single definition.
    */
   private buildGroupKey({
     jobPath,

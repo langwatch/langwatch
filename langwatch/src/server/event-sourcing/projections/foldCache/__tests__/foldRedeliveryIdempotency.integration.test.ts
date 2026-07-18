@@ -163,7 +163,6 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
     const durable = createDurableStore();
     const cached = new RedisCachedFoldStore<CounterState>(durable.store, redis, {
       keyPrefix,
-      checkDelayMs: 60_000,
     });
 
     const fold = createMockFoldProjectionDefinition("counter", {

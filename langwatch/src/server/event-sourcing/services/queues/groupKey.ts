@@ -6,13 +6,9 @@
  * - `domainKey` defaults to `${aggregateType}:${aggregateId}`, overridable per
  *   projection
  *
- * Lives here rather than inside `QueueManager` because it is not only the queue
- * that needs it: the fold-cache confirmation processor has to ask whether an
- * aggregate still has queue work before releasing its cached state, and it can
- * only do that if it derives exactly the same key. A second, hand-copied format
- * would fail silently and in the dangerous direction — a key that does not
- * exist reads as "no work in flight", which releases a cache entry that a retry
- * still depends on.
+ * Lives here rather than inside `QueueManager` so the format has exactly one
+ * definition — anything deriving a group key outside the queue must produce the
+ * identical string, and a hand-copied format would fail silently.
  */
 export function composeGroupKey({
   tenantId,

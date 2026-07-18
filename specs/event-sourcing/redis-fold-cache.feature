@@ -1,16 +1,25 @@
-Feature: Durability-gated fold state cache
+Feature: Redis write-through cache for fold state
 
   Fold projections build state by reading what came before, applying an
-  event, and writing the result back. The durable store is replicated, so
-  a read can land on a replica that has not caught up yet and return state
-  that is missing recent events. Folding on top of that silently loses
-  whatever it was missing.
+  event, and writing the result back. Reading that state from the durable
+  store on every batch is expensive — for a large trace it is hundreds of
+  kilobytes — so a Redis cache sits in front of it.
 
-  A cache in front of the durable store closes that window. What makes it
-  safe is when the cached copy is released: only once the durable store is
-  confirmed to hold the state on every replica. A cache miss therefore
-  means the durable store is known to be authoritative, so reading it is
-  always correct.
+  The cache is an optimisation, not a durability mechanism. A miss falls
+  through to the durable store and the fold continues.
+
+  It carries one extra thing: the ids of the events already folded into the
+  cached state. Queue delivery is at-least-once, and a job that fails after
+  its state was stored is re-dispatched with the same events. Most fold
+  handlers accumulate — span counts, token and cost sums, id appends — so
+  re-applying would double-count. That set is scoped to a retry chain: a
+  fresh delivery replaces it, because the previous batch for that group must
+  have been acked and its ids can never come back; a retry merges into it,
+  because they still can.
+
+  Because the set lives in the cache entry, losing the entry loses the
+  protection. That leaves the cold path open, and closing it means making
+  the folds themselves idempotent — see dev/docs/plans/fold-idempotency-plan.md.
 
   Background:
     Given a fold projection with a cached store
@@ -28,52 +37,33 @@ Feature: Durability-gated fold state cache
     When the fold reads state for "trace-1"
     Then the state is returned from the durable store
 
-  Scenario: A cached entry is released once every replica holds the state
-    Given the fold state for aggregate "trace-1" is cached
-    And every replica of the durable store holds that state
-    When the confirmation processor checks "trace-1"
-    Then the cached entry is released
-
-  Scenario: A cached entry is retained while any replica lags
-    Given the fold state for aggregate "trace-1" is cached
-    And one replica of the durable store has not caught up
-    When the confirmation processor checks "trace-1"
-    Then the cached entry is retained
-    And "trace-1" is checked again later
-
-  Scenario: A cached entry is retained when a replica cannot be reached
-    Given the fold state for aggregate "trace-1" is cached
-    And one replica of the durable store does not answer
-    When the confirmation processor checks "trace-1"
-    Then the cached entry is retained
-
-  Scenario: An aggregate still being folded is never released
-    Given a trace whose spans are still arriving
-    When the confirmation processor runs repeatedly
-    Then the cached entry for that trace is never released
-    And it is released only after the trace stops receiving spans
-
-  Scenario: An aggregate with work still in flight is not released
-    Given the fold state for aggregate "trace-1" is cached
-    And a fold job for "trace-1" is still in flight
-    And every replica of the durable store holds that state
-    When the confirmation processor checks "trace-1"
-    Then the cached entry is retained
-
   Scenario: A redelivered event is not applied twice
     Given a fold job for aggregate "trace-1" failed after its state was stored
     When the job is retried with the same events
     Then those events are recognised as already applied
     And the aggregate reflects each event exactly once
 
-  Scenario: The confirmation processor falling behind never loses state
-    Given the confirmation processor is not running
-    When fold states are stored for many aggregates
-    Then every cached entry is retained
-    And no fold reads state that is missing recent events
+  Scenario: A retry chain remembers everything it has applied
+    Given a fold job failed after storing, and new events arrived before it retried
+    When the retry applies the new events and fails again
+    And the whole set is delivered once more
+    Then no event is applied twice across the chain
 
-  Scenario: A cached entry cannot outlive its backstop
-    Given a cached entry whose aggregate was never confirmed
-    When the backstop period passes
-    Then the cached entry is released
-    And the release is reported as a backstop expiry rather than a confirmation
+  Scenario: A fresh delivery forgets what an acked batch applied
+    Given consecutive batches for one aggregate that all succeed
+    When each batch is stored
+    Then the recorded event ids are only those of the most recent batch
+    And the record does not grow with the number of batches
+
+  Scenario: A sibling leading a retry is still recognised as a retry
+    Given a coalesced batch failed and its drained siblings were re-staged
+    When a sibling is dispatched first on the next attempt
+    Then it is treated as a continuation of the retry chain
+    And the events the chain already applied are not applied again
+
+  Scenario: Losing the cached entry loses the protection
+    Given a fold job failed after its state was stored
+    And its cached entry is evicted before the retry
+    When the job is retried with the same events
+    Then the events are applied again
+    And the aggregate over-counts, as it did before the record existed
