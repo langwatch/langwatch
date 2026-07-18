@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin.json",
+  "name": "coding-agents",
+  "description": "Type-aware Go and TypeScript engineering skills for Claude Code",
+  "version": "0.1.0",
+  "author": {
+    "name": "LangWatch"
+  },
+  "license": "Apache-2.0"
+}
