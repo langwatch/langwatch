@@ -50,6 +50,11 @@ function toNumber(value: string | number | null | undefined): number | null {
  * batched, keyed on the primary key, and runs on a periodic job rather than in
  * the fold path. Establishing the same guarantee synchronously was measured and
  * reverted — #2751 (~200ms per fold step) and #2899 (10-14s reads).
+ *
+ * `UpdatedAt` is `DateTime64(3)` on every fold table, so it MUST be read
+ * through `toUnixTimestamp64Milli`: a raw `max(UpdatedAt)` serialises as a
+ * datetime string, which parses to NaN and silently reports every aggregate
+ * as unconfirmable. The cached value it is compared against is epoch ms.
  */
 export class ClickHouseDurabilityProbe implements FoldDurabilityProbe {
   private readonly projectionName: string;
@@ -113,7 +118,7 @@ export class ClickHouseDurabilityProbe implements FoldDurabilityProbe {
           SELECT
             ${this.deps.idColumn} AS aggregateId,
             hostName() AS host,
-            max(UpdatedAt) AS latest
+            toUnixTimestamp64Milli(max(UpdatedAt)) AS latest
           FROM clusterAllReplicas({cluster:Identifier}, currentDatabase(), ${this.deps.table})
           WHERE TenantId = {tenantId:String}
             AND ${this.deps.idColumn} IN {aggregateIds:Array(String)}
@@ -126,6 +131,11 @@ export class ClickHouseDurabilityProbe implements FoldDurabilityProbe {
         tenantId,
         aggregateIds: [...aggregateIds],
       },
+      // The host-count guard below only means anything if an unreachable
+      // replica FAILS the query rather than being silently omitted — a skipped
+      // replica would make hostsWithRow == hostsTotal and release an entry the
+      // recovered node does not yet hold.
+      clickhouse_settings: { skip_unavailable_shards: 0 },
       format: "JSONEachRow",
     });
 
@@ -170,7 +180,7 @@ export class ClickHouseDurabilityProbe implements FoldDurabilityProbe {
       query: `
         SELECT
           ${this.deps.idColumn} AS aggregateId,
-          max(UpdatedAt) AS updatedAt
+          toUnixTimestamp64Milli(max(UpdatedAt)) AS updatedAt
         FROM ${this.deps.table}
         WHERE TenantId = {tenantId:String}
           AND ${this.deps.idColumn} IN {aggregateIds:Array(String)}

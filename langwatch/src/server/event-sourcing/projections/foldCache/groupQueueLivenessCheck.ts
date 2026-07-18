@@ -1,5 +1,8 @@
 import type { Redis } from "ioredis";
-import { foldGroupKey } from "../../services/queues/groupKey";
+import {
+  type ProjectionLane,
+  projectionGroupKey,
+} from "../../services/queues/groupKey";
 import type { AggregateLivenessCheck } from "./confirmationProcessor";
 
 export interface GroupQueueLivenessCheckDeps {
@@ -10,6 +13,8 @@ export interface GroupQueueLivenessCheckDeps {
   projectionName: string;
   /** Aggregate type the fold consumes, e.g. `trace`. */
   aggregateType: string;
+  /** Lane the projection is registered on. Fold projections default to `fold`. */
+  lane?: ProjectionLane;
 }
 
 /**
@@ -26,7 +31,7 @@ export interface GroupQueueLivenessCheckDeps {
  * most: they wait on an operator, so their jobs run again at an arbitrary point
  * in the future.
  *
- * The group key is derived through {@link foldGroupKey}, the same helper the
+ * The group key is derived through {@link projectionGroupKey}, the same helper the
  * queue itself uses. That shared derivation is load-bearing rather than tidy:
  * a key that does not exist reads as "no work in flight", so a hand-copied
  * format that drifted would release entries a retry still depends on, silently
@@ -44,16 +49,18 @@ export class GroupQueueLivenessCheck implements AggregateLivenessCheck {
   }): Promise<Set<string>> {
     if (aggregateIds.length === 0) return new Set();
 
-    const { redis, queueName, projectionName, aggregateType } = this.deps;
+    const { redis, queueName, projectionName, aggregateType, lane } =
+      this.deps;
     const prefix = `${queueName}:gq`;
 
     const pipeline = redis.pipeline();
     for (const aggregateId of aggregateIds) {
-      const groupId = foldGroupKey({
+      const groupId = projectionGroupKey({
         tenantId,
         projectionName,
         aggregateType,
         aggregateId,
+        lane,
       });
       pipeline.hlen(`${prefix}:group:${groupId}:data`);
       pipeline.exists(`${prefix}:group:${groupId}:active`);

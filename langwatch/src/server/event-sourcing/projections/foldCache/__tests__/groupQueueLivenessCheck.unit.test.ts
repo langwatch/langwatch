@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { foldGroupKey } from "../../../services/queues/groupKey";
+import { projectionGroupKey } from "../../../services/queues/groupKey";
 import { GroupQueueLivenessCheck } from "../groupQueueLivenessCheck";
 
 /**
@@ -56,7 +56,7 @@ describe("GroupQueueLivenessCheck", () => {
       // A key that does not exist reads as "quiet", which would release a cache
       // entry a retry still depends on — so this derivation must not drift from
       // the queue's own.
-      const expected = foldGroupKey({
+      const expected = projectionGroupKey({
         tenantId: "tenant-1",
         projectionName: "traceSummary",
         aggregateType: "trace",

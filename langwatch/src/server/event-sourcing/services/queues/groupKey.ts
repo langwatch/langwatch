@@ -37,21 +37,30 @@ export function defaultDomainKey({
   return `${aggregateType}:${aggregateId}`;
 }
 
-/** Group key for a fold projection's own jobs. */
-export function foldGroupKey({
+/**
+ * The lane a projection's jobs run on. Fold projections default to `fold`;
+ * `state` is the separate lane registered by the process-manager substrate.
+ * The lane is part of the job path, so it is part of the group key.
+ */
+export type ProjectionLane = "fold" | "state";
+
+/** Group key for a projection's own jobs. */
+export function projectionGroupKey({
   tenantId,
   projectionName,
   aggregateType,
   aggregateId,
+  lane = "fold",
 }: {
   tenantId: string;
   projectionName: string;
   aggregateType: string;
   aggregateId: string;
+  lane?: ProjectionLane;
 }): string {
   return composeGroupKey({
     tenantId,
-    jobPath: `fold/${projectionName}`,
+    jobPath: `${lane}/${projectionName}`,
     domainKey: defaultDomainKey({ aggregateType, aggregateId }),
   });
 }
