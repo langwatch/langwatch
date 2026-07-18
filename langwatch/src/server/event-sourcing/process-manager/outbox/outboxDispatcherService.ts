@@ -12,7 +12,7 @@ import {
   incrementEsProcessOutboxTotal,
   observeEsProcessOutboxDuration,
 } from "~/server/metrics";
-
+import { toSafeFailureDiagnostic } from "../failureDiagnostic";
 import type { JsonValue } from "../json";
 import type {
   LeasedOutboxMessageRecord,
@@ -184,17 +184,7 @@ export class OutboxDispatcherService {
             status: "dispatched",
           });
         } catch (error) {
-          const errorType =
-            error instanceof Error ? error.name : "NonErrorThrown";
-          const errorMessage =
-            error instanceof Error
-              ? error.message
-                  .replace(
-                    /\b(api[_-]?key|token|password|secret|authorization)\b\s*[:=]\s*\S+/gi,
-                    "$1=[REDACTED]",
-                  )
-                  .slice(0, 500)
-              : "A non-Error value was thrown";
+          const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
           span.recordException({
             name: errorType,
             message: errorMessage,
