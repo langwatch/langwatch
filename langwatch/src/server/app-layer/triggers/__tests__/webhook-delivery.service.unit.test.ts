@@ -51,10 +51,11 @@ describe("WebhookDeliveryService", () => {
 
   describe("pruneExpired", () => {
     it("deletes rows older than ~30 days", async () => {
-      const repo = makeRepo({ deleteOlderThan: vi.fn(async () => 7) });
+		const deleteOlderThan = vi.fn(async (_: { before: Date }) => 7);
+      const repo = makeRepo({ deleteOlderThan });
       const deleted = await new WebhookDeliveryService(repo).pruneExpired();
       expect(deleted).toBe(7);
-      const before = repo.deleteOlderThan.mock.calls[0]![0].before.getTime();
+      const before = deleteOlderThan.mock.calls[0]![0].before.getTime();
       const daysAgo = (Date.now() - before) / (24 * 60 * 60 * 1000);
       expect(daysAgo).toBeGreaterThan(29.9);
       expect(daysAgo).toBeLessThan(30.1);

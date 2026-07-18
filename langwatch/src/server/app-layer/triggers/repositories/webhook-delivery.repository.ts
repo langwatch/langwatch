@@ -15,7 +15,7 @@ export interface WebhookDeliveryRow {
   dispatchId: string;
   requestMethod: string;
   requestUrl: string;
-  /** Redacted header record (auth/signature values already masked). */
+  /** Redacted header record (every custom value is masked). */
   requestHeaders: Record<string, string>;
   responseStatus: number | null;
   responseBody: string | null;

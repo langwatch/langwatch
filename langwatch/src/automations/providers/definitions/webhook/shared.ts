@@ -53,24 +53,19 @@ export function sanitizeWebhookHeaders(
   return out;
 }
 
-/** Header names whose VALUE is a secret and must be masked before a request
- *  is persisted to the delivery log (ADR-040 §6). Matched case-insensitively,
- *  substring — covers `Authorization`, `X-Api-Key`, `X-Signature`, etc. */
-const SECRET_HEADER_PATTERN =
-  /authorization|cookie|token|secret|api[-_]?key|signature|password|auth/i;
-
 /**
  * Redact a header record for the delivery log: which headers were sent is kept
  * (an operator debugging a 401 needs to see `Authorization` was present), but
- * the secret VALUE is masked to "***" so credential material never lands in
- * control-plane Postgres (ADR-040 §6).
+ * every custom VALUE is secret regardless of its name. Masking all values keeps
+ * innocently named credentials such as `X-Access-Code` out of control-plane
+ * Postgres (ADR-040 §6).
  */
 export function redactHeadersForLog(
   headers: Record<string, string>,
 ): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [name, value] of Object.entries(headers)) {
-    out[name] = SECRET_HEADER_PATTERN.test(name) ? "***" : value;
+  for (const name of Object.keys(headers)) {
+    out[name] = "***";
   }
   return out;
 }

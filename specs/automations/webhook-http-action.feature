@@ -34,7 +34,13 @@ Feature: Webhook (generic HTTP) automation action
     Scenario: The flag hides the channel end to end
       Given the release_webhook_automations flag is off for the project
       Then the delivery picker does not offer the Webhook card
+      And the flag-off authoring copy does not mention webhooks
       And saving a webhook automation through the API is rejected
+
+    Scenario: An existing webhook automation remains understandable while the flag is off
+      Given a saved webhook automation is opened after the project flag is turned off
+      Then its selected Webhook card remains visible and read-only
+      And a notice explains that another channel must be selected before saving
 
   Rule: Header values are secrets
 
@@ -95,17 +101,17 @@ Feature: Webhook (generic HTTP) automation action
 
     Scenario: Server errors retry, client errors do not
       When the endpoint answers 500, 429, or 408, or times out
-      Then the dispatch is retried by the outbox
+      Then the dispatch is retried by the process manager
       When the endpoint answers any other 4xx
       Then the dispatch fails terminally without retry
 
     Scenario: A receiver's Retry-After lengthens the backoff
       Given the endpoint answers 429 with a Retry-After header
-      When the dispatch is retried by the outbox
+      When the dispatch is retried by the process manager
       Then the next attempt waits at least as long as the receiver asked
 
     Scenario: Every attempt of one fire carries the same event id
-      Given a dispatch that is retried by the outbox
+      Given a dispatch is retried after only part of its candidate batch was claimed
       Then each attempt sends the same X-LangWatch-Event-Id
       So a receiver can dedupe replays of the same fire
 
@@ -123,8 +129,8 @@ Feature: Webhook (generic HTTP) automation action
       And each row shows the HTTP status or transport error and the latency
 
     Scenario: Stored request headers never contain secret values
-      Given a webhook automation with an Authorization header that fires
-      Then the delivery log stores the header name with its value masked
+      Given a webhook automation with custom headers that fires
+      Then the delivery log stores every header name with every value masked
 
     Scenario: The delivery log is pruned after 30 days
       Given delivery rows older than 30 days exist

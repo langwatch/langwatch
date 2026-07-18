@@ -8,12 +8,13 @@ import {
 } from "../shared";
 
 describe("redactHeadersForLog", () => {
-  it("masks secret-bearing header values but keeps their names", () => {
+  it("masks every custom header value but keeps the names", () => {
     expect(
       redactHeadersForLog({
         Authorization: "Bearer sk-123",
         "X-Api-Key": "k",
         "X-Signature": "abc",
+        "X-Access-Code": "not-obviously-secret",
         "X-Trace-Id": "t1",
         Accept: "application/json",
       }),
@@ -21,8 +22,9 @@ describe("redactHeadersForLog", () => {
       Authorization: "***",
       "X-Api-Key": "***",
       "X-Signature": "***",
-      "X-Trace-Id": "t1",
-      Accept: "application/json",
+      "X-Access-Code": "***",
+      "X-Trace-Id": "***",
+      Accept: "***",
     });
   });
 });

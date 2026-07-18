@@ -59,9 +59,19 @@ export class PrismaWebhookDeliveryRepository
   }
 
   async deleteOlderThan({ before }: { before: Date }): Promise<number> {
-    const { count } = await this.prisma.webhookDelivery.deleteMany({
-      where: { firedAt: { lt: before } },
+    // WebhookDelivery is project-scoped, so the Prisma tenancy guard rejects a
+    // global deleteMany. Enumerate the global Project table, then prune each
+    // tenant with projectId present in the destructive query.
+    const projects = await this.prisma.project.findMany({
+      select: { id: true },
     });
-    return count;
+    let deleted = 0;
+    for (const project of projects) {
+      const result = await this.prisma.webhookDelivery.deleteMany({
+        where: { projectId: project.id, firedAt: { lt: before } },
+      });
+      deleted += result.count;
+    }
+    return deleted;
   }
 }

@@ -364,7 +364,7 @@ model WebhookDelivery {
   attempt         Int                        // 1-based
   requestMethod   String
   requestUrl      String                     // stored as-is (no secret in a URL by policy)
-  requestHeaders  Json                       // REDACTED: signature/auth/api-key values → "***"
+  requestHeaders  Json                       // REDACTED: every custom value → "***"; names retained
   responseStatus  Int?                       // null when no response (timeout/DNS)
   responseBody    String?                    // size-capped snippet (≤ 4 KB)
   latencyMs       Int?
@@ -380,9 +380,10 @@ model WebhookDelivery {
 enum WebhookDeliveryOutcome { success  retryable  terminal  pending }
 ```
 
-- **Redaction (mandatory).** `requestHeaders` stores signature, `Authorization`,
-  and api-key header values masked to `***` — which headers were sent, never the
-  secret material (same as `createAgentTestTrace`'s sanitization in `httpProxy.ts`).
+- **Redaction (mandatory).** `requestHeaders` keeps the custom header names but
+  masks every value to `***`, regardless of whether its name looks sensitive.
+  Custom values are all treated as secret material and never reach control-plane
+  Postgres.
 - **Response-body sensitivity.** The snippet is the *customer's own endpoint's*
   response, not LangWatch data — but it still lands in control-plane Postgres, so
   cap it hard (≤ 4 KB), truncate with an ellipsis, and document retention. It lets
@@ -522,6 +523,14 @@ deliberate deltas against the text above:
   `__kept__` sentinel), and decrypted just before dispatch. The
   `ProjectSecret`-ref auth union remains the target shape for when HMAC
   signing lands.
+  Rows created before header encryption may still contain a plaintext
+  `actionParams.headers` record. Dispatch must read that compatibility shape,
+  so those values remain exposed in Postgres until the automation is saved
+  again. The next save resolves kept header values, writes
+  `headersEncrypted`, and removes the plaintext record. A bulk backfill is
+  deferred because encrypting requires the deployment credential secret; until
+  then operators should treat legacy Trigger JSON backups and database access
+  as credential-bearing.
 - **Graph alerts no longer dead-letter `SEND_WEBHOOK`** — the third notify
   branch in `dispatchGraphAlertAction`, gated per-fire on the endpoint
   identity. On the cron parity path, a terminal failure CONSUMES the fire
@@ -531,14 +540,14 @@ deliberate deltas against the text above:
 **Phase 3 completed in a follow-up (also #5807):** `Retry-After` →
 `DispatchError.retryAfterMs` (parsed delta-seconds + HTTP-date, capped at 1h;
 honored by the GroupQueue as a backoff FLOOR); the stable `X-LangWatch-Event-Id`
-(trace path from the batch's traceIds, graph-alert path from the fire digest —
-identical across retries so receivers dedupe); and a per-project hourly
+(trace path from the process-outbox message key, graph-alert path from the fire
+digest — identical across partial-claim retries so receivers dedupe); and a per-project hourly
 dispatch cap (`webhook-dispatch:{projectId}`).
 
 **Phase 4 shipped as a standalone table (§6).** `WebhookDelivery` + a
 `WebhookDeliveryOutcome` enum, one row per attempt written by `deliverWebhook`
 (send + classify + log as a unit), redacted headers (`redactHeadersForLog`
-masks auth/signature values to `***`), a `getWebhookDeliveries` read procedure,
+masks every custom value to `***`), a `getWebhookDeliveries` read procedure,
 the drawer's "Recent deliveries" drill-down, and a 30-day prune cron
 (`/api/cron/webhook_delivery_cleanup`).
 
