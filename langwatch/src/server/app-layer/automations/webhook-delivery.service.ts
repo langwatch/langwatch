@@ -10,7 +10,7 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * The per-attempt webhook delivery log (ADR-040 §6). Write-side records one
- * row per HTTP attempt (failure responses truncated + scrubbed by the
+ * row per HTTP attempt (failure responses truncated by the
  * caller); read-side backs the drawer's "Recent deliveries" drill-down; the
  * prune keeps the table bounded at 30 days.
  */

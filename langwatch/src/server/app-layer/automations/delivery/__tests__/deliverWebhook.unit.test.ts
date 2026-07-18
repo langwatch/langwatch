@@ -89,7 +89,7 @@ describe("deliverWebhook", () => {
       expect(JSON.stringify(rows[0])).not.toContain("Bearer secret");
     });
 
-    it("scrubs our configured header values when the receiver echoes them", async () => {
+    it("stores the receiver's response verbatim, even when it echoes a configured header value", async () => {
       const rows: WebhookDeliveryInput[] = [];
       await expect(
         deliverWebhook({
@@ -104,11 +104,13 @@ describe("deliverWebhook", () => {
           },
         }),
       ).rejects.toBeInstanceOf(DispatchError);
-      expect(rows[0]!.error).toContain("***");
-      expect(JSON.stringify(rows[0])).not.toContain("Bearer secret");
-      // Scrubbed inside the stored response too — body AND headers.
-      expect(rows[0]!.response?.body).toContain("***");
-      expect(rows[0]!.response?.headers).toEqual({ "x-echo": "***" });
+      // ADR-040 §6: no redaction of the receiver's output — what they echo
+      // is their own response, stored as-is (truncated) so operators see
+      // exactly what the endpoint said. Only our REQUEST is never stored.
+      expect(rows[0]!.response?.body).toBe('auth failed for "Bearer secret"');
+      expect(rows[0]!.response?.headers).toEqual({
+        "x-echo": "Bearer secret",
+      });
     });
   });
 

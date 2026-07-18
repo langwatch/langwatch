@@ -551,16 +551,20 @@ request content is persisted at all.** `WebhookDelivery` + a
 classify + log as a unit). Unlike the §6 shape above, the row carries no
 `requestMethod`/`requestUrl`/`requestHeaders` — only `responseStatus`,
 `latencyMs`, `error`, and, on a failed attempt, the receiver's truncated
-failure `response` (`{ body, headers, retryAfterMs }`, capped at 4 KB). Every
-configured header *value* is scrubbed out of `error` and `response` via
-`scrubHeaderValues` (`deliverWebhook.ts:30`, string-replace of each
-configured header's value with `***`) before the row is written — there is no
-`redactHeadersForLog` function. The scrub is deliberately best-effort exact
-match: a receiver that echoes the secret re-encoded (base64, URL-encoded,
-case-folded) evades it, an accepted residual of the industry-baseline
-plaintext decision — a receiver leaking its caller's own secret back in a
-transformed form is the receiver's bug, and the row is plaintext precisely so
-operators can see what the receiver actually said. A `getWebhookDeliveries` read procedure feeds
+failure `response` (`{ body, headers, retryAfterMs }`, capped at 4 KB).
+
+**Decision: the receiver's response is stored verbatim — no redaction.**
+The response side of a failed delivery is the receiver's own output; if an
+endpoint echoes a secret back in its error body, that is the endpoint's bug
+and masking it would only hide from the operator what the receiver actually
+said (the exact thing this log exists to show). Any masking scheme is also
+inherently best-effort — an echo that is re-encoded, cased, or truncated
+evades exact-match scrubbing, so a scrub would add code and a false sense of
+safety without a real guarantee. The boundary is drawn one level up instead:
+our *request* content (URL, headers, body — where our customer's secrets
+actually live) is never persisted in any form, and the stored response is
+plaintext with a bounded lifetime (30-day prune). This matches the
+industry-baseline shape (GitHub/Stripe webhook delivery logs). A `getWebhookDeliveries` read procedure feeds
 the drawer's "Recent deliveries" drill-down, and a 30-day prune runs as the
 daily `webhookDeliveryPrune` scheduled process manager on the worker
 (ADR-052); the K8s cron cleanup route + chart CronJob were removed along with
