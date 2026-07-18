@@ -84,27 +84,7 @@ func StampInternalGenAI(ctx context.Context, params domain.AITraceParams) {
 	if params.Model != "" {
 		attrs = append(attrs, attribute.String(AttrGenAIRequestModel, params.Model))
 	}
-	if params.Usage.Model != "" {
-		attrs = append(attrs, attribute.String(AttrGenAIResponseModel, params.Usage.Model))
-	}
-	if params.Usage.PromptTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageIn, params.Usage.PromptTokens))
-	}
-	if params.Usage.CompletionTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageOut, params.Usage.CompletionTokens))
-	}
-	if params.Usage.TotalTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageTotal, params.Usage.TotalTokens))
-	}
-	if params.Usage.CacheReadTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheRead, params.Usage.CacheReadTokens))
-	}
-	if params.Usage.CacheCreationTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate, params.Usage.CacheCreationTokens))
-	}
-	if params.Usage.CostMicroUSD > 0 {
-		attrs = append(attrs, attribute.Float64(AttrCostUSD, float64(params.Usage.CostMicroUSD)/1_000_000))
-	}
+	attrs = append(attrs, usageAttributes(params.Usage)...)
 	if params.VirtualKeyID != "" {
 		attrs = append(attrs, attribute.String(AttrVirtualKeyID, params.VirtualKeyID))
 	}
@@ -119,4 +99,32 @@ func StampInternalGenAI(ctx context.Context, params domain.AITraceParams) {
 	}
 
 	span.SetAttributes(attrs...)
+}
+
+// usageAttributes returns the operational usage values that are present. It
+// intentionally contains no request or response body fields.
+func usageAttributes(usage domain.Usage) []attribute.KeyValue {
+	attrs := make([]attribute.KeyValue, 0, 7)
+	if usage.Model != "" {
+		attrs = append(attrs, attribute.String(AttrGenAIResponseModel, usage.Model))
+	}
+	if usage.PromptTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageIn, usage.PromptTokens))
+	}
+	if usage.CompletionTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageOut, usage.CompletionTokens))
+	}
+	if usage.TotalTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageTotal, usage.TotalTokens))
+	}
+	if usage.CacheReadTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheRead, usage.CacheReadTokens))
+	}
+	if usage.CacheCreationTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate, usage.CacheCreationTokens))
+	}
+	if usage.CostMicroUSD > 0 {
+		attrs = append(attrs, attribute.Float64(AttrCostUSD, float64(usage.CostMicroUSD)/1_000_000))
+	}
+	return attrs
 }
