@@ -506,8 +506,8 @@ end
 -- post-dispatch survive-dispatch squash). Only a GQ1 blob is safe to delete
 -- here: its randomUUID id belongs to this value alone. A GQ2 blob is
 -- content-addressed and possibly shared with concurrently-staging producers
--- whose leases are taken after their stage returns, so it is left to the
--- leases of staged jobs sharing its content or to the TTL backstop.
+-- whose leases are acquired during staging via gqTakeLease, so it is left to
+-- those leases or the TTL backstop.
 local function gqReclaimDiscardedNew(keyPrefix, value)
   local lease = gqParseLease(value)
   if lease and lease.kind == "gq1" then
