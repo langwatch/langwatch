@@ -138,11 +138,12 @@ The design rests on assumptions that are currently unmeasured. These metrics are
 
 **Correctness proof**
 
-- `es_fold_duplicate_events_skipped_total{projection}` — events the applied-set caught. Non-zero proves redelivery is real and the mechanism works; flat zero over a long window means it was built for nothing.
+- `es_fold_duplicate_events_skipped_total{projection_name}` — events the applied-set caught. Non-zero proves redelivery is real and the mechanism works; flat zero over a long window means it was built for nothing.
 
 **The write path**
 
-- `es_fold_store_duration_seconds{projection, tier}`, split Redis vs ClickHouse.
+- `es_fold_cache_get_duration_milliseconds{projection_name, source}` — `redis` vs `clickhouse`, on the READ path.
+- `es_fold_cache_store_duration_milliseconds{projection_name}` — the write path, covering the durable store and the cache write together. No tier split on writes.
 - `es_fold_cache_entry_bytes` histogram — at 40k spans the full-state GET/SET round-trip is its own O(N²) cost and is currently invisible.
 
 Refold visibility today is `es_fold_refold_total{projection_name, outcome}`; there is no events histogram.
@@ -160,8 +161,7 @@ Refold visibility today is `es_fold_refold_total{projection_name, outcome}`; the
 ## Open questions
 
 1. **Backstop TTL value.** Purely a leak guard now, so it can be hours. Wants a number and a rationale recorded in code, not in prose.
-4. **Whether `evaluationRun` should be cached at all.** It is the only uncached fold (`pipelineRegistry.ts:394-396`), is fully idempotent, and uses `wait_for_async_insert: 1`. It may simply not need this machinery.
-5. **How the expected replica count is determined.** Reading it from `system.clusters` per check is wasteful and racy during a rolling restart; pinning it to config drifts. A replica genuinely removed from the cluster must not strand every cache entry forever — the backstop TTL bounds that, but the behaviour should be deliberate rather than incidental.
+2. **Whether `evaluationRun` should be cached at all.** It is the only uncached fold (`pipelineRegistry.ts:394-396`), is fully idempotent, and uses `wait_for_async_insert: 1`. It may simply not need this machinery.
 
 ## Disposition of prior ADRs
 
@@ -172,7 +172,7 @@ No ADR in this subsystem may remain `Proposed` while shipped.
 | 002-event-sourcing | Superseded | Keep as history. Its rule 4 ("projections are derived") is restated as invariant 1 — ADR-007 dropped it without retiring it. |
 | **007-event-sourcing-architecture** | **Accepted** | **Superseded by this ADR.** Banner required. Four normative claims describe a deleted queue substrate; three more are contradicted by 021/022/034. Most-cited and least-accurate document in the corpus. Its "Decision — No Checkpoints" is retained, since this ADR reaches correctness without checkpoints. |
 | 015-projection-replay-coordination | Accepted | Keep. Amend to record that rollup replay needs a truncate step (`034:34`) absent from its 7-phase protocol. |
-| 021-lean-fold-cache | **Proposed** | **Retire.** Carries no superseded banner despite ADR-022 superseding its Decision §1 — add one; its mechanism (`toCacheable`, `blobref`, permanent S3, 32 KB) is dead in code. Stop citing it as normative — `034:114` does. |
+| 021-lean-fold-cache | Superseded | **Done here** — banner and status added. Its mechanism (`toCacheable`, `blobref`, permanent S3, 32 KB) is dead in code. |
 | 022-event-log-source-of-truth | **Proposed** | **Promote to Accepted and renumber.** Shipped, load-bearing, cited as authority by five documents, colliding with `022-data-retention` over the same data. |
 | 023 / 025 orphan sweep | Superseded / Accepted | Clean. |
 | 026-groupqueue-payload-envelope | Accepted | **Renumber.** Mark its §"Blob lifecycle" superseded by 029 rather than leaving it reading as live. |
@@ -181,7 +181,7 @@ No ADR in this subsystem may remain `Proposed` while shipped.
 | 029-groupqueue-content-addressed-payload-store | **Proposed** | **Promote to Accepted.** Shipped. Reconcile its reinstatement of project-prefix scoping against `022:129`, which declared it structurally unnecessary. |
 | 030-groupqueue-blob-handling-hardening | **Proposed** | **Promote and renumber.** Shipped. Reconcile TTL figures against `blobConstants.ts`. |
 | 030-transactional-outbox | Accepted | **Renumber.** Strip the stale "Original design (pre-ADR-035)" block at `:207` reading as a second live decision, and the Phase-0 retention instruction at `:162,248` for deleted code. |
-| 034-event-sourced-analytics-materialization | Accepted | Amend: its idempotency citation at `:12,114` attributes to ADR-021 a rule ADR-021 does not contain. **Its lossy-row decision is the named follow-up to this ADR.** |
+| 034-event-sourced-analytics-materialization | Accepted | Citation **corrected here** — it attributed to ADR-021 a rule ADR-021 never made, which is where the corpus-wide "folds are idempotent" assumption began. **Its lossy-row decision remains the named follow-up.** |
 | 035 / 039 | Accepted | Clean. |
 
 **Numbering.** Renumber the later member of each colliding pair. The 022 collision is urgent — both govern ClickHouse durability of trace data, and downstream ADRs already resort to path-qualified links to disambiguate.

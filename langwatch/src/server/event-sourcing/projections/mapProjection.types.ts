@@ -96,10 +96,11 @@ export interface MapProjectionOptions {
    * same `idempotencyKey`.
    *
    * The event log is append-only and at-least-once: a client re-report
-   * (deterministic ids, SDK retries) appends a SECOND event row with the
-   * invoked once per appended event — for an additive sink (an
-   * AggregatingMergeTree rollup) that means the increment lands twice,
-   * SYSTEMATICALLY for write paths designed around retries.
+   * (deterministic ids, SDK retries) appends a SECOND event row with the same
+   * idempotency key, and a map projection is invoked once per appended event.
+   * For an additive sink (an AggregatingMergeTree rollup) that means the
+   * increment lands twice, SYSTEMATICALLY for write paths designed around
+   * retries.
    *
    * With this option, the executor checks the aggregate's event history
    * before mapping: if an EARLIER event holds this event's idempotency key,

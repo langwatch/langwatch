@@ -61,6 +61,13 @@ Feature: Redis write-through cache for fold state
     Then it is treated as a continuation of the retry chain
     And the events the chain already applied are not applied again
 
+  Scenario: A corrupt cached entry is treated as a miss
+    Given the cached entry for aggregate "trace-1" cannot be read back
+    When the fold reads state for "trace-1"
+    Then the durable store is read instead
+    And the fold is not failed, because the state is durable
+    And the read is counted, because the record of applied events went with it
+
   Scenario: Losing the cached entry loses the protection
     Given a fold job failed after its state was stored
     And its cached entry is evicted before the retry
