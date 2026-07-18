@@ -11,11 +11,11 @@ import {
   Sparkles,
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
-import { useRouter } from "~/utils/compat/next-router";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import { useRequiredSession } from "~/hooks/useRequiredSession";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
 import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { GovernSection } from "./sidebar/GovernSection";
@@ -79,7 +79,9 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
   // `/[project]/<section>` routes, so highlight them off the current path
   // the same way MainMenu does for project nav.
   const isTracesActive = router.pathname.includes("/traces");
-  const isEvaluationsActive = router.pathname.includes("/evaluations");
+  const isOnlineEvaluationsActive = router.pathname.includes(
+    "/online-evaluations",
+  );
   const isDatasetsActive = router.pathname.includes("/datasets");
   const isAnnotationsActive = router.pathname.includes("/annotations");
   const isAutomationsActive = router.pathname.includes("/automations");
@@ -145,9 +147,9 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
             {personalProjectSlug && features?.evaluations && (
               <SideMenuLink
                 icon={ClipboardList}
-                label="Evaluations"
-                href={`/${personalProjectSlug}/evaluations`}
-                isActive={isEvaluationsActive}
+                label="Online Evaluations"
+                href={`/${personalProjectSlug}/online-evaluations`}
+                isActive={isOnlineEvaluationsActive}
                 showLabel={showExpanded}
               />
             )}

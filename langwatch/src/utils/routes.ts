@@ -26,37 +26,41 @@ export const projectRoutes = {
   },
   evaluations: {
     path: "/[project]/evaluations",
-    title: "Evaluations",
+    title: "Experiments",
+  },
+  online_evaluations: {
+    path: "/[project]/online-evaluations",
+    title: "Online Evaluations",
   },
   evaluations_new_choose: {
     path: "/[project]/evaluations/new/choose",
     title: "New Evaluation",
-    parent: "evaluations",
+    parent: "online_evaluations",
   },
   evaluations_new: {
     path: "/[project]/evaluations/new",
     title: "New Evaluation",
-    parent: "evaluations",
+    parent: "online_evaluations",
   },
   evaluations_edit_choose: {
     path: "/[project]/evaluations/[id]/edit/choose",
     title: "Editing Evaluation",
-    parent: "evaluations",
+    parent: "online_evaluations",
   },
   evaluations_edit: {
     path: "/[project]/evaluations/[id]/edit",
     title: "Editing Evaluation",
-    parent: "evaluations",
+    parent: "online_evaluations",
   },
   experiments_workbench: {
     path: "/[project]/experiments/workbench/[slug]",
     title: "Experiments Workbench",
-    parent: "evaluations",
+    parent: "experiments",
   },
   evaluations_wizard: {
     path: "/[project]/evaluations/wizard/[slug]",
     title: "Evaluation Wizard",
-    parent: "evaluations",
+    parent: "experiments",
   },
   experiments: {
     path: "/[project]/experiments",

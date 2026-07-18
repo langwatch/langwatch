@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for the Evaluations page permission-based UI visibility.
+ * Integration tests for the Experiments page permission-based UI visibility.
  *
  * Verifies that delete and replicate menu items are gated behind
  * the `evaluations:manage` permission for lite members.
@@ -91,16 +91,6 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
-    monitors: {
-      getAllForProject: {
-        useQuery: () => ({
-          data: [],
-          isLoading: false,
-          isError: false,
-          refetch: vi.fn(),
-        }),
-      },
-    },
   },
 }));
 
@@ -115,16 +105,12 @@ vi.mock("~/components/ui/toaster", () => ({
   },
 }));
 
-vi.mock("~/components/evaluations/NewEvaluationMenu", () => ({
-  NewEvaluationMenu: () => <div data-testid="new-evaluation-menu" />,
+vi.mock("~/components/experiments/CreateExperimentButton", () => ({
+  CreateExperimentButton: () => <div data-testid="create-experiment-button" />,
 }));
 
 vi.mock("~/components/evaluations/CopyEvaluationDialog", () => ({
   CopyEvaluationDialog: () => <div data-testid="copy-evaluation-dialog" />,
-}));
-
-vi.mock("~/components/evaluations/MonitorsSection", () => ({
-  MonitorsSection: () => <div data-testid="monitors-section" />,
 }));
 
 vi.mock("~/components/NavigationFooter", () => ({
@@ -220,19 +206,19 @@ vi.mock("@prisma/client", () => ({
 }));
 
 // Lazy import to ensure mocks are set up first
-const { default: EvaluationsPage } = await import(
+const { GuardedExperimentsPage: ExperimentsPage } = await import(
   "~/pages/[project]/evaluations"
 );
 
 function renderPage() {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <EvaluationsPage />
+      <ExperimentsPage />
     </ChakraProvider>,
   );
 }
 
-describe("Evaluations page permission visibility", () => {
+describe("Experiments page permission visibility", () => {
   afterEach(() => {
     cleanup();
   });

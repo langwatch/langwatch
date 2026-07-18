@@ -21,6 +21,12 @@ const __dirname = path.dirname(__filename);
  */
 export const SKILL_TESTS_SET_ID = "skill-tests";
 
+export function createSkillTestWorkDir(prefix: string): string {
+  const root = path.resolve(__dirname, "../../../.claude/tmp/skill-tests");
+  fs.mkdirSync(root, { recursive: true });
+  return fs.mkdtempSync(path.join(root, prefix));
+}
+
 /**
  * Inline a SKILL.mdx (resolving its `_shared/*.mdx` imports) and write it as
  * SKILL.md into a `.skills/<dir>/` folder under the agent's working directory.
@@ -44,7 +50,7 @@ export function installSkillToWorkDir({
     __dirname,
     "../..",
     skillSubpath,
-    "SKILL.mdx"
+    "SKILL.mdx",
   );
   const skillName = installAs ?? path.basename(skillSubpath);
   const skillDir = path.join(workingDirectory, ".skills", skillName);
@@ -54,7 +60,7 @@ export function installSkillToWorkDir({
 
 const cliDistPath = path.resolve(
   __dirname,
-  "../../../typescript-sdk/dist/cli/index.js"
+  "../../../typescript-sdk/dist/cli/index.js",
 );
 
 /**
@@ -68,7 +74,7 @@ export function setupLocalCli(workingDirectory: string): void {
   if (!fs.existsSync(cliDistPath)) {
     throw new Error(
       `Local langwatch CLI not built at ${cliDistPath}. ` +
-        `Run \`pnpm build\` inside typescript-sdk/ before running scenario tests.`
+        `Run \`pnpm build\` inside typescript-sdk/ before running scenario tests.`,
     );
   }
 
@@ -95,15 +101,19 @@ exec node "${cliDistPath}" "$@"
  * @param cleanEnv - When true, strips LANGWATCH_API_KEY, OPENAI_API_KEY, and
  *   ANTHROPIC_API_KEY from the spawned process environment. Use this to test
  *   cold-start flows where the agent must discover keys from .env files.
+ * @param omitEnvKeys - Additional variables to keep in the test process but
+ *   remove from Claude Code, such as a provider key used only by the judge.
  */
 export function createClaudeCodeAgent({
   workingDirectory,
   skillPath,
   cleanEnv,
+  omitEnvKeys = [],
 }: {
   workingDirectory: string;
   skillPath?: string;
   cleanEnv?: boolean;
+  omitEnvKeys?: string[];
 }): AgentAdapter {
   setupLocalCli(workingDirectory);
   if (skillPath) {
@@ -120,14 +130,18 @@ export function createClaudeCodeAgent({
   if (fs.existsSync(skillsDir) && !fs.existsSync(claudeMdPath)) {
     const skillDirs = fs
       .readdirSync(skillsDir, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && fs.existsSync(path.join(skillsDir, d.name, "SKILL.md")));
+      .filter(
+        (d) =>
+          d.isDirectory() &&
+          fs.existsSync(path.join(skillsDir, d.name, "SKILL.md")),
+      );
     if (skillDirs.length > 0) {
       const instructions = skillDirs
         .map((d) => `.skills/${d.name}/SKILL.md`)
         .join(" and ");
       fs.writeFileSync(
         claudeMdPath,
-        `Read and follow the instructions in ${instructions} before doing anything else.\n`
+        `Read and follow the instructions in ${instructions} before doing anything else.\n`,
       );
     }
   }
@@ -144,7 +158,11 @@ export function createClaudeCodeAgent({
       const renderContent = (content: unknown): string => {
         if (typeof content === "string") return content;
         if (!Array.isArray(content)) {
-          try { return JSON.stringify(content); } catch { return String(content); }
+          try {
+            return JSON.stringify(content);
+          } catch {
+            return String(content);
+          }
         }
         return content
           .map((block: any) => {
@@ -154,9 +172,8 @@ export function createClaudeCodeAgent({
               case "text":
                 return block.text ?? "";
               case "tool_use": {
-                const input = block.input != null
-                  ? JSON.stringify(block.input)
-                  : "";
+                const input =
+                  block.input != null ? JSON.stringify(block.input) : "";
                 return `[tool_use ${block.name ?? "?"}(${input})]`;
               }
               case "tool_result": {
@@ -171,7 +188,11 @@ export function createClaudeCodeAgent({
               case "image":
                 return "[image omitted]";
               default:
-                try { return JSON.stringify(block); } catch { return String(block); }
+                try {
+                  return JSON.stringify(block);
+                } catch {
+                  return String(block);
+                }
             }
           })
           .filter(Boolean)
@@ -196,19 +217,22 @@ export function createClaudeCodeAgent({
           formattedMessages,
         ];
 
-        console.log(
-          chalk.blue("Starting claude in:"),
-          workingDirectory
-        );
+        console.log(chalk.blue("Starting claude in:"), workingDirectory);
 
-        const envVars = cleanEnv
-          ? Object.fromEntries(
-              Object.entries(process.env).filter(
-                ([key]) =>
-                  !["LANGWATCH_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"].includes(key)
+        const omittedKeys = new Set(omitEnvKeys);
+        if (cleanEnv) {
+          omittedKeys.add("LANGWATCH_API_KEY");
+          omittedKeys.add("OPENAI_API_KEY");
+          omittedKeys.add("ANTHROPIC_API_KEY");
+        }
+        const envVars =
+          omittedKeys.size > 0
+            ? Object.fromEntries(
+                Object.entries(process.env).filter(
+                  ([key]) => !omittedKeys.has(key),
+                ),
               )
-            )
-          : process.env;
+            : process.env;
 
         // Prepend the local bin/ wrapper (created by setupLocalCli) so Claude
         // uses the locally-built `langwatch` CLI with the latest commands.
@@ -244,20 +268,13 @@ export function createClaudeCodeAgent({
                   return null;
                 }
               })
-              .filter(
-                (message) => message !== null && "message" in message
-              )
+              .filter((message) => message !== null && "message" in message)
               .map((message) => message.message);
-            console.log(
-              "messages",
-              JSON.stringify(messages, undefined, 2)
-            );
+            console.log("messages", JSON.stringify(messages, undefined, 2));
 
             resolve(messages);
           } else {
-            reject(
-              new Error(`Command failed with exit code ${exitCode}`)
-            );
+            reject(new Error(`Command failed with exit code ${exitCode}`));
           }
         });
 
@@ -276,11 +293,11 @@ export function createClaudeCodeAgent({
  */
 export function assertSkillWasRead(
   state: ScenarioExecutionStateLike,
-  skillName: string
+  skillName: string,
 ): void {
   const allContent = state.messages
     .map((m) =>
-      typeof m.content === "string" ? m.content : JSON.stringify(m.content)
+      typeof m.content === "string" ? m.content : JSON.stringify(m.content),
     )
     .join("\n");
 
@@ -293,7 +310,7 @@ export function assertSkillWasRead(
     throw new Error(
       `Expected agent to read the ${skillName} SKILL.md file, but found no evidence ` +
         `of reading .skills/${skillName}/SKILL.md in the conversation. ` +
-        `The agent may have ignored the skill and hallucinated instructions.`
+        `The agent may have ignored the skill and hallucinated instructions.`,
     );
   }
 }

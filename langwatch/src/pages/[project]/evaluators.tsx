@@ -4,6 +4,7 @@ import {
   Grid,
   Skeleton,
   Spacer,
+  Text,
   VStack,
 } from "@chakra-ui/react";
 import { CheckSquare, Plus } from "lucide-react";
@@ -29,7 +30,7 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
  * This is a hidden page for managing database-backed evaluators.
  */
 function Page() {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
   const { openDrawer, closeDrawer } = useDrawer();
   const utils = api.useContext();
 
@@ -226,7 +227,8 @@ function Page() {
               </EmptyState.Indicator>
               <EmptyState.Title>No evaluators yet</EmptyState.Title>
               <EmptyState.Description>
-                Create reusable evaluators for your evaluations.
+                Create reusable scoring functions for experiments, online
+                evaluations, and guardrails.
               </EmptyState.Description>
               <PageLayout.HeaderButton onClick={handleCreateNewEvaluator}>
                 <Plus size={16} /> Create your first evaluator
@@ -236,6 +238,10 @@ function Page() {
         </Center>
       ) : (
         <VStack gap={6} width="full" align="start" padding={6}>
+          <Text color="fg.muted">
+            Evaluators are reusable scoring functions for experiments, online
+            evaluations, and guardrails.
+          </Text>
           <Grid
             templateColumns="repeat(auto-fill, minmax(300px, 1fr))"
             gap={4}

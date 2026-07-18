@@ -125,53 +125,21 @@ Run the application and check that traces appear in your LangWatch dashboard at 
 - Do NOT forget to add LANGWATCH_API_KEY to .env
 - Do NOT use \`platform_\` MCP tools — this skill is about adding code, not creating platform resources`;
 
-export const PROMPT_EVALUATIONS = `Set Up Evaluations for Your Agent
+export const PROMPT_EXPERIMENTS = `Run Experiments for Your Agent
 
-You are using LangWatch for your AI agent project. Follow these instructions.
+Use LangWatch experiments for pre-deployment batch tests, prompt or model comparisons, regression checks, benchmarks, and CI quality gates.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
-First, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.
+Read the agent code before creating a domain-specific dataset. Read the current documentation with \`langwatch docs evaluations/experiments/overview\` and \`langwatch docs evaluations/experiments/sdk\`. Build the experiment with the SDK that matches the project, run it with real credentials from the project environment, then verify it with \`langwatch experiment list --format json\`.
 
-# Set Up Evaluations for Your Agent
+Do not configure production monitors or guardrails. If the request concerns live traffic, use the online-evaluations skill instead.`;
 
-LangWatch Evaluations is a comprehensive quality assurance system. Understand which part the user needs:
+export const PROMPT_ONLINE_EVALUATIONS = `Set Up Online Evaluations and Guardrails
 
-| User says... | They need... | Go to... |
-|---|---|---|
-| "test my agent", "benchmark", "compare models" | **Experiments** | Step A |
-| "monitor production", "track quality", "block harmful content", "safety" | **Online Evaluation** (includes guardrails) | Step B |
-| "create an evaluator", "scoring function" | **Evaluators** | Step C |
-| "create a dataset", "test data" | **Datasets** | Step D |
-| "evaluate" (ambiguous) | Ask: "batch test or production monitoring?" | - |
+Use LangWatch online evaluations to score live traces or threads asynchronously. Use guardrails only when an evaluator must synchronously stop or replace unsafe traffic.
 
-## Where Evaluations Fit
+Inspect existing evaluators and monitors first. Read the current documentation with \`langwatch docs evaluations/online-evaluation/overview\`, \`langwatch docs evaluations/online-evaluation/setup-monitors\`, and the relevant guardrail guide. Discover the installed CLI flags with \`langwatch monitor create --help\`, create the real monitor or guardrail, and verify the saved configuration and real behavior.
 
-Evaluations sit at the **component level of the testing pyramid** — they test specific aspects of your agent with many input/output examples. This is different from scenarios (end-to-end multi-turn conversation testing).
-
-Use evaluations when:
-- You have many examples with clear correct/incorrect answers
-- Testing RAG retrieval accuracy
-- Benchmarking classification, routing, or detection tasks
-- Running CI/CD quality gates
-
-Use scenarios instead when:
-- Testing multi-turn agent conversation behavior
-- Validating complex tool-calling sequences
-- Checking agent decision-making in realistic situations
-
-For onboarding, create 1-2 Jupyter notebooks (or scripts) maximum. Focus on generating domain-realistic data that's as close to real-world inputs as possible.
-
-## Common Mistakes
-
-- Do NOT say "run an evaluation" — be specific: experiment, monitor, or guardrail
-- Do NOT use generic/placeholder datasets — generate domain-specific examples
-- Do NOT use \`platform_\` MCP tools for code-based features (experiments, guardrails) — write code
-- Do use \`platform_\` MCP tools for platform-based features (evaluators, monitors) when the user wants no-code
-- Do NOT skip running the experiment to verify it works
-- Monitors **measure** (async), guardrails **act** (sync, via code with \`as_guardrail=True\`) — both are online evaluation
-- Always set up \`LANGWATCH_API_KEY\` in \`.env\`
-- Always call \`discover_schema\` before creating evaluators via MCP to understand available types
-- Do NOT create prompts with \`langwatch prompt create\` CLI when using the platform approach — that's for code-based projects`;
+Do not create a batch experiment. If the request concerns a dataset, benchmark, comparison, or CI gate, use the experiments skill instead.`;
 
 export const PROMPT_SCENARIOS = `Test Your Agent with Scenarios
 
@@ -256,7 +224,7 @@ ${PROMPT_PROMPTS}
 
 ---
 
-${PROMPT_EVALUATIONS}
+${PROMPT_EXPERIMENTS}
 
 ---
 

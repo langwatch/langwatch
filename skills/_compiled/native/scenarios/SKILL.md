@@ -39,7 +39,7 @@ If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **C
 
 ## The Agent Testing Pyramid
 
-Scenarios sit at the **top of the testing pyramid** — they test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use evaluations instead for single input/output benchmarking with many examples.
+Scenarios sit at the **top of the testing pyramid** and test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use the `experiments` skill instead for single input/output benchmarking with many examples. If it is not installed, use `npx skills add langwatch/skills/experiments`.
 
 Best practices:
 
@@ -168,7 +168,9 @@ import { describe, it, expect } from "vitest";
 
 const myAgent: AgentAdapter = {
   role: AgentRole.AGENT,
-  async call(input) { return await myExistingAgent(input.messages); },
+  async call(input) {
+    return await myExistingAgent(input.messages);
+  },
 };
 
 describe("My Agent", () => {
@@ -179,7 +181,9 @@ describe("My Agent", () => {
       agents: [
         myAgent,
         scenario.userSimulatorAgent(),
-        scenario.judgeAgent({ criteria: ["Agent provides a helpful response"] }),
+        scenario.judgeAgent({
+          criteria: ["Agent provides a helpful response"],
+        }),
       ],
     });
     expect(result.success).toBe(true);
@@ -283,7 +287,9 @@ import { describe, it, expect } from "vitest";
 
 const myAgent = {
   role: scenario.AgentRole.AGENT,
-  async call(input: scenario.AgentInput) { return await myExistingAgent(input.messages); },
+  async call(input: scenario.AgentInput) {
+    return await myExistingAgent(input.messages);
+  },
 };
 
 describe("Agent Security", () => {
@@ -347,14 +353,14 @@ There are dozens of patterns there (angry customer with cafe noise, password-res
 
 Detect the user's transport from their codebase and pick the matching adapter. **Critically**, every adapter has a different idea of "what is the agent under test":
 
-| User's stack | Adapter | How it connects to the user's agent |
-| --- | --- | --- |
-| Pipecat / Twilio Media Streams WS bot deployed somewhere | `scenario.PipecatAgentAdapter(url="ws://<your-bot>/stream", ...)` | Opens a WebSocket to the user's **already-running** bot. The bot has to be reachable (locally on `ws://localhost:<port>` or remotely). |
-| ElevenLabs hosted ConvAI agent (created in the EL dashboard) | `scenario.ElevenLabsAgentAdapter(agent_id=..., api_key=...)` | Dials the user's hosted ConvAI agent by ID. The hosted agent owns model + voice + instructions + tools. |
-| Twilio phone number (real PSTN, agent answers via Media Streams) | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`) | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up. |
-| Gemini Live model is the agent | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)` | The **adapter IS the agent**. It opens a Gemini Live session with these params — there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent. |
-| OpenAI Realtime model is the agent | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live — the **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent. |
-| Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)` | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
+| User's stack                                                                                          | Adapter                                                                                  | How it connects to the user's agent                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pipecat / Twilio Media Streams WS bot deployed somewhere                                              | `scenario.PipecatAgentAdapter(url="ws://<your-bot>/stream", ...)`                        | Opens a WebSocket to the user's **already-running** bot. The bot has to be reachable (locally on `ws://localhost:<port>` or remotely).                                                                                                                                                                                         |
+| ElevenLabs hosted ConvAI agent (created in the EL dashboard)                                          | `scenario.ElevenLabsAgentAdapter(agent_id=..., api_key=...)`                             | Dials the user's hosted ConvAI agent by ID. The hosted agent owns model + voice + instructions + tools.                                                                                                                                                                                                                        |
+| Twilio phone number (real PSTN, agent answers via Media Streams)                                      | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`)                    | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up.                                                                                                                                                                                                                                          |
+| Gemini Live model is the agent                                                                        | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)`          | The **adapter IS the agent**. It opens a Gemini Live session with these params — there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent.                                   |
+| OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live — the **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                   |
+| Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)`                | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
 
 If you can't tell from the codebase which path the user is on, ASK before generating a test. Picking the wrong adapter means the test exercises something the user hasn't deployed — and they will (rightly) call it useless.
 
@@ -386,14 +392,14 @@ audio_effects=[
 
 The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the `scenario` object. Pick the adapter the same way (Step 2) — the mapping is one-to-one:
 
-| User's stack | TypeScript adapter |
-| --- | --- |
-| Pipecat / Twilio Media Streams WS bot | `scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })` |
-| ElevenLabs hosted ConvAI agent | `scenario.elevenLabsAgent({ agentId, apiKey })` |
-| Twilio phone number (real PSTN) | `scenario.twilioAgent({ accountSid, authToken, phoneNumber })` |
-| Gemini Live model is the agent | `scenario.geminiLiveAgent({ model, systemInstruction, voice })` |
-| OpenAI Realtime model is the agent | `scenario.openAIRealtimeAgent({ model, instructions, voice, tools })` |
-| Text-only stack wrapped as voice | `scenario.composableAgent({ stt, llm, tts })` |
+| User's stack                          | TypeScript adapter                                                    |
+| ------------------------------------- | --------------------------------------------------------------------- |
+| Pipecat / Twilio Media Streams WS bot | `scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })`            |
+| ElevenLabs hosted ConvAI agent        | `scenario.elevenLabsAgent({ agentId, apiKey })`                       |
+| Twilio phone number (real PSTN)       | `scenario.twilioAgent({ accountSid, authToken, phoneNumber })`        |
+| Gemini Live model is the agent        | `scenario.geminiLiveAgent({ model, systemInstruction, voice })`       |
+| OpenAI Realtime model is the agent    | `scenario.openAIRealtimeAgent({ model, instructions, voice, tools })` |
+| Text-only stack wrapped as voice      | `scenario.composableAgent({ stt, llm, tts })`                         |
 
 Seed a voice on the simulator and layer effects the same way:
 
@@ -405,7 +411,7 @@ scenario.userSimulatorAgent({
   persona: "...",
   audioEffects: [
     voice.effects.backgroundNoise("cafe", 0.4), // presets: cafe / office / street / airport
-    voice.effects.phoneQuality(),               // mulaw + 8kHz + codec degradation
+    voice.effects.phoneQuality(), // mulaw + 8kHz + codec degradation
   ],
 });
 ```
@@ -583,7 +589,7 @@ describe("Voice agent — angry billing", () => {
       ],
     });
     expect(result.success).toBe(true);
-  }, 240_000);  // voice scenarios are slow — TTS + transport + multi-turn
+  }, 240_000); // voice scenarios are slow — TTS + transport + multi-turn
 });
 ```
 
@@ -636,7 +642,7 @@ describe("Voice agent — angry billing (Pipecat WS)", () => {
       ],
       script: [
         scenario.agent(), // the bot greets first (voice convention)
-        scenario.user(),  // heated opening
+        scenario.user(), // heated opening
         scenario.proceed(5),
         scenario.judge(),
       ],
@@ -690,9 +696,15 @@ async def test_noisy_handoff(): ...
 //
 // Then mark scenarios as concurrent inside the same file:
 describe.concurrent("voice agent", () => {
-  it("billing inquiry", async () => { /* scenario.run(...) */ }, 240_000);
-  it("account lockout", async () => { /* scenario.run(...) */ }, 240_000);
-  it("refund flow", async () => { /* scenario.run(...) */ }, 240_000);
+  it("billing inquiry", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
+  it("account lockout", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
+  it("refund flow", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
 });
 ```
 

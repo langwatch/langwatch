@@ -26,7 +26,10 @@ const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
 
 function copySkillToWorkDir(tempFolder: string) {
-  installSkillToWorkDir({ workingDirectory: tempFolder, skillSubpath: "datasets" });
+  installSkillToWorkDir({
+    workingDirectory: tempFolder,
+    skillSubpath: "datasets",
+  });
 }
 
 function findGeneratedFiles({
@@ -64,12 +67,12 @@ describe("Dataset Generation Skill", () => {
     "generates a domain-specific dataset for a Python chatbot",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-dataset-py-")
+        path.join(os.tmpdir(), "langwatch-skill-dataset-py-"),
       );
 
       // Copy the tweet-bot fixture — agent must generate data matching its domain
       execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
+        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`,
       );
       copySkillToWorkDir(tempFolder);
       setupLocalCli(tempFolder);
@@ -82,7 +85,10 @@ describe("Dataset Generation Skill", () => {
       if (process.env.LANGWATCH_ENDPOINT) {
         envLines.push(`LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}`);
       }
-      fs.writeFileSync(path.join(tempFolder, ".env"), envLines.join("\n") + "\n");
+      fs.writeFileSync(
+        path.join(tempFolder, ".env"),
+        envLines.join("\n") + "\n",
+      );
 
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
@@ -93,7 +99,7 @@ describe("Dataset Generation Skill", () => {
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({
             model: judgeModel,
-            instructions:
+            persona:
               "You are a developer who wants to create an evaluation dataset for your chatbot. " +
               "When the agent proposes a plan, confirm it. When shown a preview, approve it and ask to continue. " +
               "Be brief in your responses — just confirm and let the agent do its work.",
@@ -111,13 +117,17 @@ describe("Dataset Generation Skill", () => {
         ],
         script: [
           scenario.user(
-            "generate an evaluation dataset for my chatbot. read my code first to understand what it does, then create something realistic."
+            "generate an evaluation dataset for my chatbot. read my code first to understand what it does, then create something realistic.",
           ),
           scenario.agent(),
-          (state) => { toolCallFix(state); },
+          (state) => {
+            toolCallFix(state);
+          },
           scenario.user(),
           scenario.agent(),
-          (state) => { toolCallFix(state); },
+          (state) => {
+            toolCallFix(state);
+          },
           scenario.user(),
           scenario.agent(),
           (state) => {
@@ -125,10 +135,13 @@ describe("Dataset Generation Skill", () => {
             assertSkillWasRead(state, "datasets");
 
             // Check a CSV file was created
-            const csvFiles = findGeneratedFiles({ dir: tempFolder, extensions: [".csv"] });
+            const csvFiles = findGeneratedFiles({
+              dir: tempFolder,
+              extensions: [".csv"],
+            });
             expect(
               csvFiles.length,
-              `Expected at least one CSV file in ${tempFolder}`
+              `Expected at least one CSV file in ${tempFolder}`,
             ).toBeGreaterThan(0);
 
             // Read the CSV and validate it has realistic content
@@ -138,19 +151,21 @@ describe("Dataset Generation Skill", () => {
               .toLowerCase();
 
             // Should have meaningful rows (at least a header + 10 data rows)
-            const lineCount = csvContent.split("\n").filter((l) => l.trim()).length;
+            const lineCount = csvContent
+              .split("\n")
+              .filter((l) => l.trim()).length;
             expect(
               lineCount,
-              "Dataset should have at least 11 lines (header + 10 rows)"
+              "Dataset should have at least 11 lines (header + 10 rows)",
             ).toBeGreaterThanOrEqual(11);
 
             // Should NOT be dominated by generic trivia — a tweet-bot dataset should have
             // casual, fun, social-media-style inputs, not textbook questions
             expect(
               csvContent,
-              "Dataset should not contain academic trivia like 'capital of france' or 'quantum computing'"
+              "Dataset should not contain academic trivia like 'capital of france' or 'quantum computing'",
             ).not.toMatch(
-              /capital of france|quantum computing|photosynthesis|explain the theory of/
+              /capital of france|quantum computing|photosynthesis|explain the theory of/,
             );
           },
           scenario.judge(),
@@ -159,19 +174,19 @@ describe("Dataset Generation Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "generates a RAG-specific dataset with context columns for a farm advisory agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-dataset-rag-")
+        path.join(os.tmpdir(), "langwatch-skill-dataset-rag-"),
       );
 
       // Copy the RAG fixture — agent should find the knowledge base
       execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`
+        `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`,
       );
       copySkillToWorkDir(tempFolder);
       setupLocalCli(tempFolder);
@@ -183,7 +198,10 @@ describe("Dataset Generation Skill", () => {
       if (process.env.LANGWATCH_ENDPOINT) {
         envLines2.push(`LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}`);
       }
-      fs.writeFileSync(path.join(tempFolder, ".env"), envLines2.join("\n") + "\n");
+      fs.writeFileSync(
+        path.join(tempFolder, ".env"),
+        envLines2.join("\n") + "\n",
+      );
 
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
@@ -194,7 +212,7 @@ describe("Dataset Generation Skill", () => {
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({
             model: judgeModel,
-            instructions:
+            persona:
               "You are a farm tech developer who wants to test your RAG agent. " +
               "When asked questions, provide brief answers. When shown a plan, approve it. " +
               "When shown a preview, say it looks good and ask to finish generating. " +
@@ -213,20 +231,27 @@ describe("Dataset Generation Skill", () => {
         ],
         script: [
           scenario.user(
-            "I need an evaluation dataset for my RAG agent. Can you look at my code and generate something realistic? I want to test both accuracy and hallucination."
+            "I need an evaluation dataset for my RAG agent. Can you look at my code and generate something realistic? I want to test both accuracy and hallucination.",
           ),
           scenario.agent(),
-          (state) => { toolCallFix(state); },
+          (state) => {
+            toolCallFix(state);
+          },
           scenario.user(),
           scenario.agent(),
-          (state) => { toolCallFix(state); },
+          (state) => {
+            toolCallFix(state);
+          },
           scenario.user(),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "datasets");
 
-            const csvFiles = findGeneratedFiles({ dir: tempFolder, extensions: [".csv"] });
+            const csvFiles = findGeneratedFiles({
+              dir: tempFolder,
+              extensions: [".csv"],
+            });
             expect(csvFiles.length).toBeGreaterThan(0);
 
             const csvContent = csvFiles
@@ -244,12 +269,12 @@ describe("Dataset Generation Skill", () => {
 
             expect(
               hasFarmTerms,
-              "Dataset should contain farming-related terms (irrigation, frost, pest, orchard, soil)"
+              "Dataset should contain farming-related terms (irrigation, frost, pest, orchard, soil)",
             ).toBe(true);
 
             // Should NOT be generic
             expect(csvContent).not.toMatch(
-              /capital of france|what is 2 ?\+ ?2|quantum computing/
+              /capital of france|what is 2 ?\+ ?2|quantum computing/,
             );
           },
           scenario.judge(),
@@ -258,18 +283,18 @@ describe("Dataset Generation Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "presents a plan and waits for user confirmation in multi-turn flow",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-dataset-multiturn-")
+        path.join(os.tmpdir(), "langwatch-skill-dataset-multiturn-"),
       );
 
       execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
+        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`,
       );
       copySkillToWorkDir(tempFolder);
       setupLocalCli(tempFolder);
@@ -281,7 +306,10 @@ describe("Dataset Generation Skill", () => {
       if (process.env.LANGWATCH_ENDPOINT) {
         envLines2.push(`LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}`);
       }
-      fs.writeFileSync(path.join(tempFolder, ".env"), envLines2.join("\n") + "\n");
+      fs.writeFileSync(
+        path.join(tempFolder, ".env"),
+        envLines2.join("\n") + "\n",
+      );
 
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
@@ -292,7 +320,7 @@ describe("Dataset Generation Skill", () => {
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({
             model: judgeModel,
-            instructions:
+            persona:
               "You want a dataset. When the agent proposes a plan, say 'looks good, go ahead'. " +
               "When shown a preview, say 'these look realistic, please generate the full dataset'. " +
               "Be a normal developer, brief and to the point.",
@@ -307,14 +335,16 @@ describe("Dataset Generation Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "create an evaluation dataset for my project"
-          ),
+          scenario.user("create an evaluation dataset for my project"),
           scenario.agent(),
-          (state) => { toolCallFix(state); },
+          (state) => {
+            toolCallFix(state);
+          },
           scenario.user(),
           scenario.agent(),
-          (state) => { toolCallFix(state); },
+          (state) => {
+            toolCallFix(state);
+          },
           scenario.user(),
           scenario.agent(),
           (state) => {
@@ -327,18 +357,18 @@ describe("Dataset Generation Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "generates a hallucination-testing dataset with context column for a RAG agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-dataset-hallucination-")
+        path.join(os.tmpdir(), "langwatch-skill-dataset-hallucination-"),
       );
 
       execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`
+        `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`,
       );
       copySkillToWorkDir(tempFolder);
       setupLocalCli(tempFolder);
@@ -350,7 +380,10 @@ describe("Dataset Generation Skill", () => {
       if (process.env.LANGWATCH_ENDPOINT) {
         envLines2.push(`LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}`);
       }
-      fs.writeFileSync(path.join(tempFolder, ".env"), envLines2.join("\n") + "\n");
+      fs.writeFileSync(
+        path.join(tempFolder, ".env"),
+        envLines2.join("\n") + "\n",
+      );
 
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
@@ -362,7 +395,7 @@ describe("Dataset Generation Skill", () => {
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({
             model: judgeModel,
-            instructions:
+            persona:
               "You want to test hallucination in your RAG farm advisory bot. " +
               "When shown a plan, approve it. When shown a preview, approve it. " +
               "Emphasize that you specifically need to test cases where the bot hallucinates " +
@@ -380,21 +413,28 @@ describe("Dataset Generation Skill", () => {
         script: [
           scenario.user(
             "I need a dataset specifically for testing hallucination in my RAG agent. " +
-            "I want to make sure it doesn't make up answers that aren't in the knowledge base. " +
-            "Read my code to understand the domain."
+              "I want to make sure it doesn't make up answers that aren't in the knowledge base. " +
+              "Read my code to understand the domain.",
           ),
           scenario.agent(),
-          (state) => { toolCallFix(state); },
+          (state) => {
+            toolCallFix(state);
+          },
           scenario.user(),
           scenario.agent(),
-          (state) => { toolCallFix(state); },
+          (state) => {
+            toolCallFix(state);
+          },
           scenario.user(),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "datasets");
 
-            const csvFiles = findGeneratedFiles({ dir: tempFolder, extensions: [".csv"] });
+            const csvFiles = findGeneratedFiles({
+              dir: tempFolder,
+              extensions: [".csv"],
+            });
             expect(csvFiles.length).toBeGreaterThan(0);
 
             // Read CSV content and check for context-related columns
@@ -410,7 +450,7 @@ describe("Dataset Generation Skill", () => {
 
             expect(
               hasContextColumn,
-              "Dataset should include a context or expected_contexts column for hallucination testing"
+              "Dataset should include a context or expected_contexts column for hallucination testing",
             ).toBe(true);
           },
           scenario.judge(),
@@ -419,19 +459,19 @@ describe("Dataset Generation Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "generates a travel-specific dataset when user provides domain context for a generic codebase",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-dataset-ts-generic-")
+        path.join(os.tmpdir(), "langwatch-skill-dataset-ts-generic-"),
       );
 
       // Use the generic TypeScript fixture — "You are a helpful assistant" gives no domain signal
       execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
+        `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`,
       );
       copySkillToWorkDir(tempFolder);
       setupLocalCli(tempFolder);
@@ -443,7 +483,10 @@ describe("Dataset Generation Skill", () => {
       if (process.env.LANGWATCH_ENDPOINT) {
         envLines2.push(`LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}`);
       }
-      fs.writeFileSync(path.join(tempFolder, ".env"), envLines2.join("\n") + "\n");
+      fs.writeFileSync(
+        path.join(tempFolder, ".env"),
+        envLines2.join("\n") + "\n",
+      );
 
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
@@ -456,7 +499,7 @@ describe("Dataset Generation Skill", () => {
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({
             model: judgeModel,
-            instructions:
+            persona:
               "Your bot is a travel planning assistant that helps users plan trips, book hotels, " +
               "and find activities. The code just says 'helpful assistant' but you should tell the agent " +
               "it's actually a travel bot when asked about the domain. " +
@@ -472,20 +515,27 @@ describe("Dataset Generation Skill", () => {
         ],
         script: [
           scenario.user(
-            "generate an evaluation dataset for my chatbot. it's a travel planning assistant that helps users plan trips, book hotels, and find activities. please explore the code and then generate the full dataset."
+            "generate an evaluation dataset for my chatbot. it's a travel planning assistant that helps users plan trips, book hotels, and find activities. please explore the code and then generate the full dataset.",
           ),
           scenario.agent(),
-          (state) => { toolCallFix(state); },
+          (state) => {
+            toolCallFix(state);
+          },
           scenario.user(),
           scenario.agent(),
-          (state) => { toolCallFix(state); },
+          (state) => {
+            toolCallFix(state);
+          },
           scenario.user(),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "datasets");
 
-            const csvFiles = findGeneratedFiles({ dir: tempFolder, extensions: [".csv"] });
+            const csvFiles = findGeneratedFiles({
+              dir: tempFolder,
+              extensions: [".csv"],
+            });
             expect(csvFiles.length).toBeGreaterThan(0);
 
             const csvContent = csvFiles
@@ -504,7 +554,7 @@ describe("Dataset Generation Skill", () => {
 
             expect(
               hasTravelTerms,
-              "Dataset should contain travel-related terms since the user described a travel bot"
+              "Dataset should contain travel-related terms since the user described a travel bot",
             ).toBe(true);
           },
           scenario.judge(),
@@ -513,6 +563,6 @@ describe("Dataset Generation Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 });

@@ -177,30 +177,30 @@ Do NOT consider the work complete without verifying. In order:
 
 <div className="lw-accordion">
   <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
-    <span className="lw-accordion-title">Set up evaluations for my agent</span>
+    <span className="lw-accordion-title">Run experiments for my agent</span>
     <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
   </div>
   <div className="lw-accordion-body">
     <div className="lw-accordion-commands">
       <div className="lw-accordion-cmd-col">
         <div className="lw-accordion-cmd-label">Install via CLI</div>
-        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/evaluations"} data-track="docs_copy_skill_install" data-track-title={"Set up evaluations for my agent"} data-track-skill={"langwatch/skills/evaluations"}>
-          <code>npx skills add langwatch/skills/evaluations</code>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/experiments"} data-track="docs_copy_skill_install" data-track-title={"Run experiments for my agent"} data-track-skill={"langwatch/skills/experiments"}>
+          <code>npx skills add langwatch/skills/experiments</code>
           <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
           <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
         </div>
       </div>
       <div className="lw-accordion-cmd-col">
         <div className="lw-accordion-cmd-label">Skill Usage</div>
-        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/evaluations"} data-track="docs_copy_slash_command" data-track-title={"Set up evaluations for my agent"} data-track-command={"/evaluations"}>
-          <code><span className="lw-slash-command">/evaluations</span></code>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/experiments"} data-track="docs_copy_slash_command" data-track-title={"Run experiments for my agent"} data-track-command={"/experiments"}>
+          <code><span className="lw-slash-command">/experiments</span></code>
           <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
           <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
         </div>
       </div>
     </div>
     <div className="lw-accordion-actions">
-      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Set up evaluations for my agent"} data-track-skill={"langwatch/skills/evaluations"}>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Run experiments for my agent"} data-track-skill={"langwatch/skills/experiments"}>
         <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
         <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
         <span className="lw-accordion-action-text">
@@ -210,51 +210,45 @@ Do NOT consider the work complete without verifying. In order:
         <div className="lw-prompt-source">
 
 ````text
-Set up evaluations for my agent
+Set up experiments for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
 IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
-# Set Up Evaluations for Your Agent
+# Run Experiments for Your Agent
 
-LangWatch Evaluations is a comprehensive QA system. Map the user's request to one branch:
+Experiments are pre-deployment batch tests. They run an application over a dataset and compare outputs with reusable evaluators. They are appropriate for prompt and model comparisons, regression tests, benchmarks, and CI quality gates.
 
-| User says... | They need... | Go to... |
-|---|---|---|
-| "test my agent", "benchmark", "compare models" | **Experiments** | Step A |
-| "monitor production", "track quality", "block harmful content", "safety" | **Online Evaluation** (includes guardrails) | Step B |
-| "create an evaluator", "scoring function" | **Evaluators** | Step C |
-| "create a dataset", "test data" | **Datasets** | Step D |
-| "evaluate" (ambiguous) | Ask: "batch test or production monitoring?" | - |
+## Hand Off Production Evaluation Requests
 
-## Where Evaluations Fit
+If the user wants to score live traces or threads, monitor production quality, or block unsafe traffic, this is the wrong workflow.
 
-Evaluations sit at the **component level** of the testing pyramid — they test specific aspects of an agent with many input/output examples. Different from scenarios (end-to-end multi-turn).
+1. If the `online-evaluations` skill is available, load it and follow it now.
+2. Otherwise, tell the user to install it with:
+   ```bash
+   npx skills add langwatch/skills/online-evaluations
+   ```
 
-Use evaluations when you have many examples with clear correct answers, or for CI quality gates. Use scenarios for multi-turn behavior and tool-calling sequences.
+Do not configure a monitor or guardrail from this skill.
+
+## Experiments and Scenarios
+
+Use experiments for many single input and output examples with measurable results. Use the `scenarios` skill for end-to-end, multi-turn behavior and tool-calling sequences.
 
 ## Determine Scope
 
-If the user's request is **general** ("set up evaluations"):
+For a general request such as "test my agent":
 
-- Read the codebase to understand the agent
-- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
-- Set up an experiment + evaluator + dataset
-- After the experiment is working, summarize results and suggest improvements (consultant mode — see end of skill).
+1. Read the agent code, system prompt, tools, and relevant git history.
+2. Identify the behavior most likely to regress.
+3. Create a domain-specific dataset.
+4. Select evaluators that measure the intended behavior.
+5. Create and run a real experiment.
+6. Interpret the results and recommend concrete improvements.
 
-If the user's request is **specific** ("add a faithfulness evaluator"):
-
-- Focus on the specific need
-- Create the targeted evaluator, dataset, or experiment
-- Verify it works
-
-## Detect Context
-
-If you're in a codebase (`package.json`, `pyproject.toml`, etc.) — use the SDK for experiments and guardrails; use the CLI for evaluators, datasets, monitors. If there is no codebase, drive everything via the CLI. If ambiguous, ask the user.
-
-Some features are code-only (experiments, guardrails) and some are platform-only (monitors). Evaluators work on both surfaces.
+For a targeted request, focus on that behavior and still run the resulting experiment.
 
 ## Plan Limits
 
@@ -299,41 +293,43 @@ And two ways to authenticate:
 
 So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
-Then read the evaluations overview:
+Read the experiment documentation before writing code:
 
 ```bash
-langwatch docs evaluations/overview
+langwatch docs evaluations/experiments/overview
+langwatch docs evaluations/experiments/sdk
 ```
 
-## Step A: Experiments (Batch Testing) — Code Approach
+## Build a Domain-Specific Dataset
 
-Create a script or notebook that runs the agent against a dataset and measures quality.
+The examples must match what the application actually does. Read the system prompt, function signatures, tools, and knowledge sources first.
 
-1. Read the SDK docs:
-   ```bash
-   langwatch docs evaluations/experiments/sdk
-   ```
-2. Analyze the agent code to understand its inputs/outputs.
-3. Create a dataset with examples that look like real production data — domain-realistic, not generic.
-4. Create the experiment file:
+Good examples resemble real requests to this application and cover normal cases, edge cases, and past failures. Never use generic trivia such as "What is 2+2?" or "What is the capital of France?" unless the application itself is a trivia system.
 
-**Python (Jupyter):**
+If an existing LangWatch dataset is appropriate, inspect it with `langwatch dataset list --format json` and `langwatch dataset get --help`. Otherwise create the dataset in code or use the `datasets` skill.
+
+## Create the Experiment
+
+Use the SDK that matches the codebase. Keep credentials in environment variables and use the project's existing dependency manager.
+
+### Python
 
 ```python
 import langwatch
 import pandas as pd
 
-data = {
-    "input": ["domain-specific question 1", "domain-specific question 2"],
-    "expected_output": ["expected answer 1", "expected answer 2"],
-}
-df = pd.DataFrame(data)
+dataset = pd.DataFrame([
+    {
+        "input": "A realistic request for this application",
+        "expected_output": "The expected behavior",
+    },
+])
 
-evaluation = langwatch.experiment.init("agent-evaluation")
+experiment = langwatch.experiment.init("agent-regression")
 
-for index, row in evaluation.loop(df.iterrows()):
+for index, row in experiment.loop(dataset.iterrows()):
     response = my_agent(row["input"])
-    evaluation.evaluate(
+    experiment.evaluate(
         "ragas/answer_relevancy",
         index=index,
         data={"input": row["input"], "output": response},
@@ -341,21 +337,24 @@ for index, row in evaluation.loop(df.iterrows()):
     )
 ```
 
-**TypeScript:**
+### TypeScript
 
 ```typescript
 import { LangWatch } from "langwatch";
 
 const langwatch = new LangWatch();
 const dataset = [
-  { input: "domain-specific question", expectedOutput: "expected answer" },
+  {
+    input: "A realistic request for this application",
+    expectedOutput: "The expected behavior",
+  },
 ];
 
-const evaluation = await langwatch.experiments.init("agent-evaluation");
+const experiment = await langwatch.experiments.init("agent-regression");
 
-await evaluation.run(dataset, async ({ item, index }) => {
+await experiment.run(dataset, async ({ item, index }) => {
   const response = await myAgent(item.input);
-  await evaluation.evaluate("ragas/answer_relevancy", {
+  await experiment.evaluate("ragas/answer_relevancy", {
     index,
     data: { input: item.input, output: response },
     settings: { model: "openai/gpt-5-mini", max_tokens: 2048 },
@@ -363,89 +362,25 @@ await evaluation.run(dataset, async ({ item, index }) => {
 });
 ```
 
-5. Run it. ALWAYS execute the experiment after creating it — an unrun experiment is useless. For Python notebooks: run the cells, or `jupyter nbconvert --to notebook --execute`. For TypeScript: `npx tsx experiment.ts`.
+Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
 
-## Step B: Online Evaluation (Production Monitoring & Guardrails)
+## Run and Verify
 
-### Platform mode: Monitors (continuous async scoring)
+Always execute the experiment. An unrun experiment is incomplete.
 
-```bash
-langwatch docs evaluations/online-evaluation/overview
-```
+- Python script: run it with the project's Python environment.
+- Notebook: execute all cells, for example with `jupyter nbconvert --to notebook --execute`.
+- TypeScript: run it with the project's package manager, for example `pnpm exec tsx experiment.ts`.
 
-Create monitors via the CLI (`langwatch monitor --help` for the flag set). Optionally configure further at https://app.langwatch.ai → Evaluations → Monitors.
-
-### Code mode: Guardrails (synchronous blocking)
+After it runs, verify the result with the CLI:
 
 ```bash
-langwatch docs evaluations/guardrails/code-integration
+langwatch experiment list --format json
 ```
 
-Add guardrail checks in agent code:
-
-```python
-import langwatch
-
-@langwatch.trace()
-def my_agent(user_input):
-    guardrail = langwatch.evaluation.evaluate(
-        "azure/jailbreak",
-        name="Jailbreak Detection",
-        as_guardrail=True,
-        data={"input": user_input},
-    )
-    if not guardrail.passed:
-        return "I can't help with that request."
-    ...
-```
-
-Key distinction: Monitors **measure** (async). Guardrails **act** (sync via `as_guardrail=True`).
-
-## Step C: Evaluators (Scoring Functions)
-
-Read the docs first:
-
-```bash
-langwatch docs evaluations/evaluators/overview
-langwatch docs evaluations/evaluators/list      # Browse available evaluators
-```
-
-In code, call evaluators via the SDK as shown in Step A. To create or manage evaluators on the platform, use `langwatch evaluator --help`. If unsure which `--type` values are valid, run `langwatch evaluator create --help` first.
-
-If you need an LLM-as-judge evaluator, verify a model provider is configured (`langwatch model-provider list`).
-
-## Step D: Datasets
-
-Read the docs first:
-
-```bash
-langwatch docs datasets/overview
-langwatch docs datasets/programmatic-access
-langwatch docs datasets/ai-dataset-generation
-```
-
-Use `langwatch dataset --help` for create/upload/download. Generate data tailored to the agent:
-
-| Agent type | Dataset examples |
-|---|---|
-| Chatbot | Realistic user questions matching the bot's persona |
-| RAG pipeline | Questions with expected answers testing retrieval quality |
-| Classifier | Inputs with expected category labels |
-| Code assistant | Coding tasks with expected outputs |
-| Customer support | Support tickets and customer questions |
-| Summarizer | Documents with expected summaries |
-
-CRITICAL: The dataset MUST be specific to what the agent ACTUALLY does. Before generating any data:
-
-1. Read the agent's system prompt word by word
-2. Read the agent's function signatures and tool definitions
-3. Understand the agent's domain, persona, and constraints
-
-Then generate data reflecting EXACTLY this agent's real-world usage. NEVER use generic examples like "What is 2+2?", "What is the capital of France?", or "Explain quantum computing" — every example must be something a real user of THIS specific agent would say.
+If the CLI supports a more specific read or run for the installed version, discover it with `langwatch experiment --help` before using it.
 
 ## Consultant Mode
-
-Once the experiment is working, summarize results and suggest 2-3 domain-specific improvements based on what you learned from the codebase.
 
 After delivering initial results, transition to consultant mode to help the user get maximum value.
 
@@ -459,15 +394,236 @@ Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask g
 
 ## Common Mistakes
 
-- Do NOT say "run an evaluation" — be specific: experiment, monitor, or guardrail
-- Do NOT use generic/placeholder datasets — generate domain-specific examples
-- Do NOT skip running the experiment to verify it works
-- Monitors **measure** (async), guardrails **act** (sync, via code with `as_guardrail=True`)
+- Do not configure production monitoring or guardrails from this skill.
+- Do not call a batch run an online evaluation.
+- Do not use placeholder datasets.
+- Do not guess SDK APIs when the installed documentation is available.
+- Do not stop after writing the experiment. Run it and inspect the real result.
 ````
 
         </div>
       </div>
-      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/evaluations/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Set up evaluations for my agent"} data-track-skill={"langwatch/skills/evaluations"}>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/experiments/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Run experiments for my agent"} data-track-skill={"langwatch/skills/experiments"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Set up online evaluations and guardrails</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/online-evaluations"} data-track="docs_copy_skill_install" data-track-title={"Set up online evaluations and guardrails"} data-track-skill={"langwatch/skills/online-evaluations"}>
+          <code>npx skills add langwatch/skills/online-evaluations</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/online-evaluations"} data-track="docs_copy_slash_command" data-track-title={"Set up online evaluations and guardrails"} data-track-command={"/online-evaluations"}>
+          <code><span className="lw-slash-command">/online-evaluations</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Set up online evaluations and guardrails"} data-track-skill={"langwatch/skills/online-evaluations"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+Set up online evaluations for my agent
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+
+# Set Up Online Evaluations and Guardrails
+
+Online evaluations apply reusable evaluators to production traffic:
+
+- An online evaluation measures live traces or threads asynchronously.
+- A guardrail runs synchronously and can stop or replace unsafe traffic.
+
+## Hand Off Batch Testing Requests
+
+If the user wants to test a dataset, compare prompts or models, benchmark, or create a CI quality gate, this is the wrong workflow.
+
+1. If the `experiments` skill is available, load it and follow it now.
+2. Otherwise, tell the user to install it with:
+   ```bash
+   npx skills add langwatch/skills/experiments
+   ```
+
+Do not create a batch experiment from this skill.
+
+## Choose the Production Workflow
+
+Use an online evaluation when the user wants continuous scoring, quality trends, sampling, or evaluation by trace or thread.
+
+Use a guardrail when the result must affect the request or response immediately, such as jailbreak detection, PII blocking, or policy enforcement.
+
+If the user's wording is broad, inspect the application and choose the safer non-blocking online evaluation unless they explicitly require synchronous enforcement.
+
+## Plan Limits
+
+LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments, and datasets. When you hit a limit, the API returns `"Free plan limit of N reached..."` with an upgrade link.
+
+How to handle:
+
+- Work within the limits — if 3 scenarios are allowed, create 3 meaningful ones, not 10.
+- Make every creation count: each one should demonstrate clear value.
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
+- Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
+
+If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
+
+## Prerequisites
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+**Projects and API keys: target a real project, not a personal one.**
+
+LangWatch has two kinds of project:
+
+- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
+
+And two ways to authenticate:
+
+- **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
+- **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
+
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+
+Read the relevant documentation before changing configuration or code:
+
+```bash
+langwatch docs evaluations/online-evaluation/overview
+langwatch docs evaluations/online-evaluation/setup-monitors
+langwatch docs evaluations/guardrails/overview
+langwatch docs evaluations/evaluators/list
+```
+
+## Inspect the Existing Setup
+
+Use JSON output and inspect what already exists before creating duplicates:
+
+```bash
+langwatch monitor list --format json
+langwatch evaluator list --format json
+```
+
+Read recent traces only when they are needed to determine mappings, level, sampling, or realistic evaluator inputs. Do not send production data to a different project.
+
+## Create an Online Evaluation
+
+Discover the installed CLI contract first:
+
+```bash
+langwatch monitor create --help
+```
+
+Then create the monitor with a descriptive name, a valid evaluator type or saved evaluator, and the correct level:
+
+- Use `trace` for per-interaction quality.
+- Use `thread` for multi-message outcomes and configure an appropriate idle timeout in the platform when needed.
+- Start with a conservative sample rate for expensive evaluators on high-volume traffic.
+- Use `ON_MESSAGE` for asynchronous online evaluation.
+
+Do not guess evaluator parameters. Read the evaluator docs and the installed CLI help. If an LLM evaluator is used, verify that the target project has a model provider configured.
+
+After creation, verify the saved resource:
+
+```bash
+langwatch monitor list --format json
+langwatch monitor get <monitor-id> --format json
+```
+
+The task is complete only when the created monitor appears with the intended evaluator, execution mode, level, sample rate, and enabled state.
+
+## Add a Guardrail
+
+For platform-managed guardrails, create or edit the monitor with `AS_GUARDRAIL` after reading `langwatch monitor create --help` or `langwatch monitor update --help`.
+
+For an in-code guardrail, follow the language-specific documentation. A Python integration has this general shape:
+
+```python
+import langwatch
+
+@langwatch.trace()
+def my_agent(user_input):
+    result = langwatch.evaluation.evaluate(
+        "azure/jailbreak",
+        name="Jailbreak detection",
+        as_guardrail=True,
+        data={"input": user_input},
+    )
+    if not result.passed:
+        return "I cannot help with that request."
+
+    return generate_response(user_input)
+```
+
+Treat the snippet as a shape, not a substitute for the installed docs. Preserve the application's existing error handling and decide explicitly what happens if the guardrail service is unavailable.
+
+## Verify Real Behavior
+
+For an online evaluation:
+
+1. Send or reuse a representative traced interaction in the target project.
+2. Confirm the monitor is enabled.
+3. Confirm a real evaluation result appears in Online Evaluations analytics.
+
+For a guardrail:
+
+1. Run one allowed input and one input that should be blocked.
+2. Verify the allowed path still works.
+3. Verify the blocked path does not reach the protected operation.
+4. Verify both outcomes are traced without exposing sensitive content.
+
+## Common Mistakes
+
+- Do not create a batch experiment from this skill.
+- Do not describe a synchronous guardrail as asynchronous monitoring.
+- Do not enable an expensive evaluator on all traffic without considering sampling and cost.
+- Do not create duplicate monitors without inspecting the project first.
+- Do not claim success after saving configuration. Verify a real monitor or guardrail behavior.
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/online-evaluations/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Set up online evaluations and guardrails"} data-track-skill={"langwatch/skills/online-evaluations"}>
         <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
         <span className="lw-accordion-action-text">
           <span className="lw-accordion-action-title">Download SKILL.md</span>
@@ -553,7 +709,7 @@ If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **C
 
 ## The Agent Testing Pyramid
 
-Scenarios sit at the **top of the testing pyramid** — they test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use evaluations instead for single input/output benchmarking with many examples.
+Scenarios sit at the **top of the testing pyramid** and test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use the `experiments` skill instead for single input/output benchmarking with many examples. If it is not installed, use `npx skills add langwatch/skills/experiments`.
 
 Best practices:
 
@@ -682,7 +838,9 @@ import { describe, it, expect } from "vitest";
 
 const myAgent: AgentAdapter = {
   role: AgentRole.AGENT,
-  async call(input) { return await myExistingAgent(input.messages); },
+  async call(input) {
+    return await myExistingAgent(input.messages);
+  },
 };
 
 describe("My Agent", () => {
@@ -693,7 +851,9 @@ describe("My Agent", () => {
       agents: [
         myAgent,
         scenario.userSimulatorAgent(),
-        scenario.judgeAgent({ criteria: ["Agent provides a helpful response"] }),
+        scenario.judgeAgent({
+          criteria: ["Agent provides a helpful response"],
+        }),
       ],
     });
     expect(result.success).toBe(true);
@@ -797,7 +957,9 @@ import { describe, it, expect } from "vitest";
 
 const myAgent = {
   role: scenario.AgentRole.AGENT,
-  async call(input: scenario.AgentInput) { return await myExistingAgent(input.messages); },
+  async call(input: scenario.AgentInput) {
+    return await myExistingAgent(input.messages);
+  },
 };
 
 describe("Agent Security", () => {
@@ -861,14 +1023,14 @@ There are dozens of patterns there (angry customer with cafe noise, password-res
 
 Detect the user's transport from their codebase and pick the matching adapter. **Critically**, every adapter has a different idea of "what is the agent under test":
 
-| User's stack | Adapter | How it connects to the user's agent |
-| --- | --- | --- |
-| Pipecat / Twilio Media Streams WS bot deployed somewhere | `scenario.PipecatAgentAdapter(url="ws://<your-bot>/stream", ...)` | Opens a WebSocket to the user's **already-running** bot. The bot has to be reachable (locally on `ws://localhost:<port>` or remotely). |
-| ElevenLabs hosted ConvAI agent (created in the EL dashboard) | `scenario.ElevenLabsAgentAdapter(agent_id=..., api_key=...)` | Dials the user's hosted ConvAI agent by ID. The hosted agent owns model + voice + instructions + tools. |
-| Twilio phone number (real PSTN, agent answers via Media Streams) | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`) | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up. |
-| Gemini Live model is the agent | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)` | The **adapter IS the agent**. It opens a Gemini Live session with these params — there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent. |
-| OpenAI Realtime model is the agent | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live — the **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent. |
-| Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)` | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
+| User's stack                                                                                          | Adapter                                                                                  | How it connects to the user's agent                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pipecat / Twilio Media Streams WS bot deployed somewhere                                              | `scenario.PipecatAgentAdapter(url="ws://<your-bot>/stream", ...)`                        | Opens a WebSocket to the user's **already-running** bot. The bot has to be reachable (locally on `ws://localhost:<port>` or remotely).                                                                                                                                                                                         |
+| ElevenLabs hosted ConvAI agent (created in the EL dashboard)                                          | `scenario.ElevenLabsAgentAdapter(agent_id=..., api_key=...)`                             | Dials the user's hosted ConvAI agent by ID. The hosted agent owns model + voice + instructions + tools.                                                                                                                                                                                                                        |
+| Twilio phone number (real PSTN, agent answers via Media Streams)                                      | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`)                    | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up.                                                                                                                                                                                                                                          |
+| Gemini Live model is the agent                                                                        | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)`          | The **adapter IS the agent**. It opens a Gemini Live session with these params — there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent.                                   |
+| OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live — the **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                   |
+| Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)`                | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
 
 If you can't tell from the codebase which path the user is on, ASK before generating a test. Picking the wrong adapter means the test exercises something the user hasn't deployed — and they will (rightly) call it useless.
 
@@ -900,14 +1062,14 @@ audio_effects=[
 
 The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the `scenario` object. Pick the adapter the same way (Step 2) — the mapping is one-to-one:
 
-| User's stack | TypeScript adapter |
-| --- | --- |
-| Pipecat / Twilio Media Streams WS bot | `scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })` |
-| ElevenLabs hosted ConvAI agent | `scenario.elevenLabsAgent({ agentId, apiKey })` |
-| Twilio phone number (real PSTN) | `scenario.twilioAgent({ accountSid, authToken, phoneNumber })` |
-| Gemini Live model is the agent | `scenario.geminiLiveAgent({ model, systemInstruction, voice })` |
-| OpenAI Realtime model is the agent | `scenario.openAIRealtimeAgent({ model, instructions, voice, tools })` |
-| Text-only stack wrapped as voice | `scenario.composableAgent({ stt, llm, tts })` |
+| User's stack                          | TypeScript adapter                                                    |
+| ------------------------------------- | --------------------------------------------------------------------- |
+| Pipecat / Twilio Media Streams WS bot | `scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })`            |
+| ElevenLabs hosted ConvAI agent        | `scenario.elevenLabsAgent({ agentId, apiKey })`                       |
+| Twilio phone number (real PSTN)       | `scenario.twilioAgent({ accountSid, authToken, phoneNumber })`        |
+| Gemini Live model is the agent        | `scenario.geminiLiveAgent({ model, systemInstruction, voice })`       |
+| OpenAI Realtime model is the agent    | `scenario.openAIRealtimeAgent({ model, instructions, voice, tools })` |
+| Text-only stack wrapped as voice      | `scenario.composableAgent({ stt, llm, tts })`                         |
 
 Seed a voice on the simulator and layer effects the same way:
 
@@ -919,7 +1081,7 @@ scenario.userSimulatorAgent({
   persona: "...",
   audioEffects: [
     voice.effects.backgroundNoise("cafe", 0.4), // presets: cafe / office / street / airport
-    voice.effects.phoneQuality(),               // mulaw + 8kHz + codec degradation
+    voice.effects.phoneQuality(), // mulaw + 8kHz + codec degradation
   ],
 });
 ```
@@ -1097,7 +1259,7 @@ describe("Voice agent — angry billing", () => {
       ],
     });
     expect(result.success).toBe(true);
-  }, 240_000);  // voice scenarios are slow — TTS + transport + multi-turn
+  }, 240_000); // voice scenarios are slow — TTS + transport + multi-turn
 });
 ```
 
@@ -1150,7 +1312,7 @@ describe("Voice agent — angry billing (Pipecat WS)", () => {
       ],
       script: [
         scenario.agent(), // the bot greets first (voice convention)
-        scenario.user(),  // heated opening
+        scenario.user(), // heated opening
         scenario.proceed(5),
         scenario.judge(),
       ],
@@ -1204,9 +1366,15 @@ async def test_noisy_handoff(): ...
 //
 // Then mark scenarios as concurrent inside the same file:
 describe.concurrent("voice agent", () => {
-  it("billing inquiry", async () => { /* scenario.run(...) */ }, 240_000);
-  it("account lockout", async () => { /* scenario.run(...) */ }, 240_000);
-  it("refund flow", async () => { /* scenario.run(...) */ }, 240_000);
+  it("billing inquiry", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
+  it("account lockout", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
+  it("refund flow", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
 });
 ```
 
@@ -2337,44 +2505,38 @@ Run `langwatch prompt list` to confirm everything synced, or open the Prompts se
 
 ---
 
-# Set Up Evaluations for Your Agent
+# Run Experiments for Your Agent
 
-LangWatch Evaluations is a comprehensive QA system. Map the user's request to one branch:
+Experiments are pre-deployment batch tests. They run an application over a dataset and compare outputs with reusable evaluators. They are appropriate for prompt and model comparisons, regression tests, benchmarks, and CI quality gates.
 
-| User says... | They need... | Go to... |
-|---|---|---|
-| "test my agent", "benchmark", "compare models" | **Experiments** | Step A |
-| "monitor production", "track quality", "block harmful content", "safety" | **Online Evaluation** (includes guardrails) | Step B |
-| "create an evaluator", "scoring function" | **Evaluators** | Step C |
-| "create a dataset", "test data" | **Datasets** | Step D |
-| "evaluate" (ambiguous) | Ask: "batch test or production monitoring?" | - |
+## Hand Off Production Evaluation Requests
 
-## Where Evaluations Fit
+If the user wants to score live traces or threads, monitor production quality, or block unsafe traffic, this is the wrong workflow.
 
-Evaluations sit at the **component level** of the testing pyramid — they test specific aspects of an agent with many input/output examples. Different from scenarios (end-to-end multi-turn).
+1. If the `online-evaluations` skill is available, load it and follow it now.
+2. Otherwise, tell the user to install it with:
+   ```bash
+   npx skills add langwatch/skills/online-evaluations
+   ```
 
-Use evaluations when you have many examples with clear correct answers, or for CI quality gates. Use scenarios for multi-turn behavior and tool-calling sequences.
+Do not configure a monitor or guardrail from this skill.
+
+## Experiments and Scenarios
+
+Use experiments for many single input and output examples with measurable results. Use the `scenarios` skill for end-to-end, multi-turn behavior and tool-calling sequences.
 
 ## Determine Scope
 
-If the user's request is **general** ("set up evaluations"):
+For a general request such as "test my agent":
 
-- Read the codebase to understand the agent
-- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
-- Set up an experiment + evaluator + dataset
-- After the experiment is working, summarize results and suggest improvements (consultant mode — see end of skill).
+1. Read the agent code, system prompt, tools, and relevant git history.
+2. Identify the behavior most likely to regress.
+3. Create a domain-specific dataset.
+4. Select evaluators that measure the intended behavior.
+5. Create and run a real experiment.
+6. Interpret the results and recommend concrete improvements.
 
-If the user's request is **specific** ("add a faithfulness evaluator"):
-
-- Focus on the specific need
-- Create the targeted evaluator, dataset, or experiment
-- Verify it works
-
-## Detect Context
-
-If you're in a codebase (`package.json`, `pyproject.toml`, etc.) — use the SDK for experiments and guardrails; use the CLI for evaluators, datasets, monitors. If there is no codebase, drive everything via the CLI. If ambiguous, ask the user.
-
-Some features are code-only (experiments, guardrails) and some are platform-only (monitors). Evaluators work on both surfaces.
+For a targeted request, focus on that behavior and still run the resulting experiment.
 
 ## Plan Limits
 
@@ -2386,41 +2548,43 @@ Some features are code-only (experiments, guardrails) and some are platform-only
 
 (see "ProjectsAndApiKeys" above)
 
-Then read the evaluations overview:
+Read the experiment documentation before writing code:
 
 ```bash
-langwatch docs evaluations/overview
+langwatch docs evaluations/experiments/overview
+langwatch docs evaluations/experiments/sdk
 ```
 
-## Step A: Experiments (Batch Testing) — Code Approach
+## Build a Domain-Specific Dataset
 
-Create a script or notebook that runs the agent against a dataset and measures quality.
+The examples must match what the application actually does. Read the system prompt, function signatures, tools, and knowledge sources first.
 
-1. Read the SDK docs:
-   ```bash
-   langwatch docs evaluations/experiments/sdk
-   ```
-2. Analyze the agent code to understand its inputs/outputs.
-3. Create a dataset with examples that look like real production data — domain-realistic, not generic.
-4. Create the experiment file:
+Good examples resemble real requests to this application and cover normal cases, edge cases, and past failures. Never use generic trivia such as "What is 2+2?" or "What is the capital of France?" unless the application itself is a trivia system.
 
-**Python (Jupyter):**
+If an existing LangWatch dataset is appropriate, inspect it with `langwatch dataset list --format json` and `langwatch dataset get --help`. Otherwise create the dataset in code or use the `datasets` skill.
+
+## Create the Experiment
+
+Use the SDK that matches the codebase. Keep credentials in environment variables and use the project's existing dependency manager.
+
+### Python
 
 ```python
 import langwatch
 import pandas as pd
 
-data = {
-    "input": ["domain-specific question 1", "domain-specific question 2"],
-    "expected_output": ["expected answer 1", "expected answer 2"],
-}
-df = pd.DataFrame(data)
+dataset = pd.DataFrame([
+    {
+        "input": "A realistic request for this application",
+        "expected_output": "The expected behavior",
+    },
+])
 
-evaluation = langwatch.experiment.init("agent-evaluation")
+experiment = langwatch.experiment.init("agent-regression")
 
-for index, row in evaluation.loop(df.iterrows()):
+for index, row in experiment.loop(dataset.iterrows()):
     response = my_agent(row["input"])
-    evaluation.evaluate(
+    experiment.evaluate(
         "ragas/answer_relevancy",
         index=index,
         data={"input": row["input"], "output": response},
@@ -2428,21 +2592,24 @@ for index, row in evaluation.loop(df.iterrows()):
     )
 ```
 
-**TypeScript:**
+### TypeScript
 
 ```typescript
 import { LangWatch } from "langwatch";
 
 const langwatch = new LangWatch();
 const dataset = [
-  { input: "domain-specific question", expectedOutput: "expected answer" },
+  {
+    input: "A realistic request for this application",
+    expectedOutput: "The expected behavior",
+  },
 ];
 
-const evaluation = await langwatch.experiments.init("agent-evaluation");
+const experiment = await langwatch.experiments.init("agent-regression");
 
-await evaluation.run(dataset, async ({ item, index }) => {
+await experiment.run(dataset, async ({ item, index }) => {
   const response = await myAgent(item.input);
-  await evaluation.evaluate("ragas/answer_relevancy", {
+  await experiment.evaluate("ragas/answer_relevancy", {
     index,
     data: { input: item.input, output: response },
     settings: { model: "openai/gpt-5-mini", max_tokens: 2048 },
@@ -2450,89 +2617,25 @@ await evaluation.run(dataset, async ({ item, index }) => {
 });
 ```
 
-5. Run it. ALWAYS execute the experiment after creating it — an unrun experiment is useless. For Python notebooks: run the cells, or `jupyter nbconvert --to notebook --execute`. For TypeScript: `npx tsx experiment.ts`.
+Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
 
-## Step B: Online Evaluation (Production Monitoring & Guardrails)
+## Run and Verify
 
-### Platform mode: Monitors (continuous async scoring)
+Always execute the experiment. An unrun experiment is incomplete.
 
-```bash
-langwatch docs evaluations/online-evaluation/overview
-```
+- Python script: run it with the project's Python environment.
+- Notebook: execute all cells, for example with `jupyter nbconvert --to notebook --execute`.
+- TypeScript: run it with the project's package manager, for example `pnpm exec tsx experiment.ts`.
 
-Create monitors via the CLI (`langwatch monitor --help` for the flag set). Optionally configure further at https://app.langwatch.ai → Evaluations → Monitors.
-
-### Code mode: Guardrails (synchronous blocking)
+After it runs, verify the result with the CLI:
 
 ```bash
-langwatch docs evaluations/guardrails/code-integration
+langwatch experiment list --format json
 ```
 
-Add guardrail checks in agent code:
-
-```python
-import langwatch
-
-@langwatch.trace()
-def my_agent(user_input):
-    guardrail = langwatch.evaluation.evaluate(
-        "azure/jailbreak",
-        name="Jailbreak Detection",
-        as_guardrail=True,
-        data={"input": user_input},
-    )
-    if not guardrail.passed:
-        return "I can't help with that request."
-    ...
-```
-
-Key distinction: Monitors **measure** (async). Guardrails **act** (sync via `as_guardrail=True`).
-
-## Step C: Evaluators (Scoring Functions)
-
-Read the docs first:
-
-```bash
-langwatch docs evaluations/evaluators/overview
-langwatch docs evaluations/evaluators/list      # Browse available evaluators
-```
-
-In code, call evaluators via the SDK as shown in Step A. To create or manage evaluators on the platform, use `langwatch evaluator --help`. If unsure which `--type` values are valid, run `langwatch evaluator create --help` first.
-
-If you need an LLM-as-judge evaluator, verify a model provider is configured (`langwatch model-provider list`).
-
-## Step D: Datasets
-
-Read the docs first:
-
-```bash
-langwatch docs datasets/overview
-langwatch docs datasets/programmatic-access
-langwatch docs datasets/ai-dataset-generation
-```
-
-Use `langwatch dataset --help` for create/upload/download. Generate data tailored to the agent:
-
-| Agent type | Dataset examples |
-|---|---|
-| Chatbot | Realistic user questions matching the bot's persona |
-| RAG pipeline | Questions with expected answers testing retrieval quality |
-| Classifier | Inputs with expected category labels |
-| Code assistant | Coding tasks with expected outputs |
-| Customer support | Support tickets and customer questions |
-| Summarizer | Documents with expected summaries |
-
-CRITICAL: The dataset MUST be specific to what the agent ACTUALLY does. Before generating any data:
-
-1. Read the agent's system prompt word by word
-2. Read the agent's function signatures and tool definitions
-3. Understand the agent's domain, persona, and constraints
-
-Then generate data reflecting EXACTLY this agent's real-world usage. NEVER use generic examples like "What is 2+2?", "What is the capital of France?", or "Explain quantum computing" — every example must be something a real user of THIS specific agent would say.
+If the CLI supports a more specific read or run for the installed version, discover it with `langwatch experiment --help` before using it.
 
 ## Consultant Mode
-
-Once the experiment is working, summarize results and suggest 2-3 domain-specific improvements based on what you learned from the codebase.
 
 After delivering initial results, transition to consultant mode to help the user get maximum value.
 
@@ -2546,10 +2649,11 @@ Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask g
 
 ## Common Mistakes
 
-- Do NOT say "run an evaluation" — be specific: experiment, monitor, or guardrail
-- Do NOT use generic/placeholder datasets — generate domain-specific examples
-- Do NOT skip running the experiment to verify it works
-- Monitors **measure** (async), guardrails **act** (sync, via code with `as_guardrail=True`)
+- Do not configure production monitoring or guardrails from this skill.
+- Do not call a batch run an online evaluation.
+- Do not use placeholder datasets.
+- Do not guess SDK APIs when the installed documentation is available.
+- Do not stop after writing the experiment. Run it and inspect the real result.
 
 ---
 
@@ -2586,7 +2690,7 @@ If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **C
 
 ## The Agent Testing Pyramid
 
-Scenarios sit at the **top of the testing pyramid** — they test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use evaluations instead for single input/output benchmarking with many examples.
+Scenarios sit at the **top of the testing pyramid** and test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use the `experiments` skill instead for single input/output benchmarking with many examples. If it is not installed, use `npx skills add langwatch/skills/experiments`.
 
 Best practices:
 
@@ -2682,7 +2786,9 @@ import { describe, it, expect } from "vitest";
 
 const myAgent: AgentAdapter = {
   role: AgentRole.AGENT,
-  async call(input) { return await myExistingAgent(input.messages); },
+  async call(input) {
+    return await myExistingAgent(input.messages);
+  },
 };
 
 describe("My Agent", () => {
@@ -2693,7 +2799,9 @@ describe("My Agent", () => {
       agents: [
         myAgent,
         scenario.userSimulatorAgent(),
-        scenario.judgeAgent({ criteria: ["Agent provides a helpful response"] }),
+        scenario.judgeAgent({
+          criteria: ["Agent provides a helpful response"],
+        }),
       ],
     });
     expect(result.success).toBe(true);
@@ -2797,7 +2905,9 @@ import { describe, it, expect } from "vitest";
 
 const myAgent = {
   role: scenario.AgentRole.AGENT,
-  async call(input: scenario.AgentInput) { return await myExistingAgent(input.messages); },
+  async call(input: scenario.AgentInput) {
+    return await myExistingAgent(input.messages);
+  },
 };
 
 describe("Agent Security", () => {
@@ -2861,14 +2971,14 @@ There are dozens of patterns there (angry customer with cafe noise, password-res
 
 Detect the user's transport from their codebase and pick the matching adapter. **Critically**, every adapter has a different idea of "what is the agent under test":
 
-| User's stack | Adapter | How it connects to the user's agent |
-| --- | --- | --- |
-| Pipecat / Twilio Media Streams WS bot deployed somewhere | `scenario.PipecatAgentAdapter(url="ws://<your-bot>/stream", ...)` | Opens a WebSocket to the user's **already-running** bot. The bot has to be reachable (locally on `ws://localhost:<port>` or remotely). |
-| ElevenLabs hosted ConvAI agent (created in the EL dashboard) | `scenario.ElevenLabsAgentAdapter(agent_id=..., api_key=...)` | Dials the user's hosted ConvAI agent by ID. The hosted agent owns model + voice + instructions + tools. |
-| Twilio phone number (real PSTN, agent answers via Media Streams) | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`) | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up. |
-| Gemini Live model is the agent | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)` | The **adapter IS the agent**. It opens a Gemini Live session with these params — there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent. |
-| OpenAI Realtime model is the agent | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live — the **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent. |
-| Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)` | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
+| User's stack                                                                                          | Adapter                                                                                  | How it connects to the user's agent                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pipecat / Twilio Media Streams WS bot deployed somewhere                                              | `scenario.PipecatAgentAdapter(url="ws://<your-bot>/stream", ...)`                        | Opens a WebSocket to the user's **already-running** bot. The bot has to be reachable (locally on `ws://localhost:<port>` or remotely).                                                                                                                                                                                         |
+| ElevenLabs hosted ConvAI agent (created in the EL dashboard)                                          | `scenario.ElevenLabsAgentAdapter(agent_id=..., api_key=...)`                             | Dials the user's hosted ConvAI agent by ID. The hosted agent owns model + voice + instructions + tools.                                                                                                                                                                                                                        |
+| Twilio phone number (real PSTN, agent answers via Media Streams)                                      | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`)                    | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up.                                                                                                                                                                                                                                          |
+| Gemini Live model is the agent                                                                        | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)`          | The **adapter IS the agent**. It opens a Gemini Live session with these params — there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent.                                   |
+| OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live — the **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                   |
+| Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)`                | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
 
 If you can't tell from the codebase which path the user is on, ASK before generating a test. Picking the wrong adapter means the test exercises something the user hasn't deployed — and they will (rightly) call it useless.
 
@@ -2900,14 +3010,14 @@ audio_effects=[
 
 The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the `scenario` object. Pick the adapter the same way (Step 2) — the mapping is one-to-one:
 
-| User's stack | TypeScript adapter |
-| --- | --- |
-| Pipecat / Twilio Media Streams WS bot | `scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })` |
-| ElevenLabs hosted ConvAI agent | `scenario.elevenLabsAgent({ agentId, apiKey })` |
-| Twilio phone number (real PSTN) | `scenario.twilioAgent({ accountSid, authToken, phoneNumber })` |
-| Gemini Live model is the agent | `scenario.geminiLiveAgent({ model, systemInstruction, voice })` |
-| OpenAI Realtime model is the agent | `scenario.openAIRealtimeAgent({ model, instructions, voice, tools })` |
-| Text-only stack wrapped as voice | `scenario.composableAgent({ stt, llm, tts })` |
+| User's stack                          | TypeScript adapter                                                    |
+| ------------------------------------- | --------------------------------------------------------------------- |
+| Pipecat / Twilio Media Streams WS bot | `scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })`            |
+| ElevenLabs hosted ConvAI agent        | `scenario.elevenLabsAgent({ agentId, apiKey })`                       |
+| Twilio phone number (real PSTN)       | `scenario.twilioAgent({ accountSid, authToken, phoneNumber })`        |
+| Gemini Live model is the agent        | `scenario.geminiLiveAgent({ model, systemInstruction, voice })`       |
+| OpenAI Realtime model is the agent    | `scenario.openAIRealtimeAgent({ model, instructions, voice, tools })` |
+| Text-only stack wrapped as voice      | `scenario.composableAgent({ stt, llm, tts })`                         |
 
 Seed a voice on the simulator and layer effects the same way:
 
@@ -2919,7 +3029,7 @@ scenario.userSimulatorAgent({
   persona: "...",
   audioEffects: [
     voice.effects.backgroundNoise("cafe", 0.4), // presets: cafe / office / street / airport
-    voice.effects.phoneQuality(),               // mulaw + 8kHz + codec degradation
+    voice.effects.phoneQuality(), // mulaw + 8kHz + codec degradation
   ],
 });
 ```
@@ -3097,7 +3207,7 @@ describe("Voice agent — angry billing", () => {
       ],
     });
     expect(result.success).toBe(true);
-  }, 240_000);  // voice scenarios are slow — TTS + transport + multi-turn
+  }, 240_000); // voice scenarios are slow — TTS + transport + multi-turn
 });
 ```
 
@@ -3150,7 +3260,7 @@ describe("Voice agent — angry billing (Pipecat WS)", () => {
       ],
       script: [
         scenario.agent(), // the bot greets first (voice convention)
-        scenario.user(),  // heated opening
+        scenario.user(), // heated opening
         scenario.proceed(5),
         scenario.judge(),
       ],
@@ -3204,9 +3314,15 @@ async def test_noisy_handoff(): ...
 //
 // Then mark scenarios as concurrent inside the same file:
 describe.concurrent("voice agent", () => {
-  it("billing inquiry", async () => { /* scenario.run(...) */ }, 240_000);
-  it("account lockout", async () => { /* scenario.run(...) */ }, 240_000);
-  it("refund flow", async () => { /* scenario.run(...) */ }, 240_000);
+  it("billing inquiry", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
+  it("account lockout", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
+  it("refund flow", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
 });
 ```
 

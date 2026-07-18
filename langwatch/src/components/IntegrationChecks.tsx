@@ -135,7 +135,7 @@ export const IntegrationChecks = () => {
           </Link>
         </List.Item>
         <List.Item className="group" display="block" asChild>
-          <Link href={`/${project?.slug}/evaluations`}>
+          <Link href={`/${project?.slug}/online-evaluations`}>
             <List.Indicator
               asChild
               color={
@@ -155,7 +155,7 @@ export const IntegrationChecks = () => {
               borderStyle="dashed"
               _groupHover={{ border: "none" }}
             >
-              Set up your first evaluation
+              Set up your first online evaluation
             </Text>
           </Link>
         </List.Item>

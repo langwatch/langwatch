@@ -1,23 +1,15 @@
 /**
  * @vitest-environment node
  *
- * Source-level guard for lw#3586 F12: MainMenu's compact-mode placeholders
- * MUST NOT render `<div>&nbsp;</div>` inside Chakra `<Text>` (which renders
- * a `<p>`), because `<div>` cannot be a descendant of `<p>` and React flags
- * it as a hydration error in dev. The fix uses Fragments instead.
- *
- * A source-text check is enough here because the offending pattern is
- * unambiguous and the fix is a 4-character substitution; a render test
- * would require the full nav store / chakra wiring for marginal extra
- * confidence.
+ * Source-level guard for valid compact-mode section markup. MainMenu must not
+ * place block elements or placeholder nodes inside text elements.
  */
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-describe("MainMenu placeholders (lw#3586 F12)", () => {
-  /** @scenario MainMenu compact-mode placeholders use Fragments not divs to avoid hydration warnings */
+describe("MainMenu compact section markup", () => {
   it("does not render <div>&nbsp;</div> inside <Text> (would hydration-warn)", () => {
     const file = readFileSync(
       path.join(__dirname, "..", "MainMenu.tsx"),
@@ -26,11 +18,11 @@ describe("MainMenu placeholders (lw#3586 F12)", () => {
     expect(file).not.toMatch(/<div>&nbsp;<\/div>/);
   });
 
-  it("uses Fragment <>&nbsp;</> for compact placeholders", () => {
+  it("does not emit non-breaking placeholder content", () => {
     const file = readFileSync(
       path.join(__dirname, "..", "MainMenu.tsx"),
       "utf8",
     );
-    expect(file).toMatch(/<>&nbsp;<\/>/);
+    expect(file).not.toMatch(/&nbsp;/);
   });
 });

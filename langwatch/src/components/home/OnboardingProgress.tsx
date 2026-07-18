@@ -140,8 +140,8 @@ export const buildOnboardingSteps = (
     },
     {
       key: "setupEvaluation",
-      title: "Set up your first evaluation",
-      href: `/${projectSlug}/evaluations`,
+      title: "Set up your first online evaluation",
+      href: `/${projectSlug}/online-evaluations`,
       complete: (data.evaluations ?? 0) > 0,
     },
     {

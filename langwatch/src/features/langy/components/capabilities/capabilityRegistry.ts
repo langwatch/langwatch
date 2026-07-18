@@ -39,12 +39,17 @@
  */
 
 import {
+  type CardKind,
   CLI_COLLECTION_VERBS,
+  type CliResultDigest,
   cardKindFor,
   cliVerbTone,
-  type CardKind,
-  type CliResultDigest,
 } from "@langwatch/cli-cards";
+import {
+  type CliCommand,
+  featureForCliCommand,
+  parseCliToolName,
+} from "~/shared/langy/featureMap";
 import {
   CAPABILITY_CATALOG,
   type CapabilityBodyWidget,
@@ -52,11 +57,6 @@ import {
   type CapabilityIconName,
   type CapabilitySurface,
 } from "./capabilityCatalog";
-import {
-  featureForCliCommand,
-  parseCliToolName,
-  type CliCommand,
-} from "~/shared/langy/featureMap";
 
 /** Visual tone of the shared capability-card shell. */
 export type CapabilityTone = "read" | "created" | "updated" | "removed";
@@ -105,7 +105,8 @@ export const SURFACE_LABEL: Record<CapabilitySurface, string> = {
   traces: "Traces",
   analytics: "Analytics",
   experiments: "Experiments",
-  evaluations: "Evaluations",
+  evaluations: "Online Evaluations",
+  evaluators: "Evaluators",
   datasets: "Datasets",
   prompts: "Prompts",
   dashboards: "Dashboards",
@@ -127,7 +128,8 @@ export const SURFACE_PATH: Record<CapabilitySurface, string> = {
   traces: "messages",
   analytics: "analytics",
   experiments: "experiments",
-  evaluations: "evaluations",
+  evaluations: "online-evaluations",
+  evaluators: "evaluators",
   datasets: "datasets",
   prompts: "prompts",
   dashboards: "analytics/custom",
@@ -152,12 +154,13 @@ export const SURFACE_PATH: Record<CapabilitySurface, string> = {
 
 // Surfaces whose index route accepts a trailing resource id as a deep segment
 // (`/messages/<traceId>`, `/experiments/<slug>`, `/datasets/<id>`,
-// `/evaluations/<id>`). Others deep-link to their index page only.
+// Others deep-link to their index page only.
 const SURFACE_ACCEPTS_ID: Partial<Record<CapabilitySurface, boolean>> = {
   traces: true,
   experiments: true,
   datasets: true,
   evaluations: true,
+  evaluators: true,
 };
 
 // Settings / org-level surfaces whose reads render a card but have no clean
@@ -190,6 +193,16 @@ export function buildSurfaceHref({
   if (SURFACE_NO_DEEPLINK[surface]) return null;
   const base = `/${projectSlug}/${SURFACE_PATH[surface]}`;
   if (resourceId && SURFACE_ACCEPTS_ID[surface]) {
+    if (surface === "evaluations") {
+      return `${base}?drawer.open=onlineEvaluation&drawer.monitorId=${encodeURIComponent(
+        resourceId,
+      )}`;
+    }
+    if (surface === "evaluators") {
+      return `${base}?drawer.open=evaluatorViewer&drawer.evaluatorId=${encodeURIComponent(
+        resourceId,
+      )}`;
+    }
     return `${base}/${encodeURIComponent(resourceId)}`;
   }
   return base;
@@ -328,7 +341,7 @@ export const SURFACE_BY_FEATURE: Record<string, CapabilitySurface> = {
   "prompt-management.prompts": "prompts",
   "library.agents": "agents",
   "library.workflows": "workflows",
-  "library.evaluators": "evaluations",
+  "library.evaluators": "evaluators",
   "library.datasets": "datasets",
   dashboards: "dashboards",
   triggers: "automations",
@@ -414,9 +427,9 @@ export function resolveCliCapability(rawName: string): CliCapability | null {
   const render = cardKindFor(command);
   const tone = cliVerbTone(command.verb);
 
-  const entry = (
-    CAPABILITY_CATALOG as Record<string, CapabilityCatalogEntry>
-  )[command.resource];
+  const entry = (CAPABILITY_CATALOG as Record<string, CapabilityCatalogEntry>)[
+    command.resource
+  ];
   const body = bodyWidgetFor({ entry, render, verb: command.verb, tone });
 
   if (entry) {

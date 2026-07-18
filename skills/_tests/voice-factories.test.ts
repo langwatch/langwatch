@@ -4,9 +4,18 @@ import { openai } from "@ai-sdk/openai";
 
 describe("voice factory surface (documented in scenarios skill)", () => {
   it.each([
-    ["pipecatAgent", () => scenario.pipecatAgent({ url: "ws://localhost:8765/stream" })],
-    ["openAIRealtimeAgent", () => scenario.openAIRealtimeAgent({ voice: "alloy" })],
-    ["geminiLiveAgent", () => scenario.geminiLiveAgent({ model: "gemini-2.5-flash" })],
+    [
+      "pipecatAgent",
+      () => scenario.pipecatAgent({ url: "ws://localhost:8765/stream" }),
+    ],
+    [
+      "openAIRealtimeAgent",
+      () => scenario.openAIRealtimeAgent({ voice: "alloy" }),
+    ],
+    [
+      "geminiLiveAgent",
+      () => scenario.geminiLiveAgent({ model: "gemini-2.5-flash" }),
+    ],
     [
       "elevenLabsAgent",
       () => scenario.elevenLabsAgent({ agentId: "x", apiKey: "y" }),
@@ -26,7 +35,7 @@ describe("voice factory surface (documented in scenarios skill)", () => {
 
   it("constructs composableAgent with documented stt/llm/tts values", () => {
     const composable = scenario.composableAgent({
-      stt: "openai/whisper-1",
+      stt: new voice.OpenAISTTProvider({ model: "whisper-1" }),
       llm: openai("gpt-5-mini"),
       tts: "openai/nova",
     });

@@ -7,6 +7,8 @@ import path from "path";
 // too). Recipes are NOT listed here; they are auto-discovered.
 export const FEATURE_SKILLS = [
   "tracing",
+  "experiments",
+  "online-evaluations",
   "evaluations",
   "scenarios",
   "prompts",

@@ -111,13 +111,13 @@ export const navigationCommands: Command[] = [
     path: "/[project]/simulations/scenarios",
   },
   {
-    id: "nav-evaluations",
-    label: "Evaluations",
-    description: "View evaluations",
+    id: "nav-online-evaluations",
+    label: "Online Evaluations",
+    description: "Configure production evaluations and guardrails",
     icon: CheckSquare,
     category: "navigation",
-    keywords: ["eval", "test", "assess", "check"],
-    path: "/[project]/evaluations",
+    keywords: ["eval", "monitor", "guardrail", "production", "check"],
+    path: "/[project]/online-evaluations",
   },
   {
     id: "nav-experiments",

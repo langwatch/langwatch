@@ -2,16 +2,16 @@ import scenario from "@langwatch/scenario";
 import fs from "fs";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
-import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
-import { openai } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import {
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
   installSkillToWorkDir,
   SKILL_TESTS_SET_ID,
+  createSkillTestWorkDir,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -20,7 +20,8 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
-const judgeModel = openai("gpt-5-mini");
+const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY });
+const judgeModel = google("gemini-2.5-flash-lite");
 
 /**
  * Bare-CLI auth-discovery test.
@@ -34,9 +35,7 @@ describe("LangWatch CLI Auth Discovery — bare CLI, no skill", () => {
   it.skipIf(isCI)(
     "agent guides user to /authorize when no API key is configured",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-auth-"),
-      );
+      const tempFolder = createSkillTestWorkDir("langwatch-cli-auth-");
 
       // No .env, no CLAUDE.md, no .skills/ — bare directory with only the CLI.
       const result = await scenario.run({
@@ -48,6 +47,7 @@ describe("LangWatch CLI Auth Discovery — bare CLI, no skill", () => {
           createClaudeCodeAgent({
             workingDirectory: tempFolder,
             cleanEnv: true,
+            omitEnvKeys: ["ANTHROPIC_API_KEY"],
           }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
@@ -78,17 +78,17 @@ describe("LangWatch CLI Auth Discovery — bare CLI, no skill", () => {
 /**
  * Regression for the customer report: a coding agent setting up experiments
  * ran `langwatch login`, signed in to a personal project, and the evaluations
- * went there. With the evaluations skill (and the projects-and-api-keys shared
+ * went there. With the experiments skill (and the projects-and-api-keys shared
  * snippet), the agent must use the project API key already in `.env` and must
  * never run the AI-tools / device login or target a personal project.
  */
-describe("given the evaluations skill installed with a project key in .env", () => {
+describe("given the experiments skill installed with a project key in .env", () => {
   describe("when the agent is asked to set up an evaluation", () => {
     it.skipIf(isCI)(
       "uses the .env project key and never device / personal login",
       async () => {
-        const tempFolder = fs.mkdtempSync(
-          path.join(os.tmpdir(), "langwatch-cli-auth-project-"),
+        const tempFolder = createSkillTestWorkDir(
+          "langwatch-cli-auth-project-",
         );
         // A real minimal agent with a project API key already present in .env.
         fs.cpSync(
@@ -108,16 +108,19 @@ describe("given the evaluations skill installed with a project key in .env", () 
         );
         installSkillToWorkDir({
           workingDirectory: tempFolder,
-          skillSubpath: "evaluations",
+          skillSubpath: "experiments",
         });
 
         const result = await scenario.run({
           setId: SKILL_TESTS_SET_ID,
           name: "Evaluation setup stays on a real project",
           description:
-            "User asks the agent (with the evaluations skill installed) to set up a batch evaluation. A project API key is already in .env. The agent must use that real project key and must NOT run an AI-tools/device login or create/target a personal project.",
+            "User asks the agent (with the experiments skill installed) to set up a batch experiment. A project API key is already in .env. The agent must use that real project key and must NOT run an AI-tools/device login or create/target a personal project.",
           agents: [
-            createClaudeCodeAgent({ workingDirectory: tempFolder }),
+            createClaudeCodeAgent({
+              workingDirectory: tempFolder,
+              omitEnvKeys: ["ANTHROPIC_API_KEY"],
+            }),
             scenario.userSimulatorAgent({ model: judgeModel }),
             scenario.judgeAgent({
               model: judgeModel,
@@ -135,7 +138,7 @@ describe("given the evaluations skill installed with a project key in .env", () 
             scenario.agent(),
             (state) => {
               toolCallFix(state);
-              assertSkillWasRead(state, "evaluations");
+              assertSkillWasRead(state, "experiments");
               // Hard guardrail: the agent must never EXECUTE the AI-tools / device
               // login (that is what routes evaluations to a personal project). We
               // scan the executed tool-call command fields, not the whole

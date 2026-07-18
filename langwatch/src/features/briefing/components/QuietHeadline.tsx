@@ -1,8 +1,7 @@
 import { chakra, HStack, Text } from "@chakra-ui/react";
 import { Sparkles } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect, useState } from "react";
-import type { MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -46,7 +45,7 @@ const ACTIONS: QuietAction[] = [
   },
   {
     phrase: "Run an experiment",
-    href: (slug) => `/${slug}/evaluations`,
+    href: (slug) => `/${slug}/experiments`,
     ask: "How do I run my first experiment here — what should I evaluate first?",
   },
   {
@@ -107,7 +106,9 @@ export function QuietHeadline() {
   }, [step, reduceMotion]);
 
   const action = ACTIONS[step.index % ACTIONS.length]!;
-  const typed = reduceMotion ? action.phrase : action.phrase.slice(0, step.length);
+  const typed = reduceMotion
+    ? action.phrase
+    : action.phrase.slice(0, step.length);
 
   const onLearnMore = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!project) return;

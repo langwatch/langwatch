@@ -8,10 +8,16 @@
         "promptFile": "tracing.docs.txt"
       },
       {
-        "title": "Set up evaluations for my agent",
-        "skill": "langwatch/skills/evaluations",
-        "slashCommand": "/evaluations",
-        "promptFile": "evaluations.docs.txt"
+        "title": "Run experiments for my agent",
+        "skill": "langwatch/skills/experiments",
+        "slashCommand": "/experiments",
+        "promptFile": "experiments.docs.txt"
+      },
+      {
+        "title": "Set up online evaluations and guardrails",
+        "skill": "langwatch/skills/online-evaluations",
+        "slashCommand": "/online-evaluations",
+        "promptFile": "online-evaluations.docs.txt"
       },
       {
         "title": "Add scenario tests for my agent",

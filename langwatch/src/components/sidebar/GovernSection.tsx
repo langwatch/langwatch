@@ -1,12 +1,11 @@
-import { Text } from "@chakra-ui/react";
 import { Eye } from "lucide-react";
 import React from "react";
 
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { featureIcons } from "~/utils/featureIcons";
 import { useRouter } from "~/utils/compat/next-router";
-
+import { featureIcons } from "~/utils/featureIcons";
+import { SidebarSection } from "./SidebarSection";
 import { SideMenuLink } from "./SideMenuLink";
 
 /**
@@ -57,18 +56,7 @@ export const GovernSection = React.memo(function GovernSection({
     router.pathname.startsWith("/settings/governance/");
 
   return (
-    <>
-      <Text
-        fontSize="11px"
-        fontWeight="medium"
-        textTransform="uppercase"
-        color="gray.500"
-        paddingX={2}
-        paddingTop={3}
-        paddingBottom={1}
-      >
-        {showExpanded ? "Govern" : <>&nbsp;</>}
-      </Text>
+    <SidebarSection id="govern" label="Govern" showExpanded={showExpanded}>
       {showGatewayEntry && (
         <SideMenuLink
           icon={featureIcons.gateway.icon}
@@ -89,6 +77,6 @@ export const GovernSection = React.memo(function GovernSection({
           betaLabel="Beta"
         />
       )}
-    </>
+    </SidebarSection>
   );
 });
