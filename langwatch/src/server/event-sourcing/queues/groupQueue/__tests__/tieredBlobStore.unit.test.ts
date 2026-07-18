@@ -51,7 +51,7 @@ describe("TieredBlobStore", () => {
 
       /**
        * Regression: TieredBlobStore wrote through RedisJobBlobStore's default
-       * (GQ1's 7-day staged-residence backstop) instead of the refcounted GQ2
+       * (GQ1's 7-day staged-residence backstop) instead of the leased GQ2
        * orphan backstop the spec configures ("the blob TTL backstop is
        * configured at 4 days"), so every leaked blob lived days longer than
        * designed (2026-07-09 Redis memory investigation).

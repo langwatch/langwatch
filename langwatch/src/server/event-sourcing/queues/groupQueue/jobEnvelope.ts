@@ -71,7 +71,7 @@ async function boundedDecompress(data: Buffer): Promise<Buffer> {
  * Inflate + parse a body, naming the failure if it will not read.
  *
  * Named `decode*`, not `read*`: every `read*` in this file contractually never
- * throws (`readJobRoutingMeta`, `readEnvelopeDescriptor`, `readEnvelopeHold`…),
+ * throws (`readJobRoutingMeta`, `readEnvelopeDescriptor`, `readEnvelopeLease`…),
  * and this throws the `DecodeFailureError`s the drop path dispatches on.
  *
  * A body that is present but unreadable — bad compression frame, a codec this
@@ -157,7 +157,9 @@ const safeParseErrText = (err: unknown): string => {
   // single-quoted token is one character — kept because it is the most useful
   // byte in the message and one character is not a secret.
   const cut = raw.search(/["[{]/);
-  const head = (cut === -1 ? raw : raw.slice(0, cut)).trim().replace(/[,\s]+$/, "");
+  const head = (cut === -1 ? raw : raw.slice(0, cut))
+    .trim()
+    .replace(/[,\s]+$/, "");
   const name = err instanceof Error ? err.name : "Error";
   return head ? `${name}: ${head}` : name;
 };
@@ -253,7 +255,7 @@ export interface EnvelopeHeader {
   r?: string;
   /** GQ2 content-addressed tiered blob reference. */
   ref?: BlobRef;
-  /** GQ2 per-stage hold token — the holder-set member for this staged occupancy. */
+  /** GQ2 per-stage lease holder identity for this staged occupancy. */
   h?: string;
   /** Routing fields read by the Lua dispatcher and ops dashboard WITHOUT parsing the body. */
   p?: string;
@@ -569,7 +571,11 @@ export async function encodeJobEnvelope({
     // GQ2 never serializes `jobData` as a whole — only the payload. The old
     // `JSON.stringify(jobData)` above this branch was a second full pass whose
     // result this path then threw away.
-    const { bytes, codec, json: payloadJson } = encodePayload(payload, {
+    const {
+      bytes,
+      codec,
+      json: payloadJson,
+    } = encodePayload(payload, {
       msgpackEnabled: msgpackWritesEnabled(),
     });
     const payloadBytes = bytes.length;
@@ -590,7 +596,7 @@ export async function encodeJobEnvelope({
       });
       header.e = ref.tier;
       header.ref = ref;
-      // Per-stage hold token: the holder-set member identifying this staged
+      // Per-stage lease holder identity for this staged
       // occupancy. Lives in the (inline) header, never in the content-addressed
       // body, so it doesn't perturb the blob hash that collapses the fan-out.
       header.h = randomUUID();
@@ -602,7 +608,11 @@ export async function encodeJobEnvelope({
     return finalize(
       ENVELOPE_PREFIX_V2,
       header,
-      await inlineBody(payloadJson ?? bytes.toString("utf-8"), payloadBytes, header),
+      await inlineBody(
+        payloadJson ?? bytes.toString("utf-8"),
+        payloadBytes,
+        header,
+      ),
     );
   }
 
@@ -615,7 +625,7 @@ export async function encodeJobEnvelope({
 
   // GQ1 fallback path: reached when the caller opted into writes but didn't
   // supply BOTH a tiered store and a projectId. Loud so a composition-root
-  // regression can't silently ship a pipeline without dedup / holder refcount /
+  // regression can't silently ship a pipeline without dedup / blob leasing /
   // tenant namespacing (2026-06-24 review).
   if (queueName) gqEnvelopeGQ2DowngradeTotal.inc({ queue_name: queueName });
   if (logger) {
@@ -679,9 +689,9 @@ export async function decodeJobEnvelope({
   if (header.e === "redis" || header.e === "s3") {
     if (!header.ref) {
       throw new DecodeFailureError({
-      message: "Malformed job envelope: tiered body without a blob ref",
-      reason: "malformed_envelope",
-    });
+        message: "Malformed job envelope: tiered body without a blob ref",
+        reason: "malformed_envelope",
+      });
     }
     if (!tieredBlobs) {
       throw new Error(
@@ -694,9 +704,9 @@ export async function decodeJobEnvelope({
         : await tieredBlobs.get(header.ref);
     if (!data) {
       throw new DecodeFailureError({
-      message: "Job envelope tiered blob is missing (deleted or expired)",
-      reason: "missing_blob",
-    });
+        message: "Job envelope tiered blob is missing (deleted or expired)",
+        reason: "missing_blob",
+      });
     }
     const parsedBody = await decodeBody(data);
     return mergeMachinery(parsedBody, header);
@@ -706,9 +716,9 @@ export async function decodeJobEnvelope({
   if (header.e === "ref") {
     if (typeof header.r !== "string" || header.r.length === 0) {
       throw new DecodeFailureError({
-      message: "Malformed job envelope: ref body without a blob id",
-      reason: "malformed_envelope",
-    });
+        message: "Malformed job envelope: ref body without a blob id",
+        reason: "malformed_envelope",
+      });
     }
     if (!blobs) {
       throw new Error(
@@ -721,9 +731,9 @@ export async function decodeJobEnvelope({
         : await blobs.get({ id: header.r });
     if (!data) {
       throw new DecodeFailureError({
-      message: `Job envelope blob ${header.r} is missing (deleted or expired)`,
-      reason: "missing_blob",
-    });
+        message: `Job envelope blob ${header.r} is missing (deleted or expired)`,
+        reason: "missing_blob",
+      });
     }
     return await decodeBody(data);
   }
@@ -796,59 +806,57 @@ export function readEnvelopeBlobId(value: string): string | null {
 }
 
 /**
- * Header-taking variant of {@link readEnvelopeHold} — for callers that have
+ * Header-taking variant of {@link readEnvelopeLease} — for callers that have
  * already parsed the envelope and don't want a second `Buffer.from + JSON.parse`.
  */
-export function readEnvelopeHoldFromHeader(
+export function readEnvelopeLeaseFromHeader(
   header: EnvelopeHeader,
-): { ref: BlobRef; token: string } | null {
+): { ref: BlobRef; holderId: string } | null {
   if (
     (header.e === "redis" || header.e === "s3") &&
     header.ref &&
     typeof header.h === "string"
   ) {
-    return { ref: header.ref, token: header.h };
+    return { ref: header.ref, holderId: header.h };
   }
   return null;
 }
 
 /**
- * Returns the GQ2 ref together with its per-stage hold token (the holder-set
- * member), or null for inline bodies, GQ1 refs, legacy JSON, and unreadable
- * values. The acquire/release seams use this to reference-count the blob
- * without depending on the Lua-internal slot id.
+ * Returns the GQ2 ref together with its per-stage lease holder identity, or
+ * null for inline bodies, GQ1 refs, legacy JSON, and unreadable values.
  */
-export function readEnvelopeHold(
+export function readEnvelopeLease(
   value: string,
-): { ref: BlobRef; token: string } | null {
+): { ref: BlobRef; holderId: string } | null {
   try {
     if (!isEnvelope(value)) return null;
     const { header } = splitEnvelope(value);
-    return readEnvelopeHoldFromHeader(header);
+    return readEnvelopeLeaseFromHeader(header);
   } catch {
     return null;
   }
 }
 
 /**
- * Single parse for retirement: given a staged value, return the GQ2 hold and/or
- * GQ1 blob id from ONE `splitEnvelope`. Prefer over calling `readEnvelopeHold`
+ * Single parse for retirement: given a staged value, return the GQ2 lease and/or
+ * GQ1 blob id from ONE `splitEnvelope`. Prefer over calling `readEnvelopeLease`
  * + `readEnvelopeBlobId` in sequence on the completion / restage hot path
  * (2026-06-24 review).
  */
 export function readEnvelopeRetirement(value: string): {
-  hold: { ref: BlobRef; token: string } | null;
+  lease: { ref: BlobRef; holderId: string } | null;
   blobId: string | null;
 } {
   try {
-    if (!isEnvelope(value)) return { hold: null, blobId: null };
+    if (!isEnvelope(value)) return { lease: null, blobId: null };
     const { header } = splitEnvelope(value);
     return {
-      hold: readEnvelopeHoldFromHeader(header),
+      lease: readEnvelopeLeaseFromHeader(header),
       blobId: readEnvelopeBlobIdFromHeader(header),
     };
   } catch {
-    return { hold: null, blobId: null };
+    return { lease: null, blobId: null };
   }
 }
 
