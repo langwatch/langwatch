@@ -5,7 +5,7 @@ import { buildIntentFactories } from "~/server/event-sourcing/pipeline/processMa
 import {
   WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS,
   webhookDeliveryPrunePM,
-} from "../../../../event-sourcing/pipelines/automations/process-manager/webhookDeliveryPrune.process";
+} from "../webhookDeliveryPrune.process";
 
 describe("webhook delivery prune process", () => {
   describe("when the process manager is built", () => {

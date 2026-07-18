@@ -37,6 +37,12 @@ const graphAlertSweep: ProcessManagerApplier<AutomationEvent> = (pm) =>
     .schedule({ everyMs: 30_000 })
     .onWake(sweep)
     .intent("noop", emptyIntentSchema, async () => {});
+const webhookDeliveryPrune: ProcessManagerApplier<AutomationEvent> = (pm) =>
+  pm
+    .state<Record<string, never>>({})
+    .schedule({ everyMs: 86_400_000 })
+    .onWake(sweep)
+    .intent("noop", emptyIntentSchema, async () => {});
 
 const command = (
   traceId: string,
@@ -72,6 +78,7 @@ describe("automations pipeline", () => {
             },
             triggerSettlement,
             graphAlertSweep,
+            webhookDeliveryPrune,
           }),
         );
         const commands = mapCommands(pipeline.commands);
@@ -110,6 +117,7 @@ describe("automations pipeline", () => {
             },
             triggerSettlement,
             graphAlertSweep,
+            webhookDeliveryPrune,
           }),
         );
         const commands = mapCommands(pipeline.commands);
@@ -149,6 +157,7 @@ describe("automations pipeline", () => {
             },
             triggerSettlement,
             graphAlertSweep,
+            webhookDeliveryPrune,
           }),
         );
         const commands = mapCommands(pipeline.commands);
@@ -185,6 +194,7 @@ describe("automations pipeline", () => {
           },
           triggerSettlement,
           graphAlertSweep,
+          webhookDeliveryPrune,
         }),
       );
       const commands = mapCommands(pipeline.commands);

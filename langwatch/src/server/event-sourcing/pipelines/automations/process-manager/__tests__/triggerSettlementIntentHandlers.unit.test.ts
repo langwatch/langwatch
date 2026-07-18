@@ -9,7 +9,7 @@ import {
   createNotifyDigestHandler,
   createPersistMatchHandler,
   type TriggerSettlementDispatchDeps,
-} from "../../../../event-sourcing/pipelines/automations/process-manager/triggerSettlementIntentHandlers";
+} from "../triggerSettlementIntentHandlers";
 
 const { deliverWebhookMock, loggerWarnMock, sendRenderedTriggerEmailMock } =
   vi.hoisted(() => ({
@@ -178,10 +178,10 @@ describe("trigger settlement intent handlers integration", () => {
     vi.clearAllMocks();
   });
 
-  describe("given the pending-match bound dropped old entries", () => {
-    it("logs the committed drop count from an effectful intent", async () => {
+  describe("given the pending-match bound flushed old entries", () => {
+    it("logs the committed flush count from an effectful intent", async () => {
       await createLogOverflowHandler()(
-        { triggerId: "trigger-1", dropped: 2, totalDropped: 7 },
+        { triggerId: "trigger-1", flushed: 2, totalFlushed: 7 },
         context("overflow:7"),
       );
 
@@ -189,10 +189,10 @@ describe("trigger settlement intent handlers integration", () => {
         {
           projectId: "project-1",
           triggerId: "trigger-1",
-          dropped: 2,
-          totalDropped: 7,
+          flushed: 2,
+          totalFlushed: 7,
         },
-        "Trigger settlement pending-match bound dropped oldest matches",
+        "Trigger settlement pending-match bound flushed oldest matches to immediate dispatch",
       );
     });
   });

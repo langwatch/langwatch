@@ -144,8 +144,9 @@ cadence-snapped `dispatchDueAt` from the event timestamp, then stores the
 earliest boundary as `nextWakeAt`. Duplicate activity in one bucket collapses;
 activity in a later bucket records a new round and moves the pending wake. A
 wake emits one `notifyDigest` per cadence boundary and one window-identified
-`persistMatch` per settled persist-class trace. Pending state is bounded and
-logs overflow.
+`persistMatch` per settled persist-class trace. Pending state is bounded: a
+match storm past the cap flushes the oldest matches to immediate dispatch
+intents (degraded batching, never loss) and logs the flush count.
 
 This is stronger than the old Redis-delayed settle path: once the PM commit
 succeeds, a Redis flush cannot erase the pending boundary or intent.
@@ -166,7 +167,9 @@ The lightweight real-time graph subscriber retains the five-second
 non-extending project debounce and shared evaluator. `graphAlertSweep` is a
 scheduled singleton that replaces the heartbeat cron and Redis leader lock;
 revision fencing makes racing wake workers stand down. Candidate discovery
-and absence/resolve semantics are unchanged.
+and absence/resolve semantics are unchanged. The ADR-040 webhook delivery-log
+prune rides the same substrate: `webhookDeliveryPrune` is a daily scheduled
+singleton, so the Helm chart ships no automation CronJobs at all.
 
 Subscribers and generated PM consumers are live-delivery registrations. The
 projection replay path invokes neither, so rebuilding trace, evaluation, or
@@ -176,7 +179,11 @@ automation projections cannot dispatch customer effects.
 
 The entire `event-sourcing/outbox/` stack, six automation outbox reactors,
 `.withOutbox`, `ReactorOutbox`, heartbeat scheduler, and Redis leader lock are
-deleted. A migration drops the bloated table. Automation code consolidates:
+deleted. The `ReactorOutbox` table itself is NOT dropped in the cutover
+release: a rolling deploy runs migrations while old worker replicas still
+read and write the table, so dropping it here would crash them mid-drain.
+The drop migration ships one release later (expand/contract), after the old
+consumers and any drained rows are gone. Automation code consolidates:
 services, repositories, dispatch helpers and delivery senders under
 `server/app-layer/automations` (the `triggers` name is retired); process
 managers, subscribers and dispatch wiring under

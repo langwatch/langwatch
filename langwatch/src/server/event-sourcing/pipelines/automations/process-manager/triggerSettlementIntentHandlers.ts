@@ -54,17 +54,20 @@ import {
 
 const logger = createLogger("langwatch:triggers:settlement-dispatch");
 
-/** Log bounded-state drops after the process commit, never from pure evolve. */
+/** Log bounded-state flushes after the process commit, never from pure
+ *  evolve. The cap never discards matches — it dispatches the oldest ones
+ *  ahead of their settle boundary; this records how often that degraded
+ *  batching kicks in. */
 export function createLogOverflowHandler(): IntentExecutor<LogOverflowIntent> {
   return async (payload, context) => {
     logger.warn(
       {
         projectId: context.projectId,
         triggerId: payload.triggerId,
-        dropped: payload.dropped,
-        totalDropped: payload.totalDropped,
+        flushed: payload.flushed,
+        totalFlushed: payload.totalFlushed,
       },
-      "Trigger settlement pending-match bound dropped oldest matches",
+      "Trigger settlement pending-match bound flushed oldest matches to immediate dispatch",
     );
   };
 }

@@ -17,6 +17,7 @@ import {
 import {
   logOverflowIntentSchema,
   notifyDigestIntentSchema,
+  type PendingMatch,
   persistMatchIntentSchema,
   TRIGGER_SETTLEMENT_INTENT_TYPES,
   type TriggerSettlementState,
@@ -28,7 +29,7 @@ export type SettlementState = TriggerSettlementState;
 
 const INITIAL_STATE: SettlementState = {
   pendingMatches: {},
-  overflowDropped: 0,
+  overflowFlushed: 0,
 };
 
 function nextWakeFrom(state: SettlementState): number | null {
@@ -39,11 +40,18 @@ function nextWakeFrom(state: SettlementState): number | null {
   return next;
 }
 
+/** A match evicted from the pending set by the cap — flushed to immediate
+ *  dispatch instead of being discarded. */
+export interface OverflowFlush {
+  traceId: string;
+  match: PendingMatch;
+}
+
 export function addPending(
   previousState: SettlementState,
   view: TriggerMatchRecordedEventData,
   at: number,
-): SettlementState {
+): { state: SettlementState; flushed: OverflowFlush[] } {
   const settleDueAt = at + view.traceDebounceMs;
   const dispatchDueAt = computeScheduledFor({
     action: view.action,
@@ -62,21 +70,28 @@ export function addPending(
       }),
     },
   };
-  let overflowDropped = previousState.overflowDropped;
+  const flushed: OverflowFlush[] = [];
   const traceIds = Object.keys(pendingMatches);
   if (traceIds.length > MAX_PENDING_MATCHES) {
     const oldestFirst = traceIds.sort(
       (left, right) =>
         pendingMatches[left]!.settleDueAt - pendingMatches[right]!.settleDueAt,
     );
-    const overflow = oldestFirst.slice(
+    for (const traceId of oldestFirst.slice(
       0,
       traceIds.length - MAX_PENDING_MATCHES,
-    );
-    for (const traceId of overflow) delete pendingMatches[traceId];
-    overflowDropped += overflow.length;
+    )) {
+      flushed.push({ traceId, match: pendingMatches[traceId]! });
+      delete pendingMatches[traceId];
+    }
   }
-  return { pendingMatches, overflowDropped };
+  return {
+    state: {
+      pendingMatches,
+      overflowFlushed: previousState.overflowFlushed + flushed.length,
+    },
+    flushed,
+  };
 }
 
 export function settleBoundary(state: SettlementState): number | null {
@@ -150,19 +165,35 @@ export const triggerSettlementPM =
         createLogOverflowHandler(),
       )
       .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => {
-        const nextState = addPending(state, data, ctx.at);
-        const dropped = nextState.overflowDropped - state.overflowDropped;
+        const { state: nextState, flushed } = addPending(state, data, ctx.at);
         return {
           state: nextState,
+          // Cap hit: the oldest matches dispatch NOW instead of being
+          // discarded — degraded batching under extreme load, never loss.
           intents:
-            dropped > 0
+            flushed.length > 0
               ? [
+                  ...flushed.map(({ traceId, match }) =>
+                    match.actionClass === "persist"
+                      ? ctx.intents.persistMatch(
+                          `persist:${traceId}:${match.settleWindowBucket}`,
+                          { triggerId: ctx.key, traceId },
+                        )
+                      : ctx.intents.notifyDigest(
+                          `digest:${match.dispatchDueAt}:${digestBatchKey([traceId])}`,
+                          {
+                            triggerId: ctx.key,
+                            traceIds: [traceId],
+                            boundary: match.dispatchDueAt,
+                          },
+                        ),
+                  ),
                   ctx.intents.logOverflow(
-                    `overflow:${nextState.overflowDropped}`,
+                    `overflow:${nextState.overflowFlushed}`,
                     {
                       triggerId: ctx.key,
-                      dropped,
-                      totalDropped: nextState.overflowDropped,
+                      flushed: flushed.length,
+                      totalFlushed: nextState.overflowFlushed,
                     },
                   ),
                 ]

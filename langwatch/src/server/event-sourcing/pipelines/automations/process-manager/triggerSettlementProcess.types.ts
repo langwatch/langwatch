@@ -16,7 +16,10 @@ export interface PendingMatch {
 
 export interface TriggerSettlementState {
   pendingMatches: Record<string, PendingMatch>;
-  overflowDropped: number;
+  /** Matches flushed early because the pending set hit its cap. Overflow
+   *  never discards customer matches — it dispatches them ahead of their
+   *  settle boundary instead (degraded batching, no loss). */
+  overflowFlushed: number;
 }
 
 export const notifyDigestIntentSchema = z.object({
@@ -34,7 +37,7 @@ export type PersistMatchIntent = z.infer<typeof persistMatchIntentSchema>;
 
 export const logOverflowIntentSchema = z.object({
   triggerId: z.string().min(1),
-  dropped: z.number().int().positive(),
-  totalDropped: z.number().int().positive(),
+  flushed: z.number().int().positive(),
+  totalFlushed: z.number().int().positive(),
 });
 export type LogOverflowIntent = z.infer<typeof logOverflowIntentSchema>;

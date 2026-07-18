@@ -5,7 +5,7 @@ import { buildIntentFactories } from "~/server/event-sourcing/pipeline/processMa
 import {
   GRAPH_ALERT_SWEEP_INTERVAL_MS,
   graphAlertSweepPM,
-} from "../../../../event-sourcing/pipelines/automations/process-manager/graphAlertSweep.process";
+} from "../graphAlertSweep.process";
 
 describe("graph alert sweep process", () => {
   describe("when the process manager is built", () => {

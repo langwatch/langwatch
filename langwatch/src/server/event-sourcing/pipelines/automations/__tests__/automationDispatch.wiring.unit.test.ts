@@ -5,12 +5,14 @@ const {
   decideGraphTriggerHeartbeatMock,
   evaluateGraphTriggerMock,
   filterSuppressedMock,
+  pruneExpiredMock,
 } = vi.hoisted(() => ({
   decideGraphTriggerHeartbeatMock: vi.fn().mockResolvedValue([]),
   evaluateGraphTriggerMock: vi.fn().mockResolvedValue(undefined),
   filterSuppressedMock: vi.fn(
     async ({ emails }: { emails: string[] }) => emails,
   ),
+  pruneExpiredMock: vi.fn().mockResolvedValue(7),
 }));
 
 vi.mock("~/env.mjs", () => ({
@@ -49,7 +51,10 @@ vi.mock("~/server/api/utils", () => ({
 
 vi.mock("~/server/app-layer/automations/webhook-delivery.service", () => ({
   WebhookDeliveryService: {
-    create: vi.fn(() => ({ record: vi.fn().mockResolvedValue(undefined) })),
+    create: vi.fn(() => ({
+      record: vi.fn().mockResolvedValue(undefined),
+      pruneExpired: pruneExpiredMock,
+    })),
   },
 }));
 
@@ -127,6 +132,9 @@ describe("automation dispatch wiring smoke", () => {
         sources: { sources: true },
         now,
       });
+
+      await expect(ports.pruneWebhookDeliveries()).resolves.toBe(7);
+      expect(pruneExpiredMock).toHaveBeenCalledTimes(1);
     });
   });
 });

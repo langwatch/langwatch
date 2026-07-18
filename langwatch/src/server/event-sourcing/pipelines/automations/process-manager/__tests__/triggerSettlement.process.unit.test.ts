@@ -11,12 +11,12 @@ import {
   type SettlementState,
   settleBoundary,
   triggerSettlementPM,
-} from "../../../../event-sourcing/pipelines/automations/process-manager/triggerSettlement.process";
-import type { TriggerSettlementDispatchDeps } from "../../../../event-sourcing/pipelines/automations/process-manager/triggerSettlementIntentHandlers";
+} from "../triggerSettlement.process";
+import type { TriggerSettlementDispatchDeps } from "../triggerSettlementIntentHandlers";
 
 const initialState = (): SettlementState => ({
   pendingMatches: {},
-  overflowDropped: 0,
+  overflowFlushed: 0,
 });
 
 const match = (
@@ -36,9 +36,9 @@ describe("trigger settlement process", () => {
     describe("when the trace matches again", () => {
       it("moves the durable settle wake later", () => {
         const first = addPending(initialState(), match(), 1_000);
-        const second = addPending(first, match(), 10_000);
+        const second = addPending(first.state, match(), 10_000);
 
-        expect(settleBoundary(second)).toBe(40_000);
+        expect(settleBoundary(second.state)).toBe(40_000);
       });
     });
   });
@@ -61,7 +61,7 @@ describe("trigger settlement process", () => {
               settleWindowBucket: "30000-0",
             },
           },
-          overflowDropped: 0,
+          overflowFlushed: 0,
         };
 
         expect(drainDue(state, 1_000).boundaries).toEqual([
@@ -85,7 +85,7 @@ describe("trigger settlement process", () => {
               settleWindowBucket: "30000-0",
             },
           },
-          overflowDropped: 0,
+          overflowFlushed: 0,
         };
 
         expect(drainDue(state, 1_000).settledMatches).toEqual([
@@ -110,7 +110,7 @@ describe("trigger settlement process", () => {
               settleWindowBucket: "30000-0",
             },
           },
-          overflowDropped: 0,
+          overflowFlushed: 0,
         };
 
         expect(drainDue(state, 1_000).nextBoundary).toBe(2_000);
@@ -173,7 +173,7 @@ describe("trigger settlement process", () => {
 
   describe("given more pending matches than the state bound", () => {
     describe("when another match is recorded", () => {
-      it("drops the oldest match and records the overflow", () => {
+      it("flushes the oldest match out of pending state without discarding it", () => {
         const pendingMatches = Object.fromEntries(
           Array.from({ length: MAX_PENDING_MATCHES }, (_, index) => [
             `trace-${index}`,
@@ -187,26 +187,37 @@ describe("trigger settlement process", () => {
         );
 
         const next = addPending(
-          { pendingMatches, overflowDropped: 0 },
+          { pendingMatches, overflowFlushed: 0 },
           match({ traceId: "newest" }),
           MAX_PENDING_MATCHES + 1,
         );
 
-        expect(Object.keys(next.pendingMatches)).toHaveLength(
+        expect(Object.keys(next.state.pendingMatches)).toHaveLength(
           MAX_PENDING_MATCHES,
         );
-        expect(next.pendingMatches["trace-0"]).toBeUndefined();
-        expect(next.overflowDropped).toBe(1);
+        expect(next.state.pendingMatches["trace-0"]).toBeUndefined();
+        expect(next.state.overflowFlushed).toBe(1);
+        expect(next.flushed).toEqual([
+          {
+            traceId: "trace-0",
+            match: {
+              settleDueAt: 0,
+              dispatchDueAt: 0,
+              actionClass: "notify",
+              settleWindowBucket: "30000-0",
+            },
+          },
+        ]);
       });
 
-      it("emits one post-commit log intent with the drop count", () => {
+      it("emits immediate dispatch intents for the flushed matches plus one log intent", () => {
         const pendingMatches = Object.fromEntries(
           Array.from({ length: MAX_PENDING_MATCHES }, (_, index) => [
             `trace-${index}`,
             {
               settleDueAt: index,
-              dispatchDueAt: index,
-              actionClass: "notify" as const,
+              dispatchDueAt: index === 0 ? 1_000 : index,
+              actionClass: index === 0 ? ("persist" as const) : ("notify" as const),
               settleWindowBucket: "30000-0",
             },
           ]),
@@ -221,7 +232,7 @@ describe("trigger settlement process", () => {
           definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
 
         const evolution = evolve(
-          { pendingMatches, overflowDropped: 4 },
+          { pendingMatches, overflowFlushed: 4 },
           match({ traceId: "newest" }),
           {
             at: MAX_PENDING_MATCHES + 1,
@@ -231,14 +242,25 @@ describe("trigger settlement process", () => {
           },
         );
 
+        // trace-0 (oldest, persist-class) flushes to an immediate persist
+        // intent with its settle-window identity; the log intent records the
+        // running flush count. Nothing is discarded.
         expect(evolution.intents).toEqual([
+          {
+            messageKey: "persist:trace-0:30000-0",
+            intentType: "persistMatch",
+            payload: {
+              triggerId: "trigger-1",
+              traceId: "trace-0",
+            },
+          },
           {
             messageKey: "overflow:5",
             intentType: "logOverflow",
             payload: {
               triggerId: "trigger-1",
-              dropped: 1,
-              totalDropped: 5,
+              flushed: 1,
+              totalFlushed: 5,
             },
           },
         ]);

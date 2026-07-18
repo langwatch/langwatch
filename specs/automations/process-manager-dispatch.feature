@@ -64,11 +64,11 @@ Feature: Automation dispatch on the process-manager substrate
     Then one persist intent exists per trace
     And each intent retries independently of the other
 
-  Scenario: Pending matches are bounded
+  Scenario: Pending matches are bounded without losing matches
     Given a match storm larger than the pending-match bound
     When the storm is consumed
-    Then the oldest overflow matches are dropped
-    And the drop is logged with a count
+    Then the oldest matches are dispatched immediately instead of being dropped
+    And the early flush is logged with a count
 
   Scenario: Pending settlement survives queue loss
     Given a trigger match has committed into settlement process state
