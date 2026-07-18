@@ -19,7 +19,7 @@ import {
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
 import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle";
-import { encodeJobEnvelope, readEnvelopeHold } from "../jobEnvelope";
+import { encodeJobEnvelope, readEnvelopeLease } from "../jobEnvelope";
 import { gqJobsDroppedTotal } from "../metrics";
 import { GroupStagingScripts } from "../scripts";
 import { TieredBlobStore } from "../tieredBlobStore";
@@ -54,8 +54,10 @@ type TestPayload = {
 // offload activates — see jobEnvelope.ts's projectIdFor / tenantIdFromGroupId.
 const TENANT = "proj1";
 const PROJECT = createTenantId(TENANT);
-const STORAGE_DESTINATION = async () =>
-  ({ kind: "s3" as const, bucket: "test-bucket" });
+const STORAGE_DESTINATION = async () => ({
+  kind: "s3" as const,
+  bucket: "test-bucket",
+});
 
 // > the 256 KiB s3 threshold once gzipped (see groupQueue.gq2.integration.test.ts).
 const OFFLOADABLE_S3_VALUE = () => incompressible(768 * 1024);
@@ -119,10 +121,12 @@ describe.skipIf(!hasTestcontainers)(
       return queue;
     }
 
-    const blockedMembers = (name: string) => redis.smembers(`${name}:gq:blocked`);
+    const blockedMembers = (name: string) =>
+      redis.smembers(`${name}:gq:blocked`);
     const storedErrorMessage = (name: string, groupId: string) =>
       redis.hget(`${name}:gq:group:${groupId}:error`, "message");
-    const completedStat = (name: string) => redis.get(`${name}:gq:stats:completed`);
+    const completedStat = (name: string) =>
+      redis.get(`${name}:gq:stats:completed`);
 
     /** All `gq_jobs_dropped_total` samples recorded for this test's queue. */
     async function dropsFor(name: string) {
@@ -176,7 +180,8 @@ describe.skipIf(!hasTestcontainers)(
         this.putsLeft = putsBeforeFailing;
       }
       override async put(uri: string, bytes: Buffer): Promise<void> {
-        if (this.putsLeft <= 0) throw new Error("blob store unavailable on write");
+        if (this.putsLeft <= 0)
+          throw new Error("blob store unavailable on write");
         this.putsLeft--;
         return super.put(uri, bytes);
       }
@@ -223,10 +228,12 @@ describe.skipIf(!hasTestcontainers)(
           // named it a drop. Reverting removes gq_jobs_dropped_total entirely, so
           // dropsFor() stays empty and the waitFor above times out.
           expect(entry!.labels.reason).toBe("retry_encode_failed");
-          // Unlike every other reason, this one SHOULD release: the body was
-          // already read, so keeping it buys a later worker nothing — and holding
-          // it would leak the hold to the 4-day TTL backstop.
-          expect(objectStore.deleted.length).toBeGreaterThan(0);
+          // Unlike body-present decode failures, this path retires its lease:
+          // the body was already read, so keeping the lease buys a later worker
+          // nothing. Shared bytes remain for lazy lifecycle reclaim.
+          expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(0);
+          expect(objectStore.deleted).toHaveLength(0);
+          expect(objectStore.store.size).toBe(1);
           // AC8 still holds here: a discard is not a completion.
           expect(await completedStat(name)).toBeNull();
         });
@@ -236,7 +243,7 @@ describe.skipIf(!hasTestcontainers)(
     describe("given a staged job whose body is present but cannot be decoded", () => {
       describe("when a worker claims the group and the decode fails", () => {
         /** @scenario a body-present decode failure does not destroy the body it could not read */
-        it("does not release the blob", async () => {
+        it("retires the lease without deleting the blob", async () => {
           const name = freshName();
           const groupId = `${TENANT}/body-present-release`;
           const objectStore = new InMemoryObjectStore();
@@ -266,10 +273,9 @@ describe.skipIf(!hasTestcontainers)(
           );
 
           expect(processed).not.toHaveBeenCalled();
-          // The revert-check: before #5538's fix this path called release(),
-          // which for an s3-tier blob means tieredBlobs.delete() — recorded
-          // here. Reverting the fix turns this into a non-empty array.
+          expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(0);
           expect(objectStore.deleted).toEqual([]);
+          expect(objectStore.store.size).toBe(1);
         });
 
         it("leaves the body readable from the blob store afterwards", async () => {
@@ -307,8 +313,8 @@ describe.skipIf(!hasTestcontainers)(
 
     describe("given a staged job whose referenced blob is genuinely gone", () => {
       describe("when a worker claims the group and the decode fails", () => {
-        /** @scenario a missing-blob drop releases the absent blob's holder */
-        it("releases the blob's holder", async () => {
+        /** @scenario a missing-blob drop releases the absent blob's lease */
+        it("releases the blob's lease without eager object deletion", async () => {
           const name = freshName();
           const groupId = `${TENANT}/missing-blob-release`;
           const objectStore = new InMemoryObjectStore();
@@ -333,17 +339,10 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 10000, interval: 100 },
           );
 
-          // The stated exemption (AC2a): a missing_blob drop DOES release —
-          // there is nothing left to preserve, so the holder is dropped.
-          // Revert-check: this currently passes either way (release() always
-          // ran pre-fix); its value is guarding the *other* reason branches
-          // don't regress into skipping this legitimate release.
-          await vi.waitFor(
-            () => {
-              expect(objectStore.deleted).toContain(uri);
-            },
-            { timeout: 5000, interval: 50 },
-          );
+          // There is nothing left to preserve, so the lease is retired. The
+          // application still never issues an eager shared-object delete.
+          expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(0);
+          expect(objectStore.deleted).toHaveLength(0);
         });
       });
     });
@@ -561,77 +560,69 @@ describe.skipIf(!hasTestcontainers)(
     describe("given a staged job whose blob store is temporarily unreachable", () => {
       describe("when a worker claims the group and the decode fails", () => {
         /** @scenario a transient blob-store error still retries instead of dropping */
-        it(
-          "re-stages the job for retry instead of completing it",
-          async () => {
-            const name = freshName();
-            const groupId = `${TENANT}/transient-retries`;
-            const flaky = new FlakyObjectStore(1); // fails once, then serves
-            const received: TestPayload[] = [];
-            newQueue({
-              name,
-              processFn: async (p) => {
-                received.push(p);
-              },
-              consumerEnabled: true,
-              objectStore: flaky,
-            });
+        it("re-stages the job for retry instead of completing it", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/transient-retries`;
+          const flaky = new FlakyObjectStore(1); // fails once, then serves
+          const received: TestPayload[] = [];
+          newQueue({
+            name,
+            processFn: async (p) => {
+              received.push(p);
+            },
+            consumerEnabled: true,
+            objectStore: flaky,
+          });
 
-            await queues[0]!.waitUntilReady();
-            await queues[0]!.send({
-              id: "s1",
-              groupId,
-              value: OFFLOADABLE_S3_VALUE(),
-            });
+          await queues[0]!.waitUntilReady();
+          await queues[0]!.send({
+            id: "s1",
+            groupId,
+            value: OFFLOADABLE_S3_VALUE(),
+          });
 
-            // The handler eventually runs despite the first transient
-            // failure — it could only get here via a re-stage, since a drop
-            // would never call the handler at all.
-            await vi.waitFor(() => expect(received).toHaveLength(1), {
-              timeout: 15000,
-              interval: 100,
-            });
-          },
-          20000,
-        );
+          // The handler eventually runs despite the first transient
+          // failure — it could only get here via a re-stage, since a drop
+          // would never call the handler at all.
+          await vi.waitFor(() => expect(received).toHaveLength(1), {
+            timeout: 15000,
+            interval: 100,
+          });
+        }, 20000);
 
-        it(
-          "does not increment the drop counter",
-          async () => {
-            const name = freshName();
-            const groupId = `${TENANT}/transient-no-drop`;
-            const flaky = new FlakyObjectStore(1);
-            const received: TestPayload[] = [];
-            newQueue({
-              name,
-              processFn: async (p) => {
-                received.push(p);
-              },
-              consumerEnabled: true,
-              objectStore: flaky,
-            });
+        it("does not increment the drop counter", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/transient-no-drop`;
+          const flaky = new FlakyObjectStore(1);
+          const received: TestPayload[] = [];
+          newQueue({
+            name,
+            processFn: async (p) => {
+              received.push(p);
+            },
+            consumerEnabled: true,
+            objectStore: flaky,
+          });
 
-            await queues[0]!.waitUntilReady();
-            await queues[0]!.send({
-              id: "s1",
-              groupId,
-              value: OFFLOADABLE_S3_VALUE(),
-            });
+          await queues[0]!.waitUntilReady();
+          await queues[0]!.send({
+            id: "s1",
+            groupId,
+            value: OFFLOADABLE_S3_VALUE(),
+          });
 
-            await vi.waitFor(() => expect(received).toHaveLength(1), {
-              timeout: 15000,
-              interval: 100,
-            });
+          await vi.waitFor(() => expect(received).toHaveLength(1), {
+            timeout: 15000,
+            interval: 100,
+          });
 
-            // Revert-check: pre-fix, TransientBlobStoreError still routed
-            // through handleTransientDecode (this was already correct before
-            // #5538 — see ADR-030 §2), so this specific assertion mainly
-            // guards against a regression that widens the drop path to catch
-            // transient errors too.
-            expect(await dropsFor(name)).toHaveLength(0);
-          },
-          20000,
-        );
+          // Revert-check: pre-fix, TransientBlobStoreError still routed
+          // through handleTransientDecode (this was already correct before
+          // #5538 — see ADR-030 §2), so this specific assertion mainly
+          // guards against a regression that widens the drop path to catch
+          // transient errors too.
+          expect(await dropsFor(name)).toHaveLength(0);
+        }, 20000);
       });
     });
 
@@ -671,9 +662,9 @@ describe.skipIf(!hasTestcontainers)(
             queueName: name,
           });
 
-          // Acquire the holder that `send()` would have. Staging via
-          // encodeJobEnvelope + stageBatch bypasses `blobLifecycle.acquire()`, so
-          // WITHOUT this there is no holder — release() would delete nothing and
+          // Take the lease that `send()` would have. Staging via
+          // encodeJobEnvelope + stageBatch bypasses `blobLifecycle.takeLease()`, so
+          // WITHOUT this there is no lease — release would delete nothing and
           // `flaky.deleted === []` would pass even with the fix reverted. Caught
           // by review after I shipped exactly that vacuous assertion; verified by
           // reverting the release rule and watching this test stay green.
@@ -683,8 +674,8 @@ describe.skipIf(!hasTestcontainers)(
             objectStoreFor: () => flaky,
             resolveStorageDestination: STORAGE_DESTINATION,
           });
-          await lifecycle.acquire(envelope);
-          expect(readEnvelopeHold(envelope)).not.toBeNull(); // the holder is real
+          await lifecycle.takeLease(envelope);
+          expect(readEnvelopeLease(envelope)).not.toBeNull();
 
           const scripts = new GroupStagingScripts(redis, name);
           await scripts.stageBatch([
@@ -713,14 +704,13 @@ describe.skipIf(!hasTestcontainers)(
           );
 
           const [entry] = await dropsFor(name);
-          // Revert-check: before #5538, this terminal called release() AND
-          // never counted the loss — an operator saw nothing while an event
-          // that could not possibly recover via replay was thrown away.
+          // Revert-check: before #5538 this terminal never counted the loss —
+          // an operator saw nothing while an event that could not recover via
+          // replay was thrown away.
           expect(entry!.labels.reason).toBe("transient_exhausted");
-          // The terminal's OTHER deliberate change, which had no coverage until a
-          // review caught it: it no longer releases. Eight failed READS mean the
-          // STORE was unreachable, not that the blob is gone — most likely it is
-          // still there, so retiring it would delete a body that exists.
+          // The terminal retires its lease but leaves shared object bytes to
+          // the durable-store lifecycle.
+          expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(0);
           expect(flaky.deleted).toEqual([]);
         });
       });

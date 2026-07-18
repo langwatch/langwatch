@@ -2,13 +2,10 @@ import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 
 /**
  * The single source of truth for the redis key layout of offloaded blobs and
- * their holder sets. Two collaborators must agree on it byte-for-byte — the
- * blob store writes the blob key, and the holder-set Lua `UNLINK`s it on
- * reclaim — so the layout lives here rather than being reconstructed in each.
- * Changing a prefix in one place without the other would silently break
- * reclamation, with no compiler signal; centralizing removes that drift.
+ * their lease sets. Centralizing the tenant-namespaced key layout keeps the
+ * blob store, lease scripts, and rolling-deploy compatibility guard aligned.
  *
- * Keys carry the queue name (with its cluster hash tag) so a blob, its holder
+ * Keys carry the queue name (with its cluster hash tag) so a blob, its lease
  * set, and the queue's other keys all land in one cluster slot.
  *
  * `projectId` is the branded {@link TenantId} so the tenant boundary stays
@@ -41,7 +38,19 @@ export function redisBlobKey(params: {
   return `${redisBlobKeyPrefix(params.queueName)}${blobNamespaceId(params)}`;
 }
 
-/** Full redis key for a blob's holder set (the per-blob reference count). */
+/** Full Redis key for a blob's per-holder lease deadlines. */
+export function blobLeaseSetKey(params: {
+  queueName: string;
+  projectId: TenantId;
+  hash: string;
+}): string {
+  return `${params.queueName}:gq:blobleases:${blobNamespaceId(params)}`;
+}
+
+/**
+ * Legacy ref-count holder key retained only as a rolling-deploy guard. New
+ * lifecycle decisions never derive liveness from this set.
+ */
 export function blobHolderSetKey(params: {
   queueName: string;
   projectId: TenantId;

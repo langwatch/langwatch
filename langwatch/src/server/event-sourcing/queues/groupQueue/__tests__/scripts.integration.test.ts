@@ -690,12 +690,12 @@ describe("GroupStagingScripts", () => {
       });
     });
 
-    // GQ2 blob holds move INSIDE the stage eval, atomic with the squash that
+    // GQ2 blob leases move INSIDE the stage eval, atomic with the squash that
     // displaces the value they guard. The old post-eval fire-and-forget
     // transfer could reorder against a concurrent squash of the same dedup id
-    // and leave a phantom hold pinning the blob until its TTL — the 2026-07-09
+    // and leave a phantom lifecycle entry pinning the blob until its TTL — the 2026-07-09
     // leak (~279k orphaned blobs, ~1.9 GB of prod Redis).
-    describe("given GQ2 offloaded values with blob holds", () => {
+    describe("given GQ2 offloaded values with blob leases", () => {
       const TENANT = "project-x";
       const GROUP = `${TENANT}/group-1`;
 
@@ -719,14 +719,14 @@ describe("GroupStagingScripts", () => {
         return `GQ2|${Buffer.byteLength(header)}|${header}`;
       }
 
-      function holderKey({
+      function leaseKey({
         hash,
         projectId = TENANT,
       }: {
         hash: string;
         projectId?: string;
       }) {
-        return `${keyPrefix()}blobholders:${projectId}/${hash}`;
+        return `${keyPrefix()}blobleases:${projectId}/${hash}`;
       }
 
       function blobKey({
@@ -739,8 +739,8 @@ describe("GroupStagingScripts", () => {
         return `${keyPrefix()}blob:${projectId}/${hash}`;
       }
 
-      /** Simulates the producer's blob write + hold acquire for a staged value. */
-      async function seedBlobAndHold({
+      /** Simulates the producer's blob write + lease take for a staged value. */
+      async function seedBlobAndLease({
         hash,
         token,
       }: {
@@ -748,12 +748,12 @@ describe("GroupStagingScripts", () => {
         token: string;
       }) {
         await redis.set(blobKey({ hash }), "gzipped-bytes");
-        await redis.sadd(holderKey({ hash }), token);
+        await redis.zadd(leaseKey({ hash }), Date.now() + 60_000, token);
       }
 
       describe("when a replace squash displaces a staged GQ2 value", () => {
-        /** @scenario "A dedup squash leaves no phantom hold and reclaims only unreferenced blobs" */
-        it("adds the replacement's hold, drops the displaced one, and reclaims its blob in the eval", async () => {
+        /** @scenario "A dedup squash leaves no phantom lease and never eagerly reclaims blobs" */
+        it("takes the replacement lease, drops the displaced one, and leaves reclaim lazy", async () => {
           const oldValue = gq2Value({ hash: "h1", token: "t1" });
           await scripts.stage(
             makeJob({
@@ -764,10 +764,10 @@ describe("GroupStagingScripts", () => {
               jobDataJson: oldValue,
             }),
           );
-          await seedBlobAndHold({ hash: "h1", token: "t1" });
+          await seedBlobAndLease({ hash: "h1", token: "t1" });
           await redis.set(blobKey({ hash: "h2" }), "gzipped-bytes");
 
-          const { isNew, orphanedValue, reclaimS3 } = await scripts.stage(
+          const { isNew, orphanedValue } = await scripts.stage(
             makeJob({
               stagedJobId: "j2",
               groupId: GROUP,
@@ -779,15 +779,15 @@ describe("GroupStagingScripts", () => {
 
           expect(isNew).toBe(false);
           expect(orphanedValue).toBe(oldValue);
-          expect(reclaimS3).toBe(false);
-          // Replacement holds its blob; the displaced hold and blob are gone.
-          expect(await redis.smembers(holderKey({ hash: "h2" }))).toEqual(["t2"]);
-          expect(await redis.ttl(holderKey({ hash: "h2" }))).toBeGreaterThan(0);
-          expect(await redis.exists(holderKey({ hash: "h1" }))).toBe(0);
-          expect(await redis.exists(blobKey({ hash: "h1" }))).toBe(0);
+          expect(await redis.zrange(leaseKey({ hash: "h2" }), 0, -1)).toEqual([
+            "t2",
+          ]);
+          expect(await redis.ttl(leaseKey({ hash: "h2" }))).toBeGreaterThan(0);
+          expect(await redis.exists(leaseKey({ hash: "h1" }))).toBe(0);
+          expect(await redis.exists(blobKey({ hash: "h1" }))).toBe(1);
         });
 
-        it("keeps a displaced blob other stages still hold", async () => {
+        it("keeps a displaced blob other stages still lease", async () => {
           const shared = gq2Value({ hash: "h-shared", token: "t1" });
           await scripts.stage(
             makeJob({
@@ -798,9 +798,13 @@ describe("GroupStagingScripts", () => {
               jobDataJson: shared,
             }),
           );
-          await seedBlobAndHold({ hash: "h-shared", token: "t1" });
-          // A second staged occupancy (another group) holds the same content.
-          await redis.sadd(holderKey({ hash: "h-shared" }), "t-other");
+          await seedBlobAndLease({ hash: "h-shared", token: "t1" });
+          // A second staged occupancy (another group) leases the same content.
+          await redis.zadd(
+            leaseKey({ hash: "h-shared" }),
+            Date.now() + 60_000,
+            "t-other",
+          );
 
           await scripts.stage(
             makeJob({
@@ -812,14 +816,14 @@ describe("GroupStagingScripts", () => {
             }),
           );
 
-          // t1 released, t-other still holds — the blob must survive.
-          expect(await redis.smembers(holderKey({ hash: "h-shared" }))).toEqual([
-            "t-other",
-          ]);
+          // t1 released, t-other still leases — the blob must survive.
+          expect(
+            await redis.zrange(leaseKey({ hash: "h-shared" }), 0, -1),
+          ).toEqual(["t-other"]);
           expect(await redis.exists(blobKey({ hash: "h-shared" }))).toBe(1);
         });
 
-        it("reports an s3-tier displaced blob for out-of-band deletion", async () => {
+        it("does not report an s3-tier displaced blob for eager deletion", async () => {
           const oldValue = gq2Value({ hash: "h-s3", token: "t1", tier: "s3" });
           await scripts.stage(
             makeJob({
@@ -830,9 +834,13 @@ describe("GroupStagingScripts", () => {
               jobDataJson: oldValue,
             }),
           );
-          await redis.sadd(holderKey({ hash: "h-s3" }), "t1");
+          await redis.zadd(
+            leaseKey({ hash: "h-s3" }),
+            Date.now() + 60_000,
+            "t1",
+          );
 
-          const { orphanedValue, reclaimS3 } = await scripts.stage(
+          const { orphanedValue } = await scripts.stage(
             makeJob({
               stagedJobId: "j2",
               groupId: GROUP,
@@ -842,11 +850,9 @@ describe("GroupStagingScripts", () => {
             }),
           );
 
-          // Lua cannot reach s3: the holder set is emptied here and the caller
-          // is told to delete the object.
+          // The lease is released, but durable reclaim is left to its lifecycle sweep.
           expect(orphanedValue).toBe(oldValue);
-          expect(reclaimS3).toBe(true);
-          expect(await redis.exists(holderKey({ hash: "h-s3" }))).toBe(0);
+          expect(await redis.exists(leaseKey({ hash: "h-s3" }))).toBe(0);
         });
 
         it("UNLINKs a displaced GQ1 blob directly (mixed-format rollout)", async () => {
@@ -874,13 +880,15 @@ describe("GroupStagingScripts", () => {
           );
 
           expect(await redis.exists(`${keyPrefix()}blob:legacy-id`)).toBe(0);
-          expect(await redis.smembers(holderKey({ hash: "h2" }))).toEqual(["t2"]);
+          expect(await redis.zrange(leaseKey({ hash: "h2" }), 0, -1)).toEqual([
+            "t2",
+          ]);
         });
       });
 
       describe("when a job is squashed twice in succession", () => {
-        /** @scenario "A squash chain never leaves a phantom hold" */
-        it("leaves only the final value's hold and reclaims every displaced blob", async () => {
+        /** @scenario "A squash chain never leaves a phantom lease" */
+        it("leaves only the final lease and no eager blob deletions", async () => {
           await scripts.stage(
             makeJob({
               stagedJobId: "j1",
@@ -890,7 +898,7 @@ describe("GroupStagingScripts", () => {
               jobDataJson: gq2Value({ hash: "h1", token: "t1" }),
             }),
           );
-          await seedBlobAndHold({ hash: "h1", token: "t1" });
+          await seedBlobAndLease({ hash: "h1", token: "t1" });
 
           for (const [hash, token] of [
             ["h2", "t2"],
@@ -908,18 +916,20 @@ describe("GroupStagingScripts", () => {
             );
           }
 
-          expect(await redis.smembers(holderKey({ hash: "h3" }))).toEqual(["t3"]);
-          expect(await redis.exists(holderKey({ hash: "h1" }))).toBe(0);
-          expect(await redis.exists(holderKey({ hash: "h2" }))).toBe(0);
-          expect(await redis.exists(blobKey({ hash: "h1" }))).toBe(0);
-          expect(await redis.exists(blobKey({ hash: "h2" }))).toBe(0);
+          expect(await redis.zrange(leaseKey({ hash: "h3" }), 0, -1)).toEqual([
+            "t3",
+          ]);
+          expect(await redis.exists(leaseKey({ hash: "h1" }))).toBe(0);
+          expect(await redis.exists(leaseKey({ hash: "h2" }))).toBe(0);
+          expect(await redis.exists(blobKey({ hash: "h1" }))).toBe(1);
+          expect(await redis.exists(blobKey({ hash: "h2" }))).toBe(1);
           expect(await redis.exists(blobKey({ hash: "h3" }))).toBe(1);
         });
       });
 
       describe("when the squash keeps the stored payload (replace off)", () => {
-        /** @scenario "A squash that keeps the stored payload acquires no hold for the discarded value" */
-        it("leaves the stored hold untouched and records none for the discarded value", async () => {
+        /** @scenario "A squash that keeps the stored payload takes no lease for the discarded value" */
+        it("leaves the stored lease untouched and records none for the discarded value", async () => {
           const kept = gq2Value({ hash: "h-kept", token: "t-kept" });
           await scripts.stage(
             makeJob({
@@ -932,10 +942,10 @@ describe("GroupStagingScripts", () => {
               shouldReplace: false,
             }),
           );
-          await seedBlobAndHold({ hash: "h-kept", token: "t-kept" });
+          await seedBlobAndLease({ hash: "h-kept", token: "t-kept" });
 
           const discarded = gq2Value({ hash: "h-disc", token: "t-disc" });
-          const { orphanedValue, reclaimS3 } = await scripts.stage(
+          const { orphanedValue } = await scripts.stage(
             makeJob({
               stagedJobId: "j2",
               groupId: GROUP,
@@ -947,18 +957,18 @@ describe("GroupStagingScripts", () => {
             }),
           );
 
-          // The discarded value was never staged: no hold may exist for it —
-          // the old code self-transferred and minted a phantom hold here.
+          // The discarded value was never staged: no lease may exist for it.
           expect(orphanedValue).toBe(discarded);
-          expect(reclaimS3).toBe(false);
-          expect(await redis.smembers(holderKey({ hash: "h-kept" }))).toEqual(["t-kept"]);
-          expect(await redis.exists(holderKey({ hash: "h-disc" }))).toBe(0);
+          expect(
+            await redis.zrange(leaseKey({ hash: "h-kept" }), 0, -1),
+          ).toEqual(["t-kept"]);
+          expect(await redis.exists(leaseKey({ hash: "h-disc" }))).toBe(0);
         });
       });
 
       describe("when a survive-dispatch squash hits an already-dispatched dedup", () => {
-        /** @scenario "A post-dispatch survive-dispatch squash acquires no hold for the discarded value" */
-        it("records no hold for the discarded value", async () => {
+        /** @scenario "A post-dispatch survive-dispatch squash takes no lease for the discarded value" */
+        it("records no lease for the discarded value", async () => {
           await scripts.stage(
             makeJob({
               stagedJobId: "j1",
@@ -977,7 +987,7 @@ describe("GroupStagingScripts", () => {
           expect(dispatched?.stagedJobId).toBe("j1");
 
           const late = gq2Value({ hash: "h-late", token: "t-late" });
-          const { isNew, orphanedValue, reclaimS3 } = await scripts.stage(
+          const { isNew, orphanedValue } = await scripts.stage(
             makeJob({
               stagedJobId: "j2",
               groupId: GROUP,
@@ -990,13 +1000,12 @@ describe("GroupStagingScripts", () => {
 
           expect(isNew).toBe(false);
           expect(orphanedValue).toBe(late);
-          expect(reclaimS3).toBe(false);
-          expect(await redis.exists(holderKey({ hash: "h-late" }))).toBe(0);
+          expect(await redis.exists(leaseKey({ hash: "h-late" }))).toBe(0);
         });
       });
 
       describe("when the displaced ref belongs to another tenant", () => {
-        it("skips the foreign hold and leaves it to its TTL", async () => {
+        it("skips the foreign lease and leaves it to its TTL", async () => {
           const foreign = gq2Value({
             hash: "h-foreign",
             token: "t-foreign",
@@ -1011,8 +1020,15 @@ describe("GroupStagingScripts", () => {
               jobDataJson: foreign,
             }),
           );
-          await redis.set(blobKey({ hash: "h-foreign", projectId: "project-other" }), "bytes");
-          await redis.sadd(holderKey({ hash: "h-foreign", projectId: "project-other" }), "t-foreign");
+          await redis.set(
+            blobKey({ hash: "h-foreign", projectId: "project-other" }),
+            "bytes",
+          );
+          await redis.zadd(
+            leaseKey({ hash: "h-foreign", projectId: "project-other" }),
+            Date.now() + 60_000,
+            "t-foreign",
+          );
 
           await scripts.stage(
             makeJob({
@@ -1024,19 +1040,25 @@ describe("GroupStagingScripts", () => {
             }),
           );
 
-          // Mirror of the TS release guard (ADR-030 §5): never touch a hold
+          // Mirror of the TS release guard: never touch a lease
           // whose ref is not this group's tenant.
           expect(
-            await redis.smembers(holderKey({ hash: "h-foreign", projectId: "project-other" })),
+            await redis.zrange(
+              leaseKey({ hash: "h-foreign", projectId: "project-other" }),
+              0,
+              -1,
+            ),
           ).toEqual(["t-foreign"]);
-          expect(await redis.exists(blobKey({ hash: "h-foreign", projectId: "project-other" }))).toBe(
-            1,
-          );
+          expect(
+            await redis.exists(
+              blobKey({ hash: "h-foreign", projectId: "project-other" }),
+            ),
+          ).toBe(1);
         });
       });
 
       describe("when the batch script squashes a GQ2 value", () => {
-        it("transfers holds per entry and flags s3 reclaims index-aligned", async () => {
+        it("transfers leases per entry without flagging eager s3 reclaim", async () => {
           const oldS3 = gq2Value({ hash: "hb-s3", token: "tb1", tier: "s3" });
           await scripts.stage(
             makeJob({
@@ -1047,9 +1069,13 @@ describe("GroupStagingScripts", () => {
               jobDataJson: oldS3,
             }),
           );
-          await redis.sadd(holderKey({ hash: "hb-s3" }), "tb1");
+          await redis.zadd(
+            leaseKey({ hash: "hb-s3" }),
+            Date.now() + 60_000,
+            "tb1",
+          );
 
-          const { orphanedValues, reclaimS3Flags } = await scripts.stageBatch([
+          const { orphanedValues } = await scripts.stageBatch([
             makeJob({
               stagedJobId: "j1",
               groupId: GROUP,
@@ -1067,12 +1093,13 @@ describe("GroupStagingScripts", () => {
           ]);
 
           expect(orphanedValues).toEqual([oldS3, ""]);
-          expect(reclaimS3Flags).toEqual([true, false]);
-          expect(await redis.smembers(holderKey({ hash: "hb2" }))).toEqual(["tb2"]);
-          expect(await redis.exists(holderKey({ hash: "hb-s3" }))).toBe(0);
-          // Entry 1 was a fresh stage: its hold is the PRODUCER's to acquire,
+          expect(await redis.zrange(leaseKey({ hash: "hb2" }), 0, -1)).toEqual([
+            "tb2",
+          ]);
+          expect(await redis.exists(leaseKey({ hash: "hb-s3" }))).toBe(0);
+          // Entry 1 was a fresh stage: its lease is the PRODUCER's to take,
           // not the eval's.
-          expect(await redis.exists(holderKey({ hash: "hb3" }))).toBe(0);
+          expect(await redis.exists(leaseKey({ hash: "hb3" }))).toBe(0);
         });
       });
     });

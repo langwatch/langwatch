@@ -93,11 +93,11 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
   }
 
   const blobKeys = (name: string) => redis.keys(`${name}:gq:blob:*`);
-  const holderKeys = (name: string) => redis.keys(`${name}:gq:blobholders:*`);
+  const leaseKeys = (name: string) => redis.keys(`${name}:gq:blobleases:*`);
 
   describe("given a job whose payload exceeds the inline ceiling", () => {
     describe("when it is processed to completion", () => {
-      it("resolves the full payload on dispatch and reclaims the blob + holder", async () => {
+      it("resolves the full payload, releases its lease, and leaves blob reclaim lazy", async () => {
         const received: TestPayload[] = [];
         const { queue, name } = createQueue({
           processFn: async (p) => {
@@ -120,11 +120,11 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
         });
         expect(received[0]!.value).toBe(OFFLOADED_VALUE);
 
-        // The blob and its holder set are eagerly reclaimed once the last holder completes.
+        // Completion removes only the lease. Redis expiry reclaims the blob lazily.
         await vi.waitFor(
           async () => {
-            expect(await blobKeys(name)).toHaveLength(0);
-            expect(await holderKeys(name)).toHaveLength(0);
+            expect(await blobKeys(name)).toHaveLength(1);
+            expect(await leaseKeys(name)).toHaveLength(0);
           },
           { timeout: 5000, interval: 50 },
         );
@@ -136,8 +136,8 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
   // jobEnvelope.unit.test.ts ("when two envelopes have identical user payloads
   // but different queue machinery → ONE stored blob"). A queue-level end-to-end
   // proof requires multi-reactor wiring (multiple reactor definitions over one
-  // event) — out of scope for this single-reactor harness. The holder reclaim
-  // sequence itself is proven in blobHolders.integration.test.ts.
+  // event) — out of scope for this single-reactor harness. Lease expiry and
+  // idempotency are proven in blobLeases.integration.test.ts.
   describe("given an offloaded job", () => {
     describe("when it is staged", () => {
       it("keys the blob by tenant namespace and content hash", async () => {
@@ -167,6 +167,33 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
           },
           { timeout: 5000, interval: 50 },
         );
+      });
+    });
+  });
+
+  describe("given three jobs with identical offloaded content", () => {
+    describe("when they are staged", () => {
+      it("stores one blob and records one lease per job", async () => {
+        const { queue, name } = createQueue({
+          processFn: async () => {},
+          consumerEnabled: false,
+        });
+        await queue.waitUntilReady();
+
+        for (let i = 0; i < 3; i++) {
+          await queue.send({
+            id: "same-payload",
+            groupId: TENANT_GROUP,
+            value: OFFLOADED_VALUE,
+          });
+        }
+
+        await vi.waitFor(async () => {
+          expect(await blobKeys(name)).toHaveLength(1);
+          const keys = await leaseKeys(name);
+          expect(keys).toHaveLength(1);
+          expect(await redis.zcard(keys[0]!)).toBe(3);
+        });
       });
     });
   });

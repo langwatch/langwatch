@@ -10,7 +10,7 @@ import {
   encodeJobEnvelope,
   PayloadTooLargeError,
   readEnvelopeBlobId,
-  readEnvelopeHold,
+  readEnvelopeLease,
   readJobRoutingMeta,
 } from "../jobEnvelope";
 import { TieredBlobStore } from "../tieredBlobStore";
@@ -421,7 +421,7 @@ describe("jobEnvelope", () => {
         });
 
         expect(encoded.startsWith("GQ2|")).toBe(true);
-        expect(readEnvelopeHold(encoded)).toBeNull();
+        expect(readEnvelopeLease(encoded)).toBeNull();
         expect(
           await decodeJobEnvelope({ value: encoded, tieredBlobs }),
         ).toEqual(payload);
@@ -446,7 +446,7 @@ describe("jobEnvelope", () => {
         });
 
         expect(encoded).toContain('"e":"redis"');
-        expect(readEnvelopeHold(encoded)?.ref).toMatchObject({
+        expect(readEnvelopeLease(encoded)?.ref).toMatchObject({
           tier: "redis",
           projectId: PROJECT,
         });
@@ -466,7 +466,7 @@ describe("jobEnvelope", () => {
         });
 
         expect(encoded).toContain('"e":"s3"');
-        expect(readEnvelopeHold(encoded)?.ref.tier).toBe("s3");
+        expect(readEnvelopeLease(encoded)?.ref.tier).toBe("s3");
         expect(objectStore.store.size).toBe(1);
         expect(
           await decodeJobEnvelope({ value: encoded, tieredBlobs }),
@@ -487,7 +487,7 @@ describe("jobEnvelope", () => {
         });
       });
 
-      it("stores one copy for byte-identical payloads, with distinct hold tokens", async () => {
+      it("stores one copy for byte-identical payloads with distinct lease identities", async () => {
         const { tieredBlobs, redisBlobs } = makeTiered();
 
         const e1 = await encodeJobEnvelope({
@@ -502,11 +502,10 @@ describe("jobEnvelope", () => {
         });
 
         expect(redisBlobs.store.size).toBe(1);
-        // One shared blob ref, but a distinct per-stage hold token each time —
-        // so N fan-out jobs share one body yet each holds its own reference.
-        expect(readEnvelopeHold(e1)?.ref).toEqual(readEnvelopeHold(e2)?.ref);
-        expect(readEnvelopeHold(e1)?.token).not.toBe(
-          readEnvelopeHold(e2)?.token,
+        // One shared blob ref, but a distinct per-stage lease identity each time.
+        expect(readEnvelopeLease(e1)?.ref).toEqual(readEnvelopeLease(e2)?.ref);
+        expect(readEnvelopeLease(e1)?.holderId).not.toBe(
+          readEnvelopeLease(e2)?.holderId,
         );
       });
 
@@ -559,7 +558,7 @@ describe("jobEnvelope", () => {
           projectId: PROJECT,
         });
 
-        // The two envelopes are different (different headers / hold tokens)
+        // The two envelopes are different (different headers / lease identities)
         // but the underlying blob is a single content-addressed entry.
         expect(v1).not.toBe(v2);
         expect(redisBlobs.store.size).toBe(1);

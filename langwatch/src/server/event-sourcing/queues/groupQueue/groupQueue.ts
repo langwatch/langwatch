@@ -205,9 +205,9 @@ const dropReasonOf = (err: unknown): DecodeFailureReason | "unknown" =>
  * - Weighted round-robin (sqrt(pendingCount)) provides fair scheduling across groups
  * - fastq provides concurrency-limited async task execution with backpressure
  */
-export class GroupQueueProcessor<Payload extends Record<string, unknown>>
-  implements EventSourcedQueueProcessor<Payload>
-{
+export class GroupQueueProcessor<
+  Payload extends Record<string, unknown>,
+> implements EventSourcedQueueProcessor<Payload> {
   private readonly logger = createLogger(
     "langwatch:event-sourcing:group-queue",
   );
@@ -314,8 +314,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       this.queueName,
     );
 
-    // The GQ2 content-addressed blob lifecycle — tiered store, holder-set
-    // refcount, and the encode/decode/acquire/release seams (ADR-029/030).
+    // The GQ2 content-addressed blob lifecycle — tiered store, renewable
+    // per-holder leases, and the encode/decode/take/release seams.
     this.blobLifecycle = new EnvelopeBlobLifecycle({
       redis: this.redisConnection,
       queueName: this.queueName,
@@ -450,7 +450,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       groupId,
     });
 
-    const { isNew, orphanedValue, reclaimS3 } = await this.scripts.stage({
+    const { isNew, orphanedValue } = await this.scripts.stage({
       stagedJobId,
       groupId,
       dispatchAfterMs,
@@ -462,29 +462,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       shouldSurviveDispatch,
     });
 
-    // Blob holds for a dedup squash move INSIDE the stage eval, atomic with
+    // Blob leases for a dedup squash move INSIDE the stage eval, atomic with
     // the displacement — a post-eval transfer can reorder against a concurrent
-    // squash of the same dedup id and leave a phantom hold that pins the blob
-    // until its TTL (the 2026-07-09 leak). Two cases remain on this side:
-    //   - a squash whose displaced blob is s3-tier and newly unreferenced
-    //     (Lua can't reach s3, so the eval reports it for deletion here);
-    //   - a genuine new stage, whose hold the eval doesn't manage — acquire it
-    //     now. When the squash DISCARDED the new value instead (replace off,
-    //     or a post-dispatch survive-dispatch squash: orphanedValue equals
-    //     jobDataJson), it was never staged and gets no hold: a discarded GQ1
-    //     blob (uniquely owned by this value) was already UNLINKed directly
-    //     inside the eval, while a GQ2 blob is content-addressed and left to
-    //     the holders of staged jobs sharing its content, or to the TTL
-    //     backstop.
-    if (orphanedValue) {
-      if (reclaimS3) {
-        await this.blobLifecycle.reclaimOrphanedS3({
-          value: orphanedValue,
-          groupId,
-        });
-      }
-    } else {
-      await this.blobLifecycle.acquire(jobDataJson);
+    // squash of the same dedup id and leave a phantom lifecycle entry. A genuine
+    // new stage still takes its lease here. When the squash DISCARDED the new
+    // value instead (replace off or a post-dispatch survive-dispatch squash), it
+    // was never staged and gets no lease. A discarded GQ1 private blob was
+    // already UNLINKed inside the eval; a GQ2 blob is left to lazy backstop reclaim.
+    if (!orphanedValue) {
+      await this.blobLifecycle.takeLease(jobDataJson);
     }
 
     if (isNew) {
@@ -601,25 +587,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }),
     );
 
-    const { newStagedCount, orphanedValues, reclaimS3Flags } =
+    const { newStagedCount, orphanedValues } =
       await this.scripts.stageBatch(jobsToStage);
 
-    // Dedup-squash holds moved inside the stage eval (see send()); here we
-    // only delete s3 objects the eval reported newly unreferenced, and acquire
-    // holds for genuinely new stages. A squash that discarded the NEW value
-    // (orphan === the job's own value) staged nothing and gets no hold.
+    // Dedup-squash leases move inside the stage eval (see send()); here we take
+    // leases only for genuinely new stages. A squash that discarded the NEW
+    // value (orphan === the job's own value) staged nothing and gets no lease.
     await Promise.all(
       jobsToStage.map(async (job, i) => {
         const orphan = orphanedValues[i];
-        if (orphan && orphan.length > 0) {
-          if (reclaimS3Flags[i]) {
-            await this.blobLifecycle.reclaimOrphanedS3({
-              value: orphan,
-              groupId: job.groupId,
-            });
-          }
-        } else {
-          await this.blobLifecycle.acquire(job.jobDataJson);
+        if (!orphan || orphan.length === 0) {
+          await this.blobLifecycle.takeLease(job.jobDataJson);
         }
       }),
     );
@@ -936,7 +914,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     }
 
     const jobStartTime = performance.now();
-    const heartbeat = this.startActiveKeyHeartbeat({ groupId, stagedJobId });
+    const heartbeat = this.startActiveKeyHeartbeat({
+      groupId,
+      stagedJobId,
+      jobDataJson,
+    });
     this.activeJobCount++;
 
     try {
@@ -1042,7 +1024,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // removed from staging during the drain, so completing the
               // dispatched job is enough to free the group.
               await this.scripts.complete({ groupId, stagedJobId, jobName });
-              await this.blobLifecycle.release({
+              await this.blobLifecycle.releaseLease({
                 values: [
                   jobDataJson,
                   ...drainedSiblings.map((sibling) => sibling.jobDataJson),
@@ -1101,12 +1083,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 const newStagedJobId = `${stagedJobId}/r/${attempt}`;
                 // If the retry re-encode fails (transient blob-store down,
                 // payload-too-large from a state-bloat regression), the retry
-                // can't proceed and the job is DISCARDED. Release the OLD hold
-                // explicitly — otherwise the old hold token stays in the holder
-                // set until the 4-day TTL backstop reclaims it, leaking the blob
-                // for that whole window. Releasing is right here (unlike the
-                // decode drops): the body was already read, so keeping it buys a
-                // later worker nothing — what failed is the re-ENCODE.
+                // can't proceed and the job is DISCARDED. Retire the old lease
+                // explicitly: the body was already read, so keeping a liveness
+                // claim buys a later worker nothing. Blob bytes remain for lazy
+                // reclaim; what failed here is the re-ENCODE.
                 let retryJobData: string;
                 try {
                   retryJobData = await this.blobLifecycle.encode({
@@ -1125,12 +1105,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     err: encodeErr,
                     reason: "retry_encode_failed",
                     message:
-                      "Retry re-encode failed; releasing old hold and discarding job",
+                      "Retry re-encode failed; releasing old lease and discarding job",
                     // Released below, deliberately: the body was already read, so
                     // keeping it buys a later worker nothing.
                     bodyPreserved: false,
                   });
-                  await this.blobLifecycle.release({
+                  await this.blobLifecycle.releaseLease({
                     values: [jobDataJson],
                     groupId,
                   });
@@ -1157,12 +1137,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   jobDataJson: retryJobData,
                   backoffMs,
                 });
-                // Atomically transfer the hold from the dispatched value to the
+                // Atomically transfer the lease from the dispatched value to the
                 // re-staged one. For GQ2 the retry re-encodes to the SAME content
-                // hash, so it's SADD+SREM on one holder set (the blob stays
-                // referenced); for a mixed/GQ1 value it falls back to ordered
-                // acquire+release. Drained siblings keep their ORIGINAL values.
-                await this.blobLifecycle.transfer({
+                // hash, so one deadline replaces another in the lease set (the
+                // blob stays); mixed/GQ1 falls back to ordered take+release.
+                await this.blobLifecycle.transferLease({
                   newValue: retryJobData,
                   oldValue: jobDataJson,
                   groupId,
@@ -1237,7 +1216,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                       }),
                   ),
                 );
-                await this.blobLifecycle.release({
+                await this.blobLifecycle.releaseLease({
                   values: [jobDataJson],
                   groupId,
                 });
@@ -1371,9 +1350,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           dedupTtlMs: 0,
           jobDataJson: sibling.jobDataJson,
         });
-        // Re-acquire the sibling's hold (idempotent: it kept its hold through
-        // the drain, and its value — hence token — is unchanged).
-        await this.blobLifecycle.acquire(sibling.jobDataJson);
+        // Renew the sibling's lease (idempotent: it kept the same holder
+        // identity through the drain).
+        await this.blobLifecycle.takeLease(sibling.jobDataJson);
       } catch (err) {
         // The sibling never made it back into staging, so nothing will dispatch
         // it again — that is a discard, whatever the re-stage intended (#5538).
@@ -1399,9 +1378,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private startActiveKeyHeartbeat({
     groupId,
     stagedJobId,
+    jobDataJson,
   }: {
     groupId: string;
     stagedJobId: string;
+    jobDataJson: string;
   }): ReturnType<typeof setInterval> {
     const intervalMs = (GROUP_QUEUE_CONFIG.activeTtlSec * 1000) / 3;
     return setInterval(() => {
@@ -1422,6 +1403,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
             "Failed to heartbeat active key during processing",
           );
         });
+      void this.blobLifecycle.renewLease(jobDataJson);
     }, intervalMs);
   }
 
@@ -1471,9 +1453,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       errorStack: lastError?.stack,
     });
 
-    // Acquire the re-staged value's hold; the caller releases the dispatched
-    // one after this returns (acquire-before-release keeps a GQ2 blob alive).
-    await this.blobLifecycle.acquire(jobDataJson);
+    // Take the re-staged value's lease; the caller releases the dispatched one
+    // after this returns (take-before-release preserves continuous liveness).
+    await this.blobLifecycle.takeLease(jobDataJson);
 
     gqGroupsBlockedTotal.inc(routingLabels);
     gqJobsExhaustedTotal.inc(routingLabels);
@@ -1526,15 +1508,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    *   alive to its TTL backstop and names it, but nothing re-delivers it.
    * - `complete()` — chosen. Liveness is the one thing the old drop got right.
    *
-   * **Why `release()` is conditional** — release reclaims the blob and deletes
-   * the s3 object out-of-band: this module's retire-forever signal. Only
-   * `missing_blob` has nothing left to lose (the body is already gone; releasing
-   * merely drops the stale holder). Every other reason means the body is PRESENT
-   * and unreadable *to this worker* — a rolling-deploy codec skew is exactly that,
-   * and the next worker could read it fine — so retiring it would destroy
-   * recoverable data. `handleTransientDecode` already refuses to release for the
-   * same reason. A preserved body lives to its TTL backstop, and the descriptor
-   * logged here is how an operator finds it.
+   * Lease release is non-destructive: every terminal drop retires its liveness
+   * claim, while Redis expiry or the durable-store lifecycle preserves and later
+   * reclaims the shared bytes independently. A body-present codec-skew drop can
+   * therefore leave its bytes inspectable without pretending a completed slot is
+   * still a live lease holder.
    */
   private async dropStagedJob({
     groupId,
@@ -1548,18 +1526,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     stagedJobId: string;
     jobDataJson: string;
     err: unknown;
-    /**
-     * Narrower than {@link DropReason} on purpose. The release rule below is only
-     * sound for reasons where "was the body still there?" is the right question —
-     * `sibling_restage_failed` and `retry_encode_failed` are discards for reasons
-     * unrelated to the body, and they handle their own values. Narrowing makes
-     * that a compile error rather than a silent behaviour question.
-     */
+    /** Narrower than {@link DropReason}; other discard sites own no active slot. */
     reason: DecodeFailureReason | "transient_exhausted" | "unknown";
     message: string;
   }): Promise<void> {
-    // The release rule, named once. Everything below reads off this predicate so
-    // the log cannot claim one thing while the code does another.
     const bodyIsGone = reason === "missing_blob";
 
     this.recordDrop({
@@ -1575,11 +1545,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // `dropped: true` keeps the group advancing WITHOUT counting a thrown-away
     // job as a completion or clearing the group's stored error (#5538).
     await this.scripts.complete({ groupId, stagedJobId, dropped: true });
-
-    if (bodyIsGone) {
-      // Nothing left to preserve — releasing just drops the stale holder.
-      await this.blobLifecycle.release({ values: [jobDataJson], groupId });
-    }
+    await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
   }
 
   /**
@@ -1658,7 +1624,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
   /**
    * Claim-side poison park (specs/event-sourcing/poison-group-park-guard.feature):
-   * re-stage the SAME staged value (no decode, no re-encode, hold token
+   * re-stage the SAME staged value (no decode, no re-encode, lease identity
    * unchanged - the transient-decode rationale applies) and move the group to
    * the blocked set with a stored error. The value stays inspectable via the
    * ops peek path; operators recover with the existing unblock/drain surface.
@@ -1706,9 +1672,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   /**
    * A transient blob-store failure (network/5xx) means the body is temporarily
    * unreachable — not gone. Re-stage the SAME envelope with backoff so the job
-   * retries instead of dropping to replay; the value is still valid and its hold
-   * token is unchanged, so there is no re-encode and no holder churn (releasing
-   * here would risk reclaiming the blob the re-stage still needs). Bounded by the
+   * retries instead of dropping to replay; the value is still valid and its lease
+   * identity is unchanged, so there is no re-encode or identity churn. The
+   * restage renews that lease before returning. Bounded by the
    * `/r/` retry suffixes already in the stagedJobId, so a misclassified permanent
    * failure still terminates at the fail-safe (ADR-030 §2).
    */
@@ -1728,12 +1694,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       // The retry ladder is out of rungs. This is a discard like any other, and
       // it used to claim replay would recover it — it does not (#5538).
       //
-      // It also used to release() the value. Reaching here means every one of
+      // Reaching here means every one of
       // `JOB_RETRY_CONFIG.maxAttempts` READS failed — ~2h27m of sustained
       // unreachability (`queues/shared.ts`) — which says the STORE is down, not
-      // that the blob is gone. It is most likely still there, so retiring it
-      // would delete a body that exists; this drop preserves like every other
-      // non-missing_blob reason.
+      // that the blob is gone. It is most likely still there, so the drop keeps
+      // the shared bytes for lazy reclaim while retiring this job's lease.
       await this.dropStagedJob({
         groupId,
         stagedJobId,
@@ -1753,6 +1718,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       jobDataJson,
       backoffMs,
     });
+    await this.blobLifecycle.renewLease(jobDataJson);
     this.logger.warn(
       {
         queueName: this.queueName,
