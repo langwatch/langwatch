@@ -63,6 +63,26 @@ function withOccurredAtHint(
   return { ...context, occurredAtMs: occurredAt };
 }
 
+/**
+ * Whether a re-folded history event pre-dates this delivery — i.e. the fold is
+ * RESUMING an aggregate that already had events, rather than touching it for
+ * the first time.
+ *
+ * Keyed on `event.id`, deliberately, and never on `idempotencyKey`. A retry
+ * delivery carries a NEW id but the SAME idempotency key as the earlier event
+ * it repeats, so keying on the idempotency key would read that earlier event as
+ * "one of the ones we just delivered" and mislabel resumed work as first touch.
+ * Both re-fold paths must share this predicate or the same persisted history
+ * reports different kinds depending on which loader the projection happens to
+ * use.
+ *
+ * This is distinct from the DEDUP key (`idempotencyKey || id`), which the
+ * streamed path still needs to collapse a raw, undeduplicated page.
+ */
+function isPreExisting(event: Event, deliveredIds: ReadonlySet<string>): boolean {
+  return !deliveredIds.has(event.id);
+}
+
 function recordStoreMissRefoldMetrics({
   projectionName,
   refoldEventCount,
@@ -388,8 +408,8 @@ export class FoldProjectionExecutor {
     if (history.length === 0) return null;
 
     const deliveredIds = new Set(delivered.map((event) => event.id));
-    const sawPreExisting = history.some(
-      (event) => !deliveredIds.has(event.id),
+    const sawPreExisting = history.some((event) =>
+      isPreExisting(event, deliveredIds),
     );
     recordStoreMissRefoldMetrics({
       projectionName: projection.name,
@@ -455,9 +475,10 @@ export class FoldProjectionExecutor {
     // instead of hanging the fold worker for the aggregate indefinitely.
     // 100k pages * 1000/page default covers a 100M-event aggregate.
     const MAX_PAGES = 100_000;
-    const deliveredDedupKeys = new Set(
-      delivered.map((event) => event.idempotencyKey || event.id),
-    );
+    // Two different keyings, on purpose — see `isPreExisting`. Dedup collapses
+    // a raw page by idempotency key; the resumed/first-touch classification
+    // keys on id so it matches the array path.
+    const deliveredIds = new Set(delivered.map((event) => event.id));
     const seen = new Set<string>();
     let state = projection.init();
     let after: { timestamp: number; eventId: string } | undefined;
@@ -485,7 +506,7 @@ export class FoldProjectionExecutor {
         const dedupKey = event.idempotencyKey || event.id;
         if (seen.has(dedupKey)) continue;
         seen.add(dedupKey);
-        if (!deliveredDedupKeys.has(dedupKey)) sawPreExisting = true;
+        if (isPreExisting(event, deliveredIds)) sawPreExisting = true;
         state = projection.apply(state, event as E);
         refoldEventCount++;
       }

@@ -195,6 +195,51 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
       });
     });
 
+    describe("when a delivered retry shares an idempotencyKey with an earlier event", () => {
+      // The two loader routes must agree on resumed-vs-first_touch for the same
+      // persisted history. The classification keys on event id, not idempotency
+      // key: a retry carries a new id but repeats an earlier event's key, so
+      // keying on the key would read that earlier event as one of the delivered
+      // ones and report first_touch for work that is plainly resumed.
+      const earlier = () => ev("e1", 1, "K");
+      const deliveredRetry = () => ev("e2", 2, "K");
+
+      it("reports resumed on the streamed path", async () => {
+        const loader = pagedLoaderFrom([earlier(), deliveredRetry()]);
+        const { foldDef } = makeFold(loader);
+        const executor = new FoldProjectionExecutor(2);
+
+        await executor.execute(foldDef, deliveredRetry(), context);
+
+        expect(incrementEsFoldStoreMissRefoldTotal).toHaveBeenCalledWith({
+          projectionName: "slim",
+          kind: "resumed",
+        });
+      });
+
+      it("reports resumed on the array path too", async () => {
+        // Same persisted history via the unbounded loader, which applies the
+        // store's first-occurrence dedup and so surfaces only the earlier event.
+        const store = createMockFoldProjectionStore<CountState>();
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        const foldDef = createMockFoldProjectionDefinition("slim", {
+          store,
+          init,
+          apply,
+          options: { refoldOnStoreMiss: true },
+        });
+        foldDef.eventLoaderUpTo = vi.fn(async () => [earlier()]);
+        const executor = new FoldProjectionExecutor();
+
+        await executor.execute(foldDef, deliveredRetry(), context);
+
+        expect(incrementEsFoldStoreMissRefoldTotal).toHaveBeenCalledWith({
+          projectionName: "slim",
+          kind: "resumed",
+        });
+      });
+    });
+
     describe("when the history read has not caught up to the delivered event", () => {
       it("applies the delivered event on top", async () => {
         const history = [ev("e1", 1)];
