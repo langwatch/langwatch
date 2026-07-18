@@ -6,13 +6,13 @@
 
 > **Lifecycle amendment (2026-07-18):** WP4 replaced the holder-set eager-reclaim design below with per-holder renewable leases and lazy reclaim. The content-addressed tiers, tenant namespacing, and GQ2 envelope remain unchanged. See the current [GroupQueue architecture](../../../langwatch/src/server/event-sourcing/queues/groupQueue/ARCHITECTURE.md#per-holder-renewable-leases); the holder-set sections in this ADR are retained as the historical decision being superseded.
 
-> **Durable-tier retention requirement (2026-07-18):** Every deployment MUST configure a lifecycle/retention rule on each `stored-objects` destination used by the GroupQueue durable blob tier. The rule is the durable tier's reclaim mechanism and must eventually delete queue payload objects, while retaining them for at least the configured Redis blob backstop window. This applies equally to the default bucket, per-project/BYOC buckets, and self-hosted file/object-store destinations. Without it, payloads above the durable-tier threshold (> 256 KiB by default after encoding/compression) accumulate without bound on self-hosted deployments; releasing the last lease does not delete their stored bytes.
+> **Dedicated durable tier (2026-07-19):** GroupQueue S3 payloads use deployment-owned `LANGWATCH_QUEUE_PAYLOAD_BUCKET` and `LANGWATCH_QUEUE_PAYLOAD_PREFIX`, with keys `temp-tier-3-offload/{tenantId}/{hash}`. This destination never consults tenant BYOC configuration. Its lifecycle rule is the durable tier's reclaim mechanism; the SaaS bucket expires the prefix after seven days. Deployments that do not configure the dedicated bucket retain the existing storage fallback for compatibility and must provide equivalent retention.
 >
 > Two lifecycle follow-ups remain explicit: add lease-aware durable GC so expired durable blobs can be reclaimed sooner than the retention backstop, and remove the temporary `blobholders` legacy mirror writes after the rolling-deploy compatibility window has closed fleet-wide.
 
 **Extends / supersedes in part:** [ADR-026](./026-groupqueue-payload-envelope.md) (GroupQueue payload envelope). The versioned-envelope + header-only routing decision stands. This ADR supersedes ADR-026's §"Blob lifecycle" — random blob ids, best-effort delete, and the 7-day pure-backstop TTL — for offloaded bodies.
 
-**Reuses:** the `stored-objects` object store — `StorageDriver` / `StorageRegistry` / content-addressed URI minting / `resolveProjectStorageDestination` (`src/server/stored-objects/`, the codebase's single pluggable object-store abstraction; behavioural contract in [externalize-event-byte-content.feature](../../../specs/features/scenarios/externalize-event-byte-content.feature)). The S3/file tier delegates to it. This is *not* [ADR-022](./022-event-log-source-of-truth.md)'s `BlobStore`, which is event_log-centric (it reads full content back out of ClickHouse) and is not a general object store; that one is not reused here.
+**Reuses:** the `stored-objects` driver interfaces (`StorageDriver` / `StorageRegistry`) while keeping GroupQueue destination resolution, URI minting, and S3 client construction separate. This is *not* [ADR-022](./022-event-log-source-of-truth.md)'s `BlobStore`, which is event_log-centric and is not reused here.
 
 **Not to be confused with:** [ADR-024](./024-cold-path-tiered-storage.md) (cold-path tiered storage). ADR-024 tiers *ClickHouse* parts hot→cold across SSD and S3 volumes. This ADR tiers *GroupQueue staged-job payloads* inline→Redis→S3. Different subsystem; overlapping word.
 
@@ -44,7 +44,7 @@ The bulk of a staged job — its shared payload component(s) — is stored by **
 |---|---|---|---|
 | `inline` | ≤ 4 KiB | the envelope body itself (raw, or gzip when it wins) | — |
 | `redis` | 4 KiB – 256 KiB | standalone Redis key, gzip binary (the queue's own `RedisJobBlobStore`) | `{queue}:gq:blob:{projectId}/<hash>` |
-| `s3` | > 256 KiB | the reused `stored-objects` `StorageRegistry` (s3:// or file://) | `s3://{bucket}/{projectId}/<hash>` |
+| `s3` | > 256 KiB | GroupQueue `StorageRegistry` (s3:// or file:// fallback) | `s3://{bucket}/temp-tier-3-offload/{tenantId}/<hash>` |
 
 `<hash>` is SHA-256 of the canonical component bytes, truncated to 128 bits, base64url (~22 chars; collision probability negligible). Identical bytes ⇒ identical key ⇒ **one** stored copy, however many jobs reference it. PUTs are idempotent — same content, same key — so a retried or racing stage is free and crash-safe.
 
@@ -77,11 +77,11 @@ Because a content-addressed blob is shared, ADR-026's "delete on complete" is un
 
 ### 4. Tenant-namespaced keys
 
-Every blob key — Redis and S3 — is **namespaced by `projectId`**, which *is* the tenant id in this codebase (`tenantId === projectId` throughout; the queue already derives it via `tenantIdFromGroupId`). So the durable tier mints exactly the `stored_objects` layout `s3://{bucket}/{projectId}/<hash>` via `mintS3Uri` + `resolveProjectStorageDestination` (which also picks the per-project BYOC bucket / global / local-FS destination). Consequences:
+Every blob key — Redis and S3 — is **namespaced by `projectId`**, which *is* the tenant id in this codebase (`tenantId === projectId` throughout; the queue already derives it via `tenantIdFromGroupId`). The dedicated durable tier mints `s3://{bucket}/temp-tier-3-offload/{tenantId}/<hash>` and never consults per-project BYOC storage. Consequences:
 
 - **Tenants never share a blob.** Two tenants with byte-identical content get distinct keys. Isolation is structural (in the key path), not incidental to the content.
-- **Purge is tractable.** A project delete becomes a delete-by-prefix over `…/{projectId}/*` on the durable tier; the Redis tier's 3-day TTL makes its purge effectively immediate once the project's jobs drain. This closes the GDPR gap that a globally-keyed shared blob would have opened.
-- **Logs must redact.** A BYOC tenant's bucket name is a cross-tenant disclosure channel; any log line carrying a blob URI goes through `redactStorageUri` (already provided by `stored-objects`).
+- **Retention is bounded.** Tenant namespacing keeps keys separable, while the dedicated bucket lifecycle removes durable payloads after the configured temporary-retention window.
+- **Logs must redact.** Any log line carrying a blob URI goes through `redactStorageUri`.
 
 ### 5. GQ2 envelope + two-phase rollout
 

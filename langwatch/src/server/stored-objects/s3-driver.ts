@@ -54,7 +54,10 @@ function parseS3Uri(uri: string): { bucket: string; key: string } {
  * are resolved for every operation.
  */
 export class S3Driver implements StorageDriver {
-  constructor(private readonly projectId: string) {}
+  constructor(
+    private readonly projectId: string,
+    private readonly clientFactory: typeof createS3Client = createS3Client,
+  ) {}
 
   /**
    * Returns a readable stream for the object at the given S3 URI.
@@ -63,7 +66,7 @@ export class S3Driver implements StorageDriver {
    */
   async get(uri: string): Promise<Readable> {
     const { bucket, key } = parseS3Uri(uri);
-    const { s3Client } = await createS3Client(this.projectId);
+    const { s3Client } = await this.clientFactory(this.projectId);
 
     try {
       const response = await s3Client.send(
@@ -84,7 +87,7 @@ export class S3Driver implements StorageDriver {
    */
   async put(uri: string, bytes: Buffer, mediaType: string): Promise<void> {
     const { bucket, key } = parseS3Uri(uri);
-    const { s3Client } = await createS3Client(this.projectId);
+    const { s3Client } = await this.clientFactory(this.projectId);
 
     await s3Client.send(
       new PutObjectCommand({
@@ -101,7 +104,7 @@ export class S3Driver implements StorageDriver {
    */
   async delete(uri: string): Promise<void> {
     const { bucket, key } = parseS3Uri(uri);
-    const { s3Client } = await createS3Client(this.projectId);
+    const { s3Client } = await this.clientFactory(this.projectId);
 
     await s3Client.send(
       new DeleteObjectCommand({ Bucket: bucket, Key: key }),
@@ -115,7 +118,7 @@ export class S3Driver implements StorageDriver {
    */
   async exists(uri: string): Promise<boolean> {
     const { bucket, key } = parseS3Uri(uri);
-    const { s3Client } = await createS3Client(this.projectId);
+    const { s3Client } = await this.clientFactory(this.projectId);
 
     try {
       await s3Client.send(

@@ -5,18 +5,20 @@ import type { Logger } from "@langwatch/observability";
 
 import { COMMAND_INLINE_THRESHOLD } from "~/server/app-layer/traces/lean-for-projection";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
-import { mintFileUri, mintS3Uri } from "~/server/stored-objects/uri";
 
 import { BLOB_BACKSTOP_TTL_SECONDS, MAX_BLOB_BYTES } from "./blobConstants";
 import { blobNamespaceId } from "./blobKeys";
 import type { JobBlobStore } from "./jobEnvelope";
 import { gqBlobDecodeCapExceededTotal } from "./metrics";
+import {
+  type GroupQueueStorageDestination,
+  mintGroupQueueStorageUri,
+} from "./groupQueueStorage";
 
 /**
  * Minimal object-store surface the durable (s3/file) tier needs. Structurally
- * satisfied by the stored-objects `StorageRegistry`, so this tier reuses the
- * codebase's one pluggable object store rather than adding another. See
+ * satisfied by the stored-objects `StorageRegistry`. GroupQueue reuses the
+ * driver interface but owns its destination, key minter, and S3 client. See
  * ADR-029.
  */
 export interface ObjectStore {
@@ -132,31 +134,30 @@ function isObjectMissingError(err: unknown): boolean {
 
 /**
  * Content-addressed, tenant-namespaced blob store with two durable tiers: Redis
- * for mid-size bodies, the reused stored-objects object store for very large
- * ones. Keys are namespaced by `projectId` (the tenant id) so tenants never
- * share a blob and a project purge is a delete-by-prefix. See ADR-029.
+ * for mid-size bodies, the GroupQueue object store for very large ones. Keys
+ * are namespaced by `projectId` (the tenant id) so tenants never share a blob.
+ * See ADR-029.
  *
  * Dependencies are injected (no env coupling) so the store is exercised in
- * isolation: `objectStore` is satisfied by `StorageRegistry`, `resolveDestination`
- * by `resolveProjectStorageDestination`.
+ * isolation: `objectStore` is satisfied by `StorageRegistry`, while the
+ * composition root supplies the GroupQueue-specific destination resolver.
  */
 export class TieredBlobStore {
   private readonly redisBlobs: JobBlobStore;
-  // Per-project so the s3/file tier resolves each tenant's BYOC bucket and
-  // credentials (the stored-objects S3Driver is projectId-scoped).
+  // Per-project for the compatibility fallback; the dedicated S3 path uses a
+  // deployment-owned client and never resolves tenant BYOC credentials.
   private readonly objectStoreFor: (projectId: string) => ObjectStore;
   private readonly resolveDestination: (
     projectId: string,
-  ) => Promise<ProjectStorageDestination>;
+  ) => Promise<GroupQueueStorageDestination>;
   private readonly s3ThresholdBytes: number;
   private readonly queueName?: string;
   private readonly logger?: Logger;
-  // Per-project storage destination, cached for the process lifetime. BYOC
-  // bucket changes are rare deliberate migrations, picked up on the next worker
-  // restart (deploys are frequent); a failed resolve is not cached.
+  // Per-project storage destination, cached for the process lifetime. Dedicated
+  // config changes are picked up on restart; a failed resolve is not cached.
   private readonly destinationCache = new Map<
     TenantId,
-    Promise<ProjectStorageDestination>
+    Promise<GroupQueueStorageDestination>
   >();
 
   constructor(deps: {
@@ -164,7 +165,7 @@ export class TieredBlobStore {
     objectStoreFor: (projectId: string) => ObjectStore;
     resolveDestination: (
       projectId: string,
-    ) => Promise<ProjectStorageDestination>;
+    ) => Promise<GroupQueueStorageDestination>;
     s3ThresholdBytes?: number;
     /** Optional queue name for the decode-cap-exceeded counter. */
     queueName?: string;
@@ -191,7 +192,7 @@ export class TieredBlobStore {
 
   private resolveDestinationCached(
     projectId: TenantId,
-  ): Promise<ProjectStorageDestination> {
+  ): Promise<GroupQueueStorageDestination> {
     let cached = this.destinationCache.get(projectId);
     if (!cached) {
       cached = this.resolveDestination(projectId).catch((err: unknown) => {
@@ -212,22 +213,7 @@ export class TieredBlobStore {
     hash: string;
   }): Promise<string> {
     const destination = await this.resolveDestinationCached(projectId);
-    switch (destination.kind) {
-      case "s3":
-        return mintS3Uri({
-          bucket: destination.bucket,
-          projectId,
-          sha256: hash,
-        });
-      case "file":
-        return mintFileUri({ root: destination.root, projectId, sha256: hash });
-      default: {
-        const unhandled: never = destination;
-        throw new Error(
-          `Unhandled storage destination kind: ${JSON.stringify(unhandled)}`,
-        );
-      }
-    }
+    return mintGroupQueueStorageUri({ destination, tenantId: projectId, hash });
   }
 
   async put({

@@ -29,9 +29,9 @@ Feature: GroupQueue content-addressed tiered payload store
   #     s3 >256 KiB (boundary aligned with ADR-022 COMMAND_INLINE_THRESHOLD).
   #   - Blob id = SHA-256(canonical bytes) truncated to 128 bits, base64url.
   #     Identical bytes -> identical key -> one stored copy. PUTs idempotent.
-  #     Keys are namespaced by projectId (the tenant id; tenantId === projectId),
-  #     minting the stored_objects layout s3://{bucket}/{projectId}/<hash> so
-  #     tenants never share a blob and purge is delete-by-prefix.
+  #     Durable keys live in a GroupQueue-specific bucket and prefix as
+  #     s3://{bucket}/temp-tier-3-offload/{tenantId}/{hash}; they never use a
+  #     tenant's BYOC stored-objects destination.
   #   - Flat jobs: the fan-out producer hoists the shared component (event, fold
   #     state) out of every job; each job carries refs, not the payload. Decode
   #     resolves refs before the handler, which is unchanged.
@@ -43,10 +43,9 @@ Feature: GroupQueue content-addressed tiered payload store
   #     A missing blob completes the slot without the handler
   #     (recoverable via replay) — a fail-safe, never a wedge.
   #
-  # RESOLVED (ADR-029): the s3/file tier reuses the stored-objects StorageDriver/
-  # StorageRegistry/URI minting (specs/features/scenarios/externalize-event-byte-content.feature)
-  # — the driver only, NOT StoredObjectsService (whose no-GC lifecycle would
-  # clash with lease/backstop reclaim). The redis tier stays the queue's own store.
+  # RESOLVED (ADR-029): the s3/file tier reuses the stored-objects driver
+  # interfaces, but has a GroupQueue-specific destination, URI minter, and S3
+  # client so queue payloads cannot drift into customer or BYOC object storage.
   #
   # Related ADRs: 029 (this), 026 (envelope, extended), 022 (event_log SoT — its
   # BlobStore is event_log-centric, NOT reused here), 024 (CH cold-path tiering —
@@ -80,9 +79,12 @@ Feature: GroupQueue content-addressed tiered payload store
     And the handler receives the payload intact
 
   @integration @track1 @unimplemented
-  Scenario: A very large payload offloads to S3 through the reused object store
+  Scenario: A very large payload offloads to the dedicated GroupQueue S3 namespace
+    Given the GroupQueue bucket is "langwatch-prod-group-queue"
+    And the GroupQueue prefix is "temp-tier-3-offload/"
     When a job whose shared payload exceeds the S3 threshold is staged
-    Then the body is stored via the stored-objects registry under an s3:// key namespaced by projectId and content hash
+    Then the body is stored under "s3://langwatch-prod-group-queue/temp-tier-3-offload/{tenantId}/{hash}"
+    And no tenant BYOC destination is consulted
     And the queued value is a flat envelope referencing the blob by tier "s3" and hash
     And the handler receives the payload intact
 
@@ -137,11 +139,10 @@ Feature: GroupQueue content-addressed tiered payload store
 
   @unit @track2 @unimplemented
   # Multi-tenancy guard: blob keys are namespaced by projectId (the tenant id;
-  # tenantId === projectId), matching the stored_objects layout
-  # s3://{bucket}/{projectId}/<hash>. Isolation is structural — in the key path —
-  # not incidental to content. This also makes a project purge a delete-by-prefix
-  # over .../{projectId}/* (driven by the platform's project-delete cascade); the
-  # redis tier needs none, its 4-day TTL clears once the project's jobs drain.
+  # tenantId === projectId), matching the GroupQueue layout
+  # s3://{bucket}/temp-tier-3-offload/{tenantId}/<hash>. Isolation is structural — in the key path —
+  # not incidental to content. The durable bucket lifecycle bounds retention;
+  # the redis tier clears through its 4-day TTL once the jobs drain.
   Scenario: Blob keys are namespaced by tenant so tenants never share a blob
     Given two tenants whose jobs carry byte-identical user content
     When each payload is offloaded
@@ -268,8 +269,8 @@ Feature: GroupQueue content-addressed tiered payload store
   #     -> A sub-threshold payload stays inline in the envelope body
   #   AC1.2 "Mid-size offloads to a content-addressed Redis blob"
   #     -> A mid-size payload offloads to a content-addressed Redis blob
-  #   AC1.3 "Very large offloads to the S3 tier (reused stored-objects store)"
-  #     -> A very large payload offloads to S3 through the reused object store
+  #   AC1.3 "Very large offloads to the dedicated GroupQueue S3 namespace"
+  #     -> A very large payload offloads to the dedicated GroupQueue S3 namespace
   #   AC1.4 "Identical bytes collapse to one key; PUT is idempotent"
   #     -> The same bytes always produce the same blob key
   # Track 2 — flat jobs and content-addressed sharing

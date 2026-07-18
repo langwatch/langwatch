@@ -115,6 +115,29 @@ describe("S3Driver", () => {
         ContentType: mediaType,
       });
     });
+
+    it("uses an explicitly supplied client factory", async () => {
+      mockCreateS3Client.mockClear();
+      const dedicatedClient = makeMockS3Client();
+      dedicatedClient.send.mockResolvedValueOnce({});
+      const dedicatedFactory = vi.fn().mockResolvedValue({
+        s3Client: dedicatedClient,
+        s3Bucket: TEST_BUCKET,
+      });
+      const dedicatedDriver = new S3Driver(
+        TEST_PROJECT_ID,
+        dedicatedFactory as typeof createS3Client,
+      );
+
+      await dedicatedDriver.put(
+        TEST_URI,
+        Buffer.from("queue payload"),
+        "application/octet-stream",
+      );
+
+      expect(dedicatedFactory).toHaveBeenCalledWith(TEST_PROJECT_ID);
+      expect(mockCreateS3Client).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------

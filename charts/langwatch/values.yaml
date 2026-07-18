@@ -352,6 +352,22 @@ app:
       size: 10Gi
       storageClassName: ""
 
+  # Optional dedicated object-storage namespace for GroupQueue payloads.
+  # The bucket must have a lifecycle rule for the configured prefix.
+  ## @extra app.queuePayloads GroupQueue durable-tier object storage.
+  ## @param app.queuePayloads.enabled [default: false] Store GroupQueue durable-tier payloads in a dedicated S3 bucket.
+  ## @param app.queuePayloads.bucket [string] Dedicated GroupQueue bucket name.
+  ## @param app.queuePayloads.prefix [string, default: temp-tier-3-offload/] Key prefix expired by the bucket lifecycle rule.
+  ## @param app.queuePayloads.endpoint.value [string] S3 endpoint for the dedicated bucket.
+  queuePayloads:
+    enabled: false
+    bucket: ""
+    prefix: "temp-tier-3-offload/"
+    endpoint:
+      value: ""
+      ## @param app.queuePayloads.endpoint.secretKeyRef [object] Secret ref for the dedicated bucket endpoint.
+      secretKeyRef: { name: "", key: "" }
+
   # Email notification configuration
   # Enables sending alerts and notifications via email
   ## @extra app.email Email provider configuration.

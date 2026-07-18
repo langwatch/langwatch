@@ -256,6 +256,12 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `app.storedObjects.localFilesystem.path`                     | Mount point that the LocalFilesystemDriver writes under.                                                              | `/var/lib/langwatch/objects` |
 | `app.storedObjects.localFilesystem.size`                     | PVC size for the stored-objects volume.                                                                               | `10Gi`                       |
 | `app.storedObjects.localFilesystem.storageClassName`         | PVC storageClassName (cluster default if empty).                                                                      | `""`                         |
+| `app.queuePayloads`                                          | GroupQueue durable-tier object storage.                                                                               |                              |
+| `app.queuePayloads.enabled`                                  | Store GroupQueue durable-tier payloads in a dedicated S3 bucket.                                                      | `false`                      |
+| `app.queuePayloads.bucket`                                   | Dedicated GroupQueue bucket name.                                                                                     | `""`                         |
+| `app.queuePayloads.prefix`                                   | Key prefix expired by the bucket lifecycle rule.                                                                      | `temp-tier-3-offload/`       |
+| `app.queuePayloads.endpoint.value`                           | S3 endpoint for the dedicated bucket.                                                                                 | `""`                         |
+| `app.queuePayloads.endpoint.secretKeyRef`                    | Secret ref for the dedicated bucket endpoint.                                                                         | `{}`                         |
 | `app.email`                                                  | Email provider configuration.                                                                                         |                              |
 | `app.email.enabled`                                          | Enable email notifications.                                                                                           | `false`                      |
 | `app.email.defaultFrom`                                      | Default "from" address.                                                                                               | `""`                         |
@@ -711,5 +717,4 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `langyagent.secrets.internalSecretKey`  | Key inside the existing Secret that holds the shared internal secret.                                                                                                                                                                                                                                                                                                                                                                                                                     | `LANGY_INTERNAL_SECRET`           |
 
 _This section will be replaced by the generator._
-
 

@@ -12,8 +12,10 @@ import {
   TTL_HELPER_LUA,
 } from "~/server/event-sourcing/queues/groupQueue/scripts";
 import { TieredBlobStore } from "~/server/event-sourcing/queues/groupQueue/tieredBlobStore";
-import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
-import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
+import {
+  createGroupQueueStorageRegistry,
+  resolveGroupQueueStorageDestination,
+} from "~/server/event-sourcing/queues/groupQueue/groupQueueStorage";
 import { normalizeErrorMessage } from "../normalize-error-message";
 import type { ErrorCluster, GroupInfo, QueueInfo } from "../types";
 import type {
@@ -577,8 +579,9 @@ export class QueueRedisRepository implements QueueRepository {
       // (2026-07-03 audit follow-up).
       const tieredBlobs = new TieredBlobStore({
         redisBlobs: blobs,
-        objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
-        resolveDestination: resolveProjectStorageDestination,
+        objectStoreFor: (projectId) =>
+          createGroupQueueStorageRegistry({ projectId }),
+        resolveDestination: resolveGroupQueueStorageDestination,
         queueName: params.queueName,
         logger,
       });

@@ -197,6 +197,9 @@ export function createEnvConfig() {
       // SignatureDoesNotMatch.
       S3_REGION: z.string().optional(),
       S3_BUCKET_NAME: z.string().optional(),
+      LANGWATCH_QUEUE_PAYLOAD_BUCKET: z.string().optional(),
+      LANGWATCH_QUEUE_PAYLOAD_PREFIX: z.string().optional(),
+      LANGWATCH_QUEUE_PAYLOAD_S3_ENDPOINT: z.string().optional(),
       // Root path used by the stored-objects LocalFilesystemDriver when S3 is
       // not configured. Defaults to /var/lib/langwatch/objects inside the
       // service. Self-hosting operators running multi-pod deployments MUST
@@ -375,6 +378,12 @@ export function createEnvConfig() {
       S3_SESSION_TOKEN: process.env.S3_SESSION_TOKEN,
       S3_REGION: process.env.S3_REGION,
       S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
+      LANGWATCH_QUEUE_PAYLOAD_BUCKET:
+        process.env.LANGWATCH_QUEUE_PAYLOAD_BUCKET,
+      LANGWATCH_QUEUE_PAYLOAD_PREFIX:
+        process.env.LANGWATCH_QUEUE_PAYLOAD_PREFIX,
+      LANGWATCH_QUEUE_PAYLOAD_S3_ENDPOINT:
+        process.env.LANGWATCH_QUEUE_PAYLOAD_S3_ENDPOINT,
       LANGWATCH_LOCAL_STORAGE_PATH: process.env.LANGWATCH_LOCAL_STORAGE_PATH,
       AZURE_BLOB_ACCOUNT_NAME: process.env.AZURE_BLOB_ACCOUNT_NAME,
       AZURE_BLOB_ACCOUNT_KEY: process.env.AZURE_BLOB_ACCOUNT_KEY,

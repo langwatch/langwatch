@@ -52,8 +52,10 @@ You only instantiate `GroupQueueProcessor` when building a new queue surface out
 ```typescript
 import { GroupQueueProcessor } from "~/server/event-sourcing/queues/groupQueue/groupQueue";
 import { connection } from "~/server/redis";
-import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
-import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
+import {
+  createGroupQueueStorageRegistry,
+  resolveGroupQueueStorageDestination,
+} from "~/server/event-sourcing/queues/groupQueue/groupQueueStorage";
 
 const queue = new GroupQueueProcessor<MyPayload>(
   {
@@ -65,8 +67,8 @@ const queue = new GroupQueueProcessor<MyPayload>(
   connection,
   {
     consumerEnabled: processRole === "worker",
-    objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
-    resolveStorageDestination: resolveProjectStorageDestination,
+    objectStoreFor: (projectId) => createGroupQueueStorageRegistry({ projectId }),
+    resolveStorageDestination: resolveGroupQueueStorageDestination,
   },
 );
 
@@ -162,7 +164,7 @@ Payloads of different sizes land in different places, picked at encode time. You
 | **≤ 1 KiB** | Inline raw JSON in the staged value | nothing — the cheap path |
 | **1 KiB to ≤ 4 KiB** | Inline gzip+base64 (if smaller than raw) | nothing |
 | **4 KiB to ≤ 256 KiB** | Standalone Redis key, ref in envelope. Reads refresh a 4-day TTL; expiry reclaims it lazily. | Redis memory growth in the `{queue}:gq:blob:*` keyspace — usually a runaway-fan-out signal |
-| **> 256 KiB, ≤ 50 MiB** | Object store (S3 / file / azure-blob — projectId-scoped to the BYOC bucket) | Object-store request rate and lifecycle-sweep health |
+| **> 256 KiB, ≤ 50 MiB** | Dedicated GroupQueue S3 bucket/prefix, or the existing file/object-store fallback when disabled | Object-store request rate and lifecycle-sweep health |
 | **> 50 MiB** | Rejected at encode — `PayloadTooLargeError` | Hit by a product bug or a runaway loop — fix upstream rather than raise the cap |
 
 **Content-addressed sharing** means the storage cost of a payload is paid **once** per `(projectId, content-hash)`, regardless of how many jobs reference it. A 30-reactor fan-out of the same event stages 30 envelopes — 30 renewable lease members in one sorted set, one stored blob. Completion drops a member but never deletes the shared blob; Redis expiry or the durable-store lifecycle sweep reclaims it lazily.
@@ -170,6 +172,11 @@ Payloads of different sizes land in different places, picked at encode time. You
 ### Configuring writes
 
 GQ2 (content-addressed) writes are gated behind `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true`. With the flag unset, the queue writes legacy bare-JSON envelopes (GQ1 path) — the GQ2 reader handles both, so rollout is one-way: enable the flag once every consumer in the fleet reads GQ2 envelopes.
+
+For the dedicated durable tier, set `LANGWATCH_QUEUE_PAYLOAD_BUCKET`,
+`LANGWATCH_QUEUE_PAYLOAD_PREFIX` (normally `temp-tier-3-offload/`), and
+`LANGWATCH_QUEUE_PAYLOAD_S3_ENDPOINT`. The bucket lifecycle must expire that
+prefix; SaaS uses seven days. This path never uses tenant BYOC credentials.
 
 ---
 

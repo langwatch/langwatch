@@ -611,6 +611,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ .Values.app.storedObjects.localFilesystem.path | quote }}
 {{- end }}
 
+# GroupQueue durable-tier storage. When disabled the application keeps the
+# existing stored-objects/local-filesystem fallback.
+{{- if .Values.app.queuePayloads.enabled }}
+- name: LANGWATCH_QUEUE_PAYLOAD_BUCKET
+  value: {{ required "app.queuePayloads.bucket is required when app.queuePayloads.enabled=true" .Values.app.queuePayloads.bucket | quote }}
+- name: LANGWATCH_QUEUE_PAYLOAD_PREFIX
+  value: {{ .Values.app.queuePayloads.prefix | quote }}
+{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_QUEUE_PAYLOAD_S3_ENDPOINT" "fieldValues" .Values.app.queuePayloads.endpoint) }}
+{{- end }}
+
 # NextAuth secret. Lives in sharedEnv (not just the app Deployment) because
 # BetterAuth initializes eagerly at import time across every consumer of the
 # app image — workers and the dataset-s3-migration hook Job both pull in the

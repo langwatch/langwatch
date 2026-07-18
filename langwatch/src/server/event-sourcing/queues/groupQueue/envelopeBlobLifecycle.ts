@@ -1,10 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { Cluster, type Redis as IORedis } from "ioredis";
 import { tenantIdFromGroupId } from "../../../observability/tenantRateTracker";
-import {
-  type ProjectStorageDestination,
-  redactStorageUrisInText,
-} from "../../../stored-objects/project-storage-destination";
+import { redactStorageUrisInText } from "../../../stored-objects/project-storage-destination";
 import { createTenantId, type TenantId } from "../../domain/tenantId";
 import { BlobLeases } from "./blobLeases";
 import {
@@ -19,6 +16,7 @@ import {
 import { hasRedisHashTag } from "./redisHashTag";
 import { RedisJobBlobStore } from "./redisJobBlobStore";
 import { type ObjectStore, TieredBlobStore } from "./tieredBlobStore";
+import type { GroupQueueStorageDestination } from "./groupQueueStorage";
 
 const logger = createLogger("langwatch:event-sourcing:envelope-blob-lifecycle");
 
@@ -47,7 +45,7 @@ export class EnvelopeBlobLifecycle {
     objectStoreFor?: (projectId: string) => ObjectStore;
     resolveStorageDestination?: (
       projectId: string,
-    ) => Promise<ProjectStorageDestination>;
+    ) => Promise<GroupQueueStorageDestination>;
     /**
      * Explicit override of the format-rollout gate. Threaded through to
      * {@link encodeJobEnvelope} so the composition root — not per-call

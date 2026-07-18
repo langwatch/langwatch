@@ -100,9 +100,9 @@ serialized payload size
         │                                  envelope = "GQ2|<hLen>|<hJson>"  (no body)
         │                                  blob key  = "{queue}:gq:blob:{projectId}/{sha256}"
         │
-        └──── > 256 KiB, ≤ 50 MiB ─────▶ S3-TIER BLOB (stored-objects bucket)
+        └──── > 256 KiB, ≤ 50 MiB ─────▶ S3-TIER BLOB (GroupQueue bucket)
                                            envelope = "GQ2|<hLen>|<hJson>"  (no body)
-                                           object key = "{projectId}/{sha256}" in the project's bucket
+                                           object key = "temp-tier-3-offload/{tenantId}/{hash}"
 ```
 
 `> 50 MiB` is rejected at encode time (`PayloadTooLargeError`) — large enough to be a clear product bug, small enough to bound worst-case worker memory at `MAX_BLOB_BYTES × concurrency`.
@@ -112,7 +112,7 @@ serialized payload size
 - **Inline raw (≤ 1 KiB)** — gzip+base64 of sub-kilobyte JSON is usually *larger* than the input. Skip compression entirely.
 - **Inline gzip (1–4 KiB)** — gzip wins for most real payloads in this range; the encoder verifies (`gzip+base64 < raw`) and falls back to raw if not. The inline ceiling (`INLINE_CEILING_BYTES = 4 KiB`) is set low so ordinary fan-out events cross into the dedup tier rather than inlining N× across reactors. Tighter than the GQ1 32 KiB threshold (`BLOB_OFFLOAD_THRESHOLD_BYTES`), which only offloaded for the very-large case.
 - **Redis blob (4–256 KiB)** — bigger than we want repeated in the staged value (every fan-out copy would replicate), but small enough that round-trip latency through a standalone Redis key is fine. It has a 4-day backstop refreshed on every read (`GETEX`) and is reclaimed lazily by Redis expiry.
-- **S3 / object-store (> 256 KiB)** — large bodies are the worst-case for Redis: memory pressure, replication lag, eviction risk. Push them to the durable object store the rest of the platform already runs on (`StorageRegistry`, projectId-scoped so each tenant's BYOC bucket is honored). Application releases never delete shared objects; the configured durable-store lifecycle sweep is the reclaim path.
+- **S3 / object-store (> 256 KiB)** — large bodies are the worst-case for Redis: memory pressure, replication lag, eviction risk. Push them to the deployment-owned GroupQueue bucket under `temp-tier-3-offload/{tenantId}/{hash}` using the queue-specific client; tenant BYOC storage is never consulted. Application releases never delete shared objects; the configured lifecycle sweep is the reclaim path.
 
 All thresholds live in [`jobEnvelope.ts`](./jobEnvelope.ts) and [`tieredBlobStore.ts`](./tieredBlobStore.ts). The 4 KiB inline ceiling and 256 KiB S3 threshold are conservative — tighten them under load if metrics show too much inline bloat or too many Redis-tier blobs.
 
@@ -121,7 +121,7 @@ All thresholds live in [`jobEnvelope.ts`](./jobEnvelope.ts) and [`tieredBlobStor
 A Redis-tier or S3-tier blob is keyed by `{projectId}/{sha256(payload-bytes)}` — content-addressed, tenant-namespaced. The two consequences:
 
 - **Identical bytes → one stored blob.** A 30-reactor fan-out of the same event stages 30 envelopes, each carrying a distinct lease-holder identity, but the underlying blob is a single stored copy. PUTs are idempotent — racing or retrying just overwrites the same key with the same content.
-- **Tenant isolation.** Two tenants with byte-identical user payloads still get distinct blobs (different `projectId` prefix). A project purge is a delete-by-prefix.
+- **Tenant isolation.** Two tenants with byte-identical user payloads still get distinct blobs (different `tenantId` prefix). The bucket lifecycle bounds retention independently of customer stored objects.
 
 The hash is taken over the **raw** payload bytes, not the gzipped output, so the dedup key doesn't depend on gzip determinism (zlib version / compression level).
 
@@ -156,7 +156,7 @@ Key properties:
 - **Crash-bounded.** A crashed holder stops renewing and disappears after the lease window; no explicit release is required for convergence.
 - **Live siblings remain protected.** Every holder has its own deadline, so pruning a crashed sibling cannot remove a live job's renewed lease.
 - **Duplicate take/release is idempotent.** `ZADD` updates one member and `ZREM` of a missing member is harmless.
-- **No eager deletion.** Release and transfer mutate lease membership only. Redis TTL reclaims Redis-tier bytes. The durable tier relies on the deployment's bucket lifecycle/project-purge policy; adding lease-aware, storage-specific durable GC is separate from this change's explicitly unchanged S3 tiering behaviour.
+- **No eager deletion.** Release and transfer mutate lease membership only. Redis TTL reclaims Redis-tier bytes. The dedicated GroupQueue bucket lifecycle reclaims durable bytes after seven days in SaaS.
 - **Cluster-safe.** Blob, lease, migration-guard, and queue keys share the queue's Redis hash tag.
 
 A retry or dedup-squash uses `TRANSFER_LUA` to take/renew the new lease and remove the old member atomically. The blob is never deleted on either the same-content or changed-content path.
@@ -171,7 +171,7 @@ Every blob ref carries the tenant's `projectId` (branded `TenantId` end-to-end).
 
 The s3 object URI is re-minted server-side from `(projectId, hash)` on every read, never trusted from the envelope. Even a tampered envelope can't redirect a fetch across tenants.
 
-Error logs from the blob lifecycle run through `redactStorageUrisInText` so an object-store SDK error quoting `s3://bucket/...` doesn't leak a BYOC bucket name into a shared log sink.
+Error logs from the blob lifecycle run through `redactStorageUrisInText` so an object-store SDK error quoting `s3://bucket/...` doesn't leak storage identifiers into a shared log sink.
 
 ---
 
@@ -274,8 +274,8 @@ OpenTelemetry spans wrap dispatch + processing; `__context` round-trips OTel tra
 GroupQueue dependencies are explicit constructor injections — no env-coupling. The composition root ([`eventSourcing.ts`](../../eventSourcing.ts)) supplies:
 
 - The Redis connection (shared with the rest of the platform).
-- `objectStoreFor(projectId)` → `StorageRegistry` (per-tenant BYOC bucket resolution).
-- `resolveStorageDestination(projectId)` → `ProjectStorageDestination` (BYOC or global).
+- `objectStoreFor(projectId)` → the queue-specific `StorageRegistry`.
+- `resolveStorageDestination(projectId)` → the deployment-owned GroupQueue bucket/prefix, with the existing object-store fallback when dedicated storage is disabled.
 - `featureFlagService` (kill-switch support).
 
 This keeps the queue testable in isolation: integration tests pass an in-memory `ObjectStore` + a stub destination resolver and exercise the full Lua + lease lifecycle against a testcontainers Redis.

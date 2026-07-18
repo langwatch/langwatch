@@ -41,7 +41,7 @@ The retry and dedup-squash transitions move a hold from an old token to a new on
 
 ### 5. Re-mint location on read — don't trust the stored ref
 
-Decode derives the read location from server-trusted inputs — the redis key from `(projectId, hash)`, the s3 uri by re-minting via `resolveProjectStorageDestination(projectId)` + `mintS3Uri` — rather than trusting `ref.uri` carried in the envelope. A tampered envelope (requires queue-store write access) can otherwise point a read at another tenant's key/bucket; re-minting makes the stored uri advisory, not authoritative. The per-project destination is cached to avoid a resolve per read.
+Decode derives the read location from server-trusted inputs — the redis key from `(projectId, hash)`, the s3 URI from the deployment-owned GroupQueue bucket/prefix plus `(tenantId, hash)` — rather than trusting `ref.uri` carried in the envelope. A tampered envelope cannot select a tenant BYOC bucket or redirect a read; the resolved destination is cached to avoid repeated work.
 
 **Tenant-attributed logging.** Every blob/holder/job log line MUST carry the owning `projectId`, log the tenant-scoped reference (`projectId` + content hash) rather than a bare hash, and never log the raw s3 uri or bucket name (use `redactStorageUri`). A log that names a blob without its tenant is a cross-tenant attribution hazard — logs are a real isolation surface. The blob lifecycle's previously-silent fire-and-forget failures now `warn` with `{ projectId, blobHash, tier }`, and the decode-failure (missing-blob) log carries the `projectId` too.
 
@@ -78,6 +78,6 @@ Add a `GroupQueue` GQ2 integration test (testcontainers) exercising the lifecycl
 ## References
 
 - Amends: [ADR-029](./029-groupqueue-content-addressed-payload-store.md)
-- Reuses: `src/server/stored-objects/` (object PUT/GET, destination resolver)
+- Reuses: `src/server/stored-objects/` (object PUT/GET driver interfaces)
 - Spec: `specs/event-sourcing/payload-store-blob-hardening.feature`
 - Core contract: `specs/event-sourcing/payload-store-content-addressed.feature` (ADR-029)

@@ -8,8 +8,10 @@ import { type ProcessRole, roleRunsWorkers } from "~/server/app-layer/config";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { makeQueueName } from "~/server/queues/makeQueueName";
-import { resolveProjectStorageDestination } from "../stored-objects/project-storage-destination";
-import { createStorageRegistry } from "../stored-objects/stored-objects-factory";
+import {
+  createGroupQueueStorageRegistry,
+  resolveGroupQueueStorageDestination,
+} from "./queues/groupQueue/groupQueueStorage";
 import { DisabledPipeline } from "./disabledPipeline";
 import type { Event, Projection } from "./domain/types";
 import type { OutboxReactorDefinition } from "./outbox/outboxReactor.types";
@@ -626,8 +628,9 @@ export class EventSourcing {
     if (effectiveRedis) {
       this._globalQueue = new GroupQueueProcessor(definition, effectiveRedis, {
         consumerEnabled: roleRunsWorkers(this._processRole),
-        objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
-        resolveStorageDestination: resolveProjectStorageDestination,
+        objectStoreFor: (projectId) =>
+          createGroupQueueStorageRegistry({ projectId }),
+        resolveStorageDestination: resolveGroupQueueStorageDestination,
       });
     } else {
       this._globalQueue = new EventSourcedQueueProcessorMemory(definition);

@@ -96,6 +96,27 @@ describe("TieredBlobStore", () => {
         expect([...objectStore.store.keys()]).toEqual([expectedUri]);
       });
 
+      it("mints the lifecycle-managed GroupQueue prefix when configured", async () => {
+        const objectStore = new InMemoryObjectStore();
+        const store = new TieredBlobStore({
+          redisBlobs: new InMemoryJobBlobStore(),
+          objectStoreFor: () => objectStore,
+          resolveDestination: async () => ({
+            kind: "s3",
+            bucket: "langwatch-prod-group-queue",
+            prefix: "temp-tier-3-offload/",
+          }),
+          s3ThresholdBytes: 8,
+        });
+        const data = Buffer.from("this comfortably exceeds the threshold");
+
+        await store.put({ projectId: PROJECT, data });
+
+        expect([...objectStore.store.keys()]).toEqual([
+          `s3://langwatch-prod-group-queue/temp-tier-3-offload/${PROJECT}/${contentHash(data)}`,
+        ]);
+      });
+
       it("round-trips the bytes back through get", async () => {
         const { store } = makeStore(8);
         const data = Buffer.from("durable tier round trip");
