@@ -3,6 +3,7 @@ import type { Cluster } from "ioredis";
 
 import { CachedLuaScript } from "./cachedLuaScript";
 import {
+  BLOB_BACKSTOP_TTL_SECONDS,
   BLOB_LEASE_SET_TTL_SECONDS,
   BLOB_LEASE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
@@ -406,9 +407,9 @@ local function gqRoutingMeta(jobDataJson)
 end
 `;
 
-// Lua side of the GQ2 blob-lease lifecycle for the dedup squash. A squash
-// displaces one staged value with another; its replacement lease is taken and
-// its displaced lease released atomically with that job transition. Releases
+// Lua side of the GQ2 blob-lease lifecycle for staging. A genuine stage takes
+// its lease in the same eval as the staged value becomes visible. A squash
+// transfers the displaced lease atomically with that replacement. Releases
 // never delete content-addressed blobs: Redis TTL and the durable-store
 // lifecycle sweep are the only reclaim paths.
 //
@@ -417,6 +418,12 @@ end
 // GQ1 values ("GQ1|", header.r = blob id) are private — their blob is
 // UNLINKed directly. Legacy bare-JSON / inline values carry no blob at all.
 const BLOB_LEASE_HELPER_LUA = `
+local function gqTenantOf(groupId)
+  local slashPos = string.find(groupId, "/", 1, true)
+  if slashPos and slashPos > 1 then return string.sub(groupId, 1, slashPos - 1) end
+  return groupId
+end
+
 local function gqParseLease(value)
   local prefix = string.sub(value, 1, 4)
   if prefix ~= "GQ2|" and prefix ~= "GQ1|" then return nil end
@@ -461,6 +468,9 @@ local function gqTakeLease(keyPrefix, lease, nowMs)
   local legacyKey = keyPrefix .. "blobholders:" .. lease.projectId .. "/" .. lease.hash
   redis.call("SADD", legacyKey, "${LEGACY_HOLDER_LEASE_GUARD}", lease.holderId)
   redis.call("EXPIRE", legacyKey, ${BLOB_LEASE_SET_TTL_SECONDS})
+  if lease.tier == "redis" then
+    redis.call("EXPIRE", keyPrefix .. "blob:" .. lease.projectId .. "/" .. lease.hash, ${BLOB_BACKSTOP_TTL_SECONDS})
+  end
 end
 
 -- Take the replacement lease and release the displaced lease in the caller's
@@ -609,6 +619,10 @@ end
 
 redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
 redis.call("HSET", dataKey, stagedJobId, jobDataJson)
+local stagedLease = gqParseLease(jobDataJson)
+if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
+  gqTakeLease(parkKeyPrefixOf(readyKey), stagedLease, gqRedisNowMs())
+end
 refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
 
 if dedupId ~= "" and dedupTtlMs > 0 then
@@ -626,7 +640,7 @@ redis.call("LTRIM", signalKey, 0, 999)
 -- New job staged: increment total pending counter
 redis.call("INCR", totalPendingKey)
 
--- A genuinely new stage displaces nothing, so there is no blob to reclaim.
+-- A genuinely new stage displaces nothing; its lease was taken with the HSET.
 return {1, ""}
 `;
 
@@ -724,6 +738,10 @@ for i = 1, count do
   if not isDeduped then
     redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
     redis.call("HSET", dataKey, stagedJobId, jobDataJson)
+    local stagedLease = gqParseLease(jobDataJson)
+    if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
+      gqTakeLease(keyPrefix, stagedLease, gqRedisNowMs())
+    end
     if dedupId ~= "" and dedupTtlMs > 0 then
       redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
     end
@@ -1403,6 +1421,7 @@ return 0
 `;
 
 const RESTAGE_AND_BLOCK_LUA =
+  BLOB_LEASE_HELPER_LUA +
   ROUTING_META_HELPER_LUA +
   `
 local blockedKey      = KEYS[1]
@@ -1433,6 +1452,10 @@ redis.call("SADD", blockedKey, groupId)
 -- 2. Re-stage the failed job with a new ID
 local inserted = redis.call("ZADD", groupJobsKey, score, newStagedJobId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
+local stagedLease = gqParseLease(jobDataJson)
+if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
+  gqTakeLease(keyPrefix, stagedLease, gqRedisNowMs())
+end
 if inserted == 1 then
   redis.call("INCR", totalPendingKey)
 end
@@ -1478,6 +1501,7 @@ return 1
 `;
 
 const RETRY_RESTAGE_LUA =
+  BLOB_LEASE_HELPER_LUA +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
   `
@@ -1508,6 +1532,10 @@ local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
 local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
 local inserted = redis.call("ZADD", groupJobsKey, dispatchAfterMs, newStagedJobId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
+local stagedLease = gqParseLease(jobDataJson)
+if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
+  gqTakeLease(keyPrefix, stagedLease, gqRedisNowMs())
+end
 if inserted == 1 then
   redis.call("INCR", totalPendingKey)
 end

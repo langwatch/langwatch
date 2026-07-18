@@ -109,11 +109,13 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
         const lease = readEnvelopeLease(value)!;
         const key = leaseKey(lease.ref.hash);
         await redis.zadd(key, Date.now() + 100, lease.holderId);
+        await redis.expire(blobKey(lease.ref.hash), 1);
 
         await lifecycle.renewLease(value);
 
         const deadline = Number(await redis.zscore(key, lease.holderId));
         expect(deadline).toBeGreaterThan(Date.now() + 100);
+        expect(await redis.ttl(blobKey(lease.ref.hash))).toBeGreaterThan(1);
       });
     });
   });

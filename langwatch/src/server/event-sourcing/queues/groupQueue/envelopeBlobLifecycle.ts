@@ -165,6 +165,7 @@ export class EnvelopeBlobLifecycle {
           projectId: lease.ref.projectId,
           hash: lease.ref.hash,
           holderId: lease.holderId,
+          tier: lease.ref.tier,
         })
         .catch((err: unknown) => {
           logger.warn(
@@ -183,13 +184,9 @@ export class EnvelopeBlobLifecycle {
   }
 
   /**
-   * Takes this staged occupancy's lease on its GQ2 blob (no-op for GQ1,
-   * inline, and legacy values). Awaited by the caller (2026-07-11 fix): this
-   * was previously fire-and-forget, which let a killed worker process drop
-   * the acquire silently — before it ever reached Redis — leaving a
-   * concurrent squash's release free to reclaim a blob this occupancy still
-   * needed. A failed acquire still only warns and degrades to the TTL
-   * backstop; it never throws to the caller.
+   * Best-effort lease primitive for callers that already own a GQ2 envelope
+   * but are not publishing it through a staging script. Normal stage and
+   * restage paths take their lease atomically in Lua.
    */
   async takeLease(value: string): Promise<void> {
     const lease = readEnvelopeLease(value);
@@ -230,6 +227,7 @@ export class EnvelopeBlobLifecycle {
         projectId: lease.ref.projectId,
         hash: lease.ref.hash,
         holderId: lease.holderId,
+        tier: lease.ref.tier,
       });
     } catch (err) {
       logger.warn(
@@ -373,7 +371,7 @@ export class EnvelopeBlobLifecycle {
     // blob before the new lease is recorded.
     if (!newLease || !oldLease || oldLease.ref.projectId !== expected) {
       try {
-        await this.takeLeaseAwait(newValue);
+        await this.takeLeaseOrThrow(newValue);
       } catch (err) {
         logger.warn(
           {
@@ -417,7 +415,7 @@ export class EnvelopeBlobLifecycle {
    * Awaited take used by the transfer fallback so a
    * failed acquire can be observed synchronously before the release runs.
    */
-  private async takeLeaseAwait(value: string): Promise<void> {
+  private async takeLeaseOrThrow(value: string): Promise<void> {
     const lease = readEnvelopeLease(value);
     if (!lease) return;
     await this.blobLeases.take({

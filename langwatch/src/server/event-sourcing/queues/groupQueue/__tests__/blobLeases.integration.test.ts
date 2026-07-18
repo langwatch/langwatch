@@ -130,6 +130,7 @@ describe("BlobLeases", () => {
           projectId: PROJECT,
           hash: HASH,
           holderId: "live",
+          tier: "redis",
         });
 
         expect(await leases.countLive({ projectId: PROJECT, hash: HASH })).toBe(
@@ -137,6 +138,7 @@ describe("BlobLeases", () => {
         );
         expect(await redis.zrange(LEASE_KEY, 0, -1)).toEqual(["live"]);
         expect(await redis.exists(BLOB_KEY)).toBe(1);
+        expect(await redis.ttl(BLOB_KEY)).toBeGreaterThan(10);
       });
     });
   });

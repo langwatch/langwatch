@@ -18,8 +18,7 @@ import {
 } from "../../../__tests__/integration/testContainers";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
-import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle";
-import { encodeJobEnvelope, readEnvelopeLease } from "../jobEnvelope";
+import { encodeJobEnvelope } from "../jobEnvelope";
 import { gqJobsDroppedTotal } from "../metrics";
 import { GroupStagingScripts } from "../scripts";
 import { TieredBlobStore } from "../tieredBlobStore";
@@ -662,21 +661,6 @@ describe.skipIf(!hasTestcontainers)(
             queueName: name,
           });
 
-          // Take the lease that `send()` would have. Staging via
-          // encodeJobEnvelope + stageBatch bypasses `blobLifecycle.takeLease()`, so
-          // WITHOUT this there is no lease — release would delete nothing and
-          // `flaky.deleted === []` would pass even with the fix reverted. Caught
-          // by review after I shipped exactly that vacuous assertion; verified by
-          // reverting the release rule and watching this test stay green.
-          const lifecycle = new EnvelopeBlobLifecycle({
-            redis,
-            queueName: name,
-            objectStoreFor: () => flaky,
-            resolveStorageDestination: STORAGE_DESTINATION,
-          });
-          await lifecycle.takeLease(envelope);
-          expect(readEnvelopeLease(envelope)).not.toBeNull();
-
           const scripts = new GroupStagingScripts(redis, name);
           await scripts.stageBatch([
             {
@@ -688,6 +672,9 @@ describe.skipIf(!hasTestcontainers)(
               jobDataJson: envelope,
             },
           ]);
+          // The stage transaction publishes the lease with the job. Without
+          // this assertion, the later no-delete check could pass vacuously.
+          expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(1);
 
           newQueue({
             name,
