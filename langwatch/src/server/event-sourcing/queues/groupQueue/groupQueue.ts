@@ -1055,8 +1055,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
               // Success — complete the group slot. Drained siblings were
               // removed from staging during the drain, so completing the
-              // dispatched job is enough to free the group.
-              await this.scripts.complete({ groupId, stagedJobId, jobName });
+              // dispatched job is enough to free the group. It is also the only
+              // completion the siblings get, hence payloadCount: the Redis
+              // counters ops reads must advance per payload, like the Prometheus
+              // one below, not once per handler call.
+              await this.scripts.complete({
+                groupId,
+                stagedJobId,
+                jobName,
+                payloadCount: handlerPayloadCount,
+              });
               await this.blobLifecycle.release({
                 values: [
                   jobDataJson,

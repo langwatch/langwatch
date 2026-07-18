@@ -30,6 +30,8 @@ type TestPayload = {
   id: string;
   groupId: string;
   value: string;
+  /** Caller-set routing metadata; stripped before the handler sees the payload. */
+  __jobName?: string;
 };
 
 function createQueueDefinition(
@@ -790,6 +792,64 @@ describe.skipIf(!hasTestcontainers)(
           // One producer stage plus one atomic sibling re-stage. The failed
           // coalesced handler does not issue one Redis stage call per sibling.
           expect(stageBatch).toHaveBeenCalledTimes(2);
+        });
+      });
+
+      describe("when a coalesced batch completes successfully", () => {
+        /** @scenario 'A coalesced batch counts every event it completed' */
+        it("advances the Redis completed counters by the number of events", async () => {
+          const queueName = `{test/gq/count-${crypto.randomUUID().slice(0, 8)}}`;
+          const batches: TestPayload[][] = [];
+          const singles: TestPayload[] = [];
+          const queue = createQueue(
+            async (p) => {
+              singles.push(p);
+            },
+            {
+              name: queueName,
+              processBatch: async (ps) => {
+                batches.push(ps as TestPayload[]);
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number(p.value) * 1000,
+            },
+          );
+          await queue.waitUntilReady();
+
+          const eventCount = 12;
+          await queue.sendBatch(
+            Array.from({ length: eventCount }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(i),
+              __jobName: "recordSpan",
+            })),
+          );
+
+          const statAt = async (key: string) =>
+            Number((await redis.get(`${queueName}:gq:${key}`)) ?? 0);
+
+          // The counters are written by COMPLETE_LUA after the handler returns,
+          // so wait on the counter itself rather than on the handler calls.
+          await vi.waitFor(
+            async () => {
+              expect(await statAt("stats:completed")).toBe(eventCount);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // Per-job-name total (the metrics collector reads this one per job).
+          expect(await statAt("stats:completed:recordSpan")).toBe(eventCount);
+
+          // The counters only mean something here if coalescing actually
+          // happened — without a multi-event batch this would pass even when
+          // completions are counted per handler call.
+          expect(Math.max(...batches.map((b) => b.length), 0)).toBeGreaterThan(
+            1,
+          );
+          // And every event really was handled exactly once.
+          const allIds = [...batches.flat(), ...singles].map((p) => p.id);
+          expect(new Set(allIds).size).toBe(eventCount);
         });
       });
     });
