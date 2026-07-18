@@ -2,14 +2,12 @@
  * Shared evaluation handler for custom-graph threshold alerts
  * (ADR-034 Phase 5 + 8.1).
  *
- * Single canonical handler called by BOTH:
+ * Single canonical handler called by both graph-alert process-manager paths:
  *
- *   - the real-time outbox reactor on the trace-processing pipeline
- *     (`graphTriggerEvaluation.outboxReactor.ts`), which decides on every
- *     `traceAnalytics` fold update; and
- *   - the heartbeat (`graph-trigger-heartbeat.ts`), which scans for
- *     no-data / firing-resolve absence cases the event-driven path
- *     structurally cannot reach.
+ *   - the real-time activity subscriber, which reacts to trace/evaluation
+ *     activity; and
+ *   - the scheduled graph-alert sweep, which scans for no-data and
+ *     firing-resolve absence cases the event-driven path cannot reach.
  *
  * The evaluation side (fetch trigger + graph, build TimeseriesInput, call
  * `analyticsService.getTimeseries(...)`, compute current value via

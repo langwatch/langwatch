@@ -151,7 +151,7 @@ export class EventSourcing {
   }
 
   /**
-   * The `withProcess` runtime — lazily constructed so an EventSourcing
+   * The `withProcessManager` runtime — lazily constructed so an EventSourcing
    * instance with no process declarations pays nothing. Public so the
    * composition root can feed lifecycle envelopes from outside a pipeline.
    */

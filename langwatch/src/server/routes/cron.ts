@@ -230,8 +230,9 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
 
 // NOTE: the `/api/cron/triggers` graph-alert sweep was removed (ADR-034):
 // custom-graph threshold alerts now fire exclusively from the event-sourced
-// path (real-time outbox reactor + 30s heartbeat), and trace-based triggers
-// were already reactive. There is no cron graph-alert path anymore.
+// path (real-time activity subscriber + scheduled graph-alert process manager),
+// and trace-based triggers were already reactive. There is no cron graph-alert
+// path anymore.
 
 // ---------- POST /api/cron/seed_demo ----------
 //
