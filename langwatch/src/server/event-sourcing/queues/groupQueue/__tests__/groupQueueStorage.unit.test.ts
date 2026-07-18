@@ -23,7 +23,7 @@ describe("GroupQueue storage", () => {
     resolveProjectStorageDestination.mockReset();
   });
 
-  /** @scenario "A very large payload offloads to the dedicated GroupQueue S3 namespace" */
+  /** @scenario "A very large payload offloads to the dedicated GroupQueue durable storage namespace" */
   it("uses the dedicated bucket and prefix without consulting tenant storage", async () => {
     mockedEnv.LANGWATCH_QUEUE_PAYLOAD_BUCKET = "langwatch-prod-group-queue";
     mockedEnv.LANGWATCH_QUEUE_PAYLOAD_PREFIX = "/temp-tier-3-offload/";

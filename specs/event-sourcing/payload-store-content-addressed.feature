@@ -79,11 +79,10 @@ Feature: GroupQueue content-addressed tiered payload store
     And the handler receives the payload intact
 
   @integration @track1 @unimplemented
-  Scenario: A very large payload offloads to the dedicated GroupQueue S3 namespace
-    Given the GroupQueue bucket is "langwatch-prod-group-queue"
-    And the GroupQueue prefix is "temp-tier-3-offload/"
+  Scenario: A very large payload offloads to the dedicated GroupQueue durable storage namespace
+    Given a dedicated durable storage destination is configured for the GroupQueue
     When a job whose shared payload exceeds the S3 threshold is staged
-    Then the body is stored under "s3://langwatch-prod-group-queue/temp-tier-3-offload/{tenantId}/{hash}"
+    Then the body is stored in the dedicated durable destination under a tenant-isolated key
     And no tenant BYOC destination is consulted
     And the queued value is a flat envelope referencing the blob by tier "s3" and hash
     And the handler receives the payload intact
@@ -270,7 +269,7 @@ Feature: GroupQueue content-addressed tiered payload store
   #   AC1.2 "Mid-size offloads to a content-addressed Redis blob"
   #     -> A mid-size payload offloads to a content-addressed Redis blob
   #   AC1.3 "Very large offloads to the dedicated GroupQueue S3 namespace"
-  #     -> A very large payload offloads to the dedicated GroupQueue S3 namespace
+  #     -> A very large payload offloads to the dedicated GroupQueue durable storage namespace
   #   AC1.4 "Identical bytes collapse to one key; PUT is idempotent"
   #     -> The same bytes always produce the same blob key
   # Track 2 — flat jobs and content-addressed sharing

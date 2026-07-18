@@ -58,7 +58,7 @@ describe("S3Driver", () => {
       s3Client: s3Client as any,
       s3Bucket: TEST_BUCKET,
     });
-    driver = new S3Driver(TEST_PROJECT_ID);
+    driver = new S3Driver({ projectId: TEST_PROJECT_ID });
   });
 
   // -------------------------------------------------------------------------
@@ -124,10 +124,10 @@ describe("S3Driver", () => {
         s3Client: dedicatedClient,
         s3Bucket: TEST_BUCKET,
       });
-      const dedicatedDriver = new S3Driver(
-        TEST_PROJECT_ID,
-        dedicatedFactory as typeof createS3Client,
-      );
+      const dedicatedDriver = new S3Driver({
+        projectId: TEST_PROJECT_ID,
+        clientFactory: dedicatedFactory as typeof createS3Client,
+      });
 
       await dedicatedDriver.put(
         TEST_URI,

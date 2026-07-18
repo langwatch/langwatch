@@ -106,7 +106,10 @@ export function createGroupQueueStorageRegistry({
   if (!queuePayloadBucket()) return createStorageRegistry({ projectId });
 
   return new StorageRegistry({
-    s3: new S3Driver(projectId, createGroupQueueS3Client),
+    s3: new S3Driver({
+      projectId,
+      clientFactory: createGroupQueueS3Client,
+    }),
     file: new LocalFilesystemDriver(),
   });
 }

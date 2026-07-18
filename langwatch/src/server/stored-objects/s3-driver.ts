@@ -54,10 +54,19 @@ function parseS3Uri(uri: string): { bucket: string; key: string } {
  * are resolved for every operation.
  */
 export class S3Driver implements StorageDriver {
-  constructor(
-    private readonly projectId: string,
-    private readonly clientFactory: typeof createS3Client = createS3Client,
-  ) {}
+  private readonly projectId: string;
+  private readonly clientFactory: typeof createS3Client;
+
+  constructor({
+    projectId,
+    clientFactory = createS3Client,
+  }: {
+    projectId: string;
+    clientFactory?: typeof createS3Client;
+  }) {
+    this.projectId = projectId;
+    this.clientFactory = clientFactory;
+  }
 
   /**
    * Returns a readable stream for the object at the given S3 URI.

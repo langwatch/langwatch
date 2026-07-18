@@ -51,7 +51,7 @@ export function createStorageRegistry({
   projectId: string;
 }): StorageRegistry {
   return new StorageRegistry({
-    s3: new S3Driver(projectId),
+    s3: new S3Driver({ projectId }),
     file: new LocalFilesystemDriver(),
     "azure-blob": maybeAzureDriver(),
   });

@@ -76,7 +76,7 @@ describe("AzureBlobDriver", () => {
       fetchSpy.mockResolvedValueOnce(new Response(payload, { status: 200 }));
 
       const registry = new StorageRegistry({
-        s3: new S3Driver("proj-1"),
+        s3: new S3Driver({ projectId: "proj-1" }),
         file: new LocalFilesystemDriver(),
         "azure-blob": azure,
       });

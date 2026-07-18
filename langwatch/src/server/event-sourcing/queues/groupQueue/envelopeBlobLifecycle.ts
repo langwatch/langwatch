@@ -139,10 +139,10 @@ export class EnvelopeBlobLifecycle {
       if (lease.ref.projectId !== expected) {
         logger.warn(
           {
-            projectId: expected,
-            refProjectId: lease.ref.projectId,
+            projectId: "[redacted]",
+            refProjectId: "[redacted]",
             blobHash: lease.ref.hash,
-            groupId,
+            groupId: "[redacted]",
           },
           "Blob ref tenant mismatch; refusing cross-tenant read",
         );
@@ -168,7 +168,7 @@ export class EnvelopeBlobLifecycle {
         .catch((err: unknown) => {
           logger.warn(
             {
-              projectId: lease.ref.projectId,
+              projectId: "[redacted]",
               blobHash: lease.ref.hash,
               err: redactStorageUrisInText(
                 err instanceof Error ? err.message : String(err),
@@ -199,7 +199,7 @@ export class EnvelopeBlobLifecycle {
     } catch (err) {
       logger.warn(
         {
-          projectId: lease.ref.projectId,
+          projectId: "[redacted]",
           blobHash: lease.ref.hash,
           tier: lease.ref.tier,
           err: redactStorageUrisInText(
@@ -242,10 +242,10 @@ export class EnvelopeBlobLifecycle {
           if (lease.ref.projectId !== expected) {
             logger.warn(
               {
-                projectId: expected,
-                refProjectId: lease.ref.projectId,
+                projectId: "[redacted]",
+                refProjectId: "[redacted]",
                 blobHash: lease.ref.hash,
-                groupId,
+                groupId: "[redacted]",
               },
               "Skipping blob release for a tenant-mismatched ref",
             );
@@ -260,7 +260,7 @@ export class EnvelopeBlobLifecycle {
           } catch (err) {
             logger.warn(
               {
-                projectId: lease.ref.projectId,
+                projectId: "[redacted]",
                 blobHash: lease.ref.hash,
                 tier: lease.ref.tier,
                 err: redactStorageUrisInText(
@@ -312,15 +312,15 @@ export class EnvelopeBlobLifecycle {
     const newLease = readEnvelopeLease(newValue);
     const oldLease = readEnvelopeLease(oldValue);
     // A tenant-mismatched newValue must not acquire a foreign lease (the
-    // mirror of the release-side guard). Skip both sides — the guarded release
-    // also drops the old lease iff its tenant matches (ADR-030 §5).
+    // mirror of the release-side guard). Skip the foreign replacement; the
+    // guarded release retires the old lease only when its tenant matches.
     if (newLease && newLease.ref.projectId !== expected) {
       logger.warn(
         {
-          projectId: expected,
-          refProjectId: newLease.ref.projectId,
+          projectId: "[redacted]",
+          refProjectId: "[redacted]",
           blobHash: newLease.ref.hash,
-          groupId,
+          groupId: "[redacted]",
         },
         "Skipping blob acquire for a tenant-mismatched replacement ref",
       );
@@ -342,9 +342,9 @@ export class EnvelopeBlobLifecycle {
       } catch (err) {
         logger.warn(
           {
-            refProjectId: newLease?.ref.projectId,
+            refProjectId: newLease ? "[redacted]" : undefined,
             blobHash: newLease?.ref.hash,
-            groupId,
+            groupId: "[redacted]",
             err: err instanceof Error ? err.message : String(err),
           },
           "transfer fallback: acquire failed; skipping release to keep old blob alive under TTL",
@@ -366,7 +366,7 @@ export class EnvelopeBlobLifecycle {
     } catch (err) {
       logger.warn(
         {
-          projectId: oldLease.ref.projectId,
+          projectId: "[redacted]",
           blobHash: oldLease.ref.hash,
           tier: oldLease.ref.tier,
           err: redactStorageUrisInText(
