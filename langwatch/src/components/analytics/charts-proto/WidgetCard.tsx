@@ -150,7 +150,11 @@ export function WidgetCard({
               <Badge colorPalette="green" variant="subtle" size="xs" flexShrink={0}>
                 Real data
               </Badge>
-            ) : null}
+            ) : (
+              <Badge colorPalette="gray" variant="subtle" size="xs" flexShrink={0}>
+                Sample data
+              </Badge>
+            )}
             <Spacer />
             <Menu.Root>
               <Menu.Trigger asChild>
