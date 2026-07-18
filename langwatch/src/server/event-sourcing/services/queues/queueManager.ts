@@ -15,6 +15,7 @@ import type {
   QueueSendOptions,
 } from "../../queues";
 import { resolveDeduplicationStrategy } from "../../queues";
+import { composeGroupKey, defaultDomainKey } from "./groupKey";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import {
   type CommandHandlerOptions,
@@ -114,10 +115,9 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   /**
-   * Builds a hierarchical group key function: `${tenantId}/${jobPath}/${domainKey}`.
-   *
-   * - jobPath reflects the pipeline topology (e.g. `fold/traceSummary/reactor/evaluationTrigger`)
-   * - domainKey defaults to `${aggregateType}:${aggregateId}`, overridable via custom fn
+   * Builds a hierarchical group key function, delegating the format to
+   * {@link composeGroupKey} so the fold-cache confirmation processor can derive
+   * the identical key when it asks whether an aggregate still has work queued.
    */
   private buildGroupKey({
     jobPath,
@@ -129,7 +129,11 @@ export class QueueManager<EventType extends Event = Event> {
     domainKeyFn: (payload: any) => string;
   }): (payload: any) => string {
     return (payload: any) =>
-      `${getTenantId(payload)}/${jobPath}/${domainKeyFn(payload)}`;
+      composeGroupKey({
+        tenantId: getTenantId(payload),
+        jobPath,
+        domainKey: domainKeyFn(payload),
+      });
   }
 
   private key(
@@ -311,7 +315,10 @@ export class QueueManager<EventType extends Event = Event> {
         domainKeyFn: customGroupKeyFn
           ? (event: any) => customGroupKeyFn(event)
           : (event: any) =>
-              `${event.aggregateType}:${String(event.aggregateId)}`,
+              defaultDomainKey({
+                aggregateType: event.aggregateType,
+                aggregateId: String(event.aggregateId),
+              }),
       });
       const entry: JobRegistryEntry = {
         groupKeyFn,
@@ -383,7 +390,10 @@ export class QueueManager<EventType extends Event = Event> {
         domainKeyFn: customGroupKeyFn
           ? (event: any) => customGroupKeyFn(event)
           : (event: any) =>
-              `${event.aggregateType}:${String(event.aggregateId)}`,
+              defaultDomainKey({
+                aggregateType: event.aggregateType,
+                aggregateId: String(event.aggregateId),
+              }),
       });
       const coalesceMaxBatch = projectionDef.coalesceMaxBatch;
       const entry: JobRegistryEntry = {
@@ -674,7 +684,10 @@ export class QueueManager<EventType extends Event = Event> {
         domainKeyFn: customGroupKeyFn
           ? (payload: any) => customGroupKeyFn(payload)
           : (payload: any) =>
-              `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
+              defaultDomainKey({
+                aggregateType: payload.event.aggregateType,
+                aggregateId: String(payload.event.aggregateId),
+              }),
       });
       const entry: JobRegistryEntry = {
         groupKeyFn: reactorGroupKeyFn,

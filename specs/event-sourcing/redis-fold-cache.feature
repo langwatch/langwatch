@@ -1,54 +1,79 @@
-Feature: Redis write-through cache for fold projections
+Feature: Durability-gated fold state cache
 
-  Fold projections accumulate state by reading the previous state,
-  applying an event, and writing back. With replicated ClickHouse
-  behind an NLB, reads can hit a stale replica, causing data loss.
-  A Redis cache layer eliminates replication lag and enables
-  fire-and-forget ClickHouse writes for better batching.
+  Fold projections build state by reading what came before, applying an
+  event, and writing the result back. The durable store is replicated, so
+  a read can land on a replica that has not caught up yet and return state
+  that is missing recent events. Folding on top of that silently loses
+  whatever it was missing.
+
+  A cache in front of the durable store closes that window. What makes it
+  safe is when the cached copy is released: only once the durable store is
+  confirmed to hold the state on every replica. A cache miss therefore
+  means the durable store is known to be authoritative, so reading it is
+  always correct.
 
   Background:
-    Given a fold projection with a Redis-cached store
-    And ClickHouse as the inner persistent store
+    Given a fold projection with a cached store
+    And a durable store behind it
 
-  Scenario: Cache hit returns state from Redis without querying ClickHouse
-    Given the fold state for aggregate "trace-1" is cached in Redis
+  Scenario: A cached entry is served without reading the durable store
+    Given the fold state for aggregate "trace-1" is cached
     When the fold reads state for "trace-1"
-    Then the state is returned from Redis
-    And ClickHouse is not queried
+    Then the cached state is returned
+    And the durable store is not read
 
-  Scenario: Cache miss falls back to ClickHouse
-    Given the fold state for aggregate "trace-1" is not in Redis
-    And ClickHouse has state for "trace-1"
+  Scenario: A miss reads the durable store
+    Given the fold state for aggregate "trace-1" is not cached
+    And the durable store holds state for "trace-1"
     When the fold reads state for "trace-1"
-    Then the state is returned from ClickHouse
+    Then the state is returned from the durable store
 
-  Scenario: Store commits to ClickHouse first then updates the Redis cache
-    When the fold stores new state for aggregate "trace-1"
-    Then the state is written to ClickHouse first (throwing on failure so the event is retried)
-    And only then cached in Redis with a 300-second TTL
+  Scenario: A cached entry is released once every replica holds the state
+    Given the fold state for aggregate "trace-1" is cached
+    And every replica of the durable store holds that state
+    When the confirmation processor checks "trace-1"
+    Then the cached entry is released
 
-  Scenario: ClickHouse write failure triggers replay from event log
-    Given the fold stores new state for aggregate "trace-1"
-    And the ClickHouse INSERT fails with a connection error
-    When the failure is detected
-    Then a replay job is queued for aggregate "trace-1"
+  Scenario: A cached entry is retained while any replica lags
+    Given the fold state for aggregate "trace-1" is cached
+    And one replica of the durable store has not caught up
+    When the confirmation processor checks "trace-1"
+    Then the cached entry is retained
+    And "trace-1" is checked again later
 
-  Scenario: Replay rebuilds state from event log
-    Given the event log contains 6 span events for trace "trace-1"
-    When the replay job runs for "trace-1"
-    Then all 6 events are read from the event log
-    And the fold is rebuilt from init state
-    And the final state is written to ClickHouse with durability wait
-    And the final state is cached in Redis
+  Scenario: A cached entry is retained when a replica cannot be reached
+    Given the fold state for aggregate "trace-1" is cached
+    And one replica of the durable store does not answer
+    When the confirmation processor checks "trace-1"
+    Then the cached entry is retained
 
-  Scenario: TTL expiry causes graceful fallback to ClickHouse
-    Given the fold state for aggregate "trace-1" was cached 301 seconds ago
-    When the fold reads state for "trace-1"
-    Then the state is returned from ClickHouse
+  Scenario: An aggregate still being folded is never released
+    Given a trace whose spans are still arriving
+    When the confirmation processor runs repeatedly
+    Then the cached entry for that trace is never released
+    And it is released only after the trace stops receiving spans
 
-  Scenario: Sequential fold steps use Redis for consistency
-    Given a trace with 6 spans arriving within 2 seconds
-    When all 6 spans are processed through the fold
-    Then each fold step after the first reads from Redis
-    And the final state contains all 6 spans accumulated data
-    And ClickHouse receives the writes asynchronously
+  Scenario: An aggregate with work still in flight is not released
+    Given the fold state for aggregate "trace-1" is cached
+    And a fold job for "trace-1" is still in flight
+    And every replica of the durable store holds that state
+    When the confirmation processor checks "trace-1"
+    Then the cached entry is retained
+
+  Scenario: A redelivered event is not applied twice
+    Given a fold job for aggregate "trace-1" failed after its state was stored
+    When the job is retried with the same events
+    Then those events are recognised as already applied
+    And the aggregate reflects each event exactly once
+
+  Scenario: The confirmation processor falling behind never loses state
+    Given the confirmation processor is not running
+    When fold states are stored for many aggregates
+    Then every cached entry is retained
+    And no fold reads state that is missing recent events
+
+  Scenario: A cached entry cannot outlive its backstop
+    Given a cached entry whose aggregate was never confirmed
+    When the backstop period passes
+    Then the cached entry is released
+    And the release is reported as a backstop expiry rather than a confirmation

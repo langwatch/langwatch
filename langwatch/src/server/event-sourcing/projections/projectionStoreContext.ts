@@ -32,4 +32,15 @@ export interface ProjectionStoreContext {
    * unbounded.
    */
   retentionPolicy?: ResolvedRetention | null;
+
+  /**
+   * Ids of the events folded into the state being stored.
+   *
+   * Recorded alongside the cached state so a redelivery can be recognised.
+   * Queue delivery is at-least-once: a fold job that fails after its state was
+   * stored is re-dispatched with the same events, and most fold handlers
+   * accumulate (counters, sums, appends) rather than being idempotent, so
+   * re-applying them would double-count. Absent for stores that do not cache.
+   */
+  appliedEventIds?: readonly string[];
 }

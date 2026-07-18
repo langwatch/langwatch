@@ -1,165 +1,248 @@
 import { describe, expect, it, vi } from "vitest";
-import { RedisCachedFoldStore } from "../redisCachedFoldStore";
+import { createTenantId } from "../../domain/tenantId";
 import type { FoldProjectionStore } from "../foldProjection.types";
 import type { ProjectionStoreContext } from "../projectionStoreContext";
-import { createTenantId } from "../../domain/tenantId";
+import { RedisCachedFoldStore } from "../redisCachedFoldStore";
 
 interface TestState {
   count: number;
-  name: string;
+  UpdatedAt: number;
 }
 
-function createMockInnerStore(): FoldProjectionStore<TestState> & {
-  getCalls: Array<{ aggregateId: string }>;
-  storeCalls: Array<{ state: TestState }>;
-} {
-  const store = {
-    getCalls: [] as Array<{ aggregateId: string }>,
-    storeCalls: [] as Array<{ state: TestState }>,
+function createInnerStore(
+  durable: TestState | null = { count: 1, UpdatedAt: 100 },
+) {
+  const calls = {
+    get: [] as string[],
+    store: [] as TestState[],
+  };
 
-    async get(aggregateId: string): Promise<TestState | null> {
-      store.getCalls.push({ aggregateId });
-      return { count: 1, name: "from-ch" };
+  const store: FoldProjectionStore<TestState> = {
+    async get(aggregateId: string) {
+      calls.get.push(aggregateId);
+      return durable;
     },
-
-    async store(state: TestState): Promise<void> {
-      store.storeCalls.push({ state });
+    async store(state: TestState) {
+      calls.store.push(state);
     },
   };
 
-  return store;
+  return { store, calls };
 }
 
-function createMockRedis() {
-  const data = new Map<string, { value: string; ttl: number }>();
+function createRedis() {
+  const values = new Map<string, { value: string; ttlSeconds: number }>();
+  const sortedSets = new Map<string, Map<string, number>>();
+
   return {
-    data,
-    get: vi.fn(async (key: string) => data.get(key)?.value ?? null),
-    set: vi.fn(async (key: string, value: string, _mode: string, ttl: number) => {
-      data.set(key, { value, ttl });
-      return "OK";
+    values,
+    sortedSets,
+    get: vi.fn(async (key: string) => values.get(key)?.value ?? null),
+    set: vi.fn(
+      async (key: string, value: string, _mode: string, ttlSeconds: number) => {
+        values.set(key, { value, ttlSeconds });
+        return "OK";
+      },
+    ),
+    zadd: vi.fn(async (key: string, score: number, member: string) => {
+      const set = sortedSets.get(key) ?? new Map<string, number>();
+      set.set(member, score);
+      sortedSets.set(key, set);
+      return 1;
     }),
   };
 }
 
-const TEST_TENANT_ID = createTenantId("tenant-1");
-const TEST_CONTEXT: ProjectionStoreContext = {
+const TENANT = createTenantId("tenant-1");
+const CONTEXT: ProjectionStoreContext = {
   aggregateId: "agg-1",
-  tenantId: TEST_TENANT_ID,
+  tenantId: TENANT,
 };
+const CACHE_KEY = `fold:test_table:${String(TENANT)}:agg-1`;
+
+function createStore(
+  redis: ReturnType<typeof createRedis>,
+  inner = createInnerStore(),
+) {
+  return {
+    inner,
+    store: new RedisCachedFoldStore<TestState>(inner.store, redis as never, {
+      keyPrefix: "test_table",
+      backstopTtlSeconds: 3_600,
+      checkDelayMs: 5_000,
+    }),
+  };
+}
 
 describe("RedisCachedFoldStore", () => {
-  describe("get()", () => {
-    describe("when Redis has cached state", () => {
-      it("returns cached state without calling inner store", async () => {
-        const redis = createMockRedis();
-        const inner = createMockInnerStore();
-        const store = new RedisCachedFoldStore<TestState>(inner, redis as any, {
-          keyPrefix: "test_table",
-        });
+  describe("given a cached entry", () => {
+    describe("when the fold reads state", () => {
+      it("returns the cached state without reading the durable store", async () => {
+        const redis = createRedis();
+        const { store, inner } = createStore(redis);
 
-        const state: TestState = { count: 5, name: "cached" };
-        redis.data.set("fold:test_table:tenant-1:agg-1", {
-          value: JSON.stringify(state),
-          ttl: 30,
-        });
+        await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
+        const result = await store.get("agg-1", CONTEXT);
 
-        const result = await store.get("agg-1", TEST_CONTEXT);
-
-        expect(result).toEqual(state);
-        expect(redis.get).toHaveBeenCalledWith("fold:test_table:tenant-1:agg-1");
-        expect(inner.getCalls).toHaveLength(0);
-      });
-    });
-
-    describe("when Redis cache misses", () => {
-      it("reads from inner store without caching the result", async () => {
-        const redis = createMockRedis();
-        const inner = createMockInnerStore();
-        const store = new RedisCachedFoldStore<TestState>(inner, redis as any, {
-          keyPrefix: "test_table",
-        });
-
-        const result = await store.get("agg-1", TEST_CONTEXT);
-
-        expect(result).toEqual({ count: 1, name: "from-ch" });
-        expect(inner.getCalls).toHaveLength(1);
-        expect(redis.set).not.toHaveBeenCalled();
+        expect(result).toEqual({ count: 5, UpdatedAt: 200 });
+        expect(inner.calls.get).toHaveLength(0);
       });
     });
   });
 
-  describe("store()", () => {
-    describe("when storing state", () => {
-      it("writes to CH first then caches in Redis", async () => {
-        const redis = createMockRedis();
-        const inner = createMockInnerStore();
-        const store = new RedisCachedFoldStore<TestState>(inner, redis as any, {
-          keyPrefix: "test_table",
-          ttlSeconds: 30,
-        });
+  describe("given no cached entry", () => {
+    describe("when the fold reads state", () => {
+      it("reads the durable store, which confirmation proves authoritative", async () => {
+        const redis = createRedis();
+        const { store, inner } = createStore(redis);
 
-        const state: TestState = { count: 10, name: "new-state" };
-        await store.store(state, TEST_CONTEXT);
+        const result = await store.get("agg-1", CONTEXT);
 
-        // CH written first
-        expect(inner.storeCalls).toHaveLength(1);
-        expect(inner.storeCalls[0]!.state).toEqual(state);
-
-        // Then Redis cached
-        expect(redis.set).toHaveBeenCalledWith(
-          "fold:test_table:tenant-1:agg-1",
-          JSON.stringify(state),
-          "EX",
-          30,
-        );
+        expect(result).toEqual({ count: 1, UpdatedAt: 100 });
+        expect(inner.calls.get).toEqual(["agg-1"]);
       });
     });
+  });
 
-    describe("when inner store write fails", () => {
-      it("propagates the error to the caller", async () => {
-        const redis = createMockRedis();
-        const innerStore: FoldProjectionStore<TestState> = {
-          get: vi.fn(),
-          store: vi.fn().mockRejectedValue(new Error("CH connection refused")),
-        };
+  describe("given Redis is unreachable", () => {
+    describe("when the fold reads state", () => {
+      it("falls through to the durable store rather than failing the fold", async () => {
+        const redis = createRedis();
+        redis.get.mockRejectedValueOnce(new Error("connection lost"));
+        const { store, inner } = createStore(redis);
 
-        const store = new RedisCachedFoldStore<TestState>(
-          innerStore,
-          redis as any,
-          { keyPrefix: "test_table" },
-        );
+        const result = await store.get("agg-1", CONTEXT);
+
+        expect(result).toEqual({ count: 1, UpdatedAt: 100 });
+        expect(inner.calls.get).toEqual(["agg-1"]);
+      });
+    });
+  });
+
+  describe("when the fold stores state", () => {
+    it("writes the durable store before caching", async () => {
+      const redis = createRedis();
+      const { store, inner } = createStore(redis);
+
+      await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
+
+      expect(inner.calls.store).toEqual([{ count: 5, UpdatedAt: 200 }]);
+      expect(redis.values.has(CACHE_KEY)).toBe(true);
+    });
+
+    it("caches under a backstop TTL, not a residency TTL", async () => {
+      const redis = createRedis();
+      const { store } = createStore(redis);
+
+      await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
+
+      expect(redis.values.get(CACHE_KEY)?.ttlSeconds).toBe(3_600);
+    });
+
+    it("registers the aggregate for durability confirmation", async () => {
+      const redis = createRedis();
+      const { store } = createStore(redis);
+
+      await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
+
+      const pending = redis.sortedSets.get("fold:pending:test_table");
+      expect(pending?.has(`${String(TENANT)}\u0000agg-1`)).toBe(true);
+    });
+
+    it("records the state version so confirmation has something to compare", async () => {
+      const redis = createRedis();
+      const { store } = createStore(redis);
+
+      await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
+
+      const entry = JSON.parse(redis.values.get(CACHE_KEY)!.value);
+      expect(entry.u).toBe(200);
+    });
+  });
+
+  describe("given the durable write succeeded but caching fails", () => {
+    describe("when the fold stores state", () => {
+      it("does not fail the fold, because the state is already durable", async () => {
+        const redis = createRedis();
+        redis.set.mockRejectedValueOnce(new Error("OOM"));
+        const { store, inner } = createStore(redis);
 
         await expect(
-          store.store({ count: 1, name: "test" }, TEST_CONTEXT),
-        ).rejects.toThrow("CH connection refused");
-
-        // Redis should NOT have been updated (CH writes first)
-        expect(redis.set).not.toHaveBeenCalled();
+          store.store({ count: 5, UpdatedAt: 200 }, CONTEXT),
+        ).resolves.toBeUndefined();
+        expect(inner.calls.store).toHaveLength(1);
       });
     });
   });
 
-  describe("end-to-end fold sequence", () => {
-    it("second fold step reads from Redis after first store caches it", async () => {
-      const redis = createMockRedis();
-      const inner = createMockInnerStore();
-      const store = new RedisCachedFoldStore<TestState>(inner, redis as any, {
-        keyPrefix: "test_table",
+  describe("given a fold applied events", () => {
+    describe("when the state is stored", () => {
+      it("records their ids so a redelivery can be recognised", async () => {
+        const redis = createRedis();
+        const { store } = createStore(redis);
+
+        await store.store(
+          { count: 5, UpdatedAt: 200 },
+          { ...CONTEXT, appliedEventIds: ["e1", "e2"] },
+        );
+
+        const cached = await store.getWithApplied("agg-1", CONTEXT);
+        expect(cached?.appliedEventIds).toEqual(["e1", "e2"]);
+      });
+    });
+
+    describe("when a later fold step applies more events", () => {
+      it("accumulates the ids across steps", async () => {
+        const redis = createRedis();
+        const { store } = createStore(redis);
+
+        await store.store(
+          { count: 5, UpdatedAt: 200 },
+          { ...CONTEXT, appliedEventIds: ["e1"] },
+        );
+        await store.store(
+          { count: 6, UpdatedAt: 201 },
+          { ...CONTEXT, appliedEventIds: ["e2"] },
+        );
+
+        const cached = await store.getWithApplied("agg-1", CONTEXT);
+        expect(cached?.appliedEventIds).toEqual(["e1", "e2"]);
       });
 
-      // Step 1: get (miss → CH) → apply → store (caches in Redis)
-      const state1 = await store.get("agg-1", TEST_CONTEXT);
-      expect(state1).toEqual({ count: 1, name: "from-ch" });
-      expect(inner.getCalls).toHaveLength(1);
+      it("does not record the same event twice", async () => {
+        const redis = createRedis();
+        const { store } = createStore(redis);
 
-      const newState: TestState = { count: 2, name: "after-apply" };
-      await store.store(newState, TEST_CONTEXT);
+        await store.store(
+          { count: 5, UpdatedAt: 200 },
+          { ...CONTEXT, appliedEventIds: ["e1"] },
+        );
+        await store.store(
+          { count: 5, UpdatedAt: 201 },
+          { ...CONTEXT, appliedEventIds: ["e1"] },
+        );
 
-      // Step 2: get (hit from Redis) — inner store NOT called again
-      const state2 = await store.get("agg-1", TEST_CONTEXT);
-      expect(state2).toEqual(newState);
-      expect(inner.getCalls).toHaveLength(1);
+        const cached = await store.getWithApplied("agg-1", CONTEXT);
+        expect(cached?.appliedEventIds).toEqual(["e1"]);
+      });
+    });
+  });
+
+  describe("given an entry written before durability gating", () => {
+    describe("when the fold reads state", () => {
+      it("still returns the state, carrying no applied events", async () => {
+        const redis = createRedis();
+        const { store } = createStore(redis);
+        redis.values.set(CACHE_KEY, {
+          value: JSON.stringify({ count: 9, UpdatedAt: 300 }),
+          ttlSeconds: 300,
+        });
+
+        const cached = await store.getWithApplied("agg-1", CONTEXT);
+
+        expect(cached?.state).toEqual({ count: 9, UpdatedAt: 300 });
+        expect(cached?.appliedEventIds).toEqual([]);
+      });
     });
   });
 });
