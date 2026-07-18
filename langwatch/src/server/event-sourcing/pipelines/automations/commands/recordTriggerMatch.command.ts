@@ -4,6 +4,7 @@ import {
   TRIGGER_MATCH_RECORDED_EVENT_TYPE,
 } from "../schemas/constants";
 import { triggerMatchRecordedEventDataSchema } from "../schemas/events";
+import { settleWindowBucket } from "../settleWindow";
 
 export const RecordTriggerMatchCommand = defineCommand({
   commandType: RECORD_TRIGGER_MATCH_COMMAND_TYPE,
@@ -13,7 +14,8 @@ export const RecordTriggerMatchCommand = defineCommand({
   schema: triggerMatchRecordedEventDataSchema,
   aggregateId: ({ triggerId }) => triggerId,
   groupKey: ({ triggerId }) => triggerId,
-  idempotencyKey: ({ triggerId, traceId }) => `${triggerId}:${traceId}`,
+  idempotencyKey: ({ triggerId, traceId, occurredAt, traceDebounceMs }) =>
+    `${triggerId}:${traceId}:${settleWindowBucket({ occurredAt, traceDebounceMs })}`,
   spanAttributes: ({ triggerId, traceId, actionClass }) => ({
     "automation.trigger.id": triggerId,
     "automation.trace.id": traceId,

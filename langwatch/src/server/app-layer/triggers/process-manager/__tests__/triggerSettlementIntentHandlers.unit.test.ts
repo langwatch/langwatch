@@ -5,18 +5,18 @@ import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/tr
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { Trace } from "~/server/tracer/types";
 import {
-	createLogOverflowHandler,
-	createNotifyDigestHandler,
+  createLogOverflowHandler,
+  createNotifyDigestHandler,
   createPersistMatchHandler,
   type TriggerSettlementDispatchDeps,
 } from "../triggerSettlementIntentHandlers";
 
 const { deliverWebhookMock, loggerWarnMock, sendRenderedTriggerEmailMock } =
-	vi.hoisted(() => ({
-		deliverWebhookMock: vi.fn().mockResolvedValue(undefined),
-		loggerWarnMock: vi.fn(),
-		sendRenderedTriggerEmailMock: vi.fn().mockResolvedValue(undefined),
-	}));
+  vi.hoisted(() => ({
+    deliverWebhookMock: vi.fn().mockResolvedValue(undefined),
+    loggerWarnMock: vi.fn(),
+    sendRenderedTriggerEmailMock: vi.fn().mockResolvedValue(undefined),
+  }));
 
 vi.mock("~/server/triggers/deliverWebhook", () => ({
   deliverWebhook: deliverWebhookMock,
@@ -31,7 +31,7 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),
-		warn: loggerWarnMock,
+    warn: loggerWarnMock,
     error: vi.fn(),
   }),
 }));
@@ -174,28 +174,28 @@ function makeDeps(activeTrigger: TriggerSummary) {
 }
 
 describe("trigger settlement intent handlers integration", () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
-	});
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-	describe("given the pending-match bound dropped old entries", () => {
-		it("logs the committed drop count from an effectful intent", async () => {
-			await createLogOverflowHandler()(
-				{ triggerId: "trigger-1", dropped: 2, totalDropped: 7 },
-				context("overflow:7"),
-			);
+  describe("given the pending-match bound dropped old entries", () => {
+    it("logs the committed drop count from an effectful intent", async () => {
+      await createLogOverflowHandler()(
+        { triggerId: "trigger-1", dropped: 2, totalDropped: 7 },
+        context("overflow:7"),
+      );
 
-			expect(loggerWarnMock).toHaveBeenCalledWith(
-				{
-					projectId: "project-1",
-					triggerId: "trigger-1",
-					dropped: 2,
-					totalDropped: 7,
-				},
-				"Trigger settlement pending-match bound dropped oldest matches",
-			);
-		});
-	});
+      expect(loggerWarnMock).toHaveBeenCalledWith(
+        {
+          projectId: "project-1",
+          triggerId: "trigger-1",
+          dropped: 2,
+          totalDropped: 7,
+        },
+        "Trigger settlement pending-match bound dropped oldest matches",
+      );
+    });
+  });
 
   describe("given a notify digest with passing, failing, and claimed traces", () => {
     it("confirms, renders, sends, claims only candidates, and drops the rest", async () => {
@@ -251,6 +251,49 @@ describe("trigger settlement intent handlers integration", () => {
     });
   });
 
+  describe("given a notify trace was sent in an earlier settle window", () => {
+    it("uses the send claim to suppress a duplicate across windows", async () => {
+      const activeTrigger = trigger(TriggerAction.SEND_EMAIL, {
+        actionParams: { members: ["ops@example.com"] },
+        templates: {
+          slackTemplateType: null,
+          slackTemplate: null,
+          emailSubjectTemplate: "Alert: {{ trigger.name }}",
+          emailBodyTemplate: "Matched {{ matches.size }} trace",
+        },
+      });
+      const { deps, triggers } = makeDeps(activeTrigger);
+      const claimed = new Set<string>();
+      triggers.isSendClaimed.mockImplementation(async ({ traceId }) =>
+        claimed.has(traceId),
+      );
+      triggers.claimSend.mockImplementation(async ({ traceId }) => {
+        claimed.add(traceId);
+      });
+      const handler = createNotifyDigestHandler(deps);
+
+      await handler(
+        {
+          triggerId: "trigger-1",
+          traceIds: ["trace-1"],
+          boundary: 31_000,
+        },
+        context("process:trigger-1:digest:31000:first-window"),
+      );
+      await handler(
+        {
+          triggerId: "trigger-1",
+          traceIds: ["trace-1"],
+          boundary: 61_000,
+        },
+        context("process:trigger-1:digest:61000:second-window"),
+      );
+
+      expect(sendRenderedTriggerEmailMock).toHaveBeenCalledTimes(1);
+      expect(triggers.claimSend).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("given a persist-match intent", () => {
     it("confirms the settled trace, writes the dataset, then claims the match", async () => {
       const activeTrigger = trigger(TriggerAction.ADD_TO_DATASET, {
@@ -277,6 +320,39 @@ describe("trigger settlement intent handlers integration", () => {
         traceId: "trace-1",
         projectId: "project-1",
       });
+    });
+  });
+
+  describe("given a persist trace only passes filters after later activity", () => {
+    it("runs the persist action during the later settle window", async () => {
+      const activeTrigger = trigger(TriggerAction.ADD_TO_DATASET, {
+        actionParams: {
+          datasetId: "dataset-1",
+          datasetMapping: { mapping: {}, expansions: [] },
+        },
+        filters: { "traces.origin": ["application"] },
+      });
+      const { deps, triggers, folds, raw } = makeDeps(activeTrigger);
+      folds.set(
+        "trace-1",
+        fold("trace-1", {
+          attributes: { "langwatch.origin": "evaluation" },
+        }),
+      );
+      const handler = createPersistMatchHandler(deps);
+
+      await handler(
+        { triggerId: "trigger-1", traceId: "trace-1" },
+        context("process:trigger-1:persist:trace-1:30000-0"),
+      );
+      folds.set("trace-1", fold("trace-1"));
+      await handler(
+        { triggerId: "trigger-1", traceId: "trace-1" },
+        context("process:trigger-1:persist:trace-1:30000-1"),
+      );
+
+      expect(raw.addToDataset).toHaveBeenCalledTimes(1);
+      expect(triggers.claimSend).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -11,6 +11,7 @@ export interface PendingMatch {
   settleDueAt: number;
   dispatchDueAt: number;
   actionClass: TriggerActionClass;
+  settleWindowBucket: string;
 }
 
 export interface TriggerSettlementState {

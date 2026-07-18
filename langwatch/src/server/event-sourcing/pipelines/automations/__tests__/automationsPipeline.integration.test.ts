@@ -76,8 +76,9 @@ describe("automations pipeline", () => {
         );
         const commands = mapCommands(pipeline.commands);
 
-        await commands.recordTriggerMatch(command("trace-1", 1_000));
-        await commands.recordTriggerMatch(command("trace-1", 2_000));
+        const redeliveredCommand = command("trace-1", 1_000);
+        await commands.recordTriggerMatch(redeliveredCommand);
+        await commands.recordTriggerMatch(redeliveredCommand);
 
         const events = await eventSourcing
           .getEventStore<AutomationEvent>()!
@@ -91,8 +92,47 @@ describe("automations pipeline", () => {
         });
 
         expect(events).toHaveLength(1);
-        expect(events[0]?.idempotencyKey).toBe("trigger-1:trace-1");
+        expect(events[0]?.idempotencyKey).toBe("trigger-1:trace-1:30000-0");
         expect(process?.state.traceIds).toEqual(["trace-1"]);
+      });
+    });
+  });
+
+  describe("given a settled trigger and trace receive later activity", () => {
+    describe("when the later activity lands in a new settle window", () => {
+      it("records and consumes a second evaluation round", async () => {
+        const processStore = new InMemoryProcessStore();
+        eventSourcing = new EventSourcing({ processStore, redis: null });
+        const pipeline = eventSourcing.register(
+          createAutomationsPipeline({
+            automationAuditStore: {
+              append: vi.fn().mockResolvedValue(undefined),
+            },
+            triggerSettlement,
+            graphAlertSweep,
+          }),
+        );
+        const commands = mapCommands(pipeline.commands);
+
+        await commands.recordTriggerMatch(command("trace-1", 1_000));
+        await commands.recordTriggerMatch(command("trace-1", 31_000));
+
+        const events = await eventSourcing
+          .getEventStore<AutomationEvent>()!
+          .getEvents("trigger-1", { tenantId }, "trigger");
+        const process = await processStore.findByRef<{ traceIds: string[] }>({
+          ref: {
+            processName: "triggerSettlement",
+            projectId: tenantId,
+            processKey: "trigger-1",
+          },
+        });
+
+        expect(events.map((event) => event.idempotencyKey)).toEqual([
+          "trigger-1:trace-1:30000-0",
+          "trigger-1:trace-1:30000-1",
+        ]);
+        expect(process?.state.traceIds).toEqual(["trace-1", "trace-1"]);
       });
     });
   });

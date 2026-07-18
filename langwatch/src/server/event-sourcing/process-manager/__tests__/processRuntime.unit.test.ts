@@ -16,7 +16,7 @@ const tenantId = createTenantId("project-1");
 function physicalEvent(id: string) {
   return triggerMatchRecordedEventSchema.parse({
     id,
-    idempotencyKey: "trigger-1:trace-1",
+    idempotencyKey: "trigger-1:trace-1:30000-0",
     aggregateId: "trigger-1",
     aggregateType: "trigger",
     tenantId,

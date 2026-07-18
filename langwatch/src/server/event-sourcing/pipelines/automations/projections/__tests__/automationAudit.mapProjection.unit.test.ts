@@ -11,7 +11,7 @@ describe("automation audit projection", () => {
     });
     const event = triggerMatchRecordedEventSchema.parse({
       id: "physical-2",
-      idempotencyKey: "trigger-1:trace-1",
+      idempotencyKey: "trigger-1:trace-1:30000-0",
       aggregateId: "trigger-1",
       aggregateType: "trigger",
       tenantId: createTenantId("project-1"),
@@ -30,7 +30,7 @@ describe("automation audit projection", () => {
     });
 
     expect(projection.map(event)).toMatchObject({
-      eventId: "trigger-1:trace-1",
+      eventId: "trigger-1:trace-1:30000-0",
       triggerId: "trigger-1",
       traceId: "trace-1",
     });

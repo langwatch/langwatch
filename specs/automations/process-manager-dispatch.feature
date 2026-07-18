@@ -46,11 +46,11 @@ Feature: Automation dispatch on the process-manager substrate
 
   # --- Settlement timing ---
 
-  Scenario: Trace activity extends the settle debounce
-    Given a pending match still inside its debounce window
-    When another match for the same trace commits
-    Then the match's settle deadline moves later
-    And no dispatch intent exists yet
+  Scenario: Trace activity in a later window re-arms settlement
+    Given a match has completed its current settle window
+    When another match for the same trace commits in a later window
+    Then a new settlement round records the trace
+    And the later round can emit a fresh dispatch intent
 
   Scenario: Matches in the same cadence window coalesce into one digest
     Given an automation on a digest cadence

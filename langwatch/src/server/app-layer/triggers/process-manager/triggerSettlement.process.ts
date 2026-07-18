@@ -5,6 +5,7 @@ import type {
   AutomationEvent,
   TriggerMatchRecordedEventData,
 } from "~/server/event-sourcing/pipelines/automations/schemas/events";
+import { settleWindowBucket } from "~/server/event-sourcing/pipelines/automations/settleWindow";
 
 import { computeScheduledFor } from "../dispatch/triggerActionDispatch";
 import {
@@ -55,6 +56,10 @@ export function addPending(
       settleDueAt,
       dispatchDueAt,
       actionClass: view.actionClass,
+      settleWindowBucket: settleWindowBucket({
+        occurredAt: at,
+        traceDebounceMs: view.traceDebounceMs,
+      }),
     },
   };
   let overflowDropped = previousState.overflowDropped;
@@ -88,14 +93,20 @@ function digestBatchKey(traceIds: readonly string[]): string {
 export function drainDue(state: SettlementState, at: number) {
   const remaining: SettlementState["pendingMatches"] = {};
   const notifyByBoundary = new Map<number, string[]>();
-  const settledMatches: Array<{ traceId: string }> = [];
+  const settledMatches: Array<{
+    traceId: string;
+    settleWindowBucket: string;
+  }> = [];
   for (const [traceId, match] of Object.entries(state.pendingMatches)) {
     if (match.dispatchDueAt > at) {
       remaining[traceId] = match;
       continue;
     }
     if (match.actionClass === "persist") {
-      settledMatches.push({ traceId });
+      settledMatches.push({
+        traceId,
+        settleWindowBucket: match.settleWindowBucket,
+      });
       continue;
     }
     const traceIds = notifyByBoundary.get(match.dispatchDueAt) ?? [];
@@ -175,10 +186,13 @@ export const triggerSettlementPM =
               ),
             ),
             ...due.settledMatches.map((match) =>
-              ctx.intents.persistMatch(`persist:${match.traceId}`, {
-                triggerId: ctx.key,
-                traceId: match.traceId,
-              }),
+              ctx.intents.persistMatch(
+                `persist:${match.traceId}:${match.settleWindowBucket}`,
+                {
+                  triggerId: ctx.key,
+                  traceId: match.traceId,
+                },
+              ),
             ),
           ],
           nextWakeAt: due.nextBoundary,

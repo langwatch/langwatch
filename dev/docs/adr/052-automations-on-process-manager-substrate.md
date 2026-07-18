@@ -6,7 +6,8 @@
 
 **Supersedes:** ADR-030's `ReactorOutbox` mechanism and `.withOutbox`
 pipeline primitive. ADR-026/027, ADR-031, ADR-034, ADR-035, ADR-036/041,
-ADR-040, and ADR-043 remain behavioral contracts.
+ADR-040, and ADR-043 remain behavioral contracts, subject to ADR-026's
+2026-07-18 deterministic settle-window amendment.
 
 ## Context
 
@@ -72,10 +73,14 @@ trigger ID, trace ID, action class, action, debounce, and cadence. Trace/span
 content never crosses into the automations event or Postgres PM tables.
 
 `recordTriggerMatch` uses trigger ID as aggregate/group identity and stamps
-`${triggerId}:${traceId}` as the event idempotency key. The PM runtime uses
-that logical key for its transactional inbox, so command redelivery can
-briefly create two physical ClickHouse rows without evolving the process
-twice. Event-log reads and the audit projection also collapse the same key.
+`${triggerId}:${traceId}:${settleWindowBucket}` as the event idempotency key.
+The bucket combines the configured debounce width with
+`floor(occurredAt / max(traceDebounceMs, 1))`; including the width prevents a
+configuration change from colliding with an earlier round. The PM runtime uses
+that logical key for its transactional inbox, so duplicate activity within one
+window can briefly create two physical ClickHouse rows without evolving the
+process twice. Event-log reads and the audit projection also collapse the same
+key. Activity in a later window records a new event and re-arms the process.
 
 ### Dedicated automations pipeline
 
@@ -108,7 +113,9 @@ the committed event through the transactional inbox.
         ...due.boundaries.map(b =>
           ctx.intents.notifyDigest(`digest:${b.key}`, b.payload)),
         ...due.settledMatches.map(m =>
-          ctx.intents.persistMatch(`persist:${m.traceId}`, m.payload)),
+          ctx.intents.persistMatch(
+            `persist:${m.traceId}:${m.settleWindowBucket}`,
+            m.payload)),
       ],
       nextWakeAt: due.nextBoundary,
     };
@@ -132,11 +139,13 @@ typing.
 ### Settlement and dispatch
 
 `triggerSettlement` has one instance per project/trigger. A match computes
-`settleDueAt` and the ADR-026/027 cadence-snapped `dispatchDueAt` from the
-event timestamp, then stores the earliest boundary as `nextWakeAt`. A repeated
-trace match extends its debounce. A wake emits one `notifyDigest` per cadence
-boundary and one `persistMatch` per settled persist-class trace. Pending state
-is bounded and logs overflow.
+`settleDueAt`, its deterministic settle-window bucket, and the ADR-026/027
+cadence-snapped `dispatchDueAt` from the event timestamp, then stores the
+earliest boundary as `nextWakeAt`. Duplicate activity in one bucket collapses;
+activity in a later bucket records a new round and moves the pending wake. A
+wake emits one `notifyDigest` per cadence boundary and one window-identified
+`persistMatch` per settled persist-class trace. Pending state is bounded and
+logs overflow.
 
 This is stronger than the old Redis-delayed settle path: once the PM commit
 succeeds, a Redis flush cannot erase the pending boundary or intent.
@@ -146,7 +155,10 @@ reconfirmation, ADR-031 retry-safe caps and suppression, claim-after-send
 `TriggerSent` at-most-once behavior, dataset/annotation actions, and ADR-040
 webhook SSRF protection, delivery log, and stable
 `X-LangWatch-Event-Id`. Retryable errors throw for leased-outbox backoff;
-terminal drops complete normally.
+Notify rounds in later windows remain suppressed after a successful send by
+the permanent `(triggerId, traceId)` claim. A persist round whose filters fail
+does not claim, so later trace activity gets a fresh window-identified intent
+and can persist once the settled state passes.
 
 ### Graph alerts and replay
 
@@ -189,5 +201,6 @@ observability are outside this decision.
 ## References
 
 - [`specs/automations/process-manager-dispatch.feature`](../../../specs/automations/process-manager-dispatch.feature)
+- [`specs/automations/dispatch-timing.feature`](../../../specs/automations/dispatch-timing.feature)
 - ADR-049 (process-manager inbox/state/outbox)
 - ADR-051 (durable revision-fenced wakes)

@@ -52,11 +52,13 @@ describe("trigger settlement process", () => {
               settleDueAt: 900,
               dispatchDueAt: 1_000,
               actionClass: "notify",
+              settleWindowBucket: "30000-0",
             },
             "trace-a": {
               settleDueAt: 800,
               dispatchDueAt: 1_000,
               actionClass: "notify",
+              settleWindowBucket: "30000-0",
             },
           },
           overflowDropped: 0,
@@ -74,19 +76,21 @@ describe("trigger settlement process", () => {
               settleDueAt: 800,
               dispatchDueAt: 1_000,
               actionClass: "persist",
+              settleWindowBucket: "30000-0",
             },
             "trace-b": {
               settleDueAt: 900,
               dispatchDueAt: 1_000,
               actionClass: "persist",
+              settleWindowBucket: "30000-0",
             },
           },
           overflowDropped: 0,
         };
 
         expect(drainDue(state, 1_000).settledMatches).toEqual([
-          { traceId: "trace-a" },
-          { traceId: "trace-b" },
+          { traceId: "trace-a", settleWindowBucket: "30000-0" },
+          { traceId: "trace-b", settleWindowBucket: "30000-0" },
         ]);
       });
 
@@ -97,17 +101,72 @@ describe("trigger settlement process", () => {
               settleDueAt: 800,
               dispatchDueAt: 1_000,
               actionClass: "notify",
+              settleWindowBucket: "30000-0",
             },
             future: {
               settleDueAt: 1_800,
               dispatchDueAt: 2_000,
               actionClass: "notify",
+              settleWindowBucket: "30000-0",
             },
           },
           overflowDropped: 0,
         };
 
         expect(drainDue(state, 1_000).nextBoundary).toBe(2_000);
+      });
+    });
+  });
+
+  describe("given a persist match completed its settle round", () => {
+    describe("when later activity arrives in a new settle window", () => {
+      it("creates a fresh persist intent for the later round", () => {
+        const definition = buildProcessManager({
+          name: "triggerSettlement",
+          applier: triggerSettlementPM({
+            dispatch: {} as TriggerSettlementDispatchDeps,
+          }),
+        });
+        const evolve =
+          definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
+        const intents = buildIntentFactories(definition.config.intents);
+        const context = {
+          key: "trigger-1",
+          projectId: "project-1",
+          intents,
+        };
+
+        const firstRound = evolve(
+          initialState(),
+          match({
+            action: TriggerAction.ADD_TO_DATASET,
+            actionClass: "persist",
+          }),
+          { ...context, at: 1_000 },
+        );
+        const firstWake = definition.config.onWake!(firstRound.state, {
+          ...context,
+          at: 31_000,
+        });
+        const secondRound = evolve(
+          firstWake.state,
+          match({
+            action: TriggerAction.ADD_TO_DATASET,
+            actionClass: "persist",
+          }),
+          { ...context, at: 31_001 },
+        );
+        const secondWake = definition.config.onWake!(secondRound.state, {
+          ...context,
+          at: 61_001,
+        });
+
+        expect(firstWake.intents?.map((intent) => intent.messageKey)).toEqual([
+          "persist:trace-1:30000-0",
+        ]);
+        expect(secondWake.intents?.map((intent) => intent.messageKey)).toEqual([
+          "persist:trace-1:30000-1",
+        ]);
       });
     });
   });
@@ -122,6 +181,7 @@ describe("trigger settlement process", () => {
               settleDueAt: index,
               dispatchDueAt: index,
               actionClass: "notify" as const,
+              settleWindowBucket: "30000-0",
             },
           ]),
         );
@@ -147,6 +207,7 @@ describe("trigger settlement process", () => {
               settleDueAt: index,
               dispatchDueAt: index,
               actionClass: "notify" as const,
+              settleWindowBucket: "30000-0",
             },
           ]),
         );
