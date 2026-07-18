@@ -261,6 +261,42 @@ func TestResolve_StaleEntry_RecoveryReplacesEntryWithFreshBundle(t *testing.T) {
 	}
 }
 
+func TestApplyChange_ModelProviderUpdatedEvictsMatchingModelProvider(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	matchingKey := hashKey("vk-lw-matching-provider")
+	otherKey := hashKey("vk-lw-other-provider")
+	svc.storeL1(matchingKey, &domain.Bundle{
+		VirtualKeyID: "vk-matching",
+		Config: domain.BundleConfig{Credentials: []domain.Credential{{
+			ID:         "model-provider-1",
+			ProviderID: domain.ProviderOpenAI,
+		}}},
+	})
+	svc.storeL1(otherKey, &domain.Bundle{
+		VirtualKeyID: "vk-other",
+		Config: domain.BundleConfig{Credentials: []domain.Credential{{
+			ID:         "model-provider-2",
+			ProviderID: domain.ProviderOpenAI,
+		}}},
+	})
+
+	svc.applyChange(CacheChange{
+		Kind:            ChangeKindProviderBindingUpdated,
+		ModelProviderID: "model-provider-1",
+	})
+
+	_, matchingPresent := svc.l1.Get(matchingKey)
+	_, otherPresent := svc.l1.Get(otherKey)
+	if matchingPresent {
+		t.Fatal("the changed model provider must be evicted")
+	}
+	if !otherPresent {
+		t.Fatal("other provider bindings must stay cached")
+	}
+}
+
 // --- Background refresh classification --------------------------------------
 
 func TestRefreshBackground_TransportFailure_BumpsSoft(t *testing.T) {

@@ -567,9 +567,9 @@ func (r *Relay) forwardTraces(ctx context.Context, info WorkerInfo, payload []by
 		return err
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 2048))
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("ingest answered %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("ingest answered %d", resp.StatusCode)
 	}
 	return nil
 }

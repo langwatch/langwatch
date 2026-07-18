@@ -2,12 +2,18 @@
 package otel
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/otel/trace"
 )
+
+var fallbackIDCounter atomic.Uint64
 
 const (
 	attrServiceName  = "service.name"
@@ -74,6 +80,12 @@ func InternalCopy(
 	turn trace.SpanContext,
 ) ptrace.Traces {
 	out := ptrace.NewTraces()
+	traceID := newTraceID()
+	parentSpanID := pcommon.NewSpanIDEmpty()
+	if turn.IsValid() {
+		traceID = pcommon.TraceID(turn.TraceID())
+		parentSpanID = pcommon.SpanID(turn.SpanID())
+	}
 	sourceResources := td.ResourceSpans()
 	for i := 0; i < sourceResources.Len(); i++ {
 		sourceResource := sourceResources.At(i)
@@ -92,7 +104,8 @@ func InternalCopy(
 					sourceSpans.At(k),
 					destinationScope.Spans().AppendEmpty(),
 					trustedModel,
-					turn,
+					traceID,
+					parentSpanID,
 				)
 			}
 		}
@@ -106,11 +119,16 @@ func stampInternalResource(attrs pcommon.Map, conversationID string) {
 	attrs.PutStr(attrConversation, conversationID)
 }
 
-func copySafeSpan(source, destination ptrace.Span, trustedModel string, turn trace.SpanContext) {
+func copySafeSpan(
+	source, destination ptrace.Span,
+	trustedModel string,
+	traceID pcommon.TraceID,
+	parentSpanID pcommon.SpanID,
+) {
 	destination.SetName(internalSpanName)
-	destination.SetTraceID(source.TraceID())
-	destination.SetSpanID(source.SpanID())
-	destination.SetParentSpanID(source.ParentSpanID())
+	destination.SetTraceID(traceID)
+	destination.SetSpanID(newSpanID())
+	destination.SetParentSpanID(parentSpanID)
 	destination.SetStartTimestamp(source.StartTimestamp())
 	destination.SetEndTimestamp(source.EndTimestamp())
 	destination.SetKind(source.Kind())
@@ -118,14 +136,6 @@ func copySafeSpan(source, destination ptrace.Span, trustedModel string, turn tra
 	destination.Status().SetCode(source.Status().Code())
 
 	copySafeAttributes(source.Attributes(), destination.Attributes(), trustedModel)
-	copySafeLinks(source.Links(), destination.Links())
-
-	if turn.IsValid() {
-		destination.SetTraceID(pcommon.TraceID(turn.TraceID()))
-		if destination.ParentSpanID().IsEmpty() {
-			destination.SetParentSpanID(pcommon.SpanID(turn.SpanID()))
-		}
-	}
 }
 
 func copySafeAttributes(source, destination pcommon.Map, trustedModel string) {
@@ -204,12 +214,21 @@ func copySafeEnumSlice(
 	}
 }
 
-func copySafeLinks(source, destination ptrace.SpanLinkSlice) {
-	for i := 0; i < source.Len(); i++ {
-		sourceLink := source.At(i)
-		destinationLink := destination.AppendEmpty()
-		destinationLink.SetTraceID(sourceLink.TraceID())
-		destinationLink.SetSpanID(sourceLink.SpanID())
-		destinationLink.SetFlags(sourceLink.Flags())
+func newTraceID() pcommon.TraceID {
+	var id pcommon.TraceID
+	if _, err := rand.Read(id[:]); err == nil && !id.IsEmpty() {
+		return id
 	}
+	binary.BigEndian.PutUint64(id[:8], uint64(time.Now().UnixNano()))
+	binary.BigEndian.PutUint64(id[8:], fallbackIDCounter.Add(1))
+	return id
+}
+
+func newSpanID() pcommon.SpanID {
+	var id pcommon.SpanID
+	if _, err := rand.Read(id[:]); err == nil && !id.IsEmpty() {
+		return id
+	}
+	binary.BigEndian.PutUint64(id[:], fallbackIDCounter.Add(1))
+	return id
 }

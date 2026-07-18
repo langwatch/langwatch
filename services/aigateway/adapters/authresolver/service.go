@@ -59,13 +59,12 @@ const (
 // CacheChange is one cache-invalidation hint surfaced by ChangePoller.
 // Mirrors the wire shape from the control plane's /changes endpoint.
 type CacheChange struct {
-	Kind                 string
-	VirtualKeyID         string
-	BudgetID             string
-	ProviderCredentialID string
-	ModelProviderID      string
-	ProjectID            string
-	Revision             string
+	Kind            string
+	VirtualKeyID    string
+	BudgetID        string
+	ModelProviderID string
+	ProjectID       string
+	Revision        string
 }
 
 // ChangePoller is the upstream that streams cache-invalidation events
@@ -561,21 +560,20 @@ func (s *Service) changeFeedLoop(ctx context.Context) {
 func (s *Service) applyChange(ch CacheChange) {
 	switch ch.Kind {
 	case ChangeKindProviderBindingUpdated:
-		providerID := ch.ModelProviderID
-		if providerID == "" {
-			providerID = ch.ProviderCredentialID
-		}
-		if providerID == "" {
+		// The control plane emits ModelProvider.id. Config materialization puts
+		// that same ID in Credential.ID; ProviderID is only the provider type
+		// (for example "openai") and is not a cache invalidation join key.
+		if ch.ModelProviderID == "" {
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			for _, c := range b.Config.Credentials {
-				if c.ID == providerID {
+				if c.ID == ch.ModelProviderID {
 					return true
 				}
 			}
 			return false
-		}, "model_provider_updated", providerID)
+		}, "model_provider_updated", ch.ModelProviderID)
 	case ChangeKindBudgetCreated, ChangeKindBudgetUpdated, ChangeKindBudgetDeleted:
 		// BUDGET_UPDATED's project_id is the only stable join key
 		// (budget_id alone doesn't appear in the bundle; budgets nest

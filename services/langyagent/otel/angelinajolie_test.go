@@ -116,6 +116,26 @@ func TestInternalCopy_KeepsOnlyTrustedOperationalMetadata(t *testing.T) {
 	assert.NotContains(t, tool, "gen_ai.tool.result")
 }
 
+func TestInternalCopy_PreservesHTTPSpanLatencyMetadata(t *testing.T) {
+	td := workerBatch(t)
+	source := td.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(1)
+	source.SetKind(ptrace.SpanKindClient)
+	source.SetStartTimestamp(pcommon.Timestamp(1_000_000_000))
+	source.SetEndTimestamp(pcommon.Timestamp(1_350_000_000))
+	source.Attributes().PutStr("http.request.method", "POST")
+	source.Attributes().PutInt("http.response.status_code", 201)
+
+	out := InternalCopy(td, "conv-1", trustedModel, turnContext(t))
+	span := out.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(1)
+	attrs := spanAttrsAt(out, 1)
+
+	assert.Equal(t, ptrace.SpanKindClient, span.Kind())
+	assert.Equal(t, source.StartTimestamp(), span.StartTimestamp())
+	assert.Equal(t, source.EndTimestamp(), span.EndTimestamp())
+	assert.Equal(t, "POST", attrs["http.request.method"])
+	assert.Equal(t, "201", attrs["http.response.status_code"])
+}
+
 func TestInternalCopy_RejectsEveryFreeFormOTLPCarrier(t *testing.T) {
 	const secret = "customer-secret-abcdef"
 	td := workerBatch(t)
@@ -160,9 +180,7 @@ func TestInternalCopy_RejectsEveryFreeFormOTLPCarrier(t *testing.T) {
 	assert.Empty(t, outSpan.TraceState().AsRaw())
 	assert.Zero(t, outSpan.Events().Len())
 	assert.Empty(t, outSpan.Status().Message())
-	require.Equal(t, 1, outSpan.Links().Len())
-	assert.Empty(t, outSpan.Links().At(0).TraceState().AsRaw())
-	assert.Zero(t, outSpan.Links().At(0).Attributes().Len())
+	assert.Zero(t, outSpan.Links().Len(), "worker-controlled links must not cross the boundary")
 }
 
 func TestInternalCopy_ReplacesWorkerResourceWithOurIdentity(t *testing.T) {
@@ -197,15 +215,21 @@ func TestInternalCopy_ReparentsOntoTheTurn(t *testing.T) {
 	spans := out.ResourceSpans().At(0).ScopeSpans().At(0).Spans()
 	for i := 0; i < spans.Len(); i++ {
 		assert.Equal(t, pcommon.TraceID(turn.TraceID()), spans.At(i).TraceID())
+		assert.Equal(t, pcommon.SpanID(turn.SpanID()), spans.At(i).ParentSpanID())
 	}
-	assert.Equal(t, pcommon.SpanID(turn.SpanID()), spans.At(0).ParentSpanID())
-	assert.Equal(t, pcommon.SpanID([8]byte{1}), spans.At(1).ParentSpanID())
+	assert.NotEqual(t, pcommon.SpanID([8]byte{1}), spans.At(0).SpanID())
+	assert.NotEqual(t, pcommon.SpanID([8]byte{2}), spans.At(1).SpanID())
 }
 
-func TestInternalCopy_LeavesIDsAloneWithoutATurn(t *testing.T) {
+func TestInternalCopy_RegeneratesWorkerIDsWithoutATurn(t *testing.T) {
 	out := InternalCopy(workerBatch(t), "conv-1", trustedModel, trace.SpanContext{})
 
-	span := out.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0)
-	assert.Equal(t, pcommon.TraceID([16]byte{9}), span.TraceID())
+	spans := out.ResourceSpans().At(0).ScopeSpans().At(0).Spans()
+	assert.NotEqual(t, pcommon.TraceID([16]byte{9}), spans.At(0).TraceID())
+	assert.NotEqual(t, pcommon.SpanID([8]byte{1}), spans.At(0).SpanID())
+	assert.NotEqual(t, pcommon.SpanID([8]byte{2}), spans.At(1).SpanID())
+	assert.Equal(t, spans.At(0).TraceID(), spans.At(1).TraceID())
+	assert.Empty(t, spans.At(0).ParentSpanID())
+	assert.Empty(t, spans.At(1).ParentSpanID())
 	assert.NotContains(t, string(marshalTraces(t, out)), userPrompt)
 }
