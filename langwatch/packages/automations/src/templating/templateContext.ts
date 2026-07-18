@@ -342,7 +342,9 @@ export function buildGraphAlertTemplateContext({
   return {
     trigger: {
       id: trigger.id,
-      name: trigger.name,
+      // tpl5015-005: trigger.name is user-set and lands verbatim in the email
+      // subject. Strip CR/LF so a hostile name can't inject an extra header.
+      name: stripHeaderInjection(trigger.name),
       alertType: trigger.alertType,
       editUrl: buildAutomationEditUrl({ projectUrl, triggerId: trigger.id }),
     },
@@ -479,6 +481,9 @@ export function buildTemplateContext({
   return {
     trigger: {
       ...trigger,
+      // tpl5015-005: trigger.name is user-set and lands verbatim in the email
+      // subject. Strip CR/LF so a hostile name can't inject an extra header.
+      name: stripHeaderInjection(trigger.name),
       editUrl: buildAutomationEditUrl({ projectUrl, triggerId: trigger.id }),
     },
     project: {
@@ -781,7 +786,9 @@ export function buildReportTemplateContext({
   return {
     trigger: {
       id: trigger.id,
-      name: trigger.name,
+      // tpl5015-005: trigger.name is user-set and lands verbatim in the email
+      // subject. Strip CR/LF so a hostile name can't inject an extra header.
+      name: stripHeaderInjection(trigger.name),
       editUrl: buildAutomationEditUrl({ projectUrl, triggerId: trigger.id }),
     },
     report: {

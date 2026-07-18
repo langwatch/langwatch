@@ -5,7 +5,7 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
 } from "../../schemas/constants";
 import type { TraceProcessingEvent } from "../../schemas/events";
-import { passesTraceOriginGuards } from "../_originGuardedSubscriber";
+import { passesTraceOriginGuards } from "../_originGuardedReactor";
 
 const NOW = new Date("2026-07-18T12:00:00.000Z").getTime();
 

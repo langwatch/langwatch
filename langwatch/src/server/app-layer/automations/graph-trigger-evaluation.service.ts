@@ -468,16 +468,26 @@ export async function evaluateGraphTrigger({
         }),
       });
     } catch (dispatchError) {
-      try {
-        await deps.triggerSent.deleteOpenClaim({ id: claim.id, projectId });
-      } catch (cleanupError) {
-        // Best-effort: the dispatch failure is the actionable signal; a
-        // failed rollback must not mask it. The orphaned claim self-heals
-        // when the metric recovers (markResolved frees the identity).
-        logger.error(
-          { triggerId, projectId, customGraphId, error: cleanupError },
-          "Failed to roll back the open graph-alert claim after a dispatch failure — the alert may stay suppressed until the metric recovers",
-        );
+      // A terminal (non-retryable) failure means the endpoint is permanently
+      // broken — keep the claim so the outbox retry's open pre-check backs
+      // off as `already_firing` instead of re-POSTing to a dead receiver on
+      // every subsequent evaluation (specs/automations/webhook-http-action.feature:148).
+      // Only roll back for retryable/unknown errors, where a retry might
+      // still succeed and must be allowed to re-claim.
+      const isTerminal =
+        dispatchError instanceof DispatchError && !dispatchError.retryable;
+      if (!isTerminal) {
+        try {
+          await deps.triggerSent.deleteOpenClaim({ id: claim.id, projectId });
+        } catch (cleanupError) {
+          // Best-effort: the dispatch failure is the actionable signal; a
+          // failed rollback must not mask it. The orphaned claim self-heals
+          // when the metric recovers (markResolved frees the identity).
+          logger.error(
+            { triggerId, projectId, customGraphId, error: cleanupError },
+            "Failed to roll back the open graph-alert claim after a dispatch failure — the alert may stay suppressed until the metric recovers",
+          );
+        }
       }
       throw dispatchError;
     }

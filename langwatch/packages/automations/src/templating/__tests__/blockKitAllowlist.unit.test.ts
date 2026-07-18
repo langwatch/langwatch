@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { filterBlockKit, MAX_SECTION_TEXT_CHARS } from "../blockKitAllowlist";
+import {
+  filterBlockKit,
+  MAX_HEADER_TEXT_CHARS,
+  MAX_MARKDOWN_TEXT_CHARS,
+  MAX_SECTION_TEXT_CHARS,
+} from "../blockKitAllowlist";
 
 describe("filterBlockKit", () => {
   describe("when given a mix of allowed and disallowed blocks", () => {
@@ -18,6 +23,86 @@ describe("filterBlockKit", () => {
         "divider",
         "markdown",
       ]);
+    });
+  });
+
+  // A `markdown` block's `text` is a raw string Slack parses directly — unlike a
+  // text object the template already ran through `mrkdwn_escape`. Passing it
+  // through untouched (the old default branch) let attacker-controlled trace
+  // content forge `<!channel>` broadcasts or `<url|text>` links, so the block
+  // now runs through a sanitiser that escapes the mrkdwn control characters.
+  describe("when a markdown block carries forged broadcast / link mrkdwn", () => {
+    it("escapes &, <, > so <!channel> and <url|text> can't ride in", () => {
+      const [block] = filterBlockKit([
+        { type: "markdown", text: "hi <!channel> & <https://evil|click>" },
+      ]);
+      expect(block?.type).toBe("markdown");
+      expect(block?.text).toBe(
+        "hi &lt;!channel&gt; &amp; &lt;https://evil|click&gt;",
+      );
+    });
+
+    it("leaves ordinary markdown untouched", () => {
+      const [block] = filterBlockKit([
+        { type: "markdown", text: "## Heading\n*bold* [link](https://ok/x)" },
+      ]);
+      expect(block?.text).toBe("## Heading\n*bold* [link](https://ok/x)");
+    });
+  });
+
+  describe("when a markdown block has no usable text", () => {
+    it("drops a markdown block whose text is not a non-empty string", () => {
+      expect(
+        filterBlockKit([
+          { type: "markdown", text: { type: "mrkdwn", text: "x" } },
+          { type: "markdown", text: "" },
+          { type: "markdown" },
+        ]),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a markdown block runs past Slack's character limit", () => {
+    it("caps it to the documented maximum with a visible marker", () => {
+      const [block] = filterBlockKit([
+        { type: "markdown", text: "x".repeat(MAX_MARKDOWN_TEXT_CHARS * 2) },
+      ]);
+      const text = block?.text as string;
+      expect(text.length).toBeLessThanOrEqual(MAX_MARKDOWN_TEXT_CHARS);
+      expect(text).toContain("truncated");
+    });
+  });
+
+  // Slack accepts only a `plain_text` object in a header and rejects the whole
+  // message past 150 characters, so the header now runs through a minimal
+  // sanitiser: the text object is coerced to plain_text and capped.
+  describe("when a header block is present", () => {
+    it("coerces a stray mrkdwn text object to plain_text and caps it", () => {
+      const [block] = filterBlockKit([
+        {
+          type: "header",
+          text: { type: "mrkdwn", text: "H".repeat(MAX_HEADER_TEXT_CHARS * 2) },
+        },
+      ]);
+      expect(block?.type).toBe("header");
+      const text = block?.text as { type: string; text: string };
+      expect(text.type).toBe("plain_text");
+      expect(text.text.length).toBeLessThanOrEqual(MAX_HEADER_TEXT_CHARS);
+      expect(text.text).toContain("truncated");
+    });
+
+    it("keeps a valid plain_text header verbatim", () => {
+      const [block] = filterBlockKit([
+        { type: "header", text: { type: "plain_text", text: "Hi", emoji: true } },
+      ]);
+      expect(block).toEqual({
+        type: "header",
+        text: { type: "plain_text", text: "Hi", emoji: true },
+      });
+    });
+
+    it("drops a header with no valid text object", () => {
+      expect(filterBlockKit([{ type: "header" }])).toEqual([]);
     });
   });
 

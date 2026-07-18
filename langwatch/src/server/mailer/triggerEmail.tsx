@@ -216,6 +216,11 @@ async function sendPerRecipient({
   recordRecipientSent?: (recipientHash: string) => Promise<void>;
 }): Promise<void> {
   const baseHost = env.BASE_HOST;
+  // Defense in depth at the boundary: every template context builder strips
+  // CR/LF from the fields it interpolates, but the subject is assembled from
+  // free-form values in several places — a newline here becomes an injected
+  // SMTP header no matter which builder produced it.
+  subject = subject.replace(/[\r\n\0]+/g, " ");
   const noReplyTo = buildTriggerNoReplyAddress({
     defaultFrom: computeDefaultFrom(),
     triggerId,

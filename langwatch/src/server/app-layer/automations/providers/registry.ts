@@ -59,6 +59,13 @@ export function redactActionParamsFor(
   action: TriggerAction,
   params: unknown,
 ): unknown {
-  const hook = SERVER_PROVIDERS[action].server.redactActionParams;
+  // Fail closed: a legacy row can carry an action value no provider claims
+  // (e.g. after an action is removed). Returning the params unredacted would
+  // leak whatever secrets that action stored; return nothing instead.
+  const entry = SERVER_PROVIDERS[action] as
+    | (typeof SERVER_PROVIDERS)[TriggerAction]
+    | undefined;
+  if (!entry) return {};
+  const hook = entry.server.redactActionParams;
   return hook ? hook(params) : params;
 }

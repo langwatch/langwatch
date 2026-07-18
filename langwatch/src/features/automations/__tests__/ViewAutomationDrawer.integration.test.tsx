@@ -208,6 +208,59 @@ describe("ViewAutomationDrawer", () => {
     });
   });
 
+  describe("given a webhook automation with a failed delivery attempt", () => {
+    beforeEach(() => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "Pager webhook",
+        action: "SEND_WEBHOOK",
+        customGraphId: null,
+        filters: "{}",
+        actionParams: {
+          url: "https://events.example.test/hook",
+          method: "POST",
+          headers: {},
+        },
+      };
+      mockRecentFires = [];
+      mockWebhookDeliveries = [
+        {
+          id: "delivery_1",
+          triggerId: "trigger_1",
+          dispatchId: "dispatch_1",
+          responseStatus: 500,
+          latencyMs: 120,
+          error: null,
+          response: {
+            body: "<script>alert('xss')</script>",
+            headers: { "X-Debug": "<img src=x onerror=alert(1)>" },
+          },
+          outcome: "terminal",
+          firedAt: new Date(Date.now() - HOUR_MS),
+        },
+      ];
+    });
+
+    describe("when the user expands the attempt", () => {
+      it("renders the response body and headers as literal text, not markup", async () => {
+        renderDrawer();
+
+        await userEvent.click(
+          screen.getByRole("button", { name: /HTTP 500/ }),
+        );
+
+        expect(
+          screen.getByText("<script>alert('xss')</script>"),
+        ).toBeDefined();
+        expect(document.querySelector("script")).toBeNull();
+        expect(
+          screen.getByText("X-Debug: <img src=x onerror=alert(1)>"),
+        ).toBeDefined();
+        expect(document.querySelector("img")).toBeNull();
+      });
+    });
+  });
+
   describe("given a graph alert whose incident ran for over an hour", () => {
     beforeEach(() => {
       mockTriggerRow = {

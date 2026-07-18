@@ -399,7 +399,7 @@ async function dispatchNotifyDigest({
         now: new Date(),
         cap: deps.tenantDailyCap,
         recipientCount: recipients.length,
-        dedupKey: `${projectId}:tenant:${dispatchDigest}`,
+        dedupKey: `${projectId}:tenant:${triggerId}:${dispatchDigest}`,
       });
       if (!tenantSlot.allowed) {
         logger.warn(

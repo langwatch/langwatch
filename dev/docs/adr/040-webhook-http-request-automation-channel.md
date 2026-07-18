@@ -8,7 +8,7 @@
 
 Automations today notify through two channels — **Email** (`SEND_EMAIL`) and
 **Slack** (`SEND_SLACK_MESSAGE`). Both are `category: "notify"` providers
-(`src/shared/automations/providers/` + per-side registries, ADR-037), render a customer-authored Liquid
+(`packages/automations/src/providers/` + per-side registries, ADR-037), render a customer-authored Liquid
 template (ADR-036), and ride the ADR-052 automation process managers on the
 trace path and graph-alert dispatch helper on the alert path.
 
@@ -35,7 +35,7 @@ primitive unless fenced. ADR-030 foreshadowed exactly this work:
 
 The framework mostly exists; the job is to *compose* it, not invent it:
 
-- **Provider registry** (`src/shared/automations/providers/types.ts` + per-side registries) — a new channel is
+- **Provider registry** (`packages/automations/src/providers/types.ts` + per-side registries) — a new channel is
   one directory + three registry lines.
 - **SSRF-safe outbound fetch**: `src/utils/ssrfProtection.ts` (`validateUrlForSSRF`
   + `ssrfSafeFetch` + `fetchWithResolvedIp`), with cloud-metadata denylist,
@@ -544,14 +544,26 @@ honored by the GroupQueue as a backoff FLOOR); the stable `X-LangWatch-Event-Id`
 digest — identical across partial-claim retries so receivers dedupe); and a per-project hourly
 dispatch cap (`webhook-dispatch:{projectId}`).
 
-**Phase 4 shipped as a standalone table (§6).** `WebhookDelivery` + a
+**Phase 4 shipped as a standalone table (§6), narrower than planned — no
+request content is persisted at all.** `WebhookDelivery` + a
 `WebhookDeliveryOutcome` enum, one row per attempt written by `deliverWebhook`
-(send + classify + log as a unit), redacted headers (`redactHeadersForLog`
-masks every custom value to `***`), a `getWebhookDeliveries` read procedure,
-the drawer's "Recent deliveries" drill-down, and a 30-day prune. The prune
-originally shipped as a K8s cron (`/api/cron/webhook_delivery_cleanup`); it now
-runs as the daily `webhookDeliveryPrune` scheduled process manager on the
-worker (ADR-052), and the cron route + chart CronJob were removed along with
+(`src/server/app-layer/automations/delivery/deliverWebhook.ts`, send +
+classify + log as a unit). Unlike the §6 shape above, the row carries no
+`requestMethod`/`requestUrl`/`requestHeaders` — only `responseStatus`,
+`latencyMs`, `error`, and, on a failed attempt, the receiver's truncated
+failure `response` (`{ body, headers, retryAfterMs }`, capped at 4 KB). Every
+configured header *value* is scrubbed out of `error` and `response` via
+`scrubHeaderValues` (`deliverWebhook.ts:30`, string-replace of each
+configured header's value with `***`) before the row is written — there is no
+`redactHeadersForLog` function. The scrub is deliberately best-effort exact
+match: a receiver that echoes the secret re-encoded (base64, URL-encoded,
+case-folded) evades it, an accepted residual of the industry-baseline
+plaintext decision — a receiver leaking its caller's own secret back in a
+transformed form is the receiver's bug, and the row is plaintext precisely so
+operators can see what the receiver actually said. A `getWebhookDeliveries` read procedure feeds
+the drawer's "Recent deliveries" drill-down, and a 30-day prune runs as the
+daily `webhookDeliveryPrune` scheduled process manager on the worker
+(ADR-052); the K8s cron cleanup route + chart CronJob were removed along with
 the rest of the automations cron machinery.
 
 > **Known design debt / future direction.** `WebhookDelivery` is a
@@ -598,5 +610,6 @@ and the `ProjectSecret`-ref auth union — the only remaining Phase 2 gap.
   encryption-at-rest pattern for the HMAC secret and auth tokens.
 - `src/server/mailer/unsubscribeToken.ts` / `triggerNoReply.ts` — HMAC keyed-hash +
   `timingSafeEqual` pattern the signature follows.
-- `src/shared/automations/providers/` + per-side registries — (`types.ts`, `registry.ts`,
-  `server.ts`) and the Slack definition the webhook provider is shaped after.
+- `packages/automations/src/providers/` (the `@langwatch/automations` workspace
+  package) + per-side registries — (`types.ts`, `registry.ts`, `server.ts`) and
+  the Slack definition the webhook provider is shaped after.
