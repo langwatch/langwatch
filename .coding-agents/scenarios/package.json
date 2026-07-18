@@ -1,0 +1,20 @@
+{
+  "name": "@langwatch/coding-agent-scenarios",
+  "version": "1.0.0",
+  "description": "Scenario tests for coding agent skills (go-engineer, ts-engineer)",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:ui": "vitest ui"
+  },
+  "dependencies": {
+    "@langwatch/scenario": "^0.4.12"
+  },
+  "devDependencies": {
+    "@ai-sdk/openai": "^3.0.26",
+    "dotenv": "^16.4.5",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
