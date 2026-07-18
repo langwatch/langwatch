@@ -47,8 +47,8 @@ gopls workspace/packages                  # list packages
 
 ### Refactor
 ```bash
-gopls rename            file.go:line:col NewName --dry-run  # ALWAYS dry-run first
-gopls rename            file.go:line:col NewName
+gopls rename -d         file.go:line:col NewName             # ALWAYS preview first
+gopls rename -w         file.go:line:col NewName             # apply edits
 gopls organize_imports file.go            # fix imports
 ```
 
@@ -68,8 +68,8 @@ gopls diagnostics                        # check workspace
 ### Safe Rename
 ```bash
 gopls references src/pkg/utils.go:25:6       # review impact
-gopls rename src/pkg/utils.go:25:6 NewName --dry-run
-gopls rename src/pkg/utils.go:25:6 NewName
+gopls rename -d src/pkg/utils.go:25:6 NewName
+gopls rename -w src/pkg/utils.go:25:6 NewName
 gopls diagnostics src/pkg/                   # verify
 ```
 
@@ -82,7 +82,7 @@ gopls diagnostics src/api/                   # verify
 ```
 
 ## Tips
-1. **Always --dry-run first** for renames
+1. **Always use `-d` to preview a rename before `-w` applies it**
 2. **Verify with diagnostics** after edits
 3. Column numbers are **byte offsets**, not character counts
 4. gopls uses `go` command from PATH - ensure correct Go version
