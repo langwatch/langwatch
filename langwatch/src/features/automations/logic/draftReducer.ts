@@ -15,8 +15,8 @@ import {
   type GraphAlertOperator,
   type GraphAlertTimePeriod,
   extractGraphAlertFromTriggerRow as parseGraphAlertRow,
-} from "~/server/app-layer/triggers/graph-alert.builder";
-import { reportSourceSchema } from "~/server/app-layer/triggers/report.builder";
+} from "~/server/app-layer/automations/graph-alert.builder";
+import { reportSourceSchema } from "~/server/app-layer/automations/report.builder";
 import type { FilterField } from "~/server/filters/types";
 import { describeCron, isValidCron } from "./reportSchedule";
 

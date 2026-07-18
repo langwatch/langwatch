@@ -1,5 +1,5 @@
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { AutomationAuditRepository } from "~/server/app-layer/triggers/repositories/automation-audit.repository";
+import type { AutomationAuditRepository } from "~/server/app-layer/automations/repositories/automation-audit.repository";
 
 import type {
   AppendStore,

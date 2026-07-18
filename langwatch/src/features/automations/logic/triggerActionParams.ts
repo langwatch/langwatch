@@ -1,7 +1,7 @@
 import type {
   GraphAlertOperator,
   GraphAlertTimePeriod,
-} from "~/server/app-layer/triggers/graph-alert.builder";
+} from "~/server/app-layer/automations/graph-alert.builder";
 
 /**
  * Client-side display typing for a `Trigger` row's `actionParams` JSON. The

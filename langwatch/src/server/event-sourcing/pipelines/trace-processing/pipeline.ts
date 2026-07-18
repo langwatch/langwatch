@@ -1,6 +1,6 @@
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/app-layer/triggers/subscribers/graphTriggerActivity.subscriber";
+import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { definePipeline } from "../../";
 import type { TriggerContext } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";

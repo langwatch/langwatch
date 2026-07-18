@@ -158,4 +158,4 @@ We do not block the management surface on the deferred dispatch wiring: the alwa
 - [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — `TriggerSent` + `ReactorOutbox` schemas the dispatch-health view reads; `subjectId` extension
 - [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence + debounce columns the cadence secondary edits
 - [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — Liquid templates + test-fire banner the Configuration secondary edits
-- Code touched: `src/components/AddAutomationDrawer.tsx`, `src/components/EditTriggerTemplatesDrawer.tsx`, `src/pages/[project]/automations.tsx`, `src/server/api/routers/automations.ts`, `src/server/app-layer/triggers/trigger-template.service.ts`, `src/automations/**`, `src/features/automations/**`
+- Code touched: `src/components/AddAutomationDrawer.tsx`, `src/components/EditTriggerTemplatesDrawer.tsx`, `src/pages/[project]/automations.tsx`, `src/server/api/routers/automations.ts`, `src/server/app-layer/automations/trigger-template.service.ts`, `src/automations/**`, `src/features/automations/**`

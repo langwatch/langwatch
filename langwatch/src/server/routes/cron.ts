@@ -9,7 +9,7 @@ import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { scheduleTopicClustering } from "~/server/topicClustering/topicClusteringQueue";
-import { WebhookDeliveryService } from "~/server/app-layer/triggers/webhook-delivery.service";
+import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import { captureException, toError } from "~/utils/posthogErrorCapture";

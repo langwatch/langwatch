@@ -26,7 +26,7 @@ import {
   type ProjectStorageDestination,
   redactStorageUrisInText,
 } from "../../../stored-objects/project-storage-destination";
-import { isDispatchError } from "../../../triggers/dispatchError";
+import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,

@@ -14,14 +14,14 @@ import { actionParamsSchemaFor } from "~/automations/providers/server";
 import { getApp } from "~/server/app-layer/app";
 import { HandledError } from "~/server/app-layer/handled-error";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
-import { listSlackChannels } from "~/server/triggers/slackWebApi";
+import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
 import {
   InvalidEmailRecipientError,
   MissingAnnotatorError,
   NotificationDeliveryError,
   ProjectNotFoundError,
-} from "~/server/app-layer/triggers/errors";
-import { isDispatchError } from "~/server/triggers/dispatchError";
+} from "~/server/app-layer/automations/errors";
+import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import {
   decryptSlackBotToken,
   persistSlackActionParams,
@@ -46,19 +46,19 @@ import {
   buildGraphAlertTriggerData,
   type GraphAlertActionParams,
   graphAlertActionParamsSchema,
-} from "~/server/app-layer/triggers/graph-alert.builder";
+} from "~/server/app-layer/automations/graph-alert.builder";
 import {
   buildReportTriggerData,
   extractReportFromTriggerRow,
   reportActionParamsSchema,
-} from "~/server/app-layer/triggers/report.builder";
-import { TriggerFireHistoryService } from "~/server/app-layer/triggers/trigger-fire-history.service";
+} from "~/server/app-layer/automations/report.builder";
+import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
 import {
   type DraftProject,
   validateTemplateDraft,
-} from "~/server/app-layer/triggers/trigger-template.service";
-import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/triggers/dispatch/triggerActionDispatch";
-import { WebhookDeliveryService } from "~/server/app-layer/triggers/webhook-delivery.service";
+} from "~/server/app-layer/automations/trigger-template.service";
+import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
+import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
 import { featureFlagService } from "~/server/featureFlag";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {

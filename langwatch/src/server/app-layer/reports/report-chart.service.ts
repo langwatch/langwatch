@@ -11,7 +11,7 @@ import {
   extractGroupTotals,
   extractSeriesPoints,
 } from "~/server/app-layer/analytics/series-points";
-import type { ReportSource } from "~/server/app-layer/triggers/report.builder";
+import type { ReportSource } from "~/server/app-layer/automations/report.builder";
 import type { ReportChart } from "~/shared/templating/templateContext";
 
 /**

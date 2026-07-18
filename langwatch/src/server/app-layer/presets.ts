@@ -21,7 +21,7 @@ import { getPostHogInstance } from "~/server/posthog";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { createS3Client } from "~/server/storage";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
-import { liveTriggerNotifier } from "~/server/triggers/triggerNotifier";
+import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
@@ -57,10 +57,10 @@ import { loadReportCharts } from "./reports/report-chart.service";
 import { dispatchScheduledReport } from "./reports/report-dispatch";
 import { toReportTraceRow } from "./reports/trace-report-row";
 import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
-import { REPORT_SCHEDULER_TARGET_TYPE } from "./triggers/report.builder";
+import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
-import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
-import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
+import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
+import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { EventSourcing } from "../event-sourcing";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
@@ -224,22 +224,22 @@ import {
 import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import { traced } from "./tracing";
-import { EmailSuppressionService } from "./triggers/emailSuppression.service";
-import { buildAutomationDispatchPorts } from "./triggers/dispatch/automationDispatch.wiring";
-import { ClickHouseAutomationAuditRepository } from "./triggers/repositories/automation-audit.clickhouse.repository";
-import { NullAutomationAuditRepository } from "./triggers/repositories/automation-audit.repository";
+import { EmailSuppressionService } from "./automations/emailSuppression.service";
+import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
+import { ClickHouseAutomationAuditRepository } from "./automations/repositories/automation-audit.clickhouse.repository";
+import { NullAutomationAuditRepository } from "./automations/repositories/automation-audit.repository";
 import {
   PrismaEmailSuppressionNameLookupRepository,
   PrismaEmailSuppressionRepository,
-} from "./triggers/repositories/emailSuppression.prisma.repository";
+} from "./automations/repositories/emailSuppression.prisma.repository";
 import {
   NullEmailSuppressionNameLookupRepository,
   NullEmailSuppressionRepository,
-} from "./triggers/repositories/emailSuppression.repository";
-import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
-import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
-import { TriggerService } from "./triggers/trigger.service";
-import { testFireTrigger } from "./triggers/trigger-template.service";
+} from "./automations/repositories/emailSuppression.repository";
+import { PrismaTriggerRepository } from "./automations/repositories/trigger.prisma.repository";
+import { NullTriggerRepository } from "./automations/repositories/trigger.repository";
+import { TriggerService } from "./automations/trigger.service";
+import { testFireTrigger } from "./automations/trigger-template.service";
 import { UsageService } from "./usage/usage.service";
 
 /**

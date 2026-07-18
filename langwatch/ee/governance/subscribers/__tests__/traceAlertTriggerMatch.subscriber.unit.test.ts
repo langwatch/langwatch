@@ -3,7 +3,7 @@
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
+import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";

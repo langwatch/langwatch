@@ -1,16 +1,16 @@
 import type { Project, Trigger } from "@prisma/client";
 import { Cron } from "croner";
 import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
-import { extractReportFromTriggerRow } from "~/server/app-layer/triggers/report.builder";
-import type { ReportSource } from "~/server/app-layer/triggers/report.builder";
+import { extractReportFromTriggerRow } from "~/server/app-layer/automations/report.builder";
+import type { ReportSource } from "~/server/app-layer/automations/report.builder";
 import { decryptSlackBotToken } from "~/automations/providers/definitions/slack/secret";
 import {
   type SlackActionParams,
   slackDeliveryMethodOf,
 } from "~/automations/providers/definitions/slack/shared";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
-import type { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
-import type { postSlackChatMessage } from "~/server/triggers/slackWebApi";
+import type { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
+import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { REPORT_TRIGGER_DEFAULTS } from "~/shared/templating/defaults";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import {

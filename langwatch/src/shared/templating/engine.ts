@@ -55,7 +55,7 @@ export function getLiquidEngine(): Liquid {
     });
     // Slack mrkdwn escaping for user-controlled content (trace input/output,
     // evaluation labels). Mirrors `escapeMrkdwn` in the legacy Slack webhook
-    // path (src/server/triggers/sendSlackWebhook.ts): Slack treats only `&`,
+    // path (src/server/app-layer/automations/delivery/sendSlackWebhook.ts): Slack treats only `&`,
     // `<`, `>` as control characters in message text, so escaping them stops
     // user-authored content from forging mrkdwn links (`<https://evil|click>`)
     // or broadcasts (`<!channel>`). See the Slack-mrkdwn-injection finding;

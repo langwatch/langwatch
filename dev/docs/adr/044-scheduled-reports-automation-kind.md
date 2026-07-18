@@ -585,7 +585,7 @@ for the other kinds.
 - PR #5015 (`feat(automations): graph alerts in automations drawer + Liquid template
   wiring`) — the kind-aware drawer, `graphAlert` sub-shape, and
   `graph-trigger-evaluation.service.ts` this report generalizes.
-- `src/server/app-layer/triggers/graph-trigger-evaluation.service.ts` — the
+- `src/server/app-layer/automations/graph-trigger-evaluation.service.ts` — the
   server-side "stored graph → `getTimeseries`" evaluator the report render extends
   from one series to many.
 - `src/server/dashboards/dashboard.repository.ts` / `prisma/schema.prisma`

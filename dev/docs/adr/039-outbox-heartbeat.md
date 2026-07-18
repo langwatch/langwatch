@@ -67,4 +67,4 @@ This ADR is framework-primitive; the first consumer's specifics live here as imp
 
 - Registry + types: `src/server/event-sourcing/outbox/heartbeat/heartbeat.registry.ts`, `heartbeat.types.ts`.
 - Scheduler: `src/server/event-sourcing/outbox/heartbeat/heartbeat.scheduler.ts`.
-- First consumer (graph triggers): `src/server/app-layer/triggers/graph-trigger-heartbeat.ts`, registered from the worker bootstrap in `src/server/app-layer/presets.ts`.
+- First consumer (graph triggers): `src/server/app-layer/automations/graph-trigger-heartbeat.ts`, registered from the worker bootstrap in `src/server/app-layer/presets.ts`.

@@ -52,15 +52,15 @@ import type { SpanStorageService } from "../app-layer/traces/span-storage.servic
 import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../app-layer/traces/types";
-import type { TriggerService } from "../app-layer/triggers/trigger.service";
-import type { AutomationAuditRepository } from "../app-layer/triggers/repositories/automation-audit.repository";
-import type { AutomationDispatchPorts } from "../app-layer/triggers/dispatch/automationDispatch.wiring";
+import type { TriggerService } from "../app-layer/automations/trigger.service";
+import type { AutomationAuditRepository } from "../app-layer/automations/repositories/automation-audit.repository";
+import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import {
   graphAlertSweepPM,
   triggerSettlementPM,
-} from "../app-layer/triggers/process-manager";
-import { createEvaluationAlertTriggerMatchHandler } from "../app-layer/triggers/subscribers/evaluationAlertTriggerMatch.subscriber";
-import { createGraphTriggerActivityHandler } from "../app-layer/triggers/subscribers/graphTriggerActivity.subscriber";
+} from "../event-sourcing/pipelines/automations/process-manager";
+import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
+import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
 import { type CommandDispatcher, Deferred } from "./deferred";

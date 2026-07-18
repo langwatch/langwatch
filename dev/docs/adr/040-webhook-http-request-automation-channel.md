@@ -292,7 +292,7 @@ atomic `ssrfSafeFetch`), the primitive `httpProxy.ts:187` already ships to prod.
   the whole worker pool waiting on 10-second timeouts.
 
 **Where the sender lives:** a single reusable module
-`src/server/triggers/sendWebhook.ts` (sibling to `sendSlackWebhook.ts`), wrapping
+`src/server/app-layer/automations/delivery/sendWebhook.ts` (sibling to `sendSlackWebhook.ts`), wrapping
 `ssrfProtection` + signing + size/timeout caps + `DispatchError` classification
 (`toDispatchError`, `sendSlackWebhook.ts:143`). This is the "one outbound utility
 every future customer-webhook dispatch shares" ADR-030 asked for.

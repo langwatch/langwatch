@@ -13,7 +13,7 @@ import {
   GRAPH_ALERT_TIME_PERIODS,
   type GraphAlertOperator,
   type GraphAlertTimePeriod,
-} from "~/server/app-layer/triggers/graph-alert.builder";
+} from "~/server/app-layer/automations/graph-alert.builder";
 import {
   type AutomationDraft,
   cadenceIsSet,
