@@ -1,8 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GraphEvalStagePayload } from "~/server/event-sourcing/outbox/payload";
-import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import {
   decideGraphTriggerHeartbeat,
   defaultCandidateSources,
@@ -60,12 +58,6 @@ function makeTriggersService(
     updateLastRunAt: vi.fn(),
     invalidate: vi.fn(),
   } as unknown as TriggerService;
-}
-
-function makeFlagsAllOn(): FeatureFlagServiceInterface {
-  return {
-    isEnabled: vi.fn(async () => true),
-  };
 }
 
 function makeSources(overrides: {
@@ -127,31 +119,19 @@ describe("decideGraphTriggerHeartbeat", () => {
     chStub = makeClickHouseStub({});
   });
 
-  describe("given no flagged projects", () => {
+  describe("given no candidate projects", () => {
     it("returns no enqueues", async () => {
-      const triggers = makeTriggersService({
-        [PROJECT_A]: [
-          makeTrigger(TRIGGER_NO_DATA, PROJECT_A, {
-            threshold: 1,
-            operator: "lt",
-            timePeriod: 5,
-          }),
-        ],
-      });
-      const flags: FeatureFlagServiceInterface = {
-        isEnabled: vi.fn(async () => false),
-      };
+      const triggers = makeTriggersService({});
       deps = {
         triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
-        featureFlagService: flags,
         lookupTriggerSource: async () => "trace" as const,
       };
 
       const result = await decideGraphTriggerHeartbeat({
         deps,
-        sources: makeSources({ graphProjects: [PROJECT_A] }),
+        sources: makeSources({ graphProjects: [] }),
         now,
       });
 
@@ -174,7 +154,6 @@ describe("decideGraphTriggerHeartbeat", () => {
         triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
-        featureFlagService: makeFlagsAllOn(),
         lookupTriggerSource: async () => "trace" as const,
       };
 
@@ -204,7 +183,6 @@ describe("decideGraphTriggerHeartbeat", () => {
         triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
-        featureFlagService: makeFlagsAllOn(),
         lookupTriggerSource: async () => "trace" as const,
       };
 
@@ -215,12 +193,9 @@ describe("decideGraphTriggerHeartbeat", () => {
       });
 
       expect(result).toHaveLength(1);
-      const payload = result[0]?.payload as unknown as GraphEvalStagePayload;
-      expect(payload.reason).toBe("heartbeat-absence");
-      expect(payload.triggerId).toBe(TRIGGER_NO_DATA);
-      expect(result[0]?.dedupKey).toBe(
-        `${PROJECT_A}/${TRIGGER_NO_DATA}:graph:hb`,
-      );
+      expect(result[0]?.reason).toBe("heartbeat-absence");
+      expect(result[0]?.triggerId).toBe(TRIGGER_NO_DATA);
+      expect(result[0]?.projectId).toBe(PROJECT_A);
     });
   });
 
@@ -241,7 +216,6 @@ describe("decideGraphTriggerHeartbeat", () => {
         triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
-        featureFlagService: makeFlagsAllOn(),
         lookupTriggerSource: async () => "trace" as const,
       };
 
@@ -273,7 +247,6 @@ describe("decideGraphTriggerHeartbeat", () => {
         triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
-        featureFlagService: makeFlagsAllOn(),
         lookupTriggerSource: async () => "trace" as const,
       };
 
@@ -286,9 +259,8 @@ describe("decideGraphTriggerHeartbeat", () => {
       });
 
       expect(result).toHaveLength(1);
-      const payload = result[0]?.payload as unknown as GraphEvalStagePayload;
-      expect(payload.reason).toBe("heartbeat-resolve");
-      expect(payload.triggerId).toBe(TRIGGER_OPEN);
+      expect(result[0]?.reason).toBe("heartbeat-resolve");
+      expect(result[0]?.triggerId).toBe(TRIGGER_OPEN);
     });
   });
 
@@ -318,7 +290,6 @@ describe("decideGraphTriggerHeartbeat", () => {
         triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
-        featureFlagService: makeFlagsAllOn(),
         lookupTriggerSource: async () => "trace" as const,
       };
 

@@ -1,6 +1,7 @@
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/app-layer/triggers/subscribers/graphTriggerActivity.subscriber";
 import { definePipeline } from "../../";
-import type { OutboxReactorDefinition } from "../../outbox/outboxReactor.types";
+import type { TriggerContext } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
@@ -19,6 +20,10 @@ import {
   type EvaluationAnalyticsRollupRow,
 } from "./projections/evaluationAnalyticsRollup.mapProjection";
 import { EvaluationRunFoldProjection } from "./projections/evaluationRun.foldProjection";
+import {
+  EVALUATION_COMPLETED_EVENT_TYPE,
+  EVALUATION_REPORTED_EVENT_TYPE,
+} from "./schemas/constants";
 import type { EvaluationProcessingEvent } from "./schemas/events";
 
 export interface EvaluationProcessingPipelineDeps {
@@ -30,32 +35,16 @@ export interface EvaluationProcessingPipelineDeps {
    *  `traceAnalyticsRollupAppendStore`). */
   evaluationAnalyticsRollupAppendStore: AppendStore<EvaluationAnalyticsRollupRow>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
-  /** PERSIST-class branch of the evaluation alert trigger, routed
-   *  through the framework's `.withOutbox` plumbing (ADR-030 + ADR-035).
-   *  Emits settle payloads stamped `actionClass: "persist"`. */
-  evaluationAlertTriggerReactor: OutboxReactorDefinition<
-    EvaluationProcessingEvent,
-    EvaluationRunData
-  >;
-  /** NOTIFY-class branch of the evaluation alert trigger, routed
-   *  through the framework's `.withOutbox` plumbing (ADR-030). */
-  evaluationAlertTriggerNotifyOutboxReactor: OutboxReactorDefinition<
-    EvaluationProcessingEvent,
-    EvaluationRunData
-  >;
-  /**
-   * ADR-034 Phase 6: real-time path for eval-metric custom-graph threshold
-   * alerts. Attached on `evaluationAnalytics` (the slim eval fold) so it
-   * fires on every slim-fold update; debounced per (triggerId, projectId)
-   * inside the reactor's `decide`. Flag-gated per project via the same
-   * `release_es_graph_triggers_firing` flag the trace pipeline uses —
-   * disabled = empty decide; cron handles the project's graph triggers
-   * as today.
-   */
-  graphTriggerEvaluationOutboxReactor: OutboxReactorDefinition<
-    EvaluationProcessingEvent,
-    EvaluationAnalyticsData
-  >;
+  automations: {
+    triggerMatchHandler: (
+      event: EvaluationProcessingEvent,
+      context: TriggerContext<EvaluationRunData>,
+    ) => Promise<void>;
+    graphActivityHandler: (
+      event: EvaluationProcessingEvent,
+      context: { tenantId: string },
+    ) => Promise<void>;
+  };
   customerIoEvaluationSyncReactor?: ReactorDefinition<
     EvaluationProcessingEvent,
     EvaluationRunData
@@ -98,21 +87,32 @@ export function createEvaluationProcessingPipeline(
         store: deps.evaluationAnalyticsRollupAppendStore,
       }),
     )
-    .withOutbox(
-      "evaluationRun",
-      "evaluationAlertTrigger",
-      deps.evaluationAlertTriggerReactor,
-    )
-    .withOutbox(
-      "evaluationRun",
-      "evaluationAlertTriggerNotifyOutbox",
-      deps.evaluationAlertTriggerNotifyOutboxReactor,
-    )
-    .withOutbox(
-      "evaluationAnalytics",
-      "graphTriggerEvaluation",
-      deps.graphTriggerEvaluationOutboxReactor,
-    );
+    .withSubscriber("triggerMatch", {
+      fold: "evaluationRun",
+      events: [
+        EVALUATION_COMPLETED_EVENT_TYPE,
+        EVALUATION_REPORTED_EVENT_TYPE,
+      ],
+      delay: 10_000,
+      ttl: 30_000,
+      handler: (event, context) =>
+        deps.automations.triggerMatchHandler(event, context),
+    })
+    .withSubscriber("graphTriggerActivity", {
+      events: [
+        EVALUATION_COMPLETED_EVENT_TYPE,
+        EVALUATION_REPORTED_EVENT_TYPE,
+      ],
+      delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+      dedup: {
+        makeId: (event) => `graph-trigger-activity:${event.tenantId}`,
+        ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+        extend: false,
+        replace: false,
+      },
+      handler: (event, context) =>
+        deps.automations.graphActivityHandler(event, context),
+    });
 
   if (deps.customerIoEvaluationSyncReactor) {
     builder = builder.withReactor(

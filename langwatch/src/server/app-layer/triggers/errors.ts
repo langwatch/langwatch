@@ -38,7 +38,7 @@ export class TestFireUnavailableError extends HandledError {
   declare readonly code: "test_fire_unavailable";
 
   constructor(
-    public readonly channel: "email" | "slack",
+    public readonly channel: "email" | "slack" | "webhook",
     /** Why the test fire can't be sent (no recipients, no webhook, …). */
     reason: string,
   ) {

@@ -15,8 +15,8 @@ the distinction out loud:
 - **Condition-triggered** — a custom-graph metric crosses a threshold; an incident
   opens on breach and resolves on recovery. Stored as a `Trigger` with a non-null
   `customGraphId` FK, evaluated by the real-time outbox reactor + the 30 s
-  graph-trigger heartbeat (ADR-034 Ph 5) or the legacy `/api/cron/triggers` sweep
-  (`src/server/routes/cron.ts:205`).
+  graph-trigger heartbeat (ADR-034 Ph 5 — now the sole path; the K8s
+  `/api/cron/triggers` sweep was removed once every project cut over).
 
 Customers keep asking for a **third** shape neither covers: *"every Monday 09:00,
 post my evals dashboard to #quality"*, *"daily 07:00, the top-5 error traces from
@@ -394,9 +394,9 @@ guarantee lives in the scheduler*, so every future consumer inherits it.
 - The scheduler **never** replays every missed slot — the per-slot claim makes it
   *possible*, but a stampede of stale fires is worse than a gap.
 
-Why not the K8s `/api/cron/triggers` sweep: it is project-blind, coarse (3-minute),
-and being migrated *off* (ADR-034 Ph 5). 60 s granularity is ample for calendar
-reports.
+Why not the K8s `/api/cron/triggers` sweep: it was project-blind, coarse
+(3-minute), and has since been removed (ADR-034 Ph 5 — the graph-alert cron is
+gone). 60 s granularity is ample for calendar reports.
 
 ---
 

@@ -7,9 +7,8 @@
  * that needs the watched series must therefore resolve it by index against the
  * live graph, never by position 0.
  *
- * The cron (`pages/api/cron/triggers/customGraphTrigger.ts`), the event-sourced
- * evaluator, and the heartbeat's source classifier all parse this string, so it
- * lives here rather than being re-derived at each call site.
+ * The event-sourced evaluator and the heartbeat's source classifier both parse
+ * this string, so it lives here rather than being re-derived at each call site.
  */
 
 /**

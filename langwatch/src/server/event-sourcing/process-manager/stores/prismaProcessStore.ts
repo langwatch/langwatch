@@ -290,11 +290,16 @@ export class PrismaProcessStore implements ProcessStore {
     now: number;
     limit: number;
     leaseDurationMs: number;
+    processNames?: readonly string[];
   }): Promise<LeasedOutboxMessageRecord[]> {
     if (params.limit <= 0) return [];
+    if (params.processNames && params.processNames.length === 0) return [];
     const now = asDate(params.now);
     const leasedUntil = asDate(params.now + params.leaseDurationMs);
     const leaseBatchToken = nanoid();
+    const processNameFilter = params.processNames
+      ? Prisma.sql`AND "processName" IN (${Prisma.join([...params.processNames])})`
+      : Prisma.empty;
     const rows = await this.prisma.$transaction(async (tx) => {
       return await tx.$queryRaw<ProcessManagerOutbox[]>(Prisma.sql`
         WITH candidates AS (
@@ -303,6 +308,7 @@ export class PrismaProcessStore implements ProcessStore {
           WHERE "status" = 'pending'::"ProcessManagerOutboxStatus"
             AND "nextAttemptAt" <= ${now}
             AND ("leasedUntil" IS NULL OR "leasedUntil" <= ${now})
+            ${processNameFilter}
           ORDER BY "nextAttemptAt" ASC, "createdAt" ASC, "id" ASC
           FOR UPDATE SKIP LOCKED
           LIMIT ${params.limit}
@@ -397,5 +403,19 @@ export class PrismaProcessStore implements ProcessStore {
             },
           ],
     );
+  }
+
+  async deleteDispatchedBefore(params: {
+    processName: string;
+    before: number;
+  }): Promise<number> {
+    const result = await this.prisma.processManagerOutbox.deleteMany({
+      where: {
+        processName: params.processName,
+        status: "dispatched",
+        dispatchedAt: { lt: asDate(params.before) },
+      },
+    });
+    return result.count;
   }
 }

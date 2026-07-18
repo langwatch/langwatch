@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DispatchError } from "../../../outbox/dispatchError";
+import { DispatchError } from "../../../../triggers/dispatchError";
 import {
   ConfigurationError,
   categorizeError,

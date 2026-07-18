@@ -1,5 +1,12 @@
-import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
-import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import {
+  DispatchError,
+  parseRetryAfterMs,
+} from "~/server/triggers/dispatchError";
+import {
+  fetchWithResolvedIp,
+  ssrfSafeFetch,
+  type SSRFValidationResult,
+} from "~/utils/ssrfProtection";
 
 /** Total-request timeout — a slowloris endpoint can't pin a worker slot. */
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -25,12 +32,25 @@ export interface HttpDestinationRequest {
   maxResponseBytes?: number;
   /** Short label woven into DispatchError messages (e.g. the trigger name). */
   contextLabel: string;
+  /**
+   * Override the SSRF validator — e.g. a `createSSRFValidator({ blockLocal:
+   * true, allowedHosts: [] })` instance that blocks private IPs regardless of
+   * the global BLOCK_LOCAL_HTTP_CALLS toggle (ADR-040 §4). When set, redirects
+   * are NOT followed: hop re-validation inside `fetchWithResolvedIp` uses the
+   * default (env-gated) validator, so following a redirect would silently drop
+   * back to the weaker policy. A 3xx with a Location throws terminally; a
+   * bare 3xx is returned to the caller to classify.
+   */
+  validateUrl?: (url: string) => Promise<SSRFValidationResult>;
 }
 
 export interface HttpDestinationResponse {
   status: number;
   /** Response body, truncated at {@link HttpDestinationRequest.maxResponseBytes}. */
   body: string;
+  /** Parsed `Retry-After` (ms) when the receiver sent one — a backpressure
+   *  hint the caller can fold into its retry backoff (ADR-040 §5). */
+  retryAfterMs?: number;
 }
 
 type ResponseBodyStream = Awaited<ReturnType<typeof ssrfSafeFetch>>["body"];
@@ -102,10 +122,11 @@ export async function sendHttpDestination({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES,
   contextLabel,
+  validateUrl,
 }: HttpDestinationRequest): Promise<HttpDestinationResponse> {
   let response: Awaited<ReturnType<typeof ssrfSafeFetch>>;
   try {
-    response = await ssrfSafeFetch(url, {
+    const init = {
       method,
       headers,
       body,
@@ -115,13 +136,25 @@ export async function sendHttpDestination({
       // on every one of up to 10 redirect hops.
       headersTimeoutMs: timeoutMs,
       bodyTimeoutMs: timeoutMs,
-    });
+    };
+    if (validateUrl) {
+      const validated = await validateUrl(url);
+      // Redirects are refused outright: a hop would re-validate through the
+      // weaker default policy (see `validateUrl` on the request type).
+      response = await fetchWithResolvedIp(validated, {
+        ...init,
+        followRedirects: false,
+      });
+    } else {
+      response = await ssrfSafeFetch(url, init);
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    // An SSRF rejection is a permanent misconfiguration; DNS / connection /
-    // timeout failures are transient and worth a retry.
+    // An SSRF rejection is a permanent misconfiguration (as is a redirect on
+    // the strict-validator path — the endpoint's shape, not a blip); DNS /
+    // connection / timeout failures are transient and worth a retry.
     const ssrfBlocked =
-      /ssrf|blocked|not allowed|private|loopback|metadata|link-local|disallowed/i.test(
+      /ssrf|blocked|not allowed|private|loopback|metadata|link-local|disallowed|redirects are not followed|too many redirects/i.test(
         message,
       );
     throw new DispatchError({
@@ -141,5 +174,9 @@ export async function sendHttpDestination({
     // carries the outcome; leave the snippet empty.
   }
 
-  return { status: response.status, body: responseBody };
+  return {
+    status: response.status,
+    body: responseBody,
+    retryAfterMs: parseRetryAfterMs(response.headers?.get("retry-after")),
+  };
 }

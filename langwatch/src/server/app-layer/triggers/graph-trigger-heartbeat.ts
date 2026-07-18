@@ -1,34 +1,31 @@
 /**
- * ADR-034 Phase 5 — heartbeat path for custom-graph threshold alerts.
+ * ADR-034 Phase 5 — heartbeat sweep for custom-graph threshold alerts,
+ * driven by the graphAlertSweep process every 30 seconds (ADR-052 §4; the
+ * locked Phase 5 cadence). Every sweep:
  *
- * Registered as an `OutboxHeartbeatRegistry` entry that ticks every
- * 30 seconds (the locked Phase 5 cadence). Worker-only at runtime; the
- * scheduler no-ops on web. Every tick:
- *
- *   1. For each project with `release_es_graph_triggers_firing` ON,
- *      load (a) active triggers whose operator/threshold combination
- *      matches `isNoDataPredicate`, plus (b) active triggers with at
- *      least one unresolved `TriggerSent` row. Union = candidates.
+ *   1. For each project with graph triggers, load (a) active triggers
+ *      whose operator/threshold combination matches `isNoDataPredicate`,
+ *      plus (b) active triggers with at least one unresolved `TriggerSent`
+ *      row. Union = candidates.
  *   2. Pre-filter (LOCKED by the Phase 5 spec): one batched
  *      `max(OccurredAt)` query against the slim `trace_analytics`
- *      table per project per tick — bounded by `max(windowMs)` across
+ *      table per project per sweep — bounded by `max(windowMs)` across
  *      that project's candidates. For each candidate, if the project's
  *      most recent qualifying event is older than the candidate's own
- *      window (or NULL), enqueue. If it is recent enough, the
- *      real-time reactor is already handling that trigger, so skip.
- *   3. Return one `OutboxEnqueueRequest` per surviving candidate; the
- *      heartbeat scheduler routes them through `dispatchOutboxEnqueues`,
- *      same path the event-driven reactor uses.
+ *      window (or NULL), evaluate. If it is recent enough, the
+ *      real-time subscriber is already handling that trigger, so skip.
+ *   3. Return one candidate per surviving trigger; the sweep intent
+ *      handler runs each through the shared `evaluateGraphTrigger`.
  *
- * The heartbeat does NOT re-enqueue every active trigger every tick —
- * only the absence cases the event-driven path cannot reach. The
- * shared evaluator handler picks the actual `fired` / `resolved` /
- * `not_breached` outcome from the analytics data.
+ * The sweep does NOT evaluate every active trigger every tick — only the
+ * absence cases the event-driven path cannot reach. The shared evaluator
+ * picks the actual `fired` / `resolved` / `not_breached` outcome from the
+ * analytics data.
  */
 
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-import type { ActionParams } from "~/pages/api/cron/triggers/types";
+import type { ActionParams } from "~/server/app-layer/triggers/trigger.types";
 import {
   type AnalyticsMetricSource,
   getMetricSource,
@@ -36,17 +33,8 @@ import {
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
-import { outboxHeartbeatRegistry } from "~/server/event-sourcing/outbox/heartbeat/heartbeat.registry";
-import type { OutboxEnqueueRequest } from "~/server/event-sourcing/outbox/outboxReactor.types";
-import {
-  GRAPH_TRIGGER_EVAL_REACTOR_NAME,
-  type GraphEvalStagePayload,
-  graphEvalDedupId,
-  graphEvalGroupKey,
-} from "~/server/event-sourcing/outbox/payload";
-import { featureFlagService as defaultFeatureFlagService } from "~/server/featureFlag";
-import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";
+import type { GraphTriggerEvaluationReason } from "./graph-trigger-evaluation.service";
 import { parseSeriesIndex } from "./seriesName";
 import type { TriggerService } from "./trigger.service";
 
@@ -80,7 +68,6 @@ export interface GraphTriggerHeartbeatDeps {
    *  tests can stub a single client and the prod path uses the default
    *  per-project resolver. */
   resolveClickHouseClient: ClickHouseClientResolver;
-  featureFlagService: FeatureFlagServiceInterface;
   /**
    * ADR-034 Phase 6: look up the upstream pipeline source for a graph
    * trigger by reading the metric key of the series the trigger actually
@@ -89,8 +76,7 @@ export interface GraphTriggerHeartbeatDeps {
    * points the recency probe at the wrong slim table. Returns `undefined`
    * when the source can't be determined (graph missing, series index out of
    * range, metric not in field-availability) — the heartbeat treats those as
-   * `"trace"` so behaviour is unchanged for unknown-source triggers (the cron
-   * has always handled them).
+   * `"trace"` so behaviour is unchanged for unknown-source triggers.
    */
   lookupTriggerSource(params: {
     triggerId: string;
@@ -102,14 +88,12 @@ export interface GraphTriggerHeartbeatDeps {
 }
 
 export interface HeartbeatCandidateSources {
-  /** Project ids with `release_es_graph_triggers_firing` ON. The
-   *  heartbeat must NOT bombard the operator-flag table — the
-   *  cron-equivalent project read covers this in one query. */
+  /** Project ids that have at least one active graph trigger. */
   loadProjectsWithGraphTriggers(): Promise<string[]>;
   /** Project ids that have at least one unresolved graph-alert
    *  `TriggerSent` (the "resolve-when-traffic-stops" candidate set).
    *  Returns a Set so the heartbeat can intersect cheaply with the
-   *  flagged-projects set. */
+   *  graph-trigger project set. */
   loadProjectsWithOpenGraphTriggerSent(): Promise<Set<string>>;
 }
 
@@ -144,33 +128,11 @@ const SLIM_AGGREGATE_ID_COLUMN_BY_SOURCE: Record<
   evaluation: "EvaluationId",
 };
 
-/**
- * Register the graph-trigger heartbeat with the process-singleton
- * registry. Idempotent on `name` — re-registration throws (so a
- * second worker boot fails loud rather than silently shadowing).
- *
- * Worker-only at RUNTIME (the scheduler `start()`s only on workers),
- * but registration is passive data so it's safe to call this from any
- * process role. Returns the registered definition so callers can keep
- * a reference for tests / shutdown.
- */
-export function registerGraphTriggerHeartbeat(
-  deps: GraphTriggerHeartbeatDeps,
-): {
-  name: typeof GRAPH_TRIGGER_HEARTBEAT_NAME;
-} {
-  const sources = defaultCandidateSources(deps.prisma);
-  outboxHeartbeatRegistry.register({
-    name: GRAPH_TRIGGER_HEARTBEAT_NAME,
-    intervalMs: GRAPH_TRIGGER_HEARTBEAT_INTERVAL_MS,
-    decide: ({ now }) =>
-      decideGraphTriggerHeartbeat({
-        deps,
-        sources,
-        now,
-      }),
-  });
-  return { name: GRAPH_TRIGGER_HEARTBEAT_NAME };
+/** One surviving sweep candidate: evaluate this trigger with this reason. */
+export interface GraphTriggerSweepCandidate {
+  triggerId: string;
+  projectId: string;
+  reason: GraphTriggerEvaluationReason;
 }
 
 /**
@@ -230,8 +192,8 @@ export function defaultCandidateSources(
 }
 
 /**
- * Pure heartbeat `decide` (no I/O outside its injected deps). Exported
- * so tests can drive it directly without going through the registry.
+ * Sweep candidate discovery (no I/O outside its injected deps). Exported
+ * so tests can drive it directly without going through the sweep process.
  */
 export async function decideGraphTriggerHeartbeat({
   deps,
@@ -241,9 +203,10 @@ export async function decideGraphTriggerHeartbeat({
   deps: GraphTriggerHeartbeatDeps;
   sources: HeartbeatCandidateSources;
   now: Date;
-}): Promise<OutboxEnqueueRequest[]> {
+}): Promise<GraphTriggerSweepCandidate[]> {
   // Step 1: load the union of "has graph triggers" + "has open sent"
-  // projects, then intersect with flag-ON projects.
+  // projects. Every such project is processed — the event-sourced path is
+  // the sole graph-alert path (ADR-034: the K8s cron was removed).
   const [graphProjects, openSentProjects] = await Promise.all([
     sources.loadProjectsWithGraphTriggers(),
     sources.loadProjectsWithOpenGraphTriggerSent(),
@@ -251,35 +214,13 @@ export async function decideGraphTriggerHeartbeat({
   const projectIds = Array.from(
     new Set<string>([...graphProjects, ...openSentProjects]),
   );
+  if (projectIds.length === 0) return [];
 
-  const flaggedProjects: string[] = [];
+  const candidates: GraphTriggerSweepCandidate[] = [];
   for (const projectId of projectIds) {
     try {
-      const enabled = await deps.featureFlagService.isEnabled(
-        "release_es_graph_triggers_firing",
-        { distinctId: projectId, projectId },
-      );
-      if (enabled) flaggedProjects.push(projectId);
-    } catch (error) {
-      // Treat an unreadable flag as OFF: the cron still owns this project
-      // (it fails the same way, in the same direction), so the alert is
-      // evaluated by exactly one path rather than none.
-      logger.error(
-        {
-          projectId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "graphTriggerHeartbeat: flag lookup failed, leaving project on the cron path",
-      );
-    }
-  }
-  if (flaggedProjects.length === 0) return [];
-
-  const requests: OutboxEnqueueRequest[] = [];
-  for (const projectId of flaggedProjects) {
-    try {
-      requests.push(
-        ...(await collectRequestsForProject({
+      candidates.push(
+        ...(await collectCandidatesForProject({
           deps,
           projectId,
           hasOpenSent: openSentProjects.has(projectId),
@@ -287,40 +228,41 @@ export async function decideGraphTriggerHeartbeat({
         })),
       );
     } catch (error) {
-      // One project's failure must not abort the tick for the others: the
-      // heartbeat is the ONLY path that fires no-data alerts, so a single
-      // project's transient DB error would otherwise silence every flagged
-      // project's absence alerts for as long as it persists.
+      // One project's failure must not abort the sweep for the others: this
+      // is the ONLY path that fires no-data alerts, so a single project's
+      // transient DB error would otherwise silence every flagged project's
+      // absence alerts for as long as it persists.
       logger.error(
         {
           projectId,
           error: error instanceof Error ? error.message : String(error),
         },
-        "graphTriggerHeartbeat: project tick failed, continuing with other projects",
+        "graphTriggerHeartbeat: project sweep failed, continuing with other projects",
       );
     }
   }
 
-  if (requests.length > 0) {
+  if (candidates.length > 0) {
     logger.info(
-      { count: requests.length },
-      "graphTriggerHeartbeat enqueueing absence/resolve evaluations",
+      { count: candidates.length },
+      "graphTriggerHeartbeat surfacing absence/resolve evaluations",
     );
   }
-  return requests;
+  return candidates;
 }
 
 /**
  * Per-project, per-source pre-filter — ONE batched slim query per
- * (project, source) per tick (at most two per project: `trace_analytics` and
- * `evaluation_analytics`). If the project's recent qualifying activity for a
- * trigger's source is fresher than that trigger's window, the real-time path
- * is already handling it and the enqueue is skipped.
+ * (project, source) per sweep (at most two per project: `trace_analytics`
+ * and `evaluation_analytics`). If the project's recent qualifying activity
+ * for a trigger's source is fresher than that trigger's window, the
+ * real-time path is already handling it and the candidate is skipped.
  *
- * Throws on an unreadable project; `decideGraphTriggerHeartbeat` isolates that
- * so the remaining projects still get their absence/resolve evaluations.
+ * Throws on an unreadable project; `decideGraphTriggerHeartbeat` isolates
+ * that so the remaining projects still get their absence/resolve
+ * evaluations.
  */
-async function collectRequestsForProject({
+async function collectCandidatesForProject({
   deps,
   projectId,
   hasOpenSent,
@@ -330,7 +272,7 @@ async function collectRequestsForProject({
   projectId: string;
   hasOpenSent: boolean;
   now: Date;
-}): Promise<OutboxEnqueueRequest[]> {
+}): Promise<GraphTriggerSweepCandidate[]> {
   const candidates = await loadCandidatesForProject({
     deps,
     projectId,
@@ -352,7 +294,7 @@ async function collectRequestsForProject({
     recencyBySource.set(source, recency);
   }
 
-  const requests: OutboxEnqueueRequest[] = [];
+  const surviving: GraphTriggerSweepCandidate[] = [];
   for (const candidate of candidates) {
     const recency = recencyBySource.get(candidate.source);
     if (!recency) continue;
@@ -364,32 +306,16 @@ async function collectRequestsForProject({
       // Real-time path is firing for this trigger; skip.
       continue;
     }
-    const reason: GraphEvalStagePayload["reason"] =
-      candidate.reasonKind === "absence"
-        ? "heartbeat-absence"
-        : "heartbeat-resolve";
-    const payload: GraphEvalStagePayload = {
-      stage: "graphEval",
-      projectId,
+    surviving.push({
       triggerId: candidate.triggerId,
-      reactorName: GRAPH_TRIGGER_EVAL_REACTOR_NAME,
-      reason,
-    };
-    requests.push({
-      dedupKey: graphEvalDedupId({
-        projectId,
-        triggerId: candidate.triggerId,
-        suffix: "hb",
-      }),
-      groupKey: graphEvalGroupKey({
-        projectId,
-        triggerId: candidate.triggerId,
-      }),
-      payload: payload as unknown as OutboxEnqueueRequest["payload"],
-      enqueueOptions: { ttlMs: GRAPH_TRIGGER_HEARTBEAT_INTERVAL_MS },
+      projectId,
+      reason:
+        candidate.reasonKind === "absence"
+          ? "heartbeat-absence"
+          : "heartbeat-resolve",
     });
   }
-  return requests;
+  return surviving;
 }
 
 async function loadCandidatesForProject({
@@ -583,7 +509,6 @@ export function defaultGraphTriggerHeartbeatDeps({
       }
       return client;
     },
-    featureFlagService: defaultFeatureFlagService,
     lookupTriggerSource: async ({ customGraphId, projectId, seriesName }) => {
       // The graph is the only place the metric key lives; the trigger's
       // `actionParams.seriesName` carries the series INDEX. Classify from the

@@ -3,16 +3,15 @@
  *
  * The heartbeat is the ONLY path that fires no-data alerts and resolves
  * firing alerts when traffic stops. A tick that aborts on the first project's
- * transient error therefore silences absence alerts for EVERY flagged project
- * for as long as that error persists — a silent, cross-tenant outage.
+ * transient error therefore silences absence alerts for EVERY project for as
+ * long as that error persists — a silent, cross-tenant outage.
  *
- * Both the per-project flag lookup and the per-project candidate load are
- * isolated: a failure logs and the tick continues with the next project.
+ * The per-project candidate load is isolated: a failure logs and the tick
+ * continues with the next project.
  */
 
 import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import {
   decideGraphTriggerHeartbeat,
   type GraphTriggerHeartbeatDeps,
@@ -51,10 +50,8 @@ function makeSources(): HeartbeatCandidateSources {
 }
 
 function makeDeps({
-  flags,
   getActiveGraphTriggersForProject,
 }: {
-  flags: FeatureFlagServiceInterface;
   getActiveGraphTriggersForProject: (p: string) => Promise<TriggerSummary[]>;
 }): GraphTriggerHeartbeatDeps {
   const clickHouse = {
@@ -67,7 +64,6 @@ function makeDeps({
     } as unknown as GraphTriggerHeartbeatDeps["prisma"],
     resolveClickHouseClient: (async () =>
       clickHouse) as unknown as GraphTriggerHeartbeatDeps["resolveClickHouseClient"],
-    featureFlagService: flags,
     lookupTriggerSource: async () => "trace" as const,
   };
 }
@@ -79,43 +75,10 @@ describe("decideGraphTriggerHeartbeat per-project isolation", () => {
     vi.clearAllMocks();
   });
 
-  describe("given one project's flag lookup throws", () => {
-    it("still evaluates the healthy project's candidates", async () => {
-      const flags: FeatureFlagServiceInterface = {
-        isEnabled: vi.fn(async (_key: string, ctx: { projectId: string }) => {
-          if (ctx.projectId === BROKEN) throw new Error("redis blip");
-          return true;
-        }),
-      } as unknown as FeatureFlagServiceInterface;
-
-      const requests = await decideGraphTriggerHeartbeat({
-        deps: makeDeps({
-          flags,
-          getActiveGraphTriggersForProject: async () => [
-            makeTrigger("trig-healthy", "graph-healthy"),
-          ],
-        }),
-        sources: makeSources(),
-        now,
-      });
-
-      expect(requests).toHaveLength(1);
-      expect(requests[0]?.payload).toMatchObject({
-        projectId: HEALTHY,
-        triggerId: "trig-healthy",
-      });
-    });
-  });
-
   describe("given one project's candidate load throws", () => {
     it("still enqueues the healthy project's absence evaluation", async () => {
-      const flags: FeatureFlagServiceInterface = {
-        isEnabled: vi.fn(async () => true),
-      } as unknown as FeatureFlagServiceInterface;
-
       const requests = await decideGraphTriggerHeartbeat({
         deps: makeDeps({
-          flags,
           getActiveGraphTriggersForProject: async (projectId: string) => {
             if (projectId === BROKEN) throw new Error("db unavailable");
             return [makeTrigger("trig-healthy", "graph-healthy")];
@@ -126,17 +89,12 @@ describe("decideGraphTriggerHeartbeat per-project isolation", () => {
       });
 
       expect(requests).toHaveLength(1);
-      expect(requests[0]?.payload).toMatchObject({ projectId: HEALTHY });
+      expect(requests[0]).toMatchObject({ projectId: HEALTHY });
     });
 
     it("does not enqueue anything for the failing project", async () => {
-      const flags: FeatureFlagServiceInterface = {
-        isEnabled: vi.fn(async () => true),
-      } as unknown as FeatureFlagServiceInterface;
-
       const requests = await decideGraphTriggerHeartbeat({
         deps: makeDeps({
-          flags,
           getActiveGraphTriggersForProject: async (projectId: string) => {
             if (projectId === BROKEN) throw new Error("db unavailable");
             return [makeTrigger("trig-healthy", "graph-healthy")];
@@ -146,9 +104,7 @@ describe("decideGraphTriggerHeartbeat per-project isolation", () => {
         now,
       });
 
-      const projectIds = requests.map(
-        (r) => (r.payload as unknown as { projectId: string }).projectId,
-      );
+      const projectIds = requests.map((r) => r.projectId);
       expect(projectIds).not.toContain(BROKEN);
     });
   });

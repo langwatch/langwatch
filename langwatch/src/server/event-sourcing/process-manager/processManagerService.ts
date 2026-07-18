@@ -107,6 +107,7 @@ export class ProcessManagerService<State> {
         const evolution = this.definition.evolve({
           previousState: existing?.state ?? this.definition.initialState,
           input: { kind: "event", event: envelope },
+          ref,
         });
 
         return await this.commitEvolution({
@@ -154,6 +155,7 @@ export class ProcessManagerService<State> {
         const evolution = this.definition.evolve({
           previousState: existing.state,
           input: { kind: "wake", scheduledFor: wake.wakeAt },
+          ref: wake.ref,
         });
 
         return await this.commitEvolution({

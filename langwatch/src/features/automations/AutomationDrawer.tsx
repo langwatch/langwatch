@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { AlertType, TriggerKind, type TriggerAction } from "@prisma/client";
+import { AlertType, TriggerAction, TriggerKind } from "@prisma/client";
 import { Mail, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -48,6 +48,7 @@ import {
 } from "~/shared/templating/exampleContext";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import { renderTriggerSlack } from "~/shared/templating/renderSlack";
+import { renderWebhookBody } from "~/shared/templating/renderWebhookBody";
 import {
   buildExampleGraphAlertTemplateContext,
   buildExampleReportTemplateContext,
@@ -215,6 +216,7 @@ export function AutomationDrawer({
   const hydrate = useAutomationStore((s) => s.hydrate);
   const reset = useAutomationStore((s) => s.reset);
   const pushAttempt = useAutomationStore((s) => s.pushTestAttempt);
+  const testHistory = useAutomationStore((s) => s.testHistory);
 
   // Wipe the singleton store on unmount — next open is a fresh slate.
   useEffect(() => () => reset(), [reset]);
@@ -621,6 +623,28 @@ export function AutomationDrawer({
               errors: rendered.errors,
             });
           }
+        } else if (channel === "webhook") {
+          // The webhook's body lives in its slice (actionParams), not the
+          // template columns — read it straight off the draft.
+          const slice = draft.slices[TriggerAction.SEND_WEBHOOK];
+          const rendered = await renderWebhookBody({
+            template: slice.template.value.trim() ? slice.template.value : null,
+            context: previewContext,
+            defaultBody: previewDefaults.webhookBody,
+          });
+          if (token === previewToken.current) {
+            setPreview({
+              channel: "webhook",
+              payload: {
+                method: slice.method,
+                url: slice.url,
+                body: rendered.body,
+              },
+              usedDefault: rendered.usedDefault,
+              missingVariables: rendered.missingVariables,
+              errors: rendered.errors,
+            });
+          }
         } else {
           const rendered = await renderTriggerSlack({
             templateType:
@@ -694,6 +718,7 @@ export function AutomationDrawer({
         channel,
         webhook: target.webhook,
         botDestination: target.botDestination,
+        webhookDestination: target.webhookDestination,
         automationId,
         graphName,
         seriesLabel,
@@ -706,6 +731,7 @@ export function AutomationDrawer({
             status: "success",
             recipientCount: r.recipientCount,
             usedDefault: r.usedDefault,
+            httpStatus: r.httpStatus,
           });
           toaster.create({
             title: "Test fire sent",
@@ -713,7 +739,9 @@ export function AutomationDrawer({
             description:
               r.channel === "email"
                 ? "Sent to your inbox."
-                : "Posted to Slack.",
+                : r.channel === "webhook"
+                  ? `Your endpoint answered HTTP ${r.httpStatus ?? "2xx"}.`
+                  : "Posted to Slack.",
             meta: { closable: true },
           });
         },
@@ -876,6 +904,9 @@ export function AutomationDrawer({
       // Lets a notify provider offer a "Send test" button inside its config.
       onTestFire,
       testFireLoading: testFire.isLoading,
+      // The latest test outcome, so a provider can render the result (HTTP
+      // status / failure) inline next to its own test button.
+      lastTestAttempt: testHistory[0] ?? null,
     }),
     [
       projectId,
@@ -894,6 +925,7 @@ export function AutomationDrawer({
       draft.report.sourceKind,
       onTestFire,
       testFire.isLoading,
+      testHistory,
     ],
   );
 

@@ -37,6 +37,15 @@ function makeNotifier() {
     channel: string;
     payload: unknown;
   }> = [];
+  const sentWebhooks: Array<{
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    body: string;
+  }> = [];
+  // The endpoint's answer a webhook test fire surfaces to the author; tests
+  // override to exercise a non-2xx failure.
+  let webhookStatus = 200;
   const notifier: TriggerNotifier = {
     sendEmail: async (args) => {
       sentEmails.push(args);
@@ -47,8 +56,21 @@ function makeNotifier() {
     sendSlackBot: async (args) => {
       sentSlackBot.push(args);
     },
+    sendWebhook: async (args) => {
+      sentWebhooks.push(args);
+      return { status: webhookStatus };
+    },
   };
-  return { notifier, sentEmails, sentSlack, sentSlackBot };
+  return {
+    notifier,
+    sentEmails,
+    sentSlack,
+    sentSlackBot,
+    sentWebhooks,
+    setWebhookStatus: (status: number) => {
+      webhookStatus = status;
+    },
+  };
 }
 
 function makeService(notifier: TriggerNotifier) {
@@ -107,6 +129,80 @@ describe("validateTemplateDraft", () => {
 });
 
 describe("testFireTrigger", () => {
+  describe("given a webhook destination", () => {
+    it("sends the rendered JSON body and returns the endpoint's HTTP status", async () => {
+      const { notifier, sentWebhooks } = makeNotifier();
+      const service = makeService(notifier);
+
+      const result = await service.testFire({
+        channel: "webhook",
+        trigger: TRIGGER,
+        project: PROJECT,
+        draft: {},
+        recipients: [],
+        webhook: null,
+        webhookDestination: {
+          url: "https://example.com/hook",
+          method: "POST",
+          headers: { Authorization: "Bearer x" },
+          bodyTemplate: null,
+        },
+      });
+
+      expect(result.channel).toBe("webhook");
+      expect(result.httpStatus).toBe(200);
+      expect(sentWebhooks).toHaveLength(1);
+      expect(sentWebhooks[0]).toMatchObject({
+        url: "https://example.com/hook",
+        method: "POST",
+      });
+      // The default trace envelope rendered as valid JSON.
+      const body = JSON.parse(sentWebhooks[0]!.body) as { event: string };
+      expect(body.event).toBe("trigger.matched");
+    });
+
+    it("renders a custom body template against the example context", async () => {
+      const { notifier, sentWebhooks } = makeNotifier();
+      const service = makeService(notifier);
+
+      await service.testFire({
+        channel: "webhook",
+        trigger: TRIGGER,
+        project: PROJECT,
+        draft: {},
+        recipients: [],
+        webhook: null,
+        webhookDestination: {
+          url: "https://example.com/hook",
+          method: "PUT",
+          headers: {},
+          bodyTemplate: '{ "name": {{ trigger.name | json }} }',
+        },
+      });
+
+      const body = JSON.parse(sentWebhooks[0]!.body) as { name: string };
+      expect(body.name).toBe(TRIGGER.name);
+    });
+
+    describe("when no destination is supplied", () => {
+      it("throws a TestFireUnavailableError", async () => {
+        const { notifier } = makeNotifier();
+        const service = makeService(notifier);
+        await expect(
+          service.testFire({
+            channel: "webhook",
+            trigger: TRIGGER,
+            project: PROJECT,
+            draft: {},
+            recipients: [],
+            webhook: null,
+            webhookDestination: null,
+          }),
+        ).rejects.toThrow(/endpoint/i);
+      });
+    });
+  });
+
   describe("given a Slack bot destination", () => {
     it("posts via the Web API with gated blocks kept, not the webhook", async () => {
       const { notifier, sentSlack, sentSlackBot } = makeNotifier();

@@ -13,6 +13,11 @@ export {
   type HandleResult,
   type ProcessManagerServiceOptions,
 } from "./processManagerService";
+export {
+  ProcessWakeWorker,
+  type ProcessWakeWorkerOptions,
+  type WakeHandlerPort,
+} from "./wake/processWakeWorker";
 export type {
   Evolution,
   ProcessDefinition,
@@ -35,3 +40,7 @@ export type {
 } from "./stores/processStore.types";
 export { InMemoryProcessStore } from "./stores/inMemoryProcessStore";
 export { PrismaProcessStore } from "./stores/prismaProcessStore";
+export {
+  ProcessRuntime,
+  type GeneratedProcessArtifacts,
+} from "./processRuntime";

@@ -378,7 +378,7 @@ model Project {
   annotations              Annotation[]
   projectSecrets           ProjectSecret[]
   TriggerSent              TriggerSent[]
-  ReactorOutbox            ReactorOutbox[]
+  WebhookDelivery          WebhookDelivery[]
   annotationScores         AnnotationScore[]
   publicShares             PublicShare[]
   workflows                Workflow[]
@@ -745,6 +745,7 @@ enum TriggerAction {
   ADD_TO_DATASET
   ADD_TO_ANNOTATION_QUEUE
   SEND_SLACK_MESSAGE
+  SEND_WEBHOOK
 }
 
 // The three automation kinds, distinguished by WHAT FIRES them (ADR-042):
@@ -809,10 +810,49 @@ model Trigger {
   // without a schema migration.
   traceDebounceMs      Int           @default(30000)
   TriggerSent   TriggerSent[]
+  webhookDeliveries WebhookDelivery[]
   customGraphId String?       @unique
   customGraph   CustomGraph?  @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+}
+
+// ADR-040 §6: per-ATTEMPT webhook delivery log — the drill-down behind a
+// webhook automation's "recent fires". One row per HTTP attempt; all attempts
+// of one logical fire share `dispatchId` (== the X-LangWatch-Event-Id). Header
+// values are stored REDACTED (auth/signature masked to "***"); the response
+// snippet is size-capped. Pruned after 30 days.
+model WebhookDelivery {
+  id             String                @id @default(nanoid())
+  projectId      String
+  project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  triggerId      String
+  trigger        Trigger               @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  // Groups every attempt of one logical fire (== X-LangWatch-Event-Id).
+  dispatchId     String
+  requestMethod  String
+  requestUrl     String
+  // Redacted header record: auth/signature/api-key values masked to "***".
+  requestHeaders Json
+  // Null when no HTTP response arrived (transport/SSRF/timeout).
+  responseStatus Int?
+  responseBody   String?
+  latencyMs      Int?
+  // Transport / SSRF / timeout message when there is no HTTP response.
+  error          String?
+  outcome        WebhookDeliveryOutcome
+  firedAt        DateTime              @default(now())
+  createdAt      DateTime              @default(now())
+
+  @@index([projectId, triggerId, dispatchId])
+  @@index([projectId, triggerId, firedAt])
+}
+
+enum WebhookDeliveryOutcome {
+  success
+  retryable
+  terminal
+  pending
 }
 
 enum ExperimentType {
@@ -3092,79 +3132,6 @@ model ProcessManagerOutbox {
   @@index([status, nextAttemptAt, leasedUntil])
 }
 
-// Durable outbox for stake-sensitive reactor dispatch (ADR-025). Reactors
-// registered via `.withOutbox` enqueue rows here; a queue-side audit
-// adapter projects every queue lifecycle event into the row's status.
-// The unique (projectId, reactorName, dedupKey) is the claim primitive
-// that makes replays safe — `createMany skipDuplicates` is a no-op on
-// collision. projectId is part of the uniqueness contract so a caller
-// that forgets to project-scope `dedupKey` cannot silently suppress
-// another tenant's row for the same (reactorName, dedupKey) pair.
-enum ReactorOutboxStatus {
-    queued
-    dispatching
-    dispatched
-    failed_retryable
-    dead
-}
-
-model ReactorOutbox {
-    id             String              @id @default(nanoid())
-    projectId      String
-    project        Project             @relation(fields: [projectId], references: [id])
-    // Stable identifier of the reactor that enqueued the row. Matches
-    // the reactor's `name` in the pipeline builder.
-    reactorName    String
-    // Deduplication key scoped to (projectId, reactorName, ...). Typically
-    // encodes the match identity, e.g. `${triggerId}:trace:${traceId}`.
-    // Collisions on (projectId, reactorName, dedupKey) are the claim
-    // primitive that makes replays safe.
-    dedupKey       String
-    // GroupQueue routing key. Drives per-group FIFO and fair scheduling
-    // across tenants. Always `${projectId}/`-prefixed.
-    groupKey       String
-    // Reactor-defined dispatch payload (trigger config, target ids,
-    // rendered template inputs, etc).
-    payload        Json
-    status         ReactorOutboxStatus @default(queued)
-    attempts       Int                 @default(0)
-    maxAttempts    Int                 @default(8)
-    // Set to a future timestamp by the drainer when the row enters
-    // `dispatching`. A wakeup that arrives after `leasedUntil` may
-    // re-lease the row (assumed crashed worker).
-    leasedUntil    DateTime?
-    // Nullable: cleared (NULL) when a row is promoted to `dead`, since a
-    // terminal row no longer schedules a next attempt.
-    nextAttemptAt  DateTime?           @default(now())
-    lastError      String?
-    lastErrorAt    DateTime?
-    // Template render-health diagnostics captured at dispatch time
-    // (ADR-036 / ADR-037). Currently `{ missingVariables: string[] }` —
-    // the variables a custom email/Slack template referenced but the
-    // render context did not supply. NULL on a clean render (no missing
-    // variables) and on dispatches that never rendered a custom template.
-    // Lets the operator surface show "N missing variables" per dispatch
-    // instead of dropping the signal `renderTriggerEmail`/`renderTriggerSlack`
-    // already compute.
-    renderDiagnostics Json?
-    dispatchedAt   DateTime?
-    createdAt      DateTime            @default(now())
-    updatedAt      DateTime            @default(now()) @updatedAt
-
-    @@unique([projectId, reactorName, dedupKey])
-    // Drainer hot path: pick the next claimable row for a (project,
-    // reactor) whose backoff has elapsed.
-    @@index([projectId, reactorName, status, nextAttemptAt])
-    // Wakeup-driven lease scopes by (projectId, reactorName, groupKey)
-    // so one group's wakeup can't drain another group's ready rows.
-    // `map:` pins the name to ≤63 chars (Postgres identifier limit) so the
-    // migration's hand-written index name matches what Prisma expects.
-    @@index([projectId, reactorName, groupKey, status, nextAttemptAt], map: "ReactorOutbox_projectId_reactorName_groupKey_status_nextAtt_idx")
-    // Operator surface: list stuck/dead dispatches per project.
-    @@index([projectId, status, updatedAt])
-    // Crash recovery scan: find leased rows whose worker never came back.
-    @@index([status, leasedUntil])
-}
 // ============================================================================
 // Langy assistant
 // ============================================================================

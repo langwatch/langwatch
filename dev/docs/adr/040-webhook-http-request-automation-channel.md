@@ -509,6 +509,62 @@ path" rule.
 - **Deferred to fast-follow:** OAuth client-credentials, mTLS, dual-secret rotation,
   non-JSON content types, and a receiver-side "verify signature" doc snippet.
 
+## Amendment: what PR #5807 shipped vs deferred (2026-07)
+
+The first implementation PR (#5807, "Phases 1–3") lands the provider, the
+SSRF-fenced sender, dispatch on all three paths, the retry/terminal
+classification, and per-fire idempotency on the graph-alert path. Two
+deliberate deltas against the text above:
+
+- **Header secrets ship encrypted, but as headers — not the §3 auth union.**
+  Instead of the auth-mode selector + `ProjectSecret` ref, v1 keeps the plain
+  key/value headers editor and applies the secrecy discipline directly:
+  values are AES-256-GCM encrypted into `actionParams.headersEncrypted`
+  (`definitions/webhook/secret.ts`, same `encrypt`/`decrypt` as the Slack bot
+  token), never returned to the client (reads echo names with a
+  `__kept__` sentinel), and decrypted just before dispatch. The
+  `ProjectSecret`-ref auth union remains the target shape for when HMAC
+  signing lands.
+- **Graph alerts no longer dead-letter `SEND_WEBHOOK`** — the third notify
+  branch in `dispatchGraphAlertAction`, gated per-fire on the endpoint
+  identity. On the cron parity path, a terminal failure CONSUMES the fire
+  (no per-tick re-post to a misconfigured endpoint); only retryable failures
+  leave it open for the next tick.
+
+**Phase 3 completed in a follow-up (also #5807):** `Retry-After` →
+`DispatchError.retryAfterMs` (parsed delta-seconds + HTTP-date, capped at 1h;
+honored by the GroupQueue as a backoff FLOOR); the stable `X-LangWatch-Event-Id`
+(trace path from the batch's traceIds, graph-alert path from the fire digest —
+identical across retries so receivers dedupe); and a per-project hourly
+dispatch cap (`webhook-dispatch:{projectId}`).
+
+**Phase 4 shipped as a standalone table (§6).** `WebhookDelivery` + a
+`WebhookDeliveryOutcome` enum, one row per attempt written by `deliverWebhook`
+(send + classify + log as a unit), redacted headers (`redactHeadersForLog`
+masks auth/signature values to `***`), a `getWebhookDeliveries` read procedure,
+the drawer's "Recent deliveries" drill-down, and a 30-day prune cron
+(`/api/cron/webhook_delivery_cleanup`).
+
+> **Known design debt / future direction.** `WebhookDelivery` is a
+> webhook-only, append-per-attempt log that sits *alongside* `ReactorOutbox`
+> (the generic delivery engine — one *mutable* row per dispatch, `lastError`
+> only) and `TriggerSent` (the idempotency/incident claim). The three answer
+> different questions today, but the deliverability report arguably belongs
+> *in* the outbox's audit mechanism (which already fires an `onFailed({ attempt,
+> willRetry })` hook per attempt) so every channel gets delivery history, not
+> just webhooks. Deferred deliberately: revisit unifying the per-attempt log
+> into the outbox rather than growing a parallel table.
+
+**Still deferred:** HMAC request signing (§3, including the signing toggle UI)
+and the `ProjectSecret`-ref auth union — the only remaining Phase 2 gap.
+
+> **Note (2026-07):** the "cron parity" webhook action this ADR's migration
+> plan describes (§7, `pages/api/cron/triggers/actions/sendWebhookRequest.ts`)
+> was removed shortly after, when the K8s graph-alert cron itself was retired
+> (ADR-034 — the event-sourced path is now the sole graph-alert path). Webhook
+> dispatch rides only the outbox + `dispatchGraphAlertAction` now; the
+> planning references to a cron action above are historical.
+
 ## References
 
 - [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) —

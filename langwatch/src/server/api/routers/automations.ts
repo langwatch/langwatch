@@ -21,7 +21,7 @@ import {
   NotificationDeliveryError,
   ProjectNotFoundError,
 } from "~/server/app-layer/triggers/errors";
-import { isDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { isDispatchError } from "~/server/triggers/dispatchError";
 import {
   decryptSlackBotToken,
   persistSlackActionParams,
@@ -32,6 +32,16 @@ import {
   type SlackActionParams,
   slackDeliveryMethodOf,
 } from "~/automations/providers/definitions/slack/shared";
+import {
+  decryptWebhookHeaders,
+  persistWebhookActionParams,
+  redactWebhookActionParams,
+  type WebhookStoredActionParams,
+} from "~/automations/providers/definitions/webhook/secret";
+import {
+  WEBHOOK_HEADER_VALUE_KEPT,
+  type WebhookActionParams,
+} from "~/automations/providers/definitions/webhook/shared";
 import {
   buildGraphAlertTriggerData,
   type GraphAlertActionParams,
@@ -47,7 +57,9 @@ import {
   type DraftProject,
   validateTemplateDraft,
 } from "~/server/app-layer/triggers/trigger-template.service";
-import { NOTIFY_TRIGGER_ACTIONS } from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
+import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/triggers/dispatch/triggerActionDispatch";
+import { WebhookDeliveryService } from "~/server/app-layer/triggers/webhook-delivery.service";
+import { featureFlagService } from "~/server/featureFlag";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   sanitizeTriggerFilters,
@@ -61,19 +73,30 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
 import { buildRetryAfterMessage } from "./rateLimitMessage";
 
-/** Strip the encrypted Slack bot token from a trigger row before it leaves the
- *  server — the client only needs to know a token is set (ADR-041). No-op for
- *  every non-Slack action. */
+/** Strip secrets from a trigger row before it leaves the server: the
+ *  encrypted Slack bot token (ADR-041) and webhook header values (ADR-040 §3
+ *  — names echo with the kept sentinel, values never return). No-op for every
+ *  other action. */
 function redactTriggerForRead<
   T extends { action: TriggerAction; actionParams: unknown },
 >(trigger: T): T {
-  if (trigger.action !== TriggerAction.SEND_SLACK_MESSAGE) return trigger;
-  return {
-    ...trigger,
-    actionParams: redactSlackActionParams(
-      (trigger.actionParams ?? {}) as SlackActionParams,
-    ),
-  };
+  if (trigger.action === TriggerAction.SEND_SLACK_MESSAGE) {
+    return {
+      ...trigger,
+      actionParams: redactSlackActionParams(
+        (trigger.actionParams ?? {}) as SlackActionParams,
+      ),
+    };
+  }
+  if (trigger.action === TriggerAction.SEND_WEBHOOK) {
+    return {
+      ...trigger,
+      actionParams: redactWebhookActionParams(
+        (trigger.actionParams ?? {}) as WebhookStoredActionParams,
+      ),
+    };
+  }
+  return trigger;
 }
 
 const templateDraftSchema = z.object({
@@ -152,6 +175,12 @@ const actionParamsSchema = z.object({
   annotators: z
     .array(z.object({ id: z.string(), name: z.string() }))
     .optional(),
+  // ADR-040 SEND_WEBHOOK destination — the per-action provider schema
+  // re-validates the shape (https-only URL, sanitized headers) below.
+  url: z.string().optional(),
+  method: z.enum(["POST", "PUT", "PATCH"]).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+  bodyTemplate: z.string().nullable().optional(),
 });
 
 type TRPCErrorCode = ConstructorParameters<typeof TRPCError>[0]["code"];
@@ -473,6 +502,26 @@ export const automationRouter = createTRPCRouter({
         limit: input.limit,
       });
     }),
+  /** ADR-040 §6: the per-attempt webhook delivery log for one automation —
+   *  the drawer's "Recent deliveries" drill-down. Header values are already
+   *  redacted at write time. */
+  getWebhookDeliveries: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        triggerId: z.string(),
+        limit: z.number().int().min(1).max(50).default(50),
+      }),
+    )
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ ctx, input }) => {
+      const deliveries = WebhookDeliveryService.create(ctx.prisma);
+      return deliveries.getRecentByTrigger({
+        projectId: input.projectId,
+        triggerId: input.triggerId,
+        limit: input.limit,
+      });
+    }),
   /** The activity feed: what every automation in the project has been doing. */
   getRecentActivity: protectedProcedure
     .input(
@@ -649,13 +698,26 @@ export const automationRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        channel: z.enum(["email", "slack"]),
+        channel: z.enum(["email", "slack", "webhook"]),
         trigger: triggerIdentitySchema,
         draft: templateDraftSchema,
         webhook: z
           .string()
           .url()
           .startsWith("https://hooks.slack.com/")
+          .nullable()
+          .default(null),
+        /** ADR-040 generic HTTP test fire: the full request shape, body
+         *  template included (it lives in actionParams, not the four Trigger
+         *  template columns). URL shape is re-validated by the provider
+         *  schema; the real SSRF gate runs inside the sender. */
+        webhookDestination: z
+          .object({
+            url: z.string().url(),
+            method: z.enum(["POST", "PUT", "PATCH"]).default("POST"),
+            headers: z.record(z.string(), z.string()).default({}),
+            bodyTemplate: z.string().nullable().default(null),
+          })
           .nullable()
           .default(null),
         /** Set when the Slack automation uses a bot connection. `botToken` is
@@ -708,8 +770,26 @@ export const automationRouter = createTRPCRouter({
       // and intentionally exempt from the rate limit — it fires to the
       // customer's own webhook, not our mail provider.
       try {
-        let recipients: string[] = [];
-        if (input.channel === "email") {
+        // The webhook channel ships dark (ADR-040 §7): the type picker is
+        // flag-gated client-side, and the server refuses the channel too so
+        // the flag can't be bypassed by calling the API directly.
+        if (input.channel === "webhook") {
+          const allowed = await featureFlagService.isEnabled(
+            "release_webhook_automations",
+            { distinctId: ctx.session.user.id, projectId: input.projectId },
+          );
+          if (!allowed) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Webhook automations are not enabled for this project.",
+            });
+          }
+        }
+        // Email shares the mail provider; webhook fires at an ARBITRARY
+        // customer URL from our worker IPs, so an uncapped test button would
+        // be an outbound request-flood primitive (ADR-040 §4). Slack stays
+        // exempt: its destination is host-pinned to hooks.slack.com.
+        if (input.channel === "email" || input.channel === "webhook") {
           const limit = await rateLimit({
             key: `testfire:${ctx.session.user.id}`,
             windowSeconds: 60,
@@ -724,7 +804,9 @@ export const automationRouter = createTRPCRouter({
               }),
             });
           }
-
+        }
+        let recipients: string[] = [];
+        if (input.channel === "email") {
           const email = ctx.session.user.email;
           if (!email) {
             throw new TRPCError({
@@ -760,6 +842,41 @@ export const automationRouter = createTRPCRouter({
           botDestination = { token, channel };
         }
 
+        // ADR-040 §3: header secrets never reach the client, so a saved
+        // automation's test fire carries the kept sentinel — resolve it
+        // against the stored ciphertext, exactly like the Slack bot token
+        // above. Unresolvable kept values (fresh draft, renamed header) are
+        // dropped rather than sent as the literal sentinel.
+        let webhookDestination = input.webhookDestination;
+        if (
+          webhookDestination &&
+          Object.values(webhookDestination.headers).includes(
+            WEBHOOK_HEADER_VALUE_KEPT,
+          )
+        ) {
+          let saved: Record<string, string> = {};
+          if (input.automationId) {
+            const row = await ctx.prisma.trigger.findUnique({
+              where: { id: input.automationId, projectId: input.projectId },
+              select: { actionParams: true },
+            });
+            saved = decryptWebhookHeaders(
+              (row?.actionParams ?? {}) as WebhookStoredActionParams,
+            );
+          }
+          const headers: Record<string, string> = {};
+          for (const [name, value] of Object.entries(
+            webhookDestination.headers,
+          )) {
+            if (value === WEBHOOK_HEADER_VALUE_KEPT) {
+              if (saved[name] !== undefined) headers[name] = saved[name];
+              continue;
+            }
+            headers[name] = value;
+          }
+          webhookDestination = { ...webhookDestination, headers };
+        }
+
         const project = await resolveProjectIdentity(input.projectId);
         return await getApp().triggerTemplates.testFire({
           channel: input.channel,
@@ -769,6 +886,7 @@ export const automationRouter = createTRPCRouter({
           recipients,
           webhook: input.webhook,
           botDestination,
+          webhookDestination,
           graphAlert: input.graphAlert,
           report: input.report,
         });
@@ -811,17 +929,28 @@ export const automationRouter = createTRPCRouter({
       let parsedActionParams: Record<string, unknown> = {};
       try {
         validateTemplateDraft(input.templates);
+        // The webhook channel ships dark (ADR-040 §7): gate the save route as
+        // well as the picker, so the flag can't be bypassed via the API.
+        if (input.action === TriggerAction.SEND_WEBHOOK) {
+          const allowed = await featureFlagService.isEnabled(
+            "release_webhook_automations",
+            { distinctId: ctx.session.user.id, projectId: input.projectId },
+          );
+          if (!allowed) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Webhook automations are not enabled for this project.",
+            });
+          }
+        }
         if (isGraphAlert) {
           // Graph alerts only support notify channels — there is no
           // "ADD_TO_DATASET on a metric crossing a threshold" UX.
-          if (
-            input.action !== TriggerAction.SEND_EMAIL &&
-            input.action !== TriggerAction.SEND_SLACK_MESSAGE
-          ) {
+          if (!NOTIFY_TRIGGER_ACTIONS.has(input.action)) {
             throw new TRPCError({
               code: "BAD_REQUEST",
               message:
-                "Graph alerts only support Email or Slack notifications.",
+                "Graph alerts only support notify channels (Email, Slack, or a webhook).",
             });
           }
           if (!input.graphAlert) {
@@ -957,6 +1086,31 @@ export const automationRouter = createTRPCRouter({
         slackActionParams = persistSlackActionParams({ incoming, existing });
       }
 
+      // ADR-040 §3 webhook header secrets: resolve kept sentinels against the
+      // saved row, then encrypt the record — plaintext header values never
+      // persist and never return to the client (same discipline as the Slack
+      // bot token above).
+      let webhookActionParams: WebhookStoredActionParams | null = null;
+      if (input.action === TriggerAction.SEND_WEBHOOK) {
+        const incoming = parsedActionParams as unknown as WebhookActionParams;
+        const hasKept = Object.values(incoming.headers ?? {}).some(
+          (v) => v === WEBHOOK_HEADER_VALUE_KEPT,
+        );
+        const existing =
+          input.triggerId && hasKept
+            ? ((
+                await ctx.prisma.trigger.findUnique({
+                  where: { id: input.triggerId, projectId: input.projectId },
+                  select: { actionParams: true },
+                })
+              )?.actionParams as WebhookStoredActionParams | undefined)
+            : undefined;
+        webhookActionParams = persistWebhookActionParams({
+          incoming,
+          existing,
+        });
+      }
+
       // Annotation-queue dispatch attributes created queue items to a user
       // and skips the action when `createdByUserId` is absent. The drawer's
       // provider slice doesn't carry it, so stamp the caller here — same as
@@ -973,7 +1127,9 @@ export const automationRouter = createTRPCRouter({
             }
           : slackActionParams
             ? { ...slackActionParams }
-            : { ...parsedActionParams };
+            : webhookActionParams
+              ? { ...webhookActionParams }
+              : { ...parsedActionParams };
 
       // Graph alerts: route the row shape through the SSOT builder so it's
       // byte-identical to what `graphs.updateById` writes on the dashboard

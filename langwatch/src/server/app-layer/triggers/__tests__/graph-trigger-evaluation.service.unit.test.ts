@@ -2,7 +2,7 @@ import type { CustomGraph, Project, Trigger } from "@prisma/client";
 import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TimeseriesResult } from "~/server/analytics/types";
-import type { GraphAlertDispatchResult } from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
+import type { GraphAlertDispatchResult } from "~/server/app-layer/triggers/dispatch/graphAlertActionDispatch";
 import {
   evaluateGraphTrigger,
   type GraphTriggerEvaluationDeps,
