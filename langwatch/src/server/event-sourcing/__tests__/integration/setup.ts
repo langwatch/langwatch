@@ -76,7 +76,7 @@ export async function setup(): Promise<void> {
  * The dump on 91df42da1 narrowed the leaking handle at the last file of
  * integration shard 4 down to a single Socket to ::1:6379, the app-layer
  * ioredis singleton. ioredis auto-reconnects each time we close it
- * (BullMQ requires maxRetriesPerRequest:null, which also keeps reconnect
+ * (the queue requires maxRetriesPerRequest:null, which also keeps reconnect
  * attempts uncapped), so quit() / disconnect() can't actually keep the
  * socket down. The cure that works is to unref the underlying socket so
  * it stops pinning the event loop. ioredis still works for any test that
@@ -140,7 +140,7 @@ function unrefRedisSockets(): void {
  * 1. Each test uses unique tenant IDs and pipeline names for isolation
  * 2. Each test's afterEach already cleans up its own data via cleanupTestDataForTenant()
  * 3. Calling cleanupTestData() without tenantId triggers FLUSHALL which races with
- *    BullMQ workers that may still be completing (causes "Missing key for job" errors)
+ *    queue workers that may still be completing (causes "Missing key for job" errors)
  */
 export async function teardown(): Promise<void> {
   await stopTestContainers();

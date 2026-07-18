@@ -291,7 +291,7 @@ export interface EventSourcedQueueProcessor<
   close(): Promise<void>;
   /**
    * Waits until the queue processor is ready to accept jobs.
-   * For BullMQ, this waits for the worker to connect to Redis.
+   * Waits for the worker to connect to Redis.
    * For memory queues, this resolves immediately.
    */
   waitUntilReady(): Promise<void>;

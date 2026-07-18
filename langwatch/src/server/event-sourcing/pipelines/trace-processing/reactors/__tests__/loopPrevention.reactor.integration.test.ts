@@ -10,11 +10,11 @@
  *     constructed event + foldState (read from CH) to assert on the
  *     loop-prevention behaviour.
  *
- *   The reactor's BullMQ queue worker is NOT exercised in this test.
+ *   The reactor's queue worker is NOT exercised in this test.
  *   That is harness plumbing, not feature behaviour, and other reactor
  *   integration tests in this codebase (e.g.
  *   customEvaluationSync.reactor.integration.test.ts) are `.skip`'d for
- *   the same reason — making BullMQ reactor pickup reliable in the
+ *   the same reason — making the queue reactor pickup reliable in the
  *   vitest harness is a separate problem from "does the reactor
  *   correctly block depth>=1 spans against real fold state from real
  *   ClickHouse." This test answers the latter, which is the
@@ -439,7 +439,7 @@ describe.skipIf(!hasTestcontainers)(
         }),
       );
       // Poll the prom counter instead of sleeping a fixed 1500ms. The
-      // reactor → BullMQ → metric write chain can take longer than that
+      // reactor → the queue → metric write chain can take longer than that
       // under parallel CI load, which flaked this test (PR #4189 CI:
       // `expected 0 to be greater than or equal to 1`). The dispatch
       // assertion stays as a post-condition: by the time the blocked

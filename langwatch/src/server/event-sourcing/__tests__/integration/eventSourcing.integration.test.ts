@@ -252,7 +252,7 @@ describe.skip("Event Sourcing", () => {
       it("processes all events regardless of queue merging", async () => {
         const aggregateId = generateTestAggregateId("dedup");
 
-        // Fire all commands without awaiting individually — BullMQ may deduplicate jobs
+        // Fire all commands without awaiting individually — the queue may deduplicate jobs
         const promises = [
           pipeline.commands.testCommand.send({
             tenantId: tenantIdString,

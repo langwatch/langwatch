@@ -81,7 +81,7 @@ const LIVE_DISPATCH_IS_REPLAY = false;
  * Central router that registers fold and map projections and dispatches events.
  *
  * - FoldProjections: enqueued to GroupQueue (per-aggregate ordering), incremental only
- * - MapProjections: enqueued to SimpleQueue (per-event, no ordering)
+ * - MapProjections: enqueued to the GroupQueue (per-event, no ordering)
  */
 export class ProjectionRouter<
   EventType extends Event = Event,
@@ -282,7 +282,7 @@ export class ProjectionRouter<
 
   /**
    * Initialize queue processors for reactors.
-   * Each reactor gets a SimpleQueue for async dispatch.
+   * Each reactor gets a GroupQueue lane for async dispatch.
    */
   initializeReactorQueues(): void {
     if (this.reactorsForFold.size === 0 && this.reactorsForMap.size === 0)

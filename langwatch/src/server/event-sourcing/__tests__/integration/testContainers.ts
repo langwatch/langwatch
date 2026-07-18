@@ -157,7 +157,7 @@ export async function stopTestContainers(): Promise<void> {
   }
 
   // Close Redis connection. quit() waits for pending replies, so a test
-  // that left a BRPOP/SUBSCRIBE on the shared test connection (BullMQ
+  // that left a BRPOP/SUBSCRIBE on the shared test connection (the queue
   // workers, groupQueue dispatchers) wedges the entire shard's teardown
   // and stalls vitest's reporter. Race a quick quit() against a short
   // timeout, then forcibly disconnect so the worker can exit either way.
@@ -227,7 +227,7 @@ async function initializeClickHouseSchema(
  * Uses TRUNCATE for synchronous cleanup (faster and more reliable than DELETE).
  */
 export async function cleanupTestData(tenantId?: string): Promise<void> {
-  // Clean up Redis queues (BullMQ stores queues in Redis)
+  // Clean up Redis queues (the queue stores queues in Redis)
   // When tenantId is provided, queues should be closed before cleanup is called
   // Only flush all Redis data when doing full cleanup (no tenantId)
   if (redisConnection && !tenantId) {
@@ -238,7 +238,7 @@ export async function cleanupTestData(tenantId?: string): Promise<void> {
   }
   // For tenant-specific cleanup, we don't clean up Redis here
   // because queues should be closed first (which cleans up their keys)
-  // This prevents WRONGTYPE and "Missing key" errors from BullMQ
+  // This prevents WRONGTYPE and "Missing key" errors from the queue
 
   if (!clickHouseClient) {
     return;

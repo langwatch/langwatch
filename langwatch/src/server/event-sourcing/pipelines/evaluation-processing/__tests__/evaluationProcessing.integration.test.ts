@@ -127,7 +127,7 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
 > & {
   eventStore: EventStoreClickHouse;
   pipelineName: string;
-  /** Wait for BullMQ workers to be ready before sending commands */
+  /** Wait for queue workers to be ready before sending commands */
   ready: () => Promise<void>;
 } {
   const pipelineName = generateTestPipelineName();
@@ -181,7 +181,7 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
     eventStore,
     eventSourcing,
     pipelineName,
-    // Wait for BullMQ workers to be ready before sending commands
+    // Wait for queue workers to be ready before sending commands
     ready: () => pipeline.service.waitUntilReady(),
   } as PipelineWithCommandHandlers<
     any,
@@ -297,14 +297,14 @@ describe.skip(
       pipeline = createEvaluationTestPipeline();
       tenantId = createTestTenantId();
       tenantIdString = getTenantIdString(tenantId);
-      // Wait for BullMQ workers to initialize before running tests
+      // Wait for queue workers to initialize before running tests
       await pipeline.ready();
     });
 
     afterEach(async () => {
       // Gracefully close EventSourcing (including global queue dispatcher)
       await pipeline.eventSourcing.close();
-      // Wait for BullMQ workers to fully shut down and release Redis connections
+      // Wait for queue workers to fully shut down and release Redis connections
       // Using 1000ms to ensure all async operations complete
       await new Promise((resolve) => setTimeout(resolve, 1000));
       // Clean up test data

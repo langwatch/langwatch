@@ -268,7 +268,7 @@ describe("orgBillableEventsMeterStore", () => {
   });
 
   describe("given ClickHouse insert fails (transient error)", () => {
-    it("throws for BullMQ retry", async () => {
+    it("throws for queue retry", async () => {
       const insertError = new Error("ClickHouse connection timeout");
       mockGetClickHouseClientForOrganization.mockResolvedValue({
         insert: mockClickHouseInsert,

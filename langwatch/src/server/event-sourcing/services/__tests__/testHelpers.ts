@@ -22,7 +22,7 @@ import type { QueueManager } from "../queues/queueManager";
 
 /**
  * Creates a mock QueueManager. Defaults to the inline (no-queue) configuration
- * so routers process projections/reactors synchronously without Redis/BullMQ.
+ * so routers process projections/reactors synchronously without Redis/the queue.
  */
 export function createMockQueueManager(overrides?: {
   hasReactorQueues?: boolean;

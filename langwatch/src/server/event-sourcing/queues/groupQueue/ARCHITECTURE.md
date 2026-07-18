@@ -25,13 +25,25 @@ Every job sent to a GroupQueue lands first in the **staging layer** — a set of
 
 | Key | Type | Role |
 |---|---|---|
-| `{queue}:groups:active` | sorted set | groups with pending work, scored by next-eligible timestamp |
-| `{queue}:group:{groupId}:jobs` | list | per-group FIFO of staged-job IDs (RPUSH on stage, LPOP on dispatch) |
-| `{queue}:group:{groupId}:data` | hash | staged-job ID → envelope value (the body) |
-| `{queue}:group:{groupId}:blocked` | string | non-empty marker that this group is paused (set by retries, cleared on resume) |
-| `{queue}:signals` | list | wake-up signals consumed by `BRPOP` (one entry per stage) |
-| `{queue}:active:{groupId}` | string | TTL'd marker — group is currently being processed somewhere; crash-recovery safety net |
-| `{queue}:dedup:{dedupId}` | string | dedup window — staged-job ID currently occupying this dedup slot |
+| `{queue}:gq:ready` | sorted set | groups with pending work, scored by next-eligible timestamp |
+| `{queue}:gq:group:{groupId}:jobs` | **sorted set** | per-group staged jobs, scored by `dispatchAfterMs` — dispatch takes the lowest due score, which is what makes a delayed or re-staged job land in the right place rather than at the back of a list |
+| `{queue}:gq:group:{groupId}:data` | hash | staged-job ID → envelope value (the body) |
+| `{queue}:gq:group:{groupId}:active` | string | TTL'd marker — this group is being processed somewhere; crash-recovery safety net |
+| `{queue}:gq:group:{groupId}:attempt` | string | retry-chain counter for the group, so a re-staged sibling leading the next batch is not read as a fresh delivery |
+| `{queue}:gq:group:{groupId}:error` | string | last error recorded for the group |
+| `{queue}:gq:group:{groupId}:strikes` | string | poison-guard strike count |
+| `{queue}:gq:blocked` | **set** | groupIds blocked after exhausting retries — ONE set per queue, not a per-group marker |
+| `{queue}:gq:paused` | set | groupIds paused for replay coordination |
+| `{queue}:gq:signal` | list | wake-up signals consumed by `BRPOP` (one entry per stage) |
+| `{queue}:gq:dedup:{dedupId}` | string | dedup window — staged-job ID currently occupying this dedup slot |
+| `{queue}:gq:tenant_active_z:*` | sorted set | per-tenant in-flight counts, for the fair-dispatch soft cap |
+| `{queue}:gq:stats:{total,completed,failed}` | string | counters for the ops dashboard |
+
+Every key carries the `gq:` namespace after the queue name. An earlier version
+of this table omitted it on every row, named `jobs` a list with RPUSH/LPOP
+semantics it has never had, and described `blocked` as a per-group string —
+which is why it is worth checking key shapes against
+[`scripts.ts`](./scripts.ts) rather than this table when debugging.
 
 The `{queue}` prefix is a Redis Cluster hash tag (`{...}`), so every key for a given queue lands in the same cluster slot. This is what lets the Lua scripts touch multiple keys atomically — a CROSSSLOT eval is a runtime error, not a thing that ever happens.
 
@@ -74,7 +86,7 @@ A failure anywhere in this chain takes one of three paths:
 The dispatcher pulls one signal at a time off `BRPOP` and then runs `DISPATCH_LUA`, which:
 
 1. Picks the next eligible group from the `active` sorted set (`ZRANGEBYSCORE 0 now`).
-2. Weights groups by `sqrt(pendingCount)` so a backed-up group gets more turns without starving fresher work.
+2. Takes the first eligible group by due score (`ZRANGEBYSCORE ... LIMIT offset 200`). There is no weighting function — fairness comes from a per-tenant soft cap (`DEFAULT_TENANT_CAP`) plus park/unpark, not from a score formula.
 3. Per dispatch call, drains up to `MAX_BATCH_SIZE` jobs across groups, bounding script execution time.
 
 Each dispatched job becomes a `fastq` task on the local node, capped at `GLOBAL_QUEUE_CONCURRENCY` (default 100). `fastq` is just a local concurrency limiter — multiple worker nodes share the same Redis-side staging, so horizontal scale is `nodes × per-node-concurrency`.
@@ -272,12 +284,20 @@ OpenTelemetry spans wrap dispatch + processing; `__context` round-trips OTel tra
 
 ## Composition Root
 
-GroupQueue dependencies are explicit constructor injections — no env-coupling. The composition root ([`eventSourcing.ts`](../../eventSourcing.ts)) supplies:
+Most GroupQueue dependencies are constructor-injected by the composition root ([`eventSourcing.ts`](../../eventSourcing.ts)):
 
 - The Redis connection (shared with the rest of the platform).
 - `objectStoreFor(projectId)` → `StorageRegistry` (per-tenant BYOC bucket resolution).
 - `resolveStorageDestination(projectId)` → `ProjectStorageDestination` (BYOC or global).
-- `featureFlagService` (kill-switch support).
+- the Redis connection, the object store resolver, and the storage-destination resolver.
+
+Not everything is injected, despite what this section used to claim. The
+feature-flag service is a module-level import, and concurrency, environment and
+dispatch caps are read from `process.env` inside the queue
+(`GLOBAL_QUEUE_CONCURRENCY`, `NODE_ENV`, `LANGWATCH_DISPATCH_TENANT_CAP`,
+`LANGWATCH_DISPATCH_GLOBAL_BUDGET`). The Redis connection also falls back to a
+module-level singleton when none is passed, which quietly defeats injection at
+the call sites that rely on it.
 
 This keeps the queue testable in isolation: integration tests pass an in-memory `ObjectStore` + a stub destination resolver and exercise the full Lua + holder lifecycle against a testcontainers Redis.
 

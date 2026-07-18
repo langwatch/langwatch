@@ -360,7 +360,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       featureFlagService,
     );
 
-    // fastq promise-based queue — replaces BullMQ Queue + Worker
+    // fastq promise-based queue — replaces the queue Queue + Worker
     this.processingQueue = fastq.promise(
       this.processWithRetries.bind(this),
       this.globalConcurrency,
@@ -1107,10 +1107,23 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               const category = categorizeError(err);
               const isRetryable = isRetryableJobError(err);
 
-              // The batch stores its fold state only once, at the very end, so a
-              // failure means nothing was persisted for the drained siblings.
-              // Re-stage them so they are re-dispatched (and re-coalesced) on the
-              // dispatched job's retry, rather than lost until an event replay.
+              // Re-stage the siblings so they are re-dispatched (and
+              // re-coalesced) on the dispatched job's retry, rather than lost
+              // until an event replay.
+              //
+              // This used to claim the batch persists nothing until the very
+              // end, so a failure meant the siblings' work was undone. That is
+              // false for every throw site reachable from here: the handler
+              // stores fold state and THEN dispatches reactors, and the ack, the
+              // blob release and the reactor sends can all throw afterwards. So
+              // these siblings' events are typically already folded in, and
+              // re-staging re-delivers work that was done.
+              //
+              // It is not a correctness bug — the fold's applied-event-id set
+              // recognises the redelivery and skips it (proved end-to-end in
+              // foldRedeliveryIdempotency.integration.test.ts) — but it is real
+              // wasted work, and the comment claiming otherwise is why nobody
+              // looked.
               if (drainedSiblings.length > 0) {
                 await this.restageDrainedSiblings(groupId, drainedSiblings);
               }

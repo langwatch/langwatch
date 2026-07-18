@@ -21,7 +21,7 @@ import {
 
 /**
  * Gracefully closes a pipeline and waits for cleanup to complete.
- * This ensures all BullMQ workers finish processing before the next test starts.
+ * This ensures all queue workers finish processing before the next test starts.
  */
 export async function closePipelineGracefully(pipeline: {
   service: { close: () => Promise<void> };
@@ -46,7 +46,7 @@ export function generateTestAggregateId(
 }
 
 /**
- * Creates a test pipeline using real ClickHouse and Redis (BullMQ).
+ * Creates a test pipeline using real ClickHouse and Redis (the queue).
  * This is the main helper for integration tests.
  * Each call generates a unique pipeline name to avoid conflicts in parallel tests.
  * Returns a promise that includes a ready() function to await worker initialization.
@@ -57,7 +57,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
 > & {
   eventStore: EventStoreClickHouse;
   pipelineName: string;
-  /** Wait for BullMQ workers to be ready before sending commands */
+  /** Wait for queue workers to be ready before sending commands */
   ready: () => Promise<void>;
 } {
   // Generate unique pipeline name to avoid conflicts when tests run in parallel
@@ -107,7 +107,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     eventStore,
     eventSourcing,
     pipelineName,
-    // Wait for BullMQ workers to be ready before sending commands
+    // Wait for queue workers to be ready before sending commands
     ready: () => pipeline.service.waitUntilReady(),
   } as PipelineWithCommandHandlers<
     RegisteredPipeline<any, any>,
