@@ -1,4 +1,4 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient, type Trigger } from "@prisma/client";
 import {
   NOTIFICATION_CADENCES,
   type NotificationCadence,
@@ -117,6 +117,64 @@ export class PrismaTriggerRepository implements TriggerRepository {
     await this.prisma.trigger.update({
       where: { id: triggerId, projectId },
       data: { lastRunAt: Date.now() },
+    });
+  }
+
+  async findById({
+    triggerId,
+    projectId,
+  }: {
+    triggerId: string;
+    projectId: string;
+  }): Promise<Trigger | null> {
+    return this.prisma.trigger.findUnique({
+      where: { id: triggerId, projectId },
+    });
+  }
+
+  async findAllByProjectId({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<Trigger[]> {
+    return this.prisma.trigger.findMany({
+      where: { projectId, deleted: false },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async findFirstByCustomGraphId({
+    projectId,
+    customGraphId,
+  }: {
+    projectId: string;
+    customGraphId: string;
+  }): Promise<Trigger | null> {
+    return this.prisma.trigger.findFirst({
+      where: { projectId, customGraphId },
+    });
+  }
+
+  async create({
+    data,
+  }: {
+    data: Prisma.TriggerUncheckedCreateInput;
+  }): Promise<Trigger> {
+    return this.prisma.trigger.create({ data });
+  }
+
+  async update({
+    triggerId,
+    projectId,
+    data,
+  }: {
+    triggerId: string;
+    projectId: string;
+    data: Prisma.TriggerUncheckedUpdateInput;
+  }): Promise<Trigger> {
+    return this.prisma.trigger.update({
+      where: { id: triggerId, projectId },
+      data,
     });
   }
 }

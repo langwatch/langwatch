@@ -61,8 +61,12 @@ export interface HttpDestinationResponse {
 const RESPONSE_HEADER_VALUE_CHARS = 200;
 const RESPONSE_HEADER_MAX_COUNT = 32;
 
+type SsrfResponseHeaders = Awaited<
+  ReturnType<typeof ssrfSafeFetch>
+>["headers"];
+
 function captureResponseHeaders(
-  headers: Headers | undefined,
+  headers: SsrfResponseHeaders | undefined,
 ): Record<string, string> {
   const out: Record<string, string> = {};
   if (!headers) return out;

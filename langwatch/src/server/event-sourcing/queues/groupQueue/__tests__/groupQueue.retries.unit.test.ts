@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DispatchError } from "../~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import {
   ConfigurationError,
   categorizeError,

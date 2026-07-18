@@ -1,9 +1,10 @@
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it } from "vitest";
-import type {
-  ReportScheduleTarget,
-  TriggerRepository,
-  TriggerSummary,
+import {
+  NullTriggerRepository,
+  type ReportScheduleTarget,
+  type TriggerRepository,
+  type TriggerSummary,
 } from "../repositories/trigger.repository";
 import { TriggerService } from "../trigger.service";
 
@@ -33,7 +34,12 @@ function makeSummary(
   };
 }
 
-class FakeTriggerRepository implements TriggerRepository {
+// Extends the Null repository so the authoring surface (findById / create /
+// update / …) is inherited — these tests exercise the dispatch surface only.
+class FakeTriggerRepository
+  extends NullTriggerRepository
+  implements TriggerRepository
+{
   rowsByProject = new Map<string, TriggerSummary[]>();
   findActiveCalls = 0;
   claimSendCalls: Array<{

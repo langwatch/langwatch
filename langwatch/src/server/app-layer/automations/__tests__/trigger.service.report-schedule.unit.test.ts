@@ -4,9 +4,10 @@ import type {
   ScheduledJobRecord,
   ScheduledJobRepository,
 } from "~/server/app-layer/scheduler/scheduler.types";
-import type {
-  ReportScheduleTarget,
-  TriggerRepository,
+import {
+  NullTriggerRepository,
+  type ReportScheduleTarget,
+  type TriggerRepository,
 } from "../repositories/trigger.repository";
 import { TriggerService } from "../trigger.service";
 
@@ -38,13 +39,15 @@ function reportActionParams(): Record<string, unknown> {
 function makeTriggerRepo(
   reports: ReportScheduleTarget[] = [],
 ): TriggerRepository {
-  return {
+  // Null base supplies the authoring surface (findById / create / update / …)
+  // — these tests exercise the report-schedule sync only.
+  return Object.assign(new NullTriggerRepository(), {
     findActiveForProject: vi.fn(async () => []),
     findActiveReportTargets: vi.fn(async () => reports),
     claimSend: vi.fn(async () => true),
     isSendClaimed: vi.fn(async () => false),
     updateLastRunAt: vi.fn(async () => undefined),
-  };
+  });
 }
 
 function makeScheduledJobRecord(

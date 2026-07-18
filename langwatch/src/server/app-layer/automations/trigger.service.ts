@@ -1,4 +1,4 @@
-import { TriggerKind } from "@prisma/client";
+import { TriggerKind, type Prisma, type Trigger } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
 import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
 import { SchedulerService } from "~/server/app-layer/scheduler/scheduler.service";
@@ -119,6 +119,65 @@ export class TriggerService {
 
   async updateLastRunAt(triggerId: string, projectId: string): Promise<void> {
     return this.repo.updateLastRunAt(triggerId, projectId);
+  }
+
+  /**
+   * Full trigger row by id, scoped to the calling project. Authoring read —
+   * NOT cached (the active-triggers cache serves dispatch, not the editor,
+   * and an editor must never see a stale row it just saved).
+   */
+  async getById(params: {
+    triggerId: string;
+    projectId: string;
+  }): Promise<Trigger | null> {
+    return this.repo.findById(params);
+  }
+
+  /** Every non-deleted trigger for a project, newest first — the list view. */
+  async getAllForProject(params: { projectId: string }): Promise<Trigger[]> {
+    return this.repo.findAllByProjectId(params);
+  }
+
+  /**
+   * The trigger occupying a custom graph's unique alert slot (deleted or
+   * not) — see `TriggerRepository.findFirstByCustomGraphId` for why the
+   * soft-deleted row must be found and reactivated rather than re-created.
+   */
+  async getByCustomGraphId(params: {
+    projectId: string;
+    customGraphId: string;
+  }): Promise<Trigger | null> {
+    return this.repo.findFirstByCustomGraphId(params);
+  }
+
+  async create(params: {
+    data: Prisma.TriggerUncheckedCreateInput;
+  }): Promise<Trigger> {
+    return this.repo.create(params);
+  }
+
+  async update(params: {
+    triggerId: string;
+    projectId: string;
+    data: Prisma.TriggerUncheckedUpdateInput;
+  }): Promise<Trigger> {
+    return this.repo.update(params);
+  }
+
+  /**
+   * Soft delete: the row survives (keeping its @unique customGraphId slot
+   * occupied — see `getByCustomGraphId`) and is deactivated so dispatch
+   * stops firing it.
+   */
+  async softDeleteById(params: {
+    triggerId: string;
+    projectId: string;
+  }): Promise<Trigger> {
+    return this.repo.update({
+      triggerId: params.triggerId,
+      projectId: params.projectId,
+      data: { deleted: true, active: false },
+    });
   }
 
   async invalidate(projectId: string): Promise<void> {

@@ -55,11 +55,6 @@ import type { TraceSummaryData } from "../app-layer/traces/types";
 import type { TriggerService } from "../app-layer/automations/trigger.service";
 import type { AutomationAuditRepository } from "../app-layer/automations/repositories/automation-audit.repository";
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
-import {
-  graphAlertSweepPM,
-  triggerSettlementPM,
-  webhookDeliveryPrunePM,
-} from "../event-sourcing/pipelines/automations/process-manager";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
@@ -353,24 +348,22 @@ export class PipelineRegistry {
         automationAuditStore: new AutomationAuditAppendStore(
           this.deps.repositories.automationAudit,
         ),
-        triggerSettlement: triggerSettlementPM({
-          dispatch: automationPorts.settlementDeps,
-        }),
-        graphAlertSweep: graphAlertSweepPM({
+        dispatch: automationPorts.settlementDeps,
+        sweep: {
           decideSweepCandidates: automationPorts.decideSweepCandidates,
           evaluateGraphTrigger: automationPorts.evaluateGraphTrigger,
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.langyProcessStore.deleteDispatchedBefore(
               params,
             ),
-        }),
-        webhookDeliveryPrune: webhookDeliveryPrunePM({
+        },
+        prune: {
           pruneExpired: automationPorts.pruneWebhookDeliveries,
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.langyProcessStore.deleteDispatchedBefore(
               params,
             ),
-        }),
+        },
       }),
     );
     const automationCommands = mapCommands(automationPipeline.commands);

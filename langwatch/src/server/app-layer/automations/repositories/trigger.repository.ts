@@ -1,4 +1,10 @@
-import type { AlertType, TriggerAction, TriggerKind } from "@prisma/client";
+import type {
+  AlertType,
+  Prisma,
+  Trigger,
+  TriggerAction,
+  TriggerKind,
+} from "@prisma/client";
 import type { NotificationCadence } from "~/shared/automations/cadences";
 import type { TriggerFilters } from "~/server/filters/types";
 
@@ -88,6 +94,44 @@ export interface TriggerRepository {
 
   /** Updates the trigger's lastRunAt timestamp. */
   updateLastRunAt(triggerId: string, projectId: string): Promise<void>;
+
+  /**
+   * Full trigger row by id, scoped to the calling project (multitenancy —
+   * a foreign-tenant id resolves to null, never a row). Authoring read used
+   * by the automations router: detail view, toggle, saved-secret resolution
+   * (Slack bot token / webhook headers), and edit-time `loadExisting`.
+   */
+  findById(params: {
+    triggerId: string;
+    projectId: string;
+  }): Promise<Trigger | null>;
+
+  /**
+   * Every non-(soft-)deleted trigger for a project, newest first — the
+   * automations list. Includes inactive (paused) rows by design.
+   */
+  findAllByProjectId(params: { projectId: string }): Promise<Trigger[]>;
+
+  /**
+   * The trigger occupying a custom graph's unique alert slot — deleted or
+   * not. `deleteById` soft-deletes (the row keeps its @unique customGraphId),
+   * so a fresh create for a graph that ever had an alert must find and
+   * reactivate this row instead of violating the unique index.
+   */
+  findFirstByCustomGraphId(params: {
+    projectId: string;
+    customGraphId: string;
+  }): Promise<Trigger | null>;
+
+  /** Persist a new trigger row. `data` must carry `projectId` (multitenancy). */
+  create(params: { data: Prisma.TriggerUncheckedCreateInput }): Promise<Trigger>;
+
+  /** Update a trigger row, scoped to the calling project. */
+  update(params: {
+    triggerId: string;
+    projectId: string;
+    data: Prisma.TriggerUncheckedUpdateInput;
+  }): Promise<Trigger>;
 }
 
 /**
@@ -236,5 +280,39 @@ export class NullTriggerRepository implements TriggerRepository {
   async updateLastRunAt(_triggerId: string, _projectId: string): Promise<void> {
     // no-op: NullTriggerRepository is the in-memory fallback used by tests
     // and processes that don't write trigger metadata.
+  }
+
+  async findById(_params: {
+    triggerId: string;
+    projectId: string;
+  }): Promise<Trigger | null> {
+    return null;
+  }
+
+  async findAllByProjectId(_params: { projectId: string }): Promise<Trigger[]> {
+    return [];
+  }
+
+  async findFirstByCustomGraphId(_params: {
+    projectId: string;
+    customGraphId: string;
+  }): Promise<Trigger | null> {
+    return null;
+  }
+
+  async create(_params: {
+    data: Prisma.TriggerUncheckedCreateInput;
+  }): Promise<Trigger> {
+    // Loud by design: there is no honest Trigger row to fabricate. Wiring
+    // that reaches authoring writes must inject a real repository.
+    throw new Error("Trigger authoring is not supported by NullTriggerRepository");
+  }
+
+  async update(_params: {
+    triggerId: string;
+    projectId: string;
+    data: Prisma.TriggerUncheckedUpdateInput;
+  }): Promise<Trigger> {
+    throw new Error("Trigger authoring is not supported by NullTriggerRepository");
   }
 }

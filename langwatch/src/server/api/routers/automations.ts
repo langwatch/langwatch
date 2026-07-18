@@ -43,7 +43,9 @@ import {
   extractReportFromTriggerRow,
   reportActionParamsSchema,
 } from "~/server/app-layer/automations/report.builder";
+import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
+import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import {
   type DraftProject,
   validateTemplateDraft,
@@ -291,14 +293,7 @@ export const automationRouter = createTRPCRouter({
         });
       }
 
-      const project = await ctx.prisma.project.findUnique({
-        where: {
-          id: input.projectId,
-        },
-        select: {
-          id: true,
-        },
-      });
+      const project = await getApp().projects.getById(input.projectId);
 
       if (!project) {
         throw new Error(`Project with id ${input.projectId} not found`);
@@ -344,7 +339,7 @@ export const automationRouter = createTRPCRouter({
         }
       }
 
-      const trigger = await ctx.prisma.trigger.create({
+      const trigger = await getApp().triggers.create({
         data: {
           id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
           name: input.name,
@@ -367,16 +362,10 @@ export const automationRouter = createTRPCRouter({
   deleteById: protectedProcedure
     .input(z.object({ projectId: z.string(), triggerId: z.string() }))
     .use(checkProjectPermission("triggers:delete"))
-    .mutation(async ({ ctx, input }) => {
-      await ctx.prisma.trigger.update({
-        where: {
-          id: input.triggerId,
-          projectId: input.projectId,
-        },
-        data: {
-          deleted: true,
-          active: false,
-        },
+    .mutation(async ({ input }) => {
+      await getApp().triggers.softDeleteById({
+        triggerId: input.triggerId,
+        projectId: input.projectId,
       });
 
       // Best-effort: deactivate any scheduled-report entry for this trigger
@@ -394,14 +383,8 @@ export const automationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
-      const triggers = await ctx.prisma.trigger.findMany({
-        where: {
-          projectId: input.projectId,
-          deleted: false,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
+      const triggers = await getApp().triggers.getAllForProject({
+        projectId: input.projectId,
       });
 
       const allCheckIds = triggers.flatMap((trigger) => {
@@ -413,13 +396,9 @@ export const automationRouter = createTRPCRouter({
         }
       });
 
-      const allChecks = await ctx.prisma.monitor.findMany({
-        where: {
-          id: {
-            in: allCheckIds,
-          },
-          projectId: input.projectId,
-        },
+      const allChecks = await MonitorService.create(ctx.prisma).getAllByIds({
+        monitorIds: allCheckIds,
+        projectId: input.projectId,
       });
 
       const checksMap = allChecks.reduce<
@@ -437,9 +416,11 @@ export const automationRouter = createTRPCRouter({
         .filter((id): id is string => typeof id === "string" && id.length > 0);
       const customGraphs =
         customGraphIds.length > 0
-          ? await ctx.prisma.customGraph.findMany({
-              where: { id: { in: customGraphIds }, projectId: input.projectId },
-              select: { id: true, name: true },
+          ? await AutomationCustomGraphService.create(
+              ctx.prisma,
+            ).getAllNamesByIds({
+              customGraphIds,
+              projectId: input.projectId,
             })
           : [];
       const customGraphsById = new Map(customGraphs.map((g) => [g.id, g]));
@@ -552,10 +533,10 @@ export const automationRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("triggers:update"))
-    .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.prisma.trigger.findUnique({
-        where: { id: input.triggerId, projectId: input.projectId },
-        select: { triggerKind: true, actionParams: true },
+    .mutation(async ({ input }) => {
+      const existing = await getApp().triggers.getById({
+        triggerId: input.triggerId,
+        projectId: input.projectId,
       });
       if (!existing) {
         throw new TRPCError({
@@ -581,11 +562,9 @@ export const automationRouter = createTRPCRouter({
         });
       }
 
-      const trigger = await ctx.prisma.trigger.update({
-        where: {
-          id: input.triggerId,
-          projectId: input.projectId,
-        },
+      const trigger = await getApp().triggers.update({
+        triggerId: input.triggerId,
+        projectId: input.projectId,
         data: {
           active: input.active,
         },
@@ -614,9 +593,10 @@ export const automationRouter = createTRPCRouter({
   getTriggerById: protectedProcedure
     .input(z.object({ triggerId: z.string(), projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
-    .query(async ({ ctx, input }) => {
-      const trigger = await ctx.prisma.trigger.findUnique({
-        where: { id: input.triggerId, projectId: input.projectId },
+    .query(async ({ input }) => {
+      const trigger = await getApp().triggers.getById({
+        triggerId: input.triggerId,
+        projectId: input.projectId,
       });
       // Never return the encrypted bot token to the browser (ADR-041).
       return trigger ? redactTriggerForRead(trigger) : trigger;
@@ -639,12 +619,12 @@ export const automationRouter = createTRPCRouter({
     // triggers:update (not :view): this endpoint decrypts and exercises the
     // stored Slack bot token — the same capability testFireTemplate gates on.
     .use(checkProjectPermission("triggers:update"))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       let token = input.botToken?.trim() || null;
       if (!token && input.automationId) {
-        const saved = await ctx.prisma.trigger.findUnique({
-          where: { id: input.automationId, projectId: input.projectId },
-          select: { actionParams: true },
+        const saved = await getApp().triggers.getById({
+          triggerId: input.automationId,
+          projectId: input.projectId,
         });
         token = decryptSlackBotToken(
           (saved?.actionParams ?? {}) as SlackActionParams,
@@ -675,8 +655,9 @@ export const automationRouter = createTRPCRouter({
         });
       }
 
-      const trigger = await ctx.prisma.trigger.update({
-        where: { id: input.triggerId, projectId: input.projectId },
+      const trigger = await getApp().triggers.update({
+        triggerId: input.triggerId,
+        projectId: input.projectId,
         data: {
           filters: JSON.stringify(sanitized),
         },
@@ -816,9 +797,9 @@ export const automationRouter = createTRPCRouter({
           const channel = input.botDestination.channelId.trim();
           let token = input.botDestination.botToken?.trim() || null;
           if (!token && input.automationId) {
-            const saved = await ctx.prisma.trigger.findUnique({
-              where: { id: input.automationId, projectId: input.projectId },
-              select: { actionParams: true },
+            const saved = await getApp().triggers.getById({
+              triggerId: input.automationId,
+              projectId: input.projectId,
             });
             token = decryptSlackBotToken(
               (saved?.actionParams ?? {}) as SlackActionParams,
@@ -848,9 +829,9 @@ export const automationRouter = createTRPCRouter({
         ) {
           let saved: Record<string, string> = {};
           if (input.automationId) {
-            const row = await ctx.prisma.trigger.findUnique({
-              where: { id: input.automationId, projectId: input.projectId },
-              select: { actionParams: true },
+            const row = await getApp().triggers.getById({
+              triggerId: input.automationId,
+              projectId: input.projectId,
             });
             const stored = (row?.actionParams ?? {}) as WebhookStoredActionParams;
             if (stored.url !== webhookDestination.url) {
@@ -967,14 +948,13 @@ export const automationRouter = createTRPCRouter({
           // The graph must belong to the calling project — multitenancy
           // gate. Without this a hostile client could attach a trigger to
           // a graph from another tenant.
-          const graph = await ctx.prisma.customGraph.findUnique({
-            where: {
-              id: input.customGraphId ?? "",
-              projectId: input.projectId,
-            },
-            select: { id: true },
+          const graphExists = await AutomationCustomGraphService.create(
+            ctx.prisma,
+          ).existsInProject({
+            customGraphId: input.customGraphId ?? "",
+            projectId: input.projectId,
           });
-          if (!graph) {
+          if (!graphExists) {
             throw new TRPCError({
               code: "NOT_FOUND",
               message: "Graph not found in this project.",
@@ -1072,9 +1052,9 @@ export const automationRouter = createTRPCRouter({
         loadExisting: async () =>
           input.triggerId
             ? (
-                await ctx.prisma.trigger.findUnique({
-                  where: { id: input.triggerId, projectId: input.projectId },
-                  select: { actionParams: true },
+                await getApp().triggers.getById({
+                  triggerId: input.triggerId,
+                  projectId: input.projectId,
                 })
               )?.actionParams
             : undefined,
@@ -1190,8 +1170,9 @@ export const automationRouter = createTRPCRouter({
           input.notificationCadence,
           isGraphAlert,
         );
-        trigger = await ctx.prisma.trigger.update({
-          where: { id: input.triggerId, projectId: input.projectId },
+        trigger = await getApp().triggers.update({
+          triggerId: input.triggerId,
+          projectId: input.projectId,
           data: {
             ...data,
             ...(cadenceUpdate !== undefined
@@ -1213,16 +1194,15 @@ export const automationRouter = createTRPCRouter({
         // graphs.updateById upsert-by-customGraphId behaviour.
         const existingForGraph =
           isGraphAlert && input.customGraphId
-            ? await ctx.prisma.trigger.findFirst({
-                where: {
-                  projectId: input.projectId,
-                  customGraphId: input.customGraphId,
-                },
+            ? await getApp().triggers.getByCustomGraphId({
+                projectId: input.projectId,
+                customGraphId: input.customGraphId,
               })
             : null;
         if (existingForGraph) {
-          trigger = await ctx.prisma.trigger.update({
-            where: { id: existingForGraph.id, projectId: input.projectId },
+          trigger = await getApp().triggers.update({
+            triggerId: existingForGraph.id,
+            projectId: input.projectId,
             data: {
               ...data,
               deleted: false,
@@ -1238,7 +1218,7 @@ export const automationRouter = createTRPCRouter({
             },
           });
         } else {
-          trigger = await ctx.prisma.trigger.create({
+          trigger = await getApp().triggers.create({
             data: {
               id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
               projectId: input.projectId,
