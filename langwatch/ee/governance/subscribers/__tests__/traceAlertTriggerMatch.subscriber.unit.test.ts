@@ -179,14 +179,16 @@ describe("trace alert trigger match subscriber", () => {
         expect(secondPayload).toEqual(firstPayload);
         expect(secondPayload.occurredAt).toBe(firstDeliveryAt);
 
-        const idempotencyKeys = [firstPayload, secondPayload].map(
-          (payload) => {
-            const [producedEvent] = new RecordTriggerMatchCommand().handle({
-              tenantId: payload.tenantId,
-              data: payload,
-            } as never);
+        const idempotencyKeys = await Promise.all(
+          [firstPayload, secondPayload].map(async (payload) => {
+            const [producedEvent] = await new RecordTriggerMatchCommand().handle(
+              {
+                tenantId: payload.tenantId,
+                data: payload,
+              } as never,
+            );
             return producedEvent!.idempotencyKey;
-          },
+          }),
         );
         expect(new Set(idempotencyKeys).size).toBe(1);
         expect(idempotencyKeys[0]).toBe(
