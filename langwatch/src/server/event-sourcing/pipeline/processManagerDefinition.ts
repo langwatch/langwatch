@@ -128,6 +128,14 @@ export function defineProcessManager<
 >(
   config: ProcessManagerConfig<State, Intents, E>,
 ): ProcessManagerDefinition<State, Intents, E> {
+  if (
+    config.schedule &&
+    (!Number.isFinite(config.schedule.everyMs) || config.schedule.everyMs <= 0)
+  ) {
+    throw new Error(
+      `Process manager "${config.name}" schedule everyMs must be a positive finite number`,
+    );
+  }
   if (config.schedule && !config.onWake) {
     throw new Error(
       `Process manager "${config.name}" declares a schedule but no onWake handler`,
@@ -143,11 +151,19 @@ export function defineProcessManager<
 
 export function buildIntentFactories<
   Intents extends Record<string, IntentSpec<any>>,
->(intents: Intents): IntentFactories<Intents> {
+>(
+  intents: Intents,
+  options?: { processKey?: string },
+): IntentFactories<Intents> {
   const factories: Record<string, unknown> = {};
   for (const [intentType, spec] of Object.entries(intents)) {
     factories[intentType] = (key: string, payload: unknown) => ({
-      messageKey: key,
+      // ProcessManagerOutbox message keys are unique within
+      // (processName, projectId). Builder-authored keys are local to one
+      // process instance, so qualify them without burdening every domain.
+      messageKey: options?.processKey
+        ? `process:${encodeURIComponent(options.processKey)}:${key}`
+        : key,
       intentType,
       payload: spec.schema.parse(payload),
     });

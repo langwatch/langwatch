@@ -14,6 +14,7 @@ let mockTriggerRow: Record<string, unknown> | null = null;
 let mockRecentFires: Array<Record<string, unknown>> = [];
 let mockGraphRow: Record<string, unknown> | null = null;
 let mockDatasets: Array<Record<string, unknown>> = [];
+let mockWebhookDeliveries: Array<Record<string, unknown>> = [];
 
 const { mockOpenDrawer, mockCloseDrawer } = vi.hoisted(() => ({
   mockOpenDrawer: vi.fn(),
@@ -62,6 +63,13 @@ vi.mock("~/utils/api", () => ({
           error: null,
         }),
       },
+      getWebhookDeliveries: {
+        useQuery: () => ({
+          data: mockWebhookDeliveries,
+          isLoading: false,
+          error: null,
+        }),
+      },
     },
     graphs: {
       getById: {
@@ -95,6 +103,7 @@ function renderDrawer() {
 describe("ViewAutomationDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockWebhookDeliveries = [];
   });
 
   afterEach(() => {
@@ -171,6 +180,31 @@ describe("ViewAutomationDrawer", () => {
           automationId: "trigger_1",
         });
       });
+    });
+  });
+
+  describe("given a saved webhook automation", () => {
+    it("shows the method, safe hostname, and empty delivery state", () => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "Pager webhook",
+        action: "SEND_WEBHOOK",
+        customGraphId: null,
+        filters: "{}",
+        actionParams: {
+          url: "https://events.example.test/private/path?token=hidden",
+          method: "PATCH",
+          headers: { Authorization: "__kept__" },
+        },
+      };
+
+      renderDrawer();
+
+      expect(screen.getByText("PATCH events.example.test")).toBeDefined();
+      expect(
+        screen.getByText("No delivery attempts recorded yet."),
+      ).toBeDefined();
+      expect(screen.queryByText(/token=hidden/)).toBeNull();
     });
   });
 

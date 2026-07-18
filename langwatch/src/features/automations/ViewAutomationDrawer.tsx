@@ -128,6 +128,21 @@ export function ViewAutomationDrawer({
             {actionParams.members.join(", ")}
           </Text>
         ) : null;
+      case "SEND_WEBHOOK": {
+        let hostname = "Webhook";
+        try {
+          hostname = actionParams.url
+            ? new URL(actionParams.url).hostname
+            : hostname;
+        } catch {
+          // Stored rows are validated; retain a safe label for legacy data.
+        }
+        return (
+          <Text textStyle="sm" wordBreak="break-all">
+            {actionParams.method ?? "POST"} {hostname}
+          </Text>
+        );
+      }
       case "ADD_TO_DATASET":
         return datasetName ? <Text textStyle="sm">{datasetName}</Text> : null;
       case "ADD_TO_ANNOTATION_QUEUE":

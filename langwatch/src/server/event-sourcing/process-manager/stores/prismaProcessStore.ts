@@ -374,8 +374,13 @@ export class PrismaProcessStore implements ProcessStore {
   async findDueWakes(params: {
     now: number;
     limit: number;
+    processNames?: readonly string[];
   }): Promise<DueWake[]> {
     if (params.limit <= 0) return [];
+    if (params.processNames && params.processNames.length === 0) return [];
+    const processNameFilter = params.processNames
+      ? Prisma.sql`AND "processName" IN (${Prisma.join([...params.processNames])})`
+      : Prisma.empty;
     // Wake scanning is intentionally cross-project worker infrastructure;
     // every returned row still carries its project-scoped process identity.
     const rows = await this.prisma.$queryRaw<ProcessManagerInstance[]>(
@@ -383,6 +388,7 @@ export class PrismaProcessStore implements ProcessStore {
         SELECT *
         FROM "ProcessManagerInstance"
         WHERE "nextWakeAt" <= ${asDate(params.now)}
+        ${processNameFilter}
         ORDER BY "nextWakeAt" ASC, "processName" ASC,
                  "projectId" ASC, "processKey" ASC
         LIMIT ${params.limit}

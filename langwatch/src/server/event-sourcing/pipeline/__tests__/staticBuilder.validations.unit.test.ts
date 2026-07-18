@@ -89,6 +89,78 @@ describe("StaticPipelineBuilder validations", () => {
     });
   });
 
+  describe("when a subscriber uses custom deduplication", () => {
+    const event = {
+      tenantId: "project-1",
+      aggregateId: "trace-1",
+    } as Event;
+
+    it("preserves the full deduplication contract on a fold subscriber", () => {
+      const fold = createMockFoldProjectionDefinition<Event>("summary");
+      const pipeline = definePipeline<Event>()
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withFoldProjection("summary", fold)
+        .withSubscriber("settle", {
+          fold: "summary",
+          dedup: {
+            makeId: (input) => `custom:${input.aggregateId}`,
+            ttlMs: 12_000,
+            extend: false,
+            replace: false,
+            shouldSurviveDispatch: true,
+          },
+          handler: vi.fn(),
+        })
+        .build();
+
+      const deduplication =
+        pipeline.foldReactors.get("settle")?.definition.options
+          ?.deduplication;
+      expect(deduplication).toMatchObject({
+        ttlMs: 12_000,
+        extend: false,
+        replace: false,
+        shouldSurviveDispatch: true,
+      });
+      expect(deduplication?.makeId({ event, foldState: {} })).toBe(
+        "subscriber:settle:custom:trace-1",
+      );
+    });
+
+    it("preserves the full deduplication contract on a raw subscriber", () => {
+      const pipeline = definePipeline<Event>()
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withSubscriber("settle", {
+          events: ["trace_received"],
+          dedup: {
+            makeId: (input) => `custom:${input.aggregateId}`,
+            ttlMs: 12_000,
+            extend: false,
+            replace: false,
+            shouldSurviveDispatch: true,
+          },
+          handler: vi.fn(),
+        })
+        .build();
+
+      const deduplication =
+        pipeline.eventSubscribers.get("settle")?.options?.deduplication;
+      expect(deduplication).toMatchObject({
+        ttlMs: 12_000,
+        extend: false,
+        replace: false,
+        shouldSurviveDispatch: true,
+      });
+      expect(
+        deduplication === "aggregate"
+          ? undefined
+          : deduplication?.makeId(event),
+      ).toBe("custom:trace-1");
+    });
+  });
+
   describe("when a default state projection is registered", () => {
     it("keeps it out of the legacy fold and reactor registries", () => {
       const projection =

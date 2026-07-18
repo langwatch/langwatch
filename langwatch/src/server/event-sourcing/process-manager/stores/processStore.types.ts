@@ -148,7 +148,12 @@ export interface ProcessStore {
   }): Promise<void>;
 
   /** Processes whose nextWakeAt is due, with the revision to guard against staleness. */
-  findDueWakes(params: { now: number; limit: number }): Promise<DueWake[]>;
+  findDueWakes(params: {
+    now: number;
+    limit: number;
+    /** Restrict the global wake scan to process managers mounted here. */
+    processNames?: readonly string[];
+  }): Promise<DueWake[]>;
 
   /**
    * Retention for high-frequency recurring intents (ADR-052): deletes

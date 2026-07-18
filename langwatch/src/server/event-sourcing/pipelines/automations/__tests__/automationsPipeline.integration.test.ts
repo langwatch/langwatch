@@ -22,8 +22,9 @@ const triggerSettlement: ProcessManagerApplier<AutomationEvent> = (pm) =>
   pm
     .state<{ traceIds: string[] }>({ traceIds: [] })
     .intent("noop", emptyIntentSchema, async () => {})
-    .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data) => ({
+    .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => ({
       state: { traceIds: [...state.traceIds, data.traceId] },
+      intents: [ctx.intents.noop(`match:${data.traceId}`, {})],
     }));
 
 type SweepIntents = { noop: IntentSpec<typeof emptyIntentSchema> };
@@ -37,10 +38,14 @@ const graphAlertSweep: ProcessManagerApplier<AutomationEvent> = (pm) =>
     .onWake(sweep)
     .intent("noop", emptyIntentSchema, async () => {});
 
-const command = (traceId: string, occurredAt: number) => ({
+const command = (
+  traceId: string,
+  occurredAt: number,
+  triggerId = "trigger-1",
+) => ({
   tenantId,
   occurredAt,
-  triggerId: "trigger-1",
+  triggerId,
   traceId,
   action: TriggerAction.SEND_EMAIL,
   actionClass: "notify" as const,
@@ -126,6 +131,43 @@ describe("automations pipeline", () => {
           "trace-3",
         ]);
       });
+    });
+  });
+
+  describe("given two triggers in one project match the same trace", () => {
+    it("keeps their process-outbox identities isolated", async () => {
+      const processStore = new InMemoryProcessStore();
+      eventSourcing = new EventSourcing({ processStore, redis: null });
+      const pipeline = eventSourcing.register(
+        createAutomationsPipeline({
+          automationAuditStore: {
+            append: vi.fn().mockResolvedValue(undefined),
+          },
+          triggerSettlement,
+          graphAlertSweep,
+        }),
+      );
+      const commands = mapCommands(pipeline.commands);
+
+      await commands.recordTriggerMatch(command("trace-1", 1_000, "trigger-1"));
+      await commands.recordTriggerMatch(command("trace-1", 2_000, "trigger-2"));
+
+      const messages = await Promise.all(
+        ["trigger-1", "trigger-2"].map((processKey) =>
+          processStore.findMessagesByRef({
+            ref: {
+              processName: "triggerSettlement",
+              projectId: tenantId,
+              processKey,
+            },
+          }),
+        ),
+      );
+
+      expect(messages.map((rows) => rows[0]?.messageKey)).toEqual([
+        "process:trigger-1:match:trace-1",
+        "process:trigger-2:match:trace-1",
+      ]);
     });
   });
 });

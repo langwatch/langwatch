@@ -107,6 +107,7 @@ export class ProcessWakeWorker {
       const due = await this.store.findDueWakes({
         now,
         limit: this.batchSize,
+        processNames: Object.keys(this.managers),
       });
       for (const wake of due) {
         await this.handleOne(wake);

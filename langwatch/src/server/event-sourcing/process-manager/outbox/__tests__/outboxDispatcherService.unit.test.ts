@@ -112,6 +112,27 @@ describe("OutboxDispatcherService", () => {
         expect(attempts[0]!.messageKey).toBe(attempts[1]!.messageKey);
         expect(attempts.map((message) => message.attempt)).toEqual([1, 2]);
       });
+
+      it("uses a provider Retry-After as a floor over exponential backoff", async () => {
+        const handler = vi
+          .fn()
+          .mockRejectedValueOnce(
+            Object.assign(new Error("slow down"), { retryAfterMs: 90_000 }),
+          )
+          .mockResolvedValue(undefined);
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 5_000,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+        await dispatcher.runOnce({ now: T0 + 5_001 });
+        expect(handler).toHaveBeenCalledTimes(1);
+
+        await dispatcher.runOnce({ now: T0 + 90_001 });
+        expect(handler).toHaveBeenCalledTimes(2);
+      });
     });
 
     describe("when the handler keeps failing past maxAttempts", () => {

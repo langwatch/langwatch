@@ -233,7 +233,12 @@ export function isPrivateOrLocalhostIP(ip: string): boolean {
   if (normalized === "::1") return true;
   if (normalized === "::") return true;
   if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
-  if (normalized.startsWith("fe80:")) return true;
+  const firstHextet = normalized.match(/^([0-9a-f]{1,4}):/)?.[1];
+  if (firstHextet) {
+    const first = parseInt(firstHextet, 16);
+    // fe80::/10 spans first hextets fe80 through febf, not only fe80::/16.
+    if ((first & 0xffc0) === 0xfe80) return true;
+  }
 
   const ipv4MappedMatch = normalized.match(/^::ffff:(.+)$/);
   if (ipv4MappedMatch?.[1]) {

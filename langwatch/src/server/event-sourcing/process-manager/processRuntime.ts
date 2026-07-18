@@ -119,12 +119,14 @@ export class ProcessRuntime {
       );
     }
 
-    const factories = buildIntentFactories(config.intents);
     const manager = new ProcessManagerService<unknown>({
       definition: {
         name: config.name,
         initialState: config.state,
         evolve: ({ previousState, input, ref }) => {
+          const factories = buildIntentFactories(config.intents, {
+            processKey: ref.processKey,
+          });
           if (input.kind === "wake") {
             if (!config.onWake) {
               return { state: previousState, nextWakeAt: null, intents: [] };

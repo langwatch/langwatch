@@ -69,6 +69,26 @@ describe("persistWebhookActionParams", () => {
       });
       expect(decryptWebhookHeaders(stored)).toEqual({});
     });
+
+    it("refuses to carry a saved secret to a changed destination", () => {
+      const existing = persistWebhookActionParams({
+        incoming: {
+          ...BASE,
+          headers: { Authorization: "Bearer old" },
+        },
+      });
+
+      expect(() =>
+        persistWebhookActionParams({
+          incoming: {
+            ...BASE,
+            url: "https://attacker.example/collect",
+            headers: { Authorization: WEBHOOK_HEADER_VALUE_KEPT },
+          },
+          existing,
+        }),
+      ).toThrow(/Re-enter webhook header values/);
+    });
   });
 
   describe("when no headers remain", () => {

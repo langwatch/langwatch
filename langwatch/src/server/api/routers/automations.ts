@@ -299,6 +299,17 @@ export const automationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await enforceLicenseLimit(ctx, input.projectId, "automations");
 
+      // This legacy mutation cannot carry the validated/encrypted webhook
+      // destination shape. Never let a direct caller create a malformed or
+      // feature-flag-bypassing SEND_WEBHOOK row; the provider-aware upsert is
+      // the sole webhook writer.
+      if (input.action === TriggerAction.SEND_WEBHOOK) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Webhook automations must be created through the provider-aware upsert API.",
+        });
+      }
+
       const project = await ctx.prisma.project.findUnique({
         where: {
           id: input.projectId,
@@ -860,9 +871,15 @@ export const automationRouter = createTRPCRouter({
               where: { id: input.automationId, projectId: input.projectId },
               select: { actionParams: true },
             });
-            saved = decryptWebhookHeaders(
-              (row?.actionParams ?? {}) as WebhookStoredActionParams,
-            );
+            const stored = (row?.actionParams ?? {}) as WebhookStoredActionParams;
+            if (stored.url !== webhookDestination.url) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message:
+                  "Re-enter webhook header values after changing the destination URL.",
+              });
+            }
+            saved = decryptWebhookHeaders(stored);
           }
           const headers: Record<string, string> = {};
           for (const [name, value] of Object.entries(
@@ -1105,6 +1122,13 @@ export const automationRouter = createTRPCRouter({
                 })
               )?.actionParams as WebhookStoredActionParams | undefined)
             : undefined;
+        if (hasKept && existing?.url !== incoming.url) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Re-enter webhook header values after changing the destination URL.",
+          });
+        }
         webhookActionParams = persistWebhookActionParams({
           incoming,
           existing,

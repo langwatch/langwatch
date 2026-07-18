@@ -55,7 +55,11 @@ describe("ProcessWakeWorker", () => {
       worker.start();
       await vi.waitFor(() => expect(handleWake).toHaveBeenCalledTimes(1));
 
-      expect(findDueWakes).toHaveBeenCalledWith({ now: 123, limit: 7 });
+      expect(findDueWakes).toHaveBeenCalledWith({
+        now: 123,
+        limit: 7,
+        processNames: ["topicClustering"],
+      });
       expect(handleWake).toHaveBeenCalledWith({ wake: dueWake(), now: 123 });
       expect(notifyOutbox).toHaveBeenCalledTimes(1);
       await worker.stop();

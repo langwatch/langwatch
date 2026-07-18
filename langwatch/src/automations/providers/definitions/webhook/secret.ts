@@ -51,6 +51,14 @@ export function persistWebhookActionParams({
   incoming: WebhookActionParams;
   existing?: WebhookStoredActionParams | null;
 }): WebhookStoredActionParams {
+  const hasKept = Object.values(incoming.headers).includes(
+    WEBHOOK_HEADER_VALUE_KEPT,
+  );
+  if (hasKept && existing?.url !== incoming.url) {
+    throw new Error(
+      "Re-enter webhook header values after changing the destination URL.",
+    );
+  }
   const saved = existing ? decryptWebhookHeaders(existing) : {};
   const resolved: Record<string, string> = {};
   for (const [name, value] of Object.entries(incoming.headers)) {

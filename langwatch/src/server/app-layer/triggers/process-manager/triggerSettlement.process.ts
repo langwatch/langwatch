@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { createHash } from "node:crypto";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type { AutomationEvent } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/automations/schemas/constants";
@@ -80,6 +81,13 @@ export function settleBoundary(state: SettlementState): number | null {
   return nextWakeFrom(state);
 }
 
+function digestBatchKey(traceIds: readonly string[]): string {
+  return createHash("sha256")
+    .update(traceIds.join("\0"))
+    .digest("hex")
+    .slice(0, 16);
+}
+
 export function drainDue(state: SettlementState, at: number) {
   const remaining: SettlementState["pendingMatches"] = {};
   const notifyByBoundary = new Map<number, string[]>();
@@ -142,11 +150,14 @@ export const triggerSettlementPM = (
           state: due.state,
           intents: [
             ...due.boundaries.map((boundary) =>
-              ctx.intents.notifyDigest(`digest:${boundary.key}`, {
+              ctx.intents.notifyDigest(
+                `digest:${boundary.key}:${digestBatchKey(boundary.traceIds)}`,
+                {
                 triggerId: ctx.key,
                 traceIds: boundary.traceIds,
                 boundary: boundary.key,
-              }),
+                },
+              ),
             ),
             ...due.settledMatches.map((match) =>
               ctx.intents.persistMatch(`persist:${match.traceId}`, {

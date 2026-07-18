@@ -9,8 +9,8 @@
 Automations today notify through two channels — **Email** (`SEND_EMAIL`) and
 **Slack** (`SEND_SLACK_MESSAGE`). Both are `category: "notify"` providers
 (`src/automations/providers/`, ADR-037), render a customer-authored Liquid
-template (ADR-036), and ride the transactional outbox (ADR-030) on the trace path
-and the graph-alert dispatch helper on the alert path (PR #5015 / ADR-034 Ph 8.1).
+template (ADR-036), and ride the ADR-052 automation process managers on the
+trace path and graph-alert dispatch helper on the alert path.
 
 Customers want to drive their *own* systems off an automation: page PagerDuty,
 open a Jira ticket, kick a CI job, push into a warehouse, fan out through an
@@ -47,8 +47,8 @@ The framework mostly exists; the job is to *compose* it, not invent it:
 - **Encryption at rest** (`src/utils/encryption.ts`, AES-256-GCM), used by
   `ProjectSecret.encryptedValue` (`prisma/schema.prisma:1035`) and
   `LangyGithubToken.encryptedRefreshToken`.
-- **Outbox retry / backoff / dead-letter + operator audit** (`ReactorOutbox`,
-  `prisma/schema.prisma:2880`; `src/server/event-sourcing/outbox/dispatcher.ts`).
+- **Process-manager retry / backoff / dead-letter state**
+  (`ProcessManagerOutbox`; ADR-052).
 - **Fire history** (`TriggerSent` + `TriggerFireHistoryService`, in
   `ViewAutomationDrawer.tsx`).
 
@@ -301,16 +301,14 @@ every future customer-webhook dispatch shares" ADR-030 asked for.
 
 ### 5. Retries & backoff
 
-**Ride the existing `ReactorOutbox` / GroupQueue retry machinery for durability +
-scheduling; record each HTTP attempt as a `WebhookDelivery` row (§6); do NOT
-hand-roll a second attempt loop.** The outbox already gives exponential backoff,
-`maxAttempts` (default 8, `schema.prisma:2900`), `nextAttemptAt`, dead-letter
-(`status: dead`), and an operator surface — reusing it is strictly less code and
-one operational story. The sender throws the typed `DispatchError` (ADR-027) with
-`retryable` set per the HTTP outcome; the queue handles backoff and
-`PgOutboxAuditAdapter` mirrors dispatch-level state to `ReactorOutbox`. The
-per-attempt HTTP detail (status, snippet, latency) the outbox doesn't model is
-written into `WebhookDelivery`.
+**Ride the `triggerSettlement` process manager's leased
+`ProcessManagerOutbox` for durability and retry scheduling; record each HTTP
+attempt as a `WebhookDelivery` row (§6); do not hand-roll a second attempt
+loop.** The process outbox provides bounded exponential backoff,
+`maxAttempts: 8`, leasing, and dead-letter state. The sender throws the typed
+`DispatchError` (ADR-027); terminal failures complete as logged drops while
+retryable failures are re-attempted, with `Retry-After` as a backoff floor.
+Per-attempt HTTP detail (status, snippet, latency) lives in `WebhookDelivery`.
 
 **Retry vs terminal classification:**
 
@@ -349,10 +347,9 @@ dedupe — the request-level analog of the internal `TriggerSent` at-most-once c
 
 ### 6. Deliverability report / delivery log
 
-**A new per-attempt table `WebhookDelivery`.** `ReactorOutbox` is one row per
-*dispatch* and its `renderDiagnostics` blob (`schema.prisma:2910`) is
-render-health, not delivery detail — it cannot express "attempt 3 got a 502 after
-1.2 s". `TriggerSent` is the match-claim ledger. A webhook's value proposition *is*
+**A new per-attempt table `WebhookDelivery`.** `ProcessManagerOutbox` is one
+row per dispatch and cannot express "attempt 3 got a 502 after 1.2 s".
+`TriggerSent` is the match-claim ledger. A webhook's value proposition *is*
 the deliverability report (every retry, status, body, latency), so it earns its
 own table.
 
@@ -477,8 +474,8 @@ path" rule.
 - **Why HMAC over body + timestamp, not body alone.** Body-only signatures are
   replayable; the timestamp gives the receiver a cheap replay window without us
   holding receiver state, and matches what Stripe/GitHub consumers already verify.
-- **Why a dedicated `WebhookDelivery` table.** `ReactorOutbox` is dispatch-grain
-  and audit-owned; `TriggerSent` is the claim ledger. Per-attempt HTTP forensics
+- **Why a dedicated `WebhookDelivery` table.** `ProcessManagerOutbox` is
+  dispatch-grain; `TriggerSent` is the claim ledger. Per-attempt HTTP forensics
   is a genuinely new grain and the feature's headline value — it earns a table, not
   a JSON blob on an existing row.
 - **What we compromise.** More Postgres write volume (one row per attempt) and a
@@ -546,14 +543,13 @@ the drawer's "Recent deliveries" drill-down, and a 30-day prune cron
 (`/api/cron/webhook_delivery_cleanup`).
 
 > **Known design debt / future direction.** `WebhookDelivery` is a
-> webhook-only, append-per-attempt log that sits *alongside* `ReactorOutbox`
-> (the generic delivery engine — one *mutable* row per dispatch, `lastError`
-> only) and `TriggerSent` (the idempotency/incident claim). The three answer
+> webhook-only, append-per-attempt log that sits *alongside*
+> `ProcessManagerOutbox` (the generic delivery engine — one mutable row per
+> dispatch) and `TriggerSent` (the idempotency/incident claim). The three answer
 > different questions today, but the deliverability report arguably belongs
-> *in* the outbox's audit mechanism (which already fires an `onFailed({ attempt,
-> willRetry })` hook per attempt) so every channel gets delivery history, not
-> just webhooks. Deferred deliberately: revisit unifying the per-attempt log
-> into the outbox rather than growing a parallel table.
+> *in* the process outbox's audit mechanism so every channel gets delivery
+> history, not just webhooks. Deferred deliberately: revisit unifying the
+> per-attempt log into the outbox rather than growing a parallel table.
 
 **Still deferred:** HMAC request signing (§3, including the signing toggle UI)
 and the `ProjectSecret`-ref auth union — the only remaining Phase 2 gap.

@@ -169,6 +169,13 @@ class ProcessManagerBuilder<E extends Event> {
   }
 
   schedule(options: { everyMs: number }): this {
+    if (!Number.isFinite(options.everyMs) || options.everyMs <= 0) {
+      throw new ConfigurationError(
+        "ProcessManagerBuilder",
+        `Process manager "${this.name}" schedule everyMs must be a positive finite number`,
+        { name: this.name, everyMs: options.everyMs },
+      );
+    }
     this.scheduleOptions = options;
     return this;
   }

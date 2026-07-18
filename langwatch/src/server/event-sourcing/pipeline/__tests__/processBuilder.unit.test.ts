@@ -98,6 +98,27 @@ describe("ProcessManagerBuilder", () => {
         expect(definition.config.schedule).toEqual({ everyMs: 30_000 });
       });
     });
+
+    describe("when the interval cannot advance time", () => {
+      it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+        "rejects everyMs=%s",
+        (everyMs) => {
+          expect(() =>
+            buildProcessManager<AutomationEvent>({
+              name: "invalidSweep",
+              applier: (pm) =>
+                pm
+                  .state({ lastWakeAt: null as number | null })
+                  .schedule({ everyMs })
+                  .onWake<{ evaluateGraph: IntentSpec<typeof payloadSchema> }>(
+                    (state) => ({ state }),
+                  )
+                  .intent("evaluateGraph", payloadSchema, async () => {}),
+            }),
+          ).toThrow(/positive finite number/);
+        },
+      );
+    });
   });
 
   describe("given duplicate declarations", () => {

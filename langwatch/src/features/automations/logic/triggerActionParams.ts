@@ -17,6 +17,8 @@ export interface TriggerActionParams {
   members?: string[];
   datasetId?: string;
   annotators?: { id: string; name: string }[];
+  url?: string;
+  method?: "POST" | "PUT" | "PATCH";
   // Graph-alert keys — present on rows where `customGraphId` is set.
   seriesName?: string;
   operator?: GraphAlertOperator;

@@ -78,6 +78,16 @@ function defaultRetryDelayMs({ attempt }: { attempt: number }): number {
   return Math.min(1_000 * 2 ** (attempt - 1), 60_000);
 }
 
+function retryAfterMsOf(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const retryAfterMs = Reflect.get(error, "retryAfterMs");
+  return typeof retryAfterMs === "number" &&
+    Number.isFinite(retryAfterMs) &&
+    retryAfterMs > 0
+    ? retryAfterMs
+    : undefined;
+}
+
 /**
  * Leases due process-outbox messages and dispatches each inside a CONSUMER
  * span whose remote parent is restored from the message's persisted W3C
@@ -201,11 +211,15 @@ export class OutboxDispatcherService {
           });
           span.setStatus({ code: SpanStatusCode.ERROR });
           const dead = attempt >= this.maxAttempts;
+          const retryDelayMs = Math.max(
+            this.retryDelayMs({ attempt }),
+            retryAfterMsOf(error) ?? 0,
+          );
           await this.store.markFailed({
             identity,
             leaseToken: message.leaseToken,
             now,
-            nextAttemptAt: now + this.retryDelayMs({ attempt }),
+            nextAttemptAt: now + retryDelayMs,
             dead,
           });
           (dead ? report.dead : report.retried).push(message.messageKey);

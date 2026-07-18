@@ -20,7 +20,7 @@ export function createAutomationAuditMapProjection({
     name: "automationAudit",
     eventTypes: [TRIGGER_MATCH_RECORDED_EVENT_TYPE],
     map: (event) => ({
-      eventId: event.id,
+      eventId: event.idempotencyKey ?? event.id,
       triggerId: event.data.triggerId,
       traceId: event.data.traceId,
       actionClass: event.data.actionClass,

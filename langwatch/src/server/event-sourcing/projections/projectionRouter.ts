@@ -342,12 +342,14 @@ export class ProjectionRouter<
             killSwitch: reactor.options?.killSwitch,
             disabled: reactor.options?.disabled,
             delay: reactor.options?.delay,
-            deduplication: reactor.options?.makeJobId
-              ? {
-                  makeId: reactor.options.makeJobId,
-                  ttlMs: reactor.options.ttl,
-                }
-              : undefined,
+            deduplication:
+              reactor.options?.deduplication ??
+              (reactor.options?.makeJobId
+                ? {
+                    makeId: reactor.options.makeJobId,
+                    ttlMs: reactor.options.ttl,
+                  }
+                : undefined),
           },
         };
       }
@@ -378,12 +380,14 @@ export class ProjectionRouter<
             killSwitch: reactor.options?.killSwitch,
             disabled: reactor.options?.disabled,
             delay: reactor.options?.delay,
-            deduplication: reactor.options?.makeJobId
-              ? {
-                  makeId: reactor.options.makeJobId,
-                  ttlMs: reactor.options.ttl,
-                }
-              : undefined,
+            deduplication:
+              reactor.options?.deduplication ??
+              (reactor.options?.makeJobId
+                ? {
+                    makeId: reactor.options.makeJobId,
+                    ttlMs: reactor.options.ttl,
+                  }
+                : undefined),
           },
         };
       }

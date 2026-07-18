@@ -357,11 +357,31 @@ export class StaticPipelineBuilderWithNameAndType<
       const definition: ReactorDefinition<EventType> = {
         name: subscriberName,
         options: {
-          makeJobId: (payload: { event: Event; foldState: unknown }) =>
-            spec.dedupId
-              ? `subscriber:${subscriberName}:${spec.dedupId(payload.event as EventType)}`
-              : `subscriber:${subscriberName}:${payload.event.tenantId}:${String(payload.event.aggregateId)}`,
-          ttl: spec.ttl ?? 30_000,
+          deduplication: (() => {
+            const defaultId = (event: Event) =>
+              `${event.tenantId}:${String(event.aggregateId)}`;
+            const customDedup =
+              spec.dedup && spec.dedup !== "aggregate"
+                ? spec.dedup
+                : undefined;
+            if (customDedup) {
+              return {
+                ...customDedup,
+                makeId: (payload: { event: Event; foldState: unknown }) =>
+                  `subscriber:${subscriberName}:${customDedup.makeId(payload.event as EventType)}`,
+                ttlMs: spec.ttl ?? customDedup.ttlMs,
+              };
+            }
+            return {
+              makeId: (payload: { event: Event; foldState: unknown }) =>
+                `subscriber:${subscriberName}:${
+                  spec.dedupId
+                    ? spec.dedupId(payload.event as EventType)
+                    : defaultId(payload.event)
+                }`,
+              ttlMs: spec.ttl ?? 30_000,
+            };
+          })(),
           delay: spec.delay ?? 0,
         },
         // Pre-enqueue rejection: a filtered event never pays serialization.
@@ -388,7 +408,15 @@ export class StaticPipelineBuilderWithNameAndType<
       eventTypes: spec.events ?? [],
       options: {
         delay: spec.delay,
-        deduplication: spec.dedup,
+        deduplication:
+          spec.dedup ??
+          (spec.dedupId
+            ? {
+                makeId: (event) =>
+                  `subscriber:${subscriberName}:${spec.dedupId!(event)}`,
+                ttlMs: spec.ttl,
+              }
+            : undefined),
       },
       handle: async (event, context) => {
         if (spec.when && !spec.when(event)) return;

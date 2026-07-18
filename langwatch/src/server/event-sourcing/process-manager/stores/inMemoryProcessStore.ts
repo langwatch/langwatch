@@ -190,10 +190,16 @@ export class InMemoryProcessStore implements ProcessStore {
   async findDueWakes(params: {
     now: number;
     limit: number;
+    processNames?: readonly string[];
   }): Promise<DueWake[]> {
+    if (params.processNames && params.processNames.length === 0) return [];
+    const allowed = params.processNames
+      ? new Set(params.processNames)
+      : undefined;
     const due: DueWake[] = [];
     for (const instance of this.instances.values()) {
       if (due.length >= params.limit) break;
+      if (allowed && !allowed.has(instance.ref.processName)) continue;
       if (instance.nextWakeAt === null || instance.nextWakeAt > params.now) {
         continue;
       }
