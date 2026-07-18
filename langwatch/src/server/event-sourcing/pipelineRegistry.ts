@@ -308,12 +308,18 @@ export interface PipelineRegistryDeps {
 export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
 
-  private cached<State>(
-    inner: FoldProjectionStore<State>,
-    keyPrefix: string,
-  ): FoldProjectionStore<State> {
+  private cached<State>({
+    inner,
+    keyPrefix,
+    ttlSeconds,
+  }: {
+    inner: FoldProjectionStore<State>;
+    keyPrefix: string;
+    ttlSeconds?: number;
+  }): FoldProjectionStore<State> {
     return new RedisCachedFoldStore<State>(inner, this.deps.redis as Redis, {
       keyPrefix,
+      ttlSeconds,
     });
   }
 
@@ -324,10 +330,10 @@ export class PipelineRegistry {
     // See: customerIoTraceSyncReactor, customerIoEvaluationSyncReactor,
     //      customerIoSimulationSyncReactor
 
-    const traceSummaryStore = this.cached<TraceSummaryData>(
-      new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
-      "trace_summaries",
-    );
+    const traceSummaryStore = this.cached<TraceSummaryData>({
+      inner: new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
+      keyPrefix: "trace_summaries",
+    });
 
     const evalPipeline = this.registerEvaluationPipeline({ traceSummaryStore });
     const {
@@ -608,12 +614,12 @@ export class PipelineRegistry {
         // store's get() returns null by design (lossy row, no read-back),
         // and on a cache miss the fold's refoldOnStoreMiss option rebuilds
         // state from the event log. Same wiring as trace_analytics.
-        evaluationAnalyticsStore: this.cached<EvaluationAnalyticsData>(
-          new EvaluationAnalyticsStore(
+        evaluationAnalyticsStore: this.cached<EvaluationAnalyticsData>({
+          inner: new EvaluationAnalyticsStore(
             this.deps.repositories.evaluationAnalytics,
           ),
-          "evaluation_analytics",
-        ),
+          keyPrefix: "evaluation_analytics",
+        }),
         evaluationAnalyticsRollupAppendStore:
           new EvaluationAnalyticsRollupAppendStore(
             this.deps.repositories.evaluationAnalyticsRollup,
@@ -784,10 +790,10 @@ export class PipelineRegistry {
         // cache miss the fold's refoldOnStoreMiss option rebuilds state from
         // the event log. Without this wrapper every event would trigger a
         // full event-log re-fold.
-        traceAnalyticsStore: this.cached<TraceAnalyticsData>(
-          new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
-          "trace_analytics",
-        ),
+        traceAnalyticsStore: this.cached<TraceAnalyticsData>({
+          inner: new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
+          keyPrefix: "trace_analytics",
+        }),
         logRecordAppendStore: new LogRecordAppendStore(
           this.deps.repositories.logRecordStorage,
         ),
@@ -927,13 +933,13 @@ export class PipelineRegistry {
   private registerSuiteRunPipeline() {
     return this.deps.eventSourcing.register(
       createSuiteRunProcessingPipeline({
-        suiteRunStateFoldStore: this.cached<SuiteRunStateData>(
-          new RepositoryFoldStore<SuiteRunStateData>(
+        suiteRunStateFoldStore: this.cached<SuiteRunStateData>({
+          inner: new RepositoryFoldStore<SuiteRunStateData>(
             this.deps.repositories.suiteRunState,
             SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
           ),
-          "suite_runs",
-        ),
+          keyPrefix: "suite_runs",
+        }),
       }),
     );
   }
@@ -949,13 +955,13 @@ export class PipelineRegistry {
       CommandDispatcher<ComputeRunMetricsCommandData>
     >;
   }) {
-    const simulationRunStore = this.cached<SimulationRunStateData>(
-      new RepositoryFoldStore<SimulationRunStateData>(
+    const simulationRunStore = this.cached<SimulationRunStateData>({
+      inner: new RepositoryFoldStore<SimulationRunStateData>(
         this.deps.repositories.simulationRunState,
         SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
       ),
-      "simulation_runs",
-    );
+      keyPrefix: "simulation_runs",
+    });
     const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor(
       {
         broadcast: this.deps.broadcast,
@@ -1089,12 +1095,12 @@ export class PipelineRegistry {
       PipelineRegistry["registerTracePipeline"]
     >["wireExperimentDeps"];
   }) {
-    const experimentRunStore = this.cached<ExperimentRunStateData>(
-      createExperimentRunStateFoldStore(
+    const experimentRunStore = this.cached<ExperimentRunStateData>({
+      inner: createExperimentRunStateFoldStore(
         this.deps.repositories.experimentRunState,
       ),
-      "experiment_runs",
-    );
+      keyPrefix: "experiment_runs",
+    });
 
     const experimentRunPipeline = this.deps.eventSourcing.register(
       createExperimentRunProcessingPipeline({
