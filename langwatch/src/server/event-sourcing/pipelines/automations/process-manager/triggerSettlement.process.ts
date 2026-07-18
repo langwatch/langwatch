@@ -27,7 +27,7 @@ export const TRIGGER_SETTLEMENT_PROCESS_NAME = "triggerSettlement" as const;
 export const MAX_PENDING_MATCHES = 1_000;
 export type SettlementState = TriggerSettlementState;
 
-const INITIAL_STATE: SettlementState = {
+export const INITIAL_SETTLEMENT_STATE: SettlementState = {
   pendingMatches: {},
   overflowFlushed: 0,
 };
@@ -98,7 +98,7 @@ export function settleBoundary(state: SettlementState): number | null {
   return nextWakeFrom(state);
 }
 
-function digestBatchKey(traceIds: readonly string[]): string {
+export function digestBatchKey(traceIds: readonly string[]): string {
   return createHash("sha256")
     .update(traceIds.join("\0"))
     .digest("hex")
@@ -139,94 +139,3 @@ export function drainDue(state: SettlementState, at: number) {
     nextBoundary: nextWakeFrom(nextState),
   };
 }
-
-export interface TriggerSettlementPmDeps {
-  dispatch: TriggerSettlementDispatchDeps;
-}
-
-export const triggerSettlementPM =
-  (deps: TriggerSettlementPmDeps): ProcessManagerApplier<AutomationEvent> =>
-  (pm) =>
-    pm
-      .state<SettlementState>(INITIAL_STATE)
-      .intent(
-        TRIGGER_SETTLEMENT_INTENT_TYPES.NOTIFY_DIGEST,
-        notifyDigestIntentSchema,
-        createNotifyDigestHandler(deps.dispatch),
-      )
-      .intent(
-        TRIGGER_SETTLEMENT_INTENT_TYPES.PERSIST_MATCH,
-        persistMatchIntentSchema,
-        createPersistMatchHandler(deps.dispatch),
-      )
-      .intent(
-        TRIGGER_SETTLEMENT_INTENT_TYPES.LOG_OVERFLOW,
-        logOverflowIntentSchema,
-        createLogOverflowHandler(),
-      )
-      .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => {
-        const { state: nextState, flushed } = addPending(state, data, ctx.at);
-        return {
-          state: nextState,
-          // Cap hit: the oldest matches dispatch NOW instead of being
-          // discarded — degraded batching under extreme load, never loss.
-          intents:
-            flushed.length > 0
-              ? [
-                  ...flushed.map(({ traceId, match }) =>
-                    match.actionClass === "persist"
-                      ? ctx.intents.persistMatch(
-                          `persist:${traceId}:${match.settleWindowBucket}`,
-                          { triggerId: ctx.key, traceId },
-                        )
-                      : ctx.intents.notifyDigest(
-                          `digest:${match.dispatchDueAt}:${digestBatchKey([traceId])}`,
-                          {
-                            triggerId: ctx.key,
-                            traceIds: [traceId],
-                            boundary: match.dispatchDueAt,
-                          },
-                        ),
-                  ),
-                  ctx.intents.logOverflow(
-                    `overflow:${nextState.overflowFlushed}`,
-                    {
-                      triggerId: ctx.key,
-                      flushed: flushed.length,
-                      totalFlushed: nextState.overflowFlushed,
-                    },
-                  ),
-                ]
-              : undefined,
-          nextWakeAt: settleBoundary(nextState),
-        };
-      })
-      .onWake((state, ctx) => {
-        const due = drainDue(state, ctx.at);
-        return {
-          state: due.state,
-          intents: [
-            ...due.boundaries.map((boundary) =>
-              ctx.intents.notifyDigest(
-                `digest:${boundary.key}:${digestBatchKey(boundary.traceIds)}`,
-                {
-                  triggerId: ctx.key,
-                  traceIds: boundary.traceIds,
-                  boundary: boundary.key,
-                },
-              ),
-            ),
-            ...due.settledMatches.map((match) =>
-              ctx.intents.persistMatch(
-                `persist:${match.traceId}:${match.settleWindowBucket}`,
-                {
-                  triggerId: ctx.key,
-                  traceId: match.traceId,
-                },
-              ),
-            ),
-          ],
-          nextWakeAt: due.nextBoundary,
-        };
-      })
-      .outbox({ maxAttempts: 8, leaseDurationMs: 120_000 });

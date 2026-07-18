@@ -38,7 +38,10 @@ type PruneIntents = {
   prune: IntentSpec<typeof pruneSchema>;
 };
 
-const wake: WakeHandler<WebhookDeliveryPruneState, PruneIntents> = (
+export const webhookDeliveryPruneWake: WakeHandler<
+  WebhookDeliveryPruneState,
+  PruneIntents
+> = (
   _state,
   ctx,
 ) => ({
@@ -46,7 +49,7 @@ const wake: WakeHandler<WebhookDeliveryPruneState, PruneIntents> = (
   intents: [ctx.intents.prune(`prune:${ctx.at}`, { scheduledFor: ctx.at })],
 });
 
-function runPrune(deps: WebhookDeliveryPruneDeps) {
+export function runWebhookDeliveryPrune(deps: WebhookDeliveryPruneDeps) {
   return async (): Promise<void> => {
     const startedAt = (deps.now ?? Date.now)();
     const deleted = await deps.pruneExpired();
@@ -66,13 +69,3 @@ function runPrune(deps: WebhookDeliveryPruneDeps) {
     }
   };
 }
-
-export const webhookDeliveryPrunePM = (
-  deps: WebhookDeliveryPruneDeps,
-): ProcessManagerApplier<AutomationEvent> =>
-  (pm) =>
-    pm
-      .state<WebhookDeliveryPruneState>({ lastPruneAt: null })
-      .schedule({ everyMs: WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS })
-      .onWake(wake)
-      .intent("prune", pruneSchema, runPrune(deps));

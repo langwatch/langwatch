@@ -130,13 +130,15 @@ Feature: Webhook (generic HTTP) automation action
 
     Scenario: The delivery log never stores request content
       Given a webhook automation with custom headers that fires
-      Then the delivery row stores the outcome, status, latency, and error only
-      And the request URL, headers, and response body are never stored
+      Then the delivery row stores the outcome, status, latency, and a capped error summary
+      And the request URL, headers, and body are never stored
 
-    Scenario: A failed attempt is classified for operator guidance
-      Given a webhook automation whose endpoint cannot be reached
+    Scenario: A failed attempt keeps the receiver's response for debugging
+      Given a webhook automation whose endpoint answers an error
       When the attempt fails
-      Then the delivery row carries a failure classification the drawer can explain
+      Then the truncated response body and headers are stored encrypted
+      And any configured header value echoed back is masked before storage
+      And the stored response is deleted with the row by the prune
 
     Scenario: The delivery log is pruned after 30 days
       Given delivery rows older than 30 days exist

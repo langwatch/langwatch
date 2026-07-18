@@ -3,7 +3,6 @@ import type {
   WebhookDeliveryInput,
   WebhookDeliveryRepository,
   WebhookDeliveryRow,
-  WebhookFailureKind,
 } from "./webhook-delivery.repository";
 
 export class PrismaWebhookDeliveryRepository
@@ -20,7 +19,7 @@ export class PrismaWebhookDeliveryRepository
         responseStatus: input.responseStatus ?? null,
         latencyMs: input.latencyMs ?? null,
         error: input.error ?? null,
-        failureKind: input.failureKind ?? null,
+        responseEncrypted: input.responseEncrypted ?? null,
         outcome: input.outcome,
       },
     });
@@ -47,7 +46,7 @@ export class PrismaWebhookDeliveryRepository
       responseStatus: row.responseStatus,
       latencyMs: row.latencyMs,
       error: row.error,
-      failureKind: (row.failureKind as WebhookFailureKind | null) ?? null,
+      responseEncrypted: row.responseEncrypted,
       outcome: row.outcome,
       firedAt: row.firedAt,
     }));

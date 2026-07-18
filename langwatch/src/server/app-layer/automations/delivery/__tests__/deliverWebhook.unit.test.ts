@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { WebhookDeliveryInput } from "~/server/app-layer/automations/repositories/webhook-delivery.repository";
-import { classifyWebhookFailure, deliverWebhook } from "../deliverWebhook";
+import { decrypt } from "~/utils/encryption";
+import {
+  deliverWebhook,
+  type WebhookFailureResponse,
+} from "../deliverWebhook";
 import type { sendWebhook, WebhookSendResult } from "../sendWebhook";
 
 const base = {
@@ -81,12 +85,37 @@ describe("deliverWebhook", () => {
       expect(rows[0]).toMatchObject({
         responseStatus: 503,
         outcome: "retryable",
-        failureKind: "server_error",
       });
-      // The status is the fact; the classified error message embeds a
-      // response-body snippet, so HTTP failures store no error text at all.
-      expect(rows[0]!.error).toBeNull();
-      expect(JSON.stringify(rows[0])).not.toContain("down");
+      // The capped classified message is kept — it may quote the RECEIVER's
+      // error body (their fault if they echo secrets); our own request
+      // content never appears in it.
+      expect(rows[0]!.error).toContain("HTTP 503");
+      expect(JSON.stringify(rows[0])).not.toContain("Bearer secret");
+    });
+
+    it("scrubs our configured header values when the receiver echoes them", async () => {
+      const rows: WebhookDeliveryInput[] = [];
+      await expect(
+        deliverWebhook({
+          ...base,
+          send: sendResolvingWith({
+            status: 500,
+            body: 'auth failed for "Bearer secret"',
+            responseHeaders: { "x-echo": "Bearer secret" },
+          }),
+          recorder: async (row) => {
+            rows.push(row);
+          },
+        }),
+      ).rejects.toBeInstanceOf(DispatchError);
+      expect(rows[0]!.error).toContain("***");
+      expect(JSON.stringify(rows[0])).not.toContain("Bearer secret");
+      // Scrubbed inside the encrypted response too — body AND headers.
+      const response = JSON.parse(
+        decrypt(rows[0]!.responseEncrypted!),
+      ) as WebhookFailureResponse;
+      expect(response.body).toContain("***");
+      expect(response.headers).toEqual({ "x-echo": "***" });
     });
   });
 
@@ -105,8 +134,12 @@ describe("deliverWebhook", () => {
       expect(rows[0]).toMatchObject({
         responseStatus: 404,
         outcome: "terminal",
-        failureKind: "client_error",
       });
+      // The receiver's truncated response is kept encrypted for debugging.
+      const response = JSON.parse(
+        decrypt(rows[0]!.responseEncrypted!),
+      ) as WebhookFailureResponse;
+      expect(response.body).toBe("gone");
     });
   });
 
@@ -131,7 +164,7 @@ describe("deliverWebhook", () => {
       expect(rows[0]).toMatchObject({
         responseStatus: null,
         error: "blocked: private address",
-        failureKind: "blocked_url",
+        responseEncrypted: null,
         outcome: "terminal",
       });
     });
@@ -157,51 +190,6 @@ describe("deliverWebhook", () => {
         send: sendResolvingWith({ status: 200 }),
       });
       expect(result.status).toBe(200);
-    });
-  });
-});
-
-describe("classifyWebhookFailure", () => {
-  describe("when a response status is present", () => {
-    it("maps 429 to rate_limited, 408/5xx to server_error, other 4xx to client_error", () => {
-      expect(classifyWebhookFailure({ status: 429, error: null })).toBe(
-        "rate_limited",
-      );
-      expect(classifyWebhookFailure({ status: 408, error: null })).toBe(
-        "server_error",
-      );
-      expect(classifyWebhookFailure({ status: 502, error: null })).toBe(
-        "server_error",
-      );
-      expect(classifyWebhookFailure({ status: 422, error: null })).toBe(
-        "client_error",
-      );
-    });
-  });
-
-  describe("when the attempt failed without a response", () => {
-    it("classifies SSRF-gate refusals as blocked_url", () => {
-      expect(
-        classifyWebhookFailure({
-          status: null,
-          error: "URL blocked by SSRF protection",
-        }),
-      ).toBe("blocked_url");
-      expect(
-        classifyWebhookFailure({
-          status: null,
-          error: "redirect to a private address was refused",
-        }),
-      ).toBe("blocked_url");
-    });
-
-    it("classifies timeouts and everything else as timeout/network", () => {
-      expect(
-        classifyWebhookFailure({ status: null, error: "request timed out" }),
-      ).toBe("timeout");
-      expect(
-        classifyWebhookFailure({ status: null, error: "ECONNRESET" }),
-      ).toBe("network");
     });
   });
 });

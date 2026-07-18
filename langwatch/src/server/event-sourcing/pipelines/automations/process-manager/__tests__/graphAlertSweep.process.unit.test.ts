@@ -1,22 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import { buildIntentFactories } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import {
-  GRAPH_ALERT_SWEEP_INTERVAL_MS,
-  graphAlertSweepPM,
-} from "../graphAlertSweep.process";
+import { automationProcessDefinition } from "../../__tests__/pipelineTestHarness";
+import { GRAPH_ALERT_SWEEP_INTERVAL_MS } from "../graphAlertSweep.process";
 
 describe("graph alert sweep process", () => {
   describe("when the process manager is built", () => {
     it("declares a scheduled singleton wake every thirty seconds", () => {
-      const definition = buildProcessManager({
+      const definition = automationProcessDefinition({
         name: "graphAlertSweep",
-        applier: graphAlertSweepPM({
-          decideSweepCandidates: vi.fn().mockResolvedValue([]),
-          evaluateGraphTrigger: vi.fn().mockResolvedValue(undefined),
-          deleteDispatchedBefore: vi.fn().mockResolvedValue(0),
-        }),
       });
 
       expect(definition.config.schedule).toEqual({
@@ -25,13 +17,8 @@ describe("graph alert sweep process", () => {
     });
 
     it("subscribes to no pipeline events", () => {
-      const definition = buildProcessManager({
+      const definition = automationProcessDefinition({
         name: "graphAlertSweep",
-        applier: graphAlertSweepPM({
-          decideSweepCandidates: vi.fn().mockResolvedValue([]),
-          evaluateGraphTrigger: vi.fn().mockResolvedValue(undefined),
-          deleteDispatchedBefore: vi.fn().mockResolvedValue(0),
-        }),
       });
 
       expect(definition.config.eventTypes).toEqual([]);
@@ -43,20 +30,22 @@ describe("graph alert sweep process", () => {
       it("emits the sweep intent, evaluates the candidate, and prunes old intents", async () => {
         const evaluateGraphTrigger = vi.fn().mockResolvedValue(undefined);
         const deleteDispatchedBefore = vi.fn().mockResolvedValue(4);
-        const definition = buildProcessManager({
+        const definition = automationProcessDefinition({
           name: "graphAlertSweep",
-          applier: graphAlertSweepPM({
-            decideSweepCandidates: vi.fn().mockResolvedValue([
-              {
-                triggerId: "trigger-1",
-                projectId: "project-1",
-                reason: "heartbeat",
-              },
-            ]),
-            evaluateGraphTrigger,
-            deleteDispatchedBefore,
-            now: () => 10_000,
-          }),
+          deps: {
+            sweep: {
+              decideSweepCandidates: vi.fn().mockResolvedValue([
+                {
+                  triggerId: "trigger-1",
+                  projectId: "project-1",
+                  reason: "heartbeat",
+                },
+              ]),
+              evaluateGraphTrigger,
+              deleteDispatchedBefore,
+              now: () => 10_000,
+            },
+          },
         });
 
         const wake = definition.config.onWake!(

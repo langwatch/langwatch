@@ -489,22 +489,19 @@ function WebhookDeliveriesList({
   );
 }
 
-/** Plain-language guidance per failure classification — what happened and
- *  what the operator can do about it. */
-const FAILURE_KIND_GUIDANCE: Record<string, string> = {
-  blocked_url:
-    "This URL points somewhere LangWatch won't deliver to — private networks and redirects are blocked. Check the destination URL.",
-  timeout:
-    "The endpoint didn't answer in time. Make sure it responds quickly; delivery retries automatically.",
-  network:
-    "The endpoint couldn't be reached. Check the URL and that your receiver is up.",
-  rate_limited:
-    "The endpoint asked us to slow down. Delivery backs off and retries.",
-  client_error:
-    "The endpoint rejected the request. Check its authentication and the payload it expects.",
-  server_error:
-    "The endpoint had a server error. Delivery retries automatically.",
-};
+/** Plain-language guidance derived from the HTTP status bucket — what
+ *  happened and what the operator can do about it. Transport failures carry
+ *  their own self-explanatory error text instead. */
+function guidanceForStatus(status: number | null): string | undefined {
+  if (status === null) return undefined;
+  if (status === 429)
+    return "The endpoint asked us to slow down. Delivery backs off and retries.";
+  if (status === 408 || status >= 500)
+    return "The endpoint had a server error. Delivery retries automatically.";
+  if (status >= 400)
+    return "The endpoint rejected the request. Check its authentication and the payload it expects.";
+  return undefined;
+}
 
 function DeliveryAttemptRow({
   attempt,
@@ -520,10 +517,11 @@ function DeliveryAttemptRow({
     attempt.responseStatus != null
       ? `HTTP ${attempt.responseStatus}`
       : (attempt.error ?? "No response");
-  const guidance = attempt.failureKind
-    ? FAILURE_KIND_GUIDANCE[attempt.failureKind]
-    : undefined;
-  const hasDetail = Boolean(attempt.error ?? guidance);
+  const guidance =
+    attempt.outcome === "success"
+      ? undefined
+      : guidanceForStatus(attempt.responseStatus);
+  const hasDetail = Boolean(attempt.error ?? guidance ?? attempt.response);
 
   return (
     <Box borderBottomWidth="1px" borderColor="border" _last={{ borderBottomWidth: 0 }}>
@@ -563,6 +561,25 @@ function DeliveryAttemptRow({
             >
               {attempt.error}
             </Code>
+          ) : null}
+          {attempt.response?.body ? (
+            <Code
+              fontSize="xs"
+              width="full"
+              whiteSpace="pre-wrap"
+              wordBreak="break-word"
+            >
+              {attempt.response.body}
+            </Code>
+          ) : null}
+          {attempt.response?.headers ? (
+            <VStack align="stretch" gap={0.5}>
+              {Object.entries(attempt.response.headers).map(([name, value]) => (
+                <Code key={name} fontSize="xs" width="full" whiteSpace="pre-wrap">
+                  {name}: {value}
+                </Code>
+              ))}
+            </VStack>
           ) : null}
           {guidance ? (
             <Text textStyle="xs" color="fg.muted">

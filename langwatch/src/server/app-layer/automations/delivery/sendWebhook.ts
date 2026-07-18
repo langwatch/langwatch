@@ -81,6 +81,8 @@ export interface WebhookSendResult {
   status: number;
   /** Response snippet, already size-capped by the HTTP utility. */
   body: string;
+  /** Truncated response headers — debugging context for the delivery log. */
+  responseHeaders?: Record<string, string>;
   /** Parsed `Retry-After` (ms) the receiver asked us to back off by. */
   retryAfterMs?: number;
   /** The `X-LangWatch-Event-Id` actually sent — surfaced for the delivery log. */

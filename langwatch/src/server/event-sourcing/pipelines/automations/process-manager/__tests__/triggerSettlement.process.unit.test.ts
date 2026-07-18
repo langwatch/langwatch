@@ -1,7 +1,7 @@
 import { TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import { buildIntentFactories } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import { automationProcessDefinition } from "../../__tests__/pipelineTestHarness";
 import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/automations/schemas/constants";
 import type { TriggerMatchRecordedEventData } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 import {
@@ -10,9 +10,7 @@ import {
   MAX_PENDING_MATCHES,
   type SettlementState,
   settleBoundary,
-  triggerSettlementPM,
 } from "../triggerSettlement.process";
-import type { TriggerSettlementDispatchDeps } from "../triggerSettlementIntentHandlers";
 
 const initialState = (): SettlementState => ({
   pendingMatches: {},
@@ -121,11 +119,8 @@ describe("trigger settlement process", () => {
   describe("given a persist match completed its settle round", () => {
     describe("when later activity arrives in a new settle window", () => {
       it("creates a fresh persist intent for the later round", () => {
-        const definition = buildProcessManager({
+        const definition = automationProcessDefinition({
           name: "triggerSettlement",
-          applier: triggerSettlementPM({
-            dispatch: {} as TriggerSettlementDispatchDeps,
-          }),
         });
         const evolve =
           definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
@@ -222,11 +217,8 @@ describe("trigger settlement process", () => {
             },
           ]),
         );
-        const definition = buildProcessManager({
+        const definition = automationProcessDefinition({
           name: "triggerSettlement",
-          applier: triggerSettlementPM({
-            dispatch: {} as TriggerSettlementDispatchDeps,
-          }),
         });
         const evolve =
           definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;

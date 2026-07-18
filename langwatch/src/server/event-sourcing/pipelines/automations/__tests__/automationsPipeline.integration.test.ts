@@ -1,48 +1,38 @@
 import { TriggerAction } from "@prisma/client";
-import { z } from "zod";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createTenantId } from "../../../domain/tenantId";
 import { EventSourcing } from "../../../eventSourcing";
-import type { ProcessManagerApplier } from "../../../pipeline/processBuilder";
-import type {
-  IntentSpec,
-  WakeHandler,
-} from "../../../pipeline/processManagerDefinition";
 import { mapCommands } from "../../../mapCommands";
 import { InMemoryProcessStore } from "../../../process-manager/stores/inMemoryProcessStore";
 import type { AutomationEvent } from "../schemas/events";
-import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "../schemas/constants";
-import { createAutomationsPipeline } from "../pipeline";
+import type { SettlementState } from "../process-manager/triggerSettlement.process";
+import type { TriggerSettlementDispatchDeps } from "../process-manager/triggerSettlementIntentHandlers";
+import {
+  createAutomationsPipeline,
+  type AutomationsPipelineDeps,
+} from "../pipeline";
 
 const tenantId = createTenantId("project-1");
-const emptyIntentSchema = z.object({});
 
-const triggerSettlement: ProcessManagerApplier<AutomationEvent> = (pm) =>
-  pm
-    .state<{ traceIds: string[] }>({ traceIds: [] })
-    .intent("noop", emptyIntentSchema, async () => {})
-    .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => ({
-      state: { traceIds: [...state.traceIds, data.traceId] },
-      intents: [ctx.intents.noop(`match:${data.traceId}`, {})],
-    }));
-
-type SweepIntents = { noop: IntentSpec<typeof emptyIntentSchema> };
-const sweep: WakeHandler<Record<string, never>, SweepIntents> = (state) => ({
-  state,
+// The REAL inline pipeline topology (ADR-052) with inert executor deps —
+// intent executors never run in these tests (no wake worker), so the
+// dispatch surface can stay empty.
+const pipelineDeps = (): AutomationsPipelineDeps => ({
+  automationAuditStore: {
+    append: vi.fn().mockResolvedValue(undefined),
+  } as unknown as AutomationsPipelineDeps["automationAuditStore"],
+  dispatch: {} as TriggerSettlementDispatchDeps,
+  sweep: {
+    decideSweepCandidates: vi.fn().mockResolvedValue([]),
+    evaluateGraphTrigger: vi.fn().mockResolvedValue(undefined),
+    deleteDispatchedBefore: vi.fn().mockResolvedValue(0),
+  },
+  prune: {
+    pruneExpired: vi.fn().mockResolvedValue(0),
+    deleteDispatchedBefore: vi.fn().mockResolvedValue(0),
+  },
 });
-const graphAlertSweep: ProcessManagerApplier<AutomationEvent> = (pm) =>
-  pm
-    .state<Record<string, never>>({})
-    .schedule({ everyMs: 30_000 })
-    .onWake(sweep)
-    .intent("noop", emptyIntentSchema, async () => {});
-const webhookDeliveryPrune: ProcessManagerApplier<AutomationEvent> = (pm) =>
-  pm
-    .state<Record<string, never>>({})
-    .schedule({ everyMs: 86_400_000 })
-    .onWake(sweep)
-    .intent("noop", emptyIntentSchema, async () => {});
 
 const command = (
   traceId: string,
@@ -72,14 +62,7 @@ describe("automations pipeline", () => {
         const processStore = new InMemoryProcessStore();
         eventSourcing = new EventSourcing({ processStore, redis: null });
         const pipeline = eventSourcing.register(
-          createAutomationsPipeline({
-            automationAuditStore: {
-              append: vi.fn().mockResolvedValue(undefined),
-            },
-            triggerSettlement,
-            graphAlertSweep,
-            webhookDeliveryPrune,
-          }),
+          createAutomationsPipeline(pipelineDeps()),
         );
         const commands = mapCommands(pipeline.commands);
 
@@ -90,7 +73,7 @@ describe("automations pipeline", () => {
         const events = await eventSourcing
           .getEventStore<AutomationEvent>()!
           .getEvents("trigger-1", { tenantId }, "trigger");
-        const process = await processStore.findByRef<{ traceIds: string[] }>({
+        const process = await processStore.findByRef<SettlementState>({
           ref: {
             processName: "triggerSettlement",
             projectId: tenantId,
@@ -100,7 +83,9 @@ describe("automations pipeline", () => {
 
         expect(events).toHaveLength(1);
         expect(events[0]?.idempotencyKey).toBe("trigger-1:trace-1:30000-0");
-        expect(process?.state.traceIds).toEqual(["trace-1"]);
+        expect(Object.keys(process?.state.pendingMatches ?? {})).toEqual([
+          "trace-1",
+        ]);
       });
     });
   });
@@ -111,14 +96,7 @@ describe("automations pipeline", () => {
         const processStore = new InMemoryProcessStore();
         eventSourcing = new EventSourcing({ processStore, redis: null });
         const pipeline = eventSourcing.register(
-          createAutomationsPipeline({
-            automationAuditStore: {
-              append: vi.fn().mockResolvedValue(undefined),
-            },
-            triggerSettlement,
-            graphAlertSweep,
-            webhookDeliveryPrune,
-          }),
+          createAutomationsPipeline(pipelineDeps()),
         );
         const commands = mapCommands(pipeline.commands);
 
@@ -128,7 +106,7 @@ describe("automations pipeline", () => {
         const events = await eventSourcing
           .getEventStore<AutomationEvent>()!
           .getEvents("trigger-1", { tenantId }, "trigger");
-        const process = await processStore.findByRef<{ traceIds: string[] }>({
+        const process = await processStore.findByRef<SettlementState>({
           ref: {
             processName: "triggerSettlement",
             projectId: tenantId,
@@ -140,7 +118,10 @@ describe("automations pipeline", () => {
           "trigger-1:trace-1:30000-0",
           "trigger-1:trace-1:30000-1",
         ]);
-        expect(process?.state.traceIds).toEqual(["trace-1", "trace-1"]);
+        // The second round re-armed the same trace in the later window.
+        expect(
+          process?.state.pendingMatches["trace-1"]?.settleWindowBucket,
+        ).toBe("30000-1");
       });
     });
   });
@@ -151,14 +132,7 @@ describe("automations pipeline", () => {
         const processStore = new InMemoryProcessStore();
         eventSourcing = new EventSourcing({ processStore, redis: null });
         const pipeline = eventSourcing.register(
-          createAutomationsPipeline({
-            automationAuditStore: {
-              append: vi.fn().mockResolvedValue(undefined),
-            },
-            triggerSettlement,
-            graphAlertSweep,
-            webhookDeliveryPrune,
-          }),
+          createAutomationsPipeline(pipelineDeps()),
         );
         const commands = mapCommands(pipeline.commands);
 
@@ -166,7 +140,7 @@ describe("automations pipeline", () => {
         await commands.recordTriggerMatch(command("trace-2", 2_000));
         await commands.recordTriggerMatch(command("trace-3", 3_000));
 
-        const process = await processStore.findByRef<{ traceIds: string[] }>({
+        const process = await processStore.findByRef<SettlementState>({
           ref: {
             processName: "triggerSettlement",
             projectId: tenantId,
@@ -174,7 +148,7 @@ describe("automations pipeline", () => {
           },
         });
 
-        expect(process?.state.traceIds).toEqual([
+        expect(Object.keys(process?.state.pendingMatches ?? {})).toEqual([
           "trace-1",
           "trace-2",
           "trace-3",
@@ -188,23 +162,16 @@ describe("automations pipeline", () => {
       const processStore = new InMemoryProcessStore();
       eventSourcing = new EventSourcing({ processStore, redis: null });
       const pipeline = eventSourcing.register(
-        createAutomationsPipeline({
-          automationAuditStore: {
-            append: vi.fn().mockResolvedValue(undefined),
-          },
-          triggerSettlement,
-          graphAlertSweep,
-          webhookDeliveryPrune,
-        }),
+        createAutomationsPipeline(pipelineDeps()),
       );
       const commands = mapCommands(pipeline.commands);
 
       await commands.recordTriggerMatch(command("trace-1", 1_000, "trigger-1"));
       await commands.recordTriggerMatch(command("trace-1", 2_000, "trigger-2"));
 
-      const messages = await Promise.all(
+      const processes = await Promise.all(
         ["trigger-1", "trigger-2"].map((processKey) =>
-          processStore.findMessagesByRef({
+          processStore.findByRef<SettlementState>({
             ref: {
               processName: "triggerSettlement",
               projectId: tenantId,
@@ -214,10 +181,13 @@ describe("automations pipeline", () => {
         ),
       );
 
-      expect(messages.map((rows) => rows[0]?.messageKey)).toEqual([
-        "process:trigger-1:match:trace-1",
-        "process:trigger-2:match:trace-1",
-      ]);
+      // Each trigger owns its own process instance; the shared trace lands
+      // in both pending sets without cross-talk.
+      expect(
+        processes.map((process) =>
+          Object.keys(process?.state.pendingMatches ?? {}),
+        ),
+      ).toEqual([["trace-1"], ["trace-1"]]);
     });
   });
 });

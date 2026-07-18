@@ -1,21 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import { buildIntentFactories } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import {
-  WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS,
-  webhookDeliveryPrunePM,
-} from "../webhookDeliveryPrune.process";
+import { automationProcessDefinition } from "../../__tests__/pipelineTestHarness";
+import { WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS } from "../webhookDeliveryPrune.process";
 
 describe("webhook delivery prune process", () => {
   describe("when the process manager is built", () => {
     it("declares a scheduled singleton wake once a day", () => {
-      const definition = buildProcessManager({
+      const definition = automationProcessDefinition({
         name: "webhookDeliveryPrune",
-        applier: webhookDeliveryPrunePM({
-          pruneExpired: vi.fn().mockResolvedValue(0),
-          deleteDispatchedBefore: vi.fn().mockResolvedValue(0),
-        }),
       });
 
       expect(definition.config.schedule).toEqual({
@@ -24,12 +17,8 @@ describe("webhook delivery prune process", () => {
     });
 
     it("subscribes to no pipeline events", () => {
-      const definition = buildProcessManager({
+      const definition = automationProcessDefinition({
         name: "webhookDeliveryPrune",
-        applier: webhookDeliveryPrunePM({
-          pruneExpired: vi.fn().mockResolvedValue(0),
-          deleteDispatchedBefore: vi.fn().mockResolvedValue(0),
-        }),
       });
 
       expect(definition.config.eventTypes).toEqual([]);
@@ -41,13 +30,11 @@ describe("webhook delivery prune process", () => {
       it("emits the prune intent, prunes the log, and prunes old intents", async () => {
         const pruneExpired = vi.fn().mockResolvedValue(12);
         const deleteDispatchedBefore = vi.fn().mockResolvedValue(1);
-        const definition = buildProcessManager({
+        const definition = automationProcessDefinition({
           name: "webhookDeliveryPrune",
-          applier: webhookDeliveryPrunePM({
-            pruneExpired,
-            deleteDispatchedBefore,
-            now: () => 10_000,
-          }),
+          deps: {
+            prune: { pruneExpired, deleteDispatchedBefore, now: () => 10_000 },
+          },
         });
 
         const wake = definition.config.onWake!(
@@ -94,13 +81,11 @@ describe("webhook delivery prune process", () => {
         const deleteDispatchedBefore = vi
           .fn()
           .mockRejectedValue(new Error("boom"));
-        const definition = buildProcessManager({
+        const definition = automationProcessDefinition({
           name: "webhookDeliveryPrune",
-          applier: webhookDeliveryPrunePM({
-            pruneExpired,
-            deleteDispatchedBefore,
-            now: () => 10_000,
-          }),
+          deps: {
+            prune: { pruneExpired, deleteDispatchedBefore, now: () => 10_000 },
+          },
         });
 
         await expect(

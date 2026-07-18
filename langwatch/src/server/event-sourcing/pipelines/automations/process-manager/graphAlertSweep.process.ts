@@ -42,7 +42,10 @@ type SweepIntents = {
   evaluateGraph: IntentSpec<typeof sweepSchema>;
 };
 
-const sweep: WakeHandler<GraphAlertSweepState, SweepIntents> = (
+export const graphAlertSweepWake: WakeHandler<
+  GraphAlertSweepState,
+  SweepIntents
+> = (
   _state,
   ctx,
 ) => ({
@@ -52,7 +55,7 @@ const sweep: WakeHandler<GraphAlertSweepState, SweepIntents> = (
   ],
 });
 
-function runSweep(deps: GraphAlertSweepDeps) {
+export function runGraphAlertSweep(deps: GraphAlertSweepDeps) {
   return async (): Promise<void> => {
     const startedAt = (deps.now ?? Date.now)();
     const candidates = await deps.decideSweepCandidates({
@@ -94,13 +97,3 @@ function runSweep(deps: GraphAlertSweepDeps) {
     }
   };
 }
-
-export const graphAlertSweepPM = (
-  deps: GraphAlertSweepDeps,
-): ProcessManagerApplier<AutomationEvent> =>
-  (pm) =>
-    pm
-      .state<GraphAlertSweepState>({ lastSweepAt: null })
-      .schedule({ everyMs: GRAPH_ALERT_SWEEP_INTERVAL_MS })
-      .onWake(sweep)
-      .intent("evaluateGraph", sweepSchema, runSweep(deps));

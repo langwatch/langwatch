@@ -3,19 +3,10 @@ import type { WebhookDeliveryOutcome } from "@prisma/client";
 /**
  * Read + write repository over `WebhookDelivery` — the per-attempt delivery
  * log behind a webhook automation's "recent fires" drill-down (ADR-040 §6).
- * A slim facts table: outcome, status, latency, capped error message and a
- * failure classification. Request/response content is never stored.
+ * A slim facts table: outcome, status, latency, capped error message, plus an
+ * ENCRYPTED truncated failure response for debugging. Our request content is
+ * never stored; the ciphertext dies with the row in the 30-day prune.
  */
-
-/** Failure classification driving operator guidance in the drawer. Stored as
- *  a plain string so new kinds ship without migrations. */
-export type WebhookFailureKind =
-  | "blocked_url"
-  | "timeout"
-  | "network"
-  | "rate_limited"
-  | "client_error"
-  | "server_error";
 
 /** One persisted delivery attempt, as shown in the drawer's attempts list. */
 export interface WebhookDeliveryRow {
@@ -26,7 +17,9 @@ export interface WebhookDeliveryRow {
   responseStatus: number | null;
   latencyMs: number | null;
   error: string | null;
-  failureKind: WebhookFailureKind | null;
+  /** AES ciphertext of the truncated failure response ({body, headers,
+   *  retryAfterMs}); the service decrypts it for the drawer. */
+  responseEncrypted: string | null;
   outcome: WebhookDeliveryOutcome;
   firedAt: Date;
 }
@@ -40,7 +33,7 @@ export interface WebhookDeliveryInput {
   responseStatus?: number | null;
   latencyMs?: number | null;
   error?: string | null;
-  failureKind?: WebhookFailureKind | null;
+  responseEncrypted?: string | null;
   outcome: WebhookDeliveryOutcome;
 }
 

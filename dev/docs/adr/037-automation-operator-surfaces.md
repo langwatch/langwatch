@@ -152,6 +152,7 @@ We do not block the management surface on the deferred dispatch wiring: the alwa
 - **Outbox-derived columns depend on outbox-backed notify dispatch.** Until ADR-030 + ADR-026 fully wire, they render as "—"/empty; only `TriggerSent`-derived columns are populated. This is an explicit, documented two-phase rollout, not a bug.
 - **Migration**: existing triggers open in the new drawer with every section pre-filled; no data migration is required (the drawer reads the same `Trigger` columns, including the ADR-036 template columns and the ADR-026 cadence/debounce columns).
 - **A new domain folder `src/automations/`** holds the provider model + `cadences.ts` (the shared cadence constants). The drawer + UI live under `src/features/automations/`. Keeps client-only UI separate from cross-cutting domain types.
+  - *Implementation note (PR #5911):* the provider model later split per side — pure definitions + `cadences.ts` in `src/shared/automations/`, client halves + registry in `src/features/automations/providers/`, server halves (persistence/secret hooks) + registry in `src/server/app-layer/automations/providers/`. `src/automations/` no longer exists.
 
 ## References
 

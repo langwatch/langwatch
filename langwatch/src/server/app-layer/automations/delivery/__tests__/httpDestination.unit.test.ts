@@ -48,7 +48,7 @@ describe("sendHttpDestination", () => {
   describe("when the endpoint responds", () => {
     it("returns the status and body", async () => {
       fetchResolves(200, "ok-body");
-      await expect(send()).resolves.toEqual({ status: 200, body: "ok-body" });
+      await expect(send()).resolves.toMatchObject({ status: 200, body: "ok-body" });
     });
 
     it("caps an oversized response body", async () => {
@@ -76,7 +76,7 @@ describe("sendHttpDestination", () => {
           },
         }),
       } as unknown as MockedResponse);
-      await expect(send()).resolves.toEqual({ status: 200, body: "" });
+      await expect(send()).resolves.toMatchObject({ status: 200, body: "" });
     });
 
     it("returns an empty snippet when there is no body at all (204)", async () => {
@@ -84,7 +84,7 @@ describe("sendHttpDestination", () => {
         status: 204,
         body: null,
       } as unknown as MockedResponse);
-      await expect(send()).resolves.toEqual({ status: 204, body: "" });
+      await expect(send()).resolves.toMatchObject({ status: 204, body: "" });
     });
   });
 

@@ -48,9 +48,31 @@ export interface HttpDestinationResponse {
   status: number;
   /** Response body, truncated at {@link HttpDestinationRequest.maxResponseBytes}. */
   body: string;
+  /** Response headers, truncated per value — debugging context for the
+   *  delivery log (ADR-040 §6). */
+  responseHeaders: Record<string, string>;
   /** Parsed `Retry-After` (ms) when the receiver sent one — a backpressure
    *  hint the caller can fold into its retry backoff (ADR-040 §5). */
   retryAfterMs?: number;
+}
+
+/** Per-header value cap + header-count cap for the captured response
+ *  headers — enough to debug, bounded against hostile receivers. */
+const RESPONSE_HEADER_VALUE_CHARS = 200;
+const RESPONSE_HEADER_MAX_COUNT = 32;
+
+function captureResponseHeaders(
+  headers: Headers | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!headers) return out;
+  let count = 0;
+  for (const [name, value] of headers.entries()) {
+    if (count >= RESPONSE_HEADER_MAX_COUNT) break;
+    out[name] = value.slice(0, RESPONSE_HEADER_VALUE_CHARS);
+    count++;
+  }
+  return out;
 }
 
 type ResponseBodyStream = Awaited<ReturnType<typeof ssrfSafeFetch>>["body"];
@@ -177,6 +199,7 @@ export async function sendHttpDestination({
   return {
     status: response.status,
     body: responseBody,
+    responseHeaders: captureResponseHeaders(response.headers),
     retryAfterMs: parseRetryAfterMs(response.headers?.get("retry-after")),
   };
 }

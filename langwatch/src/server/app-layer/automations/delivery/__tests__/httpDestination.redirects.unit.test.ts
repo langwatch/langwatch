@@ -91,7 +91,7 @@ describe("sendHttpDestination with a strict validator", () => {
 
   describe("when the endpoint answers 2xx", () => {
     it("delivers normally through the strict path", async () => {
-      await expect(send("/ok")).resolves.toEqual({ status: 200, body: "ok" });
+      await expect(send("/ok")).resolves.toMatchObject({ status: 200, body: "ok" });
     });
   });
 });

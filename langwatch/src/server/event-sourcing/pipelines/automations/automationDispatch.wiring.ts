@@ -33,6 +33,7 @@ import {
   defaultGraphTriggerHeartbeatDeps,
   type GraphTriggerSweepCandidate,
 } from "~/server/app-layer/automations/graph-trigger-heartbeat";
+import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import { dispatchGraphAlertAction } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
@@ -137,15 +138,16 @@ export function buildAutomationDispatchPorts({
   const recordWebhookDelivery = (
     input: Parameters<typeof webhookDeliveries.record>[0],
   ) => webhookDeliveries.record(input);
+  // Graph-config loads go through the automations-owned service, not raw
+  // prisma — same query shape, service/repository layering (no direct
+  // prisma in composition-root closures).
+  const customGraphs = AutomationCustomGraphService.create(prisma);
   const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
     loadTrigger: async ({ triggerId, projectId }) =>
-      prisma.trigger.findUnique({ where: { id: triggerId, projectId } }),
+      triggers.getById({ triggerId, projectId }),
     loadCustomGraph: async ({ customGraphId, projectId }) =>
-      prisma.customGraph.findUnique({
-        where: { id: customGraphId, projectId },
-      }),
-    loadProject: async (projectId) =>
-      prisma.project.findUnique({ where: { id: projectId } }),
+      customGraphs.getById({ customGraphId, projectId }),
+    loadProject: async (projectId) => projects.getById(projectId),
     getTimeseries: async (input) => getAnalyticsService().getTimeseries(input),
     triggerSent: graphTriggerSentRepo,
     updateLastRunAt: async ({ triggerId, projectId }) =>
