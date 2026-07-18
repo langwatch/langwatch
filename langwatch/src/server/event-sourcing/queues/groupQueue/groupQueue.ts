@@ -1468,6 +1468,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         values: [sibling.jobDataJson],
         groupId,
       });
+      // Tag the sibling so `restageDrainedSiblings` skips it if the batch later
+      // throws (e.g. the dispatched job itself fails). Without this, a sibling
+      // already moved to the drop path gets re-staged → re-dispatched →
+      // re-decoded → re-dropped, resurrecting a job the system judged terminal
+      // and inflating the drop counter (#5857).
+      sibling.dropped = true;
       return null;
     }
   }
@@ -1550,6 +1556,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     siblings: DrainedJob[],
   ): Promise<void> {
     for (const sibling of siblings) {
+      // Skip siblings that `parseDrainedPayload` already routed to the drop
+      // path: recordDrop already counted them, their body was already
+      // dispositioned, and re-staging would resurrect a job the system judged
+      // terminal — re-dispatch → re-decode → re-drop, an idempotency hole
+      // that both re-runs side effects and double-counts the drop (#5857).
+      if (sibling.dropped) {
+        continue;
+      }
       try {
         await this.scripts.stage({
           stagedJobId: sibling.stagedJobId,

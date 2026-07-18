@@ -1419,11 +1419,20 @@ export interface DispatchResult {
  * A job drained from a group's pending queue for batch coalescing.
  * Unlike a DispatchResult it carries no groupId (the caller already knows it)
  * and is never marked active — it is folded alongside the active job.
+ *
+ * `dropped` is set on the sibling object itself by `parseDrainedPayload` when it
+ * gives up on the sibling (recordDrop already ran) — see groupQueue.ts. The
+ * flag is read by `restageDrainedSiblings` so a sibling already routed to the
+ * drop path is NOT resurrected into staging when the batch itself later throws
+ * (#5857): re-staging a dropped sibling re-dispatches it, re-decodes the same
+ * bad body, and re-drops it — an idempotency hole that inflates the drop counter
+ * and re-runs side effects on a payload the system already judged terminal.
  */
 export interface DrainedJob {
   stagedJobId: string;
   jobDataJson: string;
   originalScore: number;
+  dropped?: boolean;
 }
 
 /**
