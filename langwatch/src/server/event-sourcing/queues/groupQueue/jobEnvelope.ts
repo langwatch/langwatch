@@ -157,9 +157,7 @@ const safeParseErrText = (err: unknown): string => {
   // single-quoted token is one character — kept because it is the most useful
   // byte in the message and one character is not a secret.
   const cut = raw.search(/["[{]/);
-  const head = (cut === -1 ? raw : raw.slice(0, cut))
-    .trim()
-    .replace(/[,\s]+$/, "");
+  const head = (cut === -1 ? raw : raw.slice(0, cut)).trim().replace(/[,\s]+$/, "");
   const name = err instanceof Error ? err.name : "Error";
   return head ? `${name}: ${head}` : name;
 };
@@ -571,11 +569,7 @@ export async function encodeJobEnvelope({
     // GQ2 never serializes `jobData` as a whole — only the payload. The old
     // `JSON.stringify(jobData)` above this branch was a second full pass whose
     // result this path then threw away.
-    const {
-      bytes,
-      codec,
-      json: payloadJson,
-    } = encodePayload(payload, {
+    const { bytes, codec, json: payloadJson } = encodePayload(payload, {
       msgpackEnabled: msgpackWritesEnabled(),
     });
     const payloadBytes = bytes.length;
@@ -608,11 +602,7 @@ export async function encodeJobEnvelope({
     return finalize(
       ENVELOPE_PREFIX_V2,
       header,
-      await inlineBody(
-        payloadJson ?? bytes.toString("utf-8"),
-        payloadBytes,
-        header,
-      ),
+      await inlineBody(payloadJson ?? bytes.toString("utf-8"), payloadBytes, header),
     );
   }
 
@@ -689,9 +679,9 @@ export async function decodeJobEnvelope({
   if (header.e === "redis" || header.e === "s3") {
     if (!header.ref) {
       throw new DecodeFailureError({
-        message: "Malformed job envelope: tiered body without a blob ref",
-        reason: "malformed_envelope",
-      });
+      message: "Malformed job envelope: tiered body without a blob ref",
+      reason: "malformed_envelope",
+    });
     }
     if (!tieredBlobs) {
       throw new Error(
@@ -704,9 +694,9 @@ export async function decodeJobEnvelope({
         : await tieredBlobs.get(header.ref);
     if (!data) {
       throw new DecodeFailureError({
-        message: "Job envelope tiered blob is missing (deleted or expired)",
-        reason: "missing_blob",
-      });
+      message: "Job envelope tiered blob is missing (deleted or expired)",
+      reason: "missing_blob",
+    });
     }
     const parsedBody = await decodeBody(data);
     return mergeMachinery(parsedBody, header);
@@ -716,9 +706,9 @@ export async function decodeJobEnvelope({
   if (header.e === "ref") {
     if (typeof header.r !== "string" || header.r.length === 0) {
       throw new DecodeFailureError({
-        message: "Malformed job envelope: ref body without a blob id",
-        reason: "malformed_envelope",
-      });
+      message: "Malformed job envelope: ref body without a blob id",
+      reason: "malformed_envelope",
+    });
     }
     if (!blobs) {
       throw new Error(
@@ -731,9 +721,9 @@ export async function decodeJobEnvelope({
         : await blobs.get({ id: header.r });
     if (!data) {
       throw new DecodeFailureError({
-        message: `Job envelope blob ${header.r} is missing (deleted or expired)`,
-        reason: "missing_blob",
-      });
+      message: `Job envelope blob ${header.r} is missing (deleted or expired)`,
+      reason: "missing_blob",
+    });
     }
     return await decodeBody(data);
   }

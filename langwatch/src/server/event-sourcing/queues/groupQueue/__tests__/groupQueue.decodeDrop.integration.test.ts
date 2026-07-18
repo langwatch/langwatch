@@ -53,10 +53,8 @@ type TestPayload = {
 // offload activates — see jobEnvelope.ts's projectIdFor / tenantIdFromGroupId.
 const TENANT = "proj1";
 const PROJECT = createTenantId(TENANT);
-const STORAGE_DESTINATION = async () => ({
-  kind: "s3" as const,
-  bucket: "test-bucket",
-});
+const STORAGE_DESTINATION = async () =>
+  ({ kind: "s3" as const, bucket: "test-bucket" });
 
 // > the 256 KiB s3 threshold once gzipped (see groupQueue.gq2.integration.test.ts).
 const OFFLOADABLE_S3_VALUE = () => incompressible(768 * 1024);
@@ -120,12 +118,10 @@ describe.skipIf(!hasTestcontainers)(
       return queue;
     }
 
-    const blockedMembers = (name: string) =>
-      redis.smembers(`${name}:gq:blocked`);
+    const blockedMembers = (name: string) => redis.smembers(`${name}:gq:blocked`);
     const storedErrorMessage = (name: string, groupId: string) =>
       redis.hget(`${name}:gq:group:${groupId}:error`, "message");
-    const completedStat = (name: string) =>
-      redis.get(`${name}:gq:stats:completed`);
+    const completedStat = (name: string) => redis.get(`${name}:gq:stats:completed`);
 
     /** All `gq_jobs_dropped_total` samples recorded for this test's queue. */
     async function dropsFor(name: string) {
@@ -179,8 +175,7 @@ describe.skipIf(!hasTestcontainers)(
         this.putsLeft = putsBeforeFailing;
       }
       override async put(uri: string, bytes: Buffer): Promise<void> {
-        if (this.putsLeft <= 0)
-          throw new Error("blob store unavailable on write");
+        if (this.putsLeft <= 0) throw new Error("blob store unavailable on write");
         this.putsLeft--;
         return super.put(uri, bytes);
       }
@@ -559,69 +554,77 @@ describe.skipIf(!hasTestcontainers)(
     describe("given a staged job whose blob store is temporarily unreachable", () => {
       describe("when a worker claims the group and the decode fails", () => {
         /** @scenario a transient blob-store error still retries instead of dropping */
-        it("re-stages the job for retry instead of completing it", async () => {
-          const name = freshName();
-          const groupId = `${TENANT}/transient-retries`;
-          const flaky = new FlakyObjectStore(1); // fails once, then serves
-          const received: TestPayload[] = [];
-          newQueue({
-            name,
-            processFn: async (p) => {
-              received.push(p);
-            },
-            consumerEnabled: true,
-            objectStore: flaky,
-          });
+        it(
+          "re-stages the job for retry instead of completing it",
+          async () => {
+            const name = freshName();
+            const groupId = `${TENANT}/transient-retries`;
+            const flaky = new FlakyObjectStore(1); // fails once, then serves
+            const received: TestPayload[] = [];
+            newQueue({
+              name,
+              processFn: async (p) => {
+                received.push(p);
+              },
+              consumerEnabled: true,
+              objectStore: flaky,
+            });
 
-          await queues[0]!.waitUntilReady();
-          await queues[0]!.send({
-            id: "s1",
-            groupId,
-            value: OFFLOADABLE_S3_VALUE(),
-          });
+            await queues[0]!.waitUntilReady();
+            await queues[0]!.send({
+              id: "s1",
+              groupId,
+              value: OFFLOADABLE_S3_VALUE(),
+            });
 
-          // The handler eventually runs despite the first transient
-          // failure — it could only get here via a re-stage, since a drop
-          // would never call the handler at all.
-          await vi.waitFor(() => expect(received).toHaveLength(1), {
-            timeout: 15000,
-            interval: 100,
-          });
-        }, 20000);
+            // The handler eventually runs despite the first transient
+            // failure — it could only get here via a re-stage, since a drop
+            // would never call the handler at all.
+            await vi.waitFor(() => expect(received).toHaveLength(1), {
+              timeout: 15000,
+              interval: 100,
+            });
+          },
+          20000,
+        );
 
-        it("does not increment the drop counter", async () => {
-          const name = freshName();
-          const groupId = `${TENANT}/transient-no-drop`;
-          const flaky = new FlakyObjectStore(1);
-          const received: TestPayload[] = [];
-          newQueue({
-            name,
-            processFn: async (p) => {
-              received.push(p);
-            },
-            consumerEnabled: true,
-            objectStore: flaky,
-          });
+        it(
+          "does not increment the drop counter",
+          async () => {
+            const name = freshName();
+            const groupId = `${TENANT}/transient-no-drop`;
+            const flaky = new FlakyObjectStore(1);
+            const received: TestPayload[] = [];
+            newQueue({
+              name,
+              processFn: async (p) => {
+                received.push(p);
+              },
+              consumerEnabled: true,
+              objectStore: flaky,
+            });
 
-          await queues[0]!.waitUntilReady();
-          await queues[0]!.send({
-            id: "s1",
-            groupId,
-            value: OFFLOADABLE_S3_VALUE(),
-          });
+            await queues[0]!.waitUntilReady();
+            await queues[0]!.send({
+              id: "s1",
+              groupId,
+              value: OFFLOADABLE_S3_VALUE(),
+            });
 
-          await vi.waitFor(() => expect(received).toHaveLength(1), {
-            timeout: 15000,
-            interval: 100,
-          });
+            await vi.waitFor(() => expect(received).toHaveLength(1), {
+              timeout: 15000,
+              interval: 100,
+            });
 
-          // Revert-check: pre-fix, TransientBlobStoreError still routed
-          // through handleTransientDecode (this was already correct before
-          // #5538 — see ADR-030 §2), so this specific assertion mainly
-          // guards against a regression that widens the drop path to catch
-          // transient errors too.
-          expect(await dropsFor(name)).toHaveLength(0);
-        }, 20000);
+            // Revert-check: pre-fix, TransientBlobStoreError still routed
+            // through handleTransientDecode (this was already correct before
+            // #5538 — see ADR-030 §2), so this specific assertion mainly
+            // guards against a regression that widens the drop path to catch
+            // transient errors too.
+            expect(await dropsFor(name)).toHaveLength(0);
+          },
+          20000,
+        );
       });
     });
 
