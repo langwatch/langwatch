@@ -18,6 +18,7 @@ describe("MainMenu compact section markup", () => {
     expect(file).not.toMatch(/<div>&nbsp;<\/div>/);
   });
 
+  /** @scenario MainMenu compact mode omits placeholder content */
   it("does not emit non-breaking placeholder content", () => {
     const file = readFileSync(
       path.join(__dirname, "..", "MainMenu.tsx"),
