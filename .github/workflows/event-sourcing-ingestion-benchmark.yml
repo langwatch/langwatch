@@ -294,10 +294,20 @@ jobs:
           DATABASE_URL: postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_bench
           CLICKHOUSE_URL: http://default:${{ env.CH_PASSWORD }}@localhost:8123/langwatch_bench
           REDIS_URL: redis://localhost:6379
-          # Workers run in-process. On 4 vCPU a second Node process costs more
-          # in RAM and context switching than it buys in parallelism, and the
-          # fold path under test is identical either way.
-          WORKERS_IN_PROCESS: "1"
+          # Run a REAL worker process alongside the app, exactly as production
+          # does (separate web and worker deployments).
+          #
+          # This is load-bearing, not a preference. The GroupQueue consumer loop
+          # only starts for processRole "worker" or "all" — a web-role process
+          # constructs the queue with `consumerEnabled: false` and no dispatcher,
+          # so it can enqueue but never drain. Without this the collector would
+          # accept every span into Redis, nothing would fold them, and the run
+          # would report total data loss caused entirely by the harness.
+          #
+          # Do NOT swap this for WORKERS_IN_PROCESS=1: that is gated on
+          # NODE_ENV === "development" in both start.sh and start.ts, so under
+          # NODE_ENV=production it is silently ignored and no worker runs at all.
+          START_WORKERS: "true"
           # No self-ingest: the platform must never hold a LangWatch API key or
           # it feeds its own traces back into the pipeline under test.
           LANGWATCH_SKIP_NLP: "1"
