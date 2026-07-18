@@ -57,6 +57,43 @@ The store write happens inside `executeBatch`; the ack is `groupQueue.ts:1044`. 
 
 ---
 
+## 2b. Measurements (real Redis, `foldCacheSize.integration.test.ts`)
+
+Absolute latencies drifted run-to-run on a loaded laptop (6.3 → 15.5 ms/batch for the same case), so treat timings as indicative and ratios as solid.
+
+### The applied-event-id set is a flat ~29 KiB, and that is the wrong shape
+
+| state | state bytes | + applied-set | set as share of entry |
+|---|---|---|---|
+| small trace (10 spans, 1 KiB IO) | 2.7 KiB | 29.3 KiB | **91.5%** |
+| medium (500 spans, 16 KiB IO) | 43.3 KiB | 29.3 KiB | 40.3% |
+| large (40k spans, 64 KiB IO) | 139.3 KiB | 29.3 KiB | 17.4% |
+
+The set is constant regardless of state size, so it is **11× the state on a small trace** — negligible on the traces we worried about, dominant on the traces there are most of. If typical traces are small this multiplies the fold cache's Redis footprint roughly 12×, on an instance shared with the queues.
+
+**Cause:** `MAX_APPLIED_EVENT_IDS = 1000`, chosen from the 500 coalesce ceiling plus headroom, never measured. A redelivery re-sends at most one batch; the retry chain needs a little more than one. **The right cap is a function of real batch fill, which is unmeasured — so the batch-fill histogram is a blocker for sizing it, not a nice-to-have.**
+
+### The O(N²) round-trip is smaller than previously claimed
+
+~5-16 ms per batch, flat, and 13.2 MiB moved through Redis across a whole 40k-span trace. Earlier drafts of this plan called the full-state GET/SET a major untouched problem. At these numbers it is not, and the claim is withdrawn.
+
+**It is flat only because `MAX_PROCESSED_SPANS` freezes derivation at 512 spans**, so state plateaus. The two findings are the same finding seen from opposite ends.
+
+### Removing `MAX_PROCESSED_SPANS` costs 18× entry size
+
+| spans | capped | uncapped | ratio | one write |
+|---|---|---|---|---|
+| 512 | 139.3 KiB | 157.0 KiB | 1.1× | 2.6 ms |
+| 5,000 | 139.3 KiB | 419.0 KiB | 3.0× | 7.9 ms |
+| 40,000 | 139.3 KiB | **2528.4 KiB** | **18.1×** | **83.3 ms** |
+
+At 40k spans an uncapped entry is 2.5 MiB and each write takes 83 ms; ~80 batches is ~6.6 s of Redis write time for one trace, plus a 2.5 MiB `JSON.stringify` on the event loop per batch.
+
+**The cap is a symptom-suppressor for unbounded fold state, not the disease.** It cannot be removed until state stops growing with span count.
+
+
+---
+
 ## 3. Decision: cut the durability-gated confirmation machinery
 
 ADR-046's central claim is that a cache miss proves the durable store is authoritative. Against the constraints above that claim does not survive:
@@ -88,9 +125,10 @@ The probe as written also **never confirmed anything** (`UpdatedAt` is `DateTime
 3. Fix the **false comment and the re-stage amplification** at `groupQueue.ts:1082-1088` — siblings whose events were already folded in must not be blindly re-staged.
 4. Fix **blob release throwing after `complete()` succeeded** (`groupQueue.ts:1045-1051`) — a separate double-delivery path.
 5. Fix `__attempt` not surviving sibling restaging (`groupQueue.ts:1318-1325`), which silently resets the 25-attempt budget.
-6. Add the **batch-fill histogram** — currently unmeasurable, and it gates every future decision here.
-7. Boot-time assertion (or loud warning) on Redis `maxmemory-policy`, since the fold cache is now explicitly a correctness-relevant cache.
-8. Tests: executor-level redelivery-not-applied-twice (the spec scenario with no automated counterpart today), and a real-GroupQueue integration test for the liveness/key derivation if any of it survives.
+6. Add the **batch-fill histogram** — currently unmeasurable. It now BLOCKS sizing `MAX_APPLIED_EVENT_IDS`, which at 1000 makes the applied-set 91.5% of a small trace's cache entry (§2b).
+7. **Re-cap the applied-set** from measured fill once (6) has data. Until then, lower it to a defensible figure rather than leaving 1000 in place.
+8. Boot-time assertion (or loud warning) on Redis `maxmemory-policy`, since the fold cache is now explicitly a correctness-relevant cache.
+9. Tests: executor-level redelivery-not-applied-twice (the spec scenario with no automated counterpart today), and a real-GroupQueue integration test for the liveness/key derivation if any of it survives.
 
 ### Phase 2 — Make the two cheap folds idempotent
 Near-zero blast radius, so this is the highest value-per-risk work in the plan.
@@ -106,6 +144,8 @@ Only after Phase 0's numbers.
 - `totalCost` and the token sums **can** move to read-time: `stored_spans.Cost`/`NonBilledCost` already exist, computed by the same service to reconcile.
 - `spanCount` **must stay a monotonic fold counter** — it is a watermark, not a statistic. Do not convert it.
 - `annotationIds` is already idempotent. `models` is membership-idempotent but order-dependent on replay.
+- **Removing `MAX_PROCESSED_SPANS` is part of this phase, not separate.** It is wanted — past 512 spans derivation freezes, so a 40k-span trace reports attributes, models and IO from its first 512 spans while `spanCount` says 40000, i.e. quietly wrong rather than merely truncated. But removing it before state is bounded costs 18× entry size (§2b). Order: identify what actually grows (the merged attribute map is the main suspect; `events`, `spanCosts` and `scenarioRoleCosts` were already moved out for exactly this reason — `traceSummary.foldProjection.ts:350-357`), move or bound it, then drop the cap. At that point state is O(1) in span count and the cap protects nothing.
+- Removing the cap also removes the evaluation-dispatch suppression at `evaluationTrigger.reactor.ts:91`, which exists for cost control on runaway traces. That needs a replacement guard that is not a fold-state counter.
 - Reconcile the **three existing dual-source-of-truth pairs** first (`trace_summaries.SpanCount` vs `count()` over `stored_spans`; `TotalCost` vs `sum(Cost)`; token counts vs read-time attribute extraction) — they already disagree past the 512-span cap.
 
 ### Phase 4 — Documentation sweep (independent of the above)

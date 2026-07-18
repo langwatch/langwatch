@@ -90,12 +90,16 @@ function createDurableStore() {
   return { store, committed: () => committed };
 }
 
-function toEvent(job: FoldJob): Event {
+function toEvent(
+  job: FoldJob,
+  aggregateId: string = AGGREGATE,
+  tenantId: ReturnType<typeof createTenantId> = TENANT,
+): Event {
   return {
     id: job.eventId,
-    aggregateId: AGGREGATE,
+    aggregateId,
     aggregateType: "trace",
-    tenantId: TENANT,
+    tenantId,
     createdAt: job.occurredAt,
     occurredAt: job.occurredAt,
     version: "2026-01-01",
@@ -122,7 +126,10 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
     for (const queue of queues) await queue.close?.();
     const keys = await redis.keys("*test/fold-redelivery*");
     if (keys.length > 0) await redis.del(...keys);
-    const foldKeys = await redis.keys("fold:it_redeliver*");
+    // Every fold key this suite creates, not just one prefix — a stale
+    // applied-set leaking into the next test suppresses its events and shows
+    // up as an unexplained timeout rather than an assertion failure.
+    const foldKeys = await redis.keys("fold:it_*");
     if (foldKeys.length > 0) await redis.del(...foldKeys);
     vi.unstubAllEnvs();
   });
@@ -140,12 +147,18 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
     keyPrefix,
     failFirstBatch,
     failAlways,
+    failures,
     coalesce,
+    aggregateId = AGGREGATE,
+    tenantId = TENANT,
   }: {
     keyPrefix: string;
     failFirstBatch?: boolean;
     failAlways?: boolean;
+    failures?: number;
     coalesce?: number;
+    aggregateId?: string;
+    tenantId?: ReturnType<typeof createTenantId>;
   }) {
     const durable = createDurableStore();
     const cached = new RedisCachedFoldStore<CounterState>(durable.store, redis, {
@@ -166,20 +179,22 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
     });
 
     const context: ProjectionStoreContext = {
-      aggregateId: AGGREGATE,
-      tenantId: TENANT,
+      aggregateId,
+      tenantId,
     };
 
     const applied: string[][] = [];
     let failuresLeft = failAlways
       ? Number.POSITIVE_INFINITY
-      : failFirstBatch
-        ? 1
-        : 0;
+      : (failures ?? (failFirstBatch ? 1 : 0));
 
     const runBatch = async (jobs: FoldJob[]) => {
       applied.push(jobs.map((job) => job.eventId));
-      await executor.executeBatch(fold, jobs.map(toEvent), context);
+      await executor.executeBatch(
+        fold,
+        jobs.map((job) => toEvent(job, aggregateId, tenantId)),
+        context,
+      );
       if (failuresLeft > 0) {
         failuresLeft--;
         // The fold state is committed at this point. Everything from here to
@@ -319,4 +334,207 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
       }, 30_000);
     });
   });
+
+  describe("given a retry chain where each attempt fails after storing", () => {
+    describe("when new events arrive between attempts", () => {
+      it("counts every distinct event once across the whole chain", async () => {
+        // This is the case the applied-set accumulates FOR. Retry 1 skips the
+        // redelivered batch and applies whatever arrived alongside it; if the
+        // entry held only that last write, retry 2 — which redelivers the whole
+        // set — would no longer recognise the original batch and re-apply it.
+        const { queue, durable, applied } = createFoldQueue({
+          keyPrefix: "it_retry_chain",
+          failures: 2,
+          coalesce: 10,
+        });
+        await queue.waitUntilReady();
+
+        const base = Date.now();
+        for (let index = 0; index < 3; index++) {
+          await queue.send({
+            eventId: `first-${index}`,
+            groupId: AGGREGATE,
+            occurredAt: base + index,
+          });
+        }
+
+        await vi.waitFor(() => expect(applied.length).toBeGreaterThanOrEqual(1), {
+          timeout: 15_000,
+          interval: 50,
+        });
+
+        // Arrive mid-chain, so a retry batch mixes redelivered and fresh events.
+        for (let index = 0; index < 2; index++) {
+          await queue.send({
+            eventId: `second-${index}`,
+            groupId: AGGREGATE,
+            occurredAt: base + 100 + index,
+          });
+        }
+
+        await vi.waitFor(() => expect(durable.committed()?.count).toBe(5), {
+          timeout: 20_000,
+          interval: 100,
+        });
+        // At least one redelivery happened; how many batches the queue formed
+        // is its own scheduling business and not something to assert on.
+        expect(applied.length).toBeGreaterThanOrEqual(2);
+      }, 40_000);
+    });
+  });
+
+  describe("given the same aggregate id under two different tenants", () => {
+    describe("when both fold and one is redelivered", () => {
+      it("keeps their applied-sets isolated", async () => {
+        // Aggregate ids are not unique across tenants — trace ids repeat — so a
+        // shared applied-set would let one tenant's redelivery suppress
+        // another tenant's genuinely new event.
+        const other = createTenantId("tenant-redelivery-other");
+        const a = createFoldQueue({
+          keyPrefix: "it_tenant_a",
+          failFirstBatch: true,
+        });
+        const b = createFoldQueue({ keyPrefix: "it_tenant_a", tenantId: other });
+        await a.queue.waitUntilReady();
+        await b.queue.waitUntilReady();
+
+        const now = Date.now();
+        await a.queue.send({
+          eventId: "shared-event-id",
+          groupId: AGGREGATE,
+          occurredAt: now,
+        });
+        await b.queue.send({
+          eventId: "shared-event-id",
+          groupId: AGGREGATE,
+          occurredAt: now,
+        });
+
+        await vi.waitFor(
+          () => {
+            expect(a.durable.committed()?.count).toBe(1);
+            expect(b.durable.committed()?.count).toBe(1);
+          },
+          { timeout: 20_000, interval: 100 },
+        );
+      }, 40_000);
+    });
+  });
+
+  describe("given two aggregates folding concurrently", () => {
+    describe("when one of them is redelivered", () => {
+      it("does not suppress or double-count the other", async () => {
+        const { queue, durable } = createFoldQueue({
+          keyPrefix: "it_two_aggregates",
+          failFirstBatch: true,
+        });
+        const second = createFoldQueue({
+          keyPrefix: "it_two_aggregates",
+          aggregateId: "trace-2",
+        });
+        await queue.waitUntilReady();
+        await second.queue.waitUntilReady();
+
+        const now = Date.now();
+        await queue.send({ eventId: "a1", groupId: AGGREGATE, occurredAt: now });
+        await second.queue.send({
+          eventId: "b1",
+          groupId: "trace-2",
+          occurredAt: now,
+        });
+
+        await vi.waitFor(
+          () => {
+            expect(durable.committed()?.count).toBe(1);
+            expect(second.durable.committed()?.count).toBe(1);
+          },
+          { timeout: 20_000, interval: 100 },
+        );
+      }, 40_000);
+    });
+  });
+
+  describe("given an event that arrives out of order after a redelivery", () => {
+    describe("when it has an earlier occurredAt but a new id", () => {
+      it("applies it rather than mistaking it for a duplicate", async () => {
+        // Dedup keys on event id, deliberately not on occurredAt — a late
+        // arrival is a real event, and folds carrying refoldOnOutOfOrder:false
+        // are expected to apply it.
+        const { queue, durable, applied } = createFoldQueue({
+          keyPrefix: "it_out_of_order",
+          failFirstBatch: true,
+        });
+        await queue.waitUntilReady();
+
+        const base = Date.now();
+        await queue.send({
+          eventId: "late-anchor",
+          groupId: AGGREGATE,
+          occurredAt: base,
+        });
+        await vi.waitFor(() => expect(applied.length).toBeGreaterThanOrEqual(2), {
+          timeout: 15_000,
+          interval: 50,
+        });
+
+        await queue.send({
+          eventId: "late-arrival",
+          groupId: AGGREGATE,
+          occurredAt: base - 60_000,
+        });
+
+        await vi.waitFor(() => expect(durable.committed()?.count).toBe(2), {
+          timeout: 20_000,
+          interval: 100,
+        });
+      }, 40_000);
+    });
+  });
+
+  describe("given the cache entry is lost before a redelivery", () => {
+    describe("when the job is retried", () => {
+      it("double-counts — the known limit of a cache-held applied-set", async () => {
+        // Not a bug report, a boundary. The applied-set lives in the cache
+        // entry, so eviction or Redis loss takes the dedup with it. This
+        // degrades to the pre-existing behaviour rather than to something
+        // worse, and it is the reason the plan does not claim this closes the
+        // cold path. Pinned so the limit is visible rather than folklore.
+        const { queue, durable, applied } = createFoldQueue({
+          keyPrefix: "it_cache_lost",
+          failFirstBatch: true,
+        });
+        await queue.waitUntilReady();
+
+        await queue.send({
+          eventId: "event-1",
+          groupId: AGGREGATE,
+          occurredAt: Date.now(),
+        });
+
+        await vi.waitFor(() => expect(applied.length).toBeGreaterThanOrEqual(1), {
+          timeout: 15_000,
+          interval: 50,
+        });
+
+        // Keep the entry evicted for the whole retry window. Deleting once
+        // races the retry: if the redelivery lands first it dedups normally and
+        // the count never moves, which surfaces as an unexplained timeout.
+        const evict = setInterval(() => {
+          void redis
+            .keys("fold:it_cache_lost:*")
+            .then((keys) => (keys.length > 0 ? redis.del(...keys) : 0));
+        }, 20);
+
+        try {
+          await vi.waitFor(() => expect(durable.committed()?.count).toBe(2), {
+            timeout: 20_000,
+            interval: 100,
+          });
+        } finally {
+          clearInterval(evict);
+        }
+      }, 40_000);
+    });
+  });
+
 });
