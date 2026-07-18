@@ -63,6 +63,14 @@ func (o *OTel) DebugCollector() (endpoint string, headers map[string]string) {
 	return o.DebugCollectorEndpoint, parseHeaders(o.DebugCollectorHeaders)
 }
 
+// PrimaryOTLP returns the primary collector's base endpoint (no signal path)
+// and its parsed headers. Exposed for callers that forward OTLP payloads
+// directly rather than through the SDK exporter — e.g. the Langy relay shipping
+// LangWatch's own copy of worker telemetry.
+func (o *OTel) PrimaryOTLP() (endpoint string, headers map[string]string) {
+	return o.OTLPEndpoint, parseHeaders(o.OTLPHeaders)
+}
+
 // Configure initializes the OTel provider from the config, parsing headers and
 // returning a Provider whose Shutdown method flushes pending telemetry.
 func (o *OTel) Configure(ctx context.Context, nodeID string) (*otelsetup.Provider, error) {

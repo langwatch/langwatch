@@ -79,6 +79,52 @@ Feature: Langy agent activity is traced into the user's project
     Then the manager rejects it and forwards nothing
 
   # ============================================================================
+  # LangWatch's own copy of worker telemetry
+  #
+  # The customer's project gets the worker's spans verbatim — their agent, their
+  # prompts. LangWatch also needs to see how its own workers behave, but must
+  # not receive the content, so a SECOND, content-stripped copy goes to
+  # LangWatch's collector. Worker logs and metrics are already dropped outright
+  # for the same reason; spans are filtered per attribute instead, because their
+  # shape and cost data is the operational signal.
+  # ============================================================================
+
+  Scenario: LangWatch keeps an operational copy of worker telemetry
+    Given the manager is configured with its own OTLP collector
+    When the worker exports a span batch
+    Then the batch is forwarded to the customer's project unchanged
+    And a second copy is delivered to LangWatch's own collector
+
+  Scenario: LangWatch's copy carries no prompt or completion content
+    When the worker exports a span batch containing prompts, completions and tool output
+    Then LangWatch's copy contains none of that content
+    And LangWatch's copy still reports the model and token usage
+
+  Scenario: An unrecognised span attribute is dropped from LangWatch's copy
+    Given the worker emits a span attribute LangWatch does not recognise
+    When the batch is copied for LangWatch's collector
+    Then the unrecognised attribute is dropped
+    # Fail closed: a new key from the agent's instrumentation is assumed to
+    # carry content until it is deliberately allowlisted.
+
+  Scenario: Span events and status descriptions are removed from LangWatch's copy
+    Given a worker span carries an exception event and a status description
+    When the batch is copied for LangWatch's collector
+    Then the copy carries no span events
+    And the copy carries no status description
+
+  Scenario: The worker's resource identity is replaced in LangWatch's copy
+    When the batch is copied for LangWatch's collector
+    Then the resource names LangWatch's own worker service and the conversation
+    And no worker-set resource attribute survives
+
+  Scenario: The customer's export is unaffected by the second copy
+    Given the manager has no OTLP collector of its own configured
+    When the worker exports a span batch
+    Then the batch still reaches the customer's project
+    And no second copy is sent anywhere
+
+  # ============================================================================
   # Manager-mediated LLM calls (phase 2)
   # ============================================================================
 

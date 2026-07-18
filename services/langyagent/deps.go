@@ -52,7 +52,14 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	// The loopback relay for host-mediated worker telemetry + LLM traffic. Binds
 	// an ephemeral 127.0.0.1 port immediately; workers get token-scoped URLs on
 	// it at spawn. Failing to bind loopback is a broken host — fail fast.
-	relay, err := otelrelay.New(ctx)
+	// The relay also keeps LangWatch's own content-stripped copy of worker
+	// telemetry, shipped to the same collector the manager's spans go to. With
+	// no collector configured the second export is simply not installed.
+	internalEndpoint, internalHeaders := cfg.OTel.PrimaryOTLP()
+	relay, err := otelrelay.New(ctx, otelrelay.Options{
+		InternalOTLPEndpoint: internalEndpoint,
+		InternalOTLPHeaders:  internalHeaders,
+	})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("otelrelay init: %w", err)
 	}
