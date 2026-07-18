@@ -1068,40 +1068,63 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // removed from staging during the drain, so completing the
               // dispatched job is enough to free the group.
               await this.scripts.complete({ groupId, stagedJobId, jobName });
-              // The chain is over: anything it recorded is no longer live.
-              await this.clearGroupAttempt(groupId);
-              await this.blobLifecycle.release({
-                values: [
-                  jobDataJson,
-                  ...drainedSiblings.map((sibling) => sibling.jobDataJson),
-                ],
-                groupId,
-              });
-              gqJobsCompletedTotal.inc(routingLabels);
 
-              // Audit hook: onDispatched fires once per dispatched payload
-              // (dispatched + every drained sibling on success).
-              const dispatchedAt = new Date();
-              await this.runAuditAll(
-                (batchPayloads ?? [payload]).map(
-                  (p) => () =>
-                    this.auditAdapter?.onDispatched({
-                      payload: p,
-                      at: dispatchedAt,
-                      attempt,
-                    }),
-                ),
-              );
-
-              this.logger.debug(
-                {
-                  queueName: this.queueName,
+              // PAST THE POINT OF NO RETURN. The slot is completed, so the job
+              // is done whatever happens next — everything below is cleanup and
+              // bookkeeping. It gets its own catch because the outer one treats
+              // a throw as a FAILED job: it re-stages the drained siblings and
+              // schedules a retry of a job whose slot has already been
+              // completed, delivering the whole batch a second time. A blob
+              // release failing on a brief S3 blip was enough to trigger it.
+              try {
+                // The chain is over: anything it recorded is no longer live.
+                await this.clearGroupAttempt(groupId);
+                await this.blobLifecycle.release({
+                  values: [
+                    jobDataJson,
+                    ...drainedSiblings.map((sibling) => sibling.jobDataJson),
+                  ],
                   groupId,
-                  stagedJobId,
-                  attempt,
-                },
-                "Group job completed, slot freed",
-              );
+                });
+                gqJobsCompletedTotal.inc(routingLabels);
+
+                // Audit hook: onDispatched fires once per dispatched payload
+                // (dispatched + every drained sibling on success).
+                const dispatchedAt = new Date();
+                await this.runAuditAll(
+                  (batchPayloads ?? [payload]).map(
+                    (p) => () =>
+                      this.auditAdapter?.onDispatched({
+                        payload: p,
+                        at: dispatchedAt,
+                        attempt,
+                      }),
+                  ),
+                );
+
+                this.logger.debug(
+                  {
+                    queueName: this.queueName,
+                    groupId,
+                    stagedJobId,
+                    attempt,
+                  },
+                  "Group job completed, slot freed",
+                );
+              } catch (cleanupErr) {
+                // Worth knowing about — an unreleased blob lingers until its
+                // backstop TTL — but never worth re-running the job for.
+                this.logger.error(
+                  {
+                    queueName: this.queueName,
+                    groupId,
+                    stagedJobId,
+                    attempt,
+                    err: cleanupErr,
+                  },
+                  "Post-completion cleanup failed; the job itself completed and is NOT retried",
+                );
+              }
             } catch (err) {
               const error = err instanceof Error ? err : new Error(String(err));
               const category = categorizeError(err);

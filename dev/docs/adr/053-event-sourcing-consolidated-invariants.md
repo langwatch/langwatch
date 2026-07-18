@@ -1,4 +1,4 @@
-# ADR-046: Durability-gated fold cache, and consolidated event-sourcing invariants
+# ADR-053: Consolidated event-sourcing invariants
 
 **Date:** 2026-07-18
 

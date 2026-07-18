@@ -2,7 +2,7 @@
 
 **Branch:** `feat/event-sourcing-consolidation`, rebased on `origin/feat/automations-process-manager` (PR #5911, ADR-052 process-manager substrate).
 **Status:** plan agreed; execution not started beyond what is listed under "Already committed".
-**Written:** 2026-07-18. Supersedes the durability-gated design in `dev/docs/adr/046-event-sourcing-consolidated-invariants.md` — see §3.
+**Written:** 2026-07-18. Supersedes the durability-gated design in `dev/docs/adr/053-event-sourcing-consolidated-invariants.md` — see §3.
 
 ---
 
@@ -96,7 +96,7 @@ At 40k spans an uncapped entry is 2.5 MiB and each write takes 83 ms; ~80 batche
 
 ## 3. Decision: cut the durability-gated confirmation machinery
 
-ADR-046's central claim is that a cache miss proves the durable store is authoritative. Against the constraints above that claim does not survive:
+ADR-053's central claim is that a cache miss proves the durable store is authoritative. Against the constraints above that claim does not survive:
 
 - The npx installer ships **`allkeys-lru`**, so fold cache entries are evicted under memory pressure, and nothing detects it. The invariant is fiction in one of three shipping configurations.
 - Redis is a **single shared instance**, so queue traffic can evict cache entries.
@@ -106,7 +106,7 @@ ADR-046's central claim is that a cache miss proves the durable store is authori
 The probe as written also **never confirmed anything** (`UpdatedAt` is `DateTime64(3)`; raw `max()` serialises as a datetime string, `Number()` → `NaN` → every aggregate dropped). Fixed on the branch, but it shipped with a unit test that fed numbers and therefore passed regardless.
 
 **Keep** the applied-event-id set and the executor dedup: ~100 lines, no probe, no processor, no liveness check, no topology assumptions. It closes the dominant warm-retry path.
-**Cut** `confirmationProcessor.ts`, `durabilityProbe.ts`, `clickhouseDurabilityProbe.ts`, `groupQueueLivenessCheck.ts`, `pendingConfirmations.ts`, the confirmation metrics, and the backstop-TTL change. Record in ADR-046 as considered-and-deferred, with the constraints above as the reason.
+**Cut** `confirmationProcessor.ts`, `durabilityProbe.ts`, `clickhouseDurabilityProbe.ts`, `groupQueueLivenessCheck.ts`, `pendingConfirmations.ts`, the confirmation metrics, and the backstop-TTL change. Record in ADR-053 as considered-and-deferred, with the constraints above as the reason.
 
 **Known limitation of the narrow fix:** the applied-set lives in the cache entry, so if Redis evicts or fails, dedup is lost. That degrades to *today's* behaviour rather than to something worse, which is the bar for this PR.
 
@@ -169,4 +169,4 @@ Commit `7aefec27da`, 22 files. Contains both what to keep and what §3 cuts:
 
 ## 6. Principle
 
-Every mechanism added here carries a **named retirement condition**. ADR-046's best quality is that it audits its predecessors honestly; its successor should be able to do the same to it without finding that a temporary mechanism quietly became permanent.
+Every mechanism added here carries a **named retirement condition**. ADR-053's best quality is that it audits its predecessors honestly; its successor should be able to do the same to it without finding that a temporary mechanism quietly became permanent.

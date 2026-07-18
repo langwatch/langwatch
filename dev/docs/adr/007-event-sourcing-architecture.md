@@ -1,8 +1,38 @@
 # ADR-007: Event Sourcing Architecture
 
+> ## ⚠️ Substantially inaccurate — do not implement from this document
+>
+> Kept as the historical record of the fold/map refactoring it describes. Several
+> of its normative claims describe machinery that no longer exists, and it is the
+> document most other ADRs cite as the foundation, so the errors propagate:
+>
+> - **The queue substrate is wrong throughout.** It describes fold projections on
+>   "a GroupQueue (BullMQ + Redis)" and map projections and reactors on a
+>   "SimpleQueue (BullMQ)". BullMQ was removed from event-sourcing entirely; there
+>   are no `bullmq` imports under `event-sourcing/` and there is no `SimpleQueue`
+>   module. Everything runs on the in-house GroupQueue.
+> - **"Fold state = stored data"** and **"the fold state serves as both data store
+>   and checkpoint"** do not hold for the analytics folds, whose rows are
+>   deliberately lossy and whose `get()` returns `null` unconditionally
+>   (`pipelines/shared/analyticsStoreBase.ts`). They rebuild from the event log
+>   instead.
+> - **"Reactors only fire on success"** is false: the ADR-039 heartbeat dispatches
+>   with no triggering fold, and a reactor failure re-runs a batch whose rows are
+>   already committed.
+> - **`apply()` must be pure/deterministic** is stated, but idempotence is not —
+>   and at-least-once delivery needs idempotence. Four fold projections accumulate
+>   and could double-count on an ordinary retry. See
+>   `dev/docs/plans/fold-idempotency-plan.md`.
+> - **The two-role runtime** (§Process Roles) omits the `"all"` role, which is the
+>   default under haven.
+>
+> What survives: the pipeline model, the fold/map/reactor vocabulary, and the
+> decision to carry no separate checkpoint store.
+
 **Date:** 2026-02-14
 
-**Status:** Accepted
+**Status:** Accepted in outline; several decisions below are contradicted by the
+system as built — see the banner above.
 
 **Supersedes:** [ADR-002](./002-event-sourcing.md)
 
