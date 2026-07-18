@@ -131,4 +131,33 @@ describe("<OnlineEvaluationsTable />", () => {
 
     expect(onEdit).toHaveBeenCalledWith("monitor-down");
   });
+
+  it("does not render an empty action menu when the viewer has no row actions", () => {
+    render(
+      <OnlineEvaluationsTable
+        {...defaultProps}
+        canManage={false}
+        canViewAnalytics={false}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    expect(screen.getAllByText("Analytics unavailable")).toHaveLength(3);
+    expect(
+      screen.queryByRole("button", { name: "Actions for Answer quality" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows an explicit state when performance analytics cannot load", () => {
+    render(
+      <OnlineEvaluationsTable
+        {...defaultProps}
+        rows={[{ ...rows[0]!, performance: undefined, performanceError: true }]}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    expect(screen.getByText("Performance unavailable")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
 });

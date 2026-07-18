@@ -151,7 +151,8 @@ export const MainMenu = React.memo(function MainMenu({
                 isActive={
                   router.pathname.includes("/online-evaluations") ||
                   (router.pathname.includes("/evaluations/") &&
-                    !router.pathname.includes("/analytics"))
+                    !router.pathname.includes("/analytics") &&
+                    !router.pathname.includes("/evaluations/wizard"))
                 }
                 showLabel={showExpanded}
               />

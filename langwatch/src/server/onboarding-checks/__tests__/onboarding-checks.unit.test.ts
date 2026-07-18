@@ -10,17 +10,23 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockGetScenarioSetsData, mockFindUniqueProject, mockFindFirstPrompt } =
-  vi.hoisted(() => ({
-    mockGetScenarioSetsData: vi.fn(),
-    mockFindUniqueProject: vi.fn(),
-    mockFindFirstPrompt: vi.fn(),
-  }));
+const {
+  mockGetScenarioSetsData,
+  mockFindUniqueProject,
+  mockFindFirstPrompt,
+  mockFindFirstModelProvider,
+} = vi.hoisted(() => ({
+  mockGetScenarioSetsData: vi.fn(),
+  mockFindUniqueProject: vi.fn(),
+  mockFindFirstPrompt: vi.fn(),
+  mockFindFirstModelProvider: vi.fn(),
+}));
 
 vi.mock("~/server/db", () => ({
   prisma: {
     project: { findUnique: mockFindUniqueProject },
     llmPromptConfig: { findFirst: mockFindFirstPrompt },
+    modelProvider: { findFirst: mockFindFirstModelProvider },
   },
 }));
 
@@ -41,6 +47,7 @@ describe("OnboardingChecksService", () => {
     vi.clearAllMocks();
     mockFindUniqueProject.mockResolvedValue(null);
     mockFindFirstPrompt.mockResolvedValue(null);
+    mockFindFirstModelProvider.mockResolvedValue(null);
     service = new OnboardingChecksService();
   });
 
@@ -79,6 +86,43 @@ describe("OnboardingChecksService", () => {
         const result = await service.getCheckStatus("project-1");
 
         expect(result.simulations).toBe(0);
+      });
+    });
+
+    describe("given the project has online evaluations", () => {
+      const projectWith = (overrides: Record<string, unknown>) => ({
+        workflows: [],
+        customGraphs: [],
+        datasets: [],
+        checks: [],
+        triggers: [],
+        teamId: "team-1",
+        team: { organizationId: "organization-1", members: [] },
+        firstMessage: false,
+        integrated: false,
+        ...overrides,
+      });
+
+      it("marks the online evaluation step complete from a monitor", async () => {
+        mockFindUniqueProject.mockResolvedValue(
+          projectWith({ checks: [{ id: "monitor-1" }] }),
+        );
+        mockGetScenarioSetsData.mockResolvedValue([]);
+
+        const result = await service.getCheckStatus("project-1");
+
+        expect(result.onlineEvaluations).toBe(1);
+      });
+
+      it("does not complete the online evaluation step from an experiment", async () => {
+        mockFindUniqueProject.mockResolvedValue(
+          projectWith({ experiments: [{ id: "experiment-1" }] }),
+        );
+        mockGetScenarioSetsData.mockResolvedValue([]);
+
+        const result = await service.getCheckStatus("project-1");
+
+        expect(result.onlineEvaluations).toBe(0);
       });
     });
   });

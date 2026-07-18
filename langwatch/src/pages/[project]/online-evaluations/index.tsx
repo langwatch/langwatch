@@ -14,8 +14,8 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { CopyMonitorDialog } from "~/components/evaluations/CopyMonitorDialog";
 import { OnlineEvaluationHeaderActions } from "~/components/evaluations/OnlineEvaluationHeaderActions";
 import {
-  OnlineEvaluationsTable,
   type OnlineEvaluationRow,
+  OnlineEvaluationsTable,
 } from "~/components/evaluations/OnlineEvaluationsTable";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
@@ -25,6 +25,7 @@ import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { isLegacyOnlineEvaluationWorkbenchState } from "~/server/experiments/workbenchState";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 
@@ -34,6 +35,7 @@ function OnlineEvaluationsPage() {
   const { openDrawer } = useDrawer();
   const canManage = hasPermission("evaluations:manage");
   const canViewAnalytics = hasPermission("analytics:view");
+  const canViewExperiments = hasPermission("experiments:view");
   const [copyMonitor, setCopyMonitor] = useState<{
     id: string;
     name: string;
@@ -52,11 +54,20 @@ function OnlineEvaluationsPage() {
       projectId: project?.id ?? "",
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     },
-    { enabled: !!project && canViewAnalytics, refetchOnWindowFocus: false },
+    {
+      enabled: !!project && canViewAnalytics && monitors.isSuccess,
+      refetchOnWindowFocus: false,
+      trpc: { context: { skipBatch: true } },
+    },
   );
-  const experiments = api.experiments.getAllForEvaluationsList.useQuery(
+  const experiments = api.experiments.getAllByProjectId.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project, refetchOnWindowFocus: false },
+    {
+      enabled:
+        !!project && canManage && canViewExperiments && monitors.isSuccess,
+      refetchOnWindowFocus: false,
+      trpc: { context: { skipBatch: true } },
+    },
   );
 
   const performanceByMonitor = useMemo(
@@ -69,10 +80,11 @@ function OnlineEvaluationsPage() {
   const experimentSlugs = useMemo(
     () =>
       new Map(
-        experiments.data?.experiments.map((experiment) => [
-          experiment.id,
-          experiment.slug,
-        ]) ?? [],
+        (experiments.data ?? [])
+          .filter((experiment) =>
+            isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState),
+          )
+          .map((experiment) => [experiment.id, experiment.slug]),
       ),
     [experiments.data],
   );
@@ -84,6 +96,7 @@ function OnlineEvaluationsPage() {
       enabled: monitor.enabled,
       executionMode: monitor.executionMode,
       performance: performanceByMonitor.get(monitor.id),
+      performanceError: performance.isError,
     })) ?? [];
 
   const toggleMonitor = api.monitors.toggle.useMutation({
@@ -113,7 +126,9 @@ function OnlineEvaluationsPage() {
 
   if (!project) return null;
 
-  const monitorById = new Map(monitors.data?.map((monitor) => [monitor.id, monitor]));
+  const monitorById = new Map(
+    monitors.data?.map((monitor) => [monitor.id, monitor]),
+  );
   const editMonitor = (monitorId: string) => {
     const monitor = monitorById.get(monitorId);
     if (!monitor) return;

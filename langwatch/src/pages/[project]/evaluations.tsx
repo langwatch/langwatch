@@ -29,8 +29,8 @@ import { Link } from "~/components/ui/link";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { useRouter } from "~/utils/compat/next-router";
 import { DashboardLayout } from "../../components/DashboardLayout";
-import { CopyEvaluationDialog } from "../../components/evaluations/CopyEvaluationDialog";
 import { formatEvaluationSummary } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
+import { CopyExperimentDialog } from "../../components/experiments/CopyExperimentDialog";
 import {
   NavigationFooter,
   useNavigationFooter,
@@ -51,7 +51,7 @@ export function ExperimentsPage() {
   const [copyDialogState, setCopyDialogState] = useState<{
     open: boolean;
     experimentId: string;
-    evaluationName: string;
+    experimentName: string;
   } | null>(null);
   const [experimentToDelete, setExperimentToDelete] = useState<{
     id: string;
@@ -113,16 +113,16 @@ export function ExperimentsPage() {
   if (!project) return null;
 
   const taskTypeToLabel: Record<keyof typeof TASK_TYPES, string> = {
-    real_time: "Real-Time Evaluation",
-    llm_app: "LLM App Evaluation",
-    prompt_creation: "Prompt Creation",
-    custom_evaluator: "Custom Evaluator",
-    scan: "Scan for Vulnerabilities",
+    real_time: "Legacy live workflow",
+    llm_app: "LLM App Experiment",
+    prompt_creation: "Prompt Experiment",
+    custom_evaluator: "Evaluator Experiment",
+    scan: "Vulnerability Scan",
   };
 
   const experimentTypeToLabel: Record<ExperimentType, string> = {
     BATCH_EVALUATION_V2: "Experiment (SDK)",
-    BATCH_EVALUATION: "Batch Evaluation",
+    BATCH_EVALUATION: "Batch Experiment",
     DSPY: "DSPy Optimization",
     EVALUATIONS_V3: "Experiment (UI)",
   };
@@ -232,7 +232,7 @@ export function ExperimentsPage() {
                       ))
                     : experiments.data
                       ? experiments.data.experiments.map((experiment, i) => (
-                          // Point Langy at an evaluation. Same chip id the
+                          // Point Langy at an experiment. Same chip id the
                           // `/experiments/<slug>` route derives, so pointing
                           // at a row and then opening it yields one chip, not
                           // two. Closed, this is the plain clickable row.
@@ -379,6 +379,9 @@ export function ExperimentsPage() {
                                 >
                                   <Menu.Root>
                                     <Menu.Trigger
+                                      aria-label={`Actions for ${
+                                        experiment.name ?? experiment.slug
+                                      }`}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                       }}
@@ -437,7 +440,7 @@ export function ExperimentsPage() {
                                             setCopyDialogState({
                                               open: true,
                                               experimentId: experiment.id,
-                                              evaluationName:
+                                              experimentName:
                                                 experiment.name ??
                                                 experiment.slug,
                                             });
@@ -482,11 +485,11 @@ export function ExperimentsPage() {
         </Container>
       )}
       {copyDialogState && (
-        <CopyEvaluationDialog
+        <CopyExperimentDialog
           open={copyDialogState.open}
           onClose={() => setCopyDialogState(null)}
           experimentId={copyDialogState.experimentId}
-          evaluationName={copyDialogState.evaluationName}
+          experimentName={copyDialogState.experimentName}
         />
       )}
       <ConfirmDialog

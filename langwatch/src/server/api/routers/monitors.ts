@@ -6,6 +6,7 @@ import { ZodError, z } from "zod";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import { getAnalyticsService } from "../../app-layer/analytics";
+import { buildSeriesName } from "../../app-layer/analytics/repositories/_timeseries-row-parser";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -128,6 +129,11 @@ export const monitorsRouter = createTRPCRouter({
           : ("evaluations.evaluation_score" as const),
         aggregation: "avg" as const,
         key: monitor.id,
+        filters: {
+          "evaluations.state": {
+            [monitor.id]: ["processed"],
+          },
+        },
       }));
       const endDate = Date.now();
       const startDate = endDate - 7 * 24 * 60 * 60 * 1000;
@@ -148,7 +154,7 @@ export const monitorsRouter = createTRPCRouter({
 
       return monitors.map((monitor, index) => {
         const metric = series[index]!.metric;
-        const resultKey = [index, metric, "avg", monitor.id].join("/");
+        const resultKey = buildSeriesName(series[index]!, index);
         const numberAtKey = (
           bucket: (typeof daily.currentPeriod)[number] | undefined,
         ) => {

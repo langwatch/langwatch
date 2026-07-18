@@ -10,7 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { BarChart2 } from "lucide-react";
 import qs from "qs";
-import { useCallback } from "react";
+import { Fragment, useCallback } from "react";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -257,7 +257,7 @@ const renderGridItems = (
     }
 
     return (
-      <>
+      <Fragment key={check.id}>
         <GridItem colSpan={1} display="inline-grid">
           <Card.Root>
             <Card.Header>
@@ -335,7 +335,7 @@ const renderGridItems = (
             </Card.Root>
           </GridItem>
         )}
-      </>
+      </Fragment>
     );
   });
 };

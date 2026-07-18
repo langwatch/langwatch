@@ -109,8 +109,8 @@ vi.mock("~/components/experiments/CreateExperimentButton", () => ({
   CreateExperimentButton: () => <div data-testid="create-experiment-button" />,
 }));
 
-vi.mock("~/components/evaluations/CopyEvaluationDialog", () => ({
-  CopyEvaluationDialog: () => <div data-testid="copy-evaluation-dialog" />,
+vi.mock("~/components/experiments/CopyExperimentDialog", () => ({
+  CopyExperimentDialog: () => <div data-testid="copy-experiment-dialog" />,
 }));
 
 vi.mock("~/components/NavigationFooter", () => ({

@@ -317,6 +317,10 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       void utils.monitors.getAllForProject.invalidate({
         projectId: project?.id ?? "",
       });
+      void utils.monitors.getPerformanceForProject.invalidate({
+        projectId: project?.id ?? "",
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
       // Clear persisted state after successful save
       onlineEvaluationDrawerState = null;
       onSave?.();
@@ -329,6 +333,10 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     onSuccess: () => {
       void utils.monitors.getAllForProject.invalidate({
         projectId: project?.id ?? "",
+      });
+      void utils.monitors.getPerformanceForProject.invalidate({
+        projectId: project?.id ?? "",
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       if (monitorId) {
         void utils.monitors.getById.invalidate({

@@ -186,7 +186,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
         return;
       }
       if (variant === "evaluations") {
-        window.location.href = "/@project/evaluations";
+        window.location.href = "/@project/online-evaluations";
       } else if (variant === "prompts") {
         window.location.href = "/@project/prompts";
       } else {

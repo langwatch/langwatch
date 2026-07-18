@@ -31,6 +31,7 @@ import type {
   ESBatchEvaluation,
 } from "../../experiments/types";
 import {
+  isLegacyOnlineEvaluationWorkbenchState,
   type WizardState,
   workbenchStateSchema,
 } from "../../experiments/workbenchState";
@@ -507,12 +508,6 @@ export const experimentsRouter = createTRPCRouter({
       const pageOffset = input.pageOffset ?? 0;
       const pageSize = input.pageSize ?? 25;
 
-      // Helper to check if an experiment is a real_time evaluation (old wizard)
-      const isRealTimeEvaluation = (workbenchState: JsonValue | null) => {
-        if (!workbenchState || typeof workbenchState !== "object") return false;
-        return (workbenchState as Record<string, unknown>).task === "real_time";
-      };
-
       // Fetch every active experiment with its workflow+currentVersion join,
       // then filter/paginate in JS. Prisma JSON-path filtering is unreliable
       // for the `task` field inside `workbenchState`, so the count and the
@@ -521,12 +516,16 @@ export const experimentsRouter = createTRPCRouter({
         projectId: input.projectId,
       });
       const totalHits = allExperiments.filter(
-        (e) => !isRealTimeEvaluation(e.workbenchState),
+        (experiment) =>
+          !isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState),
       ).length;
 
       // Filter out real_time evaluations and apply pagination
       const experiments = allExperiments
-        .filter((e) => !isRealTimeEvaluation(e.workbenchState))
+        .filter(
+          (experiment) =>
+            !isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState),
+        )
         .slice(pageOffset, pageOffset + pageSize);
 
       const getDatasetId = (dsl: JsonValue | undefined) => {

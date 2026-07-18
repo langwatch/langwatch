@@ -38,6 +38,7 @@ export type OnlineEvaluationRow = {
   enabled: boolean;
   executionMode: string;
   performance?: OnlineEvaluationPerformance;
+  performanceError?: boolean;
 };
 
 type OnlineEvaluationsTableProps = {
@@ -151,57 +152,59 @@ export const OnlineEvaluationsTable = ({
               )}
             </Table.Cell>
             <Table.Cell>
-              <Menu.Root>
-                <Menu.Trigger asChild>
-                  <IconButton
-                    aria-label={`Actions for ${row.name}`}
-                    variant="ghost"
-                    size="sm"
-                  >
-                    <LuEllipsis />
-                  </IconButton>
-                </Menu.Trigger>
-                <Menu.Content>
-                  {canViewAnalytics && (
-                    <Menu.Item value="analytics" asChild>
-                      <a href={href}>
-                        <LuChartNoAxesCombined />
-                        View analytics
-                      </a>
-                    </Menu.Item>
-                  )}
-                  {canManage && (
-                    <>
-                      <Menu.Item value="edit" onClick={() => onEdit(row.id)}>
-                        <LuPencil />
-                        Edit
+              {(canViewAnalytics || canManage) && (
+                <Menu.Root>
+                  <Menu.Trigger asChild>
+                    <IconButton
+                      aria-label={`Actions for ${row.name}`}
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <LuEllipsis />
+                    </IconButton>
+                  </Menu.Trigger>
+                  <Menu.Content>
+                    {canViewAnalytics && (
+                      <Menu.Item value="analytics" asChild>
+                        <a href={href}>
+                          <LuChartNoAxesCombined />
+                          View analytics
+                        </a>
                       </Menu.Item>
-                      <Menu.Item
-                        value="replicate"
-                        onClick={() => onReplicate(row.id)}
-                      >
-                        <LuCopy />
-                        Replicate to another project
-                      </Menu.Item>
-                      <Menu.Item
-                        value="toggle"
-                        onClick={() => onToggle(row.id)}
-                      >
-                        {row.enabled ? <LuPause /> : <LuPlay />}
-                        {row.enabled ? "Disable" : "Enable"}
-                      </Menu.Item>
-                      <Menu.Item
-                        value="delete"
-                        color="red.fg"
-                        onClick={() => onDelete(row.id)}
-                      >
-                        <LuTrash />
-                        Delete
-                      </Menu.Item>
-                    </>
-                  )}
-                </Menu.Content>
-              </Menu.Root>
+                    )}
+                    {canManage && (
+                      <>
+                        <Menu.Item value="edit" onClick={() => onEdit(row.id)}>
+                          <LuPencil />
+                          Edit
+                        </Menu.Item>
+                        <Menu.Item
+                          value="replicate"
+                          onClick={() => onReplicate(row.id)}
+                        >
+                          <LuCopy />
+                          Replicate to another project
+                        </Menu.Item>
+                        <Menu.Item
+                          value="toggle"
+                          onClick={() => onToggle(row.id)}
+                        >
+                          {row.enabled ? <LuPause /> : <LuPlay />}
+                          {row.enabled ? "Disable" : "Enable"}
+                        </Menu.Item>
+                        <Menu.Item
+                          value="delete"
+                          color="red.fg"
+                          onClick={() => onDelete(row.id)}
+                        >
+                          <LuTrash />
+                          Delete
+                        </Menu.Item>
+                      </>
+                    )}
+                  </Menu.Content>
+                </Menu.Root>
+              )}
             </Table.Cell>
           </Table.Row>
         );
@@ -212,6 +215,14 @@ export const OnlineEvaluationsTable = ({
 
 const PerformancePreview = ({ row }: { row: OnlineEvaluationRow }) => {
   const performance = row.performance;
+
+  if (row.performanceError) {
+    return (
+      <Text textStyle="sm" color="fg.muted">
+        Performance unavailable
+      </Text>
+    );
+  }
 
   if (!performance) {
     return (

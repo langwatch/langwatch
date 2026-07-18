@@ -17670,7 +17670,7 @@ async function myLLMStep(userInput: string): Promise<string> {
 
 You can also run evaluations through the Experiments Workbench without writing code:
 
-<a href="https://app.langwatch.ai/@project/evaluations" target="_blank">
+<a href="https://app.langwatch.ai/@project/experiments" target="_blank">
 <Frame>
 <img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png" alt="" style={{ maxWidth: '400px' }} noZoom />
 </Frame>
@@ -18266,7 +18266,7 @@ Configure your experiment once in the LangWatch Experiments via UI, then trigger
 
 ### Setup
 
-1. **Create your experiment** in the [Experiments via UI](https://app.langwatch.ai/@project/evaluations)
+1. **Create your experiment** in the [Experiments via UI](https://app.langwatch.ai/@project/experiments)
    - Add your dataset
    - Configure targets (prompts, models, or API endpoints)
    - Select evaluators
@@ -20223,7 +20223,7 @@ Consider scenarios where a correct answer exists for your LLM given a set of exa
 
 This example demonstrates how to evaluate a customer support agent.
 
-1. Navigate to the [experiments page](https://app.langwatch.ai/@project/evaluations) and click "New Evaluation":
+1. Navigate to the [experiments page](https://app.langwatch.ai/@project/experiments) and click "New Experiment":
 
 <Frame>
 <img src="/images/offline-evaluation/image_psd_2.png" alt="" style={{ maxWidth: '400px' }} />
@@ -20375,6 +20375,7 @@ You can now iterate on the prompt to address the failing questions. After making
 The version marker allows you to compare performance across different iterations and identify the best-performing version.
 
 This completes your first experiment. You can now integrate this versioned prompt into your application using LangWatch APIs. Maintain this evaluation in LangWatch to validate that future versions of prompts, datasets, or LLM models meet or exceed current performance standards before deploying to production.
+
 ---
 
 # FILE: ./evaluations/experiments/ui/llm-as-a-judge.mdx
@@ -20449,7 +20450,7 @@ It is not the best first tool when:
 
 ## Setting it up
 
-1. Open the [Experiments Workbench](https://app.langwatch.ai/@project/evaluations).
+1. Open the [Experiments Workbench](https://app.langwatch.ai/@project/experiments).
 2. Add the two or more prompts, agents, models, or other targets you want to compare.
 3. Add **Comparison** from Add to Evaluation. If you already have a saved Comparison evaluator, pick it from the list, or select **New Comparison** to start blank.
 4. Select the targets you want as variants — they lay out in an even grid as you add more (3–4 per row).
@@ -21341,8 +21342,8 @@ trace.end();
 
 ### 2. Create a Monitor
 
-1. Go to [Evaluations](https://app.langwatch.ai/@project/evaluations) in LangWatch
-2. Click **New Evaluation**
+1. Go to [Online Evaluations](https://app.langwatch.ai/@project/online-evaluations) in LangWatch
+2. Click **New Online Evaluation**
 3. Select **Real-time evaluation** (this creates a Monitor)
 4. Choose "When a message arrives" as the trigger
 5. Select evaluators (e.g., PII Detection, Faithfulness)
@@ -21482,7 +21483,7 @@ Just like all web applications need standard safety protections from for example
 
 On LangWatch, it's very easy to set up a prompt injection detection, and making sure it works well with your data, so you can monitor any incidents and get alerted.
 
-First, go to the [evaluations page](https://app.langwatch.ai/@project/evaluations) and click in New Evaluation:
+First, go to the [Online Evaluations page](https://app.langwatch.ai/@project/online-evaluations) and click New Online Evaluation:
 
 <Frame>
 <img src="/images/real-time-evaluation/image.psd(2).png" alt="" style={{ maxWidth: '400px' }} />
@@ -21625,7 +21626,7 @@ Test your LLM on a dataset using the Experiments via UI or via code:
 
   ### Platform
 
-    Go to [Experiments](https://app.langwatch.ai/@project/evaluations) and click "New Experiment" to get started with the UI.
+    Go to [Experiments](https://app.langwatch.ai/@project/experiments) and click "New Experiment" to get started with the UI.
 
   ### Python
 
@@ -21659,8 +21660,8 @@ await evaluation.run(dataset, async ({ item, index }) => {
 
 Monitor your production traffic with evaluators that run on every trace:
 
-1. Go to [Monitors](https://app.langwatch.ai/@project/evaluations)
-2. Create a new monitor with "When a message arrives" trigger
+1. Go to [Online Evaluations](https://app.langwatch.ai/@project/online-evaluations)
+2. Create a new online evaluation with the "When a message arrives" trigger
 3. Select evaluators (e.g., PII Detection, Faithfulness)
 4. Enable monitoring
 
@@ -30698,7 +30699,7 @@ description: 'Browse all available evaluators in LangWatch to find the right sco
 
 LangWatch offers an extensive library of evaluators to help you evaluate the quality and guarantee the safety of your LLM apps.
 
-While here you can find a reference list, to get the execution code you can use the [Experiments via UI](https://app.langwatch.ai/@project/evaluations) on LangWatch platform.
+While here you can find a reference list, to get the execution code you can use the [Experiments via UI](https://app.langwatch.ai/@project/experiments) on LangWatch platform.
 
 ## Authentication
 
@@ -30787,9 +30788,9 @@ Miscellaneous evaluators
 
 ## Running Evaluations
 
-Set up your first evaluation using the [Experiments via UI](https://app.langwatch.ai/@project/evaluations):
+Set up your first experiment using the [Experiments via UI](https://app.langwatch.ai/@project/experiments):
 
-<a href="https://app.langwatch.ai/@project/evaluations" target="_blank">
+<a href="https://app.langwatch.ai/@project/experiments" target="_blank">
 <Frame>
 <img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png" alt="" style={{ maxWidth: '400px' }} noZoom />
 </Frame>

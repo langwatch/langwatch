@@ -163,7 +163,7 @@ export const recentItemTypeToFeature: Record<string, FeatureKey> = {
   prompt: "prompts",
   workflow: "workflows",
   dataset: "datasets",
-  evaluation: "experiments",
+  evaluation: "online_evaluations",
   annotation: "annotations",
   simulation: "simulations",
 };

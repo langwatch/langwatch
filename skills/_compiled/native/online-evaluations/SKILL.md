@@ -39,12 +39,12 @@ LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments,
 
 How to handle:
 
-- Work within the limits — if 3 scenarios are allowed, create 3 meaningful ones, not 10.
+- Work within the limits. If 3 scenarios are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
 - Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
 
-If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
+If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted. Direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead.
 
 ## Prerequisites
 
@@ -60,7 +60,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 **Projects and API keys: target a real project, not a personal one.**
 
