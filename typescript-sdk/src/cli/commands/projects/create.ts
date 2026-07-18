@@ -65,7 +65,7 @@ export const createProjectCommand = async (options: CreateProjectOptions): Promi
     console.log(chalk.gray("Service API key id: ") + project.serviceApiKeyId);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "create project", format: options?.format });
+    failSpinner({ spinner, error, action: "create project" });
     process.exit(1);
   }
 };

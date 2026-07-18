@@ -35,7 +35,7 @@ export const deleteTriggerCommand = async (
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete trigger", format: options?.format });
+    failSpinner({ spinner, error, action: "delete trigger" });
     process.exit(1);
   }
 };

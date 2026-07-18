@@ -3,9 +3,37 @@ import { config } from "dotenv";
 import { getEndpoint } from "./endpoint";
 import { getOutputFormat, renderErrorAsJson } from "./errorOutput";
 
+/**
+ * Re-read the caller's .env, applying only the LANGWATCH_* keys.
+ *
+ * In-process this is mostly a no-op (index.ts already ran a full
+ * `dotenv.config()` at boot — that path is untouched). Under the daemon it
+ * runs per request, against the CALLER's cwd, in a long-lived shared process:
+ * loading the whole file the way `dotenv.config()` does would stuff unrelated
+ * secrets (DATABASE_URL, AWS credentials, …) into that process's memory for
+ * every later request to potentially see, contradicting the
+ * secret-minimisation the request env allowlist (daemon/eligibility.ts
+ * collectForwardedEnv) is built on. The caller's .env therefore contributes
+ * the same class of variables the allowlist would have forwarded: the
+ * LANGWATCH_* ones — which covers everything the CLI itself reads
+ * (LANGWATCH_API_KEY, LANGWATCH_ENDPOINT, LANGWATCH_PROJECT_ID, …).
+ *
+ * dotenv semantics are preserved: a variable that is already set (the
+ * baseline, or the caller's forwarded overlay) is never overwritten.
+ */
+const loadEnvFileScoped = (): void => {
+  // `processEnv: {}` parses the file into a throwaway object instead of
+  // straight into process.env, so the filter below decides what lands.
+  const parsed = config({ quiet: true, processEnv: {} })?.parsed ?? {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (!key.startsWith("LANGWATCH_")) continue;
+    if (process.env[key] === undefined) process.env[key] = value;
+  }
+};
+
 export const checkApiKey = (): void => {
-  // Load environment variables from .env file
-  config({ quiet: true });
+  // Load environment variables from .env file (scoped — see above)
+  loadEnvFileScoped();
 
   const apiKey = process.env.LANGWATCH_API_KEY;
 
@@ -13,10 +41,11 @@ export const checkApiKey = (): void => {
     const authUrl = `${getEndpoint()}/authorize`;
 
     // Machine callers (`--format json`) get the structured document on stdout,
-    // same contract as every other failure: a `kind` to match on beats prose.
+    // same contract as every other failure: a `code` to match on beats prose.
     if (getOutputFormat() === "json") {
       console.log(
         renderErrorAsJson({
+          code: "missing_api_key",
           kind: "missing_api_key",
           message:
             "LANGWATCH_API_KEY is not set. Run `langwatch login` or add it to your .env file.",

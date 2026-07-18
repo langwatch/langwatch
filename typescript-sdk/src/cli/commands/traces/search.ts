@@ -4,6 +4,11 @@ import { TracesApiService } from "@/client-sdk/services/traces/traces-api.servic
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
+import {
+  printResult,
+  resolveOutputOptions,
+  type RawOutputFlags,
+} from "../../utils/output";
 import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
 
 /** Traces are walked in chunks so the progress bar moves rather than jumping 0 → 1. */
@@ -14,8 +19,7 @@ export const searchTracesCommand = async (options: {
   startDate?: string;
   endDate?: string;
   limit?: string;
-  format?: string;
-}): Promise<void> => {
+} & RawOutputFlags): Promise<void> => {
   checkApiKey();
 
   const service = new TracesApiService();
@@ -67,19 +71,24 @@ export const searchTracesCommand = async (options: {
     // These were early `return`s. They are branches now so that `completed` is
     // emitted once, on every successful path, rather than three times or not at all.
     //
-    // The JSON branch comes FIRST: a machine caller must get the document even
-    // when it holds zero traces — an empty `{ traces: [], pagination }` is a
-    // parseable answer, prose on stdout is a corrupted one.
-    if (options.format === "json") {
+    // The machine branch comes FIRST: a machine caller must get the document
+    // even when it holds zero traces — an empty `{ traces: [], pagination }`
+    // is a parseable answer, prose on stdout is a corrupted one.
+    if (resolveOutputOptions(options).format !== "table") {
       reportProgress({ events, total: traces.length, matched });
-      console.log(JSON.stringify(result, null, 2));
-    } else if (traces.length === 0) {
-      console.log();
-      console.log(chalk.gray("No traces found matching your criteria."));
-      console.log(chalk.gray("Try widening your date range or search query."));
-    } else {
-      printTable({ events, traces, matched });
     }
+    await printResult(result, {
+      ...options,
+      table: () => {
+        if (traces.length === 0) {
+          console.log();
+          console.log(chalk.gray("No traces found matching your criteria."));
+          console.log(chalk.gray("Try widening your date range or search query."));
+        } else {
+          printTable({ events, traces, matched });
+        }
+      },
+    });
 
     events.completed({
       count: traces.length,
@@ -90,7 +99,11 @@ export const searchTracesCommand = async (options: {
     events.failed({ error, message: "Trace search failed" });
     // Flush BEFORE exiting: `process.exit` does not run the `finally` below.
     await events.flush();
-    failSpinner({ spinner, error, action: "search traces", format: options?.format });
+    // No explicit `format`: the program's preAction hook has already recorded
+    // the resolved format for EVERY spelling (`-o json`, `--agent`, `-f json`),
+    // and this command's `-f` carries a commander default ("table") that would
+    // otherwise override the hook and print prose at a machine caller.
+    failSpinner({ spinner, error, action: "search traces" });
     process.exit(1);
   } finally {
     await events.flush();

@@ -104,7 +104,7 @@ export const createGatewayBudgetCommand = async (
     console.log(`${chalk.bold("Resets:")}   ${new Date(budget.resets_at).toLocaleString()}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "create gateway budget", format: options?.format });
+    failSpinner({ spinner, error, action: "create gateway budget" });
     process.exit(1);
   }
 };

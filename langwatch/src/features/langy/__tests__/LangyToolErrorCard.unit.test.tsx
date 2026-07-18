@@ -55,6 +55,24 @@ function structuredFailure(): string {
   ].join("\n");
 }
 
+/** The shape the CURRENT CLI writes: trace links top-level, code + kind. */
+function structuredFailureNewCli(): string {
+  return JSON.stringify({
+    ok: false,
+    error: {
+      code: "network_error",
+      kind: "network_error",
+      message: "Failed to search traces: socket hang up (ECONNRESET).",
+      httpStatus: 0,
+      meta: {},
+      isDomain: false,
+      traceId: TRACE_ID,
+      traceUrl: TRACE_URL,
+      logsUrl: LOGS_URL,
+    },
+  });
+}
+
 describe("Langy tool failure card", () => {
   it("renders the failure and Grafana diagnostics as card actions", () => {
     const value = message(structuredFailure());
@@ -77,6 +95,23 @@ describe("Langy tool failure card", () => {
     // URLs are actions, not an unreadable paragraph in the card.
     expect(alert.textContent).not.toContain(TRACE_URL);
     expect(alert.textContent).not.toContain(LOGS_URL);
+  });
+
+  it("reads the trace/logs actions off a new-CLI document's top-level fields", () => {
+    const value = message(structuredFailureNewCli());
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <LangyToolActivity message={value} />
+      </ChakraProvider>,
+    );
+
+    expect(screen.getByRole("alert").textContent).toContain(TRACE_ID);
+    expect(
+      screen.getByRole("link", { name: /open debug trace/i }),
+    ).toHaveAttribute("href", TRACE_URL);
+    expect(
+      screen.getByRole("link", { name: /open related logs/i }),
+    ).toHaveAttribute("href", LOGS_URL);
   });
 
   it("does not render a failed call as successful activity", () => {

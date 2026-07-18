@@ -15,7 +15,7 @@ for skill in $SKILLS; do
   $COMPILER --skills "$skill" --mode docs > "$OUT_DIR/$skill.docs.txt"
 done
 
-RECIPES="debug-instrumentation improve-setup evaluate-multimodal generate-rag-dataset test-compliance test-cli-usability"
+RECIPES="debug-instrumentation debug-with-langwatch eval-triage setup-lw improve-setup evaluate-multimodal generate-rag-dataset test-compliance test-cli-usability"
 
 for recipe in $RECIPES; do
   echo "Compiling recipe $recipe..."

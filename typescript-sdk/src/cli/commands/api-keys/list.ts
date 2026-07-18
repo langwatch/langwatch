@@ -62,7 +62,7 @@ export const listApiKeysCommand = async (options?: { format?: string }): Promise
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch API keys", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch API keys" });
     process.exit(1);
   }
 };

@@ -86,7 +86,7 @@ export const createSuiteCommand = async (
       chalk.gray(`Run it with: ${chalk.cyan(`langwatch suite run ${suite.id}`)}`),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "create suite", format: options?.format });
+    failSpinner({ spinner, error, action: "create suite" });
     process.exit(1);
   }
 };

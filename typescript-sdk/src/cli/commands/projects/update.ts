@@ -61,7 +61,7 @@ export const updateProjectCommand = async (
     console.log(`${chalk.bold("Updated:")}         ${new Date(updated.updatedAt).toLocaleString()}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "update project", format: options?.format });
+    failSpinner({ spinner, error, action: "update project" });
     process.exit(1);
   }
 };

@@ -18,7 +18,12 @@
 import { Command } from "commander";
 import { parsePromptSpec } from "./types";
 import { formatApiErrorMessage } from "../client-sdk/services/_shared/format-api-error";
-import { setOutputFormat } from "./utils/errorOutput";
+import {
+  applyOutputContext,
+  registerOutputOptions,
+  resolveActionOutputOptions,
+  type RawOutputFlags,
+} from "./utils/output";
 
 declare const __CLI_VERSION__: string;
 
@@ -126,7 +131,10 @@ export function buildProgram(): Command {
   const program = new Command();
 
   program
-    .name("langwatch")
+    // The package ships two bin names for the same bundle (see package.json):
+    // `lw` (the advertised name) and `langwatch` (the long-standing alias).
+    // Reflect whichever one was invoked in usage/help lines.
+    .name(process.argv[1]?.split(/[\\/]/).pop() === "lw" ? "lw" : "langwatch")
     .description("LangWatch CLI - Manage prompts, datasets, evaluators, scenarios, suites, and more")
     .version(__CLI_VERSION__, "-v, --version", "Display the current version")
     .enablePositionalOptions()
@@ -137,21 +145,26 @@ export function buildProgram(): Command {
     .showHelpAfterError()
     .showSuggestionAfterError();
 
-  // Record the format the command about to run was invoked with, so that when it
-  // FAILS it fails in the shape the caller asked for — a structured document for
-  // `--format json`, a human block otherwise (see utils/errorOutput.ts).
+  // Record the output context of the command about to run, so that when it
+  // FAILS it fails in the shape the caller asked for — a structured document
+  // for any machine format, a human block otherwise (see utils/errorOutput.ts)
+  // — and so that agent mode turns colour and spinners off (utils/output.ts).
   //
   // Here rather than at the ~100 catch sites: a command that forgot would print
   // prose at a parser, which is precisely the failure this is meant to end. Set
-  // on every action, including those without a `--format`, so a daemon serving
-  // one command after another cannot leak the last caller's format into the next.
+  // on every action, including those without any output flag, so a daemon
+  // serving one command after another cannot leak the last caller's format
+  // into the next.
   //
-  // A boolean `--json` (the ingest/governance/daemon spelling) counts as JSON
-  // output too, so those commands fail structured and keep their spinners off
-  // stdout's stream just like the `--format json` ones.
+  // Every spelling funnels through the one central preprocessor: the new
+  // `-o/--output`, `--json <fields>`, `--jq` and `--agent` (plus agent-mode
+  // env vars), and the legacy `-f/--format json` and bare boolean `--json`
+  // (the ingest/governance/daemon spelling) — all normalised by
+  // resolveOutputOptions. resolveActionOutputOptions additionally keeps a
+  // command's OWN `--json <json>` payload option (dataset records add/update)
+  // from being misread as machine-output intent.
   program.hook("preAction", (_thisCommand, actionCommand) => {
-    const opts = actionCommand.opts<{ format?: string; json?: boolean }>();
-    setOutputFormat(opts.format ?? (opts.json === true ? "json" : undefined));
+    applyOutputContext(resolveActionOutputOptions(actionCommand));
   });
 
   // Top-level commands
@@ -193,7 +206,7 @@ export function buildProgram(): Command {
   // `stripe config` patterns so users don't hand-edit ~/.langwatch/config.json.
   const configCmd = program
     .command("config")
-    .description("Read or write user-global CLI configuration (endpoint, gateway-url)");
+    .description("Read or write user-global CLI configuration (endpoint, gateway-url, daemon)");
 
   configCmd
     .command("set <key> <value>")
@@ -363,6 +376,8 @@ export function buildProgram(): Command {
       "  cursor          Run `cursor` routed through the gateway",
       "  gemini          Run `gemini` (Gemini CLI) routed through the gateway",
       "  opencode        Run `opencode` (multi-provider) routed through the gateway",
+      "",
+      "`lw` and `langwatch` are the same binary — use whichever you prefer.",
       "",
     ].join("\n"),
   );
@@ -794,6 +809,135 @@ export function buildProgram(): Command {
     .action(async (options: { format?: string }) => {
       const { statusCommand: impl } = await import("./commands/status.js");
       await impl(options);
+    });
+
+  // Discoverability — the machine-readable catalog + compact help tree agents
+  // use to learn the CLI without human docs (gcx `commands` / `help-tree`).
+  program
+    .command("commands")
+    .description(
+      "Machine-readable catalog of every CLI command: path, args, flags, hints, skill annotations, token costs",
+    )
+    .option("--flat", "Flatten the command tree to a single list")
+    .action(async (options: { flat?: boolean }) => {
+      const { commandsCommand: impl } = await import("./commands/commands.js");
+      await impl(options);
+    });
+
+  program
+    .command("help-tree")
+    .description(
+      "Compact indented tree of all commands with # hint:/# skill: annotations (for agent context injection)",
+    )
+    .action(async (options: RawOutputFlags) => {
+      const { helpTreeCommand: impl } = await import("./commands/help-tree.js");
+      await impl(options);
+    });
+
+  // Help TOPICS (`gh help formatting` style). Registered as a real command:
+  // a command named `help` suppresses commander's implicit one (whose dispatch
+  // is internal and could never reach a topic page), so `langwatch help agent`
+  // lands in this action. `help <command>` still prints that command's help.
+  program
+    .command("help [topic...]")
+    .description(
+      "Show help for a command or a help topic (`langwatch help agent` is the agent-mode guide)",
+    )
+    .action(async (topic: string[] = []) => {
+      const { helpCommand: impl } = await import("./commands/help.js");
+      impl(program, topic);
+    });
+
+  // `langwatch skills *` — the bundled agent skills (compiled from skills/ at
+  // the repo root into the CLI at build time): list/get/install them into
+  // ~/.agents/skills, gcx `agent skills` semantics. Named `skills`, not
+  // `agent skills` — the top-level `agent` group is agent definitions.
+  const skillsCmd = program
+    .command("skills")
+    .description(
+      "List, inspect, and install LangWatch's bundled agent skills (default install root: ~/.agents/skills)",
+    );
+
+  skillsCmd
+    .command("list")
+    .description("List every bundled skill with its installed state")
+    .option("--dir <root>", "Install root to check (default ~/.agents)")
+    .action(async (options: { dir?: string } & RawOutputFlags) => {
+      try {
+        const { skillsListCommand: impl } = await import("./commands/skills/list.js");
+        await impl(options);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  skillsCmd
+    .command("get <name>")
+    .description("Print a skill's full body on stdout (raw markdown, for piping into agent context)")
+    .action(async (name: string, options: RawOutputFlags) => {
+      try {
+        const { skillsGetCommand: impl } = await import("./commands/skills/get.js");
+        await impl(name, options);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  skillsCmd
+    .command("install [names...]")
+    .description("Install skills into <dir>/skills/<slug>/SKILL.md (recipes nest under recipes/<slug>/)")
+    .option("--all", "Install every skill in the bundle")
+    .option("--dir <root>", "Install root (default ~/.agents)")
+    .option("--dry-run", "Report what would happen without writing anything")
+    .option("--force", "Overwrite files that differ from the bundle")
+    .action(async (names: string[], options: { all?: boolean; dir?: string; dryRun?: boolean; force?: boolean } & RawOutputFlags) => {
+      try {
+        const { skillsInstallCommand: impl } = await import("./commands/skills/install.js");
+        await impl(names, options);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  skillsCmd
+    .command("uninstall [names...]")
+    .description("Remove installed skills (only files the bundle manages; never prompts non-interactively)")
+    .option("--all", "Uninstall every skill in the bundle")
+    .option("--dir <root>", "Install root (default ~/.agents)")
+    .option("--dry-run", "Report what would happen without removing anything")
+    .option("-y, --yes", "Skip the confirmation prompt (required in non-TTY/agent contexts)")
+    .action(async (names: string[], options: { all?: boolean; dir?: string; dryRun?: boolean; yes?: boolean } & RawOutputFlags) => {
+      try {
+        const { skillsUninstallCommand: impl } = await import("./commands/skills/uninstall.js");
+        await impl(names, options);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  skillsCmd
+    .command("update [names...]")
+    .description("Refresh installed skills whose content differs from the bundle (no names: all installed)")
+    .option("--dir <root>", "Install root (default ~/.agents)")
+    .option("--dry-run", "Report what would happen without writing anything")
+    .option("--force", "Overwrite managed files that carry local edits")
+    .action(async (names: string[], options: { dir?: string; dryRun?: boolean; force?: boolean } & RawOutputFlags) => {
+      try {
+        const { skillsUpdateCommand: impl } = await import("./commands/skills/update.js");
+        await impl(names, options);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
     });
 
   // Docs commands - fetch markdown documentation for LangWatch and Scenario
@@ -2194,6 +2338,12 @@ export function buildProgram(): Command {
       const { daemonStatusCommand: impl } = await import("./commands/daemon.js");
       await impl(options);
     });
+
+  // The output contract's global flags (`-o/--output`, `--json <fields>`,
+  // `--jq`, `--agent`), added here — once, centrally — rather than per
+  // command. Registered on the built tree so buildProgram() stays a pure
+  // factory: no module-level state, nothing leaks between daemon requests.
+  registerOutputOptions(program);
 
   return program;
 }

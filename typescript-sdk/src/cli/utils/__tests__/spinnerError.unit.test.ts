@@ -68,20 +68,20 @@ describe("failSpinner", () => {
   });
 
   describe("when error carries the platform's error shape", () => {
-    // `{ error: <kind>, message }` is exactly what the shared Hono error handler
+    // `{ error: <code>, message }` is exactly what the shared Hono error handler
     // puts on the wire for a handled DomainError. It used to be flattened back
     // into the sentence "NotFoundError: Record missing", which reads as though
     // the class name were part of the prose. Now the sentence is the sentence and
-    // the kind is named as a kind — which is the whole point: a caller can act on
+    // the code is named as a code — which is the whole point: a caller can act on
     // `not_found`, and could only ever have read the string.
-    it("leads with the platform's sentence and names the kind beneath it", () => {
+    it("leads with the platform's sentence and names the code beneath it", () => {
       const err = { error: "NotFoundError", message: "Record missing" };
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "fetch trace" });
 
       const rendered = stripAnsi(String(calls[0]));
       expect(rendered.split("\n")[0]).toBe("Failed to fetch trace: Record missing");
-      expect(rendered).toContain("kind");
+      expect(rendered).toContain("code");
       expect(rendered).toContain("NotFoundError");
     });
   });

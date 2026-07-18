@@ -35,7 +35,7 @@ export const deleteGraphCommand = async (
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete graph", format: options?.format });
+    failSpinner({ spinner, error, action: "delete graph" });
     process.exit(1);
   }
 };

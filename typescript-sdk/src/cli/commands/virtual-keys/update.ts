@@ -114,7 +114,7 @@ export const updateVirtualKeyCommand = async (
     console.log(JSON.stringify(updated.config, null, 2));
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "update virtual key", format: options?.format });
+    failSpinner({ spinner, error, action: "update virtual key" });
     process.exit(1);
   }
 };

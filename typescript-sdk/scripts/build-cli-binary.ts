@@ -40,6 +40,9 @@ const result = await Bun.build({
   // Bytecode compilation moves parse time from run-time to build-time — this is
   // most of the startup win, so it is not optional.
   compile: { outfile, ...(target ? { target } : {}), bytecode: true },
+  // Minification shrinks the embedded bundle (and therefore the binary) and
+  // is safe to combine with bytecode compilation.
+  minify: true,
   // Mirrors tsup.config.ts. `__CLI_VERSION__` is a bare identifier in
   // src/cli/program.ts; without this define the binary COMPILES FINE and then
   // dies at runtime with `ReferenceError: __CLI_VERSION__ is not defined` on

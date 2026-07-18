@@ -135,7 +135,7 @@ export const runSuiteCommand = async (
     console.log(`  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "run suite", format: options?.format });
+    failSpinner({ spinner, error, action: "run suite" });
     process.exit(1);
   }
 };

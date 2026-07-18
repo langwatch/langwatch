@@ -1,0 +1,44 @@
+/**
+ * `langwatch skills get <name>` — print a skill's body, raw, on stdout.
+ * Agents pipe this straight into their context, so the default output is the
+ * SKILL.md content itself in BOTH human and agent mode (same precedent as
+ * `help-tree`); an explicit machine format (`-o json`, `-o yaml`, `--jq`)
+ * returns the skill as a structured document instead.
+ */
+import { printResult, resolveOutputOptions, type RawOutputFlags } from "../../utils/output";
+import { findSkill, SKILLS_BUNDLE } from "./installer";
+import { throwValidationError } from "./shared";
+
+export const skillsGetCommand = async (
+  name: string,
+  options: RawOutputFlags = {},
+): Promise<void> => {
+  const skill = findSkill(name);
+  if (!skill) {
+    return throwValidationError(
+      `Unknown skill "${name}". Run \`langwatch skills list\` to see the bundle.`,
+      {
+        available: SKILLS_BUNDLE.map((entry) =>
+          entry.isRecipe ? `recipes/${entry.slug}` : entry.slug,
+        ),
+      },
+    );
+  }
+
+  const { format } = resolveOutputOptions({ ...options });
+  if (format === "json" || format === "yaml") {
+    await printResult(
+      {
+        slug: skill.isRecipe ? `recipes/${skill.slug}` : skill.slug,
+        name: skill.name,
+        description: skill.description,
+        ...(skill.userPrompt !== undefined ? { userPrompt: skill.userPrompt } : {}),
+        body: skill.body,
+      },
+      { ...options, table: () => process.stdout.write(skill.body) },
+    );
+    return;
+  }
+
+  process.stdout.write(skill.body);
+};

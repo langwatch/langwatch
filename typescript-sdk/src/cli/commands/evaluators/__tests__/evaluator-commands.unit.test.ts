@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import chalk from "chalk";
 import type { EvaluatorResponse } from "@/client-sdk/services/evaluators";
 import { EvaluatorsApiError } from "@/client-sdk/services/evaluators";
 
@@ -29,6 +30,7 @@ import { listEvaluatorsCommand } from "../list";
 import { getEvaluatorCommand } from "../get";
 import { createEvaluatorCommand } from "../create";
 import { deleteEvaluatorCommand } from "../delete";
+import { applyOutputContext, resolveOutputOptions } from "../../../utils/output";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -244,5 +246,92 @@ describe("deleteEvaluatorCommand()", () => {
 
       await expect(deleteEvaluatorCommand("test-evaluator")).rejects.toThrow(ProcessExitError);
     });
+  });
+});
+
+/**
+ * The migrated commands register `-f, --format` with a commander DEFAULT
+ * ("table"/"digest"), so `options.format` is always defined. Passing it
+ * explicitly into failSpinner made it beat the format the program's preAction
+ * hook recorded — failures rendered as human prose even under `-o json` /
+ * `--agent`. These tests simulate exactly what the hook does
+ * (applyOutputContext over the resolved options, commander default included)
+ * and then fail the command.
+ */
+describe("listEvaluatorsCommand() failure shape under machine formats", () => {
+  let mockGetAll: ReturnType<typeof vi.fn>;
+  let savedChalkLevel: typeof chalk.level;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    savedChalkLevel = chalk.level;
+    mockGetAll = vi.fn();
+    vi.mocked(EvaluatorsApiService).mockImplementation(function () { return ({
+      getAll: mockGetAll,
+      get: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
+    }) as unknown as EvaluatorsApiService; });
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+    mockGetAll.mockRejectedValue(
+      new EvaluatorsApiError("boom", "fetch all evaluators"),
+    );
+  });
+
+  afterEach(() => {
+    // Undo the preAction simulation: reset the recorded format and colour.
+    chalk.level = savedChalkLevel;
+    applyOutputContext(resolveOutputOptions({}, {}));
+  });
+
+  const printedStdout = (): string =>
+    vi.mocked(console.log).mock.calls.map((call) => String(call[0])).join("\n");
+
+  it("emits the structured JSON error document under -o json, despite the -f commander default", async () => {
+    // What preAction resolves for `-o json`: the -f default "table" sits on
+    // the same options object and must not win.
+    applyOutputContext(resolveOutputOptions({ output: "json", format: "table" }, {}));
+
+    await expect(
+      listEvaluatorsCommand({ output: "json", format: "table" }),
+    ).rejects.toThrow(ProcessExitError);
+
+    const doc = JSON.parse(printedStdout()) as { ok: boolean; error: { message: string } };
+    expect(doc.ok).toBe(false);
+    expect(doc.error.message).toContain("boom");
+  });
+
+  it("emits the structured JSON error document under --agent, despite the -f commander default", async () => {
+    applyOutputContext(resolveOutputOptions({ agent: true, format: "table" }, {}));
+
+    await expect(
+      listEvaluatorsCommand({ agent: true, format: "table" }),
+    ).rejects.toThrow(ProcessExitError);
+
+    const doc = JSON.parse(printedStdout()) as { ok: boolean };
+    expect(doc.ok).toBe(false);
+  });
+
+  it("still emits JSON errors when a human passes -f json explicitly", async () => {
+    applyOutputContext(resolveOutputOptions({ format: "json" }, {}));
+
+    await expect(
+      listEvaluatorsCommand({ format: "json" }),
+    ).rejects.toThrow(ProcessExitError);
+
+    const doc = JSON.parse(printedStdout()) as { ok: boolean };
+    expect(doc.ok).toBe(false);
+  });
+
+  it("keeps the human error block when no machine format was asked for", async () => {
+    applyOutputContext(resolveOutputOptions({ format: "table" }, {}));
+
+    await expect(
+      listEvaluatorsCommand({ format: "table" }),
+    ).rejects.toThrow(ProcessExitError);
+
+    expect(() => JSON.parse(printedStdout())).toThrow();
   });
 });

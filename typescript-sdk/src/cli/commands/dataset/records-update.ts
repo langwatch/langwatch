@@ -30,7 +30,6 @@ export const recordsUpdateCommand = async (
       error: commandValidationError(
         error instanceof Error ? error.message : "Invalid JSON input",
       ),
-      format: options.format,
     });
     process.exit(1);
   }

@@ -39,6 +39,7 @@ vi.mock("ora", () => ({
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { LangWatchDomainError } from "@/internal/api/errors";
 import { searchTracesCommand } from "../traces/search";
+import { setOutputFormat } from "../../utils/errorOutput";
 
 class ProcessExitError extends Error {
   constructor(public readonly code: number) {
@@ -49,6 +50,7 @@ class ProcessExitError extends Error {
 const notFound = () =>
   new LangWatchDomainError({
     domain: {
+      code: "trace_not_found",
       kind: "trace_not_found",
       message: "Trace not found: trace-abc",
       httpStatus: 404,
@@ -81,11 +83,17 @@ describe("given a command fails with a domain error", () => {
   });
 
   afterEach(() => {
+    setOutputFormat(undefined);
     vi.restoreAllMocks();
   });
 
-  const run = async (options: { format?: string }) =>
-    searchTracesCommand(options).catch((error: unknown) => error);
+  const run = async (options: { format?: string }) => {
+    // The command deliberately reads no format of its own on the error path —
+    // the program's preAction hook records it for every invocation. Driving the
+    // command directly means playing the hook's part first.
+    setOutputFormat(options.format);
+    return searchTracesCommand(options).catch((error: unknown) => error);
+  };
 
   describe("when the caller asked for --format json", () => {
     it("prints a structured document on stdout", async () => {

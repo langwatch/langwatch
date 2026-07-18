@@ -68,7 +68,7 @@ export const updateSuiteCommand = async (
     console.log(`  ${chalk.gray("Repeat:")}    ${suite.repeatCount}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "update suite", format: options?.format });
+    failSpinner({ spinner, error, action: "update suite" });
     process.exit(1);
   }
 };

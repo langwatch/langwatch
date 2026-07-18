@@ -3201,6 +3201,269 @@ langwatch trace export --format jsonl --limit 50 -o traces.jsonl
 | Missing user_id | User ID not passed to trace | Add \`user_id\` to trace metadata |
 | Traces from different calls merged | Missing \`langwatch.setup()\` or trace context not propagated | Ensure \`langwatch.setup()\` called at startup |`,
 
+  recipe_debug_with_langwatch: `You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+Use the \`langwatch\` CLI for everything: documentation (\`langwatch docs ...\`, \`langwatch scenario-docs ...\`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with \`npm install -g langwatch\` (or run any command via \`npx langwatch\`).
+
+# Debug Production Issues with LangWatch
+
+A structured diagnostic workflow: errored traces → span inspection → monitor/evaluator scores → root cause. Work the steps in order; each narrows the search space for the next.
+
+If traces themselves look broken (empty inputs/outputs, disconnected spans), switch to the \`debug-instrumentation\` recipe instead — that is an instrumentation problem, not an application problem.
+
+## Prerequisites
+
+Use \`langwatch docs <path>\` to read documentation as Markdown. Some useful entry points:
+
+\`\`\`bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+\`\`\`
+
+Discover commands with \`langwatch --help\` and \`langwatch <subcommand> --help\`. List and get commands accept \`--format json\` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP — append \`.md\` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+## Step 0: Point the CLI at the Right Project
+
+\`\`\`bash
+langwatch status
+\`\`\`
+
+A fast sanity check that the API key, endpoint, and project are the ones you mean to debug. Fix auth first (see the \`setup-lw\` recipe) — every later step reads from this project.
+
+## Step 1: Find the Errored Traces
+
+\`\`\`bash
+langwatch trace search --limit 25 -o json
+langwatch trace search -q "timeout" --start-date 2026-01-01 -o json
+\`\`\`
+
+- \`--start-date\`/\`--end-date\` bound the window (ISO strings or epoch ms; default is the last 24h).
+- \`-q\` does a text search — the error message, a user id, a thread id.
+- The result is \`{ "traces": [...], "pagination": { "totalHits": N } }\`. Pull fields out with \`--jq\` instead of reading the whole payload:
+
+\`\`\`bash
+langwatch trace search --limit 50 -o json --jq ".traces[].traceId"
+langwatch trace search -q "refund" -o json --jq ".traces | length"
+\`\`\`
+
+Look for: traces with error statuses, empty or truncated outputs, outliers in latency or cost, and repeats of the same failure across users/threads (a pattern, not a one-off).
+
+## Step 2: Inspect the Failing Spans
+
+\`\`\`bash
+langwatch trace get <traceId>            # human-readable digest
+langwatch trace get <traceId> -o json    # full span hierarchy
+\`\`\`
+
+Read the span tree top-down:
+
+- **Which span failed?** The error is usually in one span (an LLM call, a tool call), not the whole trace. Note its input — a bad input upstream often explains a failure downstream.
+- **What did the model see?** Check the prompt/messages on the failing LLM span. Missing context, truncated history, and stale retrieved documents are the usual suspects.
+- **Retries and timeouts:** repeated identical spans suggest retry loops; a long-running span before the failure suggests a timeout.
+
+## Step 3: Check Monitors and Evaluator Scores
+
+Production quality signals live in monitors (online evaluation) and their evaluators:
+
+\`\`\`bash
+langwatch monitor list -o json           # which monitors exist, are they enabled/firing?
+langwatch monitor get <id> -o json       # one monitor's config and recent state
+langwatch evaluator list -o json         # the evaluators the monitors run
+\`\`\`
+
+- A firing monitor names the failure mode (toxicity, hallucination, PII) — corroborate it against the spans from Step 2.
+- No monitor for the failure mode you found? That is a gap worth closing once the root cause is fixed (\`langwatch monitor create\`).
+
+For a quantitative view of the blast radius:
+
+\`\`\`bash
+langwatch analytics query -m trace-count -a sum --group-by metadata.model -o json
+\`\`\`
+
+## Step 4: Root Cause and Verify
+
+1. Form a hypothesis from the failing span's input + the monitor's failure mode: prompt change, model change, bad retrieval, code regression. \`git log\` on the agent's code and prompts tells you what changed when the failures started.
+2. Apply the fix (prompt, code, or configuration).
+3. Generate fresh traffic, then re-run Step 1: the errored traces should stop appearing.
+4. If the failure was a regression, add a scenario so it stays fixed — the \`scenarios\` skill covers this.
+
+## Discovery
+
+The full command surface, with per-command usage hints, is one command away:
+
+\`\`\`bash
+langwatch commands -o json     # machine-readable catalog of every command
+langwatch help-tree            # compact annotated tree (fits in context)
+langwatch <group> --help       # flags for one group
+\`\`\`
+
+Pass \`--agent\` to any command for compact single-line JSON with colour and spinners off (auto-detected under most coding agents).`,
+
+  recipe_eval_triage: `You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+Use the \`langwatch\` CLI for everything: documentation (\`langwatch docs ...\`, \`langwatch scenario-docs ...\`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with \`npm install -g langwatch\` (or run any command via \`npx langwatch\`).
+
+# Triage Failing Experiments and Evaluations
+
+From "the run failed" to the specific rows, evaluators, and inputs responsible — then to a root cause. Work the steps in order.
+
+## Prerequisites
+
+Use \`langwatch docs <path>\` to read documentation as Markdown. Some useful entry points:
+
+\`\`\`bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+\`\`\`
+
+Discover commands with \`langwatch --help\` and \`langwatch <subcommand> --help\`. List and get commands accept \`--format json\` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP — append \`.md\` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+## Step 1: Find the Failing Run
+
+\`\`\`bash
+langwatch experiment list --limit 20 -o json          # experiments in the project
+langwatch experiment list-runs <slug> -o json         # runs for one experiment
+langwatch experiment status <slug> -o json            # latest run: status, progress, errors
+langwatch experiment status <slug> --run-id <id> -o json
+\`\`\`
+
+A run can fail two ways, and they triage differently:
+
+- **Execution failure** — the run errored out or stalled. \`status\` shows the error; jump to Step 4.
+- **Score regression** — the run completed but evaluator scores dropped or rows failed. Continue to Step 2.
+
+## Step 2: Isolate the Failing Rows
+
+\`\`\`bash
+langwatch experiment results <slug> --filter failed -o json
+langwatch experiment results <slug> --filter failed --evaluator <name> -o json
+langwatch experiment results <slug> --run-id <id> --limit 50 -o json
+\`\`\`
+
+- \`--filter failed\` keeps only the rows that failed at least one evaluator — start there, not with the full result set.
+- \`--evaluator <name>\` shows one evaluator's column when several ran: is the regression concentrated in one evaluator (a scoring problem) or spread across all of them (a real behavior regression)?
+
+For each failing row, note the input, the expected output (from the dataset), and the actual output. Rows that fail the SAME way point at one root cause; rows that fail differently suggest flakiness or a noisy evaluator.
+
+## Step 3: Inspect the Evaluators
+
+\`\`\`bash
+langwatch evaluator list -o json
+langwatch evaluator get <idOrSlug> -o json
+\`\`\`
+
+Before blaming the agent, rule out the scorer:
+
+- **LLM-judge evaluators** — check the model in \`settings\`. A judge model that changed, is rate-limited, or is too weak for the rubric produces score swings that have nothing to do with the agent.
+- **Thresholds** — a score of 0.49 vs a pass threshold of 0.5 is a borderline judge, not a regression. Look at the score distribution across rows, not just pass/fail.
+- **Deterministic evaluators** (exact match, JSON validity) — these don't drift; failures here are real.
+
+## Step 4: Root Cause
+
+1. Compare the failing run against the last passing one: what changed — prompt version, model, dataset, code? \`git log\` on prompts and agent code usually answers this directly.
+2. If rows fail on retrieval or context: inspect a production trace of the same path (\`langwatch trace search\` / \`langwatch trace get\` — see the \`debug-with-langwatch\` recipe).
+3. If the dataset itself looks wrong (stale expected outputs, bad rows), fix the dataset — \`langwatch dataset get <slugOrId>\` to inspect it.
+4. Apply the fix and re-run:
+
+\`\`\`bash
+langwatch experiment run <slug> --wait
+langwatch experiment status <slug> -o json
+\`\`\`
+
+## Step 5: Prevent the Recurrence
+
+- If the failure mode wasn't covered by any evaluator, add one (\`langwatch evaluator create\`) and wire it into the experiment.
+- If it only shows up in production, set up a monitor (\`langwatch monitor create\`) so online evaluation catches it before the next experiment does.`,
+
+  recipe_setup_lw: `You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+Use the \`langwatch\` CLI for everything: documentation (\`langwatch docs ...\`, \`langwatch scenario-docs ...\`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with \`npm install -g langwatch\` (or run any command via \`npx langwatch\`).
+
+# Set Up the LangWatch CLI
+
+Get the CLI authenticated and talking to the right LangWatch project, then verify. The troubleshooting table at the end covers the common failure modes.
+
+## Step 1: Credentials
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+
+For CI and agents, configure non-interactively — never block on a browser:
+
+\`\`\`bash
+langwatch login --api-key <key>                          # writes LANGWATCH_API_KEY to .env
+langwatch login --api-key <key> --endpoint https://lw.acme.internal   # self-hosted
+\`\`\`
+
+Or set the environment directly (what the CLI actually reads):
+
+\`\`\`bash
+export LANGWATCH_API_KEY=<project-api-key>
+export LANGWATCH_ENDPOINT=https://lw.acme.internal       # self-hosted only; omit for cloud
+\`\`\`
+
+For humans at a terminal, plain \`langwatch login\` asks interactively (cloud vs self-hosted, AI tools vs project SDK), and \`langwatch login --device\` runs the RFC 8628 device flow via company SSO.
+
+## Step 2: Endpoint and Project
+
+- **Cloud** (app.langwatch.ai) needs no endpoint configuration.
+- **Self-hosted**: the endpoint resolves flag > env > config > default. Persist it with \`langwatch config set endpoint https://lw.acme.internal\`, or export \`LANGWATCH_ENDPOINT\` per shell.
+- **Project**: the API key determines the project. Check you're in the right one:
+
+\`\`\`bash
+langwatch projects list -o json
+\`\`\`
+
+A personal access token (PAT) instead of a project key also needs \`LANGWATCH_PROJECT_ID\` set.
+
+## Step 3: Verify
+
+\`\`\`bash
+langwatch whoami          # device-session identity (governance plane)
+langwatch status          # resource counts — proves auth + endpoint + project in one shot
+\`\`\`
+
+\`langwatch status\` printing resource counts means the setup is done. Everything else (traces, evaluations, scenarios) builds on this.
+
+## Step 4: Discover What You Can Do
+
+Use \`langwatch docs <path>\` to read documentation as Markdown. Some useful entry points:
+
+\`\`\`bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+\`\`\`
+
+Discover commands with \`langwatch --help\` and \`langwatch <subcommand> --help\`. List and get commands accept \`--format json\` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP — append \`.md\` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| \`401\` / \`unauthorized\` on every command | Wrong, revoked, or missing API key | Re-run \`langwatch login --api-key <key>\`; check \`LANGWATCH_API_KEY\` in \`.env\` and the shell (shell wins) |
+| \`401\` with a PAT | Missing project id | \`export LANGWATCH_PROJECT_ID=<your-project-id>\` |
+| Connection refused / DNS errors | Self-hosted endpoint wrong or unreachable | Check \`langwatch config get endpoint\` and \`LANGWATCH_ENDPOINT\`; verify the instance URL loads in a browser from this machine |
+| Right credentials, wrong data | Talking to the wrong project or instance | \`langwatch projects list\` — re-login with a key from the intended project |
+| Old shell ignores new \`.env\` | Env vars already exported | Start a new shell, or \`unset LANGWATCH_API_KEY LANGWATCH_ENDPOINT\` so \`.env\` is re-read |
+| A command hangs waiting for input | Interactive prompt in a non-interactive context | Re-run with the non-interactive flags (\`--api-key\`, \`-y\`, \`-o json\`) — the CLI never prompts when it detects an agent |`,
+
   recipe_improve_setup: `You are using LangWatch for your AI agent project. Follow these instructions.
 
 IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.

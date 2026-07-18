@@ -58,7 +58,6 @@ export const recordsAddCommand = async (
       error: commandValidationError(
         "One of --json, --file, or --stdin is required.",
       ),
-      format: options.format,
     });
     process.exit(1);
   }
@@ -70,7 +69,6 @@ export const recordsAddCommand = async (
       if (!fs.existsSync(options.file)) {
         reportCommandError({
           error: commandValidationError(`File not found: ${options.file}`),
-          format: options.format,
         });
         process.exit(1);
       }
@@ -86,7 +84,6 @@ export const recordsAddCommand = async (
       error: commandValidationError(
         error instanceof Error ? error.message : "Invalid JSON input",
       ),
-      format: options.format,
     });
     process.exit(1);
   }
@@ -96,7 +93,6 @@ export const recordsAddCommand = async (
       error: commandValidationError(
         "No records provided. The JSON array is empty.",
       ),
-      format: options.format,
     });
     process.exit(1);
   }

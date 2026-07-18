@@ -62,7 +62,7 @@ export const listAgentsCommand = async (options?: { format?: string }): Promise<
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch agents", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch agents" });
     process.exit(1);
   }
 };

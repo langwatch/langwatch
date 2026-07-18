@@ -63,7 +63,7 @@ export const promptRestoreCommand = async (
     );
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "restore prompt", format: options?.format });
+    failSpinner({ spinner, error, action: "restore prompt" });
     process.exit(1);
   }
 };

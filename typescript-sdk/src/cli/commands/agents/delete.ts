@@ -20,7 +20,7 @@ export const deleteAgentCommand = async (id: string, options?: { format?: string
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "archive agent", format: options?.format });
+    failSpinner({ spinner, error, action: "archive agent" });
     process.exit(1);
   }
 };

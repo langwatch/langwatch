@@ -28,7 +28,7 @@ export const deleteProjectCommand = async (
     console.log(chalk.gray("Archived at: ") + new Date(result.archivedAt).toLocaleString());
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "archive project", format: options?.format });
+    failSpinner({ spinner, error, action: "archive project" });
     process.exit(1);
   }
 };

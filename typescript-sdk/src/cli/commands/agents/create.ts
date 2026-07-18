@@ -37,7 +37,7 @@ export const createAgentCommand = async (
     if (error instanceof SyntaxError) {
       spinner.fail(chalk.red("--config must be valid JSON"));
     } else {
-      failSpinner({ spinner, error, action: "create agent", format: options?.format });
+      failSpinner({ spinner, error, action: "create agent" });
     }
     process.exit(1);
   }

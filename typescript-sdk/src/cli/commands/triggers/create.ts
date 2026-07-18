@@ -80,7 +80,7 @@ export const createTriggerCommand = async (
     if (error instanceof SyntaxError) {
       spinner.fail(chalk.red("--filters must be valid JSON"));
     } else {
-      failSpinner({ spinner, error, action: "create trigger", format: options?.format });
+      failSpinner({ spinner, error, action: "create trigger" });
     }
     process.exit(1);
   }

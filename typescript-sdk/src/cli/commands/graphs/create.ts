@@ -68,7 +68,7 @@ export const createGraphCommand = async (
     if (error instanceof SyntaxError) {
       spinner.fail(chalk.red("--graph must be valid JSON"));
     } else {
-      failSpinner({ spinner, error, action: "create graph", format: options?.format });
+      failSpinner({ spinner, error, action: "create graph" });
     }
     process.exit(1);
   }

@@ -74,7 +74,7 @@ export const listSecretsCommand = async (options?: {
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch secrets", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch secrets" });
     process.exit(1);
   }
 };

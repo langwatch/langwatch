@@ -2,11 +2,19 @@
  * How a failure is rendered, in each of the two shapes a caller can ask for.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import chalk from "chalk";
 import { readCliErrorDocument } from "@langwatch/cli-cards/domain-error";
 
 import { LangWatchDomainError } from "@/internal/api/errors";
 import {
+  ExecutionContext,
+  withExecutionContext,
+} from "../../daemon/execution";
+import {
   commandValidationError,
+  currentOutputScope,
+  disableOutputColor,
+  getOutputFormat,
   readCommandError,
   reportCommandError,
   renderErrorAsJson,
@@ -16,16 +24,31 @@ import {
 } from "../errorOutput";
 
 const domainError = ({
-  kind = "dataset_not_found",
+  code = "dataset_not_found",
   message = "Dataset not found: sales-q3",
   httpStatus = 404,
   meta = { id: "sales-q3" } as Record<string, unknown>,
   traceId = "4bf92f3577b34da6a3ce929d0e0e4736" as string | undefined,
+  traceUrl = undefined as string | undefined,
   reasons = undefined as { kind: string }[] | undefined,
+  suggestions = undefined as string[] | undefined,
+  docUrl = undefined as string | undefined,
 } = {}) =>
   new LangWatchDomainError({
-    domain: { kind, message, httpStatus, meta, isDomain: true, traceId, reasons },
-    body: { error: kind, message, ...meta },
+    domain: {
+      code,
+      kind: code,
+      message,
+      httpStatus,
+      meta,
+      isDomain: true,
+      traceId,
+      traceUrl,
+      reasons,
+      suggestions,
+      docUrl,
+    },
+    body: { error: code, message, ...meta },
     operation: "GET /api/dataset/sales-q3",
     message,
   });
@@ -35,12 +58,13 @@ describe("given a failure the platform named", () => {
     it("leads with the platform's sentence", () => {
       const rendered = renderErrorForHumans(readCommandError(domainError()));
 
-      expect(rendered.split("\n")[0]).toBe("Dataset not found: sales-q3");
+      expect(rendered.split("\n")[0]).toBe("Error: Dataset not found: sales-q3");
     });
 
-    it("prints the kind, the status and the trace id under it", () => {
+    it("prints the code, the status and the trace id under Details", () => {
       const rendered = renderErrorForHumans(readCommandError(domainError()));
 
+      expect(rendered).toContain("Details:");
       expect(rendered).toContain("dataset_not_found");
       expect(rendered).toContain("404");
       expect(rendered).toContain("4bf92f3577b34da6a3ce929d0e0e4736");
@@ -61,14 +85,25 @@ describe("given a failure the platform named", () => {
 
       expect(rendered).toContain("gateway_timeout → unknown");
     });
+
+    it("prints the trace link when the route sent one", () => {
+      const rendered = renderErrorForHumans(
+        readCommandError(
+          domainError({ traceUrl: "https://grafana.example.com/explore?traceId=4bf" }),
+        ),
+      );
+
+      expect(rendered).toContain("https://grafana.example.com/explore?traceId=4bf");
+    });
   });
 
   describe("when rendering it for a machine", () => {
-    it("emits a document a parser can read the kind, meta and trace id out of", () => {
+    it("emits a document a parser can read the code, meta and trace id out of", () => {
       const json = renderErrorAsJson(readCommandError(domainError()));
       const parsed = readCliErrorDocument(json);
 
       expect(parsed).toMatchObject({
+        code: "dataset_not_found",
         kind: "dataset_not_found",
         httpStatus: 404,
         meta: { id: "sales-q3" },
@@ -123,7 +158,7 @@ describe("given a server echoes a credential back in its message", () => {
 
   const echoed = () =>
     domainError({
-      kind: "project_not_found",
+      code: "project_not_found",
       message: `No project for key ${API_KEY}`,
       meta: { projectId: "project-1" },
     });
@@ -158,7 +193,7 @@ describe("given a server echoes a credential back in its message", () => {
 describe("given a domain error whose meta holds an actionable identifier", () => {
   const withKeyLikeIds = () =>
     domainError({
-      kind: "virtual_key_not_found",
+      code: "virtual_key_not_found",
       message: "Virtual key not found",
       meta: { virtualKeyId: "vk-abc123def456", handle: "lw-team-handle" },
       traceId: undefined,
@@ -264,6 +299,173 @@ describe("given a failure on a command path that has no spinner", () => {
       expect(parsed?.kind).toBe("validation_error");
       expect(parsed?.isDomain).toBe(true);
       expect(parsed?.message).toBe("At least one record ID is required.");
+    });
+  });
+});
+
+describe("given a failure the platform sent advice with", () => {
+  const advised = () =>
+    domainError({
+      code: "budget_exceeded",
+      message: "Budget exceeded: monthly cap reached",
+      httpStatus: 402,
+      meta: { budgetId: "budget-1" },
+      suggestions: ["Raise the budget in the gateway settings"],
+      docUrl: "https://langwatch.ai/docs/ai-gateway/budgets",
+    });
+
+  describe("when rendering it for a person", () => {
+    it("prints the suggestions as a bulleted list and the docs link", () => {
+      const rendered = renderErrorForHumans(readCommandError(advised()));
+
+      expect(rendered).toContain("Suggestions:");
+      expect(rendered).toContain("  - Raise the budget in the gateway settings");
+      expect(rendered).toContain(
+        "Docs: https://langwatch.ai/docs/ai-gateway/budgets",
+      );
+    });
+  });
+
+  describe("when rendering it for a machine", () => {
+    it("carries the advice in the document", () => {
+      const parsed = readCliErrorDocument(
+        renderErrorAsJson(readCommandError(advised())),
+      );
+
+      expect(parsed).toMatchObject({
+        code: "budget_exceeded",
+        suggestions: ["Raise the budget in the gateway settings"],
+        docUrl: "https://langwatch.ai/docs/ai-gateway/budgets",
+      });
+    });
+  });
+});
+
+describe("given a failure the platform sent NO advice with", () => {
+  describe("when the code is one the fallback table knows", () => {
+    it("fills the human block from the fallback table", () => {
+      const rendered = renderErrorForHumans(
+        readCommandError(domainError({ code: "missing_api_key" })),
+      );
+
+      expect(rendered).toContain("Suggestions:");
+      expect(rendered).toContain("langwatch login");
+      expect(rendered).toContain("Docs: https://langwatch.ai/docs/integration/cli");
+    });
+
+    it("fills the JSON document from the same table", () => {
+      const parsed = readCliErrorDocument(
+        renderErrorAsJson(readCommandError(domainError({ code: "missing_api_key" }))),
+      );
+
+      expect(parsed?.suggestions?.length).toBeGreaterThan(0);
+      expect(parsed?.docUrl).toBe("https://langwatch.ai/docs/integration/cli");
+    });
+
+    it("never overrides advice the platform DID send", () => {
+      const rendered = renderErrorForHumans(
+        readCommandError(
+          domainError({
+            code: "missing_api_key",
+            suggestions: ["Use the project-scoped key from settings"],
+          }),
+        ),
+      );
+
+      expect(rendered).toContain("Use the project-scoped key from settings");
+      expect(rendered).not.toContain("Or set LANGWATCH_API_KEY");
+    });
+  });
+
+  describe("when the code is one the table does NOT know", () => {
+    it("prints no Suggestions or Docs section at all", () => {
+      const rendered = renderErrorForHumans(
+        readCommandError(domainError({ code: "some_unlisted_code" })),
+      );
+
+      expect(rendered).not.toContain("Suggestions:");
+      expect(rendered).not.toContain("Docs:");
+    });
+  });
+});
+
+/**
+ * The daemon runs requests that share an execution window CONCURRENTLY, and
+ * they can disagree about `--format`/`--agent`. The output context is scoped
+ * per request (AsyncLocalStorage, entered by withExecutionContext) precisely
+ * so the second writer cannot clobber the first request's error rendering.
+ */
+describe("given two concurrent daemon requests in one window", () => {
+  const contextFor = (id: string) =>
+    new ExecutionContext(id, () => undefined);
+
+  describe("when they were invoked with different formats", () => {
+    it("renders each request's errors in its OWN format", async () => {
+      const render = (
+        id: string,
+        format: string | undefined,
+        delayMs: number,
+      ): Promise<string> =>
+        withExecutionContext(contextFor(id), async () => {
+          setOutputFormat(format);
+          // Interleave: yield so the other request records ITS format before
+          // this one renders. With the old module-global format, the second
+          // write would win and one caller would get the wrong shape.
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          return resolveOutputFormat(undefined);
+        });
+
+      const [json, text] = await Promise.all([
+        render("wants-json", "json", 5),
+        render("wants-text", undefined, 1),
+      ]);
+
+      expect(json).toBe("json");
+      expect(text).toBe("text");
+      // Scoped writes never touch the ambient (in-process) fallback.
+      expect(getOutputFormat()).toBe("text");
+    });
+  });
+
+  describe("when one of them turns colour off (agent mode)", () => {
+    it("scopes the decision to that request — chalk.level is never mutated", async () => {
+      const savedLevel = chalk.level;
+      try {
+        chalk.level = 1;
+
+        const observed = await withExecutionContext(
+          contextFor("agent"),
+          async () => {
+            disableOutputColor();
+            await new Promise((resolve) => setTimeout(resolve, 1));
+            return {
+              scopeColor: currentOutputScope()?.color,
+              level: chalk.level,
+            };
+          },
+        );
+
+        expect(observed.scopeColor).toBe(false);
+        // The whole point: a concurrent request's colour is untouched, because
+        // the process-global chalk.level was never touched.
+        expect(observed.level).toBe(1);
+        expect(chalk.level).toBe(1);
+      } finally {
+        chalk.level = savedLevel;
+      }
+    });
+
+    it("still sets chalk.level outside a request scope (the in-process path)", () => {
+      const savedLevel = chalk.level;
+      try {
+        chalk.level = 2;
+
+        disableOutputColor();
+
+        expect(chalk.level).toBe(0);
+      } finally {
+        chalk.level = savedLevel;
+      }
     });
   });
 });

@@ -40,7 +40,7 @@ export const deleteSecretCommand = async (
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete secret", format: options?.format });
+    failSpinner({ spinner, error, action: "delete secret" });
     process.exit(1);
   }
 };

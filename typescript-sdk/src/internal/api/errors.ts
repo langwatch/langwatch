@@ -16,14 +16,14 @@ import {
  * offer to fix — was indistinguishable from a 500.
  *
  * This is that structure, kept. Narrow with {@link isLangWatchDomainError} (or
- * `instanceof`) and switch on `kind`; `body` is the escape hatch to whatever the
+ * `instanceof`) and switch on `code`; `body` is the escape hatch to whatever the
  * platform sent that this class did not model.
  *
  * ```ts
  * try {
  *   await langwatch.datasets.get("nope");
  * } catch (error) {
- *   if (isLangWatchDomainError(error) && error.kind === "dataset_not_found") {
+ *   if (isLangWatchDomainError(error) && error.code === "dataset_not_found") {
  *     // Actionable: we know WHAT was not found, and can offer the list.
  *     console.error(error.meta.id, error.traceId);
  *   }
@@ -41,12 +41,17 @@ export class LangWatchDomainError extends Error {
    * The discriminant. A boolean brand rather than `instanceof` alone because a
    * bundled CLI and a consumer's `node_modules` copy of the SDK can hold two
    * different copies of this class, and `instanceof` is false across that seam —
-   * the same reason the platform's own error handler tests for `kind` rather
+   * the same reason the platform's own error handler tests for `code` rather
    * than class identity.
    */
   readonly isLangWatchDomainError = true as const;
 
   /** The platform's serialisable discriminant, e.g. `dataset_not_found`. */
+  readonly code: string;
+  /**
+   * @deprecated Back-compat alias of `code`, kept while the platform's
+   * `DomainError` → `HandledError` rename rolls out. Read `code` in new code.
+   */
   readonly kind: string;
   /** The status the platform answered with. */
   readonly httpStatus: number;
@@ -54,8 +59,16 @@ export class LangWatchDomainError extends Error {
   readonly meta: Record<string, unknown>;
   /** The OTel trace to quote at support. Absent unless the route sent one. */
   readonly traceId: string | undefined;
+  /** A clickable link to that trace, when the route sent one. */
+  readonly traceUrl: string | undefined;
+  /** A clickable link to the logs for that trace, when the route sent one. */
+  readonly logsUrl: string | undefined;
   /** The failure behind the failure, when the route sent the chain. */
   readonly reasons: CliDomainErrorReason[] | undefined;
+  /** What the user can DO about it, when the platform sent next steps. */
+  readonly suggestions: string[] | undefined;
+  /** The docs page that explains the failure, when the platform sent one. */
+  readonly docUrl: string | undefined;
   /** The raw response body, verbatim — the escape hatch for anything unmodelled. */
   readonly body: unknown;
   /** What the SDK was doing, e.g. `get dataset "abc"`. */
@@ -86,11 +99,16 @@ export class LangWatchDomainError extends Error {
   }) {
     super(message);
     this.name = "LangWatchDomainError";
-    this.kind = domain.kind;
+    this.code = domain.code;
+    this.kind = domain.code;
     this.httpStatus = domain.httpStatus;
     this.meta = domain.meta;
     this.traceId = domain.traceId;
+    this.traceUrl = domain.traceUrl;
+    this.logsUrl = domain.logsUrl;
     this.reasons = domain.reasons;
+    this.suggestions = domain.suggestions;
+    this.docUrl = domain.docUrl;
     this.body = body;
     this.operation = operation;
     this.status = domain.httpStatus;

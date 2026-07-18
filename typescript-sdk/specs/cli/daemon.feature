@@ -38,6 +38,11 @@ Feature: CLI daemon mode
       When I run a command
       Then no daemon is contacted and none is spawned
 
+    Scenario: The user opts out persistently
+      Given I ran "langwatch config set daemon off"
+      When I run a command
+      Then no daemon is contacted and none is spawned
+
   Rule: Only non-interactive invocations are served by the daemon
 
     Scenario: A human is running the CLI in a terminal
@@ -145,6 +150,12 @@ Feature: CLI daemon mode
       Then the daemon is told to cancel the request
       And the client exits with code 130
       And no output from the cancelled command is emitted afterwards
+
+    Scenario: A command that hangs
+      Given the daemon is running my command
+      When the command exceeds the per-request timeout
+      Then the request is abandoned with exit code 124
+      And its execution window is released for other callers
 
   Rule: The daemon is managed explicitly
 
