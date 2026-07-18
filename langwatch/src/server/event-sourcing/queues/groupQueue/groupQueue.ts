@@ -67,6 +67,7 @@ import {
   readJobRoutingMeta,
 } from "./jobEnvelope";
 import {
+  gqCoalescedBatchSize,
   gqGroupsBlockedTotal,
   gqGroupsPoisonParkedTotal,
   gqJobDelayMilliseconds,
@@ -1044,6 +1045,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // Run the actual handler with request context propagation
               const requestContext = createContextFromJobData(contextMetadata);
               await runWithContext(requestContext, async () => {
+                // Observe fill on every dispatch, including the uncoalesced
+                // case — a batch of one is data, and the span attribute below
+                // is only set when a drain happened, so it cannot tell "did not
+                // coalesce" from "not recorded".
+                gqCoalescedBatchSize.observe(
+                  routingLabels,
+                  batchPayloads?.length ?? 1,
+                );
                 if (batchPayloads && this.processBatch) {
                   span.setAttribute(
                     "queue.coalesced_batch_size",

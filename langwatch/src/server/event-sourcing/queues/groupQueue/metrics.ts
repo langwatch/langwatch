@@ -21,6 +21,7 @@ const metricNames = [
   "gq_retry_attempt",
   "gq_retry_backoff_milliseconds",
   "gq_job_duration_milliseconds",
+  "gq_coalesced_batch_size",
   "gq_oldest_pending_age_milliseconds",
   // ADR-030 hardening + review 2026-06-24
   "gq_blob_reclaim_s3_failures_total",
@@ -151,6 +152,26 @@ export const gqRetryBackoffMilliseconds = new Histogram({
 });
 
 // --- Per-job duration metric ---
+/**
+ * How many jobs a dispatch actually coalesced, including the dispatched job.
+ *
+ * Observed on EVERY dispatch, not only when siblings were drained — a batch of
+ * one is the measurement, not the absence of one. The existing
+ * `queue.coalesced_batch_size` span attribute is set only when a drain
+ * happened, so it cannot distinguish "did not coalesce" from "not recorded",
+ * and no aggregatable metric carried batch size at all.
+ *
+ * This decides real things: whether durable-write settings can be amortised
+ * across a batch, and how large the fold's applied-event-id cap has to be
+ * (sized from DEFAULT_FOLD_COALESCE_MAX_BATCH by eye, never from data).
+ */
+export const gqCoalescedBatchSize = new Histogram({
+  name: "gq_coalesced_batch_size",
+  help: "Jobs coalesced into one dispatch, including the dispatched job",
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
+  buckets: [1, 2, 5, 10, 25, 50, 100, 250, 500],
+});
+
 export const gqJobDurationMilliseconds = new Histogram({
   name: "gq_job_duration_milliseconds",
   help: "Duration of individual job processing in milliseconds",
