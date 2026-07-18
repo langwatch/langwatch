@@ -9,7 +9,7 @@
 
 Custom graphs and threshold triggers read analytics by aggregating over time. Today that re-scans + re-dedups `trace_summaries` on every render — wide rows, `ORDER BY (TenantId, TraceId)` (wrong for time scans), un-deduped `stored_spans` joins pulling heavy `SpanAttributes`, `quantileExact` over raw rows. "Huge queries all the time," and threshold triggers poll that path on a 3-minute K8s cron.
 
-We want analytics + triggers cheap and real-time, using ClickHouse's native engines, with the **idempotency the platform actually requires** (delivery is at-least-once; replay re-applies events — ADR-021/022/015). This is the materialization for **traces, evaluations, scenarios, experiments** — a shared primitive, traces first.
+We want analytics + triggers cheap and real-time, using ClickHouse's native engines, with the **idempotency the platform actually requires** (delivery is at-least-once; replay re-applies events — ADR-022/015; note ADR-021 constrains only the IO write path, not `apply`). This is the materialization for **traces, evaluations, scenarios, experiments** — a shared primitive, traces first.
 
 ## Decision
 

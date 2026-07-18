@@ -10,6 +10,8 @@
 
 ## Context
 
+> **Shorthand used below:** `030a` = `030-groupqueue-blob-handling-hardening.md`, `030b` = `030-transactional-outbox-for-stake-sensitive-dispatch.md`. Two files share the number, which is itself one of the problems this ADR records.
+
 Sixteen event-sourcing ADRs have accumulated over five months. They contradict each other, and the contradictions are load-bearing rather than cosmetic.
 
 - **ADR-007, the document every other ADR cites as the foundation, is substantially false.** It describes fold projections on "a GroupQueue (BullMQ + Redis)" and map projections on "a SimpleQueue (BullMQ)". There are zero `bullmq` imports under `event-sourcing/` and no `SimpleQueue` module. It states "fold state = stored data" and "the fold state serves as both data store and checkpoint", but two folds return `null` from `get()` unconditionally (`pipelines/shared/analyticsStoreBase.ts:153-158`, `traceAnalytics.store.ts:99-104`). It states "reactors only fire on success", which ADR-039's heartbeat contradicts by dispatching with no triggering event. 
@@ -31,7 +33,7 @@ Four of seven fold projections can silently corrupt state on an ordinary queue r
 
 Mechanism, identical in all four: ClickHouse insert lands (`redisCachedFoldStore.ts:124`) → Redis `SET` lands (`:130`) → a reactor throws (`projectionRouter.ts:1134-1139`) → the job is never acked (`groupQueue.ts:1002,1011`) → the retry re-dispatches → `store.get()` hits the warm cache holding already-applied state (`:101-106`) → the same events apply again. Nothing invalidates the cache; nothing deduplicates.
 
-Aggravators: five of seven live writes use `wait_for_async_insert: 0`, so the correctness argument at `redisCachedFoldStore.ts:60-63` ("CH fails → throw → event retried by queue") has never held — that comment and the setting landed in the same commit. And re-staged siblings do not carry `__attempt` (`groupQueue.ts:1324`), so the 25-attempt budget resets when a sibling leads a batch.
+Aggravators: five of seven live writes use `wait_for_async_insert: 0`, so the correctness argument at `redisCachedFoldStore.ts:60-63` ("CH fails → throw → event retried by queue") has never held — that comment and the setting landed in the same commit. Re-staged siblings also carried no `__attempt`, so the 25-attempt budget restarted whenever a sibling led a batch; that is closed here by a group-scoped attempt counter.
 
 ### What has already been tried, and why it failed
 
@@ -99,7 +101,7 @@ They keep `refoldOnStoreMiss: true`, which is their behaviour today — so this 
 
 2. **The fold cache is an optimisation, and a miss carries no durability information.** It expires on a TTL (300s default, `LANGWATCH_FOLD_CACHE_TTL_SECONDS`); a miss falls through to the durable store. Nothing may be built on the assumption that a miss proves anything — that assumption was tried and does not survive the deployment reality (see the Decision).
 
-3. **`apply` MUST be idempotent per `(aggregate, event id)` where redelivery can reach it.** Determinism is not sufficient and never was. Under invariant 2 the steady-state paths are closed structurally; the applied-event-id set in the cache entry closes redelivery against a live entry, and the processor's liveness check closes it against a confirmed-and-deleted one.
+3. **`apply` MUST be idempotent per `(aggregate, event id)` where redelivery can reach it.** Determinism is not sufficient and never was. The applied-event-id set in the cache entry closes redelivery against a live entry, scoped to a retry chain by the delivery attempt. It does NOT close redelivery against a lost entry — eviction or Redis loss takes the set with it. That cold path is open; closing it means making the folds idempotent.
 
    The set **accumulates** across fold steps rather than holding only the last write. A retry chain is why: retry 1 skips the redelivered batch and applies whatever arrived alongside it, so an entry holding only that write would fail to recognise the original batch when retry 2 redelivers the whole set.
 
@@ -129,23 +131,10 @@ The design rests on assumptions that are currently unmeasured. These metrics are
 
 **The unknowns that would falsify the design**
 
-- `es_fold_cache_miss_total{projection, cause}` — `confirmed` / `backstop_ttl` / `redis_error` / `unknown`. Under invariant 2, `confirmed` should dominate. Anything else appearing at volume means eviction is not durability-gated in practice.
-- `es_fold_confirmation_lag_seconds` — write to confirmed-delete. Sizes `checkDelay` and exposes ClickHouse lag directly.
-- `es_fold_coalesce_batch_size` histogram, by projection — whether batches fill to 500 or to 3. Currently unmeasured, and it is why the `wait_for_async_insert` argument has gone in circles.
-- `es_fold_events_per_aggregate` histogram — makes the 25–40k-span traces visible rather than anecdotal.
-
-**The processor**
-
-- `es_fold_confirmation_pending` gauge — depth of the sorted set. Sustained growth means confirmation is not keeping up.
-- `es_fold_confirmation_checks_total{result}` — `confirmed` / `not_yet` / `error`.
-- `es_fold_confirmation_query_duration_seconds` and batch-size histogram.
-- `es_fold_confirmation_skipped_inflight_total` — how often the liveness check saves a retry. Quantifies the retry hole.
-- `es_fold_confirmation_replica_lag_seconds` — spread between the leading and lagging replica at check time. This is the number that was previously invisible and that `select_sequential_consistency` was paying 10-14s to paper over.
-- `es_fold_confirmation_replicas_missing_total` — checks where fewer replicas answered than expected. Distinguishes replication lag from a node that is down or removed.
-
-**The exception path**
-
-- `es_fold_refold_total{projection, reason}`, `es_fold_refold_events` histogram, `es_fold_refold_duration_seconds`. Should be near-zero outside the two analytics folds; alert if not.
+- `es_fold_cache_total{projection_name, result}` — `hit` / `miss` / `fallback_error`. **Gap:** no delivery dimension, so a miss on a retry (where the applied-set is gone and the batch is about to be re-applied) is indistinguishable from a miss on a fresh delivery. That is the one number an operator needs during a double-count incident.
+- `gq_handler_batch_size{queue_name, pipeline_name, job_type, job_name}` — observed on every dispatch including the uncoalesced case, so a batch of one is data rather than an absence. Answers whether batches fill to 500 or to 3, which is what sizes `MAX_APPLIED_EVENT_IDS`.
+- `es_fold_refold_total{projection_name, outcome}` — pre-existing.
+- **Not implemented:** an events-per-aggregate histogram, which would make the 25–40k-span traces visible rather than anecdotal.
 
 **Correctness proof**
 
@@ -166,17 +155,13 @@ Refold visibility today is `es_fold_refold_total{projection_name, outcome}`; the
 - PR #5908's both-or-neither dilemma disappears. It exists to choose between swallowing a `SET` failure and `DEL`-and-throw; under this decision neither horn is load-bearing, and the long comment explaining which poison was chosen goes away.
 - No ClickHouse schema change, no projection version bump, no replay.
 - Redis working set shrinks; `maxmemory-policy` becomes load-bearing for these keys.
-- A new processor to own, run on the ADR-039 heartbeat.
 - `traceAnalytics` and `evaluationAnalytics` are unchanged and remain the known weak point until ADR-034's lossy-row decision is revisited.
 
 ## Open questions
 
 1. **Backstop TTL value.** Purely a leak guard now, so it can be hours. Wants a number and a rationale recorded in code, not in prose.
-2. **Where the liveness check reads from.** The GroupQueue's active/staged/blocked sets are internal; this needs a narrow query surface rather than the processor reaching into queue internals.
-3. **Sizing `checkDelay`** against measured `es_fold_confirmation_lag_seconds` once instrumented.
 4. **Whether `evaluationRun` should be cached at all.** It is the only uncached fold (`pipelineRegistry.ts:394-396`), is fully idempotent, and uses `wait_for_async_insert: 1`. It may simply not need this machinery.
 5. **How the expected replica count is determined.** Reading it from `system.clusters` per check is wasteful and racy during a rolling restart; pinning it to config drifts. A replica genuinely removed from the cluster must not strand every cache entry forever — the backstop TTL bounds that, but the behaviour should be deliberate rather than incidental.
-6. **Cost of `clusterAllReplicas` at batch scale.** It fans out to every node per query. Batched and keyed on the primary key it should be cheap, but it is a fan-out on a periodic job and wants measuring before the batch size is chosen.
 
 ## Disposition of prior ADRs
 

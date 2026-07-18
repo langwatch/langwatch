@@ -97,8 +97,6 @@ export interface MapProjectionOptions {
    *
    * The event log is append-only and at-least-once: a client re-report
    * (deterministic ids, SDK retries) appends a SECOND event row with the
-   * same idempotency key. Fold projections are immune (read-time dedup
-   * collapses the duplicates before re-folding), but a map projection is
    * invoked once per appended event — for an additive sink (an
    * AggregatingMergeTree rollup) that means the increment lands twice,
    * SYSTEMATICALLY for write paths designed around retries.

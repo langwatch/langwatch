@@ -149,7 +149,7 @@ Only after Phase 0's numbers.
 - Reconcile the **three existing dual-source-of-truth pairs** first (`trace_summaries.SpanCount` vs `count()` over `stored_spans`; `TotalCost` vs `sum(Cost)`; token counts vs read-time attribute extraction) — they already disagree past the 512-span cap.
 
 ### Phase 4 — Documentation sweep (independent of the above)
-- Delete/rewrite ADR-007 (describes BullMQ and a `SimpleQueue` that do not exist), retire ADR-021, promote 022/029/030a from `Proposed` despite being shipped, renumber the 12 duplicate ADR numbers, regenerate the index (18 of 46 indexed).
+- Delete/rewrite ADR-007 (describes BullMQ and a `SimpleQueue` that do not exist), retire ADR-021, promote 022/029/030a from `Proposed` despite being shipped, renumber the duplicate ADR numbers, regenerate the index (the index now covers all of them).
 - Sweep dead references: BullMQ/`SimpleQueue` comments, `groupQueue/ARCHITECTURE.md`'s Redis key table (all seven rows wrong), `sqrt` weighting that does not exist, TTL constants that disagree with `blobConstants.ts`.
 - ADR-052/PR #5911 already drops `ReactorOutbox`; do not duplicate.
 

@@ -1,5 +1,14 @@
 # ADR-021: Lean Fold Cache — cache the read-set, persist the write-set
 
+> ## ⚠️ Superseded — do not implement from this document
+>
+> Its Decision §1 is replaced by [ADR-022](./022-event-log-source-of-truth.md), and the
+> `toCacheable` mechanism it describes was removed from the code entirely: the fold cache
+> stores state verbatim, and no projection ever passed the hook. See
+> [ADR-053](./053-event-sourcing-consolidated-invariants.md) for the current invariants.
+
+**Status:** Superseded by [ADR-022](./022-event-log-source-of-truth.md) and [ADR-053](./053-event-sourcing-consolidated-invariants.md)
+
 **Date:** 2026-05-27
 
 

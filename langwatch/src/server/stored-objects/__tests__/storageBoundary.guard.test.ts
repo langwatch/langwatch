@@ -60,7 +60,10 @@ const KNOWN_INTERNAL_VIOLATIONS = [
 ] as const;
 
 function modulesReferencing(symbol: string): string[] {
-  const files = globSync("**/*.ts", { cwd: SRC })
+  // Both extensions: server code lives in `src/app` too, and a `.tsx` caller
+  // would otherwise never be scanned — the guard would pass while the thing it
+  // exists to catch walked past it.
+  const files = globSync("**/*.{ts,tsx}", { cwd: SRC })
     .filter((f) => !f.includes("__tests__") && !f.endsWith(".test.ts"));
 
   return files

@@ -66,8 +66,11 @@ This ADR is framework-primitive; the first consumer's specifics live here as imp
 - **Source-aware pre-filter** (Phase 6 extension): per candidate trigger, look up the metric's source (`trace` | `evaluation`) via `field-availability`. Group candidates per `(project, source)` and issue ONE batched recency query per source per project per tick — `trace_analytics` for trace-source candidates, `evaluation_analytics` for eval-source candidates. If the project has any qualifying event newer than a candidate's window, the real-time outbox reactor is already firing for that trigger; skip.
 - Surviving candidates enqueue `graphEval`-stage payloads. The shared handler `evaluateGraphTrigger` picks up — same handler the real-time reactor's payloads land at, regardless of source pipeline.
 
-## Implementation
+## Implementation (historical)
 
-- Registry + types: `src/server/event-sourcing/outbox/heartbeat/heartbeat.registry.ts`, `heartbeat.types.ts`.
-- Scheduler: `src/server/event-sourcing/outbox/heartbeat/heartbeat.scheduler.ts`.
-- First consumer (graph triggers): `src/server/app-layer/automations/graph-trigger-heartbeat.ts`, registered from the worker bootstrap in `src/server/app-layer/presets.ts`.
+> The files named below no longer exist. `event-sourcing/outbox/heartbeat/` was deleted
+> with the rest of the legacy outbox; scheduled work now runs as an ADR-052 process
+> manager, and the surviving consumer is `app-layer/automations/graph-trigger-heartbeat.ts`
+> driven by the `graphAlertSweep` process. Kept as the record of what was built, not as a
+> pointer to code.
+
