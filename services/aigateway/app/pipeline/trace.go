@@ -51,6 +51,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 			return func(ctx context.Context, call *Call) (*domain.Response, error) {
 				spanCtx, tp := begin(ctx, call.Bundle.Config.TraceProjectID, call.Request.Type)
 				call.Meta.CustomerTraceparent = tp
+				internalModel, internalProviderID := internalTraceMetadata(call.Bundle.Config, call.Request.Model)
 
 				resp, err := next(spanCtx, call)
 				if err != nil {
@@ -63,6 +64,8 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 							ProjectID:          call.Bundle.ProjectID,
 							Model:              call.Request.Resolved.ModelID,
 							ProviderID:         call.Request.Resolved.ProviderID,
+							InternalModel:      internalModel,
+							InternalProviderID: internalProviderID,
 							RequestType:        call.Request.Type,
 							VirtualKeyID:       call.Bundle.VirtualKeyID,
 							GatewayRequestID:   call.Meta.GatewayRequestID,
@@ -75,15 +78,17 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 				}
 				if call.Request.Resolved != nil {
 					end(spanCtx, domain.AITraceParams{
-						ProjectID:        call.Bundle.ProjectID,
-						Model:            call.Request.Resolved.ModelID,
-						ProviderID:       call.Request.Resolved.ProviderID,
-						Usage:            resp.Usage,
-						RequestType:      call.Request.Type,
-						VirtualKeyID:     call.Bundle.VirtualKeyID,
-						GatewayRequestID: call.Meta.GatewayRequestID,
-						RequestBody:      call.Request.Body,
-						ResponseBody:     resp.Body,
+						ProjectID:          call.Bundle.ProjectID,
+						Model:              call.Request.Resolved.ModelID,
+						ProviderID:         call.Request.Resolved.ProviderID,
+						InternalModel:      internalModel,
+						InternalProviderID: internalProviderID,
+						Usage:              resp.Usage,
+						RequestType:        call.Request.Type,
+						VirtualKeyID:       call.Bundle.VirtualKeyID,
+						GatewayRequestID:   call.Meta.GatewayRequestID,
+						RequestBody:        call.Request.Body,
+						ResponseBody:       resp.Body,
 					})
 				}
 				return resp, nil
@@ -93,6 +98,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 			return func(ctx context.Context, call *Call) (domain.StreamIterator, error) {
 				spanCtx, tp := begin(ctx, call.Bundle.Config.TraceProjectID, call.Request.Type)
 				call.Meta.CustomerTraceparent = tp
+				internalModel, internalProviderID := internalTraceMetadata(call.Bundle.Config, call.Request.Model)
 
 				iter, err := next(spanCtx, call)
 				if err != nil {
@@ -105,6 +111,8 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 							ProjectID:          call.Bundle.ProjectID,
 							Model:              call.Request.Resolved.ModelID,
 							ProviderID:         call.Request.Resolved.ProviderID,
+							InternalModel:      internalModel,
+							InternalProviderID: internalProviderID,
 							RequestType:        call.Request.Type,
 							VirtualKeyID:       call.Bundle.VirtualKeyID,
 							GatewayRequestID:   call.Meta.GatewayRequestID,
@@ -119,16 +127,33 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 					return iter, nil
 				}
 				return &traceStreamWrapper{
-					inner:   iter,
-					end:     end,
-					bundle:  call.Bundle,
-					req:     call.Request,
-					meta:    call.Meta,
-					spanCtx: spanCtx,
+					inner:              iter,
+					end:                end,
+					bundle:             call.Bundle,
+					req:                call.Request,
+					meta:               call.Meta,
+					spanCtx:            spanCtx,
+					internalModel:      internalModel,
+					internalProviderID: internalProviderID,
 				}, nil
 			}
 		},
 	}
+}
+
+// internalTraceMetadata selects model metadata that is safe for LangWatch's
+// operational span. A raw request model is arbitrary customer input unless it
+// exactly names a control-plane alias or a finite allowed-model entry.
+func internalTraceMetadata(config domain.BundleConfig, rawModel string) (string, domain.ProviderID) {
+	if alias, ok := config.ModelAliases[rawModel]; ok {
+		return alias.Model, alias.ProviderID
+	}
+	for _, allowed := range config.AllowedModels {
+		if allowed == rawModel {
+			return allowed, ""
+		}
+	}
+	return "", ""
 }
 
 // responseBodyCap bounds the per-stream response accumulator at 8 MiB so a
@@ -146,16 +171,18 @@ const responseBodyCap = 8 * 1024 * 1024
 // extractOutputMessages return "" for every streamed Path A trace — the
 // gen_ai.output.messages key was simply absent from every streaming span.
 type traceStreamWrapper struct {
-	inner       domain.StreamIterator
-	end         EndSpanFunc
-	bundle      *domain.Bundle
-	req         *domain.Request
-	meta        *Meta
-	spanCtx     context.Context
-	closeOnce   sync.Once
-	bodyMu      sync.Mutex
-	body        []byte
-	bodyDropped bool
+	inner              domain.StreamIterator
+	end                EndSpanFunc
+	bundle             *domain.Bundle
+	req                *domain.Request
+	meta               *Meta
+	spanCtx            context.Context
+	internalModel      string
+	internalProviderID domain.ProviderID
+	closeOnce          sync.Once
+	bodyMu             sync.Mutex
+	body               []byte
+	bodyDropped        bool
 }
 
 func (w *traceStreamWrapper) Next(ctx context.Context) bool {
@@ -233,6 +260,8 @@ func (w *traceStreamWrapper) onClose() {
 				ProjectID:          w.bundle.ProjectID,
 				Model:              w.req.Resolved.ModelID,
 				ProviderID:         w.req.Resolved.ProviderID,
+				InternalModel:      w.internalModel,
+				InternalProviderID: w.internalProviderID,
 				Usage:              w.inner.Usage(),
 				RequestType:        w.req.Type,
 				VirtualKeyID:       w.bundle.VirtualKeyID,

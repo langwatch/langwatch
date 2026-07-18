@@ -16,7 +16,11 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
 
-const workerSecret = "my api key is sk-live-abc123 and the patient is Jane Doe"
+const (
+	workerPrompt     = "my api key is sk-live-abc123 and the patient is Jane Doe"
+	workerCompletion = "the patient record has been summarized"
+	workerToolOutput = "tool result: customer database backup is complete"
+)
 
 // signallingIngest records one OTLP body and announces its arrival, so a test
 // can wait on the detached internal export instead of sleeping.
@@ -66,7 +70,9 @@ func contentBatch(t *testing.T) []byte {
 	span.SetTraceID(pcommon.TraceID{9})
 	span.SetSpanID(pcommon.SpanID{1})
 	span.Attributes().PutStr("gen_ai.request.model", "gpt-5-mini")
-	span.Attributes().PutStr("gen_ai.input.messages", workerSecret)
+	span.Attributes().PutStr("gen_ai.input.messages", workerPrompt)
+	span.Attributes().PutStr("gen_ai.output.messages", workerCompletion)
+	span.Attributes().PutStr("gen_ai.tool.result", workerToolOutput)
 
 	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
 	if err != nil {
@@ -127,15 +133,20 @@ func TestDualExport(t *testing.T) {
 		}
 
 		t.Run("the customer's project receives the content", func(t *testing.T) {
-			if !bytes.Contains(customer.await(t), []byte(workerSecret)) {
-				t.Fatal("the customer's own agent output must reach their project")
+			body := customer.await(t)
+			for _, content := range []string{workerPrompt, workerCompletion, workerToolOutput} {
+				if !bytes.Contains(body, []byte(content)) {
+					t.Fatalf("the customer's own agent content %q must reach their project", content)
+				}
 			}
 		})
 
 		t.Run("LangWatch's own collector receives none of it", func(t *testing.T) {
 			body := internal.await(t)
-			if bytes.Contains(body, []byte(workerSecret)) {
-				t.Fatal("worker prompt content reached LangWatch's internal collector")
+			for _, content := range []string{workerPrompt, workerCompletion, workerToolOutput} {
+				if bytes.Contains(body, []byte(content)) {
+					t.Fatalf("worker content %q reached LangWatch's internal collector", content)
+				}
 			}
 			if !bytes.Contains(body, []byte("gpt-5-mini")) {
 				t.Fatal("operational metadata was stripped along with the content")
@@ -173,7 +184,7 @@ func TestDualExport(t *testing.T) {
 		}
 		defer resp.Body.Close()
 
-		if !bytes.Contains(customer.await(t), []byte(workerSecret)) {
+		if !bytes.Contains(customer.await(t), []byte(workerPrompt)) {
 			t.Fatal("the customer path must be unaffected by the second export being off")
 		}
 	})

@@ -78,11 +78,11 @@ func StampInternalGenAI(ctx context.Context, params domain.AITraceParams) {
 	if params.RequestType != "" {
 		attrs = append(attrs, attribute.String(AttrGenAIOperationName, string(params.RequestType)))
 	}
-	if params.ProviderID != "" {
-		attrs = append(attrs, attribute.String(AttrGenAISystem, string(params.ProviderID)))
+	if params.InternalProviderID != "" {
+		attrs = append(attrs, attribute.String(AttrGenAISystem, string(params.InternalProviderID)))
 	}
-	if params.Model != "" {
-		attrs = append(attrs, attribute.String(AttrGenAIRequestModel, params.Model))
+	if params.InternalModel != "" {
+		attrs = append(attrs, attribute.String(AttrGenAIRequestModel, params.InternalModel))
 	}
 	attrs = append(attrs, usageAttributes(params.Usage)...)
 	if params.VirtualKeyID != "" {
@@ -105,9 +105,6 @@ func StampInternalGenAI(ctx context.Context, params domain.AITraceParams) {
 // intentionally contains no request or response body fields.
 func usageAttributes(usage domain.Usage) []attribute.KeyValue {
 	attrs := make([]attribute.KeyValue, 0, 7)
-	if usage.Model != "" {
-		attrs = append(attrs, attribute.String(AttrGenAIResponseModel, usage.Model))
-	}
 	if usage.PromptTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageIn, usage.PromptTokens))
 	}

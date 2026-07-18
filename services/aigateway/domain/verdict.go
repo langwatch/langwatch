@@ -32,11 +32,17 @@ type CacheDecision struct {
 
 // AITraceParams holds data for a customer AI trace.
 type AITraceParams struct {
-	ProjectID   string
-	Model       string
-	ProviderID  ProviderID
-	Usage       Usage
-	RequestType RequestType
+	ProjectID  string
+	Model      string
+	ProviderID ProviderID
+	// InternalModel and InternalProviderID are safe to copy to LangWatch's
+	// operational span because they came from manager-owned gateway config.
+	// Model and ProviderID above remain customer-trace fields: callers can
+	// control them when a virtual key permits arbitrary model names.
+	InternalModel      string
+	InternalProviderID ProviderID
+	Usage              Usage
+	RequestType        RequestType
 
 	// VirtualKeyID is the id of the VK that authorized this request. Stamped
 	// on the customer span so the control plane's trace-processing pipeline

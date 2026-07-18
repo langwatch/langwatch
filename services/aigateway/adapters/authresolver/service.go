@@ -527,7 +527,7 @@ func (s *Service) changeFeedLoop(ctx context.Context) {
 				return true
 			}
 			for _, ch := range changes {
-				s.applyChange(ch)
+				s.applyChange(orgID, ch)
 			}
 			if nextRev != "" {
 				cursor.since = nextRev
@@ -557,7 +557,7 @@ func (s *Service) changeFeedLoop(ctx context.Context) {
 // once with a kind-specific predicate and removes matching entries; the
 // next request for those VKs takes a cold miss and re-resolves with the
 // fresh control-plane state.
-func (s *Service) applyChange(ch CacheChange) {
+func (s *Service) applyChange(organizationID string, ch CacheChange) {
 	switch ch.Kind {
 	case ChangeKindProviderBindingUpdated:
 		// The control plane emits ModelProvider.id. Config materialization puts
@@ -575,17 +575,18 @@ func (s *Service) applyChange(ch CacheChange) {
 			return false
 		}, "model_provider_updated", ch.ModelProviderID)
 	case ChangeKindBudgetCreated, ChangeKindBudgetUpdated, ChangeKindBudgetDeleted:
-		// BUDGET_UPDATED's project_id is the only stable join key
-		// (budget_id alone doesn't appear in the bundle; budgets nest
-		// under scopes). Evicting all bundles for the affected project
-		// is conservative but correct — the next request re-fetches
-		// the fresh limit/spent pair from the control plane.
-		if ch.ProjectID == "" {
+		// Only PROJECT-scoped creates carry project_id. Updates, deletes, and
+		// every other scope omit it, so invalidate the polled organization in
+		// those cases rather than leaving a stale budget enforced until TTL.
+		if ch.ProjectID != "" {
+			s.evictWhere(func(b *domain.Bundle) bool {
+				return b.ProjectID == ch.ProjectID
+			}, "budget_updated", ch.ProjectID)
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
-			return b.ProjectID == ch.ProjectID
-		}, "budget_updated", ch.ProjectID)
+			return b.OrganizationID == organizationID
+		}, "budget_updated", organizationID)
 	case ChangeKindVirtualKeyConfigUpdate, ChangeKindVirtualKeyRotated, ChangeKindVirtualKeyRevoked:
 		if ch.VirtualKeyID == "" {
 			return

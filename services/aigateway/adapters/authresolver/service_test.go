@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
 
@@ -282,18 +283,43 @@ func TestApplyChange_ModelProviderUpdatedEvictsMatchingModelProvider(t *testing.
 		}}},
 	})
 
-	svc.applyChange(CacheChange{
+	svc.applyChange("", CacheChange{
 		Kind:            ChangeKindProviderBindingUpdated,
 		ModelProviderID: "model-provider-1",
 	})
 
-	_, matchingPresent := svc.l1.Get(matchingKey)
-	_, otherPresent := svc.l1.Get(otherKey)
-	if matchingPresent {
+	_, isMatchingPresent := svc.l1.Get(matchingKey)
+	_, isOtherPresent := svc.l1.Get(otherKey)
+	if isMatchingPresent {
 		t.Fatal("the changed model provider must be evicted")
 	}
-	if !otherPresent {
+	if !isOtherPresent {
 		t.Fatal("other provider bindings must stay cached")
+	}
+}
+
+func TestApplyChange_BudgetMutationWithoutProjectIDEvictsOrganization(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	for _, kind := range []string{
+		ChangeKindBudgetCreated,
+		ChangeKindBudgetUpdated,
+		ChangeKindBudgetDeleted,
+	} {
+		t.Run(kind, func(t *testing.T) {
+			matchingKey := hashKey("vk-lw-budget-matching-" + kind)
+			otherKey := hashKey("vk-lw-budget-other-" + kind)
+			svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"})
+			svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"})
+
+			svc.applyChange("org-1", CacheChange{Kind: kind})
+
+			_, isMatchingPresent := svc.l1.Get(matchingKey)
+			_, isOtherPresent := svc.l1.Get(otherKey)
+			assert.False(t, isMatchingPresent, "budget changes must evict the polled organization")
+			assert.True(t, isOtherPresent, "other organizations must remain cached")
+		})
 	}
 }
 

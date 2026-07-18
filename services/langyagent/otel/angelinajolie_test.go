@@ -104,10 +104,12 @@ func TestInternalCopy_KeepsOnlyTrustedOperationalMetadata(t *testing.T) {
 	out := InternalCopy(workerBatch(t), "conv-1", trustedModel, turnContext(t))
 
 	chat := spanAttrsAt(out, 0)
+	chatSpan := out.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0)
 	assert.Equal(t, trustedModel, chat["gen_ai.request.model"])
 	assert.Equal(t, "42", chat["gen_ai.usage.input_tokens"])
 	assert.Equal(t, "chat", chat["gen_ai.operation.name"])
 	assert.Equal(t, "openai", chat["gen_ai.system"])
+	assert.Equal(t, ptrace.StatusCodeError, chatSpan.Status().Code())
 
 	tool := spanAttrsAt(out, 1)
 	assert.Equal(t, "function", tool["gen_ai.tool.type"])

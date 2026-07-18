@@ -66,3 +66,25 @@ func TestTraceBeginsSyncAndStreamSpansUnderConfigProject(t *testing.T) {
 		assert.Equal(t, "project-from-fresh-config", beganFor)
 	})
 }
+
+func TestInternalTraceMetadataOnlyUsesConfiguredValues(t *testing.T) {
+	model, provider := internalTraceMetadata(domain.BundleConfig{
+		ModelAliases: map[string]domain.ModelAlias{
+			"safe-alias": {Model: "gpt-5-mini", ProviderID: domain.ProviderOpenAI},
+		},
+	}, "safe-alias")
+	assert.Equal(t, "gpt-5-mini", model)
+	assert.Equal(t, domain.ProviderOpenAI, provider)
+
+	model, provider = internalTraceMetadata(domain.BundleConfig{
+		AllowedModels: []string{"gpt-5-mini", "claude-*"},
+	}, "gpt-5-mini")
+	assert.Equal(t, "gpt-5-mini", model)
+	assert.Empty(t, provider)
+
+	model, provider = internalTraceMetadata(domain.BundleConfig{
+		AllowedModels: []string{"gpt-*"},
+	}, "customer-secret-in-model-field")
+	assert.Empty(t, model)
+	assert.Empty(t, provider)
+}

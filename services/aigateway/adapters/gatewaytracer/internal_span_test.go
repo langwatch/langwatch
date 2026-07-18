@@ -47,18 +47,20 @@ func stampedSpan(t *testing.T, params domain.AITraceParams) sdktrace.ReadOnlySpa
 // response bodies present, exactly as the pipeline assembles them.
 func paramsWithBodies() domain.AITraceParams {
 	return domain.AITraceParams{
-		ProjectID:        "proj-1",
-		Model:            "gpt-5-mini",
-		ProviderID:       domain.ProviderID("openai"),
-		RequestType:      domain.RequestType("chat"),
-		VirtualKeyID:     "vk-1",
-		GatewayRequestID: "req-1",
+		ProjectID:          "proj-1",
+		Model:              "customer-controlled-request-model",
+		ProviderID:         domain.ProviderID("customer-controlled-provider"),
+		InternalModel:      "gpt-5-mini",
+		InternalProviderID: domain.ProviderID("openai"),
+		RequestType:        domain.RequestType("chat"),
+		VirtualKeyID:       "vk-1",
+		GatewayRequestID:   "req-1",
 		Usage: domain.Usage{
 			PromptTokens:     120,
 			CompletionTokens: 34,
 			TotalTokens:      154,
 			CostMicroUSD:     2500,
-			Model:            "gpt-5-mini-2025",
+			Model:            "customer-controlled-response-model",
 		},
 		RequestBody:  []byte(`{"messages":[{"role":"system","content":"` + secretSystem + `"},{"role":"user","content":"` + secretPrompt + `"}]}`),
 		ResponseBody: []byte(`{"choices":[{"message":{"content":"` + secretCompletion + `"}}]}`),
@@ -109,12 +111,28 @@ func TestStampInternalGenAI_KeepsOperationalMetadata(t *testing.T) {
 	assert.Equal(t, "chat", got[AttrGenAIOperationName])
 	assert.Equal(t, "openai", got[AttrGenAISystem])
 	assert.Equal(t, "gpt-5-mini", got[AttrGenAIRequestModel])
-	assert.Equal(t, "gpt-5-mini-2025", got[AttrGenAIResponseModel])
+	assert.NotContains(t, got, AttrGenAIResponseModel)
 	assert.Equal(t, "120", got[AttrGenAIUsageIn])
 	assert.Equal(t, "34", got[AttrGenAIUsageOut])
 	assert.Equal(t, "154", got[AttrGenAIUsageTotal])
 	assert.Equal(t, "vk-1", got[AttrVirtualKeyID])
 	assert.Equal(t, "req-1", got[AttrGatewayReqID])
+}
+
+func TestStampInternalGenAI_OmitsUntrustedModelMetadata(t *testing.T) {
+	const secret = "customer-secret-in-model-field"
+	params := paramsWithBodies()
+	params.Model = secret
+	params.ProviderID = domain.ProviderID(secret)
+	params.Usage.Model = secret
+	params.InternalModel = ""
+	params.InternalProviderID = ""
+
+	span := stampedSpan(t, params)
+	for _, kv := range span.Attributes() {
+		assert.NotContains(t, kv.Value.Emit(), secret,
+			"attribute %q leaked a customer-controlled model value", kv.Key)
+	}
 }
 
 func TestStampInternalGenAI_RecordsUpstreamFailure(t *testing.T) {
