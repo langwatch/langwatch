@@ -30,7 +30,7 @@ import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/s
 import {
   type SlackActionParams,
   slackDeliveryMethodOf,
-} from "~/shared/automations/providers/slack";
+} from "@langwatch/automations/providers/slack";
 import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
 import {
   aggregateSeriesValues,
@@ -47,7 +47,7 @@ import {
   type GraphAlertDispatchInput,
   type GraphAlertDispatchResult,
 } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
-import { buildGraphAlertTemplateContext } from "~/shared/templating/templateContext";
+import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
 import {
   evaluateCustomGraphThreshold,

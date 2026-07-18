@@ -1,4 +1,4 @@
-import { AlertType } from "@prisma/client";
+import { AlertType } from "../../enums";
 import { describe, expect, it } from "vitest";
 import { EXAMPLE_MATCHES, TEMPLATE_VARIABLES } from "../exampleContext";
 

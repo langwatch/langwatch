@@ -1,4 +1,4 @@
-import type { AlertType } from "@prisma/client";
+import type { AlertType } from "../enums";
 
 /**
  * The single variable contract every trigger-notification template renders

@@ -13,14 +13,14 @@ import {
   type WebhookDeliveryRecorder,
 } from "~/server/app-layer/automations/delivery/deliverWebhook";
 import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
-import { ALERT_TRIGGER_DEFAULTS } from "~/shared/templating/defaults";
-import { renderTriggerEmail } from "~/shared/templating/renderEmail";
-import { renderWebhookBody } from "~/shared/templating/renderWebhookBody";
+import { ALERT_TRIGGER_DEFAULTS } from "@langwatch/automations/templating/defaults";
+import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
+import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
 import {
   renderTriggerSlack,
   type SlackTemplateType,
-} from "~/shared/templating/renderSlack";
-import type { GraphAlertTemplateContext } from "~/shared/templating/templateContext";
+} from "@langwatch/automations/templating/renderSlack";
+import type { GraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:graph-alert-action-dispatch");

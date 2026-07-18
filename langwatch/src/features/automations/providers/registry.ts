@@ -2,19 +2,19 @@ import { TriggerAction } from "@prisma/client";
 import annotationQueueClient, {
   type AnnotationQueueSlice,
 } from "./annotationQueue/client";
-import annotationQueueShared from "~/shared/automations/providers/annotationQueue";
+import annotationQueueShared from "@langwatch/automations/providers/annotationQueue";
 import datasetClient, { type DatasetSlice } from "./dataset/client";
-import datasetShared from "~/shared/automations/providers/dataset";
+import datasetShared from "@langwatch/automations/providers/dataset";
 import emailClient, { type EmailSlice } from "./email/client";
-import emailShared, { type EmailPreview } from "~/shared/automations/providers/email";
+import emailShared, { type EmailPreview } from "@langwatch/automations/providers/email";
 import slackClient, { type SlackSlice } from "./slack/client";
-import slackShared, { type SlackPreview } from "~/shared/automations/providers/slack";
+import slackShared, { type SlackPreview } from "@langwatch/automations/providers/slack";
 import webhookClient, {
   type WebhookSlice,
 } from "./webhook/client";
 import webhookShared, {
   type WebhookPreview,
-} from "~/shared/automations/providers/webhook";
+} from "@langwatch/automations/providers/webhook";
 import {
   type ClientEntry,
   isNotifyEntry,

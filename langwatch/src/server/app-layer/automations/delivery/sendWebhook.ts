@@ -5,7 +5,7 @@ import {
   validateWebhookUrlShape,
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookMethod,
-} from "~/shared/automations/providers/webhook";
+} from "@langwatch/automations/providers/webhook";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { rateLimit } from "~/server/rateLimit";
 import {

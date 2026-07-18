@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   MAX_TRACE_DEBOUNCE_MS,
   MIN_TRACE_DEBOUNCE_MS,
-} from "~/shared/automations/cadences";
+} from "@langwatch/automations/cadences";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
 

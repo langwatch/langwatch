@@ -2,9 +2,9 @@ import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "@prisma/client";
 import { createHash } from "crypto";
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
-import { slackDeliveryMethodOf } from "~/shared/automations/providers/slack";
+import { slackDeliveryMethodOf } from "@langwatch/automations/providers/slack";
 import { decryptWebhookHeaders } from "~/server/app-layer/automations/providers/webhook/server";
-import type { WebhookMethod } from "~/shared/automations/providers/webhook";
+import type { WebhookMethod } from "@langwatch/automations/providers/webhook";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -31,13 +31,13 @@ import {
   sendSlackWebhook,
 } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
-import { renderTriggerEmail } from "~/shared/templating/renderEmail";
-import { renderTriggerSlack } from "~/shared/templating/renderSlack";
-import { renderWebhookBody } from "~/shared/templating/renderWebhookBody";
+import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
+import { renderTriggerSlack } from "@langwatch/automations/templating/renderSlack";
+import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
 import {
   buildTemplateContext,
   type TemplateMatchInput,
-} from "~/shared/templating/templateContext";
+} from "@langwatch/automations/templating/templateContext";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 import {

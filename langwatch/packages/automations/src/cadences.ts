@@ -1,7 +1,7 @@
 /**
  * Notification cadence constants — pure data shared between server dispatch
  * code and the automation drawer UI. Kept here (not in
- * `~/server/event-sourcing/pipelines/shared/triggerActionDispatch`) so the
+ * the app's `triggerActionDispatch`) so the
  * browser bundle doesn't drag in the server-only logger + AsyncLocalStorage
  * chain via that module.
  */

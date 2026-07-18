@@ -10,7 +10,7 @@ import {
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
-import type { SlackDeliveryMethod } from "~/shared/automations/providers/slack";
+import type { SlackDeliveryMethod } from "@langwatch/automations/providers/slack";
 import {
   type DraftCadence,
   pickDefaultSlackBlockKitTemplateId,

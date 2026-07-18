@@ -8,8 +8,8 @@ import {
   MIN_TRACE_DEBOUNCE_MS,
   NOTIFICATION_CADENCES,
   type NotificationCadence,
-} from "~/shared/automations/cadences";
-import { EMAIL_RX } from "~/shared/automations/providers/email";
+} from "@langwatch/automations/cadences";
+import { EMAIL_RX } from "@langwatch/automations/providers/email";
 import {
   actionParamsSchemaFor,
   persistActionParamsFor,
@@ -27,12 +27,12 @@ import {
 } from "~/server/app-layer/automations/errors";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
-import { type SlackActionParams } from "~/shared/automations/providers/slack";
+import { type SlackActionParams } from "@langwatch/automations/providers/slack";
 import {
   decryptWebhookHeaders,
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
-import { WEBHOOK_HEADER_VALUE_KEPT } from "~/shared/automations/providers/webhook";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
 import {
   buildGraphAlertTriggerData,
   type GraphAlertActionParams,

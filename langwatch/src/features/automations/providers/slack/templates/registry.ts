@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import type { GatedBlockType } from "~/shared/templating/blockKitAllowlist";
+import type { GatedBlockType } from "@langwatch/automations/templating/blockKitAllowlist";
 import digestCompactSource from "./digest_compact.liquid?raw";
 import digestEvaluatorRollupSource from "./digest_evaluator_rollup.liquid?raw";
 import digestInlineRichSource from "./digest_inline_rich.liquid?raw";

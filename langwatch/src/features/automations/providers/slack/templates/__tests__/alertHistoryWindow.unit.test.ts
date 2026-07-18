@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { renderTriggerSlack } from "~/shared/templating/renderSlack";
+import { renderTriggerSlack } from "@langwatch/automations/templating/renderSlack";
 import {
   buildGraphAlertTemplateContext,
   type GraphAlertTemplateContext,
-} from "~/shared/templating/templateContext";
+} from "@langwatch/automations/templating/templateContext";
 import { SLACK_BLOCK_KIT_TEMPLATES } from "../registry";
 
 /**

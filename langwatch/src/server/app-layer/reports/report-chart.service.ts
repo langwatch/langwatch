@@ -12,7 +12,7 @@ import {
   extractSeriesPoints,
 } from "~/server/app-layer/analytics/series-points";
 import type { ReportSource } from "~/server/app-layer/automations/report.builder";
-import type { ReportChart } from "~/shared/templating/templateContext";
+import type { ReportChart } from "@langwatch/automations/templating/templateContext";
 
 /**
  * Turn a report's chart source — one custom graph, or every panel on a

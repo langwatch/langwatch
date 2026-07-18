@@ -1,11 +1,11 @@
-import type { AlertType, TriggerAction } from "@prisma/client";
+import type { AlertType, TriggerAction } from "../enums";
 import type { ZodTypeAny } from "zod";
 
 /**
  * Cross-side vocabulary for the automation provider system. A provider is
  * one action type expressed as three peers, one per runtime:
  *
- *   ~/shared/automations/providers/<name>.ts — metadata + Zod schema for
+ *   @langwatch/automations/providers/<name> — metadata + Zod schema for
  *     actionParams. Pure data + Zod; no React, no server-only deps.
  *
  *   ~/features/automations/providers/<name>/client.tsx — the UI half.

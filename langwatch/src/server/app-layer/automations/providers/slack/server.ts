@@ -3,7 +3,7 @@ import {
   type SlackActionParams,
   SLACK_BOT_TOKEN_KEPT,
   slackDeliveryMethodOf,
-} from "~/shared/automations/providers/slack";
+} from "@langwatch/automations/providers/slack";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { MissingSlackBotTokenError } from "../../errors";
 import type { PersistActionParamsArgs, ServerDef } from "../types";

@@ -1,4 +1,4 @@
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction } from "../enums";
 import { z } from "zod";
 import type { PreviewEnvelope, SharedDef } from "./types";
 

@@ -7,21 +7,21 @@ import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/s
 import {
   type SlackActionParams,
   slackDeliveryMethodOf,
-} from "~/shared/automations/providers/slack";
+} from "@langwatch/automations/providers/slack";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import type { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
-import { REPORT_TRIGGER_DEFAULTS } from "~/shared/templating/defaults";
-import { renderTriggerEmail } from "~/shared/templating/renderEmail";
+import { REPORT_TRIGGER_DEFAULTS } from "@langwatch/automations/templating/defaults";
+import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
 import {
   renderTriggerSlack,
   type SlackTemplateType,
-} from "~/shared/templating/renderSlack";
+} from "@langwatch/automations/templating/renderSlack";
 import {
   buildReportTemplateContext,
   type ReportChart,
   type ReportTraceRow,
-} from "~/shared/templating/templateContext";
+} from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:report-dispatch");

@@ -17,7 +17,7 @@ import {
   MIN_TRACE_DEBOUNCE_MS,
   NOTIFICATION_CADENCES,
   type NotificationCadence,
-} from "~/shared/automations/cadences";
+} from "@langwatch/automations/cadences";
 import {
   CLIENT_PROVIDERS,
   type NotifyPreview,
@@ -40,14 +40,14 @@ import {
   sanitizeTriggerFilters,
   type TriggerFilterValue,
 } from "~/server/filters/types";
-import { defaultsForSourceKind } from "~/shared/templating/defaults";
+import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
 import {
   EXAMPLE_MATCHES,
   TEMPLATE_VARIABLES,
-} from "~/shared/templating/exampleContext";
-import { renderTriggerEmail } from "~/shared/templating/renderEmail";
-import { renderTriggerSlack } from "~/shared/templating/renderSlack";
-import { renderWebhookBody } from "~/shared/templating/renderWebhookBody";
+} from "@langwatch/automations/templating/exampleContext";
+import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
+import { renderTriggerSlack } from "@langwatch/automations/templating/renderSlack";
+import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
 import {
   buildExampleGraphAlertTemplateContext,
   buildExampleReportTemplateContext,
@@ -55,7 +55,7 @@ import {
   type GraphAlertTemplateContext,
   type ReportTemplateContext,
   type TemplateContext,
-} from "~/shared/templating/templateContext";
+} from "@langwatch/automations/templating/templateContext";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { MainSectionList } from "./components/MainSectionList";

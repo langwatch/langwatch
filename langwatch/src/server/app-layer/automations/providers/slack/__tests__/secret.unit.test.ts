@@ -7,7 +7,7 @@ vi.mock("~/utils/encryption", () => ({
   decrypt: (s: string) => s.replace(/^enc\(/, "").replace(/\)$/, ""),
 }));
 
-import { SLACK_BOT_TOKEN_KEPT } from "~/shared/automations/providers/slack";
+import { SLACK_BOT_TOKEN_KEPT } from "@langwatch/automations/providers/slack";
 import {
   decryptSlackBotToken,
   persistSlackActionParams,

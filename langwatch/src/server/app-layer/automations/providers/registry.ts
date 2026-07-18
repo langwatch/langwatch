@@ -1,14 +1,14 @@
 import { TriggerAction } from "@prisma/client";
 import annotationQueueServer from "./annotationQueue/server";
-import annotationQueueShared from "~/shared/automations/providers/annotationQueue";
+import annotationQueueShared from "@langwatch/automations/providers/annotationQueue";
 import datasetServer from "./dataset/server";
-import datasetShared from "~/shared/automations/providers/dataset";
+import datasetShared from "@langwatch/automations/providers/dataset";
 import emailServer from "./email/server";
-import emailShared from "~/shared/automations/providers/email";
+import emailShared from "@langwatch/automations/providers/email";
 import slackServer from "./slack/server";
-import slackShared from "~/shared/automations/providers/slack";
+import slackShared from "@langwatch/automations/providers/slack";
 import webhookServer from "./webhook/server";
-import webhookShared from "~/shared/automations/providers/webhook";
+import webhookShared from "@langwatch/automations/providers/webhook";
 import type { PersistActionParamsArgs, ServerEntry } from "./types";
 
 /** The server-side provider registry — pairs each shared definition with

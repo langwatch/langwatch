@@ -4,18 +4,18 @@ import {
   buildTriggerNoReplyAddress,
   TEST_FIRE_TRIGGER_ID_SENTINEL,
 } from "~/server/mailer/triggerNoReply";
-import { EXAMPLE_MATCHES } from "~/shared/templating/exampleContext";
-import { renderTriggerEmail } from "~/shared/templating/renderEmail";
-import { renderWebhookBody } from "~/shared/templating/renderWebhookBody";
+import { EXAMPLE_MATCHES } from "@langwatch/automations/templating/exampleContext";
+import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
+import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
 import {
   renderTriggerSlack,
   type SlackPayload,
   type SlackTemplateType,
-} from "~/shared/templating/renderSlack";
+} from "@langwatch/automations/templating/renderSlack";
 import {
   defaultsForSourceKind,
   type TemplateSourceKind,
-} from "~/shared/templating/defaults";
+} from "@langwatch/automations/templating/defaults";
 import {
   buildExampleGraphAlertTemplateContext,
   buildExampleReportTemplateContext,
@@ -24,8 +24,8 @@ import {
   type ReportSourceKind,
   type ReportTemplateContext,
   type TemplateContext,
-} from "~/shared/templating/templateContext";
-import { validateLiquid } from "~/shared/templating/validate";
+} from "@langwatch/automations/templating/templateContext";
+import { validateLiquid } from "@langwatch/automations/templating/validate";
 import { TemplateValidationError, TestFireUnavailableError } from "./errors";
 
 export type TemplateChannel = "email" | "slack" | "webhook";
@@ -161,7 +161,7 @@ export function validateTemplateDraft(draft: TemplateDraft): void {
  * server-side because it touches credentials (SES, Slack webhooks). Live
  * preview rendering happens entirely client-side via the same shared
  * templating module — the renderers below are imported from
- * `~/shared/templating/*` so both sides see identical output for any given
+ * `@langwatch/automations/templating/*` so both sides see identical output for any given
  * draft.
  *
  * `TestFireTriggerDeps` holds the two composition-time dependencies

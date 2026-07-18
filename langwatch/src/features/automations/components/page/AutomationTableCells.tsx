@@ -13,7 +13,7 @@ import {
   CADENCE_LABELS,
   CADENCE_WINDOW_MS,
   type NotificationCadence,
-} from "~/shared/automations/cadences";
+} from "@langwatch/automations/cadences";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   OPERATOR_LABELS,

@@ -2,16 +2,16 @@ import { TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { CLIENT_PROVIDERS } from "../registry";
 import type { AnnotationQueueSlice } from "../annotationQueue/client";
-import { annotationQueueActionParamsSchema } from "~/shared/automations/providers/annotationQueue";
+import { annotationQueueActionParamsSchema } from "@langwatch/automations/providers/annotationQueue";
 import {
   type DatasetSlice,
   deriveMappingFromColumns,
 } from "../dataset/client";
-import { datasetActionParamsSchema } from "~/shared/automations/providers/dataset";
+import { datasetActionParamsSchema } from "@langwatch/automations/providers/dataset";
 import type { EmailSlice } from "../email/client";
-import { emailActionParamsSchema } from "~/shared/automations/providers/email";
+import { emailActionParamsSchema } from "@langwatch/automations/providers/email";
 import type { SlackSlice } from "../slack/client";
-import { slackActionParamsSchema } from "~/shared/automations/providers/slack";
+import { slackActionParamsSchema } from "@langwatch/automations/providers/slack";
 import type { SavedTriggerRow } from "../types";
 
 /**

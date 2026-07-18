@@ -7,7 +7,7 @@ import { Html } from "@react-email/html";
 import { Img } from "@react-email/img";
 import { render } from "@react-email/render";
 import { createHash } from "crypto";
-import { EMAIL_RX } from "~/shared/automations/providers/email";
+import { EMAIL_RX } from "@langwatch/automations/providers/email";
 import type { TriggerData } from "~/server/app-layer/automations/trigger.types";
 import { toDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { env } from "../../env.mjs";

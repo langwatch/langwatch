@@ -2,7 +2,7 @@ import type { AlertType, TriggerAction } from "@prisma/client";
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
   type NotificationCadence,
-} from "~/shared/automations/cadences";
+} from "@langwatch/automations/cadences";
 import {
   type AllSlices,
   CLIENT_PROVIDERS,

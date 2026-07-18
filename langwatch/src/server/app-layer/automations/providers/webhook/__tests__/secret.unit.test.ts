@@ -7,7 +7,7 @@ vi.mock("~/utils/encryption", () => ({
   decrypt: (s: string) => s.replace(/^enc\(/, "").replace(/\)$/, ""),
 }));
 
-import { WEBHOOK_HEADER_VALUE_KEPT } from "~/shared/automations/providers/webhook";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
 import {
   decryptWebhookHeaders,
   persistWebhookActionParams,

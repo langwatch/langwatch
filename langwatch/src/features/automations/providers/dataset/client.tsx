@@ -13,8 +13,8 @@ import type {
   ConfigFormProps,
   SummaryIdentity,
 } from "../types";
-import type { SavedTriggerRow } from "~/shared/automations/providers/types";
-import type { DatasetActionParams } from "~/shared/automations/providers/dataset";
+import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
+import type { DatasetActionParams } from "@langwatch/automations/providers/dataset";
 
 /** A single dataset column's trace source. Mirrors the `traceMappingEntrySchema`
  *  shape the dispatcher casts to `TraceMapping` — `source` names a

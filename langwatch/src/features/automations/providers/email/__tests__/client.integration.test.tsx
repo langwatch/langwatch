@@ -23,7 +23,7 @@ import {
   ALERT_TRIGGER_DEFAULTS,
   REPORT_TRIGGER_DEFAULTS,
   TRACE_TRIGGER_DEFAULTS,
-} from "~/shared/templating/defaults";
+} from "@langwatch/automations/templating/defaults";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
 /** The Liquid editor is Monaco-bound and cannot mount in jsdom. Stub just that
@@ -59,7 +59,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 import emailClient, { type EmailSlice } from "../client";
-import type { EmailPreview } from "~/shared/automations/providers/email";
+import type { EmailPreview } from "@langwatch/automations/providers/email";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

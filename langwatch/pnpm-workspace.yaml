@@ -9,6 +9,14 @@ packages:
 
 minimumReleaseAge: 10080
 
+minimumReleaseAgeExclude:
+  # Adding the @langwatch/automations workspace package forces a full
+  # re-resolve; these shipped fresh releases inside the age gate with no
+  # older version satisfying the requested ranges. Remove once they age.
+  - ws
+  - "@browserbasehq/sdk"
+  - "postcss"
+
 overrides:
   pino: ^10.3.0
   pino-pretty: ^13.0.0

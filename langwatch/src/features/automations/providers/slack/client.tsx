@@ -30,8 +30,8 @@ import {
   LiquidEditor,
   TemplateDisclosure,
 } from "~/features/automations/editors/templateAuthoring";
-import { defaultsForSourceKind } from "~/shared/templating/defaults";
-import { filterVariablesForCadence } from "~/shared/templating/exampleContext";
+import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
+import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
 import { api } from "~/utils/api";
 import { TestFireButton } from "../TestFireButton";
 import type {
@@ -39,7 +39,7 @@ import type {
   NotifyClientDef,
   SummaryIdentity,
 } from "../types";
-import type { SavedTriggerRow } from "~/shared/automations/providers/types";
+import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 import {
   SLACK_BOT_TOKEN_KEPT,
   slackDeliveryMethodOf,
@@ -47,7 +47,7 @@ import {
   type SlackDeliveryMethod,
   type SlackPreview,
   type SlackTemplateType,
-} from "~/shared/automations/providers/slack";
+} from "@langwatch/automations/providers/slack";
 import {
   findTemplateOptionBySource,
   pickDefaultSlackBlockKitTemplateId,

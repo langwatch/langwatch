@@ -5,7 +5,7 @@ import {
 } from "@slack/webhook";
 import { toDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { Trace } from "~/server/tracer/types";
-import type { SlackPayload } from "~/shared/templating/renderSlack";
+import type { SlackPayload } from "@langwatch/automations/templating/renderSlack";
 import { env } from "~/env.mjs";
 import { assertSlackWebhookUrl } from "./slackWebhookGuard";
 

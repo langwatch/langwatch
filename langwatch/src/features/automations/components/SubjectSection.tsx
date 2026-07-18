@@ -26,7 +26,7 @@ import {
 } from "~/server/filters/types";
 import { api } from "~/utils/api";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import type { NotificationCadence } from "~/shared/automations/cadences";
+import type { NotificationCadence } from "@langwatch/automations/cadences";
 import {
   type AutomationDraft,
   filterQueryIsSet,

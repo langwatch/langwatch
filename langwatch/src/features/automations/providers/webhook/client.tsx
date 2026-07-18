@@ -17,8 +17,8 @@ import {
   FieldHeader,
   LiquidEditor,
 } from "~/features/automations/editors/templateAuthoring";
-import { defaultsForSourceKind } from "~/shared/templating/defaults";
-import { filterVariablesForCadence } from "~/shared/templating/exampleContext";
+import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
+import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
 import { TestFireButton } from "../TestFireButton";
 import type {
   ConfigFormCtx,
@@ -26,7 +26,7 @@ import type {
   NotifyClientDef,
   SummaryIdentity,
 } from "../types";
-import type { SavedTriggerRow } from "~/shared/automations/providers/types";
+import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 import {
   isReservedWebhookHeader,
   validateWebhookUrlShape,
@@ -35,7 +35,7 @@ import {
   type WebhookActionParams,
   type WebhookMethod,
   type WebhookPreview,
-} from "~/shared/automations/providers/webhook";
+} from "@langwatch/automations/providers/webhook";
 
 /** A template field, mirroring the Slack provider's `FieldDraft`: empty +
  *  `usingDefault` means the framework default envelope applies. */
