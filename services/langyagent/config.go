@@ -197,6 +197,9 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	// Hydrate so PORT always wins over any stray SERVER_ADDR.
 	cfg.Server.Addr = fmt.Sprintf(":%d", cfg.Port)
 	cfg.OTel.ResolveSampleRatio(cfg.Environment)
+	if err := cfg.OTel.Validate(); err != nil {
+		return Config{}, err
+	}
 	if err := cfg.Log.Validate(); err != nil {
 		return Config{}, err
 	}

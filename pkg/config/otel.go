@@ -2,6 +2,10 @@ package config
 
 import (
 	"context"
+	"fmt"
+	"math"
+	"net"
+	"net/url"
 	"strings"
 
 	"github.com/langwatch/langwatch/pkg/otelsetup"
@@ -37,6 +41,74 @@ type OTel struct {
 // SampleRatioSet to distinguish it from an explicit 0 read from the
 // OTEL_SAMPLE_RATIO environment variable.
 const UnsetSampleRatio = 0
+
+// debugCollectorMustBeLocal rejects a debug-collector endpoint that is not on
+// the machine running the service.
+//
+// The check is deliberately on the DESTINATION, not on ENVIRONMENT. What makes
+// the debug collector safe is not what an environment is named — a name is a
+// free-text env var, and "dev"/"test" are exactly the values a shared cluster
+// holding real customer data is most likely to carry — but that the spans
+// cannot leave the developer's own machine. A hostname is checkable and a typo
+// cannot forge one; a name allowlist would hand the switch to anyone who set
+// ENVIRONMENT=test.
+//
+// Loopback forms only: `localhost` and any `*.localhost` (the portless dev
+// hostnames, which resolve to loopback natively), literal 127.0.0.0/8 and ::1,
+// and `host.docker.internal` for containerised dev stacks. Private ranges are
+// NOT accepted — 10.x and 192.168.x are ordinary in-cluster addresses, so
+// allowing them would readmit the deployment this check exists to refuse.
+func debugCollectorMustBeLocal(endpoint string) error {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return fmt.Errorf("OTEL_DEBUG_COLLECTOR_ENDPOINT is not a valid URL: %w", err)
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") || host == "host.docker.internal" {
+		return nil
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		return nil
+	}
+	return fmt.Errorf(
+		"OTEL_DEBUG_COLLECTOR_ENDPOINT must point at a collector on this machine (localhost, 127.0.0.1, ::1, *.localhost, or host.docker.internal), got %q — the debug collector receives every tenant's spans with no per-tenant routing, so it must never ship them off-box",
+		u.Host,
+	)
+}
+
+// Validate rejects OTel configuration that would silently invert a telemetry
+// boundary. Call after ResolveSampleRatio, which fills in the unset default.
+//
+// Both checks fail closed at boot rather than at the first exported span: a
+// misconfigured collector is not discoverable from inside the running service,
+// so the only place it can be caught is the place it is read.
+func (o *OTel) Validate() error {
+	// An out-of-range ratio must not reach the sampler, where it would resolve
+	// to one of the extremes: a typo like -1 or "10" (meaning 10%) lands on
+	// NeverSample or AlwaysSample instead of erroring. NaN is reachable too —
+	// strconv.ParseFloat accepts the literal string "NaN" — and every NaN
+	// comparison is false, so without the explicit check it would sail through
+	// this guard and silently disable all tracing.
+	if math.IsNaN(o.SampleRatio) || o.SampleRatio < 0 || o.SampleRatio > 1 {
+		return fmt.Errorf(
+			"OTEL_SAMPLE_RATIO must be between 0 and 1, got %v — 0 exports no traces, 1 exports all of them",
+			o.SampleRatio,
+		)
+	}
+	// The debug collector is a tenant-agnostic dual export: every span the
+	// service produces is copied there, including spans the per-tenant router
+	// would otherwise route by the originating project's key (nlpgo) or drop
+	// for lack of one. That is exactly what makes it useful on a laptop and
+	// unacceptable anywhere customer data flows, where it would pool every
+	// tenant's telemetry into one destination. ADR-042 specifies it as
+	// local-only; this makes that specification enforceable.
+	if o.DebugCollectorEndpoint != "" {
+		if err := debugCollectorMustBeLocal(o.DebugCollectorEndpoint); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // DefaultNonLocalSampleRatio is the trace sample ratio applied outside local
 // development when the operator did not choose one.

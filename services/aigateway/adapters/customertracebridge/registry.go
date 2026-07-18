@@ -51,9 +51,16 @@ func (r *Registry) Set(projectID, endpoint string, headers map[string]string) er
 }
 
 // SetFromBundle registers the project's OTLP endpoint from a resolved bundle.
-// No-op if any required field is empty.
+// A bundle that carries the project but no token (or no endpoint) is a
+// REVOCATION: the cached entry is removed so the bridge stops exporting with a
+// credential the control plane no longer vouches for. Leaving the entry in
+// place would keep shipping spans under the stale token until LRU eviction.
 func (r *Registry) SetFromBundle(projectID, otlpToken, defaultEndpoint string) error {
-	if projectID == "" || otlpToken == "" || defaultEndpoint == "" {
+	if projectID == "" {
+		return nil
+	}
+	if otlpToken == "" || defaultEndpoint == "" {
+		r.cache.Remove(projectID)
 		return nil
 	}
 	return r.Set(projectID, defaultEndpoint, map[string]string{"X-Auth-Token": otlpToken})

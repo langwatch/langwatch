@@ -25,23 +25,26 @@ const (
 // signallingIngest records one OTLP body and announces its arrival, so a test
 // can wait on the detached internal export instead of sleeping.
 type signallingIngest struct {
-	srv  *httptest.Server
-	got  chan []byte
-	auth chan string
-	path chan string
+	srv   *httptest.Server
+	got   chan []byte
+	auth  chan string
+	authz chan string
+	path  chan string
 }
 
 func startSignallingIngest(t *testing.T) *signallingIngest {
 	t.Helper()
 	si := &signallingIngest{
-		got:  make(chan []byte, 4),
-		auth: make(chan string, 4),
-		path: make(chan string, 4),
+		got:   make(chan []byte, 4),
+		auth:  make(chan string, 4),
+		authz: make(chan string, 4),
+		path:  make(chan string, 4),
 	}
 	si.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		body, _ := io.ReadAll(req.Body)
 		si.got <- body
 		si.auth <- req.Header.Get("X-Auth-Token")
+		si.authz <- req.Header.Get("Authorization")
 		si.path <- req.URL.Path
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -139,6 +142,15 @@ func TestDualExport(t *testing.T) {
 					t.Fatalf("the customer's own agent content %q must reach their project", content)
 				}
 			}
+			if got := <-customer.authz; got != "Bearer sk-session" {
+				t.Fatalf("customer forward Authorization = %q, want the session key", got)
+			}
+			if got := <-customer.auth; got != "" {
+				t.Fatalf("LangWatch's internal collector credential crossed onto the customer forward: X-Auth-Token=%q", got)
+			}
+			if got := <-customer.path; got != "/api/otel/v1/traces" {
+				t.Fatalf("customer path = %q", got)
+			}
 		})
 
 		t.Run("LangWatch's own collector receives none of it", func(t *testing.T) {
@@ -153,6 +165,9 @@ func TestDualExport(t *testing.T) {
 			}
 			if got := <-internal.auth; got != "internal-secret" {
 				t.Fatalf("internal auth header = %q", got)
+			}
+			if got := <-internal.authz; got != "" {
+				t.Fatalf("the customer's session key crossed onto the internal export: Authorization=%q", got)
 			}
 			if got := <-internal.path; got != "/v1/traces" {
 				t.Fatalf("internal path = %q", got)

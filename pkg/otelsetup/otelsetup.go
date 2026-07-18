@@ -127,8 +127,12 @@ type Options struct {
 	OTLPHeaders  map[string]string // auth headers for the collector
 	BatchTimeout time.Duration
 	MaxQueueSize int
-	// SampleRatio controls the fraction of traces sampled (0.0–1.0).
-	// 0 means "use default" (AlwaysSample). Set explicitly via config.
+	// SampleRatio controls the fraction of traces sampled, 0.0–1.0. 0 means
+	// sample nothing; 1 means sample everything. The environment-aware default
+	// for an unset ratio is applied upstream by config.OTel.ResolveSampleRatio,
+	// which is also where out-of-range values are rejected — by the time a
+	// ratio reaches here it is expected to be in range, and anything outside
+	// it is clamped to NeverSample rather than assumed to mean "all".
 	SampleRatio float64
 	// MultiTenant=true installs a per-request, per-tenant span router
 	// (TenantRouter) instead of the standard static-headers exporter.
@@ -263,14 +267,21 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 
 	res := buildResource(serviceName, serviceVersion, environment, opts.NodeID)
 
+	// Ordered so that only a ratio of 1.0 or above means "sample everything".
+	// The previous arrangement made AlwaysSample the default branch, which put
+	// every out-of-range value — a negative typo, or 10 meaning "10%" — onto
+	// full export, maximising exactly what the operator was trying to reduce.
+	// config.OTel.Validate rejects those at boot; this fails toward exporting
+	// nothing for callers that construct Options directly. NaN lands here too:
+	// it compares false against both bounds.
 	var rootSampler sdktrace.Sampler
 	switch {
-	case opts.SampleRatio == 0:
-		rootSampler = sdktrace.NeverSample()
-	case opts.SampleRatio > 0 && opts.SampleRatio < 1.0:
+	case opts.SampleRatio >= 1.0:
+		rootSampler = sdktrace.AlwaysSample()
+	case opts.SampleRatio > 0:
 		rootSampler = sdktrace.TraceIDRatioBased(opts.SampleRatio)
 	default:
-		rootSampler = sdktrace.AlwaysSample()
+		rootSampler = sdktrace.NeverSample()
 	}
 
 	tpOpts := []sdktrace.TracerProviderOption{

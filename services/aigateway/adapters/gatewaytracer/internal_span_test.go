@@ -167,6 +167,42 @@ func TestStampInternalGenAI_ErrorTypeCarriesNoProviderText(t *testing.T) {
 	}
 }
 
+// The full key set is pinned, not just the forbidden keys: a new attribute on
+// the internal span has to show up in THIS list to land, which is the review
+// moment where "can it carry content?" gets asked. Forbidden-key checks alone
+// only catch the leaks someone already predicted.
+func TestStampInternalGenAI_StampsOnlyTheAllowedKeySet(t *testing.T) {
+	params := paramsWithBodies()
+	params.UpstreamErrorType = "provider_timeout"
+	params.UpstreamStatusCode = 504
+	params.Usage.CacheReadTokens = 12
+	params.Usage.CacheCreationTokens = 7
+
+	span := stampedSpan(t, params)
+
+	got := make([]string, 0, len(span.Attributes()))
+	for _, kv := range span.Attributes() {
+		got = append(got, string(kv.Key))
+	}
+	assert.ElementsMatch(t, []string{
+		AttrGenAIOperationName, AttrGenAISystem, AttrGenAIRequestModel,
+		AttrGenAIUsageIn, AttrGenAIUsageOut, AttrGenAIUsageTotal,
+		AttrGenAIUsageCacheRead, AttrGenAIUsageCacheCreate, AttrCostUSD,
+		AttrVirtualKeyID, AttrGatewayReqID,
+		AttrErrorType, AttrUpstreamStatusCode,
+	}, got, "the internal span's key set changed — review whether the new key can carry content before extending this list")
+}
+
+// Attributes are not the only channel out of a span: events and the status
+// description are free-text too, and neither is covered by an attribute-key
+// allowlist. The stamp must leave both untouched.
+func TestStampInternalGenAI_AddsNoEventsOrStatusText(t *testing.T) {
+	span := stampedSpan(t, paramsWithBodies())
+
+	assert.Empty(t, span.Events(), "span events would bypass the attribute allowlist")
+	assert.Empty(t, span.Status().Description, "status text would bypass the attribute allowlist")
+}
+
 // The content keys must not even exist as constants in this package: a
 // declared key is one autocomplete away from being stamped.
 func TestPackageDeclaresNoContentAttributeConstants(t *testing.T) {
