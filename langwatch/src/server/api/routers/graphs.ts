@@ -1,8 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { redactSlackActionParams } from "~/automations/providers/definitions/slack/secret";
-import { type SlackActionParams } from "~/automations/providers/definitions/slack/shared";
+import { redactActionParamsFor } from "~/server/app-layer/automations/providers/registry";
 import { type FilterField, filterFieldsEnum } from "../../filters/types";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
@@ -97,18 +96,20 @@ export const graphsRouter = createTRPCRouter({
         },
       });
 
-      // The included trigger row carries the encrypted Slack bot token in
-      // actionParams — strip it before the rows leave the server (ADR-041:
-      // the token never reaches the client), same redaction the automations
-      // router applies on its read paths.
+      // The included trigger row carries provider secrets in actionParams
+      // (the encrypted Slack bot token per ADR-041, webhook header values
+      // per ADR-040 §3) — strip them per the trigger's own action before the
+      // rows leave the server, the same registry-driven redaction the
+      // automations router applies on its read paths.
       return graphs.map((graph) =>
         graph.trigger
           ? {
               ...graph,
               trigger: {
                 ...graph.trigger,
-                actionParams: redactSlackActionParams(
-                  (graph.trigger.actionParams ?? {}) as SlackActionParams,
+                actionParams: redactActionParamsFor(
+                  graph.trigger.action,
+                  graph.trigger.actionParams ?? {},
                 ),
               },
             }

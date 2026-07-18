@@ -46,6 +46,8 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+# tsgo / tsc incremental build cache (explicit tsBuildInfoFile targets)
+node_modules/.cache/tsbuildinfo/
 
 # Sentry Config File
 .sentryclirc

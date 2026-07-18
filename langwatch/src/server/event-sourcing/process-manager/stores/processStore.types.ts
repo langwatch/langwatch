@@ -122,6 +122,14 @@ export interface ProcessStore {
     now: number;
     limit: number;
     leaseDurationMs: number;
+    /**
+     * Restrict leasing to these processNames. The outbox table is shared
+     * across every process manager, so each domain's dispatcher MUST scope
+     * its leases — an unfiltered dispatcher would lease another domain's
+     * intents, fail to find a handler, and retry-churn them (ADR-051 §4).
+     * Omitted means unfiltered (single-domain deployments and tests).
+     */
+    processNames?: readonly string[];
   }): Promise<LeasedOutboxMessageRecord[]>;
 
   markDispatched(params: {
@@ -140,5 +148,22 @@ export interface ProcessStore {
   }): Promise<void>;
 
   /** Processes whose nextWakeAt is due, with the revision to guard against staleness. */
-  findDueWakes(params: { now: number; limit: number }): Promise<DueWake[]>;
+  findDueWakes(params: {
+    now: number;
+    limit: number;
+    /** Restrict the global wake scan to process managers mounted here. */
+    processNames?: readonly string[];
+  }): Promise<DueWake[]>;
+
+  /**
+   * Retention for high-frequency recurring intents (ADR-052): deletes
+   * DISPATCHED outbox rows of one processName whose dispatch finished
+   * before `before`. Pending/dead rows are never touched — dead rows are
+   * the operator's failure record, pending rows are work. Returns the
+   * deleted count.
+   */
+  deleteDispatchedBefore(params: {
+    processName: string;
+    before: number;
+  }): Promise<number>;
 }

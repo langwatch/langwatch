@@ -53,6 +53,13 @@ export interface OutboxDispatcherServiceOptions {
   retryDelayMs?: (params: { attempt: number }) => number;
   /** How long a leased message stays invisible to other loops. Default 30s. */
   leaseDurationMs?: number;
+  /**
+   * Which processNames this dispatcher serves. The outbox table is shared
+   * across domains, so every domain-scoped dispatcher must set this — an
+   * unfiltered dispatcher leases other domains' intents and retry-churns
+   * them for lack of a handler. Omitted means unfiltered.
+   */
+  processNames?: readonly string[];
   tracer?: Tracer;
   logger?: Logger;
 }
@@ -71,6 +78,16 @@ function defaultRetryDelayMs({ attempt }: { attempt: number }): number {
   return Math.min(1_000 * 2 ** (attempt - 1), 60_000);
 }
 
+function retryAfterMsOf(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const retryAfterMs = Reflect.get(error, "retryAfterMs");
+  return typeof retryAfterMs === "number" &&
+    Number.isFinite(retryAfterMs) &&
+    retryAfterMs > 0
+    ? retryAfterMs
+    : undefined;
+}
+
 /**
  * Leases due process-outbox messages and dispatches each inside a CONSUMER
  * span whose remote parent is restored from the message's persisted W3C
@@ -83,6 +100,7 @@ export class OutboxDispatcherService {
   private readonly maxAttempts: number;
   private readonly retryDelayMs: (params: { attempt: number }) => number;
   private readonly leaseDurationMs: number;
+  private readonly processNames: readonly string[] | undefined;
   private readonly tracer: Tracer;
   private readonly logger: Logger;
 
@@ -92,6 +110,7 @@ export class OutboxDispatcherService {
     this.maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     this.retryDelayMs = options.retryDelayMs ?? defaultRetryDelayMs;
     this.leaseDurationMs = options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
+    this.processNames = options.processNames;
     this.tracer =
       options.tracer ?? trace.getTracer("langwatch.process-manager");
     this.logger =
@@ -106,6 +125,7 @@ export class OutboxDispatcherService {
       now: params.now,
       limit: params.limit ?? 10,
       leaseDurationMs: this.leaseDurationMs,
+      ...(this.processNames ? { processNames: this.processNames } : {}),
     });
 
     const report: DispatchReport = { dispatched: [], retried: [], dead: [] };
@@ -191,11 +211,15 @@ export class OutboxDispatcherService {
           });
           span.setStatus({ code: SpanStatusCode.ERROR });
           const dead = attempt >= this.maxAttempts;
+          const retryDelayMs = Math.max(
+            this.retryDelayMs({ attempt }),
+            retryAfterMsOf(error) ?? 0,
+          );
           await this.store.markFailed({
             identity,
             leaseToken: message.leaseToken,
             now,
-            nextAttemptAt: now + this.retryDelayMs({ attempt }),
+            nextAttemptAt: now + retryDelayMs,
             dead,
           });
           (dead ? report.dead : report.retried).push(message.messageKey);

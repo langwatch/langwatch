@@ -31,11 +31,9 @@ Feature: In-process workers for local development
   #                               (`pnpm dev:workers:haven`).
   #
   # The "all" role runs the same worker-side wiring as "worker" via
-  # `roleRunsWorkers(role)` (src/server/app-layer/config.ts): the outbox
-  # consumer + drainer, the heartbeat scheduler, and the GroupQueue consumer.
-  # `roleRunsWorkers` is bound by src/server/app-layer/__tests__/config.unit.test.ts;
-  # the "all" role's outbox wiring is bound by
-  # src/server/app-layer/__tests__/presets.outboxWiring.integration.test.ts.
+  # `roleRunsWorkers(role)` (src/server/app-layer/config.ts): the GroupQueue
+  # consumers, process-manager wake/outbox workers, and the scheduler.
+  # `roleRunsWorkers` is bound by src/server/app-layer/__tests__/config.unit.test.ts.
 
   # --- Default: unchanged two-process dev ---
 
@@ -79,13 +77,6 @@ Feature: In-process workers for local development
     When I run "pnpm dev:workers:haven"
     Then haven adds a separate "workers" child running "pnpm run start:workers"
     And the app child boots without hosting workers in-process
-
-  @integration
-  Scenario: the in-process app wires the outbox exactly like a dedicated worker
-    Given the App is initialized with the "all" role
-    When the event-sourcing pipelines register their outbox reactors
-    Then every outbox reactor registers with a runtime (no drop-path warnings)
-    And the outbox is wired, so trigger dispatch and settle traffic drain locally
 
   @unimplemented
   Scenario: a worker boot failure in-process does not take down the web server

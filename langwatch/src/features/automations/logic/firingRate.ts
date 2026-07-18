@@ -2,7 +2,7 @@ import {
   CADENCE_LABELS,
   CADENCE_WINDOW_MS,
   type NotificationCadence,
-} from "~/automations/cadences";
+} from "@langwatch/automations/cadences";
 
 /** "About N times a {unit}", picking the coarsest unit that reads naturally. */
 function ratePhrase(perDay: number): string {

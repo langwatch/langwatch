@@ -1103,16 +1103,12 @@ cronjobs:
       schedule: "0 0 * * *" # At midnight every day
       endpoint: "/api/cron/schedule_topic_clustering"
 
-    # Alert triggers job - checks and fires alerts
-    # See: https://kubespec.dev/batch/v1/CronJob#spec.schedule
-    ## @extra cronjobs.jobs.alertTriggers Alert triggers job.
-    ## @param cronjobs.jobs.alertTriggers.enabled [default: true] Enable alert triggers job.
-    ## @param cronjobs.jobs.alertTriggers.schedule [string, default: */3 * * * *] Cron schedule.
-    ## @param cronjobs.jobs.alertTriggers.endpoint [string, default: /api/cron/triggers] Endpoint path.
-    alertTriggers:
-      enabled: true
-      schedule: "*/3 * * * *" # Every 3 minutes
-      endpoint: "/api/cron/triggers"
+    # NOTE: the automation CronJobs are gone. The alertTriggers CronJob
+    # (`/api/cron/triggers`) was removed — custom-graph threshold alerts now
+    # fire from the event-sourced worker path (ADR-034) — and the webhook
+    # delivery-log prune runs as a daily scheduled process manager on the
+    # same worker path (ADR-040 §6), so neither needs a cron sweep. The
+    # workers Deployment (workers.enabled) is what runs them now.
 
   # =============================================================================
   # Kubernetes Pass-Through Configuration

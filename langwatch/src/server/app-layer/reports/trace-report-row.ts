@@ -2,7 +2,7 @@ import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service
 import {
   type ReportTraceRow,
   reportSnippet,
-} from "~/shared/templating/templateContext";
+} from "@langwatch/automations/templating/templateContext";
 
 /**
  * Map a trace-list item onto the report template context's typed trace row.

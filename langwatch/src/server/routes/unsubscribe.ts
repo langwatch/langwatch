@@ -18,7 +18,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
-import { InvalidUnsubscribeTokenError } from "~/server/app-layer/triggers/emailSuppression.service";
+import { InvalidUnsubscribeTokenError } from "~/server/app-layer/automations/emailSuppression.service";
 import { rateLimit } from "~/server/rateLimit";
 import type { NextApiRequest } from "~/types/next-stubs";
 import { getClientIp } from "~/utils/getClientIp";

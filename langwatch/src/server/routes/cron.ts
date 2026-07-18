@@ -3,14 +3,11 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Project, Trigger } from "@prisma/client";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
-import { processCustomGraphTrigger } from "~/pages/api/cron/triggers/customGraphTrigger";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { featureFlagService } from "~/server/featureFlag";
 import { scheduleTopicClustering } from "~/server/topicClustering/topicClusteringQueue";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
@@ -203,102 +200,13 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
   return c.json({ success: true });
 });
 
-// ---------- GET /api/cron/triggers ----------
-secured.access(cronPolicy()).get("/cron/triggers", async (c) => {
-  if (!validateCronKey(c)) {
-    return c.body(null, 401);
-  }
-
-  let triggers: Trigger[];
-  let projects: Project[];
-
-  try {
-    projects = await prisma.project.findMany({
-      where: { firstMessage: true, archivedAt: null },
-    });
-
-    triggers = await prisma.trigger.findMany({
-      where: {
-        active: true,
-        projectId: { in: projects.map((project) => project.id) },
-      },
-    });
-  } catch (error) {
-    return c.json(
-      {
-        error: "Failed to fetch triggers",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      500,
-    );
-  }
-
-  // Only process custom graph triggers — trace-based triggers are handled
-  // reactively by the alertTrigger reactor on the trace-processing pipeline.
-  const graphTriggers = triggers.filter((t) => t.customGraphId);
-
-  // ADR-034 Phase 5: skip triggers whose project has flipped onto the
-  // event-sourced graph-trigger path (real-time outbox reactor + 30s
-  // heartbeat handle them there). The flag is a PROJECT-level decision;
-  // resolve it once per distinct projectId per tick instead of once per
-  // trigger — N graph triggers in the same project would otherwise fan
-  // out to N flag lookups, all with the same answer. Cache-warm case is
-  // in-process; cold case is one Redis GET per project either way.
-  const distinctProjectIds = Array.from(
-    new Set(graphTriggers.map((t) => t.projectId)),
-  );
-  const esFlaggedProjectIds = new Set<string>();
-  await Promise.all(
-    distinctProjectIds.map(async (projectId) => {
-      try {
-        const onEsPath = await featureFlagService.isEnabled(
-          "release_es_graph_triggers_firing",
-          { distinctId: projectId, projectId },
-        );
-        if (onEsPath) esFlaggedProjectIds.add(projectId);
-      } catch (error) {
-        // A flag lookup failing (Redis blip) must not reject the whole
-        // Promise.all — that would abort this tick for EVERY project, not
-        // just this one. Leave the project unflagged so the cron keeps
-        // evaluating it: a duplicate notification is deduped by TriggerSent,
-        // whereas skipping it would silently drop the alert.
-        logger.error(
-          { projectId, error },
-          "[graph-trigger] flag lookup failed; leaving project on the cron path",
-        );
-      }
-    }),
-  );
-
-  const results = [];
-
-  for (const trigger of graphTriggers) {
-    try {
-      if (esFlaggedProjectIds.has(trigger.projectId)) {
-        logger.info(
-          { triggerId: trigger.id, projectId: trigger.projectId },
-          "[graph-trigger] skipping in cron — project on event-sourced path",
-        );
-        continue;
-      }
-      const result = await processCustomGraphTrigger(trigger, projects);
-      results.push(result);
-    } catch (error) {
-      logger.error(
-        { triggerId: trigger.id, error },
-        "error processing custom graph trigger",
-      );
-      results.push({
-        triggerId: trigger.id,
-        status: "error",
-        message: error instanceof Error ? error.message : "Unknown error",
-        type: "customGraph",
-      });
-    }
-  }
-
-  return c.json(results);
-});
+// NOTE: the `/api/cron/triggers` graph-alert sweep was removed (ADR-034):
+// custom-graph threshold alerts now fire exclusively from the event-sourced
+// path (real-time activity subscriber + scheduled graph-alert process manager),
+// and trace-based triggers were already reactive. There is no cron graph-alert
+// path anymore. Likewise the webhook delivery-log prune (ADR-040 §6) runs as
+// the daily `webhookDeliveryPrune` scheduled process manager on the worker,
+// not as a cron route.
 
 // ---------- POST /api/cron/seed_demo ----------
 //

@@ -208,6 +208,34 @@ describe("guardProjectId — projectId_traceId compound key (PinnedTrace)", () =
   });
 });
 
+describe("guardProjectId — WebhookDelivery cleanup", () => {
+  describe("when deleteMany omits projectId", () => {
+    it("rejects the cross-tenant prune", async () => {
+      await expect(
+        runGuard({
+          model: "WebhookDelivery",
+          action: "deleteMany",
+          args: { where: { firedAt: { lt: new Date() } } },
+        }),
+      ).rejects.toThrow(/requires a 'projectId'/);
+    });
+  });
+
+  describe("when deleteMany includes projectId", () => {
+    it("permits the tenant-scoped prune", async () => {
+      await expect(
+        runGuard({
+          model: "WebhookDelivery",
+          action: "deleteMany",
+          args: {
+            where: { projectId: "project-1", firedAt: { lt: new Date() } },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+});
+
 describe("guardProjectId — org-scoped VirtualKey still guarded", () => {
   describe("findMany on VirtualKey WITHOUT any tenancy predicate", () => {
     it("STILL throws — VirtualKey requires organizationId/id/scope (regression guard)", async () => {

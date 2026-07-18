@@ -21,7 +21,7 @@ import { getPostHogInstance } from "~/server/posthog";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { createS3Client } from "~/server/storage";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
-import { liveTriggerNotifier } from "~/server/triggers/triggerNotifier";
+import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
@@ -57,15 +57,11 @@ import { loadReportCharts } from "./reports/report-chart.service";
 import { dispatchScheduledReport } from "./reports/report-dispatch";
 import { toReportTraceRow } from "./reports/trace-report-row";
 import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
-import { REPORT_SCHEDULER_TARGET_TYPE } from "./triggers/report.builder";
+import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
-import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
-import { postSlackChatMessage } from "~/server/triggers/slackWebApi";
+import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
+import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { EventSourcing } from "../event-sourcing";
-import { dispatchOutboxEnqueues } from "../event-sourcing/outbox/dispatchOutboxEnqueues";
-import { outboxHeartbeatRegistry } from "../event-sourcing/outbox/heartbeat/heartbeat.registry";
-import { OutboxHeartbeatScheduler } from "../event-sourcing/outbox/heartbeat/heartbeat.scheduler";
-import { buildOutboxRuntime } from "../event-sourcing/outbox/setup";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
   type AppCommands,
@@ -228,23 +224,22 @@ import {
 import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import { traced } from "./tracing";
-import { EmailSuppressionService } from "./triggers/emailSuppression.service";
-import {
-  defaultGraphTriggerHeartbeatDeps,
-  registerGraphTriggerHeartbeat,
-} from "./triggers/graph-trigger-heartbeat";
+import { EmailSuppressionService } from "./automations/emailSuppression.service";
+import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
+import { ClickHouseAutomationAuditRepository } from "./automations/repositories/automation-audit.clickhouse.repository";
+import { NullAutomationAuditRepository } from "./automations/repositories/automation-audit.repository";
 import {
   PrismaEmailSuppressionNameLookupRepository,
   PrismaEmailSuppressionRepository,
-} from "./triggers/repositories/emailSuppression.prisma.repository";
+} from "./automations/repositories/emailSuppression.prisma.repository";
 import {
   NullEmailSuppressionNameLookupRepository,
   NullEmailSuppressionRepository,
-} from "./triggers/repositories/emailSuppression.repository";
-import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
-import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
-import { TriggerService } from "./triggers/trigger.service";
-import { testFireTrigger } from "./triggers/trigger-template.service";
+} from "./automations/repositories/emailSuppression.repository";
+import { PrismaTriggerRepository } from "./automations/repositories/trigger.prisma.repository";
+import { NullTriggerRepository } from "./automations/repositories/trigger.repository";
+import { TriggerService } from "./automations/trigger.service";
+import { testFireTrigger } from "./automations/trigger-template.service";
 import { UsageService } from "./usage/usage.service";
 
 /**
@@ -266,8 +261,8 @@ export function initializeWorkerApp(): App {
 /**
  * Dev-only single-process mode: the web server also hosts the worker stack
  * in-process (opt-in via WORKERS_IN_PROCESS=1). Boots the App with the "all"
- * role so the outbox consumer, drainer, and heartbeat scheduler wire up
- * exactly as they do on a dedicated worker. Prod never calls this — it runs
+ * role so process outbox/wake consumers and schedulers wire up exactly as
+ * they do on a dedicated worker. Prod never calls this — it runs
  * web and worker as separate deployments.
  */
 export function initializeInProcessApp(): App {
@@ -657,6 +652,9 @@ export function initializeDefaultApp(options?: {
     evaluationAnalytics: clickhouseEnabled
       ? new EvaluationAnalyticsClickHouseRepository(resolveClickHouseClient)
       : new NullEvaluationAnalyticsRepository(),
+    automationAudit: clickhouseEnabled
+      ? new ClickHouseAutomationAuditRepository(resolveClickHouseClient)
+      : new NullAutomationAuditRepository(),
     experimentRunItemStorage: createExperimentRunItemAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),
@@ -700,32 +698,6 @@ export function initializeDefaultApp(options?: {
       }
     : undefined;
 
-  // Outbox stack: the consumer loop for roles where roleRunsWorkers() is true
-  // ("worker" and the in-process dev "all" role). The send-side handle is
-  // wired into the EventSourcing runtime below (passed to `new
-  // EventSourcing`), so its `.withOutbox` reactors can enqueue settle
-  // payloads. Web processes don't build this (no settle traffic; no consumer
-  // to drain).
-  const outbox = roleRunsWorkers(config.processRole)
-    ? buildOutboxRuntime({
-        prisma,
-        redis: redis ?? null,
-        triggers,
-        emailSuppressions,
-        projects,
-        evaluations: { runs: evaluations.runs },
-        traces: { spans: spanStorage },
-        traceSummaryRepository: repositories.traceSummaryFold,
-      })
-    : undefined;
-
-  // EventSourcing must be constructed AFTER `outbox` and be given it here: the
-  // reactor adapter (`.withOutbox` → enqueueSettle) and the global queue's
-  // settle/cadence routing + audit adapter all read `this._outbox`, set once at
-  // construction. Passing `outbox` anywhere else (e.g. only to the registry)
-  // leaves every outbox reactor on the silent drop path — the trigger dispatch
-  // regression fixed here (also found by /review-pr reg5014-001 +
-  // dispatch5015-001). See presets.outboxWiring.integration.test.ts.
   const es = new EventSourcing({
     clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
     redis,
@@ -733,48 +705,25 @@ export function initializeDefaultApp(options?: {
     isSaas: config.isSaas,
     processRole: config.processRole,
     retentionPolicyResolver: retentionPolicyCache,
-    outbox,
+    // ADR-052: durable persistence for withProcessManager declarations —
+    // the SAME store instance the registry's dependency assembly uses.
+    processStore: repositories.langyProcessStore,
   });
 
-  // Heartbeat scheduler (ADR-034 Phase 4): for roles where roleRunsWorkers()
-  // is true, a periodic source of outbox enqueues for the cases the
-  // event-driven outbox path STRUCTURALLY cannot reach (no-data detection,
-  // resolve-when-traffic-stops).
-  // Registrations live in `outboxHeartbeatRegistry` (process-singleton);
-  // the scheduler routes every tick's `decide` result through the same
-  // `dispatchOutboxEnqueues` helper `adaptOutboxReactor` uses, so one
-  // dispatch path serves both event-sourced and tick-sourced enqueues.
-  // Constructed only when both a worker role AND an outbox runtime AND a
-  // Redis client are present — the lock is the leader-election primitive
-  // so a missing Redis means no scheduler.
-  const outboxHeartbeatScheduler =
-    roleRunsWorkers(config.processRole) && outbox && redis
-      ? new OutboxHeartbeatScheduler({
-          registry: outboxHeartbeatRegistry,
-          redis,
-          dispatchOutboxEnqueues: ({ requests, sourceName }) =>
-            dispatchOutboxEnqueues({
-              requests,
-              outbox,
-              sourceName,
-              logger: createLogger("langwatch:event-sourcing:outbox-heartbeat"),
-            }),
-          processRole: config.processRole,
-          logger: createLogger("langwatch:event-sourcing:outbox-heartbeat"),
-        })
-      : undefined;
-  // ADR-034 Phase 5: register the graph-trigger heartbeat BEFORE the
-  // scheduler starts. Registration is passive data (the registry is a
-  // process-singleton) so this is safe on every role; the scheduler
-  // itself is worker-only and ignores non-worker processes. We only
-  // register when an outbox runtime is present — without it there's no
-  // dispatch target.
-  if (outbox) {
-    registerGraphTriggerHeartbeat(
-      defaultGraphTriggerHeartbeatDeps({ triggers, prisma }),
-    );
-  }
-  outboxHeartbeatScheduler?.start();
+  // ADR-052: automation dispatch ports for the process-manager runtime the
+  // registry composes (triggerSettlement + graphAlertSweep). Built on every
+  // role — registration is passive shape; the outbox/wake worker loops
+  // start only where roleRunsWorkers() is true.
+  const automationPorts = buildAutomationDispatchPorts({
+    prisma,
+    redis: redis ?? null,
+    triggers,
+    emailSuppressions,
+    projects,
+    evaluations: { runs: evaluations.runs },
+    traces: { spans: spanStorage },
+    traceSummaryRepository: repositories.traceSummaryFold,
+  });
 
   // ADR-044 Phase 1: the generic calendar scheduler. No cron infra. A
   // worker-only in-process loop that sleeps until the soonest due
@@ -932,6 +881,9 @@ export function initializeDefaultApp(options?: {
       worker: langyWorker,
       titleGenerator: langyTitleGenerator,
       runsWorkers: roleRunsWorkers(config.processRole),
+    },
+    automations: {
+      ports: automationPorts,
     },
     projects,
     monitors,
@@ -1115,20 +1067,11 @@ export function initializeDefaultApp(options?: {
     },
   });
   gracefulCloseables.push({
-    name: "langy-process-outbox",
+    // The langy + automation process outbox/wake workers share one stop
+    // composite exposed by the registry.
+    name: "process-outbox-workers",
     close: () => commands.processOutboxWorker.stop(),
   });
-  // The outbox runtime piggy-backs on the main event-sourcing queue
-  // (ADR-030 revision 3), so there's nothing outbox-specific to close —
-  // the event-sourcing queue's own close registration covers it.
-  if (outboxHeartbeatScheduler) {
-    gracefulCloseables.push({
-      name: "outbox-heartbeat-scheduler",
-      close: async () => {
-        await outboxHeartbeatScheduler.stop();
-      },
-    });
-  }
   if (scheduler) {
     gracefulCloseables.push({
       name: "scheduler",
@@ -1357,6 +1300,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           sendSlackBot: async () => {
             /* test no-op */
           },
+          sendWebhook: async () => ({ status: 200 }),
         },
       };
       return {
@@ -1514,6 +1458,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],
+      automations: {
+        recordTriggerMatch: noop,
+      } as AppCommands["automations"],
       scenarioExecutionHandle: {
         reactor: {
           name: "scenarioExecution",

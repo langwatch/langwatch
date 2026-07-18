@@ -7,9 +7,9 @@ import { Html } from "@react-email/html";
 import { Img } from "@react-email/img";
 import { render } from "@react-email/render";
 import { createHash } from "crypto";
-import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
-import type { TriggerData } from "~/pages/api/cron/triggers/types";
-import { toDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import { EMAIL_RX } from "@langwatch/automations/providers/email";
+import type { TriggerData } from "~/server/app-layer/automations/trigger.types";
+import { toDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { env } from "../../env.mjs";
 import { computeDefaultFrom, sendEmail } from "./emailSender";
 import {
@@ -216,6 +216,11 @@ async function sendPerRecipient({
   recordRecipientSent?: (recipientHash: string) => Promise<void>;
 }): Promise<void> {
   const baseHost = env.BASE_HOST;
+  // Defense in depth at the boundary: every template context builder strips
+  // CR/LF from the fields it interpolates, but the subject is assembled from
+  // free-form values in several places — a newline here becomes an injected
+  // SMTP header no matter which builder produced it.
+  subject = subject.replace(/[\r\n\0]+/g, " ");
   const noReplyTo = buildTriggerNoReplyAddress({
     defaultFrom: computeDefaultFrom(),
     triggerId,

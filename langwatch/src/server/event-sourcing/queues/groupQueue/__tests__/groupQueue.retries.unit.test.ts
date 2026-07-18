@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DispatchError } from "../../../outbox/dispatchError";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import {
   ConfigurationError,
   categorizeError,
@@ -8,7 +8,7 @@ import {
   SecurityError,
   ValidationError,
 } from "../../../services/errorHandling";
-import { isRetryableJobError } from "../groupQueue";
+import { isRetryableJobError, retryBackoffMsFor } from "../groupQueue";
 
 describe("groupQueue retry categorization", () => {
   describe("when error is a ValidationError", () => {
@@ -106,6 +106,31 @@ describe("groupQueue retry categorization", () => {
 
         expect(isRetryableJobError(error)).toBe(true);
       });
+    });
+  });
+});
+
+describe("groupQueue retry backoff", () => {
+  describe("when a retryable dispatch error carries Retry-After", () => {
+    it("uses the receiver delay when it exceeds exponential backoff", () => {
+      const error = new DispatchError({
+        message: "rate limited",
+        retryable: true,
+        retryAfterMs: 90_000,
+      });
+
+      expect(retryBackoffMsFor({ attempt: 1, error })).toBe(90_000);
+    });
+
+    it("keeps exponential backoff when Retry-After is shorter", () => {
+      const baseline = retryBackoffMsFor({ attempt: 3, error: new Error() });
+      const error = new DispatchError({
+        message: "retry soon",
+        retryable: true,
+        retryAfterMs: 1,
+      });
+
+      expect(retryBackoffMsFor({ attempt: 3, error })).toBe(baseline);
     });
   });
 });

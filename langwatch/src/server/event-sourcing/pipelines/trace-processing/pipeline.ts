@@ -1,7 +1,8 @@
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { definePipeline } from "../../";
-import type { OutboxReactorDefinition } from "../../outbox/outboxReactor.types";
+import type { TriggerContext } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
@@ -43,6 +44,10 @@ import type {
   RecordLogCommandData,
   RecordSpanCommandData,
 } from "./schemas/commands";
+import {
+  ORIGIN_RESOLVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+} from "./schemas/constants";
 import type { TraceProcessingEvent } from "./schemas/events";
 import type { NormalizedLogRecord } from "./schemas/logRecords";
 import type { NormalizedMetricRecord } from "./schemas/metricRecords";
@@ -83,33 +88,16 @@ export interface TraceProcessingPipelineDeps {
     TraceProcessingEvent,
     TraceSummaryData
   >;
-  /** PERSIST-class branch of the alert trigger, routed through the
-   *  framework's `.withOutbox` plumbing (ADR-030 + ADR-035). Emits settle
-   *  payloads stamped `actionClass: "persist"`; the dispatcher's cadence
-   *  stage runs `dispatchTriggerAction` for them. */
-  alertTriggerReactor: OutboxReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  /** NOTIFY-class branch of the alert trigger, routed through the
-   *  framework's `.withOutbox` plumbing (ADR-030). Always provided;
-   *  the framework adapter no-ops on process roles without an outbox
-   *  runtime, so unconditional registration is safe. */
-  alertTriggerNotifyOutboxReactor: OutboxReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  /**
-   * ADR-034 Phase 5: real-time path for custom-graph threshold alerts.
-   * Attached on `traceAnalytics` (the slim fold) so it fires on every
-   * slim-fold update; debounced per (triggerId, projectId) inside the
-   * reactor's `decide`. Flag-gated per project — disabled = empty
-   * decide; cron handles the project's graph triggers as today.
-   */
-  graphTriggerEvaluationOutboxReactor: OutboxReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
+  automations: {
+    triggerMatchHandler: (
+      event: TraceProcessingEvent,
+      context: TriggerContext<TraceSummaryData>,
+    ) => Promise<void>;
+    graphActivityHandler: (
+      event: TraceProcessingEvent,
+      context: { tenantId: string },
+    ) => Promise<void>;
+  };
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
   claudeCodeSpanSyncReactor: ReactorDefinition<TraceProcessingEvent>;
   customerIoTraceSyncReactor?: ReactorDefinition<
@@ -233,17 +221,26 @@ export function createTraceProcessingPipeline(
       "experimentMetricsSync",
       deps.experimentMetricsSyncReactor,
     )
-    .withOutbox("traceSummary", "alertTrigger", deps.alertTriggerReactor)
-    .withOutbox(
-      "traceSummary",
-      "alertTriggerNotifyOutbox",
-      deps.alertTriggerNotifyOutboxReactor,
-    )
-    .withOutbox(
-      "traceAnalytics",
-      "graphTriggerEvaluation",
-      deps.graphTriggerEvaluationOutboxReactor,
-    )
+    .withSubscriber("triggerMatch", {
+      fold: "traceSummary",
+      events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
+      delay: 30_000,
+      ttl: 30_000,
+      handler: (event, context) =>
+        deps.automations.triggerMatchHandler(event, context),
+    })
+    .withSubscriber("graphTriggerActivity", {
+      events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
+      delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+      dedup: {
+        makeId: (event) => `graph-trigger-activity:${event.tenantId}`,
+        ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+        extend: false,
+        replace: false,
+      },
+      handler: (event, context) =>
+        deps.automations.graphActivityHandler(event, context),
+    })
     .withReactor(
       "spanStorage",
       "spanStorageBroadcast",

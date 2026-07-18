@@ -75,11 +75,3 @@ Feature: Reactors
   Scenario: The evaluation trigger declines a synthetic span before enqueue
     Given a synthetic span event on a trace with a resolved origin
     Then the evaluation trigger declines to react
-
-  # The outbox adapter wraps a reactor for the outbox pipeline; its own
-  # relevance check must still gate dispatch the same way, whether or not an
-  # outbox runtime is present.
-  Scenario: An outbox reactor's relevance check reaches the dispatcher
-    Given an outbox reactor that declines to react
-    When it is adapted for the pipeline, with and without an outbox runtime
-    Then the adapted reactor declines to react as well

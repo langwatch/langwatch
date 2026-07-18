@@ -52,6 +52,9 @@ vi.mock("~/utils/api", () => ({
       getRecentFires: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
       },
+      getWebhookDeliveries: {
+        useQuery: () => ({ data: [], isLoading: false, error: null }),
+      },
     },
     graphs: {
       getById: {

@@ -64,5 +64,9 @@ export interface ProcessDefinition<State> {
   /** State an unseen process key starts from. */
   initialState: State;
   /** Pure: no I/O, no clocks, no projection reads. */
-  evolve(params: { previousState: State; input: ProcessInput }): Evolution<State>;
+  evolve(params: {
+    previousState: State;
+    input: ProcessInput;
+    ref: ProcessRef;
+  }): Evolution<State>;
 }

@@ -290,11 +290,16 @@ export class PrismaProcessStore implements ProcessStore {
     now: number;
     limit: number;
     leaseDurationMs: number;
+    processNames?: readonly string[];
   }): Promise<LeasedOutboxMessageRecord[]> {
     if (params.limit <= 0) return [];
+    if (params.processNames && params.processNames.length === 0) return [];
     const now = asDate(params.now);
     const leasedUntil = asDate(params.now + params.leaseDurationMs);
     const leaseBatchToken = nanoid();
+    const processNameFilter = params.processNames
+      ? Prisma.sql`AND "processName" IN (${Prisma.join([...params.processNames])})`
+      : Prisma.empty;
     const rows = await this.prisma.$transaction(async (tx) => {
       return await tx.$queryRaw<ProcessManagerOutbox[]>(Prisma.sql`
         WITH candidates AS (
@@ -303,6 +308,7 @@ export class PrismaProcessStore implements ProcessStore {
           WHERE "status" = 'pending'::"ProcessManagerOutboxStatus"
             AND "nextAttemptAt" <= ${now}
             AND ("leasedUntil" IS NULL OR "leasedUntil" <= ${now})
+            ${processNameFilter}
           ORDER BY "nextAttemptAt" ASC, "createdAt" ASC, "id" ASC
           FOR UPDATE SKIP LOCKED
           LIMIT ${params.limit}
@@ -368,8 +374,13 @@ export class PrismaProcessStore implements ProcessStore {
   async findDueWakes(params: {
     now: number;
     limit: number;
+    processNames?: readonly string[];
   }): Promise<DueWake[]> {
     if (params.limit <= 0) return [];
+    if (params.processNames && params.processNames.length === 0) return [];
+    const processNameFilter = params.processNames
+      ? Prisma.sql`AND "processName" IN (${Prisma.join([...params.processNames])})`
+      : Prisma.empty;
     // Wake scanning is intentionally cross-project worker infrastructure;
     // every returned row still carries its project-scoped process identity.
     const rows = await this.prisma.$queryRaw<ProcessManagerInstance[]>(
@@ -377,6 +388,7 @@ export class PrismaProcessStore implements ProcessStore {
         SELECT *
         FROM "ProcessManagerInstance"
         WHERE "nextWakeAt" <= ${asDate(params.now)}
+        ${processNameFilter}
         ORDER BY "nextWakeAt" ASC, "processName" ASC,
                  "projectId" ASC, "processKey" ASC
         LIMIT ${params.limit}
@@ -397,5 +409,26 @@ export class PrismaProcessStore implements ProcessStore {
             },
           ],
     );
+  }
+
+  async deleteDispatchedBefore(params: {
+    processName: string;
+    before: number;
+  }): Promise<number> {
+    // Cross-tenant retention sweep: this prunes dispatched outbox rows for a
+    // process name across every project, so it has no `projectId` predicate
+    // and the multitenancy guard would otherwise throw on every scheduled
+    // prune tick. Opt out via the guard's sanctioned `-- @tenancy:` marker
+    // (see dbMultiTenancyProtection.ts and the scheduler's due-scan in
+    // scheduled-job.repository.ts for the same pattern) — this is a
+    // system-owned maintenance sweep, not a tenant-scoped read/write.
+    const affected = await this.prisma.$executeRaw`
+      DELETE FROM "ProcessManagerOutbox"
+      WHERE "processName" = ${params.processName}
+        AND "status" = 'dispatched'::"ProcessManagerOutboxStatus"
+        AND "dispatchedAt" < ${asDate(params.before)}
+      -- @tenancy: process-manager outbox retention cross-tenant sweep (system-owned maintenance)
+    `;
+    return affected;
   }
 }

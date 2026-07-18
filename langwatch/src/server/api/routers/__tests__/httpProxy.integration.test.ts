@@ -9,13 +9,17 @@
  * focus on testing the HTTP proxy functionality.
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type * as SsrfProtectionModule from "~/utils/ssrfProtection";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
-// Mock ssrfSafeFetch to bypass SSRF validation in tests
+// Partially mock ssrfSafeFetch to bypass SSRF validation in tests, keeping the
+// real module's other exports (e.g. createSSRFValidator, evaluated at module
+// load by unrelated code the appRouter transitively imports).
 const mockSsrfSafeFetch = vi.fn();
-vi.mock("~/utils/ssrfProtection", () => ({
+vi.mock("~/utils/ssrfProtection", async (importOriginal) => ({
+  ...(await importOriginal<typeof SsrfProtectionModule>()),
   ssrfSafeFetch: (...args: unknown[]) => mockSsrfSafeFetch(...args),
 }));
 

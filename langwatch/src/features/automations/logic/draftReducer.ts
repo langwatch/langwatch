@@ -2,21 +2,21 @@ import type { AlertType, TriggerAction } from "@prisma/client";
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
   type NotificationCadence,
-} from "~/automations/cadences";
+} from "@langwatch/automations/cadences";
 import {
   type AllSlices,
   CLIENT_PROVIDERS,
   initialSlices,
   type SliceFor,
-} from "~/automations/providers/client";
-import { isNotifyEntry } from "~/automations/providers/types";
+} from "~/features/automations/providers/registry";
+import { isNotifyEntry } from "~/features/automations/providers/types";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import {
   type GraphAlertOperator,
   type GraphAlertTimePeriod,
   extractGraphAlertFromTriggerRow as parseGraphAlertRow,
-} from "~/server/app-layer/triggers/graph-alert.builder";
-import { reportSourceSchema } from "~/server/app-layer/triggers/report.builder";
+} from "~/server/app-layer/automations/graph-alert.builder";
+import { reportSourceSchema } from "~/server/app-layer/automations/report.builder";
 import type { FilterField } from "~/server/filters/types";
 import { describeCron, isValidCron } from "./reportSchedule";
 
@@ -321,7 +321,7 @@ export function presetLabels(
 
 export function notifyChannel(
   draft: AutomationDraft,
-): "email" | "slack" | null {
+): "email" | "slack" | "webhook" | null {
   if (!draft.action) return null;
   const provider = CLIENT_PROVIDERS[draft.action];
   return isNotifyEntry(provider) ? provider.client.channel : null;
@@ -356,16 +356,24 @@ export function buildTestFirePayload({
   channel,
   webhook,
   botDestination,
+  webhookDestination,
   automationId,
   graphName,
   seriesLabel,
 }: {
   draft: AutomationDraft;
   projectId: string;
-  channel: "email" | "slack";
+  channel: "email" | "slack" | "webhook";
   webhook: string | null;
   /** Slack bot connection: test-fires via the Web API to this channel. */
   botDestination?: { channelId: string; botToken: string | null } | null;
+  /** ADR-040 generic HTTP destination: the full request the test fire sends. */
+  webhookDestination?: {
+    url: string;
+    method: "POST" | "PUT" | "PATCH";
+    headers: Record<string, string>;
+    bodyTemplate: string | null;
+  } | null;
   /** The saved automation being edited, so a kept bot token can be resolved. */
   automationId?: string;
   graphName?: string | null;
@@ -383,6 +391,7 @@ export function buildTestFirePayload({
     draft: templatesFromDraft(draft),
     webhook,
     botDestination: botDestination ?? null,
+    webhookDestination: webhookDestination ?? null,
     ...(automationId ? { automationId } : {}),
     graphAlert: isGraphAlert
       ? {

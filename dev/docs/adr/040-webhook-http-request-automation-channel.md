@@ -8,9 +8,9 @@
 
 Automations today notify through two channels — **Email** (`SEND_EMAIL`) and
 **Slack** (`SEND_SLACK_MESSAGE`). Both are `category: "notify"` providers
-(`src/automations/providers/`, ADR-037), render a customer-authored Liquid
-template (ADR-036), and ride the transactional outbox (ADR-030) on the trace path
-and the graph-alert dispatch helper on the alert path (PR #5015 / ADR-034 Ph 8.1).
+(`packages/automations/src/providers/` + per-side registries, ADR-037), render a customer-authored Liquid
+template (ADR-036), and ride the ADR-052 automation process managers on the
+trace path and graph-alert dispatch helper on the alert path.
 
 Customers want to drive their *own* systems off an automation: page PagerDuty,
 open a Jira ticket, kick a CI job, push into a warehouse, fan out through an
@@ -35,7 +35,7 @@ primitive unless fenced. ADR-030 foreshadowed exactly this work:
 
 The framework mostly exists; the job is to *compose* it, not invent it:
 
-- **Provider registry** (`src/automations/providers/types.ts`) — a new channel is
+- **Provider registry** (`packages/automations/src/providers/types.ts` + per-side registries) — a new channel is
   one directory + three registry lines.
 - **SSRF-safe outbound fetch**: `src/utils/ssrfProtection.ts` (`validateUrlForSSRF`
   + `ssrfSafeFetch` + `fetchWithResolvedIp`), with cloud-metadata denylist,
@@ -47,8 +47,8 @@ The framework mostly exists; the job is to *compose* it, not invent it:
 - **Encryption at rest** (`src/utils/encryption.ts`, AES-256-GCM), used by
   `ProjectSecret.encryptedValue` (`prisma/schema.prisma:1035`) and
   `LangyGithubToken.encryptedRefreshToken`.
-- **Outbox retry / backoff / dead-letter + operator audit** (`ReactorOutbox`,
-  `prisma/schema.prisma:2880`; `src/server/event-sourcing/outbox/dispatcher.ts`).
+- **Process-manager retry / backoff / dead-letter state**
+  (`ProcessManagerOutbox`; ADR-052).
 - **Fire history** (`TriggerSent` + `TriggerFireHistoryService`, in
   `ViewAutomationDrawer.tsx`).
 
@@ -66,10 +66,10 @@ automations drawer. Ship it dark behind a `release_webhook_automations` flag.
 
 `SEND_WEBHOOK` is a **`category: "notify"`** provider — it renders customer
 content and coalesces into digests like Email/Slack, not a `persist` action. It
-slots in as one new directory `src/automations/providers/definitions/webhook/`
+slots in as one new provider file per side (shared schema, client UI, server secret handling)
 with the three standard peers, one registry line each in
-`providers/{server,client}.ts`, and one new key in `SliceFor` / `PreviewFor` /
-`initialSlices()` (`providers/client.ts:19-33,92-100`).
+the per-side registries, and one new key in `SliceFor` / `PreviewFor` /
+`initialSlices()`.
 
 **Enum + classification (one migration + two set edits):** add `SEND_WEBHOOK` to
 `enum TriggerAction` (`prisma/schema.prisma:736`) and to `NOTIFY_TRIGGER_ACTIONS`
@@ -292,7 +292,7 @@ atomic `ssrfSafeFetch`), the primitive `httpProxy.ts:187` already ships to prod.
   the whole worker pool waiting on 10-second timeouts.
 
 **Where the sender lives:** a single reusable module
-`src/server/triggers/sendWebhook.ts` (sibling to `sendSlackWebhook.ts`), wrapping
+`src/server/app-layer/automations/delivery/sendWebhook.ts` (sibling to `sendSlackWebhook.ts`), wrapping
 `ssrfProtection` + signing + size/timeout caps + `DispatchError` classification
 (`toDispatchError`, `sendSlackWebhook.ts:143`). This is the "one outbound utility
 every future customer-webhook dispatch shares" ADR-030 asked for.
@@ -301,16 +301,14 @@ every future customer-webhook dispatch shares" ADR-030 asked for.
 
 ### 5. Retries & backoff
 
-**Ride the existing `ReactorOutbox` / GroupQueue retry machinery for durability +
-scheduling; record each HTTP attempt as a `WebhookDelivery` row (§6); do NOT
-hand-roll a second attempt loop.** The outbox already gives exponential backoff,
-`maxAttempts` (default 8, `schema.prisma:2900`), `nextAttemptAt`, dead-letter
-(`status: dead`), and an operator surface — reusing it is strictly less code and
-one operational story. The sender throws the typed `DispatchError` (ADR-027) with
-`retryable` set per the HTTP outcome; the queue handles backoff and
-`PgOutboxAuditAdapter` mirrors dispatch-level state to `ReactorOutbox`. The
-per-attempt HTTP detail (status, snippet, latency) the outbox doesn't model is
-written into `WebhookDelivery`.
+**Ride the `triggerSettlement` process manager's leased
+`ProcessManagerOutbox` for durability and retry scheduling; record each HTTP
+attempt as a `WebhookDelivery` row (§6); do not hand-roll a second attempt
+loop.** The process outbox provides bounded exponential backoff,
+`maxAttempts: 8`, leasing, and dead-letter state. The sender throws the typed
+`DispatchError` (ADR-027); terminal failures complete as logged drops while
+retryable failures are re-attempted, with `Retry-After` as a backoff floor.
+Per-attempt HTTP detail (status, snippet, latency) lives in `WebhookDelivery`.
 
 **Retry vs terminal classification:**
 
@@ -349,10 +347,9 @@ dedupe — the request-level analog of the internal `TriggerSent` at-most-once c
 
 ### 6. Deliverability report / delivery log
 
-**A new per-attempt table `WebhookDelivery`.** `ReactorOutbox` is one row per
-*dispatch* and its `renderDiagnostics` blob (`schema.prisma:2910`) is
-render-health, not delivery detail — it cannot express "attempt 3 got a 502 after
-1.2 s". `TriggerSent` is the match-claim ledger. A webhook's value proposition *is*
+**A new per-attempt table `WebhookDelivery`.** `ProcessManagerOutbox` is one
+row per dispatch and cannot express "attempt 3 got a 502 after 1.2 s".
+`TriggerSent` is the match-claim ledger. A webhook's value proposition *is*
 the deliverability report (every retry, status, body, latency), so it earns its
 own table.
 
@@ -367,7 +364,7 @@ model WebhookDelivery {
   attempt         Int                        // 1-based
   requestMethod   String
   requestUrl      String                     // stored as-is (no secret in a URL by policy)
-  requestHeaders  Json                       // REDACTED: signature/auth/api-key values → "***"
+  requestHeaders  Json                       // REDACTED: every custom value → "***"; names retained
   responseStatus  Int?                       // null when no response (timeout/DNS)
   responseBody    String?                    // size-capped snippet (≤ 4 KB)
   latencyMs       Int?
@@ -383,9 +380,10 @@ model WebhookDelivery {
 enum WebhookDeliveryOutcome { success  retryable  terminal  pending }
 ```
 
-- **Redaction (mandatory).** `requestHeaders` stores signature, `Authorization`,
-  and api-key header values masked to `***` — which headers were sent, never the
-  secret material (same as `createAgentTestTrace`'s sanitization in `httpProxy.ts`).
+- **Redaction (mandatory).** `requestHeaders` keeps the custom header names but
+  masks every value to `***`, regardless of whether its name looks sensitive.
+  Custom values are all treated as secret material and never reach control-plane
+  Postgres.
 - **Response-body sensitivity.** The snippet is the *customer's own endpoint's*
   response, not LangWatch data — but it still lands in control-plane Postgres, so
   cap it hard (≤ 4 KB), truncate with an ellipsis, and document retention. It lets
@@ -477,8 +475,8 @@ path" rule.
 - **Why HMAC over body + timestamp, not body alone.** Body-only signatures are
   replayable; the timestamp gives the receiver a cheap replay window without us
   holding receiver state, and matches what Stripe/GitHub consumers already verify.
-- **Why a dedicated `WebhookDelivery` table.** `ReactorOutbox` is dispatch-grain
-  and audit-owned; `TriggerSent` is the claim ledger. Per-attempt HTTP forensics
+- **Why a dedicated `WebhookDelivery` table.** `ProcessManagerOutbox` is
+  dispatch-grain; `TriggerSent` is the claim ledger. Per-attempt HTTP forensics
   is a genuinely new grain and the feature's headline value — it earns a table, not
   a JSON blob on an existing row.
 - **What we compromise.** More Postgres write volume (one row per attempt) and a
@@ -509,6 +507,88 @@ path" rule.
 - **Deferred to fast-follow:** OAuth client-credentials, mTLS, dual-secret rotation,
   non-JSON content types, and a receiver-side "verify signature" doc snippet.
 
+## Amendment: what PR #5807 shipped vs deferred (2026-07)
+
+The first implementation PR (#5807, "Phases 1–3") lands the provider, the
+SSRF-fenced sender, dispatch on all three paths, the retry/terminal
+classification, and per-fire idempotency on the graph-alert path. Two
+deliberate deltas against the text above:
+
+- **Header secrets ship encrypted, but as headers — not the §3 auth union.**
+  Instead of the auth-mode selector + `ProjectSecret` ref, v1 keeps the plain
+  key/value headers editor and applies the secrecy discipline directly:
+  values are AES-256-GCM encrypted into `actionParams.headersEncrypted`
+  (`definitions/webhook/secret.ts`, same `encrypt`/`decrypt` as the Slack bot
+  token), never returned to the client (reads echo names with a
+  `__kept__` sentinel), and decrypted just before dispatch. The
+  `ProjectSecret`-ref auth union remains the target shape for when HMAC
+  signing lands.
+  Rows created before header encryption may still contain a plaintext
+  `actionParams.headers` record. Dispatch must read that compatibility shape,
+  so those values remain exposed in Postgres until the automation is saved
+  again. The next save resolves kept header values, writes
+  `headersEncrypted`, and removes the plaintext record. A bulk backfill is
+  deferred because encrypting requires the deployment credential secret; until
+  then operators should treat legacy Trigger JSON backups and database access
+  as credential-bearing.
+- **Graph alerts no longer dead-letter `SEND_WEBHOOK`** — the third notify
+  branch in `dispatchGraphAlertAction`, gated per-fire on the endpoint
+  identity. On the cron parity path, a terminal failure CONSUMES the fire
+  (no per-tick re-post to a misconfigured endpoint); only retryable failures
+  leave it open for the next tick.
+
+**Phase 3 completed in a follow-up (also #5807):** `Retry-After` →
+`DispatchError.retryAfterMs` (parsed delta-seconds + HTTP-date, capped at 1h;
+honored by the GroupQueue as a backoff FLOOR); the stable `X-LangWatch-Event-Id`
+(trace path from the process-outbox message key, graph-alert path from the fire
+digest — identical across partial-claim retries so receivers dedupe); and a per-project hourly
+dispatch cap (`webhook-dispatch:{projectId}`).
+
+**Phase 4 shipped as a standalone table (§6), narrower than planned — no
+request content is persisted at all.** `WebhookDelivery` + a
+`WebhookDeliveryOutcome` enum, one row per attempt written by `deliverWebhook`
+(`src/server/app-layer/automations/delivery/deliverWebhook.ts`, send +
+classify + log as a unit). Unlike the §6 shape above, the row carries no
+`requestMethod`/`requestUrl`/`requestHeaders` — only `responseStatus`,
+`latencyMs`, `error`, and, on a failed attempt, the receiver's truncated
+failure `response` (`{ body, headers, retryAfterMs }`, capped at 4 KB).
+
+**Decision: the receiver's response is stored verbatim — no redaction.**
+The response side of a failed delivery is the receiver's own output; if an
+endpoint echoes a secret back in its error body, that is the endpoint's bug
+and masking it would only hide from the operator what the receiver actually
+said (the exact thing this log exists to show). Any masking scheme is also
+inherently best-effort — an echo that is re-encoded, cased, or truncated
+evades exact-match scrubbing, so a scrub would add code and a false sense of
+safety without a real guarantee. The boundary is drawn one level up instead:
+our *request* content (URL, headers, body — where our customer's secrets
+actually live) is never persisted in any form, and the stored response is
+plaintext with a bounded lifetime (30-day prune). This matches the
+industry-baseline shape (GitHub/Stripe webhook delivery logs). A `getWebhookDeliveries` read procedure feeds
+the drawer's "Recent deliveries" drill-down, and a 30-day prune runs as the
+daily `webhookDeliveryPrune` scheduled process manager on the worker
+(ADR-052); the K8s cron cleanup route + chart CronJob were removed along with
+the rest of the automations cron machinery.
+
+> **Known design debt / future direction.** `WebhookDelivery` is a
+> webhook-only, append-per-attempt log that sits *alongside*
+> `ProcessManagerOutbox` (the generic delivery engine — one mutable row per
+> dispatch) and `TriggerSent` (the idempotency/incident claim). The three answer
+> different questions today, but the deliverability report arguably belongs
+> *in* the process outbox's audit mechanism so every channel gets delivery
+> history, not just webhooks. Deferred deliberately: revisit unifying the
+> per-attempt log into the outbox rather than growing a parallel table.
+
+**Still deferred:** HMAC request signing (§3, including the signing toggle UI)
+and the `ProjectSecret`-ref auth union — the only remaining Phase 2 gap.
+
+> **Note (2026-07):** the "cron parity" webhook action this ADR's migration
+> plan describes (§7, `pages/api/cron/triggers/actions/sendWebhookRequest.ts`)
+> was removed shortly after, when the K8s graph-alert cron itself was retired
+> (ADR-034 — the event-sourced path is now the sole graph-alert path). Webhook
+> dispatch rides only the outbox + `dispatchGraphAlertAction` now; the
+> planning references to a cron action above are historical.
+
 ## References
 
 - [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) —
@@ -534,5 +614,6 @@ path" rule.
   encryption-at-rest pattern for the HMAC secret and auth tokens.
 - `src/server/mailer/unsubscribeToken.ts` / `triggerNoReply.ts` — HMAC keyed-hash +
   `timingSafeEqual` pattern the signature follows.
-- `src/automations/providers/` — the registry (`types.ts`, `client.ts`,
-  `server.ts`) and the Slack definition the webhook provider is shaped after.
+- `packages/automations/src/providers/` (the `@langwatch/automations` workspace
+  package) + per-side registries — (`types.ts`, `registry.ts`, `server.ts`) and
+  the Slack definition the webhook provider is shaped after.

@@ -127,8 +127,6 @@ describe("langy-conversation-processing pipeline shape", () => {
 
         expect(pipeline.foldReactors.size).toBe(0);
         expect(pipeline.mapReactors.size).toBe(0);
-        expect(pipeline.foldOutboxReactors.size).toBe(0);
-        expect(pipeline.mapOutboxReactors.size).toBe(0);
       });
     });
 

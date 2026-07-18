@@ -42,12 +42,12 @@ import type { TokenizerService } from "./traces/tokenizer.service";
 import type { TraceListService } from "./traces/trace-list.service";
 import type { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import type { TraceSummaryService } from "./traces/trace-summary.service";
-import type { EmailSuppressionService } from "./triggers/emailSuppression.service";
-import type { TriggerService } from "./triggers/trigger.service";
+import type { EmailSuppressionService } from "./automations/emailSuppression.service";
+import type { TriggerService } from "./automations/trigger.service";
 import type {
   TestFireResult,
   TestFireTriggerInput,
-} from "./triggers/trigger-template.service";
+} from "./automations/trigger-template.service";
 import type { UsageService } from "./usage/usage.service";
 
 export interface DataRetentionDependencies {
