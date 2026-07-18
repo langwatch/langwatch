@@ -63,7 +63,7 @@ import type { ReplayMarkerChecker } from "./replayMarkerCheck";
  * events one at a time (see initializeFoldQueues below), so raising it changes
  * throughput only, never correctness.
  */
-const DEFAULT_FOLD_COALESCE_MAX_BATCH = 500;
+export const DEFAULT_FOLD_COALESCE_MAX_BATCH = 500;
 const SLOW_PROJECTION_OPERATION_MS = 5_000;
 
 /**

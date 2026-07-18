@@ -41,6 +41,20 @@ import {
   QueueError,
 } from "../../services/errorHandling";
 import { getBackoffMs, JOB_RETRY_CONFIG } from "../shared";
+
+/**
+ * How long the group's retry-chain counter survives without a refresh.
+ *
+ * It is re-set on every retry, so it only has to outlive ONE backoff — but it
+ * MUST outlive the longest one. Derived from the retry config rather than
+ * picked: the first version used `activeTtlSec * 2` (600s), which is exactly
+ * `maxBackoffMs`, so from roughly attempt 12 the counter expired during the
+ * wait, the retry read as a fresh delivery, and the fold re-applied the batch
+ * it had already folded. Pinned by retryChainInvariants.unit.test.ts.
+ */
+export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil(
+  (JOB_RETRY_CONFIG.maxBackoffMs / 1000) * 3,
+);
 import { GroupQueueDispatcher } from "./dispatcher";
 import { EnvelopeBlobLifecycle } from "./envelopeBlobLifecycle";
 import {
@@ -1380,6 +1394,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * silently restarts the retry budget and — for fold projections — looks like a
    * fresh delivery, discarding the record of what the chain already applied.
    */
+  /**
+   * How long the group's chain counter survives without a refresh.
+   *
+   * It is re-set on every retry, so it only has to outlive ONE backoff — but it
+   * MUST outlive the longest one. Derived from the retry config rather than
+   * picked, because the first version used `activeTtlSec * 2` (600s), which is
+   * exactly `maxBackoffMs`: from roughly attempt 12 the backoff is capped at
+   * 600s and the counter expired during the wait, so the retry read as a fresh
+   * delivery and re-applied the batch. Pinned by a test.
+   */
   private groupAttemptKey(groupId: string): string {
     return `${this.queueName}:gq:group:${groupId}:attempt`;
   }
@@ -1407,7 +1431,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         this.groupAttemptKey(groupId),
         String(attempt),
         "EX",
-        GROUP_QUEUE_CONFIG.activeTtlSec * 2,
+        GROUP_ATTEMPT_TTL_SECONDS,
       );
     } catch (err) {
       // Not best-effort. Losing this makes a sibling-led batch read as a fresh
