@@ -751,6 +751,28 @@ describe("GroupStagingScripts", () => {
         await redis.zadd(leaseKey({ hash }), Date.now() + 60_000, token);
       }
 
+      describe("when a genuinely new GQ2 job is staged", () => {
+        it("publishes the staged value and its lease atomically", async () => {
+          const value = gq2Value({ hash: "h-new", token: "t-new" });
+
+          const { isNew } = await scripts.stage(
+            makeJob({
+              stagedJobId: "j-new",
+              groupId: GROUP,
+              jobDataJson: value,
+            }),
+          );
+
+          expect(isNew).toBe(true);
+          expect(
+            await redis.zrange(leaseKey({ hash: "h-new" }), 0, -1),
+          ).toEqual(["t-new"]);
+          expect(
+            await redis.smembers(`${keyPrefix()}blobholders:${TENANT}/h-new`),
+          ).toEqual(expect.arrayContaining(["t-new"]));
+        });
+      });
+
       describe("when a replace squash displaces a staged GQ2 value", () => {
         /** @scenario "A dedup squash leaves no phantom lease and never eagerly reclaims blobs" */
         it("takes the replacement lease, drops the displaced one, and leaves reclaim lazy", async () => {
@@ -1097,9 +1119,10 @@ describe("GroupStagingScripts", () => {
             "tb2",
           ]);
           expect(await redis.exists(leaseKey({ hash: "hb-s3" }))).toBe(0);
-          // Entry 1 was a fresh stage: its lease is the PRODUCER's to take,
-          // not the eval's.
-          expect(await redis.exists(leaseKey({ hash: "hb3" }))).toBe(0);
+          // Entry 1 was a fresh stage: its lease is published in the same eval.
+          expect(await redis.zrange(leaseKey({ hash: "hb3" }), 0, -1)).toEqual([
+            "tb3",
+          ]);
         });
       });
     });

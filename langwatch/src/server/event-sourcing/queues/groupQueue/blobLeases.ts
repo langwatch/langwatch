@@ -3,11 +3,12 @@ import type { Cluster, Redis as IORedis } from "ioredis";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 
 import {
+  BLOB_BACKSTOP_TTL_SECONDS,
   BLOB_LEASE_SET_TTL_SECONDS,
   BLOB_LEASE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
 } from "./blobConstants";
-import { blobHolderSetKey, blobLeaseSetKey } from "./blobKeys";
+import { blobHolderSetKey, blobLeaseSetKey, redisBlobKey } from "./blobKeys";
 import { CachedLuaScript } from "./cachedLuaScript";
 
 const REDIS_NOW_MS_LUA = `
@@ -23,6 +24,7 @@ redis.call("ZADD", KEYS[1], deadlineMs, ARGV[1])
 redis.call("EXPIRE", KEYS[1], ${BLOB_LEASE_SET_TTL_SECONDS})
 redis.call("SADD", KEYS[2], "${LEGACY_HOLDER_LEASE_GUARD}", ARGV[1])
 redis.call("EXPIRE", KEYS[2], ${BLOB_LEASE_SET_TTL_SECONDS})
+if #KEYS == 3 then redis.call("EXPIRE", KEYS[3], ${BLOB_BACKSTOP_TTL_SECONDS}) end
 return deadlineMs
 `;
 
@@ -91,11 +93,23 @@ export class BlobLeases {
     this.leaseTtlSeconds = leaseTtlSeconds;
   }
 
-  private leaseKey(projectId: TenantId, hash: string): string {
+  private leaseKey({
+    projectId,
+    hash,
+  }: {
+    projectId: TenantId;
+    hash: string;
+  }): string {
     return blobLeaseSetKey({ queueName: this.queueName, projectId, hash });
   }
 
-  private legacyHolderKey(projectId: TenantId, hash: string): string {
+  private legacyHolderKey({
+    projectId,
+    hash,
+  }: {
+    projectId: TenantId;
+    hash: string;
+  }): string {
     return blobHolderSetKey({ queueName: this.queueName, projectId, hash });
   }
 
@@ -111,19 +125,38 @@ export class BlobLeases {
     await takeScript.run(
       this.redis,
       2,
-      this.leaseKey(projectId, hash),
-      this.legacyHolderKey(projectId, hash),
+      this.leaseKey({ projectId, hash }),
+      this.legacyHolderKey({ projectId, hash }),
       holderId,
       String(this.leaseTtlSeconds),
     );
   }
 
-  async renew(params: {
+  async renew({
+    projectId,
+    hash,
+    holderId,
+    tier,
+  }: {
     projectId: TenantId;
     hash: string;
     holderId: string;
+    tier: "redis" | "s3";
   }): Promise<void> {
-    await this.take(params);
+    const keys = [
+      this.leaseKey({ projectId, hash }),
+      this.legacyHolderKey({ projectId, hash }),
+    ];
+    if (tier === "redis") {
+      keys.push(redisBlobKey({ queueName: this.queueName, projectId, hash }));
+    }
+    await takeScript.run(
+      this.redis,
+      keys.length,
+      ...keys,
+      holderId,
+      String(this.leaseTtlSeconds),
+    );
   }
 
   async release({
@@ -138,8 +171,8 @@ export class BlobLeases {
     await releaseScript.run(
       this.redis,
       2,
-      this.leaseKey(projectId, hash),
-      this.legacyHolderKey(projectId, hash),
+      this.leaseKey({ projectId, hash }),
+      this.legacyHolderKey({ projectId, hash }),
       holderId,
     );
   }
@@ -162,10 +195,10 @@ export class BlobLeases {
     await transferScript.run(
       this.redis,
       4,
-      this.leaseKey(newProjectId, newHash),
-      this.leaseKey(oldProjectId, oldHash),
-      this.legacyHolderKey(newProjectId, newHash),
-      this.legacyHolderKey(oldProjectId, oldHash),
+      this.leaseKey({ projectId: newProjectId, hash: newHash }),
+      this.leaseKey({ projectId: oldProjectId, hash: oldHash }),
+      this.legacyHolderKey({ projectId: newProjectId, hash: newHash }),
+      this.legacyHolderKey({ projectId: oldProjectId, hash: oldHash }),
       newHolderId,
       oldHolderId,
       String(this.leaseTtlSeconds),
@@ -180,7 +213,11 @@ export class BlobLeases {
     hash: string;
   }): Promise<number> {
     return Number(
-      await countLiveScript.run(this.redis, 1, this.leaseKey(projectId, hash)),
+      await countLiveScript.run(
+        this.redis,
+        1,
+        this.leaseKey({ projectId, hash }),
+      ),
     );
   }
 }
