@@ -1,12 +1,24 @@
 package config
 
 import (
+	"errors"
 	"math"
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// stubLocalhostDNS pins the .localhost resolver so these tests don't depend
+// on the machine's DNS handling of the .localhost TLD (native loopback on
+// macOS/systemd-resolved, NXDOMAIN elsewhere).
+func stubLocalhostDNS(t *testing.T, ips []net.IP, err error) {
+	t.Helper()
+	prev := lookupHostIPs
+	lookupHostIPs = func(string) ([]net.IP, error) { return ips, err }
+	t.Cleanup(func() { lookupHostIPs = prev })
+}
 
 // The debug collector is a tenant-agnostic copy of every span the service
 // produces. The only deployments where that is acceptable are ones where the
@@ -14,6 +26,7 @@ import (
 // guard is on the destination address, never on what an environment calls
 // itself.
 func TestResolve_AcceptsOnMachineDebugCollectors(t *testing.T) {
+	stubLocalhostDNS(t, []net.IP{net.ParseIP("127.0.0.1")}, nil)
 	for _, endpoint := range []string{
 		"http://localhost:4318",
 		"http://LocalHost:4318",
@@ -29,7 +42,27 @@ func TestResolve_AcceptsOnMachineDebugCollectors(t *testing.T) {
 	}
 }
 
+// RFC 6761 recommends but does not guarantee that .localhost stays on-box: a
+// corporate wildcard, a search domain, or an /etc/hosts entry can point one
+// off the machine. The name is therefore resolved and every answer must be
+// loopback — and a name that does not resolve at all is refused rather than
+// trusted on suffix.
+func TestResolve_RejectsLocalhostNamesThatResolveOffBox(t *testing.T) {
+	stubLocalhostDNS(t, []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("10.0.12.3")}, nil)
+	o := OTel{DebugCollectorEndpoint: "http://observability.langwatch.localhost:4318"}
+
+	assert.Error(t, o.Resolve("local"))
+}
+
+func TestResolve_RejectsLocalhostNamesThatDoNotResolve(t *testing.T) {
+	stubLocalhostDNS(t, nil, errors.New("no such host"))
+	o := OTel{DebugCollectorEndpoint: "http://observability.langwatch.localhost:4318"}
+
+	assert.Error(t, o.Resolve("local"))
+}
+
 func TestResolve_RejectsOffBoxDebugCollectors(t *testing.T) {
+	stubLocalhostDNS(t, []net.IP{net.ParseIP("127.0.0.1")}, nil)
 	for _, endpoint := range []string{
 		"http://collector.observability.svc.cluster.local:4318",
 		"https://otlp.grafana.net",

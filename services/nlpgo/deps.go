@@ -30,20 +30,20 @@ import (
 // The deprecated `OTEL_OTLP_ENDPOINT` fallback is kept for environments
 // that predate LANGWATCH_ENDPOINT wiring.
 func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelsetup.Provider, error) {
+	// LANGWATCH_ENDPOINT is the ONLY source for the customer router. The
+	// pre-unification fallback to OTEL_OTLP_ENDPOINT was removed when that
+	// name became the deprecated alias for the INTERNAL collector: one var
+	// carrying both meanings is exactly how a config mistake inverts a
+	// tenant boundary silently — an operator pointing "nlpgo's own
+	// telemetry" at the internal stack would have routed customer studio
+	// content there instead. Losing telemetry is recoverable; misrouting it
+	// is not, so an unset LANGWATCH_ENDPOINT fails toward exporting nothing,
+	// loudly.
 	endpoint := strings.TrimSpace(os.Getenv("LANGWATCH_ENDPOINT"))
 	if endpoint != "" {
 		endpoint = strings.TrimRight(endpoint, "/") + "/api/otel/v1/traces"
-	} else {
-		endpoint = cfg.OTel.OTLPEndpoint
-		if endpoint != "" && !strings.HasSuffix(endpoint, "/v1/traces") {
-			endpoint = strings.TrimRight(endpoint, "/") + "/v1/traces"
-		}
-	}
-	if cfg.OTel.ExporterEndpoint != "" || cfg.OTel.ExporterTracesEndpoint != "" {
-		// Loud, not silent: the official exporter vars have no effect on
-		// nlpgo until it grows an ops-span pipeline with a content
-		// allowlist (like aigateway's). Tracked as follow-up work.
-		clog.Get(ctx).Warn("nlpgo ignores OTEL_EXPORTER_OTLP_ENDPOINT: spans are routed per-tenant to the LangWatch ingest derived from LANGWATCH_ENDPOINT; the debug collector still applies for local development")
+	} else if cfg.OTel.OTLPEndpoint != "" || cfg.OTel.ExporterEndpoint != "" || cfg.OTel.ExporterTracesEndpoint != "" {
+		clog.Get(ctx).Warn("nlpgo customer trace export is OFF: set LANGWATCH_ENDPOINT — the OTEL_* endpoints configure LangWatch's own telemetry and never route customer traces (an nlpgo ops-span pipeline is tracked as follow-up; the debug collector still applies for local development)")
 	}
 	// NLPGO_SPAN_SYNC=1 swaps the per-tenant BatchSpanProcessor for a
 	// SimpleSpanProcessor — every span.End() blocks on the OTLP

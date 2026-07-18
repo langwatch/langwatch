@@ -368,10 +368,13 @@ func withTracesPath(endpoint string) string {
 // cannot forge one; a name allowlist would hand the switch to anyone who set
 // ENVIRONMENT=test.
 //
-// Loopback forms only: `localhost` and any `*.localhost` (the portless dev
-// hostnames, which resolve to loopback natively), literal 127.0.0.0/8 and ::1,
-// and `host.docker.internal` for containerised dev stacks. Private ranges are
-// NOT accepted — 10.x and 192.168.x are ordinary in-cluster addresses, so
+// Loopback forms only: `localhost`, literal 127.0.0.0/8 and ::1, `*.localhost`
+// (the portless dev hostnames) — which is additionally RESOLVED and required
+// to answer with loopback addresses only, because RFC 6761 recommends but does
+// not guarantee that resolvers keep .localhost on-box — and
+// `host.docker.internal` for containerised dev stacks (inherently the host's
+// gateway address; the escape hatch's whole point). Private ranges are NOT
+// accepted — 10.x and 192.168.x are ordinary in-cluster addresses, so
 // allowing them would readmit the deployment this check exists to refuse.
 func debugCollectorMustBeLocal(endpoint string) error {
 	u, err := url.Parse(endpoint)
@@ -379,7 +382,25 @@ func debugCollectorMustBeLocal(endpoint string) error {
 		return fmt.Errorf("OTEL_DEBUG_COLLECTOR_ENDPOINT is not a valid URL: %w", err)
 	}
 	host := strings.ToLower(u.Hostname())
-	if host == "localhost" || strings.HasSuffix(host, ".localhost") || host == "host.docker.internal" {
+	if host == "localhost" || host == "host.docker.internal" {
+		return nil
+	}
+	if strings.HasSuffix(host, ".localhost") {
+		ips, err := lookupHostIPs(host)
+		if err != nil || len(ips) == 0 {
+			return fmt.Errorf(
+				"OTEL_DEBUG_COLLECTOR_ENDPOINT host %q did not resolve (%v) — use localhost or 127.0.0.1 instead",
+				host, err,
+			)
+		}
+		for _, ip := range ips {
+			if !ip.IsLoopback() {
+				return fmt.Errorf(
+					"OTEL_DEBUG_COLLECTOR_ENDPOINT host %q resolves to the non-loopback address %s — a .localhost name must stay on this machine",
+					host, ip,
+				)
+			}
+		}
 		return nil
 	}
 	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
@@ -390,6 +411,10 @@ func debugCollectorMustBeLocal(endpoint string) error {
 		u.Host,
 	)
 }
+
+// lookupHostIPs is indirected so tests can pin resolver behavior instead of
+// depending on the machine's DNS handling of .localhost names.
+var lookupHostIPs = net.LookupIP
 
 // mustBeResolved guards every accessor that reads resolved state. A missing
 // Resolve call is a programming error that would otherwise export telemetry

@@ -76,7 +76,15 @@ func ReparentTraces(td ptrace.Traces, conversationID string, turn trace.SpanCont
 // stampResource sets the reserved LangWatch keys, appending "langy" to any
 // existing tag.tags value (comma-separated, the shape the ingest accepts)
 // rather than clobbering a tag the worker legitimately set.
+//
+// It also REMOVES langwatch.origin: that key is LangWatch's provenance marker
+// (pkg/otelsetup stamps platform_internal, the relay's internal copy stamps
+// langy_worker) and the worker — a model-driven, prompt-injectable process —
+// must not be able to brand its spans with it in the customer's project.
+// Ingest-side enforcement keyed on the marker must never trust a
+// worker-supplied value.
 func stampResource(attrs pcommon.Map, conversationID string) {
+	attrs.Remove("langwatch.origin")
 	attrs.PutStr(attrThreadID, conversationID)
 	if existing, ok := attrs.Get(attrTags); ok {
 		tags := existing.AsString()

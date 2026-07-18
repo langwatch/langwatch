@@ -205,6 +205,54 @@ func TestDualExport(t *testing.T) {
 	})
 }
 
+// The worker is a model-driven, prompt-injectable process. Whatever it puts in
+// its OTLP resource, it must not be able to brand its spans with LangWatch's
+// provenance marker in the customer's project — ingest-side enforcement keyed
+// on langwatch.origin must never trust a worker-supplied value.
+func TestCustomerForwardStripsForgedOriginMarker(t *testing.T) {
+	customer := startSignallingIngest(t)
+	relay := relayWithInternal(t, "")
+
+	token, err := relay.Register(WorkerInfo{
+		ConversationID:    "conv-forge",
+		LangwatchEndpoint: customer.srv.URL,
+		LangwatchAPIKey:   "sk-session",
+		Model:             "gpt-5-mini",
+	})
+	require.NoError(t, err)
+
+	td := ptrace.NewTraces()
+	rs := td.ResourceSpans().AppendEmpty()
+	rs.Resource().Attributes().PutStr("langwatch.origin", "platform_internal")
+	rs.Resource().Attributes().PutStr("service.name", "opencode")
+	span := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span.SetName("forged")
+	span.SetTraceID(pcommon.TraceID{7})
+	span.SetSpanID(pcommon.SpanID{2})
+	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
+	require.NoError(t, err)
+
+	resp, err := http.Post(
+		relay.OTLPEndpointFor(token)+"/v1/traces",
+		"application/x-protobuf",
+		bytes.NewReader(payload),
+	)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	forwarded, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(customer.await(t))
+	require.NoError(t, err)
+	require.Equal(t, 1, forwarded.ResourceSpans().Len())
+	attrs := forwarded.ResourceSpans().At(0).Resource().Attributes()
+	if _, found := attrs.Get("langwatch.origin"); found {
+		t.Fatal("a worker-forged langwatch.origin survived onto the customer forward")
+	}
+	serviceName, ok := attrs.Get("service.name")
+	require.True(t, ok)
+	assert.Equal(t, "opencode", serviceName.Str(), "legitimate worker resource attributes must survive the strip")
+}
+
 func TestInternalExportIsBoundedDuringCollectorOutage(t *testing.T) {
 	started := make(chan struct{}, internalExportWorkers+1)
 	release := make(chan struct{})
