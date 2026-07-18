@@ -574,6 +574,13 @@ func RunBenchmark(ctx context.Context, args RunArgs, stdout, stderr io.Writer) (
 	// fresh transport per request would measure connection setup.
 	sender := &http.Client{Timeout: 2 * time.Minute}
 
+	// Prove the whole path works on ONE span before spending the run on it.
+	// A misconfigured harness that reaches the stages reports "lost spans",
+	// which is the wrong diagnosis and the expensive one to chase.
+	if err := preflight(ctx, sender, client, args, preflightTimeout, stderr); err != nil {
+		return nil, err
+	}
+
 	var results []StageResult
 
 	for _, stagePlan := range plan.Stages {

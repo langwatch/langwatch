@@ -67,6 +67,22 @@ Feature: Event-sourcing ingestion benchmark and stability workflow
     Then it fails straight away naming the offending input
     And it does not spend an hour on a run that could never settle
 
+  @ci @preflight
+  Scenario: The load goes through the app's real collector and queue
+    Given the benchmark is set up to run
+    When it sends spans
+    Then they arrive through the same ingestion endpoint a customer SDK uses
+    And they are carried by the real queue the platform runs in production
+    And no read model is written directly
+
+  @ci @preflight
+  Scenario: A run with nothing draining the queue is not reported as data loss
+    Given the platform is running without a worker to drain the queue
+    When the benchmark starts
+    Then it stops before sending the workload
+    And it reports that the benchmark could not run, naming the missing worker
+    And it does not claim the pipeline lost spans
+
   @ci @reporting
   Scenario: A benchmark that could not run is not reported as a passing run
     Given the driver cannot reach ClickHouse

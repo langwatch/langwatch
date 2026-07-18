@@ -13,6 +13,31 @@ single static binary with no runtime dependencies beyond `psql` (seeding) and
 `kubectl` (optional resource sampling), so CI builds it once up front and a
 compile error costs seconds instead of surfacing after the cluster is up.
 
+## What it drives
+
+The load goes into the **app's own collector** — `POST /api/otel/v1/traces`,
+the same OTLP route customer SDKs hit, authenticated with a real project API
+key. From there it takes the production path: the collector's dedup gate, a
+`recordSpan` command dispatched through the **real Redis-backed GroupQueue**,
+then the fold and the projections into ClickHouse. Nothing is stubbed and no
+read model is written directly; if it were, the benchmark would be asserting
+against its own inserts.
+
+**A worker process must be running, and it is not optional.** The GroupQueue
+consumer loop only starts for `processRole` `"worker"` or `"all"` — a web-role
+process constructs the queue with `consumerEnabled: false` and no dispatcher,
+so it enqueues into Redis and never drains. `WORKERS_IN_PROCESS=1` does not
+help under `NODE_ENV=production`: both `start.sh` and `start.ts` gate it on
+`NODE_ENV === "development"` exactly, so in production it is silently ignored.
+CI sets `START_WORKERS=true`, which runs `start:workers` as a second process —
+the same web/worker split production deploys.
+
+The driver checks this before doing any work: a **preflight** sends one span
+and waits for it to land. If it never does, the run aborts with exit code 2
+("could not run") and names the likely cause, rather than proceeding to report
+every span in every stage as lost — which is what the same misconfiguration
+looked like before, and reads as a catastrophic pipeline regression.
+
 ## What it measures
 
 **Correctness under concurrent load.** That is the point. After each stage it
