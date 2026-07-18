@@ -71,7 +71,9 @@ func defaultConfig() Config {
 			BaseURL: "http://localhost:5560",
 		},
 		OTel: config.OTel{
-			SampleRatio: 1.0, // overridden to 0.1 for non-local in LoadConfig
+			// Left unset so an operator-supplied ratio is distinguishable from
+			// the default; resolved in LoadConfig.
+			SampleRatio: config.UnsetSampleRatio,
 		},
 	}
 }
@@ -94,9 +96,7 @@ func LoadConfig(ctx context.Context) (Config, error) {
 		cfg.CustomerTraceBridge.BaseURL = cfg.ControlPlane.BaseURL
 	}
 	// Apply environment-aware sample ratio default when not explicitly set.
-	if cfg.OTel.SampleRatio == 1.0 && cfg.Environment != "local" {
-		cfg.OTel.SampleRatio = 0.1
-	}
+	cfg.OTel.ResolveSampleRatio(cfg.Environment)
 	if err := config.Validate(ctx, cfg); err != nil {
 		return Config{}, err
 	}

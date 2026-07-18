@@ -29,6 +29,32 @@ type OTel struct {
 	DebugCollectorHeaders string `env:"DEBUG_COLLECTOR_HEADERS"`
 }
 
+// UnsetSampleRatio is the zero value meaning no SAMPLE_RATIO was configured.
+// Telling "unset" apart from an explicit value is the whole point: services
+// previously defaulted the field to 1.0 and then rewrote it with
+// `if SampleRatio == 1.0 && environment != "local"`, which cannot distinguish an
+// operator who deliberately asked for 100% in production from one who asked for
+// nothing — and silently gave both of them 10%.
+const UnsetSampleRatio = 0
+
+// DefaultNonLocalSampleRatio is the trace sample ratio applied outside local
+// development when the operator did not choose one.
+const DefaultNonLocalSampleRatio = 0.1
+
+// ResolveSampleRatio fills in the environment-aware default when no ratio was
+// configured, and otherwise honours exactly what was asked for. Call once,
+// before Validate.
+func (o *OTel) ResolveSampleRatio(environment string) {
+	if o.SampleRatio != UnsetSampleRatio {
+		return
+	}
+	if environment == "local" {
+		o.SampleRatio = 1.0
+		return
+	}
+	o.SampleRatio = DefaultNonLocalSampleRatio
+}
+
 // DebugCollector returns the debug-collector base endpoint (no signal
 // path) and its parsed headers. An empty endpoint means the debug
 // collector is disabled. Exposed for services (e.g. nlpgo) that build
