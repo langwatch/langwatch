@@ -176,8 +176,14 @@ automation projections cannot dispatch customer effects.
 
 The entire `event-sourcing/outbox/` stack, six automation outbox reactors,
 `.withOutbox`, `ReactorOutbox`, heartbeat scheduler, and Redis leader lock are
-deleted. A migration drops the bloated table. Dispatch utilities move to
-`app-layer/triggers/dispatch` or `server/app-layer/automations/delivery`; consumers import their new
+deleted. A migration drops the bloated table. Automation code consolidates:
+services, repositories, dispatch helpers and delivery senders under
+`server/app-layer/automations` (the `triggers` name is retired); process
+managers, subscribers and dispatch wiring under
+`server/event-sourcing/pipelines/automations`; provider definitions split
+per side into `shared/automations/providers`,
+`features/automations/providers`, and
+`server/app-layer/automations/providers`. Consumers import the new
 locations directly.
 
 For one release, the global event router recognizes stale

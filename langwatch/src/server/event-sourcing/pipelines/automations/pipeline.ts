@@ -12,6 +12,7 @@ export interface AutomationsPipelineDeps {
   automationAuditStore: AppendStore<AutomationAuditRecord>;
   triggerSettlement: ProcessManagerApplier<AutomationEvent>;
   graphAlertSweep: ProcessManagerApplier<AutomationEvent>;
+  webhookDeliveryPrune: ProcessManagerApplier<AutomationEvent>;
 }
 
 export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
@@ -27,5 +28,6 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
     })
     .withProcessManager("triggerSettlement", deps.triggerSettlement)
     .withProcessManager("graphAlertSweep", deps.graphAlertSweep)
+    .withProcessManager("webhookDeliveryPrune", deps.webhookDeliveryPrune)
     .build();
 }

@@ -5,7 +5,7 @@ import {
   TEST_FIRE_NOTICE,
 } from "~/shared/templating/banner";
 import { DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE } from "~/shared/templating/defaults";
-import graphAlertDetailedSource from "~/automations/providers/definitions/slack/templates/graph_alert_detailed.liquid?raw";
+import graphAlertDetailedSource from "~/features/automations/providers/slack/templates/graph_alert_detailed.liquid?raw";
 import { TemplateValidationError, TestFireUnavailableError } from "../errors";
 import {
   type DraftIdentity,

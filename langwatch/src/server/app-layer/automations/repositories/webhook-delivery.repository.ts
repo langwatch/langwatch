@@ -3,9 +3,19 @@ import type { WebhookDeliveryOutcome } from "@prisma/client";
 /**
  * Read + write repository over `WebhookDelivery` — the per-attempt delivery
  * log behind a webhook automation's "recent fires" drill-down (ADR-040 §6).
- * Header values are already REDACTED by the writer; this layer stores and
- * returns them as-is.
+ * A slim facts table: outcome, status, latency, capped error message and a
+ * failure classification. Request/response content is never stored.
  */
+
+/** Failure classification driving operator guidance in the drawer. Stored as
+ *  a plain string so new kinds ship without migrations. */
+export type WebhookFailureKind =
+  | "blocked_url"
+  | "timeout"
+  | "network"
+  | "rate_limited"
+  | "client_error"
+  | "server_error";
 
 /** One persisted delivery attempt, as shown in the drawer's attempts list. */
 export interface WebhookDeliveryRow {
@@ -13,14 +23,10 @@ export interface WebhookDeliveryRow {
   triggerId: string;
   /** Groups every attempt of one logical fire (== X-LangWatch-Event-Id). */
   dispatchId: string;
-  requestMethod: string;
-  requestUrl: string;
-  /** Redacted header record (every custom value is masked). */
-  requestHeaders: Record<string, string>;
   responseStatus: number | null;
-  responseBody: string | null;
   latencyMs: number | null;
   error: string | null;
+  failureKind: WebhookFailureKind | null;
   outcome: WebhookDeliveryOutcome;
   firedAt: Date;
 }
@@ -31,13 +37,10 @@ export interface WebhookDeliveryInput {
   projectId: string;
   triggerId: string;
   dispatchId: string;
-  requestMethod: string;
-  requestUrl: string;
-  requestHeaders: Record<string, string>;
   responseStatus?: number | null;
-  responseBody?: string | null;
   latencyMs?: number | null;
   error?: string | null;
+  failureKind?: WebhookFailureKind | null;
   outcome: WebhookDeliveryOutcome;
 }
 

@@ -438,9 +438,9 @@ const OUTCOME_DOT: Record<WebhookDelivery["outcome"], string> = {
 
 /**
  * The webhook delivery log (ADR-040 §6): attempts grouped by the fire that
- * produced them (`dispatchId`), newest fire first. Each attempt expands to the
- * request headers (secret values already masked server-side) and the
- * receiver's response snippet — enough to debug a 401/422 without re-firing.
+ * produced them (`dispatchId`), newest fire first. A failed attempt expands
+ * to its error and a plain-language explanation of what went wrong — the log
+ * stores outcome facts only, never request or response content.
  */
 function WebhookDeliveriesList({
   deliveries,
@@ -489,6 +489,23 @@ function WebhookDeliveriesList({
   );
 }
 
+/** Plain-language guidance per failure classification — what happened and
+ *  what the operator can do about it. */
+const FAILURE_KIND_GUIDANCE: Record<string, string> = {
+  blocked_url:
+    "This URL points somewhere LangWatch won't deliver to — private networks and redirects are blocked. Check the destination URL.",
+  timeout:
+    "The endpoint didn't answer in time. Make sure it responds quickly; delivery retries automatically.",
+  network:
+    "The endpoint couldn't be reached. Check the URL and that your receiver is up.",
+  rate_limited:
+    "The endpoint asked us to slow down. Delivery backs off and retries.",
+  client_error:
+    "The endpoint rejected the request. Check its authentication and the payload it expects.",
+  server_error:
+    "The endpoint had a server error. Delivery retries automatically.",
+};
+
 function DeliveryAttemptRow({
   attempt,
   index,
@@ -503,7 +520,10 @@ function DeliveryAttemptRow({
     attempt.responseStatus != null
       ? `HTTP ${attempt.responseStatus}`
       : (attempt.error ?? "No response");
-  const headerEntries = Object.entries(attempt.requestHeaders ?? {});
+  const guidance = attempt.failureKind
+    ? FAILURE_KIND_GUIDANCE[attempt.failureKind]
+    : undefined;
+  const hasDetail = Boolean(attempt.error ?? guidance);
 
   return (
     <Box borderBottomWidth="1px" borderColor="border" _last={{ borderBottomWidth: 0 }}>
@@ -514,8 +534,8 @@ function DeliveryAttemptRow({
         paddingY={2}
         width="full"
         textAlign="left"
-        cursor="pointer"
-        onClick={() => setOpen((v) => !v)}
+        cursor={hasDetail ? "pointer" : "default"}
+        onClick={() => hasDetail && setOpen((v) => !v)}
       >
         <Box
           boxSize={2}
@@ -532,29 +552,22 @@ function DeliveryAttemptRow({
           {formatTimeAgo(new Date(attempt.firedAt).getTime())}
         </Text>
       </HStack>
-      {open ? (
+      {open && hasDetail ? (
         <VStack align="stretch" gap={2} paddingX={3} paddingBottom={3}>
-          <Text textStyle="xs" color="fg.muted">
-            {attempt.requestMethod} {attempt.requestUrl}
-          </Text>
-          {headerEntries.length > 0 ? (
-            <VStack align="stretch" gap={0.5}>
-              {headerEntries.map(([name, value]) => (
-                <Code key={name} fontSize="xs" width="full" whiteSpace="pre-wrap">
-                  {name}: {value}
-                </Code>
-              ))}
-            </VStack>
-          ) : null}
-          {attempt.responseBody ? (
+          {attempt.error ? (
             <Code
               fontSize="xs"
               width="full"
               whiteSpace="pre-wrap"
               wordBreak="break-word"
             >
-              {attempt.responseBody}
+              {attempt.error}
             </Code>
+          ) : null}
+          {guidance ? (
+            <Text textStyle="xs" color="fg.muted">
+              {guidance}
+            </Text>
           ) : null}
         </VStack>
       ) : null}

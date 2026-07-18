@@ -54,23 +54,6 @@ export function sanitizeWebhookHeaders(
 }
 
 /**
- * Redact a header record for the delivery log: which headers were sent is kept
- * (an operator debugging a 401 needs to see `Authorization` was present), but
- * every custom VALUE is secret regardless of its name. Masking all values keeps
- * innocently named credentials such as `X-Access-Code` out of control-plane
- * Postgres (ADR-040 §6).
- */
-export function redactHeadersForLog(
-  headers: Record<string, string>,
-): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const name of Object.keys(headers)) {
-    out[name] = "***";
-  }
-  return out;
-}
-
-/**
  * Shape check for the destination URL: https only, a real host, and the
  * default port (ADR-040 §4 — `https://internal:6379` probes are rejected at
  * authoring time; the real SSRF gate runs again at dispatch).

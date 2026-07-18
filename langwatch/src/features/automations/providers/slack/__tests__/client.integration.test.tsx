@@ -38,7 +38,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 import slackClient, { type SlackSlice } from "../client";
-import { SLACK_BOT_TOKEN_KEPT, type SlackPreview } from "../shared";
+import { SLACK_BOT_TOKEN_KEPT, type SlackPreview } from "~/shared/automations/providers/slack";
 import {
   SLACK_BLOCK_KIT_TEMPLATES,
   templateOptionsFor,

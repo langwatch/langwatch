@@ -59,7 +59,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 import emailClient, { type EmailSlice } from "../client";
-import type { EmailPreview } from "../shared";
+import type { EmailPreview } from "~/shared/automations/providers/email";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

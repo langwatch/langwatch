@@ -33,6 +33,12 @@ export function createTraceAlertTriggerMatchHandler(deps: {
     );
     for (const trigger of triggers) {
       if (classifyTriggerFilters(trigger.filters).hasEvaluationFilters) continue;
+      // Idempotency contract (at-least-once delivery): every input to the
+      // command's idempotency key — triggerId, traceId, and the settle-window
+      // bucket derived from occurredAt + traceDebounceMs — comes from the
+      // committed event or trigger config, never wall-clock at handling time.
+      // A redelivered event therefore re-sends byte-identical commands whose
+      // events collapse on idempotencyKey in the store.
       await deps.recordTriggerMatch.send({
         tenantId: context.tenantId,
         occurredAt: event.occurredAt,

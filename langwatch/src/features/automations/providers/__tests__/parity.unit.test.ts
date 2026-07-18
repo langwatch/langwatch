@@ -17,7 +17,7 @@ import {
 import {
   SLACK_BLOCK_KIT_TEMPLATES,
   type SlackBlockKitTemplateOption,
-} from "../definitions/slack/templates/registry";
+} from "../slack/templates/registry";
 import { SERVER_PROVIDERS } from "~/server/app-layer/automations/providers/registry";
 
 /**

@@ -1103,21 +1103,12 @@ cronjobs:
       schedule: "0 0 * * *" # At midnight every day
       endpoint: "/api/cron/schedule_topic_clustering"
 
-    # NOTE: the alertTriggers CronJob (`/api/cron/triggers`) was removed —
-    # custom-graph threshold alerts now fire from the event-sourced worker
-    # path (ADR-034), so no cron sweep is needed. The workers Deployment
-    # (workers.enabled) is what fires them now.
-
-    # Webhook delivery-log prune - deletes attempt rows older than 30 days
-    # See: https://kubespec.dev/batch/v1/CronJob#spec.schedule
-    ## @extra cronjobs.jobs.webhookDeliveryCleanup Webhook delivery-log prune job.
-    ## @param cronjobs.jobs.webhookDeliveryCleanup.enabled [default: true] Enable webhook delivery-log prune job.
-    ## @param cronjobs.jobs.webhookDeliveryCleanup.schedule [string, default: 30 3 * * *] Cron schedule.
-    ## @param cronjobs.jobs.webhookDeliveryCleanup.endpoint [string, default: /api/cron/webhook_delivery_cleanup] Endpoint path.
-    webhookDeliveryCleanup:
-      enabled: true
-      schedule: "30 3 * * *" # At 03:30 every day
-      endpoint: "/api/cron/webhook_delivery_cleanup"
+    # NOTE: the automation CronJobs are gone. The alertTriggers CronJob
+    # (`/api/cron/triggers`) was removed — custom-graph threshold alerts now
+    # fire from the event-sourced worker path (ADR-034) — and the webhook
+    # delivery-log prune runs as a daily scheduled process manager on the
+    # same worker path (ADR-040 §6), so neither needs a cron sweep. The
+    # workers Deployment (workers.enabled) is what runs them now.
 
   # =============================================================================
   # Kubernetes Pass-Through Configuration

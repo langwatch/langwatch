@@ -511,10 +511,6 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `cronjobs.jobs.topicClustering.enabled`  | Enable topic clustering job.                       | `true`                                |
 | `cronjobs.jobs.topicClustering.schedule` | Cron schedule.                                     | `0 0 * * *`                           |
 | `cronjobs.jobs.topicClustering.endpoint` | Endpoint path.                                     | `/api/cron/schedule_topic_clustering` |
-| `cronjobs.jobs.webhookDeliveryCleanup`          | Webhook delivery-log prune job.             |                                       |
-| `cronjobs.jobs.webhookDeliveryCleanup.enabled`  | Enable webhook delivery-log prune job.      | `true`                                |
-| `cronjobs.jobs.webhookDeliveryCleanup.schedule` | Cron schedule.                              | `30 3 * * *`                          |
-| `cronjobs.jobs.webhookDeliveryCleanup.endpoint` | Endpoint path.                              | `/api/cron/webhook_delivery_cleanup`  |
 | `cronjobs.podSecurityContext`            | Pod security context overrides.                    | `{}`                                  |
 | `cronjobs.containerSecurityContext`      | Container security context overrides.              | `{}`                                  |
 | `cronjobs.nodeSelector`                  | Node selector overrides.                           | `{}`                                  |

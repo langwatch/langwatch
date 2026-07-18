@@ -58,6 +58,7 @@ import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automa
 import {
   graphAlertSweepPM,
   triggerSettlementPM,
+  webhookDeliveryPrunePM,
 } from "../event-sourcing/pipelines/automations/process-manager";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
@@ -358,6 +359,13 @@ export class PipelineRegistry {
         graphAlertSweep: graphAlertSweepPM({
           decideSweepCandidates: automationPorts.decideSweepCandidates,
           evaluateGraphTrigger: automationPorts.evaluateGraphTrigger,
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.langyProcessStore.deleteDispatchedBefore(
+              params,
+            ),
+        }),
+        webhookDeliveryPrune: webhookDeliveryPrunePM({
+          pruneExpired: automationPorts.pruneWebhookDeliveries,
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.langyProcessStore.deleteDispatchedBefore(
               params,

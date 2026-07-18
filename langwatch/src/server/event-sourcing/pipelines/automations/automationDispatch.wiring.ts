@@ -58,6 +58,10 @@ export interface AutomationDispatchPorts {
   decideSweepCandidates: (params: {
     now: Date;
   }) => Promise<GraphTriggerSweepCandidate[]>;
+  /** ADR-040 §6: deletes delivery-log rows older than 30 days; returns the
+   *  row count. Driven by the daily `webhookDeliveryPrune` scheduled process
+   *  manager (the K8s CronJob path was removed). */
+  pruneWebhookDeliveries: () => Promise<number>;
 }
 
 export function buildAutomationDispatchPorts({
@@ -273,5 +277,6 @@ export function buildAutomationDispatchPorts({
         sources: heartbeatSources,
         now,
       }),
+    pruneWebhookDeliveries: () => webhookDeliveries.pruneExpired(),
   };
 }

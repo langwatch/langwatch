@@ -8,7 +8,7 @@
 
 Automations today notify through two channels — **Email** (`SEND_EMAIL`) and
 **Slack** (`SEND_SLACK_MESSAGE`). Both are `category: "notify"` providers
-(`src/automations/providers/`, ADR-037), render a customer-authored Liquid
+(`src/shared/automations/providers/` + per-side registries, ADR-037), render a customer-authored Liquid
 template (ADR-036), and ride the ADR-052 automation process managers on the
 trace path and graph-alert dispatch helper on the alert path.
 
@@ -35,7 +35,7 @@ primitive unless fenced. ADR-030 foreshadowed exactly this work:
 
 The framework mostly exists; the job is to *compose* it, not invent it:
 
-- **Provider registry** (`src/automations/providers/types.ts`) — a new channel is
+- **Provider registry** (`src/shared/automations/providers/types.ts` + per-side registries) — a new channel is
   one directory + three registry lines.
 - **SSRF-safe outbound fetch**: `src/utils/ssrfProtection.ts` (`validateUrlForSSRF`
   + `ssrfSafeFetch` + `fetchWithResolvedIp`), with cloud-metadata denylist,
@@ -66,10 +66,10 @@ automations drawer. Ship it dark behind a `release_webhook_automations` flag.
 
 `SEND_WEBHOOK` is a **`category: "notify"`** provider — it renders customer
 content and coalesces into digests like Email/Slack, not a `persist` action. It
-slots in as one new directory `src/automations/providers/definitions/webhook/`
+slots in as one new provider file per side (shared schema, client UI, server secret handling)
 with the three standard peers, one registry line each in
-`providers/{server,client}.ts`, and one new key in `SliceFor` / `PreviewFor` /
-`initialSlices()` (`providers/client.ts:19-33,92-100`).
+the per-side registries, and one new key in `SliceFor` / `PreviewFor` /
+`initialSlices()`.
 
 **Enum + classification (one migration + two set edits):** add `SEND_WEBHOOK` to
 `enum TriggerAction` (`prisma/schema.prisma:736`) and to `NOTIFY_TRIGGER_ACTIONS`
@@ -548,8 +548,11 @@ dispatch cap (`webhook-dispatch:{projectId}`).
 `WebhookDeliveryOutcome` enum, one row per attempt written by `deliverWebhook`
 (send + classify + log as a unit), redacted headers (`redactHeadersForLog`
 masks every custom value to `***`), a `getWebhookDeliveries` read procedure,
-the drawer's "Recent deliveries" drill-down, and a 30-day prune cron
-(`/api/cron/webhook_delivery_cleanup`).
+the drawer's "Recent deliveries" drill-down, and a 30-day prune. The prune
+originally shipped as a K8s cron (`/api/cron/webhook_delivery_cleanup`); it now
+runs as the daily `webhookDeliveryPrune` scheduled process manager on the
+worker (ADR-052), and the cron route + chart CronJob were removed along with
+the rest of the automations cron machinery.
 
 > **Known design debt / future direction.** `WebhookDelivery` is a
 > webhook-only, append-per-attempt log that sits *alongside*
@@ -595,5 +598,5 @@ and the `ProjectSecret`-ref auth union — the only remaining Phase 2 gap.
   encryption-at-rest pattern for the HMAC secret and auth tokens.
 - `src/server/mailer/unsubscribeToken.ts` / `triggerNoReply.ts` — HMAC keyed-hash +
   `timingSafeEqual` pattern the signature follows.
-- `src/automations/providers/` — the registry (`types.ts`, `client.ts`,
+- `src/shared/automations/providers/` + per-side registries — (`types.ts`, `registry.ts`,
   `server.ts`) and the Slack definition the webhook provider is shaped after.

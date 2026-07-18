@@ -1,5 +1,7 @@
 import { TriggerAction, TriggerKind } from "@prisma/client";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { RecordTriggerMatchCommand } from "~/server/event-sourcing/pipelines/automations/commands/recordTriggerMatch.command";
+import { settleWindowBucket } from "~/server/event-sourcing/pipelines/automations/settleWindow";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
@@ -126,6 +128,58 @@ describe("evaluation alert trigger match subscriber", () => {
           actionClass: "notify",
         }),
       );
+    });
+  });
+
+  describe("given at-least-once delivery of a committed event", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    describe("when the same event is delivered twice", () => {
+      it("sends identical commands yielding one identical idempotency key, regardless of wall-clock at handling time", async () => {
+        vi.useFakeTimers();
+        const firstDeliveryAt = 1_750_000_000_000;
+        vi.setSystemTime(firstDeliveryAt);
+        const committedEvent = event({ occurredAt: firstDeliveryAt });
+        const deliveryContext = context();
+        const dependencies = deps();
+        const handler = createEvaluationAlertTriggerMatchHandler({
+          ...dependencies,
+          triggers: dependencies.triggers as never,
+          traceSummaryStore: dependencies.traceSummaryStore as never,
+        });
+
+        await handler(committedEvent, deliveryContext);
+        // Queue redelivery lands later in wall-clock time.
+        vi.advanceTimersByTime(120_000);
+        await handler(committedEvent, deliveryContext);
+
+        expect(dependencies.recordTriggerMatch.send).toHaveBeenCalledTimes(2);
+        const [firstPayload, secondPayload] =
+          dependencies.recordTriggerMatch.send.mock.calls.map(
+            ([payload]) => payload,
+          );
+        expect(secondPayload).toEqual(firstPayload);
+        expect(secondPayload.occurredAt).toBe(firstDeliveryAt);
+
+        const idempotencyKeys = [firstPayload, secondPayload].map(
+          (payload) => {
+            const [producedEvent] = new RecordTriggerMatchCommand().handle({
+              tenantId: payload.tenantId,
+              data: payload,
+            } as never);
+            return producedEvent!.idempotencyKey;
+          },
+        );
+        expect(new Set(idempotencyKeys).size).toBe(1);
+        expect(idempotencyKeys[0]).toBe(
+          `trigger-1:trace-1:${settleWindowBucket({
+            occurredAt: firstDeliveryAt,
+            traceDebounceMs: 30_000,
+          })}`,
+        );
+      });
     });
   });
 

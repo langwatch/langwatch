@@ -128,9 +128,15 @@ Feature: Webhook (generic HTTP) automation action
       Then the automation's recent deliveries show one row per attempt
       And each row shows the HTTP status or transport error and the latency
 
-    Scenario: Stored request headers never contain secret values
+    Scenario: The delivery log never stores request content
       Given a webhook automation with custom headers that fires
-      Then the delivery log stores every header name with every value masked
+      Then the delivery row stores the outcome, status, latency, and error only
+      And the request URL, headers, and response body are never stored
+
+    Scenario: A failed attempt is classified for operator guidance
+      Given a webhook automation whose endpoint cannot be reached
+      When the attempt fails
+      Then the delivery row carries a failure classification the drawer can explain
 
     Scenario: The delivery log is pruned after 30 days
       Given delivery rows older than 30 days exist

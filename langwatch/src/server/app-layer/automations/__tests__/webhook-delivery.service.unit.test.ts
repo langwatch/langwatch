@@ -23,9 +23,8 @@ describe("WebhookDeliveryService", () => {
         projectId: "p1",
         triggerId: "t1",
         dispatchId: "evt_1",
-        requestMethod: "POST",
-        requestUrl: "https://example.com/hook",
-        requestHeaders: { Authorization: "***" },
+        responseStatus: 200,
+        latencyMs: 42,
         outcome: "success",
       };
       await new WebhookDeliveryService(repo).record(row);

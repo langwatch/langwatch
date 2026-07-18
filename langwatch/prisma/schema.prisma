@@ -819,9 +819,10 @@ model Trigger {
 
 // ADR-040 §6: per-ATTEMPT webhook delivery log — the drill-down behind a
 // webhook automation's "recent fires". One row per HTTP attempt; all attempts
-// of one logical fire share `dispatchId` (== the X-LangWatch-Event-Id). Header
-// values are stored REDACTED (auth/signature masked to "***"); the response
-// snippet is size-capped. Pruned after 30 days.
+// of one logical fire share `dispatchId` (== the X-LangWatch-Event-Id). A slim
+// facts table: outcome, status, latency, a capped error message and a failure
+// classification — request/response content (URL, headers, body) is never
+// stored. Pruned after 30 days.
 model WebhookDelivery {
   id             String                @id @default(nanoid())
   projectId      String
@@ -830,16 +831,15 @@ model WebhookDelivery {
   trigger        Trigger               @relation(fields: [triggerId], references: [id], onDelete: Cascade)
   // Groups every attempt of one logical fire (== X-LangWatch-Event-Id).
   dispatchId     String
-  requestMethod  String
-  requestUrl     String
-  // Redacted header record: auth/signature/api-key values masked to "***".
-  requestHeaders Json
   // Null when no HTTP response arrived (transport/SSRF/timeout).
   responseStatus Int?
-  responseBody   String?
   latencyMs      Int?
-  // Transport / SSRF / timeout message when there is no HTTP response.
+  // Capped, classified error message when the attempt failed.
   error          String?
+  // Failure classification driving operator guidance in the drawer
+  // (blocked_url / timeout / network / rate_limited / client_error /
+  // server_error). Free-form string so new kinds ship without migrations.
+  failureKind    String?
   outcome        WebhookDeliveryOutcome
   firedAt        DateTime              @default(now())
   createdAt      DateTime              @default(now())

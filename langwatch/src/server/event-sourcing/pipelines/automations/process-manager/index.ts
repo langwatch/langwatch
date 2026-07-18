@@ -17,6 +17,14 @@ export {
   type GraphAlertSweepState,
 } from "./graphAlertSweep.process";
 export {
+  WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS,
+  WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
+  pruneSchema,
+  webhookDeliveryPrunePM,
+  type WebhookDeliveryPruneDeps,
+  type WebhookDeliveryPruneState,
+} from "./webhookDeliveryPrune.process";
+export {
   createNotifyDigestHandler,
   createPersistMatchHandler,
   type TriggerSettlementDispatchDeps,

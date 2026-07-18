@@ -52,6 +52,10 @@ export function createEvaluationAlertTriggerMatchHandler(deps: {
       context.tenantId,
     );
     for (const trigger of triggers.filter(triggerReadsEvaluations)) {
+      // Same idempotency contract as traceAlertTriggerMatch.subscriber: all
+      // idempotency-key inputs (triggerId, traceId, occurredAt) derive from
+      // the committed event or trigger config — never wall-clock at handling
+      // time — so redelivery re-sends identical, store-deduped commands.
       await deps.recordTriggerMatch.send({
         tenantId: context.tenantId,
         occurredAt: event.occurredAt,
