@@ -1,11 +1,6 @@
 import { performance } from "node:perf_hooks";
 import { createLogger } from "@langwatch/observability";
-import {
-  context as otelContext,
-  SpanKind,
-  TraceFlags,
-  trace,
-} from "@opentelemetry/api";
+import { SpanKind, TraceFlags, trace } from "@opentelemetry/api";
 import fastq from "fastq";
 import { Cluster, Redis as IORedis } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
@@ -957,7 +952,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.activeJobCount++;
 
     try {
-      // Restore OTEL trace context and wrap in a span
+      // Wrap job execution in its own isolated root span
       const spanName = `${this.queueName}/${this.jobName}`;
       const spanAttributes: Record<string, string | number | boolean> = {
         "queue.name": this.queueName,
@@ -991,6 +986,21 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           spanName,
           {
             kind: SpanKind.CONSUMER,
+            // Force a NEW root trace for every job. A single command can stage
+            // hundreds of thousands of jobs (e.g. one OTLP ingest with 330k+
+            // spans), all carrying the SAME originating trace context. This
+            // processor used to restore that context as the active one before
+            // opening the job span, so every one of those jobs inherited it as
+            // a parent and collapsed into one shared traceId whose (remote)
+            // root was never exported, producing the
+            // ~6-minute, empty-root mega-trace (330k–413k spans) that
+            // OOM-crash-looped the self-observability Tempo on WAL replay.
+            // `root: true` guarantees each job is its own bounded trace;
+            // causality back to the originating command is preserved as a span
+            // LINK (added below), not by sharing a traceId. The full
+            // producer→consumer links redesign is tracked in
+            // langwatch/langwatch#5894.
+            root: true,
             attributes: spanAttributes,
           },
           async (span) => {
@@ -1306,18 +1316,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         );
       };
 
-      // Restore parent OTEL context if available
-      if (contextMetadata?.traceId && contextMetadata?.parentSpanId) {
-        const parentContext = trace.setSpanContext(otelContext.active(), {
-          traceId: contextMetadata.traceId,
-          spanId: contextMetadata.parentSpanId,
-          traceFlags: TraceFlags.SAMPLED,
-          isRemote: true,
-        });
-        await otelContext.with(parentContext, executeWithSpan);
-      } else {
-        await executeWithSpan();
-      }
+      // Each job runs as its own root trace (`root: true` on the span above).
+      // We deliberately do NOT restore the originating command's remote span
+      // context as the job's parent: doing so merged every job produced by a
+      // single command into one unbounded trace (the empty-root mega-trace).
+      // Causality to the originating command is preserved as a span LINK
+      // (added inside the span callback), which references the command's trace
+      // without merging into it.
+      await executeWithSpan();
     } finally {
       clearInterval(heartbeat);
       this.activeJobCount--;

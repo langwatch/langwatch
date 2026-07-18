@@ -83,6 +83,22 @@ if (
       detectors: [awsEksDetector, envDetector],
     }),
     advanced: {},
+    // Cap per-span payload growth, as defense-in-depth behind the per-job
+    // root-trace scoping below: a single span carrying an oversized
+    // `db.statement` or a huge attribute bag bloats a trace and, in bulk,
+    // pressures the collector's WAL.
+    //
+    // `attributeValueLengthLimit` is the one that actually changes behaviour —
+    // sdk-trace-base defaults it to Infinity, so values were previously
+    // exported whole. `attributeCountLimit` already defaults to 128; it is
+    // restated so both halves of the budget are visible in one place and an
+    // upstream default change shows up as a diff. Note that setting either
+    // here takes precedence over the OTEL_SPAN_ATTRIBUTE_* env vars, which the
+    // SDK only consults when the value is left unset.
+    spanLimits: {
+      attributeValueLengthLimit: 12_000,
+      attributeCountLimit: 128,
+    },
     spanProcessors: spanProcessors,
     logRecordProcessors: logRecordProcessors,
     textMapPropagator: new CompositePropagator({
@@ -121,9 +137,29 @@ if (
         "@opentelemetry/instrumentation-cucumber": { enabled: false },
         "@opentelemetry/instrumentation-router": { enabled: false },
 
-        // Truncate ioredis db.statement to command + first key
-        // (avoid logging content + large attributes)
+        // ioredis auto-instrumentation emits one span PER Redis command, so
+        // the event-sourcing GroupQueue's Redis chatter (Lua leasing via
+        // evalsha, holder-set bookkeeping, active-key heartbeats, stats pushes)
+        // shows up span-for-span whenever it runs inside an application span.
+        // That is what filled the empty-root mega-trace this PR's GroupQueue
+        // change fixes — the commands were traced because they ran under the
+        // job span, and the job span was parented into the originating
+        // command's trace. Rooting each job bounds them; there is nothing to
+        // turn off here.
+        //
+        // `requireParentSpan: true` is therefore an EXPLICIT PIN, not a
+        // behaviour change. @opentelemetry/instrumentation-ioredis already
+        // defaults it to true (its README: "default when unset is true"; its
+        // DEFAULT_CONFIG is spread under the caller's config by both the
+        // constructor and setConfig), and we rely on that to keep unparented
+        // background Redis I/O — the queue's BRPOP signal polling, connection
+        // health pings — out of the exporter entirely. Stating it here means an
+        // upstream default flip surfaces as a diff to review rather than a
+        // silent span flood.
         "@opentelemetry/instrumentation-ioredis": {
+          requireParentSpan: true,
+          // Truncate ioredis db.statement to command + first key
+          // (avoid logging content + large attributes)
           dbStatementSerializer: (
             cmdName: string,
             cmdArgs: Array<string | Buffer | number | unknown[]>,
