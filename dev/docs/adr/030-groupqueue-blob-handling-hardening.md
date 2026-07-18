@@ -4,6 +4,8 @@
 
 **Status:** Proposed
 
+> **Lifecycle amendment (2026-07-18):** WP4 superseded the holder TTL and eager release/transfer decisions below with Redis-time, per-holder renewable leases. Release and transfer now mutate lease membership only; Redis expiry and the durable-store lifecycle reclaim shared bytes lazily. See the current [GroupQueue architecture](../../../langwatch/src/server/event-sourcing/queues/groupQueue/ARCHITECTURE.md#per-holder-renewable-leases).
+
 **Amends:** [ADR-029](./029-groupqueue-content-addressed-payload-store.md) (GroupQueue content-addressed tiered payload store). ADR-029's tiered store, GQ2 envelope, holder-set reclaim, and queue wiring stand; this ADR hardens the blob lifecycle against the correctness, security, and design gaps a three-pass review (tests / security / code) surfaced after the implementation landed.
 
 **Relates to:** [ADR-022](./022-event-log-source-of-truth.md) (the edge `COMMAND_INLINE_THRESHOLD` this revisits), `src/server/stored-objects/` (the reused object store).
