@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { mapCommands } from "../mapCommands";
 import type { EventSourcedQueueProcessor } from "../queues";
 
-function createMockProcessor<P extends Record<string, unknown>>(): EventSourcedQueueProcessor<P> {
+function createMockProcessor<
+  P extends Record<string, unknown>,
+>(): EventSourcedQueueProcessor<P> {
   return {
     send: vi.fn().mockResolvedValue(undefined),
     sendBatch: vi.fn().mockResolvedValue(undefined),
@@ -39,6 +41,19 @@ describe("mapCommands", () => {
       await mapped.myCommand({ foo: "bar" }, options);
 
       expect(processor.send).toHaveBeenCalledWith({ foo: "bar" }, options);
+    });
+  });
+
+  describe("when called as a batch", () => {
+    it("delegates to processor.sendBatch", async () => {
+      const processor = createMockProcessor();
+      const mapped = mapCommands({ myCommand: processor });
+      const data = [{ foo: "one" }, { foo: "two" }];
+
+      await mapped.myCommand.sendBatch!(data);
+
+      expect(processor.sendBatch).toHaveBeenCalledWith(data, undefined);
+      expect(processor.send).not.toHaveBeenCalled();
     });
   });
 });

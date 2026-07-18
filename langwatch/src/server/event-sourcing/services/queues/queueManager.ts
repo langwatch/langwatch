@@ -63,6 +63,7 @@ interface QueuedEventConsumerDefinition<E extends Event> {
     disabled?: boolean;
     killSwitch?: KillSwitchOptions;
     groupKeyFn?: (event: E) => string;
+    coalesceMaxBatch?: number;
   };
 }
 
@@ -243,7 +244,7 @@ export class QueueManager<EventType extends Event = Event> {
         );
       },
       // Global queue lifecycle is owned by EventSourcing — facade close is a no-op
-      close: async () => {},
+      close: async () => undefined,
       waitUntilReady: () => globalQueue.waitUntilReady(),
     };
 
@@ -257,10 +258,16 @@ export class QueueManager<EventType extends Event = Event> {
       event: EventType,
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
+    onEventBatch?: (
+      handlerName: string,
+      events: EventType[],
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>,
   ): void {
     this.initializeEventConsumerQueues({
       definitions: mapProjections,
       onEvent,
+      onEventBatch,
       jobType: "handler",
       jobPath: "map",
       incrementCount: () => this.handlerCount++,
@@ -287,6 +294,7 @@ export class QueueManager<EventType extends Event = Event> {
   private initializeEventConsumerQueues({
     definitions,
     onEvent,
+    onEventBatch,
     jobType,
     jobPath,
     incrementCount,
@@ -295,6 +303,11 @@ export class QueueManager<EventType extends Event = Event> {
     onEvent: (
       consumerName: string,
       event: EventType,
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    onEventBatch?: (
+      consumerName: string,
+      events: EventType[],
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>;
     jobType: "handler" | "subscriber";
@@ -329,6 +342,17 @@ export class QueueManager<EventType extends Event = Event> {
             tenantId: event.tenantId,
           });
         },
+        processBatch:
+          onEventBatch &&
+          handlerDef.options.coalesceMaxBatch &&
+          handlerDef.options.coalesceMaxBatch > 1
+            ? async (events: any[]) => {
+                await onEventBatch(handlerName, events, {
+                  tenantId: events[0]?.tenantId,
+                });
+              }
+            : undefined,
+        coalesceMaxBatch: handlerDef.options.coalesceMaxBatch,
         delay: handlerDef.options.delay,
         deduplication: resolveDeduplicationStrategy(
           handlerDef.options.deduplication,

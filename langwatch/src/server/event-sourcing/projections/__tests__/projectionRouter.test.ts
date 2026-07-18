@@ -1045,6 +1045,52 @@ describe("ProjectionRouter", () => {
     });
   });
 
+  describe("initializeMapQueues (coalescing gate)", () => {
+    const registerAndInitialize = (
+      store: ReturnType<typeof createMockAppendStore<{ id: string }>>,
+    ) => {
+      const queueManager = createMockQueueManager();
+      const router = new ProjectionRouter(
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        TEST_CONSTANTS.PIPELINE_NAME,
+        queueManager,
+      );
+      router.registerMapProjection(
+        createMockMapProjectionDefinition("mapper", {
+          store,
+          eventTypes: [TEST_CONSTANTS.EVENT_TYPE_1],
+          options: { coalesceMaxBatch: 256 },
+        }),
+      );
+
+      router.initializeMapQueues();
+
+      const [handlerDefs] = (
+        queueManager.initializeHandlerQueues as ReturnType<typeof vi.fn>
+      ).mock.calls[0]!;
+      return handlerDefs.mapper.options;
+    };
+
+    describe("when the store implements bulkAppend", () => {
+      it("passes the configured batch size to the queue", () => {
+        const store = createMockAppendStore<{ id: string }>();
+        store.bulkAppend = vi.fn(async () => undefined);
+
+        expect(registerAndInitialize(store).coalesceMaxBatch).toBe(256);
+      });
+    });
+
+    describe("when the store has no bulkAppend", () => {
+      it("drops the batch size so the queue keeps per-event delivery", () => {
+        // Without an all-or-nothing write, a batch that failed part-way would
+        // be re-dispatched whole and duplicate its committed prefix.
+        const store = createMockAppendStore<{ id: string }>();
+
+        expect(registerAndInitialize(store).coalesceMaxBatch).toBeUndefined();
+      });
+    });
+  });
+
   describe("replay marker on map projections", () => {
     describe("when marker returns 'skip'", () => {
       it("does not invoke map.append for that event", async () => {

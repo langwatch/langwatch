@@ -1,6 +1,6 @@
 import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
-import type { Event } from "../domain/types";
 import type { TenantId } from "../domain/tenantId";
+import type { Event } from "../domain/types";
 import type { KillSwitchOptions } from "../pipeline/staticBuilder.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
@@ -25,10 +25,7 @@ import type { ProjectionStoreContext } from "./projectionStoreContext";
  * };
  * ```
  */
-export interface MapProjectionDefinition<
-  Record,
-  E extends Event = Event,
-> {
+export interface MapProjectionDefinition<Record, E extends Event = Event> {
   /** Unique name for this projection within the pipeline. */
   name: string;
 
@@ -78,6 +75,21 @@ export interface MapProjectionOptions {
 
   /** Custom group key function for queue routing. Enables per-item parallelism instead of per-aggregate serialization. */
   groupKeyFn?: (event: any) => string;
+
+  /**
+   * Maximum same-group events to persist through one `bulkAppend` call.
+   *
+   * Only honoured when the store implements `bulkAppend`. A store without it
+   * keeps per-event delivery and this option is ignored, with a warning at
+   * registration. That is a correctness requirement rather than an
+   * optimisation: queue delivery is at-least-once, so a batch that failed
+   * half-way through a per-record loop would duplicate its already-committed
+   * prefix when the queue re-ran it.
+   *
+   * The queue keeps the batch tenant-scoped because tenant identity is always
+   * part of its group key.
+   */
+  coalesceMaxBatch?: number;
 
   /**
    * Skip events that are DUPLICATE deliveries of an earlier event with the

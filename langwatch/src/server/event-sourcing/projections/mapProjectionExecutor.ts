@@ -1,6 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import type { Event } from "../domain/types";
-import type { MapProjectionDefinition } from "./mapProjection.types";
+import type {
+  BulkAppendContext,
+  MapProjectionDefinition,
+} from "./mapProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:map-executor");
@@ -47,6 +50,73 @@ export class MapProjectionExecutor {
     await projection.store.append(record, context);
 
     return record;
+  }
+
+  /**
+   * Maps a same-tenant queue batch and persists it with ONE `bulkAppend` call.
+   *
+   * `bulkAppend` is required, not preferred. Queue delivery is at-least-once:
+   * a batch that throws part-way is re-dispatched in full, so persistence has
+   * to be all-or-nothing for the retry to be safe. A per-record `append` loop
+   * would commit records 1..N, fail on N+1, and duplicate that prefix on the
+   * retry — and map projections write to additive stores, where a duplicate is
+   * an extra row rather than an overwrite. `ProjectionRouter` enforces this by
+   * refusing to enable coalescing for a store without `bulkAppend`; the throw
+   * below is the backstop for any other caller.
+   */
+  async executeBatch<Record, E extends Event>(
+    projection: MapProjectionDefinition<Record, E>,
+    events: readonly E[],
+    contexts: readonly ProjectionStoreContext[],
+  ): Promise<Array<{ event: E; record: Record }>> {
+    if (events.length !== contexts.length) {
+      throw new Error("Map projection batch events and contexts must align");
+    }
+
+    const bulkAppend = projection.store.bulkAppend;
+    if (!bulkAppend) {
+      throw new Error(
+        `Map projection "${projection.name}" cannot be batched: its store has no bulkAppend, and a partially-committed batch would duplicate records when the queue retries it`,
+      );
+    }
+
+    const mapped: Array<{
+      event: E;
+      record: Record;
+      context: ProjectionStoreContext;
+    }> = [];
+    for (let index = 0; index < events.length; index++) {
+      const event = events[index]!;
+      const context = contexts[index]!;
+      if (
+        projection.options?.dedupeByIdempotencyKey &&
+        (await this.isDuplicateDelivery(projection, event, context))
+      ) {
+        continue;
+      }
+      const record = projection.map(event);
+      if (record !== null) mapped.push({ event, record, context });
+    }
+
+    if (mapped.length === 0) return [];
+
+    const first = mapped[0]!.context;
+    const bulkContext: BulkAppendContext = {
+      tenantId: first.tenantId,
+      retentionPolicy: first.retentionPolicy,
+    };
+    for (const item of mapped) {
+      if (item.context.tenantId !== bulkContext.tenantId) {
+        throw new Error("Map projection batches cannot cross tenants");
+      }
+    }
+    await bulkAppend.call(
+      projection.store,
+      mapped.map(({ record }) => record),
+      bulkContext,
+    );
+
+    return mapped.map(({ event, record }) => ({ event, record }));
   }
 
   /**
