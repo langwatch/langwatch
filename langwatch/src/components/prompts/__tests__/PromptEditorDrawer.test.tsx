@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { useForm, useFormContext } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
+import type { ModelMetadataForFrontend } from "~/hooks/useModelProvidersSettings";
 
 // All mocks need to be set up before any imports
 const mockCloseDrawer = vi.fn();
@@ -588,7 +589,9 @@ describe("PromptEditorDrawer", () => {
         // leaving the model half intact) still fails this test.
         const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
         expect(methods.getValues("version.configData.llm.maxTokens")).toBe(
-          getMaxTokenLimit(mockModelMetadata["openai/gpt-4o"]),
+          getMaxTokenLimit(
+            mockModelMetadata["openai/gpt-4o"] as unknown as ModelMetadataForFrontend,
+          ),
         );
       });
 
