@@ -1761,6 +1761,67 @@ describe("GroupStagingScripts", () => {
         );
       });
     });
+
+    // These counters drive metrics-collector.ts (completed throughput and the
+    // per-job-name totals). A coalesced batch completes N payloads in ONE call,
+    // so counting calls would make them fall as batching improves.
+    describe("completed counters", () => {
+      const completedTotal = async () =>
+        Number((await redis.get(`${keyPrefix()}stats:completed`)) ?? 0);
+      const completedForJob = async (jobName: string) =>
+        Number(
+          (await redis.get(`${keyPrefix()}stats:completed:${jobName}`)) ?? 0,
+        );
+
+      describe("when a completion accounts for a coalesced batch", () => {
+        it("advances both counters by the payload count", async () => {
+          const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
+
+          await scripts.complete({
+            groupId: dispatched.groupId,
+            stagedJobId: dispatched.stagedJobId,
+            jobName: "recordSpan",
+            payloadCount: 7,
+          });
+
+          expect(await completedTotal()).toBe(7);
+          expect(await completedForJob("recordSpan")).toBe(7);
+        });
+      });
+
+      describe("when payloadCount is omitted", () => {
+        it("advances both counters by one", async () => {
+          const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
+
+          await scripts.complete({
+            groupId: dispatched.groupId,
+            stagedJobId: dispatched.stagedJobId,
+            jobName: "recordSpan",
+          });
+
+          expect(await completedTotal()).toBe(1);
+          expect(await completedForJob("recordSpan")).toBe(1);
+        });
+      });
+
+      describe("when the job was dropped", () => {
+        /** @scenario 'A discarded event still counts no completions' */
+        it("leaves both counters untouched whatever the payload count", async () => {
+          const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
+
+          await scripts.complete({
+            groupId: dispatched.groupId,
+            stagedJobId: dispatched.stagedJobId,
+            jobName: "recordSpan",
+            payloadCount: 7,
+            dropped: true,
+          });
+
+          expect(await completedTotal()).toBe(0);
+          expect(await completedForJob("recordSpan")).toBe(0);
+        });
+      });
+    });
   });
 
   describe("refreshActiveKey", () => {

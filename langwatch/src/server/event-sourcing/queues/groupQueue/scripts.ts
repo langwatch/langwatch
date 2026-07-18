@@ -1,8 +1,7 @@
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-
-import { CachedLuaScript } from "./cachedLuaScript";
 import { BLOB_HOLDER_TTL_SECONDS } from "./blobConstants";
+import { CachedLuaScript } from "./cachedLuaScript";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -1284,6 +1283,15 @@ local nowMs = tonumber(ARGV[6])
 -- counters and must not clear the group's stored error. Absent/"" = a genuine
 -- success, so older call sites keep their exact behaviour.
 local isDropped = ARGV[7] == "1"
+-- How many payloads this completion accounts for. A coalesced batch drains its
+-- siblings out of staging and frees the group with ONE complete() call, so
+-- counting calls here would make these counters fall as batching improves —
+-- and disagree with the per-payload Prometheus counter the same run reports.
+-- Absent / unparseable / < 1 = 1, so single-job call sites keep their behaviour.
+local payloadCount = tonumber(ARGV[8]) or 1
+if payloadCount < 1 then
+  payloadCount = 1
+end
 
 local currentActive = redis.call("GET", activeKey)
 if currentActive ~= stagedJobId then
@@ -1340,11 +1348,11 @@ redis.call("LTRIM", signalKey, 0, 999)
 -- error, so ops saw a win where an event had just been thrown away (#5538).
 if not isDropped then
   -- Increment completed counter for Skynet
-  redis.call("INCR", statsKey)
+  redis.call("INCRBY", statsKey, payloadCount)
 
   -- Increment per-job-name completed counter
   if jobName and jobName ~= "" then
-    redis.call("INCR", statsKey .. ":" .. jobName)
+    redis.call("INCRBY", statsKey .. ":" .. jobName, payloadCount)
   end
 
   -- Clear any leftover error from previous failures now that the job succeeded
@@ -1557,6 +1565,8 @@ export interface DrainedJob {
   stagedJobId: string;
   jobDataJson: string;
   originalScore: number;
+  /** Set after this worker has terminally dropped the drained job. */
+  dropped?: boolean;
 }
 
 /**
@@ -1905,7 +1915,11 @@ export class GroupStagingScripts {
           : [],
       };
     }
-    return { newStagedCount: Number(result), orphanedValues: [], reclaimS3Flags: [] };
+    return {
+      newStagedCount: Number(result),
+      orphanedValues: [],
+      reclaimS3Flags: [],
+    };
   }
 
   /**
@@ -2017,6 +2031,7 @@ export class GroupStagingScripts {
     stagedJobId,
     jobName,
     dropped = false,
+    payloadCount = 1,
   }: {
     groupId: string;
     stagedJobId: string;
@@ -2028,6 +2043,15 @@ export class GroupStagingScripts {
      * a successful one. Defaults false — a plain `complete()` is still a success.
      */
     dropped?: boolean;
+    /**
+     * How many payloads this completion accounts for. A coalesced batch drains
+     * its siblings out of staging and frees the group in a single call, so the
+     * Skynet counters must advance by the batch size to stay comparable with
+     * `gq_jobs_completed_total` (which counts payloads) and to keep the
+     * operational throughput view from falling as batching improves. Defaults
+     * to 1 — the single-job path is unchanged. Ignored when `dropped`.
+     */
+    payloadCount?: number;
   }): Promise<boolean> {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const jobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
@@ -2052,6 +2076,7 @@ export class GroupStagingScripts {
       String(readTenantCap()),
       String(Date.now()),
       dropped ? "1" : "",
+      String(payloadCount),
     );
 
     return result === 1;

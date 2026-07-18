@@ -1,20 +1,22 @@
-import { describe, it, expect, beforeEach } from "vitest";
 import { register } from "prom-client";
+import { beforeEach, describe, expect, it } from "vitest";
 
 // Import to trigger metric registration
 import {
-  gqJobsDelayedTotal,
+  gqBlockedGroups,
+  gqGroupsBlockedTotal,
+  gqHandlerBatchSize,
+  gqHandlerInvocationsTotal,
   gqJobDelayMilliseconds,
-  gqRetryAttempt,
-  gqRetryBackoffMilliseconds,
   gqJobDurationMilliseconds,
-  gqOldestPendingAgeMilliseconds,
   gqJobsCompletedTotal,
-  gqJobsRetriedTotal,
+  gqJobsDelayedTotal,
   gqJobsExhaustedTotal,
   gqJobsNonRetryableTotal,
-  gqGroupsBlockedTotal,
-  gqBlockedGroups,
+  gqJobsRetriedTotal,
+  gqOldestPendingAgeMilliseconds,
+  gqRetryAttempt,
+  gqRetryBackoffMilliseconds,
 } from "../metrics";
 
 const routingLabels = {
@@ -46,17 +48,20 @@ describe("GroupQueue metrics", () => {
     });
 
     it("registers gq_retry_backoff_milliseconds histogram", () => {
-      const metric = register.getSingleMetric(
-        "gq_retry_backoff_milliseconds",
-      );
+      const metric = register.getSingleMetric("gq_retry_backoff_milliseconds");
       expect(metric).toBeDefined();
     });
 
     it("registers gq_job_duration_milliseconds histogram", () => {
-      const metric = register.getSingleMetric(
-        "gq_job_duration_milliseconds",
-      );
+      const metric = register.getSingleMetric("gq_job_duration_milliseconds");
       expect(metric).toBeDefined();
+    });
+
+    it("registers handler invocation and batch-size metrics", () => {
+      expect(
+        register.getSingleMetric("gq_handler_invocations_total"),
+      ).toBeDefined();
+      expect(register.getSingleMetric("gq_handler_batch_size")).toBeDefined();
     });
 
     it("registers gq_oldest_pending_age_milliseconds gauge", () => {
@@ -100,8 +105,7 @@ describe("GroupQueue metrics", () => {
     it("records retry attempt with routing labels", async () => {
       gqRetryAttempt.observe(routingLabels, 3);
 
-      const lines =
-        await register.getSingleMetricAsString("gq_retry_attempt");
+      const lines = await register.getSingleMetricAsString("gq_retry_attempt");
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('job_name="traceSummary"');
     });
@@ -131,9 +135,29 @@ describe("GroupQueue metrics", () => {
     });
   });
 
+  describe("when a coalesced handler is observed", () => {
+    it("records one invocation and the payload count", async () => {
+      gqHandlerInvocationsTotal.inc(routingLabels);
+      gqHandlerBatchSize.observe(routingLabels, 32);
+
+      const invocations = await register.getSingleMetricAsString(
+        "gq_handler_invocations_total",
+      );
+      const batchSize = await register.getSingleMetricAsString(
+        "gq_handler_batch_size",
+      );
+      expect(invocations).toContain(
+        'gq_handler_invocations_total{queue_name="test-queue",pipeline_name="test-pipeline",job_type="fold",job_name="traceSummary"} 1',
+      );
+      expect(batchSize).toContain(
+        'gq_handler_batch_size_sum{queue_name="test-queue",pipeline_name="test-pipeline",job_type="fold",job_name="traceSummary"} 32',
+      );
+    });
+  });
+
   describe("when processing counters are recorded with routing labels", () => {
     it("records completed total with routing labels", async () => {
-      gqJobsCompletedTotal.inc(routingLabels);
+      gqJobsCompletedTotal.inc(routingLabels, 4);
 
       const lines = await register.getSingleMetricAsString(
         "gq_jobs_completed_total",
@@ -141,6 +165,9 @@ describe("GroupQueue metrics", () => {
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('job_type="fold"');
       expect(lines).toContain('job_name="traceSummary"');
+      expect(lines).toContain(
+        'gq_jobs_completed_total{queue_name="test-queue",pipeline_name="test-pipeline",job_type="fold",job_name="traceSummary"} 4',
+      );
     });
 
     it("records retried total with routing labels", async () => {
@@ -187,10 +214,7 @@ describe("GroupQueue metrics", () => {
   describe("when oldest pending age is set", () => {
     it("sets gauge value without throwing", () => {
       expect(() =>
-        gqOldestPendingAgeMilliseconds.set(
-          { queue_name: "test-queue" },
-          1500,
-        ),
+        gqOldestPendingAgeMilliseconds.set({ queue_name: "test-queue" }, 1500),
       ).not.toThrow();
     });
 

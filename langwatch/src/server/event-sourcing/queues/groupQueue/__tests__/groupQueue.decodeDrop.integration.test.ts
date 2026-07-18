@@ -17,17 +17,17 @@ import {
   stopTestContainers,
 } from "../../../__tests__/integration/testContainers";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
-import { GroupQueueProcessor } from "../groupQueue";
 import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle";
+import { GroupQueueProcessor } from "../groupQueue";
 import { encodeJobEnvelope, readEnvelopeHold } from "../jobEnvelope";
 import { gqJobsDroppedTotal } from "../metrics";
 import { GroupStagingScripts } from "../scripts";
 import { TieredBlobStore } from "../tieredBlobStore";
 import {
   FlakyObjectStore,
-  incompressible,
   InMemoryJobBlobStore,
   InMemoryObjectStore,
+  incompressible,
 } from "./blobTestDoubles";
 
 // Skip outside testcontainers (e.g. plain unit runs) — mirrors the other
@@ -54,8 +54,10 @@ type TestPayload = {
 // offload activates — see jobEnvelope.ts's projectIdFor / tenantIdFromGroupId.
 const TENANT = "proj1";
 const PROJECT = createTenantId(TENANT);
-const STORAGE_DESTINATION = async () =>
-  ({ kind: "s3" as const, bucket: "test-bucket" });
+const STORAGE_DESTINATION = async () => ({
+  kind: "s3" as const,
+  bucket: "test-bucket",
+});
 
 // > the 256 KiB s3 threshold once gzipped (see groupQueue.gq2.integration.test.ts).
 const OFFLOADABLE_S3_VALUE = () => incompressible(768 * 1024);
@@ -97,18 +99,24 @@ describe.skipIf(!hasTestcontainers)(
     function newQueue({
       name,
       processFn,
+      processBatch,
       consumerEnabled,
       objectStore,
+      score,
     }: {
       name: string;
       processFn: (payload: TestPayload) => Promise<void>;
+      processBatch?: (payloads: TestPayload[]) => Promise<void>;
       consumerEnabled: boolean;
       objectStore: InMemoryObjectStore;
+      score?: (payload: TestPayload) => number;
     }): GroupQueueProcessor<TestPayload> {
       const definition: EventSourcedQueueDefinition<TestPayload> = {
         name,
         groupKey: (p) => p.groupId,
         process: processFn,
+        ...(processBatch ? { processBatch, coalesceMaxBatch: () => 50 } : {}),
+        ...(score ? { score } : {}),
       };
       const queue = new GroupQueueProcessor<TestPayload>(definition, redis, {
         consumerEnabled,
@@ -119,10 +127,12 @@ describe.skipIf(!hasTestcontainers)(
       return queue;
     }
 
-    const blockedMembers = (name: string) => redis.smembers(`${name}:gq:blocked`);
+    const blockedMembers = (name: string) =>
+      redis.smembers(`${name}:gq:blocked`);
     const storedErrorMessage = (name: string, groupId: string) =>
       redis.hget(`${name}:gq:group:${groupId}:error`, "message");
-    const completedStat = (name: string) => redis.get(`${name}:gq:stats:completed`);
+    const completedStat = (name: string) =>
+      redis.get(`${name}:gq:stats:completed`);
 
     /** All `gq_jobs_dropped_total` samples recorded for this test's queue. */
     async function dropsFor(name: string) {
@@ -164,6 +174,38 @@ describe.skipIf(!hasTestcontainers)(
       });
     }
 
+    async function stageOffloadedBatch({
+      name,
+      groupId,
+      objectStore,
+    }: {
+      name: string;
+      groupId: string;
+      objectStore: InMemoryObjectStore;
+    }): Promise<void> {
+      const staging = newQueue({
+        name,
+        processFn: async () => {},
+        consumerEnabled: false,
+        objectStore,
+        score: (payload) => payload.id.charCodeAt(0),
+      });
+      await staging.waitUntilReady();
+      for (const id of ["A", "B", "C"]) {
+        await staging.send({
+          id,
+          groupId,
+          value: OFFLOADABLE_S3_VALUE(),
+        });
+      }
+    }
+
+    async function bodyUnreadableDropCount(name: string): Promise<number> {
+      return (await dropsFor(name))
+        .filter((entry) => entry.labels.reason === "body_unreadable")
+        .reduce((sum, entry) => sum + entry.value, 0);
+    }
+
     /**
      * Serves and stores normally, but starts rejecting `put` after N writes — so
      * the initial stage succeeds and a LATER re-encode fails. That is the only
@@ -176,11 +218,107 @@ describe.skipIf(!hasTestcontainers)(
         this.putsLeft = putsBeforeFailing;
       }
       override async put(uri: string, bytes: Buffer): Promise<void> {
-        if (this.putsLeft <= 0) throw new Error("blob store unavailable on write");
+        if (this.putsLeft <= 0)
+          throw new Error("blob store unavailable on write");
         this.putsLeft--;
         return super.put(uri, bytes);
       }
     }
+
+    class SelectiveFlakyObjectStore extends InMemoryObjectStore {
+      transientUri?: string;
+      private failed = false;
+
+      override async get(uri: string) {
+        if (uri === this.transientUri && !this.failed) {
+          this.failed = true;
+          throw new Error("transient ECONNRESET");
+        }
+        return super.get(uri);
+      }
+    }
+
+    describe("given a coalesced batch with a terminally dropped sibling", () => {
+      describe("when the handler fails after sibling parsing", () => {
+        it("re-stages healthy siblings without resurrecting the dropped sibling", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/batch-handler-failure`;
+          const objectStore = new InMemoryObjectStore();
+          await stageOffloadedBatch({ name, groupId, objectStore });
+
+          const uris = [...objectStore.store.keys()];
+          expect(uris).toHaveLength(3);
+          objectStore.store.set(uris[1]!, Buffer.from("not a valid gzip body"));
+
+          let batchAttempts = 0;
+          const succeeded = new Set<string>();
+          const consumer = newQueue({
+            name,
+            processFn: async (payload) => {
+              succeeded.add(payload.id);
+            },
+            processBatch: async (payloads) => {
+              batchAttempts++;
+              if (batchAttempts === 1) {
+                throw new Error("simulated batch failure");
+              }
+              for (const payload of payloads) {
+                succeeded.add(payload.id);
+              }
+            },
+            consumerEnabled: true,
+            objectStore,
+          });
+          await consumer.waitUntilReady();
+
+          await vi.waitFor(
+            () => {
+              expect(succeeded).toEqual(new Set(["A", "C"]));
+            },
+            { timeout: 45000, interval: 100 },
+          );
+          expect(await bodyUnreadableDropCount(name)).toBe(1);
+        });
+      });
+
+      describe("when another sibling has a transient parse failure", () => {
+        it("settles every parse before re-staging only the retryable siblings", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/mixed-parse-failures`;
+          const objectStore = new SelectiveFlakyObjectStore();
+          await stageOffloadedBatch({ name, groupId, objectStore });
+
+          const uris = [...objectStore.store.keys()];
+          expect(uris).toHaveLength(3);
+          objectStore.store.set(uris[1]!, Buffer.from("not a valid gzip body"));
+          objectStore.transientUri = uris[2]!;
+
+          const succeeded = new Set<string>();
+          const consumer = newQueue({
+            name,
+            processFn: async (payload) => {
+              succeeded.add(payload.id);
+            },
+            processBatch: async (payloads) => {
+              for (const payload of payloads) {
+                succeeded.add(payload.id);
+              }
+            },
+            consumerEnabled: true,
+            objectStore,
+          });
+          await consumer.waitUntilReady();
+
+          await vi.waitFor(
+            () => {
+              expect(succeeded).toEqual(new Set(["A", "C"]));
+            },
+            { timeout: 45000, interval: 100 },
+          );
+          expect(await bodyUnreadableDropCount(name)).toBe(1);
+        });
+      });
+    });
 
     describe("given a job whose retry cannot re-encode its payload", () => {
       describe("when the retry's re-encode fails", () => {
@@ -561,77 +699,69 @@ describe.skipIf(!hasTestcontainers)(
     describe("given a staged job whose blob store is temporarily unreachable", () => {
       describe("when a worker claims the group and the decode fails", () => {
         /** @scenario a transient blob-store error still retries instead of dropping */
-        it(
-          "re-stages the job for retry instead of completing it",
-          async () => {
-            const name = freshName();
-            const groupId = `${TENANT}/transient-retries`;
-            const flaky = new FlakyObjectStore(1); // fails once, then serves
-            const received: TestPayload[] = [];
-            newQueue({
-              name,
-              processFn: async (p) => {
-                received.push(p);
-              },
-              consumerEnabled: true,
-              objectStore: flaky,
-            });
+        it("re-stages the job for retry instead of completing it", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/transient-retries`;
+          const flaky = new FlakyObjectStore(1); // fails once, then serves
+          const received: TestPayload[] = [];
+          newQueue({
+            name,
+            processFn: async (p) => {
+              received.push(p);
+            },
+            consumerEnabled: true,
+            objectStore: flaky,
+          });
 
-            await queues[0]!.waitUntilReady();
-            await queues[0]!.send({
-              id: "s1",
-              groupId,
-              value: OFFLOADABLE_S3_VALUE(),
-            });
+          await queues[0]!.waitUntilReady();
+          await queues[0]!.send({
+            id: "s1",
+            groupId,
+            value: OFFLOADABLE_S3_VALUE(),
+          });
 
-            // The handler eventually runs despite the first transient
-            // failure — it could only get here via a re-stage, since a drop
-            // would never call the handler at all.
-            await vi.waitFor(() => expect(received).toHaveLength(1), {
-              timeout: 15000,
-              interval: 100,
-            });
-          },
-          20000,
-        );
+          // The handler eventually runs despite the first transient
+          // failure — it could only get here via a re-stage, since a drop
+          // would never call the handler at all.
+          await vi.waitFor(() => expect(received).toHaveLength(1), {
+            timeout: 15000,
+            interval: 100,
+          });
+        }, 20000);
 
-        it(
-          "does not increment the drop counter",
-          async () => {
-            const name = freshName();
-            const groupId = `${TENANT}/transient-no-drop`;
-            const flaky = new FlakyObjectStore(1);
-            const received: TestPayload[] = [];
-            newQueue({
-              name,
-              processFn: async (p) => {
-                received.push(p);
-              },
-              consumerEnabled: true,
-              objectStore: flaky,
-            });
+        it("does not increment the drop counter", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/transient-no-drop`;
+          const flaky = new FlakyObjectStore(1);
+          const received: TestPayload[] = [];
+          newQueue({
+            name,
+            processFn: async (p) => {
+              received.push(p);
+            },
+            consumerEnabled: true,
+            objectStore: flaky,
+          });
 
-            await queues[0]!.waitUntilReady();
-            await queues[0]!.send({
-              id: "s1",
-              groupId,
-              value: OFFLOADABLE_S3_VALUE(),
-            });
+          await queues[0]!.waitUntilReady();
+          await queues[0]!.send({
+            id: "s1",
+            groupId,
+            value: OFFLOADABLE_S3_VALUE(),
+          });
 
-            await vi.waitFor(() => expect(received).toHaveLength(1), {
-              timeout: 15000,
-              interval: 100,
-            });
+          await vi.waitFor(() => expect(received).toHaveLength(1), {
+            timeout: 15000,
+            interval: 100,
+          });
 
-            // Revert-check: pre-fix, TransientBlobStoreError still routed
-            // through handleTransientDecode (this was already correct before
-            // #5538 — see ADR-030 §2), so this specific assertion mainly
-            // guards against a regression that widens the drop path to catch
-            // transient errors too.
-            expect(await dropsFor(name)).toHaveLength(0);
-          },
-          20000,
-        );
+          // Revert-check: pre-fix, TransientBlobStoreError still routed
+          // through handleTransientDecode (this was already correct before
+          // #5538 — see ADR-030 §2), so this specific assertion mainly
+          // guards against a regression that widens the drop path to catch
+          // transient errors too.
+          expect(await dropsFor(name)).toHaveLength(0);
+        }, 20000);
       });
     });
 

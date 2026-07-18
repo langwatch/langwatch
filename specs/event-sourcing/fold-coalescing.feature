@@ -130,6 +130,24 @@ Feature: Group-coalesced fold projections
     When the group is retried
     Then every event is eventually processed and none are lost
 
+  # Coalescing frees the group with ONE completion call however many events the
+  # handler folded. Counting that as a single completion makes throughput and
+  # per-job-name totals fall as batching improves — the operational dashboards
+  # would read the improvement as a regression, and disagree with the payload
+  # counter the same run reports.
+  @integration @coalescing @observability
+  Scenario: A coalesced batch counts every event it completed
+    Given a group with several queued events folded into one batch
+    When the batch is processed successfully
+    Then the completed throughput counter advances by the number of events
+    And the per-job-name completed counter advances by the same number
+
+  @integration @coalescing @observability
+  Scenario: A discarded event still counts no completions
+    Given a staged event that cannot be decoded
+    When it is discarded to free the group
+    Then the completed counters do not advance
+
   @integration @coalescing @pipeline
   Scenario: Coalesced folding produces the correct accumulated state through the pipeline
     Given many spans recorded for one trace in quick succession

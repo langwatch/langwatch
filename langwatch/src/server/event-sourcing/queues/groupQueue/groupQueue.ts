@@ -68,11 +68,14 @@ import {
 import {
   gqGroupsBlockedTotal,
   gqGroupsPoisonParkedTotal,
+  gqHandlerBatchSize,
+  gqHandlerInvocationsTotal,
   gqJobDelayMilliseconds,
   gqJobDurationMilliseconds,
   gqJobsCompletedTotal,
   gqJobsDedupedTotal,
   gqJobsDelayedTotal,
+  gqJobsDispatchedTotal,
   gqJobsDroppedTotal,
   gqJobsExhaustedTotal,
   gqJobsNonRetryableTotal,
@@ -886,6 +889,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           nowMs: Date.now(),
           maxJobs: maxBatch - 1,
         });
+        if (drainedSiblings.length > 0) {
+          gqJobsDispatchedTotal.inc(
+            { queue_name: this.queueName },
+            drainedSiblings.length,
+          );
+        }
       } catch (err) {
         this.logger.warn(
           {
@@ -899,10 +908,22 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }
       if (drainedSiblings.length > 0) {
         try {
-          const parsedSiblings = await Promise.all(
+          const parseResults = await Promise.allSettled(
             drainedSiblings.map((sibling) =>
               this.parseDrainedPayload({ sibling, groupId }),
             ),
+          );
+          // Wait for every parse to settle before handling a transient or
+          // oversized sibling. A terminal parse marks its sibling as dropped;
+          // short-circuiting here could re-stage it before that mark is set.
+          const rejected = parseResults.find(
+            (result) => result.status === "rejected",
+          );
+          if (rejected) {
+            throw rejected.reason;
+          }
+          const parsedSiblings = parseResults.flatMap((result) =>
+            result.status === "fulfilled" ? [result.value] : [],
           );
           const siblingPayloads = parsedSiblings.filter(
             (parsed) => parsed !== null,
@@ -1066,6 +1087,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
               // Run the actual handler with request context propagation
               const requestContext = createContextFromJobData(contextMetadata);
+              const handlerPayloadCount = batchPayloads?.length ?? 1;
+              gqHandlerInvocationsTotal.inc(routingLabels);
+              gqHandlerBatchSize.observe(routingLabels, handlerPayloadCount);
               await runWithContext(requestContext, async () => {
                 if (batchPayloads && this.processBatch) {
                   span.setAttribute(
@@ -1080,8 +1104,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
               // Success — complete the group slot. Drained siblings were
               // removed from staging during the drain, so completing the
-              // dispatched job is enough to free the group.
-              await this.scripts.complete({ groupId, stagedJobId, jobName });
+              // dispatched job is enough to free the group. It is also the only
+              // completion the siblings get, hence payloadCount: the Redis
+              // counters ops reads must advance per payload, like the Prometheus
+              // one below, not once per handler call.
+              await this.scripts.complete({
+                groupId,
+                stagedJobId,
+                jobName,
+                payloadCount: handlerPayloadCount,
+              });
 
               // PAST THE POINT OF NO RETURN. The slot is completed, so the job
               // is done whatever happens next — everything below is cleanup and
@@ -1100,7 +1132,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   ],
                   groupId,
                 });
-                gqJobsCompletedTotal.inc(routingLabels);
+                gqJobsCompletedTotal.inc(routingLabels, handlerPayloadCount);
 
                 // Audit hook: onDispatched fires once per dispatched payload
                 // (dispatched + every drained sibling on success).
@@ -1144,23 +1176,22 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               const category = categorizeError(err);
               const isRetryable = isRetryableJobError(err);
 
-              // Re-stage the siblings so they are re-dispatched (and
+              // Re-stage drained siblings so they are re-dispatched (and
               // re-coalesced) on the dispatched job's retry, rather than lost
-              // until an event replay.
+              // until an event replay. Batch handlers are at-least-once: a store
+              // must tolerate a partial side effect before a throw, exactly as it
+              // must tolerate a single-job retry.
               //
-              // This used to claim the batch persists nothing until the very
-              // end, so a failure meant the siblings' work was undone. That is
-              // false for every throw site reachable from here: the handler
-              // stores fold state and THEN dispatches reactors, and the ack, the
-              // blob release and the reactor sends can all throw afterwards. So
-              // these siblings' events are typically already folded in, and
-              // re-staging re-delivers work that was done.
-              //
-              // It is not a correctness bug — the fold's applied-event-id set
-              // recognises the redelivery and skips it (proved end-to-end in
-              // foldRedeliveryIdempotency.integration.test.ts) — but it is real
-              // wasted work, and the comment claiming otherwise is why nobody
-              // looked.
+              // This used to say a failure meant nothing had been persisted for
+              // the siblings. That is false for every throw site reachable from
+              // here — the handler stores fold state and THEN dispatches
+              // reactors, and the ack, the blob release and the reactor sends can
+              // all throw afterwards — so these events are typically already
+              // folded in and re-staging re-delivers finished work. The fold's
+              // applied-event-id set catches the redelivery (proved end to end in
+              // foldRedeliveryIdempotency.integration.test.ts), so this costs
+              // work rather than correctness; the comment claiming otherwise is
+              // why nobody looked.
               if (drainedSiblings.length > 0) {
                 await this.restageDrainedSiblings(groupId, drainedSiblings);
               }
@@ -1425,15 +1456,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           ? err.reason === "missing_blob"
           : false),
       });
+      sibling.dropped = true;
       return null;
     }
   }
 
   /**
    * Re-stages siblings drained for a batch that ultimately failed, so they are
-   * re-dispatched instead of lost. Each is staged with its original score and
-   * raw job data (context metadata preserved). Best-effort: a re-stage failure
-   * is logged, not thrown, so it never masks the original processing error.
+   * re-dispatched instead of lost. One atomic stageBatch call restores every
+   * sibling with its original score and raw job data. Their blob holds survive
+   * the drain, so no per-sibling hold acquisition is needed.
    */
   /**
    * Attempt counter for the group's current failing chain.
@@ -1513,22 +1545,25 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     groupId: string,
     siblings: DrainedJob[],
   ): Promise<void> {
-    for (const sibling of siblings) {
-      try {
-        await this.scripts.stage({
+    const restageableSiblings = siblings.filter((sibling) => !sibling.dropped);
+    if (restageableSiblings.length === 0) {
+      return;
+    }
+    try {
+      await this.scripts.stageBatch(
+        restageableSiblings.map((sibling) => ({
           stagedJobId: sibling.stagedJobId,
           groupId,
           dispatchAfterMs: sibling.originalScore,
           dedupId: "",
           dedupTtlMs: 0,
           jobDataJson: sibling.jobDataJson,
-        });
-        // Re-acquire the sibling's hold (idempotent: it kept its hold through
-        // the drain, and its value — hence token — is unchanged).
-        await this.blobLifecycle.acquire(sibling.jobDataJson);
-      } catch (err) {
-        // The sibling never made it back into staging, so nothing will dispatch
-        // it again — that is a discard, whatever the re-stage intended (#5538).
+        })),
+      );
+    } catch (err) {
+      // Redis applies the script atomically, so it cannot leave only a subset
+      // restored. Record the failed re-stage per payload for drop accounting.
+      for (const sibling of restageableSiblings) {
         this.recordDrop({
           groupId,
           stagedJobId: sibling.stagedJobId,
