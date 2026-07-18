@@ -799,6 +799,28 @@ export const observeEsFoldCacheEntryBytes = (
 // Fold redelivery
 // ============================================================================
 
+register.removeSingleMetric("es_fold_dedup_unavailable_total");
+const esFoldDedupUnavailable = new Counter({
+  name: "es_fold_dedup_unavailable_total",
+  help: "Retried fold deliveries that had no applied-event-id set to check against, by reason",
+  labelNames: ["projection_name", "reason"] as const,
+});
+
+/**
+ * A RETRY reached the fold with no record of what an earlier attempt applied.
+ *
+ * This is the moment the batch is about to be re-applied on top of durable
+ * state that already contains it. It has to be its own counter rather than a
+ * label on the cache result, because the dangerous case is invisible in the
+ * existing signals: a miss on a retry and a miss on a fresh delivery are the
+ * same observation, and `es_fold_duplicate_events_skipped_total` staying flat
+ * during an incident reads as good news whether dedup was idle or blind.
+ */
+export const incrementEsFoldDedupUnavailable = (
+  projectionName: string,
+  reason: "cache_miss" | "read_error" | "unreadable" | "legacy_entry",
+) => esFoldDedupUnavailable.labels(projectionName, reason).inc();
+
 register.removeSingleMetric("es_fold_duplicate_events_skipped_total");
 const esFoldDuplicateEventsSkipped = new Counter({
   name: "es_fold_duplicate_events_skipped_total",

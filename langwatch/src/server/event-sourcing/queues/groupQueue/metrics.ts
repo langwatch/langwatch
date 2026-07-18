@@ -23,6 +23,7 @@ const metricNames = [
   "gq_retry_attempt",
   "gq_retry_backoff_milliseconds",
   "gq_job_duration_milliseconds",
+  "gq_post_completion_cleanup_failures_total",
   "gq_oldest_pending_age_milliseconds",
   // ADR-030 hardening + review 2026-06-24
   "gq_blob_reclaim_s3_failures_total",
@@ -166,6 +167,19 @@ export const gqRetryBackoffMilliseconds = new Histogram({
 });
 
 // --- Per-handler-invocation duration metric ---
+/**
+ * Cleanup that ran AFTER the group slot was completed and threw.
+ *
+ * The job itself is done and is not retried, so this never fails anything — but
+ * an unreleased blob then lingers until its backstop TTL, and without a counter
+ * that is only discoverable by grepping logs.
+ */
+export const gqPostCompletionCleanupFailuresTotal = new Counter({
+  name: "gq_post_completion_cleanup_failures_total",
+  help: "Post-completion cleanup failures; the job completed and is not retried",
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
+});
+
 export const gqJobDurationMilliseconds = new Histogram({
   name: "gq_job_duration_milliseconds",
   help: "Duration of one handler invocation in milliseconds; a coalesced batch produces one observation",

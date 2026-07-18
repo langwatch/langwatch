@@ -249,4 +249,51 @@ describe("RedisCachedFoldStore", () => {
       });
     });
   });
+
+  describe("given a retry whose applied-set is gone", () => {
+    /** Reads the counter straight off the registry — a spy on a destructured
+     *  copy would intercept nothing and pass regardless. */
+    async function dedupUnavailableCount(reason: string): Promise<number> {
+      const { register } = await import("prom-client");
+      const metric = await register
+        .getSingleMetric("es_fold_dedup_unavailable_total")
+        ?.get();
+      return (
+        metric?.values.find(
+          (v) =>
+            v.labels.projection_name === "test_table" &&
+            v.labels.reason === reason,
+        )?.value ?? 0
+      );
+    }
+
+    it("counts it, because the batch is about to be re-applied on top of itself", async () => {
+      // The dangerous case is invisible in the existing signals: a miss on a
+      // retry and a miss on a fresh delivery are the same observation, and the
+      // duplicate-skipped counter staying flat reads as good news whether dedup
+      // was idle or blind.
+      const before = await dedupUnavailableCount("cache_miss");
+
+      const redis = createRedis();
+      const { store } = createStore(redis);
+      const result = await store.getWithApplied("agg-1", {
+        ...CONTEXT,
+        deliveryAttempt: 3,
+      });
+
+      expect(result.appliedEventIds).toEqual([]);
+      expect(await dedupUnavailableCount("cache_miss")).toBe(before + 1);
+    });
+
+    it("does not count a fresh delivery, where a miss is unremarkable", async () => {
+      const before = await dedupUnavailableCount("cache_miss");
+
+      const redis = createRedis();
+      const { store } = createStore(redis);
+      await store.getWithApplied("agg-1", { ...CONTEXT, deliveryAttempt: 1 });
+
+      expect(await dedupUnavailableCount("cache_miss")).toBe(before);
+    });
+  });
+
 });

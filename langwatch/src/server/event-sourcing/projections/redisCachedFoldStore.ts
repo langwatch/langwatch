@@ -4,6 +4,7 @@ import type { Redis } from "ioredis";
 import {
   incrementEsFoldCacheRedisError,
   incrementEsFoldCacheTotal,
+  incrementEsFoldDedupUnavailable,
   observeEsFoldCacheEntryBytes,
   observeEsFoldCacheGetDuration,
   observeEsFoldCacheStoreDuration,
@@ -102,12 +103,25 @@ export class RedisCachedFoldStore<State>
     context: ProjectionStoreContext,
   ): Promise<{ state: State | null; appliedEventIds: string[] }> {
     const cached = await this.readCached(aggregateId, context);
-    if (cached) {
+    const isRetry = (context.deliveryAttempt ?? 1) > 1;
+
+    if (cached.hit) {
+      if (isRetry && cached.legacy) {
+        incrementEsFoldDedupUnavailable(this.keyPrefix, "legacy_entry");
+      }
       return {
         state: cached.state,
         appliedEventIds: cached.appliedEventIds,
       };
     }
+
+    // A retry with no applied-set is the moment a batch gets re-applied on top
+    // of state that already holds it. Named by reason so an incident can tell a
+    // cold cache from a Redis fault from a corrupt entry.
+    if (isRetry) {
+      incrementEsFoldDedupUnavailable(this.keyPrefix, cached.reason);
+    }
+
     return {
       state: await this.readDurable(aggregateId, context),
       appliedEventIds: [],
@@ -117,7 +131,10 @@ export class RedisCachedFoldStore<State>
   private async readCached(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<{ state: State; appliedEventIds: string[] } | null> {
+  ): Promise<
+    | { hit: true; state: State; appliedEventIds: string[]; legacy: boolean }
+    | { hit: false; reason: "cache_miss" | "read_error" | "unreadable" }
+  > {
     const key = this.redisKey(aggregateId, context);
     const startedAt = performance.now();
 
@@ -131,12 +148,12 @@ export class RedisCachedFoldStore<State>
         { aggregateId, tenantId: String(context.tenantId), error: String(error) },
         "Fold cache read failed — falling through to the durable store",
       );
-      return null;
+      return { hit: false, reason: "read_error" };
     }
 
     if (raw === null) {
       incrementEsFoldCacheTotal(this.keyPrefix, "miss");
-      return null;
+      return { hit: false, reason: "cache_miss" };
     }
 
     incrementEsFoldCacheTotal(this.keyPrefix, "hit");
@@ -160,12 +177,16 @@ export class RedisCachedFoldStore<State>
         { aggregateId, tenantId: String(context.tenantId), error: String(error) },
         "Fold cache entry was unreadable — falling through to the durable store, dedup unavailable for this read",
       );
-      return null;
+      return { hit: false, reason: "unreadable" };
     }
 
     return {
+      hit: true,
       state: decoded.state,
       appliedEventIds: decoded.appliedEventIds,
+      // Written before the applied-set existed: readable, but carries no record
+      // of what was applied.
+      legacy: decoded.updatedAt === null,
     };
   }
 

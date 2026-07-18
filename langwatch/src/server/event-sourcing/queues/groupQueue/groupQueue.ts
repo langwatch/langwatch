@@ -73,6 +73,7 @@ import {
   gqJobDelayMilliseconds,
   gqJobDurationMilliseconds,
   gqJobsCompletedTotal,
+  gqPostCompletionCleanupFailuresTotal,
   gqJobsDedupedTotal,
   gqJobsDelayedTotal,
   gqJobsDispatchedTotal,
@@ -1122,6 +1123,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // schedules a retry of a job whose slot has already been
               // completed, delivering the whole batch a second time. A blob
               // release failing on a brief S3 blip was enough to trigger it.
+              // Counted immediately after complete(), NOT inside the cleanup
+              // below. The Redis-side counters advanced in complete() already,
+              // so incrementing after a step that can throw lets an S3 blip
+              // permanently desynchronise this from them — a phantom backlog on
+              // the dispatched-minus-completed dashboard that never drains, at
+              // exactly the moment you would be reading it.
+              gqJobsCompletedTotal.inc(routingLabels, handlerPayloadCount);
+
               try {
                 // The chain is over: anything it recorded is no longer live.
                 await this.clearGroupAttempt(groupId);
@@ -1132,7 +1141,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   ],
                   groupId,
                 });
-                gqJobsCompletedTotal.inc(routingLabels, handlerPayloadCount);
 
                 // Audit hook: onDispatched fires once per dispatched payload
                 // (dispatched + every drained sibling on success).
@@ -1160,6 +1168,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               } catch (cleanupErr) {
                 // Worth knowing about — an unreleased blob lingers until its
                 // backstop TTL — but never worth re-running the job for.
+                gqPostCompletionCleanupFailuresTotal.inc(routingLabels);
                 this.logger.error(
                   {
                     queueName: this.queueName,
