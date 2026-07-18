@@ -1,8 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import type { WebhookMethod } from "~/shared/automations/providers/webhook";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
-import type { WebhookDeliveryInput } from "~/server/app-layer/automations/repositories/webhook-delivery.repository";
-import { encrypt } from "~/utils/encryption";
+import type {
+  WebhookDeliveryInput,
+  WebhookFailureResponse,
+} from "~/server/app-layer/automations/repositories/webhook-delivery.repository";
 import {
   assertWebhookDelivered,
   sendWebhook,
@@ -19,8 +21,7 @@ export type WebhookDeliveryRecorder = (
 
 /** How much of the failure message the log row keeps. */
 const LOG_ERROR_CHARS = 500;
-/** How much of the receiver's failure response body the log row keeps
- *  (encrypted at rest). */
+/** How much of the receiver's failure response body the log row keeps. */
 const LOG_RESPONSE_CHARS = 4000;
 
 /** Mask every configured header VALUE out of stored text. The receiver may
@@ -41,25 +42,17 @@ export function scrubHeaderValues({
   return out;
 }
 
-/** The debugging context a failed attempt keeps, AES-encrypted at rest and
- *  deleted with the row by the 30-day prune. */
-export interface WebhookFailureResponse {
-  body?: string;
-  headers?: Record<string, string>;
-  retryAfterMs?: number;
-}
-
-function encryptFailureResponse({
+function captureFailureResponse({
   result,
   sentHeaders,
 }: {
   result: WebhookSendResult | undefined;
   sentHeaders: Record<string, string>;
-}): string | null {
+}): WebhookFailureResponse | null {
   if (!result) return null;
   const scrub = (text: string) =>
     scrubHeaderValues({ text, headers: sentHeaders });
-  const payload: WebhookFailureResponse = {
+  return {
     body: scrub(result.body).slice(0, LOG_RESPONSE_CHARS),
     ...(result.responseHeaders
       ? {
@@ -75,7 +68,6 @@ function encryptFailureResponse({
       ? { retryAfterMs: result.retryAfterMs }
       : {}),
   };
-  return encrypt(JSON.stringify(payload));
 }
 
 /**
@@ -83,8 +75,9 @@ function encryptFailureResponse({
  * (ADR-040 §5 + §6) as a single unit: on 2xx a `success` row, on a classified
  * non-2xx a `retryable`/`terminal` row, on a transport/SSRF throw a row with
  * the error and no status. A failed attempt keeps the receiver's truncated
- * response (body + headers) encrypted at rest for debugging — scrubbed of our
- * configured header values — and it is deleted with the row by the prune. The
+ * response (body + headers) for debugging — industry-baseline plaintext,
+ * scrubbed of our configured header values, deleted with the row by the
+ * prune. The
  * classified DispatchError is always re-thrown so the outbox retry contract
  * is unchanged — logging is a side effect that never swallows a dispatch
  * failure, and a logging failure never breaks dispatch.
@@ -165,7 +158,7 @@ export async function deliverWebhook({
       responseStatus: result?.status ?? null,
       latencyMs: Date.now() - startedAt,
       error,
-      responseEncrypted: encryptFailureResponse({
+      response: captureFailureResponse({
         result,
         sentHeaders: headers ?? {},
       }),

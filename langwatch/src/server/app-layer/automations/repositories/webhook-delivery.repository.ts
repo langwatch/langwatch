@@ -3,10 +3,19 @@ import type { WebhookDeliveryOutcome } from "@prisma/client";
 /**
  * Read + write repository over `WebhookDelivery` — the per-attempt delivery
  * log behind a webhook automation's "recent fires" drill-down (ADR-040 §6).
- * A slim facts table: outcome, status, latency, capped error message, plus an
- * ENCRYPTED truncated failure response for debugging. Our request content is
- * never stored; the ciphertext dies with the row in the 30-day prune.
+ * A slim facts table: outcome, status, latency, capped error message, plus a
+ * truncated failure response for debugging (industry-baseline plaintext,
+ * GitHub/Stripe style). Our request content is never stored; the response
+ * dies with the row in the 30-day prune.
  */
+
+/** The debugging context a failed attempt keeps — the receiver's truncated
+ *  response, scrubbed of our configured header values by the writer. */
+export interface WebhookFailureResponse {
+  body?: string;
+  headers?: Record<string, string>;
+  retryAfterMs?: number;
+}
 
 /** One persisted delivery attempt, as shown in the drawer's attempts list. */
 export interface WebhookDeliveryRow {
@@ -17,9 +26,7 @@ export interface WebhookDeliveryRow {
   responseStatus: number | null;
   latencyMs: number | null;
   error: string | null;
-  /** AES ciphertext of the truncated failure response ({body, headers,
-   *  retryAfterMs}); the service decrypts it for the drawer. */
-  responseEncrypted: string | null;
+  response: WebhookFailureResponse | null;
   outcome: WebhookDeliveryOutcome;
   firedAt: Date;
 }
@@ -33,7 +40,7 @@ export interface WebhookDeliveryInput {
   responseStatus?: number | null;
   latencyMs?: number | null;
   error?: string | null;
-  responseEncrypted?: string | null;
+  response?: WebhookFailureResponse | null;
   outcome: WebhookDeliveryOutcome;
 }
 

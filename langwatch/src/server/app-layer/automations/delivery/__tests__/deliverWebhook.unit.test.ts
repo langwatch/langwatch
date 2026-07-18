@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { WebhookDeliveryInput } from "~/server/app-layer/automations/repositories/webhook-delivery.repository";
-import { decrypt } from "~/utils/encryption";
-import {
-  deliverWebhook,
-  type WebhookFailureResponse,
-} from "../deliverWebhook";
+import { deliverWebhook } from "../deliverWebhook";
 import type { sendWebhook, WebhookSendResult } from "../sendWebhook";
 
 const base = {
@@ -110,12 +106,9 @@ describe("deliverWebhook", () => {
       ).rejects.toBeInstanceOf(DispatchError);
       expect(rows[0]!.error).toContain("***");
       expect(JSON.stringify(rows[0])).not.toContain("Bearer secret");
-      // Scrubbed inside the encrypted response too — body AND headers.
-      const response = JSON.parse(
-        decrypt(rows[0]!.responseEncrypted!),
-      ) as WebhookFailureResponse;
-      expect(response.body).toContain("***");
-      expect(response.headers).toEqual({ "x-echo": "***" });
+      // Scrubbed inside the stored response too — body AND headers.
+      expect(rows[0]!.response?.body).toContain("***");
+      expect(rows[0]!.response?.headers).toEqual({ "x-echo": "***" });
     });
   });
 
@@ -135,11 +128,8 @@ describe("deliverWebhook", () => {
         responseStatus: 404,
         outcome: "terminal",
       });
-      // The receiver's truncated response is kept encrypted for debugging.
-      const response = JSON.parse(
-        decrypt(rows[0]!.responseEncrypted!),
-      ) as WebhookFailureResponse;
-      expect(response.body).toBe("gone");
+      // The receiver's truncated response is kept for debugging.
+      expect(rows[0]!.response?.body).toBe("gone");
     });
   });
 
@@ -164,7 +154,7 @@ describe("deliverWebhook", () => {
       expect(rows[0]).toMatchObject({
         responseStatus: null,
         error: "blocked: private address",
-        responseEncrypted: null,
+        response: null,
         outcome: "terminal",
       });
     });

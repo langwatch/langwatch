@@ -820,9 +820,9 @@ model Trigger {
 // ADR-040 §6: per-ATTEMPT webhook delivery log — the drill-down behind a
 // webhook automation's "recent fires". One row per HTTP attempt; all attempts
 // of one logical fire share `dispatchId` (== the X-LangWatch-Event-Id). A slim
-// facts table: outcome, status, latency, a capped error message, plus an
-// ENCRYPTED truncated copy of a failure response for debugging. Our request
-// content (URL, headers, body) is never stored. Pruned after 30 days.
+// facts table: outcome, status, latency, a capped error message, plus a
+// truncated copy of a failure response for debugging. Our request content
+// (URL, headers, body) is never stored. Pruned after 30 days.
 model WebhookDelivery {
   id             String                @id @default(nanoid())
   projectId      String
@@ -837,11 +837,11 @@ model WebhookDelivery {
   // Capped, classified error message when the attempt failed (scrubbed of
   // the configured header values).
   error          String?
-  // AES-256-GCM ciphertext of the receiver's truncated failure response
-  // ({body, headers, retryAfterMs}) — debugging context, scrubbed of our
-  // configured header values before encryption; deleted with the row by the
-  // 30-day prune. Null on success and no-response failures.
-  responseEncrypted String?
+  // The receiver's truncated failure response ({body, headers, retryAfterMs})
+  // — debugging context, industry-baseline plaintext (GitHub/Stripe style),
+  // scrubbed of our configured header values before storage; deleted with
+  // the row by the 30-day prune. Null on success and no-response failures.
+  response       Json?
   outcome        WebhookDeliveryOutcome
   firedAt        DateTime              @default(now())
   createdAt      DateTime              @default(now())

@@ -1,8 +1,9 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import type {
   WebhookDeliveryInput,
   WebhookDeliveryRepository,
   WebhookDeliveryRow,
+  WebhookFailureResponse,
 } from "./webhook-delivery.repository";
 
 export class PrismaWebhookDeliveryRepository
@@ -19,7 +20,9 @@ export class PrismaWebhookDeliveryRepository
         responseStatus: input.responseStatus ?? null,
         latencyMs: input.latencyMs ?? null,
         error: input.error ?? null,
-        responseEncrypted: input.responseEncrypted ?? null,
+        response: (input.response ?? undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
         outcome: input.outcome,
       },
     });
@@ -46,7 +49,7 @@ export class PrismaWebhookDeliveryRepository
       responseStatus: row.responseStatus,
       latencyMs: row.latencyMs,
       error: row.error,
-      responseEncrypted: row.responseEncrypted,
+      response: (row.response as WebhookFailureResponse | null) ?? null,
       outcome: row.outcome,
       firedAt: row.firedAt,
     }));

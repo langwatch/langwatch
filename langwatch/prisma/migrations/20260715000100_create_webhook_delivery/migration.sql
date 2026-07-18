@@ -1,9 +1,9 @@
 -- ADR-040 §6: per-attempt webhook delivery log — the drill-down behind a
 -- webhook automation's "recent fires". One row per HTTP attempt; all attempts
 -- of one logical fire share `dispatchId` (== the X-LangWatch-Event-Id). A slim
--- facts table: outcome, status, latency, a capped error message, plus an
--- encrypted truncated copy of a failure response for debugging. Our request
--- content (URL, headers, body) is never stored. Rows are pruned after 30 days.
+-- facts table: outcome, status, latency, a capped error message, plus a
+-- truncated copy of a failure response for debugging. Our request content
+-- (URL, headers, body) is never stored. Rows are pruned after 30 days.
 
 -- CreateEnum
 CREATE TYPE "WebhookDeliveryOutcome" AS ENUM ('success', 'retryable', 'terminal', 'pending');
@@ -17,7 +17,7 @@ CREATE TABLE "WebhookDelivery" (
     "responseStatus" INTEGER,
     "latencyMs" INTEGER,
     "error" TEXT,
-    "responseEncrypted" TEXT,
+    "response" JSONB,
     "outcome" "WebhookDeliveryOutcome" NOT NULL,
     "firedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
