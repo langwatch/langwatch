@@ -49,7 +49,20 @@ type BundleConfig struct {
 	// CacheRules lists priority-ordered cache control rules.
 	CacheRules []CacheRule
 
-	// ProjectOTLPToken is the project's auth token for AI trace export.
+	// TraceProjectID is the project customer traces are EXPORTED to. It is NOT
+	// necessarily the VK's own project: resolveTraceProject (control plane) falls
+	// back to the organization's internal_governance project whenever the VK is
+	// not scoped to exactly one project, so this can name a different project on
+	// a different team than Bundle.ProjectID.
+	//
+	// It is materialised in the SAME config payload as ProjectOTLPToken, so the
+	// two always describe one project. Pair the token with THIS field and never
+	// with Bundle.ProjectID: that one is carried on the auth JWT, refreshed on a
+	// different clock, and a skew between the two clocks exports one project's
+	// prompts and completions under another project's ingest token.
+	TraceProjectID string
+
+	// ProjectOTLPToken is the auth token for AI trace export into TraceProjectID.
 	ProjectOTLPToken string
 
 	// VKDisplayPrefix is the VK's public display prefix (e.g. "vk-lw-…").

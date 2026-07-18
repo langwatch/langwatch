@@ -171,3 +171,26 @@ func TestProviderSlotToCredential_BaseURL(t *testing.T) {
 		assert.Empty(t, cred.Extra["base_url"])
 	})
 }
+
+// The trace-export project id and its OTLP token are materialised together by
+// the control plane and must survive decoding as a pair. Dropping project_id
+// here is what forced the middleware to reach for the auth JWT's project id
+// instead — a field on a different refresh clock, whose skew exported one
+// project's prompts and completions under another project's ingest token.
+func TestConfigWire_TraceProjectIDTravelsWithToken(t *testing.T) {
+	w := &configWire{ProjectID: "proj-trace", ProjectOTLPToken: "tok-trace"}
+
+	cfg := w.toDomain()
+
+	assert.Equal(t, "proj-trace", cfg.TraceProjectID)
+	assert.Equal(t, "tok-trace", cfg.ProjectOTLPToken)
+}
+
+// A null project_id (org without an internal_governance project) must decode to
+// empty rather than to some other project's id — the middleware fails closed on
+// empty and exports nothing, which is the safe outcome.
+func TestConfigWire_AbsentTraceProjectIDIsEmpty(t *testing.T) {
+	cfg := (&configWire{ProjectOTLPToken: "tok"}).toDomain()
+
+	assert.Empty(t, cfg.TraceProjectID)
+}

@@ -49,7 +49,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 		Name: "traces",
 		Sync: func(next DispatchFunc) DispatchFunc {
 			return func(ctx context.Context, call *Call) (*domain.Response, error) {
-				spanCtx, tp := begin(ctx, call.Bundle.ProjectID, call.Request.Type)
+				spanCtx, tp := begin(ctx, call.Bundle.Config.TraceProjectID, call.Request.Type)
 				call.Meta.CustomerTraceparent = tp
 
 				resp, err := next(spanCtx, call)
@@ -91,7 +91,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 		},
 		Stream: func(next StreamFunc) StreamFunc {
 			return func(ctx context.Context, call *Call) (domain.StreamIterator, error) {
-				spanCtx, tp := begin(ctx, call.Bundle.ProjectID, call.Request.Type)
+				spanCtx, tp := begin(ctx, call.Bundle.Config.TraceProjectID, call.Request.Type)
 				call.Meta.CustomerTraceparent = tp
 
 				iter, err := next(spanCtx, call)
