@@ -307,7 +307,7 @@ describe.skipIf(!hasTestcontainers)(
 
     describe("given a staged job whose referenced blob is genuinely gone", () => {
       describe("when a worker claims the group and the decode fails", () => {
-        /** @scenario a missing-blob drop releases the absent blob's lease */
+        /** @scenario "a missing-blob drop releases the absent blob's holder" */
         it("releases the blob's lease without eager object deletion", async () => {
           const name = freshName();
           const groupId = `${TENANT}/missing-blob-release`;

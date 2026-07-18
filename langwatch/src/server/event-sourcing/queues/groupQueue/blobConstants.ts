@@ -36,7 +36,7 @@ export const BLOB_LEASE_TTL_SECONDS = 3 * 24 * 60 * 60;
 export const BLOB_LEASE_SET_TTL_SECONDS = BLOB_LEASE_TTL_SECONDS + 24 * 60 * 60;
 
 /** Sentinel that prevents previous-release code from observing a last holder. */
-export const LEGACY_HOLDER_LEASE_GUARD = "__gq2_lease_guard__";
+export const LEGACY_HOLDER_LEASE_GUARD = "__gq2_lease_guard__" as const;
 
 /**
  * Hard ceiling on a single job's serialized payload. A payload over this is
