@@ -1,14 +1,18 @@
 import { TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-
+import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
+import { buildIntentFactories } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/automations/schemas/constants";
+import type { TriggerMatchRecordedEventData } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 import {
-  MAX_PENDING_MATCHES,
   addPending,
   drainDue,
-  settleBoundary,
+  MAX_PENDING_MATCHES,
   type SettlementState,
+  settleBoundary,
+  triggerSettlementPM,
 } from "../triggerSettlement.process";
-import type { TriggerMatchEventView } from "../triggerSettlementProcess.types";
+import type { TriggerSettlementDispatchDeps } from "../triggerSettlementIntentHandlers";
 
 const initialState = (): SettlementState => ({
   pendingMatches: {},
@@ -16,8 +20,8 @@ const initialState = (): SettlementState => ({
 });
 
 const match = (
-  overrides: Partial<TriggerMatchEventView> = {},
-): TriggerMatchEventView => ({
+  overrides: Partial<TriggerMatchRecordedEventData> = {},
+): TriggerMatchRecordedEventData => ({
   triggerId: "trigger-1",
   traceId: "trace-1",
   action: TriggerAction.SEND_EMAIL,
@@ -133,6 +137,50 @@ describe("trigger settlement process", () => {
         );
         expect(next.pendingMatches["trace-0"]).toBeUndefined();
         expect(next.overflowDropped).toBe(1);
+      });
+
+      it("emits one post-commit log intent with the drop count", () => {
+        const pendingMatches = Object.fromEntries(
+          Array.from({ length: MAX_PENDING_MATCHES }, (_, index) => [
+            `trace-${index}`,
+            {
+              settleDueAt: index,
+              dispatchDueAt: index,
+              actionClass: "notify" as const,
+            },
+          ]),
+        );
+        const definition = buildProcessManager({
+          name: "triggerSettlement",
+          applier: triggerSettlementPM({
+            dispatch: {} as TriggerSettlementDispatchDeps,
+          }),
+        });
+        const evolve =
+          definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
+
+        const evolution = evolve(
+          { pendingMatches, overflowDropped: 4 },
+          match({ traceId: "newest" }),
+          {
+            at: MAX_PENDING_MATCHES + 1,
+            key: "trigger-1",
+            projectId: "project-1",
+            intents: buildIntentFactories(definition.config.intents),
+          },
+        );
+
+        expect(evolution.intents).toEqual([
+          {
+            messageKey: "overflow:5",
+            intentType: "logOverflow",
+            payload: {
+              triggerId: "trigger-1",
+              dropped: 1,
+              totalDropped: 5,
+            },
+          },
+        ]);
       });
     });
   });

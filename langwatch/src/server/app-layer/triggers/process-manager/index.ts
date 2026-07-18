@@ -25,9 +25,7 @@ export {
   notifyDigestIntentSchema,
   persistMatchIntentSchema,
   TRIGGER_SETTLEMENT_INTENT_TYPES,
-  triggerMatchEventViewSchema,
   type NotifyDigestIntent,
   type PersistMatchIntent,
-  type TriggerMatchEventView,
   type TriggerSettlementState,
 } from "./triggerSettlementProcess.types";

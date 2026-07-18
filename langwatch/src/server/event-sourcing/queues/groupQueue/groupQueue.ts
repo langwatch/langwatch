@@ -116,6 +116,18 @@ export function isRetryableJobError(err: unknown): boolean {
   return categorizeError(err) !== ErrorCategory.CRITICAL;
 }
 
+/** Resolve retry delay with a receiver Retry-After as a floor, never a cap. */
+export function retryBackoffMsFor({
+  attempt,
+  error,
+}: {
+  attempt: number;
+  error: unknown;
+}): number {
+  const retryAfterMs = isDispatchError(error) ? error.retryAfterMs : undefined;
+  return Math.max(getBackoffMs(attempt), retryAfterMs ?? 0);
+}
+
 /**
  * The `__*` namespace is reserved for queue machinery. Routing fields
  * (`__pipelineName`, `__jobType`, `__jobName`) ARE caller-set — event-sourcing
@@ -1083,13 +1095,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 // the exponential backoff: a DispatchError may carry a
                 // retryAfterMs hint, which can lengthen but never shorten the
                 // wait (so it can't cause a retry storm).
-                const retryAfterMs = isDispatchError(err)
-                  ? err.retryAfterMs
-                  : undefined;
-                const backoffMs = Math.max(
-                  getBackoffMs(attempt),
-                  retryAfterMs ?? 0,
-                );
+                const backoffMs = retryBackoffMsFor({ attempt, error: err });
                 gqRetryAttempt.observe(routingLabels, attempt);
                 gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
                 const newStagedJobId = `${stagedJobId}/r/${attempt}`;

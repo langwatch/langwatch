@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
+import { buildIntentFactories } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
   GRAPH_ALERT_SWEEP_INTERVAL_MS,
   graphAlertSweepPM,
@@ -38,9 +39,10 @@ describe("graph alert sweep process", () => {
   });
 
   describe("given one sweep candidate", () => {
-    describe("when the evaluateGraph intent runs", () => {
-      it("evaluates the candidate with its heartbeat reason", async () => {
+    describe("when the scheduled process wakes", () => {
+      it("emits the sweep intent, evaluates the candidate, and prunes old intents", async () => {
         const evaluateGraphTrigger = vi.fn().mockResolvedValue(undefined);
+        const deleteDispatchedBefore = vi.fn().mockResolvedValue(4);
         const definition = buildProcessManager({
           name: "graphAlertSweep",
           applier: graphAlertSweepPM({
@@ -52,27 +54,49 @@ describe("graph alert sweep process", () => {
               },
             ]),
             evaluateGraphTrigger,
-            deleteDispatchedBefore: vi.fn().mockResolvedValue(0),
+            deleteDispatchedBefore,
             now: () => 10_000,
           }),
         });
 
-        await definition.config.intents.evaluateGraph!.run(
-          { scheduledFor: 10_000 },
+        const wake = definition.config.onWake!(
+          { lastSweepAt: null },
           {
-            processName: "graphAlertSweep",
+            at: 10_000,
+            key: "graphAlertSweep",
             projectId: "__global__",
-            processKey: "graphAlertSweep",
-            tenantId: "__global__",
-            messageKey: "sweep:10000",
-            attempt: 1,
+            intents: buildIntentFactories(definition.config.intents),
           },
         );
+        expect(wake).toEqual({
+          state: { lastSweepAt: 10_000 },
+          intents: [
+            {
+              messageKey: "sweep:10000",
+              intentType: "evaluateGraph",
+              payload: { scheduledFor: 10_000 },
+            },
+          ],
+        });
+
+        const intent = wake.intents![0]!;
+        await definition.config.intents.evaluateGraph!.run(intent.payload, {
+          processName: "graphAlertSweep",
+          projectId: "__global__",
+          processKey: "graphAlertSweep",
+          tenantId: "__global__",
+          messageKey: intent.messageKey,
+          attempt: 1,
+        });
 
         expect(evaluateGraphTrigger).toHaveBeenCalledWith({
           triggerId: "trigger-1",
           projectId: "project-1",
           reason: "heartbeat",
+        });
+        expect(deleteDispatchedBefore).toHaveBeenCalledWith({
+          processName: "graphAlertSweep",
+          before: 10_000 - 24 * 60 * 60 * 1000,
         });
       });
     });

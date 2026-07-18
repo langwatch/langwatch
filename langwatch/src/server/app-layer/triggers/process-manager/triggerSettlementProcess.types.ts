@@ -1,19 +1,10 @@
 import { z } from "zod";
-
-export {
-  triggerActionClassSchema,
-  triggerMatchRecordedEventDataSchema as triggerMatchEventViewSchema,
-} from "~/server/event-sourcing/pipelines/automations/schemas/events";
-export type {
-  TriggerMatchRecordedEventData as TriggerMatchEventView,
-} from "~/server/event-sourcing/pipelines/automations/schemas/events";
 import type { TriggerActionClass } from "~/server/event-sourcing/pipelines/automations/schemas/events";
-
-export const TRIGGER_SETTLEMENT_PROCESS_NAME = "triggerSettlement" as const;
 
 export const TRIGGER_SETTLEMENT_INTENT_TYPES = {
   NOTIFY_DIGEST: "notifyDigest",
   PERSIST_MATCH: "persistMatch",
+  LOG_OVERFLOW: "logOverflow",
 } as const;
 
 export interface PendingMatch {
@@ -39,3 +30,10 @@ export const persistMatchIntentSchema = z.object({
   traceId: z.string().min(1),
 });
 export type PersistMatchIntent = z.infer<typeof persistMatchIntentSchema>;
+
+export const logOverflowIntentSchema = z.object({
+  triggerId: z.string().min(1),
+  dropped: z.number().int().positive(),
+  totalDropped: z.number().int().positive(),
+});
+export type LogOverflowIntent = z.infer<typeof logOverflowIntentSchema>;

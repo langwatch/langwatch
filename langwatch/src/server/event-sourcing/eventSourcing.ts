@@ -460,9 +460,10 @@ export class EventSourcing {
     // jobs staged by the previous release, so recognize the legacy shape and
     // ACK-drop it with a log instead of parsing it as an event (which would
     // poison-retry). Removable after one release.
-    const isLegacyOutboxPayload = (
-      payload: Record<string, unknown>,
-    ): boolean =>
+    // Intentionally loose for that one-release bridge: old payload revisions
+    // did not share reliable routing metadata, so a matching top-level stage
+    // is enough. Remove this stage-only matcher with the tombstone next release.
+    const isLegacyOutboxPayload = (payload: Record<string, unknown>): boolean =>
       payload.stage === "settle" ||
       payload.stage === "cadence" ||
       payload.stage === "graphEval";
@@ -548,7 +549,6 @@ export class EventSourcing {
     } else {
       this._globalQueue = new EventSourcedQueueProcessorMemory(definition);
     }
-
   }
 
   private logDisabledWarning(context: {

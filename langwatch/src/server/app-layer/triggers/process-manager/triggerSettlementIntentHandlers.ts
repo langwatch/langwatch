@@ -10,9 +10,9 @@ import type { ProjectService } from "~/server/app-layer/projects/project.service
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { IntentExecutor } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   sendRenderedTriggerEmail,
   sendTriggerEmail,
@@ -22,7 +22,10 @@ import {
   deliverWebhook,
   type WebhookDeliveryRecorder,
 } from "~/server/triggers/deliverWebhook";
-import { DispatchError, isDispatchError } from "~/server/triggers/dispatchError";
+import {
+  DispatchError,
+  isDispatchError,
+} from "~/server/triggers/dispatchError";
 import {
   sendRenderedSlackMessage,
   sendSlackWebhook,
@@ -38,17 +41,33 @@ import {
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 import {
-  confirmSettledMatch,
   type ConfirmSettledMatchDeps,
+  confirmSettledMatch,
 } from "../dispatch/confirmSettledMatch";
 import { dispatchTriggerAction } from "../dispatch/triggerActionDispatch";
 import {
-  TRIGGER_SETTLEMENT_INTENT_TYPES,
+  type LogOverflowIntent,
   type NotifyDigestIntent,
   type PersistMatchIntent,
+  TRIGGER_SETTLEMENT_INTENT_TYPES,
 } from "./triggerSettlementProcess.types";
 
 const logger = createLogger("langwatch:triggers:settlement-dispatch");
+
+/** Log bounded-state drops after the process commit, never from pure evolve. */
+export function createLogOverflowHandler(): IntentExecutor<LogOverflowIntent> {
+  return async (payload, context) => {
+    logger.warn(
+      {
+        projectId: context.projectId,
+        triggerId: payload.triggerId,
+        dropped: payload.dropped,
+        totalDropped: payload.totalDropped,
+      },
+      "Trigger settlement pending-match bound dropped oldest matches",
+    );
+  };
+}
 
 interface ActionParams {
   members?: string[] | null;
@@ -73,8 +92,7 @@ interface ActionParams {
  * dispatcher's deps (ADR-030/031/035/036/040/041 contracts) minus the
  * queue transport — the ProcessManagerOutbox owns retry now.
  */
-export interface TriggerSettlementDispatchDeps
-  extends ConfirmSettledMatchDeps {
+export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
   triggers: TriggerService;
   projects: ProjectService;
   /** Base host for deep links inside rendered customer templates (ADR-036). */
@@ -152,6 +170,7 @@ export function createNotifyDigestHandler(
         projectId: context.projectId,
         triggerId: payload.triggerId,
         traceIds: payload.traceIds,
+        messageKey: context.messageKey,
       });
     } catch (error) {
       rethrowIfRetryable(error, {
@@ -200,11 +219,13 @@ async function dispatchNotifyDigest({
   projectId,
   triggerId,
   traceIds,
+  messageKey,
 }: {
   deps: TriggerSettlementDispatchDeps;
   projectId: string;
   triggerId: string;
   traceIds: string[];
+  messageKey: string;
 }): Promise<void> {
   const triggersForProject =
     await deps.triggers.getActiveTraceTriggersForProject(projectId);
@@ -535,19 +556,12 @@ async function dispatchNotifyDigest({
           "Webhook body template render errors — fell back to default body",
         );
       }
-      // Stable per-dispatch id — sent as X-LangWatch-Event-Id so the
-      // receiver dedupes (ADR-040 §5).
+      // The outbox message key is the logical fire identity. Deriving the
+      // receiver-facing id from it keeps the id stable when a crash after a
+      // partial claim causes the retry's surviving candidate set to shrink.
       const webhookEventId =
         "evt_" +
-        createHash("sha256")
-          .update(
-            `${projectId}:${triggerId}:${triggerData
-              .map((d) => d.traceId)
-              .sort()
-              .join(",")}`,
-          )
-          .digest("hex")
-          .slice(0, 32);
+        createHash("sha256").update(messageKey).digest("hex").slice(0, 32);
       await deliverWebhook({
         recorder: deps.recordWebhookDelivery,
         projectId,

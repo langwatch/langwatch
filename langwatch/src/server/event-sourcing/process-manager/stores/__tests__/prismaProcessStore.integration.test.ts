@@ -3,10 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import type { JsonValue } from "../../json";
 import type { ProcessRef } from "../../processManager.types";
-import type {
-  NewOutboxMessage,
-  ProcessCommit,
-} from "../processStore.types";
+import type { NewOutboxMessage, ProcessCommit } from "../processStore.types";
 import { PrismaProcessStore } from "../prismaProcessStore";
 
 const store = new PrismaProcessStore(prisma);
@@ -75,7 +72,7 @@ function commit({
 
 async function clean(): Promise<void> {
   const where = {
-    processName,
+    processName: { in: [processName, `${processName}-other`] },
     projectId: { in: ["project-1", "project-2"] },
   };
   await prisma.processManagerOutbox.deleteMany({ where });
@@ -153,9 +150,11 @@ describe("PrismaProcessStore", () => {
     expect(await store.findByRef({ ref: ref() })).toEqual(
       expect.objectContaining({ state: { step: 1 }, revision: 1 }),
     );
-    expect((await store.findMessagesByRef({ ref: ref() })).map((row) => row.messageKey)).toEqual([
-      "message-1",
-    ]);
+    expect(
+      (await store.findMessagesByRef({ ref: ref() })).map(
+        (row) => row.messageKey,
+      ),
+    ).toEqual(["message-1"]);
   });
 
   it("allows exactly one concurrent revision CAS and rolls back the loser", async () => {
@@ -356,9 +355,7 @@ describe("PrismaProcessStore", () => {
       limit: 10,
       leaseDurationMs: 30_000,
     });
-    const retryLease = initialLeases.find(
-      (row) => row.messageKey === "retry",
-    )!;
+    const retryLease = initialLeases.find((row) => row.messageKey === "retry")!;
     const successLease = initialLeases.find(
       (row) => row.messageKey === "success",
     )!;
@@ -414,15 +411,17 @@ describe("PrismaProcessStore", () => {
       where: { processName, projectId: "project-1" },
       orderBy: { messageKey: "asc" },
     });
-    expect(rows.map((row) => ({
-      key: row.messageKey,
-      status: row.status,
-      attempts: row.attempts,
-      nextAttemptAt: row.nextAttemptAt.getTime(),
-      dispatchedAt: row.dispatchedAt?.getTime() ?? null,
-      leaseToken: row.leaseToken,
-      updatedAt: row.updatedAt.getTime(),
-    }))).toEqual([
+    expect(
+      rows.map((row) => ({
+        key: row.messageKey,
+        status: row.status,
+        attempts: row.attempts,
+        nextAttemptAt: row.nextAttemptAt.getTime(),
+        dispatchedAt: row.dispatchedAt?.getTime() ?? null,
+        leaseToken: row.leaseToken,
+        updatedAt: row.updatedAt.getTime(),
+      })),
+    ).toEqual([
       {
         key: "retry",
         status: "dead",
@@ -468,6 +467,44 @@ describe("PrismaProcessStore", () => {
     expect(await store.findDueWakes({ now: 2_000, limit: 10 })).toEqual([
       { ref: ref("due"), revision: 1, wakeAt: 1_500 },
     ]);
+  });
+
+  it("filters raw-SQL outbox leases and wake scans by process name", async () => {
+    const selected = ref("selected");
+    const other = {
+      ...ref("other"),
+      processName: `${processName}-other`,
+    };
+    await store.commit(
+      commit({
+        target: selected,
+        nextWakeAt: 1_500,
+        messages: [message("selected-message")],
+      }),
+    );
+    await store.commit(
+      commit({
+        target: other,
+        sourceEventId: "event-other",
+        nextWakeAt: 1_500,
+        messages: [message("other-message")],
+      }),
+    );
+
+    const leased = await store.leaseDueMessages({
+      now: 2_000,
+      limit: 10,
+      leaseDurationMs: 30_000,
+      processNames: [processName],
+    });
+    expect(leased.map((row) => row.messageKey)).toEqual(["selected-message"]);
+
+    const wakes = await store.findDueWakes({
+      now: 2_000,
+      limit: 10,
+      processNames: [processName],
+    });
+    expect(wakes).toEqual([{ ref: selected, revision: 1, wakeAt: 1_500 }]);
   });
 
   it("isolates identical process and message keys by project", async () => {

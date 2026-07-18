@@ -1,24 +1,25 @@
-import { createLogger } from "@langwatch/observability";
 import { createHash } from "node:crypto";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { AutomationEvent } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/automations/schemas/constants";
+import type {
+  AutomationEvent,
+  TriggerMatchRecordedEventData,
+} from "~/server/event-sourcing/pipelines/automations/schemas/events";
 
 import { computeScheduledFor } from "../dispatch/triggerActionDispatch";
 import {
+  createLogOverflowHandler,
   createNotifyDigestHandler,
   createPersistMatchHandler,
   type TriggerSettlementDispatchDeps,
 } from "./triggerSettlementIntentHandlers";
 import {
+  logOverflowIntentSchema,
   notifyDigestIntentSchema,
   persistMatchIntentSchema,
   TRIGGER_SETTLEMENT_INTENT_TYPES,
-  type TriggerMatchEventView,
   type TriggerSettlementState,
 } from "./triggerSettlementProcess.types";
-
-const logger = createLogger("langwatch:triggers:trigger-settlement");
 
 export const TRIGGER_SETTLEMENT_PROCESS_NAME = "triggerSettlement" as const;
 export const MAX_PENDING_MATCHES = 1_000;
@@ -39,7 +40,7 @@ function nextWakeFrom(state: SettlementState): number | null {
 
 export function addPending(
   previousState: SettlementState,
-  view: TriggerMatchEventView,
+  view: TriggerMatchRecordedEventData,
   at: number,
 ): SettlementState {
   const settleDueAt = at + view.traceDebounceMs;
@@ -69,10 +70,6 @@ export function addPending(
     );
     for (const traceId of overflow) delete pendingMatches[traceId];
     overflowDropped += overflow.length;
-    logger.warn(
-      { triggerId: view.triggerId, dropped: overflow.length },
-      "Dropped oldest pending automation matches at the state bound",
-    );
   }
   return { pendingMatches, overflowDropped };
 }
@@ -121,9 +118,8 @@ export interface TriggerSettlementPmDeps {
   dispatch: TriggerSettlementDispatchDeps;
 }
 
-export const triggerSettlementPM = (
-  deps: TriggerSettlementPmDeps,
-): ProcessManagerApplier<AutomationEvent> =>
+export const triggerSettlementPM =
+  (deps: TriggerSettlementPmDeps): ProcessManagerApplier<AutomationEvent> =>
   (pm) =>
     pm
       .state<SettlementState>(INITIAL_STATE)
@@ -137,10 +133,29 @@ export const triggerSettlementPM = (
         persistMatchIntentSchema,
         createPersistMatchHandler(deps.dispatch),
       )
+      .intent(
+        TRIGGER_SETTLEMENT_INTENT_TYPES.LOG_OVERFLOW,
+        logOverflowIntentSchema,
+        createLogOverflowHandler(),
+      )
       .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => {
         const nextState = addPending(state, data, ctx.at);
+        const dropped = nextState.overflowDropped - state.overflowDropped;
         return {
           state: nextState,
+          intents:
+            dropped > 0
+              ? [
+                  ctx.intents.logOverflow(
+                    `overflow:${nextState.overflowDropped}`,
+                    {
+                      triggerId: ctx.key,
+                      dropped,
+                      totalDropped: nextState.overflowDropped,
+                    },
+                  ),
+                ]
+              : undefined,
           nextWakeAt: settleBoundary(nextState),
         };
       })
@@ -153,9 +168,9 @@ export const triggerSettlementPM = (
               ctx.intents.notifyDigest(
                 `digest:${boundary.key}:${digestBatchKey(boundary.traceIds)}`,
                 {
-                triggerId: ctx.key,
-                traceIds: boundary.traceIds,
-                boundary: boundary.key,
+                  triggerId: ctx.key,
+                  traceIds: boundary.traceIds,
+                  boundary: boundary.key,
                 },
               ),
             ),
