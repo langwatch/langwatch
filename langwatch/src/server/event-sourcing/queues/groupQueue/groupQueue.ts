@@ -840,8 +840,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     }
 
     const contextMetadata = jobData.__context as JobContextMetadata | undefined;
-    const attempt =
+    const jobAttempt =
       typeof jobData.__attempt === "number" ? jobData.__attempt : 1;
+    // A re-staged sibling carries no __attempt of its own, so fall back to the
+    // group's chain counter rather than reading it as a fresh delivery.
+    const attempt = Math.max(jobAttempt, await this.readGroupAttempt(groupId));
     const pipelineName = (jobData.__pipelineName as string) ?? "unknown";
     const jobType = (jobData.__jobType as string) ?? "unknown";
     const jobName = (jobData.__jobName as string) ?? "unknown";
@@ -1032,9 +1035,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     "queue.coalesced_batch_size",
                     batchPayloads.length,
                   );
-                  await this.processBatch(batchPayloads);
+                  await this.processBatch(batchPayloads, { attempt });
                 } else {
-                  await this.process(payload);
+                  await this.process(payload, { attempt });
                 }
               });
 
@@ -1042,6 +1045,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // removed from staging during the drain, so completing the
               // dispatched job is enough to free the group.
               await this.scripts.complete({ groupId, stagedJobId, jobName });
+              // The chain is over: anything it recorded is no longer live.
+              await this.clearGroupAttempt(groupId);
               await this.blobLifecycle.release({
                 values: [
                   jobDataJson,
@@ -1149,6 +1154,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   return;
                 }
 
+                await this.recordGroupAttempt({
+                  groupId,
+                  attempt: attempt + 1,
+                });
                 await this.scripts.retryRestage({
                   groupId,
                   stagedJobId,
@@ -1357,6 +1366,70 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * raw job data (context metadata preserved). Best-effort: a re-stage failure
    * is logged, not thrown, so it never masks the original processing error.
    */
+  /**
+   * Attempt counter for the group's current failing chain.
+   *
+   * The dispatched job carries `__attempt` in its own payload, but drained
+   * siblings are re-staged with their ORIGINAL job data — re-encoding up to 499
+   * of them, some carrying blob refs, purely to stamp a counter would be
+   * absurd. So the chain's attempt lives on the group instead, which is also
+   * where it belongs: a retry chain is a property of the group, not of whichever
+   * job happened to lead the batch.
+   *
+   * Without this, a sibling leading the next batch reads as attempt 1, which
+   * silently restarts the retry budget and — for fold projections — looks like a
+   * fresh delivery, discarding the record of what the chain already applied.
+   */
+  private groupAttemptKey(groupId: string): string {
+    return `${this.queueName}:gq:group:${groupId}:attempt`;
+  }
+
+  private async readGroupAttempt(groupId: string): Promise<number> {
+    try {
+      const raw = await this.redisConnection.get(this.groupAttemptKey(groupId));
+      const parsed = raw === null ? 0 : Number.parseInt(raw, 10);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    } catch {
+      // Unreadable means unknown, and the job's own __attempt still applies.
+      return 0;
+    }
+  }
+
+  private async recordGroupAttempt({
+    groupId,
+    attempt,
+  }: {
+    groupId: string;
+    attempt: number;
+  }): Promise<void> {
+    try {
+      await this.redisConnection.set(
+        this.groupAttemptKey(groupId),
+        String(attempt),
+        "EX",
+        GROUP_QUEUE_CONFIG.activeTtlSec * 2,
+      );
+    } catch (err) {
+      // Not best-effort. Losing this makes a sibling-led batch read as a fresh
+      // delivery, which restarts the retry budget AND lets a fold discard the
+      // record of what the chain already applied — so the same events get
+      // folded twice. Swallowing it silently is how the first version of this
+      // hid a bug where the TTL argument was undefined.
+      this.logger.error(
+        { queueName: this.queueName, groupId, attempt, err },
+        "Failed to record the group retry attempt — a sibling-led retry may re-apply already-folded events",
+      );
+    }
+  }
+
+  private async clearGroupAttempt(groupId: string): Promise<void> {
+    try {
+      await this.redisConnection.del(this.groupAttemptKey(groupId));
+    } catch {
+      // The TTL reclaims it.
+    }
+  }
+
   private async restageDrainedSiblings(
     groupId: string,
     siblings: DrainedJob[],

@@ -32,11 +32,9 @@ function createInnerStore(
 
 function createRedis() {
   const values = new Map<string, { value: string; ttlSeconds: number }>();
-  const sortedSets = new Map<string, Map<string, number>>();
 
   return {
     values,
-    sortedSets,
     get: vi.fn(async (key: string) => values.get(key)?.value ?? null),
     set: vi.fn(
       async (key: string, value: string, _mode: string, ttlSeconds: number) => {
@@ -44,12 +42,6 @@ function createRedis() {
         return "OK";
       },
     ),
-    zadd: vi.fn(async (key: string, score: number, member: string) => {
-      const set = sortedSets.get(key) ?? new Map<string, number>();
-      set.set(member, score);
-      sortedSets.set(key, set);
-      return 1;
-    }),
   };
 }
 
@@ -68,8 +60,7 @@ function createStore(
     inner,
     store: new RedisCachedFoldStore<TestState>(inner.store, redis as never, {
       keyPrefix: "test_table",
-      backstopTtlSeconds: 3_600,
-      checkDelayMs: 5_000,
+      ttlSeconds: 3_600,
     }),
   };
 }
@@ -130,7 +121,7 @@ describe("RedisCachedFoldStore", () => {
       expect(redis.values.has(CACHE_KEY)).toBe(true);
     });
 
-    it("caches under a backstop TTL, not a residency TTL", async () => {
+    it("caches under the configured TTL", async () => {
       const redis = createRedis();
       const { store } = createStore(redis);
 
@@ -139,15 +130,6 @@ describe("RedisCachedFoldStore", () => {
       expect(redis.values.get(CACHE_KEY)?.ttlSeconds).toBe(3_600);
     });
 
-    it("registers the aggregate for durability confirmation", async () => {
-      const redis = createRedis();
-      const { store } = createStore(redis);
-
-      await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
-
-      const pending = redis.sortedSets.get("fold:pending:test_table");
-      expect(pending?.has(`${String(TENANT)}\u0000agg-1`)).toBe(true);
-    });
 
     it("records the state version so confirmation has something to compare", async () => {
       const redis = createRedis();
@@ -191,18 +173,40 @@ describe("RedisCachedFoldStore", () => {
       });
     });
 
-    describe("when a later fold step applies more events", () => {
-      it("accumulates the ids across steps", async () => {
+    describe("when a later fold step is a fresh delivery", () => {
+      it("replaces the ids, since the previous batch must have acked", async () => {
         const redis = createRedis();
         const { store } = createStore(redis);
 
         await store.store(
           { count: 5, UpdatedAt: 200 },
-          { ...CONTEXT, appliedEventIds: ["e1"] },
+          { ...CONTEXT, appliedEventIds: ["e1"], deliveryAttempt: 1 },
         );
         await store.store(
           { count: 6, UpdatedAt: 201 },
-          { ...CONTEXT, appliedEventIds: ["e2"] },
+          { ...CONTEXT, appliedEventIds: ["e2"], deliveryAttempt: 1 },
+        );
+
+        // The queue holds one active batch per group, so a fresh delivery
+        // implies the previous one completed — e1 can never come back, and
+        // keeping it is what let the set grow without bound.
+        const cached = await store.getWithApplied("agg-1", CONTEXT);
+        expect(cached?.appliedEventIds).toEqual(["e2"]);
+      });
+    });
+
+    describe("when a later fold step is a retry of the same chain", () => {
+      it("accumulates, because the earlier events can still be redelivered", async () => {
+        const redis = createRedis();
+        const { store } = createStore(redis);
+
+        await store.store(
+          { count: 5, UpdatedAt: 200 },
+          { ...CONTEXT, appliedEventIds: ["e1"], deliveryAttempt: 1 },
+        );
+        await store.store(
+          { count: 6, UpdatedAt: 201 },
+          { ...CONTEXT, appliedEventIds: ["e2"], deliveryAttempt: 2 },
         );
 
         const cached = await store.getWithApplied("agg-1", CONTEXT);
@@ -215,11 +219,11 @@ describe("RedisCachedFoldStore", () => {
 
         await store.store(
           { count: 5, UpdatedAt: 200 },
-          { ...CONTEXT, appliedEventIds: ["e1"] },
+          { ...CONTEXT, appliedEventIds: ["e1"], deliveryAttempt: 1 },
         );
         await store.store(
           { count: 5, UpdatedAt: 201 },
-          { ...CONTEXT, appliedEventIds: ["e1"] },
+          { ...CONTEXT, appliedEventIds: ["e1"], deliveryAttempt: 2 },
         );
 
         const cached = await store.getWithApplied("agg-1", CONTEXT);

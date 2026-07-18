@@ -493,7 +493,7 @@ export class EventSourcing {
         if (!result.entry.spanAttributes) return {};
         return result.entry.spanAttributes(result.clean);
       },
-      process: async (payload: Record<string, unknown>) => {
+      process: async (payload: Record<string, unknown>, delivery?: { attempt: number }) => {
         if (isLegacyOutboxPayload(payload)) {
           dropLegacyOutboxPayload(payload);
           return;
@@ -503,13 +503,13 @@ export class EventSourcing {
           logger.warn({ payload }, "Skipping unknown job in global queue");
           return;
         }
-        await result.entry.process(result.clean);
+        await result.entry.process(result.clean, delivery);
       },
       coalesceMaxBatch: (payload: Record<string, unknown>) => {
         const result = this.lookupEntry(payload);
         return result?.entry.coalesceMaxBatch ?? 1;
       },
-      processBatch: async (payloads: Record<string, unknown>[]) => {
+      processBatch: async (payloads: Record<string, unknown>[], delivery?: { attempt: number }) => {
         if (payloads.length === 0) return;
         // A coalesced batch is always one group → one registry entry. Resolve
         // every payload and guard against a mixed/unknown batch (should never
@@ -531,11 +531,14 @@ export class EventSourcing {
           resolved.every((r) => r?.entry === first.entry);
         if (!homogeneous) {
           for (const result of resolved) {
-            if (result) await result.entry.process(result.clean);
+            if (result) await result.entry.process(result.clean, delivery);
           }
           return;
         }
-        await first.entry.processBatch!(resolved.map((r) => r!.clean));
+        await first.entry.processBatch!(
+          resolved.map((r) => r!.clean),
+          delivery,
+        );
       },
     };
 

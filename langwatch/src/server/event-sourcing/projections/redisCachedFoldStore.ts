@@ -14,56 +14,35 @@ import {
   encodeFoldCacheEntry,
   mergeAppliedEventIds,
 } from "./foldCache/foldCacheEntry";
-import { PendingConfirmations } from "./foldCache/pendingConfirmations";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
 
 export interface RedisCachedFoldStoreOptions<State = unknown> {
   keyPrefix: string;
+  ttlSeconds?: number;
   /**
-   * Reads the state's own version. Defaults to the `UpdatedAt` field, which
-   * `AbstractFoldProjection` maintains as strictly increasing per apply
-   * (`Math.max(Date.now(), prev + 1)`) — the property the confirmation check
-   * relies on. Projections keyed on a different field supply their own reader.
+   * Reads the state's own version, recorded on the entry. Defaults to the
+   * `UpdatedAt` field, which `AbstractFoldProjection` maintains as strictly
+   * increasing per apply.
    */
   updatedAtOf?: (state: State) => number;
-  backstopTtlSeconds?: number;
-  checkDelayMs?: number;
 }
 
 /**
- * How long an unconfirmed entry may survive.
+ * Default cache TTL, in seconds. Sized to outlast the processing of a single
+ * aggregate's event stream so the fold state stays warm across consecutive
+ * events instead of expiring mid-stream and forcing a durable read of the
+ * (potentially large) state on every event.
  *
- * This is a leak guard, not a residency knob. Under normal operation the
- * confirmation processor releases entries within seconds of an aggregate going
- * quiet, so this only fires when confirmation itself is broken — the processor
- * is down, or the durable store never caught up. It is generous on purpose:
- * expiring early reintroduces exactly the unverified-read hole the design
- * exists to close, and an entry that lingers costs only memory.
+ * Overridable via LANGWATCH_FOLD_CACHE_TTL_SECONDS, read at call time so
+ * operators can dial residency down without a redeploy.
  */
-function defaultBackstopTtlSeconds(): number {
-  const raw = process.env.LANGWATCH_FOLD_CACHE_BACKSTOP_TTL_SECONDS;
-  const fallback = 24 * 60 * 60;
-  if (raw === undefined || raw === "") return fallback;
+function defaultFoldCacheTtlSeconds(): number {
+  const raw = process.env.LANGWATCH_FOLD_CACHE_TTL_SECONDS;
+  if (raw === undefined || raw === "") return 300;
   const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return parsed;
-}
-
-/**
- * How long after a write to first check whether the durable store has caught up.
- *
- * Sized to clear the async-insert flush window comfortably so the first check
- * usually succeeds and no re-check is needed. Checking sooner does not release
- * the entry any earlier — it just spends a query to be told "not yet".
- */
-function defaultCheckDelayMs(): number {
-  const raw = process.env.LANGWATCH_FOLD_CACHE_CHECK_DELAY_MS;
-  const fallback = 5_000;
-  if (raw === undefined || raw === "") return fallback;
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  if (!Number.isFinite(parsed) || parsed <= 0) return 300;
   return parsed;
 }
 
@@ -73,33 +52,29 @@ function readUpdatedAt<State>(state: State): number {
 }
 
 /**
- * Caches fold state in Redis in front of a durable store, and releases the
- * cached copy only once the durable store is confirmed to hold it.
+ * Wraps a fold store with a Redis write-through cache.
  *
- * The durable store is replicated and written without waiting for replication,
- * so a read can land on a replica that has not caught up and return state
- * missing recent events. Folding onto that loses them silently. Time-based
- * expiry cannot prevent this because it knows nothing about whether the
- * durable write has landed — which is why eviction here is driven by
- * confirmation instead of by a clock.
+ * - `get()`: Redis first, durable store on miss.
+ * - `store()`: durable store first (throws on failure), then the cache.
  *
- * The property that makes the rest of the system simple: **a cache miss means
- * the durable store is authoritative**, because confirmation is the only thing
- * that removes an entry. So reading through on a miss is correct, with no
- * quorum write, no sequential-consistency read, and no rebuild from the event
- * log on the steady-state path.
+ * The entry also carries the ids of the events folded into it. Queue delivery
+ * is at-least-once, so a fold job that fails after its state was stored is
+ * re-dispatched with the same events; most fold handlers accumulate (counters,
+ * sums, appends) rather than being idempotent, and would double-count. The
+ * executor uses that set to recognise and skip a redelivery.
  *
- * The backstop TTL is the sole exception and is reported separately, so a miss
- * caused by it is never mistaken for a confirmed one.
+ * The set is deliberately NOT a durability mechanism. It lives in the cache
+ * entry, so eviction or Redis loss takes it with them — which degrades to the
+ * behaviour that existed before it, not to something worse. Closing the cold
+ * path properly means making the folds themselves idempotent; see
+ * dev/docs/plans/fold-idempotency-plan.md.
  */
 export class RedisCachedFoldStore<State>
   implements FoldProjectionStore<State>
 {
   private readonly keyPrefix: string;
-  private readonly backstopTtlSeconds: number;
-  private readonly checkDelayMs: number;
+  private readonly ttlSeconds: number;
   private readonly updatedAtOf: (state: State) => number;
-  private readonly pending: PendingConfirmations;
 
   constructor(
     private readonly inner: FoldProjectionStore<State>,
@@ -107,11 +82,8 @@ export class RedisCachedFoldStore<State>
     options: RedisCachedFoldStoreOptions<State>,
   ) {
     this.keyPrefix = options.keyPrefix;
-    this.backstopTtlSeconds =
-      options.backstopTtlSeconds ?? defaultBackstopTtlSeconds();
-    this.checkDelayMs = options.checkDelayMs ?? defaultCheckDelayMs();
+    this.ttlSeconds = options.ttlSeconds ?? defaultFoldCacheTtlSeconds();
     this.updatedAtOf = options.updatedAtOf ?? readUpdatedAt;
-    this.pending = new PendingConfirmations(redis, options.keyPrefix);
   }
 
   async get(
@@ -122,16 +94,8 @@ export class RedisCachedFoldStore<State>
   }
 
   /**
-   * The state together with the events already folded into it.
-   *
-   * The executor uses the applied-set to recognise a redelivery: the queue is
-   * at-least-once, so a job that fails after its state was stored is
-   * re-dispatched with the same events, and most fold handlers accumulate
-   * (counters, sums, appends) rather than being idempotent.
-   *
-   * On a miss the set is empty, and correctly so — confirmation is the only
-   * thing that removes an entry, so a miss means the durable store already
-   * holds everything and there is nothing left to deduplicate against.
+   * The state together with the ids already folded into it. On a miss the set
+   * is empty — there is no cached state to have applied anything to.
    */
   async getWithApplied(
     aggregateId: string,
@@ -208,7 +172,6 @@ export class RedisCachedFoldStore<State>
     const startedAt = performance.now();
 
     await this.inner.store(state, context);
-
     await this.cache(state, aggregateId, context);
 
     observeEsFoldCacheStoreDuration(
@@ -218,13 +181,10 @@ export class RedisCachedFoldStore<State>
   }
 
   /**
-   * Writes the entry and schedules its confirmation.
-   *
-   * A failure here is logged but not thrown. Losing the cache entry is not a
-   * correctness problem on its own — the next read falls through to the durable
-   * store, which is where the state already is, since the durable write
-   * completed above. What it costs is the read-your-writes window, so it is
-   * counted rather than swallowed silently.
+   * A cache write failure is logged, not thrown: the durable write above
+   * already succeeded, so the next read falls through to state that is
+   * genuinely there. What is lost is the read-your-writes window and the
+   * applied-set, so it is counted rather than swallowed silently.
    */
   private async cache(
     state: State,
@@ -232,28 +192,27 @@ export class RedisCachedFoldStore<State>
     context: ProjectionStoreContext,
   ): Promise<void> {
     const key = this.redisKey(aggregateId, context);
-    const updatedAt = this.updatedAtOf(state);
 
     try {
-      const previous = await this.readCachedAppliedIds(key);
+      const applied = context.appliedEventIds ?? [];
+      // A fresh delivery means the previous batch for this group acked, so the
+      // ids it recorded can never come back — carrying them forward is what
+      // made the set grow to dwarf the state it sits next to. During a retry
+      // chain they are still live and must be kept, or a later attempt
+      // re-applies what an earlier one already folded.
+      const isRetry = (context.deliveryAttempt ?? 1) > 1;
+      const previous = isRetry ? await this.readCachedAppliedIds(key) : [];
+
       const payload = encodeFoldCacheEntry({
         state,
-        updatedAt,
-        appliedEventIds: mergeAppliedEventIds({
-          previous,
-          applied: context.appliedEventIds ?? [],
-        }),
+        updatedAt: this.updatedAtOf(state),
+        appliedEventIds: isRetry
+          ? mergeAppliedEventIds({ previous, applied })
+          : applied,
       });
 
       observeEsFoldCacheEntryBytes(this.keyPrefix, Buffer.byteLength(payload));
-
-      await this.redis.set(key, payload, "EX", this.backstopTtlSeconds);
-
-      await this.pending.register({
-        tenantId: String(context.tenantId),
-        aggregateId,
-        dueAtMs: Date.now() + this.checkDelayMs,
-      });
+      await this.redis.set(key, payload, "EX", this.ttlSeconds);
     } catch (error) {
       incrementEsFoldCacheRedisError(this.keyPrefix, "set");
       logger.warn(

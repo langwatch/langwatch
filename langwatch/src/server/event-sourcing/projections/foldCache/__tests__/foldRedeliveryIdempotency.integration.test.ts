@@ -172,10 +172,13 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
       // is not in the helper's default list.
       eventTypes: [],
       init: () => ({ count: 0, UpdatedAt: 0 }),
-      apply: (state: CounterState) => ({
-        count: state.count + 1,
-        UpdatedAt: Math.max(Date.now(), state.UpdatedAt + 1),
-      }),
+      apply: (state: CounterState, event: Event) => {
+        order.push(event.id);
+        return {
+          count: state.count + 1,
+          UpdatedAt: Math.max(Date.now(), state.UpdatedAt + 1),
+        };
+      },
     });
 
     const context: ProjectionStoreContext = {
@@ -184,16 +187,21 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
     };
 
     const applied: string[][] = [];
+    /** Every event id the fold actually applied, in the order it applied them. */
+    const order: string[] = [];
     let failuresLeft = failAlways
       ? Number.POSITIVE_INFINITY
       : (failures ?? (failFirstBatch ? 1 : 0));
 
-    const runBatch = async (jobs: FoldJob[]) => {
+    const runBatch = async (
+      jobs: FoldJob[],
+      delivery?: { attempt: number },
+    ) => {
       applied.push(jobs.map((job) => job.eventId));
       await executor.executeBatch(
         fold,
         jobs.map((job) => toEvent(job, aggregateId, tenantId)),
-        context,
+        { ...context, deliveryAttempt: delivery?.attempt },
       );
       if (failuresLeft > 0) {
         failuresLeft--;
@@ -208,10 +216,10 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
       name,
       groupKey: (job) => job.groupId,
       score: (job) => job.occurredAt,
-      process: async (job) => runBatch([job]),
+      process: async (job, delivery) => runBatch([job], delivery),
       ...(coalesce
         ? {
-            processBatch: async (jobs) => runBatch(jobs),
+            processBatch: async (jobs, delivery) => runBatch(jobs, delivery),
             coalesceMaxBatch: () => coalesce,
           }
         : {}),
@@ -222,7 +230,16 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
     });
     queues.push(queue);
 
-    return { queue, name, durable, applied };
+    const readAppliedIds = async (): Promise<string[]> => {
+      const raw = await redis.get(
+        `fold:${keyPrefix}:${String(tenantId)}:${aggregateId}`,
+      );
+      if (raw === null) return [];
+      const parsed = JSON.parse(raw) as { e?: string[] };
+      return parsed.e ?? [];
+    };
+
+    return { queue, name, durable, applied, order, readAppliedIds };
   }
 
   describe("given a fold job that fails after its state was stored", () => {
@@ -285,13 +302,14 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
   });
 
   describe("given a batch failure that re-stages drained siblings", () => {
-    describe("when a sibling is dispatched on the next attempt", () => {
-      it("preserves the retry budget rather than restarting it", async () => {
+    describe("when a sibling leads the next attempt", () => {
+      it("still reports a retry rather than a fresh delivery", async () => {
+        // A re-staged sibling carries no attempt of its own. If that read as a
+        // fresh delivery it would both restart the 25-attempt budget and, for a
+        // fold, discard the record of what the chain already applied — so the
+        // chain counter lives on the group, not on the job.
         const { queue, name } = createFoldQueue({
           keyPrefix: "it_redeliver_attempt",
-          // Keep failing, so the group stays populated long enough to inspect.
-          // With a single failure the retry succeeds and drains the group
-          // before the assertion can look at it.
           failAlways: true,
           coalesce: 10,
         });
@@ -306,32 +324,47 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
           });
         }
 
-        // Once the batch has failed, every re-staged job must carry the attempt
-        // count. A sibling without `__attempt` reads as attempt 1 when it leads
-        // the next batch, so a persistently failing group can re-apply its
-        // events far more than the 25-attempt budget allows.
-        // Wait for the whole group to be back in staging — the retry plus its
-        // re-staged siblings. Asserting on "whatever happens to be staged"
-        // would pass spuriously: vi.waitFor retries until a favourable moment,
-        // and a moment where only the retry job is present trivially satisfies
-        // an "all payloads carry __attempt" check.
-        const staged = await vi.waitFor(
+        await vi.waitFor(
           async () => {
-            const hash = await redis.hgetall(
-              `${name}:gq:group:${AGGREGATE}:data`,
+            const recorded = await redis.get(
+              `${name}:gq:group:${AGGREGATE}:attempt`,
             );
-            const payloads = Object.values(hash);
-            expect(payloads.length).toBe(3);
-            return payloads;
+            expect(Number(recorded)).toBeGreaterThan(1);
           },
-          { timeout: 15_000, interval: 50 },
+          { timeout: 20_000, interval: 100 },
         );
+      }, 40_000);
+    });
 
-        const withoutAttempt = staged.filter(
-          (raw) => !raw.includes("__attempt"),
+    describe("when the chain finally succeeds", () => {
+      it("clears the counter so the next delivery is fresh again", async () => {
+        const { queue, name, durable } = createFoldQueue({
+          keyPrefix: "it_attempt_cleared",
+          failFirstBatch: true,
+          coalesce: 10,
+        });
+        await queue.waitUntilReady();
+
+        await queue.send({
+          eventId: "cleared-1",
+          groupId: AGGREGATE,
+          occurredAt: Date.now(),
+        });
+
+        await vi.waitFor(() => expect(durable.committed()?.count).toBe(1), {
+          timeout: 20_000,
+          interval: 50,
+        });
+        await vi.waitFor(
+          async () => {
+            const recorded = await redis.get(
+              `${name}:gq:group:${AGGREGATE}:attempt`,
+            );
+            expect(recorded).toBeNull();
+          },
+          { timeout: 15_000, interval: 100 },
         );
-        expect(withoutAttempt).toEqual([]);
-      }, 30_000);
+      }, 40_000);
     });
   });
 
@@ -534,6 +567,298 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
           clearInterval(evict);
         }
       }, 40_000);
+    });
+  });
+
+
+  // ==========================================================================
+  // Applied-set lifecycle.
+  //
+  // The set exists to recognise redeliveries. An event can only be redelivered
+  // while its job is unacked, so ids from an acked batch are dead weight — and
+  // today they are never dropped, which is what makes the set 91.5% of a small
+  // trace's cache entry. Attempt number distinguishes the two cases: attempt 1
+  // is a fresh delivery (previous chain acked, old ids dead), attempt > 1 is a
+  // retry (chain still live, old ids still needed).
+  // ==========================================================================
+
+  describe("applied-set lifecycle", () => {
+    describe("given consecutive batches that all succeed", () => {
+      it("keeps the set at one batch instead of growing without bound", async () => {
+        const { queue, readAppliedIds, durable } = createFoldQueue({
+          keyPrefix: "it_lifecycle_happy",
+        });
+        await queue.waitUntilReady();
+
+        const base = Date.now();
+        for (let batch = 0; batch < 4; batch++) {
+          await queue.send({
+            eventId: `batch${batch}-e0`,
+            groupId: AGGREGATE,
+            occurredAt: base + batch * 1_000,
+          });
+          await vi.waitFor(
+            () => expect(durable.committed()?.count).toBe(batch + 1),
+            { timeout: 15_000, interval: 50 },
+          );
+        }
+
+        // Four acked deliveries. Nothing from batches 0-2 can ever come back,
+        // so carrying their ids is pure waste.
+        const ids = await readAppliedIds();
+        expect(ids).toEqual(["batch3-e0"]);
+      }, 60_000);
+    });
+
+    describe("given a retry chain that has not yet acked", () => {
+      it("accumulates across attempts so nothing in the chain is forgotten", async () => {
+        const { queue, readAppliedIds, applied } = createFoldQueue({
+          keyPrefix: "it_lifecycle_chain",
+          failures: 2,
+          coalesce: 10,
+        });
+        await queue.waitUntilReady();
+
+        const base = Date.now();
+        for (let index = 0; index < 3; index++) {
+          await queue.send({
+            eventId: `chain-${index}`,
+            groupId: AGGREGATE,
+            occurredAt: base + index,
+          });
+        }
+
+        await vi.waitFor(() => expect(applied.length).toBeGreaterThanOrEqual(2), {
+          timeout: 20_000,
+          interval: 50,
+        });
+
+        const ids = await readAppliedIds();
+        expect(ids).toEqual(
+          expect.arrayContaining(["chain-0", "chain-1", "chain-2"]),
+        );
+      }, 40_000);
+    });
+
+    describe("given a chain that eventually acked", () => {
+      it("drops the chain's ids once a fresh batch arrives", async () => {
+        const { queue, readAppliedIds, durable } = createFoldQueue({
+          keyPrefix: "it_lifecycle_reset",
+          failFirstBatch: true,
+          coalesce: 10,
+        });
+        await queue.waitUntilReady();
+
+        const base = Date.now();
+        await queue.send({
+          eventId: "chain-a",
+          groupId: AGGREGATE,
+          occurredAt: base,
+        });
+        await vi.waitFor(() => expect(durable.committed()?.count).toBe(1), {
+          timeout: 20_000,
+          interval: 50,
+        });
+
+        // Fresh delivery after the chain acked.
+        await queue.send({
+          eventId: "fresh-b",
+          groupId: AGGREGATE,
+          occurredAt: base + 5_000,
+        });
+        await vi.waitFor(() => expect(durable.committed()?.count).toBe(2), {
+          timeout: 20_000,
+          interval: 50,
+        });
+
+        const ids = await readAppliedIds();
+        expect(ids).toEqual(["fresh-b"]);
+        expect(ids).not.toContain("chain-a");
+      }, 60_000);
+    });
+  });
+
+  // ==========================================================================
+  // Things that must NOT happen.
+  // ==========================================================================
+
+  describe("negative guarantees", () => {
+    describe("given a stale applied-set from an earlier batch", () => {
+      it("never suppresses a genuinely new event", async () => {
+        const { queue, durable, order } = createFoldQueue({
+          keyPrefix: "it_negative_suppress",
+        });
+        await queue.waitUntilReady();
+
+        const base = Date.now();
+        for (let index = 0; index < 6; index++) {
+          await queue.send({
+            eventId: `distinct-${index}`,
+            groupId: AGGREGATE,
+            occurredAt: base + index * 500,
+          });
+        }
+
+        await vi.waitFor(() => expect(durable.committed()?.count).toBe(6), {
+          timeout: 25_000,
+          interval: 50,
+        });
+        // Every event applied exactly once — none skipped, none doubled.
+        expect(order).toEqual([
+          "distinct-0",
+          "distinct-1",
+          "distinct-2",
+          "distinct-3",
+          "distinct-4",
+          "distinct-5",
+        ]);
+      }, 45_000);
+    });
+
+    describe("given a redelivery", () => {
+      it("skips the duplicate without dropping anything else in the batch", async () => {
+        const { queue, durable, order } = createFoldQueue({
+          keyPrefix: "it_negative_partial",
+          failFirstBatch: true,
+          coalesce: 10,
+        });
+        await queue.waitUntilReady();
+
+        const base = Date.now();
+        for (let index = 0; index < 3; index++) {
+          await queue.send({
+            eventId: `p-${index}`,
+            groupId: AGGREGATE,
+            occurredAt: base + index,
+          });
+        }
+        await vi.waitFor(() => expect(durable.committed()?.count).toBe(3), {
+          timeout: 20_000,
+          interval: 50,
+        });
+
+        const uniqueApplied = new Set(order);
+        expect(uniqueApplied.size).toBe(3);
+        expect(order.length).toBe(3);
+      }, 40_000);
+    });
+  });
+
+  // ==========================================================================
+  // Ordering. The queue guarantees per-group FIFO by score, and the executor
+  // sorts a coalesced batch before folding. Dedup must not disturb either.
+  // ==========================================================================
+
+  describe("FIFO ordering", () => {
+    describe("given events sent in order to one group", () => {
+      it("applies them in occurredAt order", async () => {
+        const { queue, durable, order } = createFoldQueue({
+          keyPrefix: "it_fifo_plain",
+          coalesce: 10,
+        });
+        await queue.waitUntilReady();
+
+        const base = Date.now();
+        for (let index = 0; index < 5; index++) {
+          await queue.send({
+            eventId: `o-${index}`,
+            groupId: AGGREGATE,
+            occurredAt: base + index * 10,
+          });
+        }
+
+        await vi.waitFor(() => expect(durable.committed()?.count).toBe(5), {
+          timeout: 25_000,
+          interval: 50,
+        });
+        expect(order).toEqual(["o-0", "o-1", "o-2", "o-3", "o-4"]);
+      }, 45_000);
+    });
+
+    describe("given a batch that fails and is re-formed with new arrivals", () => {
+      it("still applies every event in occurredAt order overall", async () => {
+        const { queue, durable, order, applied } = createFoldQueue({
+          keyPrefix: "it_fifo_retry",
+          failFirstBatch: true,
+          coalesce: 10,
+        });
+        await queue.waitUntilReady();
+
+        const base = Date.now();
+        for (let index = 0; index < 3; index++) {
+          await queue.send({
+            eventId: `r-${index}`,
+            groupId: AGGREGATE,
+            occurredAt: base + index,
+          });
+        }
+        await vi.waitFor(() => expect(applied.length).toBeGreaterThanOrEqual(1), {
+          timeout: 20_000,
+          interval: 50,
+        });
+        for (let index = 3; index < 5; index++) {
+          await queue.send({
+            eventId: `r-${index}`,
+            groupId: AGGREGATE,
+            occurredAt: base + index,
+          });
+        }
+
+        await vi.waitFor(() => expect(durable.committed()?.count).toBe(5), {
+          timeout: 25_000,
+          interval: 50,
+        });
+        // Deduplication removes repeats; it must not reorder what survives.
+        expect(order).toEqual(["r-0", "r-1", "r-2", "r-3", "r-4"]);
+      }, 45_000);
+    });
+  });
+
+  // ==========================================================================
+  // Tenant guarantees beyond the shared-id case already covered above.
+  // ==========================================================================
+
+  describe("tenant guarantees", () => {
+    describe("given one tenant is stuck in a retry chain", () => {
+      it("does not delay or corrupt another tenant's fold of the same aggregate id", async () => {
+        const other = createTenantId("tenant-redelivery-third");
+        const stuck = createFoldQueue({
+          keyPrefix: "it_tenant_isolation",
+          failures: 2,
+          coalesce: 10,
+        });
+        const healthy = createFoldQueue({
+          keyPrefix: "it_tenant_isolation",
+          tenantId: other,
+        });
+        await stuck.queue.waitUntilReady();
+        await healthy.queue.waitUntilReady();
+
+        const base = Date.now();
+        for (let index = 0; index < 3; index++) {
+          await stuck.queue.send({
+            eventId: `shared-${index}`,
+            groupId: AGGREGATE,
+            occurredAt: base + index,
+          });
+          await healthy.queue.send({
+            eventId: `shared-${index}`,
+            groupId: AGGREGATE,
+            occurredAt: base + index,
+          });
+        }
+
+        await vi.waitFor(
+          () => {
+            expect(healthy.durable.committed()?.count).toBe(3);
+            expect(stuck.durable.committed()?.count).toBe(3);
+          },
+          { timeout: 30_000, interval: 100 },
+        );
+        // Identical ids across tenants must not cross-suppress.
+        expect(new Set(healthy.order).size).toBe(3);
+        expect(new Set(stuck.order).size).toBe(3);
+      }, 60_000);
     });
   });
 

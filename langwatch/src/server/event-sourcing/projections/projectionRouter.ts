@@ -1213,7 +1213,11 @@ export class ProjectionRouter<
         if (toApply.length === 0) return;
 
         const key = projection.key ? projection.key(toApply[0]!) : undefined;
-        const storeContext = await this.buildStoreContext(toApply[0]!, key);
+        const storeContext = await this.buildStoreContext(
+          toApply[0]!,
+          key,
+          context.deliveryAttempt,
+        );
         await withMetrics({
           fn: () =>
             this.stateProjectionExecutor.execute({
@@ -1324,7 +1328,11 @@ export class ProjectionRouter<
         }
 
         const key = fold.key ? fold.key(event) : undefined;
-        const storeContext = await this.buildStoreContext(event, key);
+        const storeContext = await this.buildStoreContext(
+          event,
+          key,
+          context.deliveryAttempt,
+        );
 
         const foldState = await withMetrics({
           fn: () => this.foldExecutor.execute(fold, event, storeContext),
@@ -1436,7 +1444,11 @@ export class ProjectionRouter<
 
         const first = toApply[0]!;
         const key = fold.key ? fold.key(first) : undefined;
-        const storeContext = await this.buildStoreContext(first, key);
+        const storeContext = await this.buildStoreContext(
+          first,
+          key,
+          context.deliveryAttempt,
+        );
 
         const foldState = await withMetrics({
           fn: () => this.foldExecutor.executeBatch(fold, toApply, storeContext),
@@ -1901,12 +1913,14 @@ export class ProjectionRouter<
   private async buildStoreContext(
     event: EventType,
     key?: string,
+    deliveryAttempt?: number,
   ): Promise<ProjectionStoreContext> {
     const retentionPolicy = await this.resolveRetention(event.tenantId);
     return {
       aggregateId: String(event.aggregateId),
       tenantId: event.tenantId,
       ...(key !== undefined ? { key } : {}),
+      ...(deliveryAttempt !== undefined ? { deliveryAttempt } : {}),
       retentionPolicy,
     };
   }

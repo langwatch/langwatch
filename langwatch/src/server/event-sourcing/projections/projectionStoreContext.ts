@@ -43,4 +43,16 @@ export interface ProjectionStoreContext {
    * re-applying them would double-count. Absent for stores that do not cache.
    */
   appliedEventIds?: readonly string[];
+
+  /**
+   * Which delivery of this job is being folded. 1 is a fresh delivery, higher
+   * values are retries of a chain that has not acked.
+   *
+   * A caching store uses it to decide whether the ids it already recorded are
+   * still live. On a fresh delivery the previous batch for this group must have
+   * acked — the queue holds one active batch per group — so those ids can never
+   * be redelivered and are discarded. During a retry chain they must be kept,
+   * or a later attempt re-applies the batch the first attempt already folded.
+   */
+  deliveryAttempt?: number;
 }

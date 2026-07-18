@@ -796,76 +796,8 @@ export const observeEsFoldCacheEntryBytes = (
 ) => esFoldCacheEntryBytes.labels(projectionName).observe(bytes);
 
 // ============================================================================
-// Fold cache durability confirmation
-//
-// A cached fold entry is released only once the durable store is confirmed to
-// hold it on every replica. These make that loop observable: whether it keeps
-// up, how far replicas lag, and whether entries are being released by
-// confirmation (expected) or by the backstop TTL (a fault).
+// Fold redelivery
 // ============================================================================
-
-register.removeSingleMetric("es_fold_confirmation_checks_total");
-const esFoldConfirmationChecksTotal = new Counter({
-  name: "es_fold_confirmation_checks_total",
-  help: "Fold cache durability checks by outcome",
-  labelNames: ["projection_name", "result"] as const,
-});
-
-export const incrementEsFoldConfirmationCheck = (
-  projectionName: string,
-  result: "confirmed" | "not_yet" | "in_flight" | "backstop_expired" | "error",
-  count = 1,
-) => esFoldConfirmationChecksTotal.labels(projectionName, result).inc(count);
-
-register.removeSingleMetric("es_fold_confirmation_pending");
-const esFoldConfirmationPending = new Gauge({
-  name: "es_fold_confirmation_pending",
-  help: "Aggregates whose cached fold state is awaiting durability confirmation",
-  labelNames: ["projection_name"] as const,
-});
-
-export const setEsFoldConfirmationPending = (
-  projectionName: string,
-  depth: number,
-) => esFoldConfirmationPending.labels(projectionName).set(depth);
-
-register.removeSingleMetric("es_fold_confirmation_lag_seconds");
-const esFoldConfirmationLag = new Histogram({
-  name: "es_fold_confirmation_lag_seconds",
-  help: "Time from storing fold state to its cache entry being released as durable",
-  labelNames: ["projection_name"] as const,
-  buckets: [1, 2, 5, 10, 30, 60, 300, 900, 3_600],
-});
-
-export const observeEsFoldConfirmationLag = (
-  projectionName: string,
-  seconds: number,
-) => esFoldConfirmationLag.labels(projectionName).observe(seconds);
-
-register.removeSingleMetric("es_fold_confirmation_replica_lag_seconds");
-const esFoldConfirmationReplicaLag = new Histogram({
-  name: "es_fold_confirmation_replica_lag_seconds",
-  help: "Spread between the leading and lagging replica at confirmation time",
-  labelNames: ["projection_name"] as const,
-  buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 300],
-});
-
-export const observeEsFoldConfirmationReplicaLag = (
-  projectionName: string,
-  seconds: number,
-) => esFoldConfirmationReplicaLag.labels(projectionName).observe(seconds);
-
-register.removeSingleMetric("es_fold_confirmation_replicas_missing_total");
-const esFoldConfirmationReplicasMissing = new Counter({
-  name: "es_fold_confirmation_replicas_missing_total",
-  help: "Checks where fewer replicas answered than expected, distinguishing a down or removed node from ordinary replication lag",
-  labelNames: ["projection_name"] as const,
-});
-
-export const incrementEsFoldConfirmationReplicasMissing = (
-  projectionName: string,
-  count = 1,
-) => esFoldConfirmationReplicasMissing.labels(projectionName).inc(count);
 
 register.removeSingleMetric("es_fold_duplicate_events_skipped_total");
 const esFoldDuplicateEventsSkipped = new Counter({
