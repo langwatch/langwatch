@@ -867,6 +867,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }
       if (drainedSiblings.length > 0) {
         try {
+          // Parse each drained sibling; failures short-circuit via Promise.all
+          // (rejecting the whole batch) so the catch below can restage the
+          // siblings that haven't been dropped yet. Siblings that failed with
+          // a non-transient error are tagged dropped=true inside
+          // parseDrainedPayload's recordDrop, so restageDrainedSiblings
+          // skips them and they don't get re-dispatched → re-dropped (#5857).
           const parsedSiblings = await Promise.all(
             drainedSiblings.map((sibling) =>
               this.parseDrainedPayload({ sibling, groupId }),
