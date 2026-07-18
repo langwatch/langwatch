@@ -56,11 +56,11 @@ if (explicitEndpoint) {
 
   if (isEnvTrue(process.env.PINO_OTEL_ENABLED)) {
     logRecordProcessors.push(
-      new BatchLogRecordProcessor(
-        new OTLPLogExporter({
+      new BatchLogRecordProcessor({
+        exporter: new OTLPLogExporter({
           url: `${explicitEndpoint}/v1/logs`,
         }),
-      ),
+      }),
     );
   }
 }

@@ -238,9 +238,9 @@ const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
     resource,
     forceFlushTimeoutMillis: FLUSH_TIMEOUT_MS,
     processors: [
-      new SimpleLogRecordProcessor(
-        new OTLPLogExporter({ url: endpoint, timeoutMillis: EXPORT_TIMEOUT_MS }),
-      ),
+      new SimpleLogRecordProcessor({
+        exporter: new OTLPLogExporter({ url: endpoint, timeoutMillis: EXPORT_TIMEOUT_MS }),
+      }),
     ],
   });
 
