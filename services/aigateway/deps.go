@@ -86,7 +86,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		jwtverify.WithAudience("langwatch-gateway"),
 	)
 	svcInfo := contexts.MustGetServiceInfo(ctx)
-	userAgent := fmt.Sprintf("langwatch-%s/%s", svcInfo.Service, svcInfo.Version)
+	userAgent := fmt.Sprintf("langwatch-aigateway/%s", svcInfo.Version)
 
 	cpClient := controlplane.NewClient(controlplane.ClientOptions{
 		BaseURL:   cfg.ControlPlane.BaseURL,
@@ -124,7 +124,10 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	}
 
 	router, err := providers.NewBifrostRouter(ctx, providers.BifrostOptions{
-		Logger: logger,
+		Logger:                        logger,
+		BlockLocalHTTPCalls:           cfg.BlockLocalHTTPCalls,
+		RequireHTTPSCustomerEndpoints: cfg.RequireHTTPSCustomerEndpoints,
+		AllowedEndpointHosts:          splitAllowedHosts(cfg.AllowedProxyHosts),
 	})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("bifrost init: %w", err)

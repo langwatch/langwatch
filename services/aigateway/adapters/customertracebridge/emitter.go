@@ -116,7 +116,7 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 
 	return &Emitter{
 		tp:         tp,
-		tracer:     tp.Tracer(fmt.Sprintf("langwatch-%s", svcCtx.Service), trace.WithInstrumentationVersion(svcCtx.Version)),
+		tracer:     tp.Tracer(svcCtx.Service, trace.WithInstrumentationVersion(svcCtx.Version)),
 		propagator: propagation.TraceContext{},
 	}, nil
 }

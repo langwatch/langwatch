@@ -36,13 +36,17 @@ type BifrostRouter struct {
 	// Voyage request so connection pooling actually works. Building a
 	// new http.Client per request would defeat keep-alive and risk
 	// port exhaustion under embedding throughput.
-	voyageClient *http.Client
+	voyageClient   *http.Client
+	endpointPolicy customerEndpointPolicy
 }
 
 // BifrostOptions configures the bifrost router.
 type BifrostOptions struct {
-	Logger          *zap.Logger
-	InitialPoolSize int
+	Logger                        *zap.Logger
+	InitialPoolSize               int
+	BlockLocalHTTPCalls           bool
+	RequireHTTPSCustomerEndpoints bool
+	AllowedEndpointHosts          []string
 }
 
 // NewBifrostRouter creates a provider router backed by bifrost.
@@ -63,6 +67,11 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 		bf:           bf,
 		logger:       opts.Logger,
 		voyageClient: newVoyageClient(),
+		endpointPolicy: newCustomerEndpointPolicy(
+			opts.BlockLocalHTTPCalls,
+			opts.RequireHTTPSCustomerEndpoints,
+			opts.AllowedEndpointHosts,
+		),
 	}, nil
 }
 
@@ -83,6 +92,18 @@ func (r *BifrostRouter) Close() {
 	r.bf.Shutdown()
 }
 
+func (r *BifrostRouter) validateCredentialEndpoints(ctx context.Context, cred domain.Credential) error {
+	err := validateCredentialEndpoints(ctx, cred, r.endpointPolicy)
+	if err != nil {
+		code := domain.ErrBadRequest
+		if isRetryableEndpointResolutionError(err) {
+			code = domain.ErrProviderError
+		}
+		return herr.NewLight(ctx, code, herr.M{"reason": err.Error()})
+	}
+	return nil
+}
+
 // Dispatch sends a non-streaming request through bifrost.
 //
 // For /v1/chat/completions (RequestTypeChat) the inbound body is
@@ -99,6 +120,9 @@ func (r *BifrostRouter) Close() {
 // to an Anthropic-family provider; sending it to OpenAI is a caller
 // error and Bifrost/OpenAI will reject accordingly.
 func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
+	if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
+		return nil, err
+	}
 	model := req.Model
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
@@ -391,6 +415,9 @@ func (r *BifrostRouter) dispatchVoyageDirect(
 //   - RequestTypePassthrough: dedicated dispatchPassthroughStream (Gemini
 //     /v1beta/...:streamGenerateContent).
 func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error) {
+	if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
+		return nil, err
+	}
 	provider := mapProvider(cred)
 	model := req.Model
 	if req.Resolved != nil {

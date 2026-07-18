@@ -9,11 +9,15 @@ import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import {
   incrementEsFoldProjectionTotal,
   incrementEsMapProjectionTotal,
+  incrementEsProjectionTotal,
   incrementEsReactorCollapsedTotal,
   incrementEsReactorTotal,
+  incrementEsSubscriberTotal,
   observeEsFoldProjectionDuration,
   observeEsMapProjectionDuration,
+  observeEsProjectionDuration,
   observeEsReactorDuration,
+  observeEsSubscriberDuration,
   withMetrics,
 } from "~/server/metrics";
 import { toError } from "~/utils/posthogErrorCapture";
@@ -60,6 +64,7 @@ import type { ReplayMarkerChecker } from "./replayMarkerCheck";
  * throughput only, never correctness.
  */
 const DEFAULT_FOLD_COALESCE_MAX_BATCH = 500;
+const SLOW_PROJECTION_OPERATION_MS = 5_000;
 
 /**
  * The router only ever dispatches reactors on the live event path — the
@@ -592,20 +597,28 @@ export class ProjectionRouter<
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, context),
               onComplete: (ms) => {
-                incrementEsMapProjectionTotal(
-                  this.pipelineName,
-                  name,
-                  "completed",
-                );
-                observeEsMapProjectionDuration(this.pipelineName, name, ms);
+                incrementEsMapProjectionTotal({
+                  pipelineName: this.pipelineName,
+                  projectionName: name,
+                  status: "completed",
+                });
+                observeEsMapProjectionDuration({
+                  pipelineName: this.pipelineName,
+                  projectionName: name,
+                  durationMs: ms,
+                });
               },
               onFail: (ms) => {
-                incrementEsMapProjectionTotal(
-                  this.pipelineName,
-                  name,
-                  "failed",
-                );
-                observeEsMapProjectionDuration(this.pipelineName, name, ms);
+                incrementEsMapProjectionTotal({
+                  pipelineName: this.pipelineName,
+                  projectionName: name,
+                  status: "failed",
+                });
+                observeEsMapProjectionDuration({
+                  pipelineName: this.pipelineName,
+                  projectionName: name,
+                  durationMs: ms,
+                });
               },
             });
 
@@ -959,20 +972,28 @@ export class ProjectionRouter<
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, storeContext),
               onComplete: (ms) => {
-                incrementEsMapProjectionTotal(
-                  this.pipelineName,
-                  name,
-                  "completed",
-                );
-                observeEsMapProjectionDuration(this.pipelineName, name, ms);
+                incrementEsMapProjectionTotal({
+                  pipelineName: this.pipelineName,
+                  projectionName: name,
+                  status: "completed",
+                });
+                observeEsMapProjectionDuration({
+                  pipelineName: this.pipelineName,
+                  projectionName: name,
+                  durationMs: ms,
+                });
               },
               onFail: (ms) => {
-                incrementEsMapProjectionTotal(
-                  this.pipelineName,
-                  name,
-                  "failed",
-                );
-                observeEsMapProjectionDuration(this.pipelineName, name, ms);
+                incrementEsMapProjectionTotal({
+                  pipelineName: this.pipelineName,
+                  projectionName: name,
+                  status: "failed",
+                });
+                observeEsMapProjectionDuration({
+                  pipelineName: this.pipelineName,
+                  projectionName: name,
+                  durationMs: ms,
+                });
               },
             });
 
@@ -1075,9 +1096,56 @@ export class ProjectionRouter<
         },
       },
       async () => {
-        await subscriber.handle(event, {
-          tenantId: String(event.tenantId),
-          aggregateId: String(event.aggregateId),
+        await withMetrics({
+          fn: () =>
+            subscriber.handle(event, {
+              tenantId: String(event.tenantId),
+              aggregateId: String(event.aggregateId),
+            }),
+          onComplete: (ms) => {
+            incrementEsSubscriberTotal({
+              pipelineName: this.pipelineName,
+              subscriberName: subscriber.name,
+              status: "completed",
+            });
+            observeEsSubscriberDuration({
+              pipelineName: this.pipelineName,
+              subscriberName: subscriber.name,
+              durationMs: ms,
+            });
+            if (ms >= SLOW_PROJECTION_OPERATION_MS) {
+              this.logger.warn(
+                {
+                  pipelineName: this.pipelineName,
+                  subscriberName: subscriber.name,
+                  durationMs: Math.round(ms),
+                },
+                "Event subscriber execution is slow",
+              );
+            }
+          },
+          onFail: (ms) => {
+            incrementEsSubscriberTotal({
+              pipelineName: this.pipelineName,
+              subscriberName: subscriber.name,
+              status: "failed",
+            });
+            observeEsSubscriberDuration({
+              pipelineName: this.pipelineName,
+              subscriberName: subscriber.name,
+              durationMs: ms,
+            });
+            if (ms >= SLOW_PROJECTION_OPERATION_MS) {
+              this.logger.warn(
+                {
+                  pipelineName: this.pipelineName,
+                  subscriberName: subscriber.name,
+                  durationMs: Math.round(ms),
+                },
+                "Failed event subscriber execution was slow",
+              );
+            }
+          },
         });
       },
     );
@@ -1143,10 +1211,65 @@ export class ProjectionRouter<
 
         const key = projection.key ? projection.key(toApply[0]!) : undefined;
         const storeContext = await this.buildStoreContext(toApply[0]!, key);
-        await this.stateProjectionExecutor.execute({
-          projection,
-          events: toApply,
-          context: storeContext,
+        await withMetrics({
+          fn: () =>
+            this.stateProjectionExecutor.execute({
+              projection,
+              events: toApply,
+              context: storeContext,
+            }),
+          onComplete: (ms) => {
+            incrementEsProjectionTotal({
+              pipelineName: this.pipelineName,
+              projectionKind: "state",
+              projectionName,
+              status: "completed",
+            });
+            observeEsProjectionDuration({
+              pipelineName: this.pipelineName,
+              projectionKind: "state",
+              projectionName,
+              durationMs: ms,
+            });
+            if (ms >= SLOW_PROJECTION_OPERATION_MS) {
+              this.logger.warn(
+                {
+                  pipelineName: this.pipelineName,
+                  projectionKind: "state",
+                  projectionName,
+                  eventCount: toApply.length,
+                  durationMs: Math.round(ms),
+                },
+                "State projection execution is slow",
+              );
+            }
+          },
+          onFail: (ms) => {
+            incrementEsProjectionTotal({
+              pipelineName: this.pipelineName,
+              projectionKind: "state",
+              projectionName,
+              status: "failed",
+            });
+            observeEsProjectionDuration({
+              pipelineName: this.pipelineName,
+              projectionKind: "state",
+              projectionName,
+              durationMs: ms,
+            });
+            if (ms >= SLOW_PROJECTION_OPERATION_MS) {
+              this.logger.warn(
+                {
+                  pipelineName: this.pipelineName,
+                  projectionKind: "state",
+                  projectionName,
+                  eventCount: toApply.length,
+                  durationMs: Math.round(ms),
+                },
+                "Failed state projection execution was slow",
+              );
+            }
+          },
         });
       },
     );
@@ -1203,28 +1326,28 @@ export class ProjectionRouter<
         const foldState = await withMetrics({
           fn: () => this.foldExecutor.execute(fold, event, storeContext),
           onComplete: (ms) => {
-            incrementEsFoldProjectionTotal(
-              this.pipelineName,
+            incrementEsFoldProjectionTotal({
+              pipelineName: this.pipelineName,
               projectionName,
-              "completed",
-            );
-            observeEsFoldProjectionDuration(
-              this.pipelineName,
+              status: "completed",
+            });
+            observeEsFoldProjectionDuration({
+              pipelineName: this.pipelineName,
               projectionName,
-              ms,
-            );
+              durationMs: ms,
+            });
           },
           onFail: (ms) => {
-            incrementEsFoldProjectionTotal(
-              this.pipelineName,
+            incrementEsFoldProjectionTotal({
+              pipelineName: this.pipelineName,
               projectionName,
-              "failed",
-            );
-            observeEsFoldProjectionDuration(
-              this.pipelineName,
+              status: "failed",
+            });
+            observeEsFoldProjectionDuration({
+              pipelineName: this.pipelineName,
               projectionName,
-              ms,
-            );
+              durationMs: ms,
+            });
           },
         });
 
@@ -1315,28 +1438,28 @@ export class ProjectionRouter<
         const foldState = await withMetrics({
           fn: () => this.foldExecutor.executeBatch(fold, toApply, storeContext),
           onComplete: (ms) => {
-            incrementEsFoldProjectionTotal(
-              this.pipelineName,
+            incrementEsFoldProjectionTotal({
+              pipelineName: this.pipelineName,
               projectionName,
-              "completed",
-            );
-            observeEsFoldProjectionDuration(
-              this.pipelineName,
+              status: "completed",
+            });
+            observeEsFoldProjectionDuration({
+              pipelineName: this.pipelineName,
               projectionName,
-              ms,
-            );
+              durationMs: ms,
+            });
           },
           onFail: (ms) => {
-            incrementEsFoldProjectionTotal(
-              this.pipelineName,
+            incrementEsFoldProjectionTotal({
+              pipelineName: this.pipelineName,
               projectionName,
-              "failed",
-            );
-            observeEsFoldProjectionDuration(
-              this.pipelineName,
+              status: "failed",
+            });
+            observeEsFoldProjectionDuration({
+              pipelineName: this.pipelineName,
               projectionName,
-              ms,
-            );
+              durationMs: ms,
+            });
           },
         });
 

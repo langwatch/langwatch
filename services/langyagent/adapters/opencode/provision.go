@@ -381,7 +381,7 @@ func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials,
 		env = append(env,
 			"OTEL_EXPORTER_OTLP_ENDPOINT="+med.OTLPEndpoint,
 			"OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf",
-			"OTEL_SERVICE_NAME=langy-worker",
+			"OTEL_SERVICE_NAME=langwatch-service-langyworker",
 		)
 	}
 	// Capabilities (GitHub today) fold their own env in — GH_TOKEN + GITHUB_LOGIN

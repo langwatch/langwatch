@@ -17,6 +17,7 @@ func Root(ctx context.Context, _ []string) error {
 	}
 
 	info := contexts.MustGetServiceInfo(ctx)
+	info.Service = "langwatch-service-aigateway"
 	info.Environment = cfg.Environment
 	ctx = contexts.SetServiceInfo(ctx, *info)
 

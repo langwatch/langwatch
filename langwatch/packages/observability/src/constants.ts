@@ -43,4 +43,4 @@ export const INVALID_TRACE_ID = "00000000000000000000000000000000";
 /**
  * Default service name for OTel resource attributes and logger configuration.
  */
-export const DEFAULT_SERVICE_NAME = "langwatch-backend";
+export const DEFAULT_SERVICE_NAME = "langwatch-app";

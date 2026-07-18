@@ -218,6 +218,7 @@ func TestBuildWorkerEnv_MediatedTelemetryAndLLMCarryNoSecrets(t *testing.T) {
 	wants := map[string]string{
 		"OTEL_EXPORTER_OTLP_ENDPOINT": med.OTLPEndpoint,
 		"OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+		"OTEL_SERVICE_NAME":           "langwatch-service-langyworker",
 		"OPENAI_BASE_URL":             med.LLMBaseURL,
 		"OPENAI_API_KEY":              mediatedLLMPlaceholderKey,
 		"LANGWATCH_API_KEY":           "lw-session-key",

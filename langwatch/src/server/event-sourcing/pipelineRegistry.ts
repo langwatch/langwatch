@@ -416,6 +416,7 @@ export class PipelineRegistry {
     const outboxDispatcher = new OutboxDispatcherService({
       store: this.deps.repositories.langyProcessStore,
       handlers: createLangyIntentHandlers({ ports: effectPorts }),
+      logger,
       // The lease MUST outlive the slowest accepted dispatch, or a healthy
       // long-running turn loses its lease mid-flight and a second instance
       // re-delivers it concurrently (the completing handler is then fenced

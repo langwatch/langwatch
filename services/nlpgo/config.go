@@ -14,10 +14,13 @@ import (
 
 // Config is the top-level service configuration.
 type Config struct {
-	Environment string        `env:"ENVIRONMENT"`
-	Server      config.Server `env:"SERVER"`
-	Log         clog.Config   `env:"LOG"`
-	OTel        config.OTel   `env:"OTEL"`
+	Environment                   string        `env:"ENVIRONMENT"`
+	BlockLocalHTTPCalls           bool          `env:"BLOCK_LOCAL_HTTP_CALLS"`
+	RequireHTTPSCustomerEndpoints bool          `env:"REQUIRE_HTTPS_CUSTOM_ENDPOINTS"`
+	AllowedProxyHosts             string        `env:"ALLOWED_PROXY_HOSTS"`
+	Server                        config.Server `env:"SERVER"`
+	Log                           clog.Config   `env:"LOG"`
+	OTel                          config.OTel   `env:"OTEL"`
 
 	// Engine knobs surfaced to operators.
 	Engine EngineConfig `env:"NLPGO_ENGINE"`
