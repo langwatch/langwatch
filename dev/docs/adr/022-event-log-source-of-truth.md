@@ -29,7 +29,7 @@ Concretely:
 - **`IO_PREVIEW_BYTES = 64 KB`** — preview budget for IO attributes (`langwatch.input`, `langwatch.output`, `gen_ai.input.messages`, `gen_ai.output.messages`, log-record `body`). Covers a complete chat-style Claude completion at the common `max_tokens=8192` setting (~16K tokens × 4 chars/token ≈ 64 KB), and most longer-form completions up to ~16K tokens. Configurable via `LANGWATCH_IO_PREVIEW_BYTES`. **Sized to a "standard Claude response length"** — search hits the preview, and the preview is wide enough to be lossless for the modal case.
 - **Edge handles oversize protection only.** No per-attribute offload at the edge anymore. Size-check the whole serialized command payload; spool the entire span if it crosses the threshold; otherwise pass through inline.
 - **Interposition derives lean shapes** at a single hook in `eventSourcingService.ts:242-251`, between `eventStore.storeEvents()` and `router.dispatch()`. `leanForProjection(event)` rewrites over-threshold IO attribute values to a preview + a server-set `langwatch.reserved.eventref.<attrKey>` pointer, leaves other attributes unchanged, and is a no-op for event types without heavy fields.
-- **Projection queue carries the lean events.** Projections (`stored_spans`, `trace_summaries`, the fold cache, all reactors) see lean shapes. The fold cache stays bounded because the dispatch lean step bounded it; `RedisCachedFoldStore.toCacheable` continues to strip non-IO ephemera (`events[]`, `spanCosts`, accumulated `attributes`).
+- **Projection queue carries the lean events.** Projections (`stored_spans`, `trace_summaries`, the fold cache, all reactors) see lean shapes. The fold cache stays bounded because the dispatch lean step bounded it. Redis stores the complete fold state because a cache hit becomes the next `apply` input.
 - **`event_log` row carries FULL content** in `EventPayload` (ZSTD(3) compressed; LLM text compresses 3–8×). Replay reads the full event from `event_log` and applies `leanForProjection(event)` **before** invoking `projection.apply(state, event)` — same utility, same shape, so live and replay produce byte-identical projection state.
 - **Read paths:**
   - List / search / detail-collapsed → projections (preview, fast, `ILIKE`).
@@ -82,8 +82,7 @@ PROJECTION WORKERS  (each pulls a lean event from its queue)
   fold projection      → trace_summaries  (preview as ComputedInput / ComputedOutput)
   map projection       → stored_spans     (lean SpanAttributes — preview + eventref)
   reactors             → eval triggers, broadcast, etc.  (same lean event)
-  fold cache (Redis) write-through uses toCacheable to also strip non-IO ephemera
-                     (events[], spanCosts, accumulated attributes for pathological many-span traces)
+  fold cache (Redis) write-through stores the complete already-leaned fold state
 
 READS
   list / search / detail-collapsed
@@ -109,7 +108,7 @@ LEAN BOUNDARIES  (what stays small at each hop)
                                                 with fail-open fallback to full inline on S3 outage)
   event_log row (CH)       unbounded, ZSTD-compressed  (the only place full content lives)
   Projection queue (Redis) ≤ ~64 KB per IO attr        (bounded by interposition)
-  Fold cache (Redis)       same as projection queue    (downstream of lean step + toCacheable)
+  Fold cache (Redis)       same as projection queue    (downstream of lean step)
   stored_spans / trace_summaries (CH)   ≤ ~64 KB per IO attr  (downstream of lean step)
 ```
 
@@ -118,7 +117,8 @@ LEAN BOUNDARIES  (what stays small at each hop)
 - **Reserved-namespace edge strip** (already at command worker via `RecordSpanCommand.stripReservedAttributes`, with `langwatch.reserved.causality_depth` passthrough).
 - **Reserved-namespace exclusion from user-visible facet enumeration** (`buildSpanAttributeKeysFacetQuery` filters `langwatch.reserved.*`).
 - **Differential preview budget** — IO attrs get the wide preview (now 64 KB), non-IO attrs stay at 2 KB.
-- **`RedisCachedFoldStore.toCacheable`** as secondary defence for non-IO ephemera (`events[]`, `spanCosts`).
+- **Complete cached fold state.** Redis and the durable fold store retain the
+  same state so a cache hit cannot strip fields from later fold writes.
 - **`BlobStore`** as the swap-seam interface. Backend changes; surface stays.
 
 ## What is rejected from ADR-021

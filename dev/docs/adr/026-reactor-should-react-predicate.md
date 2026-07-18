@@ -131,8 +131,7 @@ that condition belongs in `handle()`.
   see [ADR-025](./025-remove-orphan-sweep.md)),
   [ADR-021](./021-lean-fold-cache.md) and
   [ADR-022](./022-event-log-source-of-truth.md) (fold-state caching —
-  the `toCacheable` lean-cache hook must preserve every field the fold's
-  `apply` reads, and reactors receive the post-apply state, so predicates
-  reading `foldState.attributes` see the same values the handler does
-  even on cache-rehydrated paths)
+  Redis retains the complete state consumed by the fold's `apply`, and reactors
+  receive the post-apply state, so predicates reading `foldState.attributes`
+  see the same values the handler does even on cache-rehydrated paths)
 - Spec: [specs/event-sourcing/reactors.feature](../../../specs/event-sourcing/reactors.feature)
