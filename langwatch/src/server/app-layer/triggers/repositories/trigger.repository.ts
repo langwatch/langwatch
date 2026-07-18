@@ -92,9 +92,9 @@ export interface TriggerRepository {
 
 /**
  * Snapshot of an open custom-graph TriggerSent row — the at-most-once
- * dedup record the cron uses for "this graph alert is still firing".
- * Used by the event-sourced path (ADR-034 Phase 5) to mirror the cron's
- * dedup discipline EXACTLY: find unresolved row -> only fire once;
+ * dedup record for "this graph alert is still firing".
+ * The event-sourced path uses it to preserve the open-incident discipline:
+ * find unresolved row -> only fire once;
  * resolve unresolved row when threshold clears.
  */
 export interface OpenGraphTriggerSent {
@@ -139,9 +139,8 @@ export function graphAlertIncidentKey({
  */
 export interface GraphTriggerSentRepository {
   /**
-   * Mirror of cron's `unresolvedTriggerSent` lookup
-   * (src/pages/api/cron/triggers/customGraphTrigger.ts:179-189):
-   * orderBy createdAt desc, take first.
+   * Lookup used by the event-sourced graph-alert evaluator: order by
+   * createdAt descending and take the newest open incident.
    */
   findOpenForGraphAlert(params: {
     triggerId: string;
@@ -196,9 +195,8 @@ export interface GraphTriggerSentRepository {
   deleteOpenClaim(params: { id: string; projectId: string }): Promise<void>;
 
   /**
-   * Mirror of cron's resolve sequence
-   * (src/pages/api/cron/triggers/customGraphTrigger.ts:264-271): update
-   * by id+projectId, set resolvedAt = now — AND clear `openIncidentKey` back to
+   * Resolve an event-sourced graph-alert incident by id+projectId, set
+   * resolvedAt = now, and clear `openIncidentKey` back to
    * NULL, so the identity frees for the next fire. Setting resolvedAt without
    * clearing the key would wedge the alert: the next claim's INSERT would hit
    * the still-held unique key and never fire again.

@@ -32,7 +32,7 @@ const DUE_SCAN_LIMIT = 100;
 
 /**
  * Max time `stop()` waits for the loop to unwind before proceeding anyway,
- * mirroring the outbox heartbeat's shutdown budget.
+ * matching the bounded shutdown budget used by the other worker loops.
  */
 const SHUTDOWN_MAX_WAIT_MS = 10_000;
 

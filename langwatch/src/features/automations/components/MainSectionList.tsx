@@ -30,12 +30,14 @@ export function MainSectionList({
   isEdit,
   sourceLocked,
   prefilledGraphId,
+  webhookEnabled,
 }: {
   isEdit: boolean;
   /** The Type facet can't change (editing a saved alert, or opened from a
    *  specific chart). */
   sourceLocked: boolean;
   prefilledGraphId?: string;
+  webhookEnabled: boolean;
 }) {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
@@ -72,6 +74,8 @@ export function MainSectionList({
         value={draft.action}
         onChange={(value) => dispatch({ type: "SET_ACTION", value })}
         source={draft.source}
+        webhookEnabled={webhookEnabled}
+        preserveHiddenWebhook={isEdit}
         accordion={facetProps("delivery")}
       />
     </VStack>

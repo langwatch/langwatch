@@ -31,6 +31,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -39,9 +40,7 @@ import {
   sanitizeTriggerFilters,
   type TriggerFilterValue,
 } from "~/server/filters/types";
-import {
-  defaultsForSourceKind,
-} from "~/shared/templating/defaults";
+import { defaultsForSourceKind } from "~/shared/templating/defaults";
 import {
   EXAMPLE_MATCHES,
   TEMPLATE_VARIABLES,
@@ -61,6 +60,8 @@ import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { MainSectionList } from "./components/MainSectionList";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
+import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
+import { REPORT_TEMPLATE_VARIABLES } from "./editors/reportVariables";
 import {
   type AutomationDraft,
   actionParamsFromDraft,
@@ -76,8 +77,6 @@ import {
   subjectIsSet,
   templatesFromDraft,
 } from "./logic/draftReducer";
-import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
-import { REPORT_TEMPLATE_VARIABLES } from "./editors/reportVariables";
 import { explainHandledError, readHandledError } from "./logic/errorExplainer";
 import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { useAutomationStore } from "./state/automationStore";
@@ -96,12 +95,17 @@ function saveDisabledReason({
   nameSet,
   configComplete,
   actionPicked,
+  webhookReadOnly = false,
 }: {
   draft: AutomationDraft;
   nameSet: boolean;
   configComplete: boolean;
   actionPicked: boolean;
+  webhookReadOnly?: boolean;
 }): string {
+  if (webhookReadOnly) {
+    return "Webhook delivery is unavailable for this project. Choose another delivery channel to save changes.";
+  }
   const missing: string[] = [];
   if (!nameSet) missing.push("give it a name");
   if (!subjectIsSet(draft)) missing.push(subjectTodo(draft));
@@ -191,6 +195,10 @@ export function AutomationDrawer({
   const queryClient = api.useContext();
   const { filterParams } = useFilterParams();
   const projectId = project?.id ?? "";
+  const { enabled: webhookEnabled } = useFeatureFlag(
+    "release_webhook_automations",
+    { projectId: project?.id, enabled: !!project },
+  );
 
   const draft = useDraft();
   const section = useSection();
@@ -296,7 +304,11 @@ export function AutomationDrawer({
     if (initialName) {
       dispatch({ type: "SET_NAME", value: initialName });
     }
-    if (initialAction && initialAction in CLIENT_PROVIDERS) {
+    if (
+      initialAction &&
+      initialAction in CLIENT_PROVIDERS &&
+      (initialAction !== TriggerAction.SEND_WEBHOOK || webhookEnabled)
+    ) {
       dispatch({
         type: "SET_ACTION",
         value: initialAction as TriggerAction,
@@ -594,7 +606,7 @@ export function AutomationDrawer({
     // never send. Same resolver the providers and dispatch use, so the three
     // surfaces cannot drift apart.
     const previewDefaults = defaultsForSourceKind(
-      isGraphAlert ? "graphAlert" : isReport ? "report" : "trace"
+      isGraphAlert ? "graphAlert" : isReport ? "report" : "trace",
     );
     // Mirror the provider's delivery rules (Slack: modern blocks render only
     // over a bot connection) so the preview never promises more than the
@@ -691,6 +703,10 @@ export function AutomationDrawer({
   // Show a skeleton until the row lands, and an error state if it never does.
   const editLoading = !!automationId && triggerQuery.isLoading;
   const editError = !!automationId && triggerQuery.isError;
+  const webhookReadOnly =
+    !!automationId &&
+    draft.action === TriggerAction.SEND_WEBHOOK &&
+    !webhookEnabled;
 
   const testFire = api.automation.testFireTemplate.useMutation();
   const upsert = api.automation.upsert.useMutation();
@@ -699,7 +715,12 @@ export function AutomationDrawer({
   // "confirm the cadence" detour to gate on — subject + cadence validity is
   // folded into conditionsSet.
   const canSave =
-    nameSet && conditionsSet && configComplete && !editLoading && !editError;
+    nameSet &&
+    conditionsSet &&
+    configComplete &&
+    !editLoading &&
+    !editError &&
+    !webhookReadOnly;
 
   const onTestFire = useCallback(() => {
     if (!channel || !projectId || !draft.action) return;
@@ -982,7 +1003,11 @@ export function AutomationDrawer({
                 </Text>
               </Box>
             ) : editLoading ? (
-              <VStack align="stretch" gap={4} data-testid="automation-edit-loading">
+              <VStack
+                align="stretch"
+                gap={4}
+                data-testid="automation-edit-loading"
+              >
                 <Skeleton height="32px" width="60%" />
                 <Skeleton height="80px" width="full" />
                 <Skeleton height="80px" width="full" />
@@ -994,6 +1019,7 @@ export function AutomationDrawer({
                   isEdit={!!automationId}
                   sourceLocked={sourceLocked}
                   prefilledGraphId={prefilledGraphId}
+                  webhookEnabled={webhookEnabled}
                 />
               </Box>
             )}
@@ -1003,7 +1029,7 @@ export function AutomationDrawer({
               <Spacer />
               {/* Send test sits next to Save (ADR-043 feedback): once a notify
                   channel is set up, fire the real message before committing. */}
-              {channel && !editLoading && !editError ? (
+              {channel && !editLoading && !editError && !webhookReadOnly ? (
                 <Tooltip
                   content="Finish the delivery setup to send a test."
                   disabled={configComplete}
@@ -1024,6 +1050,7 @@ export function AutomationDrawer({
                   nameSet,
                   configComplete,
                   actionPicked: !!draft.action,
+                  webhookReadOnly,
                 })}
                 disabled={canSave}
               >

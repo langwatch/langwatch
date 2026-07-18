@@ -14,9 +14,9 @@ the distinction out loud:
   (`prisma/schema.prisma:784`), evaluated reactively on the trace pipeline.
 - **Condition-triggered** — a custom-graph metric crosses a threshold; an incident
   opens on breach and resolves on recovery. Stored as a `Trigger` with a non-null
-  `customGraphId` FK, evaluated by the real-time outbox reactor + the 30 s
-  graph-trigger heartbeat (ADR-034 Ph 5 — now the sole path; the K8s
-  `/api/cron/triggers` sweep was removed once every project cut over).
+  `customGraphId` FK, evaluated by the real-time activity subscriber plus the
+  scheduled `graphAlertSweep` process manager for absence and recovery
+  (ADR-034 Ph 5; the K8s `/api/cron/triggers` sweep was removed).
 
 Customers keep asking for a **third** shape neither covers: *"every Monday 09:00,
 post my evals dashboard to #quality"*, *"daily 07:00, the top-5 error traces from
@@ -54,7 +54,7 @@ Two capabilities are missing entirely:
 As with ADR-040, most of the framework exists: the provider registry
 (`src/automations/providers/`), the Liquid engine + its two render contexts
 (ADR-036), the Block Kit allowlist and proposed native chart/table blocks
-(ADR-041), the outbox heartbeat primitive (ADR-039), the fire-history surface
+(ADR-041), the ADR-052 process-manager substrate, the fire-history surface
 (`TriggerSent` + `ViewAutomationDrawer.tsx`), and the analytics service
 (`AnalyticsService.getTimeseries`). This ADR's job is to *compose* them into a
 schedule-triggered kind, and to design the one primitive that does not yet exist —
@@ -66,8 +66,9 @@ Introduce **Report**, a third automation *kind* triggered by a calendar schedule
 A report renders a content source (a dashboard, a single custom graph, or a trace
 query) into the existing notify channels (Slack / email / webhook) on a
 cron-expression + IANA-timezone schedule, driven by a new **in-process scheduler
-loop** — Redis-orchestrated, no cron infrastructure, sleeping until the next job is
-due (see §4). Ship it dark behind `release_scheduled_reports`.
+loop** — Postgres-leased with Redis used only for early wake signals, no cron
+infrastructure, sleeping until the next job is due (see §4). Ship it dark behind
+`release_scheduled_reports`.
 
 ---
 
@@ -120,7 +121,7 @@ pipeline wholesale.** Not a new model, not a new `TriggerAction`.
 **Why not a new model.** A report shares ~90% of its machinery with the other
 kinds: the notify providers (email/Slack/webhook), the four Liquid template
 columns (ADR-036), the fire-history ledger (`TriggerSent`), the authoring drawer,
-the provider registry, and the outbox dispatch path. A `ScheduledReport` model
+the provider registry, and the leased delivery paths. A `ScheduledReport` model
 would fork every one. ADR-040 made the identical call for the webhook channel
 (compose, don't fork); we follow it.
 
@@ -256,17 +257,15 @@ full-fidelity path from day one.
 
 ---
 
-### 4. The scheduler — a generic event-sourcing primitive, report is its first consumer
+### 4. The scheduler — a generic durable primitive, report is its first consumer
 
 The calendar scheduler does not exist and it is the load-bearing new piece. It
 should **not** be built report-specific. Add a small, general-purpose
-**event-sourcing scheduler** — a persisted set of cron entries and one cross-pod
-tick that, when an entry is due, fires it into the outbox — and make the report its
-*first consumer*. This mirrors ADR-039: that ADR made the heartbeat a framework
-primitive and the graph-trigger its first consumer; the scheduler is the
-calendar-shaped sibling. (If it grows, promote it to its own ADR.) The scheduler
-knows nothing about reports, dashboards, or graphs — it owns cron entries and
-firing; all report logic lives in the handler the enqueue routes to.
+**durable scheduler** — a persisted set of cron entries and a cross-pod worker
+loop that conditionally leases due entries — and make the report its *first
+consumer*. (If it grows, promote it to its own ADR.) The scheduler knows nothing
+about reports, dashboards, or graphs: it owns cron entries and firing; report
+logic lives in the registered handler.
 
 **Two ways to build it — poll a durable table, or park a delayed "wait" in the
 queue.** A tempting alternative skips the periodic scan: enqueue each job *now*
@@ -277,7 +276,7 @@ But we recommend **against** the queue-as-schedule *storage* model, for three
 reasons:
 
 1. **Durability.** A week-long delayed message lives in Redis; the GroupQueue is
-   Redis-backed (the in-house queue the outbox uses, not BullMQ). A flush,
+   Redis-backed (the in-house GroupQueue, not BullMQ). A flush,
    eviction, failover, or migration silently drops every parked schedule — whereas
    a Postgres `ScheduledJob` row survives all of that. The *schedule* must not live
    only in a volatile queue.
@@ -292,11 +291,10 @@ reasons:
    `UPDATE` of `cron`/`nextRunAt`, and every tick recomputes against current tz
    rules.
 
-So: **durable `ScheduledJob` rows are the source of truth, a 60 s reconciling tick
-fires the due ones.** A precise delayed "wait" is a fine *latency* optimization on
-top (an exact wake for an imminent slot) — but only with the poll as backstop, and
-it is unnecessary at 60 s granularity, so v1 is pure poll and the exact-wake is a
-documented future refinement.
+So: **durable `ScheduledJob` rows are the source of truth.** `SchedulerService`
+sleeps until the nearest known due instant, capped by a 60 s polling backstop,
+and Redis pub/sub wakes it early after a schedule change. Redis loss can increase
+latency only; the bounded Postgres re-scan still finds every durable row.
 
 **The tiny-trigger discipline (kept from the delayed-job idea).** The fire carries
 **only** `{ targetType, targetId, slot }` — an identity, never a rendered report.
@@ -332,7 +330,7 @@ collapses to "keep the `ScheduledJob` in sync on upsert").
 **An in-process scheduler loop — no cron, no fixed tick.** Explicit decision
 (supersedes a fixed-interval heartbeat framing): a long-lived **in-process loop**
 on the worker that sleeps *until the next job is due*, not a cron entry or fixed 60
-s poll. Redis orchestrates. The loop:
+s poll. Redis only accelerates wake-up. The loop:
 
 1. Reads `MIN(nextRunAt) WHERE active` — the soonest due instant across *all*
    target types — and **sleeps until exactly that instant**, capped by a
@@ -341,25 +339,20 @@ s poll. Redis orchestrates. The loop:
 2. Wakes **early** on a Redis signal when any job is created/edited/deleted (a
    pub/sub channel or `BLPOP` wakeup key the upsert path pokes), so a new "in 2
    minutes" job doesn't wait out the backstop.
-3. On wake: `SELECT ... WHERE active AND nextRunAt <= now` (indexed due-scan), and
-   for each due entry emit one `OutboxEnqueueRequest` carrying `{ targetType,
-   targetId, slot }` through `dispatchOutboxEnqueues` — the normal outbox path with
-   retry, dedup, audit — then advance `nextRunAt` to the next cron instant strictly
-   after `now` and set `lastSlot`. Advancing `nextRunAt` is a **conditional update**
-   (`WHERE nextRunAt = <the value read>`) so two pods racing the same due row →
-   exactly one wins.
+3. On wake: `SELECT ... WHERE active AND nextRunAt <= now` (indexed due-scan), then
+   conditionally lease each due row, invoke its registered handler with `{
+   targetType, targetId, slot }`, and advance `nextRunAt` after successful
+   settlement. Failures keep the slot and retry with bounded backoff.
 
-**Cross-pod safety = Redis leader-lock, reused, not reinvented.** Reuse the
-worker-role gating + Redis leader-lock the heartbeat implements
-(`heartbeat.scheduler.ts:268-285`): the loop runs only where `processRole ===
-"worker"` and holds a named Redis lease it refreshes while looping; a follower takes
-over on lease expiry.
+**Cross-pod safety = Postgres conditional leases.** Every worker-capable pod may
+run the loop and race the same conditional update; there is no leader or Redis
+lease. Exactly one worker owns a slot, and a crashed lease becomes eligible for
+retry after expiry.
 
-**Consumer registration** — a `SchedulerRegistry` maps `targetType → handler`, the
-calendar analog of the heartbeat registry. The report registers `"reportTrigger" →
-renderAndDispatchReport`; the handler runs on the outbox worker like any
-event-sourced reactor. A second scheduled feature later is one row type + one
-handler — no new tick, lock, or cron parser.
+**Consumer registration** — a `SchedulerRegistry` maps `targetType → handler`.
+The report registers `"reportTrigger" → renderAndDispatchReport`; the scheduler
+invokes it under the fenced lease. A second scheduled feature later is one row
+type + one handler — no new tick, lock, or cron parser.
 
 **Representation & `nextRunAt` computation.** Cron + IANA timezone, not a relative
 window — "09:00 *their* Monday" is a UTC instant that moves across DST. Compute
@@ -373,14 +366,12 @@ cron string plus an advanced escape hatch — the `PullScheduleField` pattern
 (`ingestion-sources.tsx:1258`), the one existing per-entity cron precedent,
 extended with the timezone it lacks.
 
-**No double-firing (the correctness core).** The leader-lock stops two replicas
-ticking at once, but a redeploy mid-window, a lock-TTL expiry, or an outbox retry
-could still re-observe a slot. Guard it in the framework with a **per-slot
-at-most-once claim** keyed on `(targetType, targetId, slot)` — either a unique row
-the enqueue inserts before dispatch, or the dispatch dedup identity itself — the
-calendar analog of the alert's `@@unique([triggerId, traceId])` incident claim. The
-per-slot conditional `nextRunAt` update (above) is the belt-and-braces backstop
-against a split-brain window. The report also records its fire in
+**No double-firing (the correctness core).** The conditional row lease stops two
+replicas from owning a slot concurrently. A crash after a provider accepts the
+message but before settlement can still re-run the handler, so channel delivery
+also uses a stable identity keyed on `(targetType, targetId, slot)`, the calendar
+analog of the alert's `@@unique([triggerId, traceId])` incident claim. The report
+also records its fire in
 `TriggerSent`/`ReportSent` for the operator surface (§7), but the *at-most-once
 guarantee lives in the scheduler*, so every future consumer inherits it.
 
@@ -410,9 +401,9 @@ batch). One graph = one bucketed CH GROUP-BY (two when the tripwire runs the rou
 independent queries with no batching. A synchronous 20-query loop inside one
 dispatch would blow the render budget and hammer CH.
 
-**Fan each graph's query out through the existing outbox / GroupQueue rather than a
+**Fan each graph's query out through process-manager intents / GroupQueue rather than a
 synchronous loop.** A report "assemble" job enqueues N per-graph "compute" jobs
-keyed by `projectId` (so the outbox `TenantRateTracker` gives per-tenant fairness
+keyed by `projectId` (so GroupQueue's `TenantRateTracker` gives per-tenant fairness
 and the global worker concurrency cap applies), collects the results, then renders +
 dispatches — reusing the durability and back-pressure the graph-alert path rides.
 Supplementary levers:
@@ -480,7 +471,7 @@ for the other kinds.
   `reportSource`/`comparison` are `actionParams` JSON — no migration.
 - **Phasing** (ordered to de-risk the scheduler first):
   - **P1 — the generic scheduler primitive + one source, no new blocks.** Ship the
-    `ScheduledJob` table, the `schedulerHeartbeat` (due-scan + per-slot
+    `ScheduledJob` table, the `SchedulerService` (due-scan + per-slot
     at-most-once claim + catch-up), the `SchedulerRegistry`, the `triggerKind`
     column, and a **single-graph** or **trace-query** report as the first
     `targetType` — rendered with *today's* allowlist-clean blocks (section-list /
@@ -489,14 +480,14 @@ for the other kinds.
     probe; the trace-query report is a natural first consumer since email renders it
     fully and the Slack fallback needs no new block.
   - **P2 — full dashboard report.** Enumerate `dashboard.graphs`, fan each query out
-    through the outbox (§5), render top-N + "view full dashboard" on Slack, full
-    render on email. Adopt the ADR-041 `data_visualization` / `table` blocks **once
+    through process intents (§5), render top-N + "view full dashboard" on Slack,
+    full render on email. Adopt the ADR-041 `data_visualization` / `table` blocks **once
     the ADR-041 Phase 3 webhook probe passes** (or the bot-token channel lands).
   - **P3 — comparative "this vs last" framing.** Promote the `comparison` toggle to
     a first-class rendering: current-vs-previous overlaid per chart plus a delta,
     reusing `TimeseriesResult.previousPeriod` and `CustomGraphInput.includePrevious`.
 - **Riskiest parts:** (1) **scheduler correctness** — a slot must fire exactly once
-  across replica leadership changes, redeploys, lock-TTL expiry, and DST; the
+  across competing replicas, redeploys, lease expiry, and DST; the
   per-slot at-most-once claim + the durable `ScheduledJob.nextRunAt` (source of
   truth, not a parked queue message) + `runLatest` catch-up are the mitigations, and
   each must be covered by a test that *executes* the path (a simulated redeploy
@@ -508,7 +499,8 @@ for the other kinds.
 ## Rationale / Trade-offs
 
 - **Why a kind, not a new model or action.** The report shares the notify channels,
-  template engine, fire-history ledger, drawer, and outbox with the other kinds.
+  template engine, fire-history ledger, drawer, and leased delivery with the other
+  kinds.
   Reusing them makes the calendar schedule and the multi-graph render the *only*
   genuinely new pieces; a new model or bespoke `TriggerAction` would fork three
   subsystems to add one trigger shape.
@@ -516,10 +508,10 @@ for the other kinds.
   already pays for the implicit `customGraphId != null` split — a dozen scattered
   branches a reader must reassemble. A third kind is the moment to name the axis;
   the column is inspectable, indexable (the due-scan), and future-proof.
-- **Why the heartbeat over the K8s cron.** The heartbeat is worker-only,
-  Redis-leader-locked, and shares the outbox dispatch path (retry/dedup/audit). The
-  cron is project-blind, coarse, and deprecated — reusing the sanctioned primitive
-  inherits correctness properties instead of re-deriving them.
+- **Why the durable scheduler over the K8s cron.** `ScheduledJob` rows are
+  tenant-scoped, Postgres-leased, worker-only, retryable, and observable. The K8s
+  cron was project-blind and coarse; durable rows preserve calendar slots across
+  worker restarts and Redis loss.
 - **Why cron + IANA timezone.** "Every Monday 09:00" is a timezone-anchored
   wall-clock instant; a relative window cannot express it, and a UTC-only cron (the
   `pullSchedule` precedent) sends the digest an hour off half the year.
@@ -527,10 +519,11 @@ for the other kinds.
   message stores the *schedule* in volatile Redis (lost on flush/failover), makes a
   recurring report a fragile self-perpetuating chain that dies silently if one fire
   is dropped, and turns an edit into a find-and-replace of queued jobs. A Postgres
-  `ScheduledJob` row reconciled by a 60 s tick is crash- and Redis-loss-proof and
-  self-healing. We keep the good half: the fire carries only a tiny `{ targetType,
-  targetId, slot }` trigger, never a parked payload.
-- **What we compromise.** The scheduler is real new surface — a heartbeat, a cron
+  `ScheduledJob` row served by an intelligent loop with a 60 s polling backstop is
+  crash- and Redis-loss-proof and self-healing. We keep the good half: the fire
+  carries only a tiny `{ targetType, targetId, slot }` trigger, never a parked
+  payload.
+- **What we compromise.** The scheduler is real new surface — a worker loop, a cron
   evaluator, a per-slot claim, DST handling, a catch-up policy — with subtle
   correctness. The Slack 50-block limit forces a curated top-N compromise on large
   dashboards (mitigated by full-fidelity email). And a large-dashboard report is a
@@ -543,12 +536,12 @@ for the other kinds.
   truth** for the three-way taxonomy; the scattered `customGraphId != null` branches
   should migrate to read it, and the notify-vs-persist axis stays orthogonal.
 - **A new generic calendar-scheduling primitive** — the `ScheduledJob` table, a
-  single `schedulerHeartbeat` due-scan, a `SchedulerRegistry`, a cron+timezone
+  single `SchedulerService` due-scan, a `SchedulerRegistry`, a cron+timezone
   representation, a framework-level per-slot at-most-once claim, and a catch-up
-  policy — enters the event-sourcing platform as a sibling to ADR-039's heartbeat.
+  policy — enters the platform alongside ADR-052's process managers.
   It is the first per-entity, timezone-aware calendar schedule and it is
   *report-agnostic*: future scheduled work (weekly rollups, retention reports)
-  registers a `targetType` + handler and inherits cross-pod locking, durability, and
+  registers a `targetType` + handler and inherits cross-pod leasing, durability, and
   exactly-once firing for free. If it accretes, promote it to its own ADR.
 - **A third render context (`ReportTemplateContext`) and default family**
   (`REPORT_TRIGGER_DEFAULTS`) join the templating module; the renderer union widens
@@ -558,7 +551,7 @@ for the other kinds.
 - **A message-size discipline (`REPORT_SLACK_GRAPH_CAP` + top-N-plus-link)** is
   introduced where none existed; a large dashboard now degrades gracefully on Slack
   instead of being rejected.
-- **Report generation queues per-graph CH queries through the outbox**, adding
+- **Report generation queues per-graph CH queries through process intents**, adding
   scheduled burst load that per-tenant fairness + rollup routing + jitter keep
   bounded.
 - **Fire-history and the authoring drawer gain a report shape** — a scheduled send
@@ -576,9 +569,8 @@ for the other kinds.
   test-fire discipline the report reuses.
 - [ADR-037](./037-automation-operator-surfaces.md) — authoring drawer + live preview
   + fire-history the report configuration and delivery surface extend.
-- [ADR-039](./039-outbox-heartbeat.md) — the heartbeat tick the scheduler runs on
-  (worker-only, Redis-leader-locked, `decide → dispatchOutboxEnqueues`); the generic
-  `ScheduledJob` scheduler is its calendar-shaped sibling.
+- [ADR-052](./052-automations-on-process-manager-substrate.md) — the durable wake,
+  leased intent, and GroupQueue substrate used by automation reactions.
 - [ADR-025](./025-remove-orphan-sweep.md) — the removed self-perpetuating reactor
   chain; the cautionary tale for why a "re-enqueue the next wait" queue-chain is
   rejected in favour of a durable-row poll.

@@ -1,24 +1,12 @@
-import {
-  Box,
-  Button,
-  chakra,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { TriggerAction } from "@prisma/client";
 import { Settings2 } from "lucide-react";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import type { ClientEntry } from "~/automations/providers/types";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { ConditionSource } from "../logic/draftReducer";
 import { useAutomationStore } from "../state/automationStore";
-import {
-  useConfigComplete,
-  useConfigurationSummary,
-} from "../state/selectors";
-import { FacetSection, type FacetAccordionProps } from "./FacetSection";
+import { useConfigComplete, useConfigurationSummary } from "../state/selectors";
+import { type FacetAccordionProps, FacetSection } from "./FacetSection";
 
 /** The active channel card is tinted with the preset's list-page accent. */
 const ACCENT_FOR_SOURCE: Record<ConditionSource, string> = {
@@ -39,30 +27,34 @@ export function DeliveryPicker({
   value,
   onChange,
   source,
+  webhookEnabled,
+  preserveHiddenWebhook,
   accordion,
 }: {
   value: TriggerAction | null;
   onChange: (action: TriggerAction) => void;
   source: ConditionSource;
+  webhookEnabled: boolean;
+  preserveHiddenWebhook: boolean;
   accordion?: FacetAccordionProps;
 }) {
   const setSection = useAutomationStore((s) => s.setSection);
   const configComplete = useConfigComplete();
   const configSummary = useConfigurationSummary();
-  const { project } = useOrganizationTeamProject();
   // ADR-040: the webhook channel ships dark. The card is hidden until the
   // flag is on (the save/test routes are gated server-side too), and never
   // offered for reports — the scheduled-report dispatch is email/Slack only.
-  const { enabled: webhookEnabled } = useFeatureFlag(
-    "release_webhook_automations",
-    { projectId: project?.id, enabled: !!project },
-  );
   const isAlertKind = source === "customGraph";
   const notifyOnly = isAlertKind || source === "report";
+  const webhookReadOnly =
+    preserveHiddenWebhook &&
+    value === TriggerAction.SEND_WEBHOOK &&
+    !webhookEnabled;
   const entries = Object.values(CLIENT_PROVIDERS).filter(
     (e) =>
       e.shared.action !== TriggerAction.SEND_WEBHOOK ||
-      (webhookEnabled && source !== "report"),
+      (webhookEnabled && source !== "report") ||
+      (preserveHiddenWebhook && e.shared.action === value),
   );
   const notify = entries.filter((e) => e.shared.category === "notify");
   const action = entries.filter((e) => e.shared.category === "action");
@@ -78,7 +70,11 @@ export function DeliveryPicker({
   return (
     <FacetSection
       title="Delivery"
-      help="Where the notification goes and what it sends. Notify channels post to Slack, email, or a webhook; actions add matching traces to a dataset or annotation queue."
+      help={
+        webhookEnabled
+          ? "Where the notification goes and what it sends. Notify channels post to Slack, send email, or call an endpoint. Actions add matching traces to a dataset or annotation queue."
+          : "Where the notification goes and what it sends. Notify channels post to Slack or send email. Actions add matching traces to a dataset or annotation queue."
+      }
       accordion={accordion}
       complete={configComplete}
       summary={value ? configSummary : "Choose where it goes"}
@@ -87,12 +83,18 @@ export function DeliveryPicker({
         {notify.length > 0 ? (
           <DeliveryGroup
             label="Notify"
-            description="Tell someone: Slack, email, webhook."
+            description={
+              webhookEnabled
+                ? "Tell someone through Slack, email, or an endpoint."
+                : "Tell someone through Slack or email."
+            }
             entries={notify}
             value={value}
             onChange={pick}
             isAlertKind={isAlertKind}
             accent={accent}
+            webhookEnabled={webhookEnabled}
+            readOnlyAction={webhookReadOnly ? TriggerAction.SEND_WEBHOOK : null}
           />
         ) : null}
         {action.length > 0 && !notifyOnly ? (
@@ -104,9 +106,26 @@ export function DeliveryPicker({
             onChange={pick}
             isAlertKind={isAlertKind}
             accent={accent}
+            webhookEnabled={webhookEnabled}
+            readOnlyAction={null}
           />
         ) : null}
-        {value ? (
+        {webhookReadOnly ? (
+          <Box
+            padding={2.5}
+            borderRadius="md"
+            borderWidth="1px"
+            colorPalette="orange"
+            borderColor="colorPalette.muted"
+            bg="colorPalette.subtle"
+          >
+            <Text textStyle="sm">
+              Webhook delivery is unavailable for this project. This saved setup
+              is read-only. Choose another channel to replace it.
+            </Text>
+          </Box>
+        ) : null}
+        {value && !webhookReadOnly ? (
           <HStack
             justify="space-between"
             gap={3}
@@ -142,6 +161,8 @@ function DeliveryGroup({
   onChange,
   isAlertKind,
   accent,
+  webhookEnabled,
+  readOnlyAction,
 }: {
   label: string;
   description: string;
@@ -150,6 +171,8 @@ function DeliveryGroup({
   onChange: (action: TriggerAction) => void;
   isAlertKind: boolean;
   accent: string;
+  webhookEnabled: boolean;
+  readOnlyAction: TriggerAction | null;
 }) {
   return (
     <VStack align="stretch" gap={2}>
@@ -176,6 +199,8 @@ function DeliveryGroup({
             onClick={() => onChange(entry.shared.action)}
             isAlertKind={isAlertKind}
             accent={accent}
+            webhookEnabled={webhookEnabled}
+            readOnly={entry.shared.action === readOnlyAction}
           />
         ))}
       </Box>
@@ -189,14 +214,26 @@ function DeliveryCard({
   onClick,
   isAlertKind,
   accent,
+  webhookEnabled,
+  readOnly,
 }: {
   entry: ClientEntry;
   active: boolean;
   onClick: () => void;
   isAlertKind: boolean;
   accent: string;
+  webhookEnabled: boolean;
+  readOnly: boolean;
 }) {
   const Icon = entry.client.Icon;
+  const description =
+    !webhookEnabled && entry.shared.action === TriggerAction.SEND_SLACK_MESSAGE
+      ? isAlertKind
+        ? "Post a message to Slack when the alert fires."
+        : "Post a message to Slack when a trace matches."
+      : isAlertKind
+        ? (entry.shared.alertDescription ?? entry.shared.description)
+        : entry.shared.description;
   return (
     <chakra.button
       type="button"
@@ -207,17 +244,16 @@ function DeliveryCard({
       colorPalette={accent}
       borderColor={active ? "colorPalette.emphasized" : "border"}
       bg={active ? "colorPalette.subtle" : "bg"}
-      cursor="pointer"
-      onClick={onClick}
+      cursor={readOnly ? "not-allowed" : "pointer"}
+      aria-disabled={readOnly || undefined}
+      onClick={readOnly ? undefined : onClick}
     >
       <HStack gap={2} mb={1}>
         <Icon size={18} />
         <Text fontWeight="semibold">{entry.shared.label}</Text>
       </HStack>
       <Text textStyle="xs" color="fg.muted">
-        {isAlertKind
-          ? (entry.shared.alertDescription ?? entry.shared.description)
-          : entry.shared.description}
+        {description}
       </Text>
     </chakra.button>
   );

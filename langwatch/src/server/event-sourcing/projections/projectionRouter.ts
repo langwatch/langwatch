@@ -70,9 +70,8 @@ const SLOW_PROJECTION_OPERATION_MS = 5_000;
  * The router only ever dispatches reactors on the live event path — the
  * replay service (`replay/replayService.ts`) rebuilds fold projections and
  * never invokes reactors, so no reactor context here can be a replay.
- * Named constant so the `isReplay` plumbing in `ReactorContext` (consumed
- * by `adaptOutboxReactor`'s replay short-circuit) is honestly "always
- * false on this path" rather than looking like a forgotten TODO. If a
+ * Named constant so the `isReplay` plumbing in `ReactorContext` is honestly
+ * "always false on this path" rather than looking like a forgotten TODO. If a
  * replay path that reaches reactors is ever added, it must thread a real
  * flag instead of this constant.
  */
