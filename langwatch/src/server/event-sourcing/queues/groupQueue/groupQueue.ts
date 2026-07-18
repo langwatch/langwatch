@@ -497,11 +497,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           groupKey: groupId,
           dedupKey: dedupId || undefined,
           scheduledAt: new Date(dispatchAfterMs),
-          // Mirror the queue's actual retry budget into the audit
-          // projection so `ReactorOutbox.maxAttempts` matches when the
-          // queue will stop retrying (otherwise the column defaults to
-          // 8 and an operator sees `attempts > maxAttempts` once the
-          // queue retries 9+ times).
+          // Mirror the queue's actual retry budget into any attached audit
+          // projection so its terminal status agrees with queue behavior.
           maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
         }),
       );

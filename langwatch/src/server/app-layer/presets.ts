@@ -261,8 +261,8 @@ export function initializeWorkerApp(): App {
 /**
  * Dev-only single-process mode: the web server also hosts the worker stack
  * in-process (opt-in via WORKERS_IN_PROCESS=1). Boots the App with the "all"
- * role so the outbox consumer, drainer, and heartbeat scheduler wire up
- * exactly as they do on a dedicated worker. Prod never calls this — it runs
+ * role so process outbox/wake consumers and schedulers wire up exactly as
+ * they do on a dedicated worker. Prod never calls this — it runs
  * web and worker as separate deployments.
  */
 export function initializeInProcessApp(): App {

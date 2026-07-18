@@ -102,8 +102,8 @@ export interface SchedulerServiceDeps {
  *
  * Worker-stack-only: `start()` no-ops unless the role runs the worker stack
  * (`roleRunsWorkers`: "worker" AND the dev single-process "all" role), so it
- * is safe to wire into shared bootstrap without role gating (mirrors
- * `OutboxHeartbeatScheduler`).
+ * is safe to wire into shared bootstrap without role gating (the same role
+ * boundary used by process-manager wake workers).
  *
  * Cross-pod early-wake is BEST-EFFORT via Redis pub/sub (optional `redis` dep):
  * a producer calls `SchedulerService.publishWake(redis)` after creating/editing
