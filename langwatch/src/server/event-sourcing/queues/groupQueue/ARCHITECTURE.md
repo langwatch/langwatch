@@ -142,7 +142,7 @@ See ADR-029 (content-addressed store) and ADR-030 (hardening) for the design.
 
 Reference counting made correctness depend on every completion releasing its token. A worker crash between processing and release leaked the holder indefinitely, while eager last-release deletion could race a live sibling or a rolling-deploy peer.
 
-GroupQueue instead uses a **per-blob Redis sorted set**. Each staged occupancy gets a stable holder identity; its score is an absolute 3-day lease deadline calculated from Redis server time. Stage/take, decode, the active-job heartbeat, and retry/transfer renew the deadline. Every lease operation first prunes expired members. The Redis blob backstop is 4 days, leaving a full day for lazy reclaim and ensuring a live lease cannot outlast its data:
+GroupQueue instead uses a **per-blob Redis sorted set**. Each staged occupancy gets a stable holder identity; its score is an absolute 3-day lease deadline calculated from Redis server time. Initial, batch, retry, and blocked-restage scripts publish the staged value and its lease in the same Redis transaction. Decode, the active-job heartbeat, and transfer renew the deadline; a coalesced batch heartbeats every participating envelope. Every lease operation first prunes expired members. A Redis-tier renewal also slides the blob's 4-day backstop in the same eval, leaving a full day for lazy reclaim and ensuring a live lease cannot outlast its data:
 
 ```lua
 local now = redis.call("TIME")
@@ -156,7 +156,7 @@ Key properties:
 - **Crash-bounded.** A crashed holder stops renewing and disappears after the lease window; no explicit release is required for convergence.
 - **Live siblings remain protected.** Every holder has its own deadline, so pruning a crashed sibling cannot remove a live job's renewed lease.
 - **Duplicate take/release is idempotent.** `ZADD` updates one member and `ZREM` of a missing member is harmless.
-- **No eager deletion.** Release and transfer mutate lease membership only. Redis TTL and the durable-store lifecycle sweep reclaim shared bytes, removing the last-release race entirely.
+- **No eager deletion.** Release and transfer mutate lease membership only. Redis TTL reclaims Redis-tier bytes. The durable tier relies on the deployment's bucket lifecycle/project-purge policy; adding lease-aware, storage-specific durable GC is separate from this change's explicitly unchanged S3 tiering behaviour.
 - **Cluster-safe.** Blob, lease, migration-guard, and queue keys share the queue's Redis hash tag.
 
 A retry or dedup-squash uses `TRANSFER_LUA` to take/renew the new lease and remove the old member atomically. The blob is never deleted on either the same-content or changed-content path.
@@ -214,7 +214,7 @@ Dedup is implemented inside `STAGE_LUA`: a write to `{queue}:dedup:{dedupId}` wi
 
 Pipelines that opt in (`processBatch` + `coalesceMaxBatch` in the queue definition) can drain multiple jobs from the same group in one dispatch, hand them to the user as an array, and complete them as a batch. The drain is bounded by `coalesceMaxBatch(payload)` — a per-payload knob since some payload shapes can usefully coalesce up to N, others only 1.
 
-Coalesced batches go through the same envelope decoder and the same lifecycle: every staged value's lease is taken at stage, released on batch completion, or retry-transferred to the re-encoded retry value.
+Coalesced batches go through the same envelope decoder and the same lifecycle: every staged value's lease is taken at stage, renewed together throughout a long-running handler, released on batch completion, or retry-transferred to the re-encoded retry value.
 
 ---
 
