@@ -24,6 +24,7 @@ const metricNames = [
   "gq_retry_backoff_milliseconds",
   "gq_job_duration_milliseconds",
   "gq_post_completion_cleanup_failures_total",
+  "gq_group_attempt_read_failures_total",
   "gq_oldest_pending_age_milliseconds",
   // ADR-030 hardening + review 2026-06-24
   "gq_blob_reclaim_s3_failures_total",
@@ -178,6 +179,22 @@ export const gqPostCompletionCleanupFailuresTotal = new Counter({
   name: "gq_post_completion_cleanup_failures_total",
   help: "Post-completion cleanup failures; the job completed and is not retried",
   labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
+});
+
+/**
+ * Reads of the group's retry-chain counter that failed.
+ *
+ * Matters more than it looks. A failed read returns 0, so a sibling-led retry
+ * resolves to attempt 1 — byte-identical to a genuine fresh delivery in the
+ * span, the metrics, and the `deliveryAttempt` reaching the fold. That both
+ * restarts the retry budget AND makes the fold discard its record of what the
+ * chain already applied. Without this counter the two are indistinguishable,
+ * which is how the equivalent TTL bug stayed invisible until it was measured.
+ */
+export const gqGroupAttemptReadFailuresTotal = new Counter({
+  name: "gq_group_attempt_read_failures_total",
+  help: "Failed reads of the group retry-chain counter; a retry may read as a fresh delivery",
+  labelNames: ["queue_name"] as const,
 });
 
 export const gqJobDurationMilliseconds = new Histogram({

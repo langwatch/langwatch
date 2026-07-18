@@ -72,6 +72,7 @@ import {
   gqHandlerInvocationsTotal,
   gqJobDelayMilliseconds,
   gqJobDurationMilliseconds,
+  gqGroupAttemptReadFailuresTotal,
   gqJobsCompletedTotal,
   gqPostCompletionCleanupFailuresTotal,
   gqJobsDedupedTotal,
@@ -987,6 +988,19 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "queue.group_id": groupId,
         "queue.staged_job_id": stagedJobId,
         "queue.attempt": attempt,
+        // The lane decision shapes the trace; without it on the span there is
+        // no queryable way to ask which lane a job took, and the failure mode
+        // it guards against is a collector OOM.
+        "queue.job_type": jobType,
+        "queue.trace_lane": continuesPublisherTrace ? "continue" : "root",
+        // Which source won `Math.max(jobAttempt, groupAttempt)`. Distinguishes
+        // a genuine first delivery from a chain whose counter was lost.
+        "queue.attempt_source":
+          attempt === 1
+            ? "fresh"
+            : jobAttempt >= attempt
+              ? "job"
+              : "group",
       };
 
       // Add custom span attributes from the definition
@@ -1509,8 +1523,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       const raw = await this.redisConnection.get(this.groupAttemptKey(groupId));
       const parsed = raw === null ? 0 : Number.parseInt(raw, 10);
       return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-    } catch {
-      // Unreadable means unknown, and the job's own __attempt still applies.
+    } catch (err) {
+      // NOT silent. Returning 0 makes a sibling-led retry resolve to attempt 1,
+      // which is indistinguishable from a fresh delivery everywhere downstream:
+      // the retry budget restarts, and the fold treats it as fresh and discards
+      // its record of what the chain already applied. Same blast radius as the
+      // TTL bug this counter's sibling replaced.
+      gqGroupAttemptReadFailuresTotal.inc({ queue_name: this.queueName });
+      this.logger.warn(
+        { queueName: this.queueName, groupId, err },
+        "Could not read the group retry-chain counter — a sibling-led retry may read as a fresh delivery and re-apply already-folded events",
+      );
       return 0;
     }
   }

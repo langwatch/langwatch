@@ -115,4 +115,43 @@ describe("EventSourcedQueueProcessorMemory root-trace scoping", () => {
     // rather than piling into one unbounded mega-trace.
     expect(new Set(jobTraceIds).size).toBe(2);
   });
+
+  it("continues the publishing trace for a subscriber, rather than rooting it", async () => {
+    // The other lane. Only the root case was covered, so a typo in
+    // TRACE_CONTINUING_JOB_TYPES — or a payload that stopped carrying
+    // __jobType — would silently move every subscriber into its own trace and
+    // pass CI. The whole point of the split is that an automation firing on a
+    // trace reads end to end.
+    const processor = new EventSourcedQueueProcessorMemory<{
+      id: string;
+      __jobType: string;
+    }>({
+      name: "test-queue",
+      process: vi.fn().mockResolvedValue(void 0),
+    } as unknown as EventSourcedQueueDefinition<{
+      id: string;
+      __jobType: string;
+    }>);
+
+    const ambientTracer = trace.getTracer("test-ambient");
+    const ambientTraceId = await ambientTracer.startActiveSpan(
+      "publishing-command",
+      async (ambient) => {
+        try {
+          await processor.send({ id: "job-1", __jobType: "subscriber" });
+          return ambient.spanContext().traceId;
+        } finally {
+          ambient.end();
+        }
+      },
+    );
+
+    const jobSpan = exporter
+      .getFinishedSpans()
+      .find((span) => span.name === "pipeline.process");
+
+    expect(jobSpan).toBeDefined();
+    expect(jobSpan!.spanContext().traceId).toBe(ambientTraceId);
+  });
+
 });
