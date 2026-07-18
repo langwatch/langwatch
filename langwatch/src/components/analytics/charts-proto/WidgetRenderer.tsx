@@ -25,9 +25,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { TrendingDown, TrendingUp } from "react-feather";
+import { Minus, TrendingDown, TrendingUp } from "react-feather";
 import { aggAlias, type WidgetSpec } from "./model";
-import { aggUnit, formatAggValue, type StubResult } from "./stubData";
+import { aggUnit, deltaTrend, formatAggValue, type StubResult } from "./stubData";
 
 const GRID_STROKE = "color-mix(in srgb, currentColor 12%, transparent)";
 const AXIS_TICK = { fontSize: 11, fill: "currentColor", opacity: 0.55 };
@@ -213,7 +213,8 @@ function LineViz({ result, height }: { result: StubResult; height: number }) {
 // ── Single stat (billboard) ─────────────────────────────────────────────────
 function StatViz({ result, height }: { result: StubResult; height: number }) {
   const { total, primaryAgg } = result;
-  const up = total.deltaPct >= 0;
+  const { direction, isGood } = deltaTrend(total.deltaPct, primaryAgg);
+  const trendColor = isGood === null ? "fg.muted" : isGood ? "green.500" : "red.500";
   const spark = total.spark.map((v, i) => ({ i, v }));
   const unit = aggUnit(primaryAgg);
   // formatAggValue already embeds $ and ms/s; only tokens need a trailing unit.
@@ -231,10 +232,16 @@ function StatViz({ result, height }: { result: StubResult; height: number }) {
           </Text>
         ) : null}
       </HStack>
-      <HStack gap={1} color={up ? "green.500" : "red.500"} fontSize="sm" fontWeight="500">
-        {up ? <TrendingUp size={15} /> : <TrendingDown size={15} />}
+      <HStack gap={1} color={trendColor} fontSize="sm" fontWeight="500">
+        {direction === "up" ? (
+          <TrendingUp size={15} />
+        ) : direction === "down" ? (
+          <TrendingDown size={15} />
+        ) : (
+          <Minus size={15} />
+        )}
         <Text>
-          {up ? "+" : ""}
+          {direction === "up" ? "+" : ""}
           {total.deltaPct}%
         </Text>
         <Text color="fg.subtle" fontWeight="400">

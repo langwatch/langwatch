@@ -38,13 +38,16 @@ export const AGGREGATIONS = [
 export type AggregationOp = (typeof AGGREGATIONS)[number]["op"];
 
 // ── Metric columns (METRIC_COLUMNS) — schema.ts:50-58 ───────────────────────
+// `polarity`: 1 when a higher value is an improvement (throughput), -1 when a
+// higher value is worse (cost, latency, volume). Drives delta colouring for
+// the single-stat viz — a metric's "up" is not always "good".
 export const METRICS = [
-  { column: "durationMs", label: "Duration", unit: "ms" },
-  { column: "cost", label: "Cost", unit: "$" },
-  { column: "promptTokens", label: "Prompt tokens", unit: "tok" },
-  { column: "completionTokens", label: "Completion tokens", unit: "tok" },
-  { column: "totalTokens", label: "Total tokens", unit: "tok" },
-  { column: "tokensPerSecond", label: "Tokens / sec", unit: "tok/s" },
+  { column: "durationMs", label: "Duration", unit: "ms", polarity: -1 },
+  { column: "cost", label: "Cost", unit: "$", polarity: -1 },
+  { column: "promptTokens", label: "Prompt tokens", unit: "tok", polarity: -1 },
+  { column: "completionTokens", label: "Completion tokens", unit: "tok", polarity: -1 },
+  { column: "totalTokens", label: "Total tokens", unit: "tok", polarity: -1 },
+  { column: "tokensPerSecond", label: "Tokens / sec", unit: "tok/s", polarity: 1 },
 ] as const;
 
 export type MetricColumn = (typeof METRICS)[number]["column"];

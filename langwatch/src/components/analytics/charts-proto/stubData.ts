@@ -141,6 +141,25 @@ export const aggUnit = (agg: AggregationSpec): string => {
   return agg.column ? metricMeta(agg.column).unit : "";
 };
 
+/** 1 (up=good) unless the metric column says otherwise; `count`/`cardinality` have no column to look up, so default neutral-good. */
+export const aggPolarity = (agg: AggregationSpec): 1 | -1 => {
+  if (agg.op === "count" || agg.op === "cardinality") return 1;
+  return agg.column ? metricMeta(agg.column).polarity : 1;
+};
+
+export interface DeltaTrend {
+  direction: "up" | "down" | "flat";
+  /** null when flat — flat is neither good nor bad. */
+  isGood: boolean | null;
+}
+
+/** Interprets a delta for display: `direction` mirrors the raw sign (icon), `isGood` folds in the metric's polarity (colour). */
+export const deltaTrend = (deltaPct: number, agg: AggregationSpec): DeltaTrend => {
+  if (deltaPct === 0) return { direction: "flat", isGood: null };
+  const direction = deltaPct > 0 ? "up" : "down";
+  return { direction, isGood: deltaPct * aggPolarity(agg) > 0 };
+};
+
 export const formatAggValue = (agg: AggregationSpec, v: number): string => {
   if (agg.op === "count") return formatCompactInt(v);
   if (agg.op === "cardinality") return formatCompactInt(v);
@@ -209,17 +228,20 @@ const bucketLabel = (t: number, fmt: "hour" | "day" | "week"): string => {
 
 // ── The engine ──────────────────────────────────────────────────────────────
 export const runStubQuery = (spec: WidgetSpec, win: StubWindow): StubResult => {
+  // `spec.filter` is deliberately excluded here — the stub never parses Liqe
+  // syntax, so folding the raw string into the seed or volume would make an
+  // inert control look functional (distinct strings would yield distinct but
+  // fake results). Output stays identical regardless of filter text until a
+  // real engine replaces this module.
   const queryKey = JSON.stringify({
     a: spec.aggregations,
     g: spec.groupBy,
-    f: spec.filter,
   });
   const primaryAgg = spec.aggregations[0] ?? { op: "count" as const };
 
   // Volume scales with the window (more days -> more traces), giving the period
-  // picker a visible cascade. A filter shrinks volume a little.
+  // picker a visible cascade.
   const windowScale = Math.max(0.15, Math.min(6, win.days / 7));
-  const filterScale = spec.filter.trim() ? 0.45 : 1;
 
   // Build the set of groups (cross-product of the chosen dimensions, bounded).
   const dimLists = spec.groupBy.map((dim, i) =>
@@ -258,9 +280,7 @@ export const runStubQuery = (spec: WidgetSpec, win: StubWindow): StubResult => {
 
     // Per-group popularity → volume; per-group mean factor per metric.
     const popularity = 0.35 + rng() * 1.3;
-    const volume = Math.round(
-      (120 + rng() * 5200) * popularity * windowScale * filterScale,
-    );
+    const volume = Math.round((120 + rng() * 5200) * popularity * windowScale);
 
     // One stable mean per (group, metric column) so every aggregation over the
     // same column is internally consistent (min ≤ p50 ≤ avg ≤ p95 ≤ max, etc.).
