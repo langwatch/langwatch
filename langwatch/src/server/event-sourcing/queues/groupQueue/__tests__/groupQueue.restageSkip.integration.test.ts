@@ -251,10 +251,22 @@ describe.skipIf(!hasTestcontainers)(
           // is in the ready zset. restageDrainedSiblings still runs on
           // every catch (the [B, C] sibling batch) — that is the call site
           // under test (groupQueue.ts line ~1078).
+          //
+          // seenPayloads records every payload observed by either handler
+          // across both processing paths. Used below to assert healthy
+          // sibling C is re-dispatched at least once after the initial
+          // batch — guarding against an inverted predicate that skips
+          // ALL siblings (e.g. an unconditional `continue;`), which would
+          // leave A retrying alone (so retriedCount > 0 still passes)
+          // while C is silently lost.
+          const seenPayloads: TestPayload[] = [];
           const consumer = newQueue({
             name,
-            processFn: async () => {},
-            processBatch: async () => {
+            processFn: async (payload) => {
+              seenPayloads.push(payload);
+            },
+            processBatch: async (payloads) => {
+              seenPayloads.push(...payloads);
               throw new Error("handler blew up");
             },
             consumerEnabled: true,
@@ -294,6 +306,19 @@ describe.skipIf(!hasTestcontainers)(
           // cycled through retryRestage, which only happens when the catch
           // block executed the restageDrainedSiblings call under test.
           expect(await retriedCount(name)).toBeGreaterThan(0);
+
+          // Functional correctness guard: healthy sibling C must be
+          // observed by the handler at least twice — once in the initial
+          // batch (A,C), and at least once more in a retry batch (A,C) —
+          // proving restageDrainedSiblings actually re-staged C. The
+          // retriedCount assertion above only proves A cycled through
+          // retryRestage; an unconditional `continue;` (or any predicate
+          // that skips every sibling) would leave A retrying alone with
+          // retriedCount > 0 still true but C silently lost. This
+          // assertion closes that gap by directly observing C's
+          // re-dispatch across both processing paths.
+          const cAppearances = seenPayloads.filter((p) => p.id === "C").length;
+          expect(cAppearances).toBeGreaterThanOrEqual(2);
         });
       });
     });
