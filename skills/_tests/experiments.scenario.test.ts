@@ -1,6 +1,5 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import scenario from "@langwatch/scenario";
-import { execSync } from "child_process";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
@@ -8,6 +7,7 @@ import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 import {
 	assertSkillWasRead,
+	copyFixtureToWorkDir,
 	createClaudeCodeAgent,
 	createSkillTestWorkDir,
 	installSkillToWorkDir,
@@ -133,9 +133,10 @@ describe("Experiments Skill", () => {
 				"langwatch-skill-experiment-py-",
 			);
 
-			execSync(
-				`cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`,
-			);
+			copyFixtureToWorkDir({
+				fixtureSubpath: "python-openai",
+				workingDirectory: tempFolder,
+			});
 			copySkillToWorkDir(tempFolder);
 			const experimentName = "Skill dogfood tweet experiment";
 
@@ -217,9 +218,10 @@ describe("Experiments Skill", () => {
 				"langwatch-skill-experiments-ts-",
 			);
 
-			execSync(
-				`cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`,
-			);
+			copyFixtureToWorkDir({
+				fixtureSubpath: "typescript-vercel",
+				workingDirectory: tempFolder,
+			});
 			copySkillToWorkDir(tempFolder);
 
 			const result = await scenario.run({
@@ -277,9 +279,10 @@ describe("Experiments Skill", () => {
 			const tempFolder = createSkillTestWorkDir(
 				"langwatch-skill-experiments-langgraph-",
 			);
-			execSync(
-				`cp -r ${path.resolve(__dirname, "fixtures/python-langgraph")}/* ${tempFolder}/`,
-			);
+			copyFixtureToWorkDir({
+				fixtureSubpath: "python-langgraph",
+				workingDirectory: tempFolder,
+			});
 			copySkillToWorkDir(tempFolder);
 
 			const result = await scenario.run({
@@ -333,9 +336,10 @@ describe("Experiments Skill", () => {
 			const tempFolder = createSkillTestWorkDir(
 				"langwatch-skill-experiments-targeted-",
 			);
-			execSync(
-				`cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`,
-			);
+			copyFixtureToWorkDir({
+				fixtureSubpath: "python-openai",
+				workingDirectory: tempFolder,
+			});
 			copySkillToWorkDir(tempFolder);
 
 			const result = await scenario.run({
@@ -386,9 +390,10 @@ describe("Experiments Skill", () => {
 			const tempFolder = createSkillTestWorkDir(
 				"langwatch-skill-experiments-rag-",
 			);
-			execSync(
-				`cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`,
-			);
+			copyFixtureToWorkDir({
+				fixtureSubpath: "python-rag-agent",
+				workingDirectory: tempFolder,
+			});
 			copySkillToWorkDir(tempFolder);
 
 			const result = await scenario.run({

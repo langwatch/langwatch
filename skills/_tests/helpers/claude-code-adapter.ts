@@ -26,6 +26,22 @@ export function createSkillTestWorkDir(prefix: string): string {
 	return fs.mkdtempSync(path.join(root, prefix));
 }
 
+export function copyFixtureToWorkDir({
+	fixtureSubpath,
+	workingDirectory,
+}: {
+	fixtureSubpath: string;
+	workingDirectory: string;
+}): void {
+	const fixtureRoot = path.resolve(__dirname, "../fixtures");
+	const sourcePath = path.resolve(fixtureRoot, fixtureSubpath);
+	if (!sourcePath.startsWith(`${fixtureRoot}${path.sep}`)) {
+		throw new Error(`Fixture path must stay inside ${fixtureRoot}`);
+	}
+
+	fs.cpSync(sourcePath, workingDirectory, { recursive: true });
+}
+
 /**
  * Inline a SKILL.mdx (resolving its `_shared/*.mdx` imports) and write it as
  * SKILL.md into a `.skills/<dir>/` folder under the agent's working directory.

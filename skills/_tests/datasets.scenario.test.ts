@@ -1,6 +1,5 @@
 import { openai } from "@ai-sdk/openai";
 import scenario from "@langwatch/scenario";
-import { execSync } from "child_process";
 import dotenv from "dotenv";
 import fs from "fs";
 import os from "os";
@@ -9,6 +8,7 @@ import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 import {
 	assertSkillWasRead,
+	copyFixtureToWorkDir,
 	createClaudeCodeAgent,
 	installSkillToWorkDir,
 	SKILL_TESTS_SET_ID,
@@ -71,9 +71,10 @@ describe("Dataset Generation Skill", () => {
 			);
 
 			// Copy the tweet-bot fixture. Agent must generate data matching its domain
-			execSync(
-				`cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`,
-			);
+			copyFixtureToWorkDir({
+				fixtureSubpath: "python-openai",
+				workingDirectory: tempFolder,
+			});
 			copySkillToWorkDir(tempFolder);
 			setupLocalCli(tempFolder);
 
@@ -185,9 +186,10 @@ describe("Dataset Generation Skill", () => {
 			);
 
 			// Copy the RAG fixture. Agent should find the knowledge base
-			execSync(
-				`cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`,
-			);
+			copyFixtureToWorkDir({
+				fixtureSubpath: "python-rag-agent",
+				workingDirectory: tempFolder,
+			});
 			copySkillToWorkDir(tempFolder);
 			setupLocalCli(tempFolder);
 
@@ -293,9 +295,10 @@ describe("Dataset Generation Skill", () => {
 				path.join(os.tmpdir(), "langwatch-skill-dataset-multiturn-"),
 			);
 
-			execSync(
-				`cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`,
-			);
+			copyFixtureToWorkDir({
+				fixtureSubpath: "python-openai",
+				workingDirectory: tempFolder,
+			});
 			copySkillToWorkDir(tempFolder);
 			setupLocalCli(tempFolder);
 
@@ -367,9 +370,10 @@ describe("Dataset Generation Skill", () => {
 				path.join(os.tmpdir(), "langwatch-skill-dataset-hallucination-"),
 			);
 
-			execSync(
-				`cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`,
-			);
+			copyFixtureToWorkDir({
+				fixtureSubpath: "python-rag-agent",
+				workingDirectory: tempFolder,
+			});
 			copySkillToWorkDir(tempFolder);
 			setupLocalCli(tempFolder);
 
@@ -470,9 +474,10 @@ describe("Dataset Generation Skill", () => {
 			);
 
 			// Use the generic TypeScript fixture. "You are a helpful assistant" gives no domain signal
-			execSync(
-				`cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`,
-			);
+			copyFixtureToWorkDir({
+				fixtureSubpath: "typescript-vercel",
+				workingDirectory: tempFolder,
+			});
 			copySkillToWorkDir(tempFolder);
 			setupLocalCli(tempFolder);
 
