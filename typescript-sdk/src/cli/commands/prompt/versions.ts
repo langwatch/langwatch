@@ -64,7 +64,7 @@ export const promptVersionsCommand = async (
     );
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch prompt versions", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch prompt versions" });
     process.exit(1);
   }
 };

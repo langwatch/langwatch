@@ -23,7 +23,6 @@ export const createCommand = async (
     if (!name || name.trim() === "") {
       reportCommandError({
         error: commandValidationError("Prompt name cannot be empty"),
-        format: options.format,
       });
       process.exit(1);
     }
@@ -46,7 +45,6 @@ export const createCommand = async (
         error: commandValidationError(
           `Prompt file already exists at ${promptPath}`,
         ),
-        format: options.format,
       });
       process.exit(1);
     }
@@ -108,7 +106,7 @@ messages:
     console.log(chalk.gray(`  Edit this file and then run:`));
     console.log(chalk.cyan(`  langwatch prompt sync`));
   } catch (error) {
-    reportCommandError({ error, format: options.format });
+    reportCommandError({ error });
     process.exit(1);
   }
 };

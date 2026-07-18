@@ -52,7 +52,7 @@ export const getScenarioCommand = async (id: string, options?: { format?: string
     }
     formatScenarioDetails(scenario);
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch scenario", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch scenario" });
     process.exit(1);
   }
 };

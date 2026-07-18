@@ -9,6 +9,9 @@ const config = tseslint.config(
             "coverage/**",
             "examples/**",
             "**/generated/**",
+            // Plain-node build scripts run by copy-types.sh — outside the
+            // eslint tsconfig project, like the shell script that calls them.
+            "scripts/**/*.mjs",
         ],
     },
     eslint.configs.recommended,

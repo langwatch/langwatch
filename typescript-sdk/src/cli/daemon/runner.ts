@@ -43,6 +43,24 @@ export interface CommandExecution {
 export type CommandExecutor = (request: ExecuteRequest) => CommandExecution;
 
 /**
+ * 10 minutes: generous for any bounded command (the unbounded ones —
+ * `--follow`/`--watch` — never reach the daemon, see eligibility.ts), tight
+ * enough that a genuinely hung command cannot pin its execution window (and
+ * suppress the daemon's idle exit) for long.
+ */
+export const DEFAULT_REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
+
+/** Operator override: LANGWATCH_DAEMON_REQUEST_TIMEOUT_MS, else the default. */
+function resolveRequestTimeoutMs(): number {
+  const fromEnv = process.env.LANGWATCH_DAEMON_REQUEST_TIMEOUT_MS;
+  if (fromEnv) {
+    const parsed = Number.parseInt(fromEnv, 10);
+    if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return DEFAULT_REQUEST_TIMEOUT_MS;
+}
+
+/**
  * Build the executor the daemon serves requests with.
  *
  * Injected into the server so tests can drive the socket, handshake, framing
@@ -51,10 +69,15 @@ export type CommandExecutor = (request: ExecuteRequest) => CommandExecution;
 export function createCommandExecutor({
   window,
   telemetry,
+  requestTimeoutMs,
 }: {
   window: ExecutionWindow;
   telemetry: DaemonTelemetry;
+  /** Injectable for tests; defaults to LANGWATCH_DAEMON_REQUEST_TIMEOUT_MS. */
+  requestTimeoutMs?: number;
 }): CommandExecutor {
+  const timeoutMs = requestTimeoutMs ?? resolveRequestTimeoutMs();
+
   return (request: ExecuteRequest): CommandExecution => {
     const context = new ExecutionContext(request.requestId, (stream, chunk) => {
       request.sink(stream, chunk);
@@ -67,6 +90,47 @@ export function createCommandExecutor({
 
     let cancelled = false;
     let settle: ((code: number) => void) | undefined;
+    let releaseWindow: (() => void) | undefined;
+    const abortController = new AbortController();
+
+    // Releasing the window is deliberately decoupled from the command's own
+    // completion. The command's promise chain cannot be killed from the
+    // outside, so a command that hangs forever would otherwise hold its
+    // working-directory window forever too — blocking every caller whose
+    // (cwd, env, colour) tuple differs, and suppressing the daemon's idle
+    // exit. On cancel/timeout the window is freed immediately; the abandoned
+    // work finishes (or doesn't) on its own and its `finally` release is a
+    // no-op.
+    const releaseOnce = (): void => {
+      const release = releaseWindow;
+      releaseWindow = undefined;
+      release?.();
+    };
+
+    const abort = (code: number, note?: string): void => {
+      if (context.isFinished) return;
+      cancelled = true;
+      if (note !== undefined) {
+        context.write("stderr", Buffer.from(note, "utf8"));
+      }
+      // Finalising first is what actually enforces the cancellation: every
+      // subsequent write from the abandoned command is dropped on the floor.
+      context.finalize(code);
+      // Wakes a request still QUEUED for its window; a no-op otherwise.
+      abortController.abort();
+      releaseOnce();
+      settle?.(code);
+    };
+
+    // 124, the `timeout(1)` convention, so scripts can tell a timeout apart
+    // from both a command failure (1) and a client cancel (130).
+    const timeout = setTimeout(() => {
+      abort(
+        124,
+        `langwatch: request timed out after ${Math.round(timeoutMs / 1000)}s; the daemon abandoned it\n`,
+      );
+    }, timeoutMs);
+    timeout.unref();
 
     const completed = (async (): Promise<number> => {
       const startedAt = Date.now();
@@ -74,11 +138,29 @@ export function createCommandExecutor({
       // May reject when the caller's cwd no longer exists. The server turns
       // that into a `fallback` frame — no output has been emitted yet, so the
       // client can safely re-run the command itself.
-      const release = await window.acquire({
-        cwd: request.cwd,
-        env: request.env,
-        colorLevel: request.colorLevel,
-      });
+      let release: (() => void) | undefined;
+      try {
+        release = await window.acquire(
+          {
+            cwd: request.cwd,
+            env: request.env,
+            colorLevel: request.colorLevel,
+          },
+          abortController.signal,
+        );
+      } catch (error) {
+        // Aborted while queued: the cancel/timeout path already settled the
+        // caller; there is nothing left to report.
+        if (cancelled) return context.exitCode;
+        throw error;
+      }
+      releaseWindow = release;
+
+      // Admitted at the same moment the abort fired. Don't start the work.
+      if (cancelled) {
+        releaseOnce();
+        return context.exitCode;
+      }
 
       telemetry.requestStarted({
         requestId: request.requestId,
@@ -116,7 +198,7 @@ export function createCommandExecutor({
           context.finalize(1);
         }
       } finally {
-        release();
+        releaseOnce();
       }
 
       telemetry.requestFinished({
@@ -132,24 +214,29 @@ export function createCommandExecutor({
 
     // The promise the server awaits: whichever of "the command finished" or
     // "the client cancelled" happens first.
-    const raced = new Promise<number>((resolve) => {
-      settle = resolve;
-      completed.then(
-        (code) => resolve(code),
-        () => resolve(context.exitCode),
-      );
+    const raced = new Promise<number>((resolve, reject) => {
+      const finish = (code: number): void => {
+        clearTimeout(timeout);
+        resolve(code);
+      };
+      settle = finish;
+      completed.then(finish, (error: unknown) => {
+        clearTimeout(timeout);
+        // A rejection means the window could not be applied (e.g. the caller's
+        // cwd was deleted) BEFORE any output was produced — the server turns
+        // it into a `fallback` frame so the client re-runs in-process. It must
+        // NOT be swallowed into a fake exit code: an empty `exit 0` is the
+        // "silent, looks like it worked" failure the daemon is designed
+        // against. Cancel/timeout never land here: those settle via `finish`,
+        // and an aborted-while-queued acquire RESOLVES `completed` (see the
+        // cancelled check above) rather than rejecting it.
+        reject(error);
+      });
     });
 
     return {
       completed: raced,
-      cancel: (code: number) => {
-        if (context.isFinished) return;
-        cancelled = true;
-        // Finalising first is what actually enforces the cancellation: every
-        // subsequent write from the abandoned command is dropped on the floor.
-        context.finalize(code);
-        settle?.(code);
-      },
+      cancel: (code: number) => abort(code),
     };
   };
 }

@@ -27,7 +27,7 @@ export const archiveGatewayBudgetCommand = async (
     console.log(chalk.gray("Archived at: ") + (budget.archived_at ? new Date(budget.archived_at).toLocaleString() : chalk.gray("—")));
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "archive gateway budget", format: options?.format });
+    failSpinner({ spinner, error, action: "archive gateway budget" });
     process.exit(1);
   }
 };

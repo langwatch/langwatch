@@ -243,7 +243,7 @@ export const experimentResultsCommand = async ({
       );
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch experiment results", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch experiment results" });
     process.exit(1);
   }
 };

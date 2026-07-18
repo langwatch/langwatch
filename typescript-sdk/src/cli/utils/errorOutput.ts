@@ -10,17 +10,22 @@
  * So the same failure is rendered twice, by output format, from one reading of
  * the error:
  *
- *   default        a red line on STDERR, then the kind, the trace id and the
- *                  meta, indented under it. Nothing on stdout.
+ *   default        a gcx-style block on STDERR — `Error: <sentence>`, then
+ *                  `Details:` (code, status, trace id/url, meta, reason chain),
+ *                  `Suggestions:` and `Docs:` when there is advice to give.
+ *                  Nothing on stdout.
  *   --format json  the structured document on STDOUT — `{ ok: false, error:
- *                  { kind, message, httpStatus, meta, traceId, reasons } }` —
- *                  and the one-line human summary still on stderr, where it
- *                  cannot corrupt what the parser reads.
+ *                  { code, kind, message, httpStatus, meta, traceId, traceUrl,
+ *                  reasons, suggestions, docUrl } }` — and the one-line human
+ *                  summary still on stderr, where it cannot corrupt what the
+ *                  parser reads.
  *
  * Both paths run every string through `redactSecrets` first. An API key echoed
  * back inside a 404 message is a real thing servers do, and it must not reach a
  * terminal, a log, or an agent's context.
  */
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import chalk from "chalk";
 import {
   domainErrorFromThrown,
@@ -28,27 +33,83 @@ import {
   type CliDomainError,
 } from "@langwatch/cli-cards/domain-error";
 import { redactSecrets } from "../telemetry/events";
+import { withFallbackSuggestions } from "./errorSuggestions";
 
 /** The output format a command was invoked with. */
 export type CliOutputFormat = "json" | "text";
 
 /**
- * The format of the command CURRENTLY running.
+ * The per-request output context: the format failures render in, and whether
+ * colour may reach the caller.
  *
- * Module state, set once per invocation by the `preAction` hook in `program.ts`,
- * because the ~100 `failSpinner` call sites should not each have to remember to
- * thread an option through to be able to fail correctly — forgetting would mean
- * a command that silently prints prose to a parser. Written on EVERY action (not
- * only when `--format` is passed) so a daemon serving one command after another
+ * Set once per invocation by the `preAction` hook in `program.ts`, because the
+ * ~100 `failSpinner` call sites should not each have to remember to thread an
+ * option through to be able to fail correctly — forgetting would mean a command
+ * that silently prints prose to a parser. Written on EVERY action (not only
+ * when `--format` is passed) so a daemon serving one command after another
  * cannot leak a `json` from the last caller into the next one.
+ *
+ * Two layers, one mechanism:
+ *
+ *   - SCOPED: an AsyncLocalStorage scope, entered per request by the daemon
+ *     (`daemon/execution.ts withExecutionContext`). Requests that share an
+ *     execution window run CONCURRENTLY and can disagree about `--format` and
+ *     `--agent`; a plain module global would let the second writer clobber the
+ *     first request's error rendering mid-flight.
+ *   - AMBIENT: a plain module global, used when no scope is active — the
+ *     in-process path (and tests), where exactly one command is in flight and
+ *     a global is faithful.
  */
-let currentFormat: CliOutputFormat = "text";
+interface OutputScope {
+  format: CliOutputFormat;
+  /** Whether ANSI colour may be emitted for this request. */
+  color: boolean;
+}
+
+const scopeStorage = new AsyncLocalStorage<OutputScope>();
+
+let ambientFormat: CliOutputFormat = "text";
+
+/**
+ * Run `fn` with a fresh output scope. Called by the daemon per request (see
+ * `withExecutionContext` in daemon/execution.ts); the in-process path never
+ * enters a scope and uses the ambient global instead.
+ */
+export const withOutputScope = <T>(fn: () => T): T =>
+  scopeStorage.run({ format: "text", color: true }, fn);
+
+/** The active request's output scope, if the caller is inside one. */
+export const currentOutputScope = (): OutputScope | undefined =>
+  scopeStorage.getStore();
 
 export const setOutputFormat = (format: string | undefined): void => {
-  currentFormat = format === "json" ? "json" : "text";
+  const resolved: CliOutputFormat = format === "json" ? "json" : "text";
+  const scope = scopeStorage.getStore();
+  if (scope) scope.format = resolved;
+  else ambientFormat = resolved;
 };
 
-export const getOutputFormat = (): CliOutputFormat => currentFormat;
+export const getOutputFormat = (): CliOutputFormat =>
+  scopeStorage.getStore()?.format ?? ambientFormat;
+
+/**
+ * Turn colour off for the rest of this command (agent mode).
+ *
+ * `chalk.level` is a process global that chalk reads at RENDER time, so
+ * AsyncLocalStorage cannot scope it: mutating it mid-request would bleed into
+ * every other request sharing the daemon's execution window (an agent request
+ * would leave a concurrent human caller colourless, and vice versa). Inside a
+ * request scope the mutation is therefore replaced by a flag the daemon's
+ * output sink honours — daemon/execution.ts strips SGR sequences from that
+ * request's bytes, and `chalk.level` is never touched. Outside a scope — a
+ * plain in-process run — exactly one command is in flight and setting
+ * `chalk.level` directly is both faithful and free.
+ */
+export const disableOutputColor = (): void => {
+  const scope = scopeStorage.getStore();
+  if (scope) scope.color = false;
+  else chalk.level = 0;
+};
 
 /**
  * The format to render a failure in: what the caller explicitly said, else what
@@ -59,7 +120,7 @@ export const getOutputFormat = (): CliOutputFormat => currentFormat;
 export const resolveOutputFormat = (
   explicit?: string,
 ): CliOutputFormat =>
-  explicit === undefined ? currentFormat : explicit === "json" ? "json" : "text";
+  explicit === undefined ? getOutputFormat() : explicit === "json" ? "json" : "text";
 
 /**
  * Read any thrown value into the platform's structure, with the MESSAGE scrubbed.
@@ -87,15 +148,18 @@ export const readCommandError = (error: unknown): CliDomainError => {
   return { ...domain, message: redactSecrets(domain.message) };
 };
 
-/** `kind` / `trace id` / meta keys, aligned into a dim block under the message. */
+/** `code` / `trace id` / meta keys, aligned into a dim block under `Details:`. */
 const detailLines = (domain: CliDomainError): string[] => {
-  const details: [string, string][] = [["kind", domain.kind]];
+  const details: [string, string][] = [["code", domain.code]];
 
   if (domain.httpStatus > 0) {
     details.push(["status", String(domain.httpStatus)]);
   }
   if (domain.traceId) {
     details.push(["trace id", domain.traceId]);
+  }
+  if (domain.traceUrl) {
+    details.push(["trace url", domain.traceUrl]);
   }
 
   // Printed as the platform composed it. See `readCommandError` on why `meta` is
@@ -115,27 +179,71 @@ const detailLines = (domain: CliDomainError): string[] => {
 
   const width = Math.max(...details.map(([key]) => key.length));
 
-  return details.map(
-    ([key, value]) => `  ${chalk.dim(key.padEnd(width))}  ${chalk.dim(value)}`,
-  );
+  return [
+    "Details:",
+    ...details.map(
+      ([key, value]) => `  ${chalk.dim(key.padEnd(width))}  ${chalk.dim(value)}`,
+    ),
+  ];
 };
 
 /**
  * The human rendering: the sentence, then everything else that was on the error.
  *
- * An INFRASTRUCTURE failure prints the sentence alone. Its "kind" is a label the
+ *   Error: <sentence>
+ *   Details:
+ *     code       dataset_not_found
+ *     status     404
+ *     trace id   …
+ *   Suggestions:
+ *     - <next step>
+ *   Docs: <docUrl>
+ *
+ * The Suggestions/Docs sections appear only when there is advice to give —
+ * server-sent when the platform sent it, the code-keyed fallback table (see
+ * `errorSuggestions.ts`) otherwise.
+ *
+ * An INFRASTRUCTURE failure prints the sentence alone. Its "code" is a label the
  * CLI invented for a failure the platform never named (`internal_error`,
  * `network_error`), and dressing that up as though the platform had said it
  * would be inventing precision that does not exist.
  */
 export const renderErrorForHumans = (domain: CliDomainError): string => {
   if (!domain.isDomain) return domain.message;
-  return [domain.message, ...detailLines(domain)].join("\n");
+
+  const enriched = withFallbackSuggestions(domain);
+  const lines = [`Error: ${enriched.message}`, ...detailLines(enriched)];
+
+  if (enriched.suggestions?.length) {
+    lines.push(
+      "Suggestions:",
+      ...enriched.suggestions.map((suggestion) => `  - ${suggestion}`),
+    );
+  }
+  if (enriched.docUrl) {
+    lines.push(`Docs: ${enriched.docUrl}`);
+  }
+
+  return lines.join("\n");
 };
 
-/** The machine rendering: one JSON document, and nothing else, on stdout. */
+/**
+ * The machine rendering: one JSON document, and nothing else, on stdout.
+ * Suggestions/docUrl are filled from the fallback table when the platform sent
+ * none, so an agent gets the same way forward a person does.
+ *
+ * The fallback applies here even for INFRASTRUCTURE errors (`isDomain: false`),
+ * and that asymmetry with the human rendering is deliberate. A person gets the
+ * bare sentence because dressing a failure the platform never named in
+ * CLI-invented detail would fake precision; a machine gets the fallback advice
+ * anyway, because the status-derived codes (`network_error`, `internal_error`)
+ * are exactly the codes the fallback table has honest, generic guidance for
+ * (check connectivity; retry and quote the trace id), and the document still
+ * carries `isDomain: false` so the reader knows the code is ours, not the
+ * platform's.
+ */
 export const renderErrorAsJson = (domain: CliDomainError): string =>
-  JSON.stringify(toCliErrorDocument(domain), null, 2);
+  JSON.stringify(toCliErrorDocument(withFallbackSuggestions(domain)), null, 2);
 
 /**
  * A local argument/precondition failure, pre-shaped so the error path reports
@@ -149,6 +257,7 @@ export const commandValidationError = (
   meta: Record<string, unknown> = {},
 ): CliDomainError & { isLangWatchDomainError: true } => ({
   isLangWatchDomainError: true,
+  code: "validation_error",
   kind: "validation_error",
   message,
   httpStatus: 0,

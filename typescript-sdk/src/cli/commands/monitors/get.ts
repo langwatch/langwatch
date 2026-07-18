@@ -3,12 +3,13 @@ import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { printResult, type RawOutputFlags } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 export const getMonitorCommand = async (
   id: string,
-  options?: { format?: string }
+  options?: RawOutputFlags
 ): Promise<void> => {
   checkApiKey();
 
@@ -46,36 +47,38 @@ export const getMonitorCommand = async (
 
     spinner.succeed(`Monitor "${monitor.name}"`);
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(monitor, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`  ${chalk.gray("ID:")}        ${chalk.green(monitor.id)}`);
-    console.log(`  ${chalk.gray("Name:")}      ${chalk.cyan(monitor.name)}`);
-    console.log(`  ${chalk.gray("Slug:")}      ${monitor.slug}`);
-    console.log(`  ${chalk.gray("Type:")}      ${monitor.checkType}`);
-    console.log(
-      `  ${chalk.gray("Status:")}    ${monitor.enabled ? chalk.green("enabled") : chalk.gray("disabled")}`
-    );
-    console.log(`  ${chalk.gray("Mode:")}      ${monitor.executionMode}`);
-    console.log(`  ${chalk.gray("Sample:")}    ${Math.round(monitor.sample * 100)}%`);
-    console.log(`  ${chalk.gray("Level:")}     ${monitor.level}`);
-    if (monitor.evaluatorId) {
-      console.log(
-        `  ${chalk.gray("Evaluator:")} ${monitor.evaluatorId}`
-      );
-    }
-    console.log(
-      `  ${chalk.gray("Created:")}   ${new Date(monitor.createdAt).toLocaleString()}`
-    );
-    if (monitor.platformUrl) {
-      console.log(`  ${chalk.bold("View:")}     ${chalk.underline(monitor.platformUrl)}`);
-    }
-    console.log();
+    await printResult(monitor, {
+      ...options,
+      table: () => {
+        console.log();
+        console.log(`  ${chalk.gray("ID:")}        ${chalk.green(monitor.id)}`);
+        console.log(`  ${chalk.gray("Name:")}      ${chalk.cyan(monitor.name)}`);
+        console.log(`  ${chalk.gray("Slug:")}      ${monitor.slug}`);
+        console.log(`  ${chalk.gray("Type:")}      ${monitor.checkType}`);
+        console.log(
+          `  ${chalk.gray("Status:")}    ${monitor.enabled ? chalk.green("enabled") : chalk.gray("disabled")}`
+        );
+        console.log(`  ${chalk.gray("Mode:")}      ${monitor.executionMode}`);
+        console.log(`  ${chalk.gray("Sample:")}    ${Math.round(monitor.sample * 100)}%`);
+        console.log(`  ${chalk.gray("Level:")}     ${monitor.level}`);
+        if (monitor.evaluatorId) {
+          console.log(
+            `  ${chalk.gray("Evaluator:")} ${monitor.evaluatorId}`
+          );
+        }
+        console.log(
+          `  ${chalk.gray("Created:")}   ${new Date(monitor.createdAt).toLocaleString()}`
+        );
+        if (monitor.platformUrl) {
+          console.log(`  ${chalk.bold("View:")}     ${chalk.underline(monitor.platformUrl)}`);
+        }
+        console.log();
+      },
+    });
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch monitor", format: options?.format });
+    // No explicit `format`: see traces/search.ts — the preAction hook covers
+    // every spelling; the `-f` commander default must not override it.
+    failSpinner({ spinner, error, action: "fetch monitor" });
     process.exit(1);
   }
 };

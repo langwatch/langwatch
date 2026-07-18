@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { printResult, type RawOutputFlags } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -15,8 +16,7 @@ export const createMonitorCommand = async (
     evaluatorId?: string;
     level?: string;
     parameters?: string;
-    format?: string;
-  }
+  } & RawOutputFlags
 ): Promise<void> => {
   checkApiKey();
 
@@ -74,24 +74,26 @@ export const createMonitorCommand = async (
 
     spinner.succeed(`Monitor "${monitor.name}" created (${monitor.id})`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(monitor, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`  ${chalk.gray("ID:")}   ${chalk.green(monitor.id)}`);
-    console.log(`  ${chalk.gray("Type:")} ${monitor.checkType}`);
-    console.log(`  ${chalk.gray("Mode:")} ${monitor.executionMode}`);
-    if (monitor.platformUrl) {
-      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(monitor.platformUrl)}`);
-    }
-    console.log();
+    await printResult(monitor, {
+      ...options,
+      table: () => {
+        console.log();
+        console.log(`  ${chalk.gray("ID:")}   ${chalk.green(monitor.id)}`);
+        console.log(`  ${chalk.gray("Type:")} ${monitor.checkType}`);
+        console.log(`  ${chalk.gray("Mode:")} ${monitor.executionMode}`);
+        if (monitor.platformUrl) {
+          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(monitor.platformUrl)}`);
+        }
+        console.log();
+      },
+    });
   } catch (error) {
     if (error instanceof SyntaxError) {
       spinner.fail(chalk.red("--parameters must be valid JSON"));
     } else {
-      failSpinner({ spinner, error, action: "create monitor", format: options?.format });
+      // No explicit `format`: see traces/search.ts — the preAction hook covers
+      // every spelling; the `-f` commander default must not override it.
+      failSpinner({ spinner, error, action: "create monitor" });
     }
     process.exit(1);
   }

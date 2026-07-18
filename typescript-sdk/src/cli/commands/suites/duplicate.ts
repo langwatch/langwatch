@@ -29,7 +29,7 @@ export const duplicateSuiteCommand = async (
     console.log(`  ${chalk.gray("Slug:")}     ${chalk.yellow(suite.slug)}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "duplicate suite", format: options?.format });
+    failSpinner({ spinner, error, action: "duplicate suite" });
     process.exit(1);
   }
 };

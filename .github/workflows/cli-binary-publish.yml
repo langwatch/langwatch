@@ -1,0 +1,171 @@
+# Builds the standalone `langwatch` CLI binary (Bun --compile, bytecode +
+# minify — see typescript-sdk/scripts/build-cli-binary.ts) for every supported
+# platform and attaches it (with sha256 sidecars) to the typescript-sdk
+# GitHub release, so users can install the CLI without npm.
+#
+# One ubuntu job builds ALL targets: `bun build --compile --target=<triple>`
+# cross-compiles from any host (Bun ≥1.1), so per-OS runners would only burn
+# minutes. The pattern (matrix + sha256 sidecars + publish) is cribbed from
+# embedded-binaries-publish.yml.
+#
+# Trigger policy:
+# - release published with a `typescript-sdk@*` tag (same event as
+#   sdk-javascript-cd.yml's npm publish) → build + attach to that release.
+# - workflow_dispatch with dry_run (default ON) → build + sha256 + native
+#   smoke test only, nothing attached. Turn dry_run off and pass release_tag
+#   to (re)attach binaries to an existing release manually.
+
+name: cli-binary-publish
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build + sha256 + native smoke only; skip attaching to the GitHub release"
+        required: false
+        type: boolean
+        default: true
+      release_tag:
+        description: "Release to attach to when dry_run is off (e.g. typescript-sdk@v0.34.0)"
+        required: false
+        type: string
+
+permissions:
+  # `gh release upload` needs to write release assets.
+  contents: write
+
+concurrency:
+  # Two runs attaching the same asset names to the same release would race.
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  # Pinned to the same Bun as the langyagent image build
+  # (Dockerfile.langyagent's oven/bun:1.3.13-cli-builder stage).
+  BUN_VERSION: 1.3.13
+
+jobs:
+  build:
+    name: build langwatch ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: startsWith(github.event.release.tag_name, 'typescript-sdk@') || github.event_name == 'workflow_dispatch'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - bun-linux-x64
+          - bun-linux-arm64
+          - bun-darwin-x64
+          - bun-darwin-arm64
+          - bun-windows-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 10.24.0
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
+
+      - name: Install Bun
+        # The official install script, pinned by version, instead of
+        # oven-sh/setup-bun so this workflow keeps the repo's
+        # no-floating-third-party-actions convention.
+        run: |
+          curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
+          echo "${HOME}/.bun/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        # Full monorepo checkout: `prepare` (run by install) generates
+        # src/internal/generated/* from langwatch/ + langevals/ sources and
+        # skills/ — the Bun compile fails to resolve those otherwise (same
+        # gotcha Dockerfile.langyagent's cli-builder stage documents).
+        working-directory: typescript-sdk
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve version and asset names
+        id: names
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RELEASE_TAG}" ]; then
+            echo "no release tag (dry-run dispatch without release_tag) — building unversioned asset names"
+            VERSION="dev"
+          else
+            VERSION="${RELEASE_TAG#typescript-sdk@v}"
+            VERSION="${VERSION#typescript-sdk@}"
+          fi
+          platform="${TARGET#bun-}"
+          ext=""
+          if [ "${TARGET}" = "bun-windows-x64" ]; then ext=".exe"; fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "asset=langwatch-${VERSION}-${platform}${ext}" >> "$GITHUB_OUTPUT"
+
+      - name: Build binary
+        working-directory: typescript-sdk
+        env:
+          TARGET: ${{ matrix.target }}
+          ASSET: ${{ steps.names.outputs.asset }}
+        run: |
+          set -euo pipefail
+          bun run scripts/build-cli-binary.ts --target="${TARGET}" --outfile="dist/bin/${ASSET}"
+          ls -lh "dist/bin/${ASSET}"
+
+      - name: Smoke test (native linux-x64 only)
+        # Cross-built binaries (windows/darwin/arm64) cannot run on the
+        # ubuntu x64 runner — their correctness rests on Bun's cross-compile
+        # and on the npm-published CLI's CI tests. Only the native target is
+        # executed here.
+        if: matrix.target == 'bun-linux-x64'
+        working-directory: typescript-sdk
+        env:
+          ASSET: ${{ steps.names.outputs.asset }}
+          VERSION: ${{ steps.names.outputs.version }}
+        run: |
+          set -euo pipefail
+          out="$(LANGWATCH_NO_DAEMON=1 "./dist/bin/${ASSET}" --version)"
+          echo "smoke: --version → ${out}"
+          if [ "${VERSION}" != "dev" ] && [ "${out}" != "${VERSION}" ]; then
+            echo "version mismatch: binary says '${out}', release is '${VERSION}'" >&2
+            exit 1
+          fi
+
+      - name: Compute sha256 sidecar
+        working-directory: typescript-sdk
+        env:
+          ASSET: ${{ steps.names.outputs.asset }}
+        run: |
+          set -euo pipefail
+          cd dist/bin
+          sha256sum "${ASSET}" > "${ASSET}.sha256"
+          cat "${ASSET}.sha256"
+
+      - name: Attach to GitHub release
+        if: ${{ !inputs.dry_run }}
+        working-directory: typescript-sdk
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+          ASSET: ${{ steps.names.outputs.asset }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RELEASE_TAG}" ]; then
+            echo "dry_run is off but no release tag is known (pass release_tag)" >&2
+            exit 1
+          fi
+          cd dist/bin
+          gh release upload "${RELEASE_TAG}" "${ASSET}" "${ASSET}.sha256" --clobber

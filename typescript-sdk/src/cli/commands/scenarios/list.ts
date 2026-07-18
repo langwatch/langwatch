@@ -61,7 +61,7 @@ export const listScenariosCommand = async (options?: { format?: string }): Promi
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch scenarios", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch scenarios" });
     process.exit(1);
   }
 };

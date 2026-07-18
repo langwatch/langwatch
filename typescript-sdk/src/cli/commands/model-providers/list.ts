@@ -58,7 +58,7 @@ export const listModelProvidersCommand = async (options?: { format?: string }): 
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch model providers", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch model providers" });
     process.exit(1);
   }
 };

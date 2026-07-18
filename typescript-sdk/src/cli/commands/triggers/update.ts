@@ -56,7 +56,7 @@ export const updateTriggerCommand = async (
       console.log(JSON.stringify(trigger, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "update trigger", format: options?.format });
+    failSpinner({ spinner, error, action: "update trigger" });
     process.exit(1);
   }
 };

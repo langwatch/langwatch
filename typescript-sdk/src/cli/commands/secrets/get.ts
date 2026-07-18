@@ -59,7 +59,7 @@ export const getSecretCommand = async (
     );
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch secret", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch secret" });
     process.exit(1);
   }
 };

@@ -33,7 +33,7 @@ export const updateDashboardCommand = async (
     console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(dashboard.name)}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "update dashboard", format: options?.format });
+    failSpinner({ spinner, error, action: "update dashboard" });
     process.exit(1);
   }
 };

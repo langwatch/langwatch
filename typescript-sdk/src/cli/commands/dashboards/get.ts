@@ -35,7 +35,7 @@ export const getDashboardCommand = async (
     }
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch dashboard", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch dashboard" });
     process.exit(1);
   }
 };

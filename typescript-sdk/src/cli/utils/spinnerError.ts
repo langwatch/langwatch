@@ -45,11 +45,15 @@ export function failSpinner({
 
   // Avoid double-prefixing when the message already starts with "Failed to …"
   // (either a service-layer `*ApiError` from `formatApiErrorForOperation`, or a
-  // sentence the platform wrote itself).
+  // sentence the platform wrote itself). The "Failed to <action>" prefix goes on
+  // the block's first line only; the Details/Suggestions sections follow intact.
   const rendered = wantsJson ? domain.message : renderErrorForHumans(domain);
-  const message = /^failed to /i.test(rendered)
-    ? rendered
-    : `Failed to ${action}: ${rendered}`;
+  const [headline = "", ...block] = rendered.split("\n");
+  const sentence = headline.replace(/^Error: /, "");
+  const message = [
+    /^failed to /i.test(sentence) ? sentence : `Failed to ${action}: ${sentence}`,
+    ...block,
+  ].join("\n");
 
   // The machine's copy: structured, on stdout, and nothing else on stdout. The
   // human's copy stays a single line on stderr — written directly, because

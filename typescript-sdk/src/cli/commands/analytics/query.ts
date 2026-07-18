@@ -150,7 +150,7 @@ export const queryAnalyticsCommand = async (options: {
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "query analytics", format: options?.format });
+    failSpinner({ spinner, error, action: "query analytics" });
     process.exit(1);
   }
 };

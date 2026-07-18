@@ -4,6 +4,7 @@ import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import type { EvaluatorResponse } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { printResult, type RawOutputFlags } from "../../utils/output";
 
 const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
   const config = evaluator.config as
@@ -63,7 +64,7 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
   console.log();
 };
 
-export const getEvaluatorCommand = async (idOrSlug: string, options?: { format?: string }): Promise<void> => {
+export const getEvaluatorCommand = async (idOrSlug: string, options?: RawOutputFlags): Promise<void> => {
   checkApiKey();
 
   const service = new EvaluatorsApiService();
@@ -72,13 +73,14 @@ export const getEvaluatorCommand = async (idOrSlug: string, options?: { format?:
   try {
     const evaluator = await service.get(idOrSlug);
     spinner.succeed(`Found evaluator "${evaluator.name}"`);
-    if (options?.format === "json") {
-      console.log(JSON.stringify(evaluator, null, 2));
-      return;
-    }
-    formatEvaluatorDetails(evaluator);
+    await printResult(evaluator, {
+      ...options,
+      table: () => formatEvaluatorDetails(evaluator),
+    });
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch evaluator", format: options?.format });
+    // No explicit `format`: see traces/search.ts — the preAction hook covers
+    // every spelling; the `-f` commander default must not override it.
+    failSpinner({ spinner, error, action: "fetch evaluator" });
     process.exit(1);
   }
 };

@@ -85,7 +85,7 @@ export const experimentListCommand = async (
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch experiments", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch experiments" });
     process.exit(1);
   }
 };

@@ -39,7 +39,7 @@ export const getAgentCommand = async (id: string, options?: { format?: string })
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch agent", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch agent" });
     process.exit(1);
   }
 };

@@ -69,7 +69,7 @@ export const getGraphCommand = async (
     );
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch graph", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch graph" });
     process.exit(1);
   }
 };

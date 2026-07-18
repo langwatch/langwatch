@@ -115,7 +115,7 @@ export const listSimulationRunsCommand = async (options: {
       chalk.gray(`Use ${chalk.cyan("langwatch simulation-run get <runId>")} to view full details`),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch simulation runs", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch simulation runs" });
     process.exit(1);
   }
 };

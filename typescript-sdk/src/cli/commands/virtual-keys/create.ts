@@ -85,7 +85,7 @@ export const createVirtualKeyCommand = async (options: CreateVirtualKeyOptions):
     }
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "create virtual key", format: options?.format });
+    failSpinner({ spinner, error, action: "create virtual key" });
     process.exit(1);
   }
 };

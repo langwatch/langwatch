@@ -2,12 +2,13 @@ import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { printResult, type RawOutputFlags } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 export const deleteMonitorCommand = async (
   id: string,
-  options?: { format?: string }
+  options?: RawOutputFlags
 ): Promise<void> => {
   checkApiKey();
 
@@ -36,11 +37,16 @@ export const deleteMonitorCommand = async (
 
     spinner.succeed(`Monitor deleted (${result.id})`);
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(result, null, 2));
-    }
+    await printResult(result, {
+      ...options,
+      table: () => {
+        // The spinner's success line is the human output.
+      },
+    });
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete monitor", format: options?.format });
+    // No explicit `format`: see traces/search.ts — the preAction hook covers
+    // every spelling; the `-f` commander default must not override it.
+    failSpinner({ spinner, error, action: "delete monitor" });
     process.exit(1);
   }
 };

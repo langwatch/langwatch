@@ -32,7 +32,7 @@ export const getWorkflowCommand = async (id: string, options?: { format?: string
     console.log(`  ${chalk.gray("Updated:")}     ${new Date(workflow.updatedAt).toLocaleString()}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch workflow", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch workflow" });
     process.exit(1);
   }
 };

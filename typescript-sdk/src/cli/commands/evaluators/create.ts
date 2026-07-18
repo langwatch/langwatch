@@ -3,10 +3,11 @@ import { createSpinner } from "../../utils/spinner";
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { printResult, type RawOutputFlags } from "../../utils/output";
 
 export const createEvaluatorCommand = async (
   name: string,
-  options: { type: string; format?: string },
+  options: { type: string } & RawOutputFlags,
 ): Promise<void> => {
   checkApiKey();
 
@@ -25,13 +26,18 @@ export const createEvaluatorCommand = async (
       `Created evaluator "${chalk.cyan(evaluator.name)}" ${chalk.gray(`(slug: ${evaluator.slug ?? "—"})`)}`,
     );
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(evaluator, null, 2));
-    } else if (evaluator.platformUrl) {
-      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
-    }
+    await printResult(evaluator, {
+      ...options,
+      table: () => {
+        if (evaluator.platformUrl) {
+          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
+        }
+      },
+    });
   } catch (error) {
-    failSpinner({ spinner, error, action: "create evaluator", format: options?.format });
+    // No explicit `format`: see traces/search.ts — the preAction hook covers
+    // every spelling; the `-f` commander default must not override it.
+    failSpinner({ spinner, error, action: "create evaluator" });
     process.exit(1);
   }
 };

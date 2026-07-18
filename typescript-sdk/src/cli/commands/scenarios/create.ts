@@ -38,7 +38,7 @@ export const createScenarioCommand = async (
       console.log(`  ${chalk.bold("View:")}  ${chalk.underline(scenario.platformUrl)}`);
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "create scenario", format: options?.format });
+    failSpinner({ spinner, error, action: "create scenario" });
     process.exit(1);
   }
 };

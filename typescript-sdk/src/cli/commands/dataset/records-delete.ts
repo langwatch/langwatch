@@ -21,7 +21,6 @@ export const recordsDeleteCommand = async (
   if (recordIds.length === 0) {
     reportCommandError({
       error: commandValidationError("At least one record ID is required."),
-      format: options?.format,
     });
     process.exit(1);
   }

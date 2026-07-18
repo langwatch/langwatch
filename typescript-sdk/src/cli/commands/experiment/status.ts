@@ -152,7 +152,7 @@ export const experimentStatusCommand = async (
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "check experiment status", format: options?.format });
+    failSpinner({ spinner, error, action: "check experiment status" });
     process.exit(1);
   }
 };

@@ -23,7 +23,7 @@ export const createDashboardCommand = async (name: string, options?: { format?: 
       console.log(`  ${chalk.bold("View:")}  ${chalk.underline(dashboard.platformUrl)}`);
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "create dashboard", format: options?.format });
+    failSpinner({ spinner, error, action: "create dashboard" });
     process.exit(1);
   }
 };

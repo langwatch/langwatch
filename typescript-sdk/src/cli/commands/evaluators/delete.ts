@@ -3,10 +3,11 @@ import { createSpinner } from "../../utils/spinner";
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { printResult, type RawOutputFlags } from "../../utils/output";
 
 export const deleteEvaluatorCommand = async (
   idOrSlug: string,
-  options?: { format?: string },
+  options?: RawOutputFlags,
 ): Promise<void> => {
   checkApiKey();
 
@@ -38,9 +39,15 @@ export const deleteEvaluatorCommand = async (
       `Archived evaluator "${chalk.cyan(evaluatorName)}"`,
     );
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify({ id: evaluatorId, name: evaluatorName, archived: true }, null, 2));
-    }
+    await printResult(
+      { id: evaluatorId, name: evaluatorName, archived: true },
+      {
+        ...options,
+        table: () => {
+          // The spinner's success line is the human output.
+        },
+      },
+    );
   } catch (error) {
     failSpinner({
       spinner: deleteSpinner,

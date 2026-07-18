@@ -34,7 +34,7 @@ export const updateAgentCommand = async (
     if (error instanceof SyntaxError) {
       spinner.fail(chalk.red("--config must be valid JSON"));
     } else {
-      failSpinner({ spinner, error, action: "update agent", format: options?.format });
+      failSpinner({ spinner, error, action: "update agent" });
     }
     process.exit(1);
   }

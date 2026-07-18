@@ -70,7 +70,7 @@ export const listTriggersCommand = async (options?: { format?: string }): Promis
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch triggers", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch triggers" });
     process.exit(1);
   }
 };

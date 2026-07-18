@@ -4,10 +4,11 @@ import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import type { UpdateEvaluatorBody } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { printResult, type RawOutputFlags } from "../../utils/output";
 
 export const updateEvaluatorCommand = async (
   idOrSlug: string,
-  options: { name?: string; settings?: string; format?: string },
+  options: { name?: string; settings?: string } & RawOutputFlags,
 ): Promise<void> => {
   checkApiKey();
 
@@ -44,14 +45,19 @@ export const updateEvaluatorCommand = async (
       `Updated evaluator "${chalk.cyan(updated.name)}" ${chalk.gray(`(slug: ${updated.slug ?? "—"})`)}`,
     );
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(updated, null, 2));
-    }
+    await printResult(updated, {
+      ...options,
+      table: () => {
+        // The spinner's success line is the human output.
+      },
+    });
   } catch (error) {
     if (error instanceof SyntaxError) {
       updateSpinner.fail(chalk.red("--settings must be valid JSON"));
     } else {
-      failSpinner({ spinner: updateSpinner, error, action: "update evaluator", format: options?.format });
+      // No explicit `format`: see traces/search.ts — the preAction hook covers
+      // every spelling; the `-f` commander default must not override it.
+      failSpinner({ spinner: updateSpinner, error, action: "update evaluator" });
     }
     process.exit(1);
   }

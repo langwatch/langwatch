@@ -120,7 +120,7 @@ export const setModelDefaultCommand = async (
       );
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "set default model", format: options?.format });
+    failSpinner({ spinner, error, action: "set default model" });
     process.exit(1);
   }
 };

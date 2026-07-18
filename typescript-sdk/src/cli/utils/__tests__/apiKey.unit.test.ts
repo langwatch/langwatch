@@ -7,11 +7,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readCliErrorDocument } from "@langwatch/cli-cards/domain-error";
 
-// A developer's local .env must not decide whether these tests see a key.
+// A developer's local .env must not decide whether these tests see a key; the
+// scoped loader's `parse` results are stubbed per test below.
 vi.mock("dotenv", () => ({ config: vi.fn() }));
 
+import { config } from "dotenv";
 import { checkApiKey } from "../apiKey";
 import { setOutputFormat } from "../errorOutput";
+
+const mockedDotenvConfig = vi.mocked(config);
 
 describe("checkApiKey()", () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
@@ -22,6 +26,7 @@ describe("checkApiKey()", () => {
   beforeEach(() => {
     savedKey = process.env.LANGWATCH_API_KEY;
     delete process.env.LANGWATCH_API_KEY;
+    mockedDotenvConfig.mockReset();
     logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     exitSpy = vi
@@ -101,6 +106,51 @@ describe("checkApiKey()", () => {
         expect(() => checkApiKey()).not.toThrow();
         expect(logSpy).not.toHaveBeenCalled();
         expect(exitSpy).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a .env the caller's shell never exported", () => {
+    describe("when it holds LANGWATCH_* keys", () => {
+      it("applies them — the .env API key unlocks the command", () => {
+        mockedDotenvConfig.mockReturnValue({
+          parsed: { LANGWATCH_API_KEY: "sk-from-dotenv" },
+        });
+
+        expect(() => checkApiKey()).not.toThrow();
+        expect(process.env.LANGWATCH_API_KEY).toBe("sk-from-dotenv");
+      });
+
+      it("never overwrites a variable the environment already has", () => {
+        process.env.LANGWATCH_API_KEY = "sk-real";
+        mockedDotenvConfig.mockReturnValue({
+          parsed: { LANGWATCH_API_KEY: "sk-from-dotenv" },
+        });
+
+        checkApiKey();
+
+        expect(process.env.LANGWATCH_API_KEY).toBe("sk-real");
+      });
+    });
+
+    describe("when it holds unrelated secrets", () => {
+      const SECRET = "LW_DOTENV_TEST_SECRET";
+
+      afterEach(() => {
+        delete process.env[SECRET];
+      });
+
+      it("does NOT stuff them into process.env (the daemon is long-lived and shared)", () => {
+        mockedDotenvConfig.mockReturnValue({
+          parsed: {
+            LANGWATCH_API_KEY: "sk-from-dotenv",
+            [SECRET]: "postgres://user:pass@host/db",
+          },
+        });
+
+        checkApiKey();
+
+        expect(process.env[SECRET]).toBeUndefined();
       });
     });
   });

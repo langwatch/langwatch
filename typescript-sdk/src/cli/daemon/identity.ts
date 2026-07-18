@@ -30,6 +30,21 @@
  * The cost of this decision is more daemons when a user juggles many projects.
  * That is bounded by the idle timeout, and is the right trade: a leaked
  * credential is unrecoverable, a spare 40MB process is not.
+ *
+ * THE LOGGED-IN SINGLE-IDENTITY BOUNDARY.
+ *
+ * A user who authenticated via `langwatch login` (device flow) has NO
+ * LANGWATCH_API_KEY in their environment — the key input to the hash is "" —
+ * so every logged-in invocation on one (endpoint, uid, config path) collapses
+ * to ONE daemon identity, shared across all of that user's projects. That is
+ * safe only because auth is resolved PER REQUEST from config.json on disk
+ * (`loadConfig` re-reads the file on every call — see
+ * utils/governance/config.ts), so a logout/login between two requests takes
+ * effect immediately. It follows that persisted credentials must NEVER be
+ * cached in this process: an in-process auth cache would keep serving a
+ * logged-out (or switched) user's requests with the previous session,
+ * silently, until the idle timeout. If you are about to add such a cache,
+ * don't — or key it on the config file's content hash at the very least.
  */
 
 import * as crypto from "node:crypto";
@@ -156,12 +171,14 @@ export function resolveBuildId(cliVersion: string, cliPath: string): string {
  * The environment a spawned daemon must boot with in order to resolve the SAME
  * identity as the client that spawned it.
  *
- * The daemon boots in `$HOME`, and the CLI runs `dotenv.config()` at startup —
- * so a `~/.env` holding a `LANGWATCH_ENDPOINT` or `LANGWATCH_API_KEY` that the
- * CALLER does not have would give the daemon a different identity, a different
- * socket, and therefore a daemon nobody ever connects to. Pinning the three
- * identity inputs explicitly (dotenv never overwrites a variable that is
- * already set, even to an empty string) makes that impossible.
+ * The daemon boots in `$HOME`. Its own boot skips the dotenv load precisely so
+ * a ~/.env cannot reach it (see index.ts), and this pinning is the second
+ * layer of that defence: even if a ~/.env value ever did get in, a
+ * `LANGWATCH_ENDPOINT` or `LANGWATCH_API_KEY` the CALLER does not have would
+ * give the daemon a different identity, a different socket, and therefore a
+ * daemon nobody ever connects to. Pinning the three identity inputs
+ * explicitly (dotenv never overwrites a variable that is already set, even to
+ * an empty string) makes that impossible.
  */
 export function identityEnv(
   env: NodeJS.ProcessEnv,

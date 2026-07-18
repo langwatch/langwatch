@@ -83,14 +83,16 @@ export function presentLangyToolError({
     };
   }
 
-  // The shared REST handler puts request diagnostics under `trace`; typed
-  // HandledErrors may carry traceId directly. Support both wire shapes.
+  // New-CLI documents carry the trace links top-level on the error; documents
+  // written by an older CLI keep them nested under `meta.trace` (the shared
+  // REST handler's wire shape). Prefer the top-level fields, fall back to the
+  // nested block so old documents keep their trace/logs actions.
   const trace = asRecord(domain.meta.trace);
   const traceId =
     domain.traceId ??
     (typeof trace?.traceId === "string" ? trace.traceId : undefined);
-  const traceUrl = safeHttpUrl(trace?.traceUrl);
-  const logsUrl = safeHttpUrl(trace?.logsUrl);
+  const traceUrl = safeHttpUrl(domain.traceUrl) ?? safeHttpUrl(trace?.traceUrl);
+  const logsUrl = safeHttpUrl(domain.logsUrl) ?? safeHttpUrl(trace?.logsUrl);
 
   return {
     title: `${title} failed`,
