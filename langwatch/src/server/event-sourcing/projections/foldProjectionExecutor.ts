@@ -1,5 +1,9 @@
 import { createLogger } from "@langwatch/observability";
-import { incrementEsFoldRefoldTotal } from "~/server/metrics";
+import {
+  incrementEsFoldRefoldTotal,
+  incrementEsFoldStoreMissRefoldTotal,
+  observeEsFoldStoreMissRefoldEvents,
+} from "~/server/metrics";
 import type { Event } from "../domain/types";
 import type { FoldProjectionDefinition } from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
@@ -57,6 +61,25 @@ function withOccurredAtHint(
   const occurredAt = (event as Record<string, unknown>).occurredAt;
   if (typeof occurredAt !== "number" || occurredAt <= 0) return context;
   return { ...context, occurredAtMs: occurredAt };
+}
+
+function recordStoreMissRefoldMetrics({
+  projectionName,
+  refoldEventCount,
+  deliveredCount,
+}: {
+  projectionName: string;
+  refoldEventCount: number;
+  deliveredCount: number;
+}): void {
+  incrementEsFoldStoreMissRefoldTotal({
+    projectionName,
+    kind: refoldEventCount > deliveredCount ? "resumed" : "first_touch",
+  });
+  observeEsFoldStoreMissRefoldEvents({
+    projectionName,
+    eventCount: refoldEventCount,
+  });
 }
 
 /**
@@ -364,6 +387,12 @@ export class FoldProjectionExecutor {
     });
     if (history.length === 0) return null;
 
+    recordStoreMissRefoldMetrics({
+      projectionName: projection.name,
+      refoldEventCount: history.length,
+      deliveredCount: delivered.length,
+    });
+
     logger.info(
       {
         projection: projection.name,
@@ -458,6 +487,12 @@ export class FoldProjectionExecutor {
     }
 
     if (refoldEventCount === 0) return null;
+
+    recordStoreMissRefoldMetrics({
+      projectionName: projection.name,
+      refoldEventCount,
+      deliveredCount: delivered.length,
+    });
 
     logger.info(
       {

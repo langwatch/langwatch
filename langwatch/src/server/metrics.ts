@@ -438,6 +438,37 @@ export const incrementEsFoldRefoldTotal = (
   outcome: "performed" | "declined" | "unavailable",
 ) => esFoldRefoldTotal.labels(projectionName, outcome).inc();
 
+register.removeSingleMetric("es_fold_store_miss_refold_total");
+const esFoldStoreMissRefoldTotal = new Counter({
+  name: "es_fold_store_miss_refold_total",
+  help: "Store-miss fold re-folds by whether history contained events before the delivered batch",
+  labelNames: ["projection_name", "kind"] as const,
+});
+
+export const incrementEsFoldStoreMissRefoldTotal = ({
+  projectionName,
+  kind,
+}: {
+  projectionName: string;
+  kind: "first_touch" | "resumed";
+}) => esFoldStoreMissRefoldTotal.labels(projectionName, kind).inc();
+
+register.removeSingleMetric("es_fold_store_miss_refold_events");
+const esFoldStoreMissRefoldEvents = new Histogram({
+  name: "es_fold_store_miss_refold_events",
+  help: "Number of events replayed per store-miss fold re-fold",
+  labelNames: ["projection_name"] as const,
+  buckets: [1, 2, 5, 10, 25, 50, 100, 250, 1000],
+});
+
+export const observeEsFoldStoreMissRefoldEvents = ({
+  projectionName,
+  eventCount,
+}: {
+  projectionName: string;
+  eventCount: number;
+}) => esFoldStoreMissRefoldEvents.labels(projectionName).observe(eventCount);
+
 register.removeSingleMetric("es_reactor_collapsed_total");
 const esReactorCollapsedTotal = new Counter({
   name: "es_reactor_collapsed_total",
@@ -565,7 +596,7 @@ const esFoldCacheRedisErrorTotal = new Counter({
 
 export const incrementEsFoldCacheRedisError = (
   projectionName: string,
-  operation: "get" | "set",
+  operation: "get" | "set" | "del",
 ) => esFoldCacheRedisErrorTotal.labels(projectionName, operation).inc();
 
 // ============================================================================

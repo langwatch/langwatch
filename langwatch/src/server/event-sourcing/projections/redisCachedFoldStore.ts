@@ -123,6 +123,7 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
       try {
         await this.redis.del(key);
       } catch (deleteError) {
+        incrementEsFoldCacheRedisError(this.keyPrefix, "del");
         logger.warn(
           { aggregateId, error: String(deleteError) },
           "Redis DEL failed after SET failure",
