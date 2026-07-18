@@ -1,17 +1,30 @@
-# ADR-021: Lean Fold Cache — lean at the edge, cache the complete fold state
+# ADR-021: Lean Fold Cache — cache the read-set, persist the write-set
 
-> **Title amended.** Originally "cache the read-set, persist the write-set",
-> which described leaning the cache by projecting a slimmer shape into it
-> (`toCacheable`). That mechanism has been removed: a cache hit becomes the next
-> `apply` input, so a stripped cached shape silently drops fields from the
-> durable row. Leanness now comes solely from edge offload and the cache holds
-> the state whole — see §Decision 3 and §Rules. The filename is kept as this
-> ADR's stable identifier ([ADR-022](./022-event-log-source-of-truth.md) and
-> [ADR-026](./026-reactor-should-react-predicate.md) link to it).
+> ## ⚠️ Superseded — do not implement from this document
+>
+> Read [ADR-022](./022-event-log-source-of-truth.md) instead. It states which
+> parts of this ADR survive ([What survives from ADR-021](./022-event-log-source-of-truth.md#what-survives-from-adr-021))
+> and which are rejected ([What is rejected](./022-event-log-source-of-truth.md#what-is-rejected-from-adr-021)).
+>
+> Everything below is kept as the historical record of a decision we no longer
+> follow. Three things in particular are now wrong:
+>
+> - **The title.** "Cache the read-set, persist the write-set" described leaning
+>   the cache by projecting a slimmer shape into it (`toCacheable`). That
+>   mechanism has been removed — a cache hit becomes the next `apply` input, so
+>   a stripped cached shape silently drops fields from the durable row. The
+>   surviving rule ("Complete cached fold state") lives in ADR-022.
+> - **Permanent S3 blob refs and `BlobStore` reads** (§Decision, §Consequences).
+>   Superseded by the `event_log` oversize spool; `event_log` is the single
+>   durable source of truth and S3 is only a transient spool.
+> - **"32 KB for IO attrs"** (§Consequences). The budget is 64 KB, per ADR-022.
+>
+> The filename is kept as this ADR's stable identifier — ADR-022 and
+> [ADR-026](./026-reactor-should-react-predicate.md) both link to it.
 
 **Date:** 2026-05-27
 
-**Status:** Proposed (issue [#4215](https://github.com/langwatch/langwatch/issues/4215))
+**Status:** Superseded in part by [ADR-022](./022-event-log-source-of-truth.md) (issue [#4215](https://github.com/langwatch/langwatch/issues/4215))
 
 **Relates to:** Departs from [ADR-007](./007-event-sourcing-architecture.md) ("fold state = stored data"); coordinates with [ADR-015](./015-projection-replay-coordination.md) (replay); enables the offload in #4215 (see also [ADR-017](./017-gateway-trace-payload-capture.md)).
 

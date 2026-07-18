@@ -50,10 +50,12 @@ function defaultFoldCacheTtlSeconds(): number {
  * cache must never be left holding PRE-event state after a durable write, or
  * the next event folds onto it and this event is lost:
  * - CH fails → throw → no Redis update → event retried by queue
- * - CH succeeds, SET fails, DEL succeeds → cache empty → next read falls back
- *   to CH → return normally (throwing here would double-apply the event)
- * - CH succeeds, SET fails, DEL fails → cache may hold stale state → throw so
- *   the queue retries off it
+ * - CH succeeds, Redis SET fails → DEL the stale entry (best effort) → throw
+ *   so the queue retries
+ *
+ * The retry is correct only while the durable read has not yet caught up with
+ * the fire-and-forget insert; see the long comment in `store` for the horn
+ * this trades against and why event-level idempotency is the real fix.
  */
 export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
   private readonly ttlSeconds: number;
@@ -120,23 +122,32 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
 
     // 2. Redis second — cache the state for the next fold step.
     //
-    // The durable write above has ALREADY COMMITTED by this point, so whether
-    // we throw here decides what the queue's retry will re-apply. That makes
-    // the two failure branches below genuinely different, and neither can be
-    // collapsed into the other:
+    // The durable write above has ALREADY COMMITTED here, so a cache write we
+    // cannot complete leaves the cache holding PRE-event state. Discard that
+    // entry and fail the fold so the queue redelivers.
     //
-    // - DEL succeeded: the cache is now empty, so the next read falls back to
-    //   ClickHouse and gets the correct post-event state. Everything is
-    //   consistent — DO NOT throw. Throwing would make the queue redeliver the
-    //   event, and the retry would load the already-post-event state and apply
-    //   the event a SECOND time. `apply` is deterministic but not idempotent
-    //   (traceSummary/traceAnalytics do `spanCount: state.spanCount + 1`), so
-    //   that inflates counts and cost/token aggregates.
+    // Why fail rather than return once the stale entry is gone: the durable
+    // write is fire-and-forget (`async_insert: 1, wait_for_async_insert: 0`,
+    // trace-summary.clickhouse.repository.ts), so `inner.store` returning does
+    // NOT mean the row is queryable. Returning here would let the NEXT event
+    // read a durable store that has not caught up and fold onto pre-event
+    // state — silently dropping this event. Failing instead makes the retry
+    // re-apply this same event on top of that same pre-event state, landing on
+    // the right answer.
     //
-    // - DEL failed: a stale PRE-event entry may still be in the cache, and the
-    //   next read would silently fold the following event onto it, dropping
-    //   this event. Throw so the queue retries: the retry reads that same stale
-    //   pre-event state and applies the event once, converging correctly.
+    // That is a race, not a proof, and the opposite horn is real: if the
+    // durable read HAS caught up by the time the retry runs, the retry loads
+    // post-event state and applies the event twice. `apply` is deterministic
+    // but not idempotent — traceSummary and traceAnalytics both do
+    // `spanCount: state.spanCount + 1` — so that inflates counts and
+    // cost/token aggregates.
+    //
+    // Neither branch is safe in general, and no ordering of SET/DEL/throw
+    // makes it safe, because the fold cannot tell a redelivery from a first
+    // delivery. Closing this needs event-level idempotency — a durable
+    // per-event cursor the executor consults before applying. Until then this
+    // takes the horn that self-corrects under the common timing, and the
+    // window is only reachable while Redis is actually failing.
     const key = this.redisKey(aggregateId, context);
     try {
       await this.redis.set(key, JSON.stringify(state), "EX", this.ttlSeconds);
@@ -147,24 +158,17 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
         await this.redis.del(key);
       } catch (deleteError) {
         incrementEsFoldCacheRedisError(this.keyPrefix, "del");
-        logger.error(
-          { aggregateId, error: String(deleteError), setError: String(error) },
-          "Redis SET and DEL both failed after the durable write — failing the fold so the queue retries off the surviving cache entry",
+        logger.warn(
+          { aggregateId, error: String(deleteError) },
+          "Redis DEL failed after SET failure",
         );
-        // Residual risk, accepted knowingly: if the SET actually landed and
-        // only its acknowledgement was lost, the surviving entry is the
-        // POST-event state and the retry double-applies. Closing that window
-        // needs event-level idempotency (a durable per-event cursor consulted
-        // by the executor), which is a larger change than this store — tracked
-        // as follow-up. Dropping the event is the worse of the two risks, so
-        // this path still throws.
-        throw error;
       }
 
       logger.warn(
         { aggregateId, error: String(error) },
-        "Redis SET failed after the durable write — cache entry dropped, next read falls back to the durable store",
+        "Redis SET failed after the durable write — fold will retry",
       );
+      throw error;
     }
 
     const storeDurationMs = performance.now() - storeStartTime;

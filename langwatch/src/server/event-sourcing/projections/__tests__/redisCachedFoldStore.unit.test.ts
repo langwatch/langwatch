@@ -158,7 +158,7 @@ describe("RedisCachedFoldStore", () => {
 
     describe("given Redis SET fails and DEL succeeds", () => {
       describe("when storing state", () => {
-        it("deletes the same cache key and does NOT throw", async () => {
+        it("deletes the same cache key and throws", async () => {
           const redis = createMockRedis();
           redis.set.mockRejectedValueOnce(new Error("Redis unavailable"));
           const inner = createMockInnerStore();
@@ -170,12 +170,12 @@ describe("RedisCachedFoldStore", () => {
             },
           );
 
-          // The durable write already committed. With the cache entry gone,
-          // the next read falls back to it and is correct — so failing here
-          // would only cause the queue to redeliver and double-apply.
+          // Failing is deliberate even though the stale entry is gone: the
+          // durable write is fire-and-forget, so returning here would let the
+          // next event read a store that has not caught up and drop this one.
           await expect(
             store.store({ count: 2, name: "new-state" }, TEST_CONTEXT),
-          ).resolves.toBeUndefined();
+          ).rejects.toThrow("Redis unavailable");
 
           expect(redis.del).toHaveBeenCalledWith(
             "fold:test_table:tenant-1:agg-1",
@@ -249,22 +249,40 @@ describe("RedisCachedFoldStore", () => {
       return { redis, store, inner, durable: () => durableState };
     };
 
-    describe("when DEL clears the stale entry", () => {
-      it("completes the fold so the event is applied exactly once", async () => {
-        const { redis, store, durable } = setup();
+    describe("when DEL clears the stale entry and the queue retries", () => {
+      it("re-applies from the not-yet-visible durable state, landing on one application", async () => {
+        // The durable write is fire-and-forget, so model what the retry
+        // actually sees: a store that has not caught up and still reports the
+        // pre-event value. Re-applying on top of that lands on one application.
+        const redis = createMockRedis();
+        let visibleState: TestState = { count: 1, name: "before-event" };
+        const inner: FoldProjectionStore<TestState> = {
+          get: vi.fn(async () => visibleState),
+          store: vi.fn(async () => undefined), // insert not yet queryable
+        };
+        const store = new RedisCachedFoldStore<TestState>(inner, redis as any, {
+          keyPrefix: "test_table",
+        });
+        redis.data.set(cacheKey, {
+          value: JSON.stringify(visibleState),
+          ttl: 30,
+        });
         redis.set.mockRejectedValueOnce(new Error("SET failed"));
 
         const state = await store.get("agg-1", TEST_CONTEXT);
-        await store.store(applyEvent(state!), TEST_CONTEXT);
-
-        // Cache dropped, durable store holds the single application.
+        await expect(
+          store.store(applyEvent(state!), TEST_CONTEXT),
+        ).rejects.toThrow("SET failed");
         expect(redis.data.has(cacheKey)).toBe(false);
-        expect(durable()).toEqual({ count: 2, name: "after-event" });
 
-        // The next read falls back to the durable store and sees the same
-        // value — no retry was needed, so `count` never reaches 3.
-        const next = await store.get("agg-1", TEST_CONTEXT);
-        expect(next).toEqual({ count: 2, name: "after-event" });
+        const retryState = await store.get("agg-1", TEST_CONTEXT);
+        expect(retryState).toEqual({ count: 1, name: "before-event" });
+        await store.store(applyEvent(retryState!), TEST_CONTEXT);
+
+        expect(inner.store).toHaveBeenLastCalledWith(
+          { count: 2, name: "after-event" },
+          TEST_CONTEXT,
+        );
       });
     });
 
