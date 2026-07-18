@@ -6,8 +6,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { FormProvider, useForm, useFormContext } from "react-hook-form";
+import { useForm, useFormContext } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
 
 // All mocks need to be set up before any imports
 const mockCloseDrawer = vi.fn();
@@ -71,15 +72,17 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+const mockModelMetadata = {
+  "openai/gpt-4o": {
+    name: "gpt-4o",
+    max_tokens: 128000,
+    max_output_tokens: 16384,
+  },
+};
+
 vi.mock("~/hooks/useModelProvidersSettings", () => ({
   useModelProvidersSettings: () => ({
-    modelMetadata: {
-      "openai/gpt-4o": {
-        name: "gpt-4o",
-        max_tokens: 128000,
-        max_output_tokens: 16384,
-      },
-    },
+    modelMetadata: mockModelMetadata,
     isLoading: false,
   }),
 }));
@@ -580,6 +583,13 @@ describe("PromptEditorDrawer", () => {
             "openai/gpt-4o",
           );
         });
+        // The maxTokens write is paired with the model write — assert it
+        // too, so removing just the maxTokens half of the backfill (while
+        // leaving the model half intact) still fails this test.
+        const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
+        expect(methods.getValues("version.configData.llm.maxTokens")).toBe(
+          getMaxTokenLimit(mockModelMetadata["openai/gpt-4o"]),
+        );
       });
 
       it("does not clobber a model the user already picked in the rendered selector", async () => {
