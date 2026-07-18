@@ -1,4 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
+import {
+  incrementEsFoldStoreMissRefoldTotal,
+  observeEsFoldStoreMissRefoldEvents,
+} from "~/server/metrics";
+
+vi.mock("~/server/metrics", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/server/metrics")>();
+  return {
+    ...actual,
+    incrementEsFoldStoreMissRefoldTotal: vi.fn(),
+    observeEsFoldStoreMissRefoldEvents: vi.fn(),
+  };
+});
+
 import type { Event } from "../../domain/types";
 import {
   createMockFoldProjectionDefinition,
@@ -123,6 +137,34 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
         expect(loader).toHaveBeenCalledTimes(3);
         expect(foldDef.eventLoaderUpTo).not.toHaveBeenCalled();
         expect(store.store).toHaveBeenCalledWith(result, context);
+        expect(incrementEsFoldStoreMissRefoldTotal).toHaveBeenCalledWith({
+          projectionName: "slim",
+          kind: "resumed",
+        });
+        expect(observeEsFoldStoreMissRefoldEvents).toHaveBeenCalledWith({
+          projectionName: "slim",
+          eventCount: 5,
+        });
+      });
+    });
+
+    describe("when the history contains only the delivered event", () => {
+      it("records a first-touch re-fold and its replayed event count", async () => {
+        const delivered = ev("e1", 1);
+        const loader = pagedLoaderFrom([delivered]);
+        const { foldDef } = makeFold(loader);
+        const executor = new FoldProjectionExecutor(2);
+
+        await executor.execute(foldDef, delivered, context);
+
+        expect(incrementEsFoldStoreMissRefoldTotal).toHaveBeenCalledWith({
+          projectionName: "slim",
+          kind: "first_touch",
+        });
+        expect(observeEsFoldStoreMissRefoldEvents).toHaveBeenCalledWith({
+          projectionName: "slim",
+          eventCount: 1,
+        });
       });
     });
 

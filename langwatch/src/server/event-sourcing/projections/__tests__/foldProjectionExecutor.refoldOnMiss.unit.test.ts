@@ -1,4 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  incrementEsFoldStoreMissRefoldTotal,
+  observeEsFoldStoreMissRefoldEvents,
+} from "~/server/metrics";
+
+vi.mock("~/server/metrics", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/server/metrics")>();
+  return {
+    ...actual,
+    incrementEsFoldStoreMissRefoldTotal: vi.fn(),
+    observeEsFoldStoreMissRefoldEvents: vi.fn(),
+  };
+});
+
 import type { Event } from "../../domain/types";
 import {
   createMockFoldProjectionDefinition,
@@ -53,6 +67,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
   }
 
   beforeEach(() => {
+    vi.clearAllMocks();
     executor = new FoldProjectionExecutor();
   });
 
@@ -85,6 +100,14 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
         upToEvent: e2,
       });
       expect(store.store).toHaveBeenCalledWith(result, context);
+      expect(incrementEsFoldStoreMissRefoldTotal).toHaveBeenCalledWith({
+        projectionName: "slim",
+        kind: "resumed",
+      });
+      expect(observeEsFoldStoreMissRefoldEvents).toHaveBeenCalledWith({
+        projectionName: "slim",
+        eventCount: 2,
+      });
     });
 
     it("does not double-apply the delivered event when the history already contains it", async () => {
@@ -107,6 +130,14 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       )) as CountState;
 
       expect(result.ids).toEqual(["e1"]);
+      expect(incrementEsFoldStoreMissRefoldTotal).toHaveBeenCalledWith({
+        projectionName: "slim",
+        kind: "first_touch",
+      });
+      expect(observeEsFoldStoreMissRefoldEvents).toHaveBeenCalledWith({
+        projectionName: "slim",
+        eventCount: 1,
+      });
     });
 
     it("applies the delivered event on top when the history read lags behind it", async () => {

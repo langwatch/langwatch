@@ -183,7 +183,7 @@ describe("RedisCachedFoldStore", () => {
 
     describe("given Redis SET and DEL both fail", () => {
       describe("when storing state", () => {
-        it("throws and records the SET failure metric", async () => {
+        it("throws and records the SET and DEL failure metrics", async () => {
           const redis = createMockRedis();
           redis.set.mockRejectedValueOnce(new Error("SET failed"));
           redis.del.mockRejectedValueOnce(new Error("DEL failed"));
@@ -203,6 +203,10 @@ describe("RedisCachedFoldStore", () => {
           expect(incrementEsFoldCacheRedisError).toHaveBeenCalledWith(
             "test_table",
             "set",
+          );
+          expect(incrementEsFoldCacheRedisError).toHaveBeenCalledWith(
+            "test_table",
+            "del",
           );
         });
       });
