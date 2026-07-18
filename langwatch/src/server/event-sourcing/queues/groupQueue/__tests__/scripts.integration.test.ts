@@ -1805,6 +1805,7 @@ describe("GroupStagingScripts", () => {
       });
 
       describe("when the job was dropped", () => {
+        /** @scenario 'A discarded event still counts no completions' */
         it("leaves both counters untouched whatever the payload count", async () => {
           const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
 
