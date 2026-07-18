@@ -72,7 +72,6 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     beforeEach(() => {
-      vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
       queues = [];
     });
 

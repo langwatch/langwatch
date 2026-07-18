@@ -22,6 +22,12 @@ import type { BlobRef, TieredBlobStore } from "./tieredBlobStore";
  * always sniffs the bytes and accepts every format we have ever written. That
  * asymmetry is the whole rollout story: ship readers that understand zstd and
  * msgpack with writes still off, let the fleet cycle, then flip the flags.
+ * Neither codec flag is set in infra today, so production writes gzip + JSON.
+ *
+ * The envelope gate itself is gone: `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED` was
+ * true on both the app and the workers, so the unprefixed-JSON write path was
+ * dead. Reads still accept unprefixed JSON and GQ1, because a value staged
+ * before the cutover can sit in a blocked group indefinitely.
  *
  * Writing first is NOT safe here. `decodeJobEnvelope` throwing a plain Error
  * (unknown codec, failed parse) does not retry — `GroupQueue` only re-stages on
@@ -219,10 +225,6 @@ const INLINE_CEILING_BYTES = 4 * 1024;
  * fleet is known to read envelopes. Read at call time so tests can toggle it
  * without module reloads.
  */
-function envelopeWritesEnabled(): boolean {
-  return process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED === "true";
-}
-
 /**
  * Storage for GQ1 offloaded envelope bodies. Implementations must persist with
  * a TTL safety net: deletion is best-effort at job completion, and a blob whose
@@ -522,7 +524,6 @@ export async function encodeJobEnvelope({
   blobs,
   tieredBlobs,
   projectId,
-  writesEnabled,
   queueName,
   logger,
 }: {
@@ -530,26 +531,16 @@ export async function encodeJobEnvelope({
   blobs?: JobBlobStore;
   tieredBlobs?: TieredBlobStore;
   projectId?: TenantId;
-  /**
-   * Explicit override of the format-rollout gate. When omitted, the encoder
-   * falls back to the `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED` env var (call-time
-   * read, so tests can toggle without module reload). Composition roots should
-   * thread this through explicitly so a partial fleet rollout doesn't put
-   * mixed GQ1/GQ2 values in the same group's hash space until every pod cycles.
-   */
-  writesEnabled?: boolean;
   /** Optional queue name for observability labels. */
   queueName?: string;
   /** Optional logger for tenant-attributed warn on cap / downgrade. */
   logger?: Logger;
 }): Promise<string> {
-  const enabled = writesEnabled ?? envelopeWritesEnabled();
-
   // GQ2: content-addressed, tenant-namespaced, tiered offload. Active only once
   // the composition root supplies a tiered store and the job's tenant. If
   // either is missing we fall back to GQ1 — noisy so a regression in the
   // composition root can't ship a silently-downgraded pipeline.
-  if (enabled && tieredBlobs && projectId) {
+  if (tieredBlobs && projectId) {
     const header = routingHeader(jobData, 2);
     // Lift queue machinery into the header so it doesn't perturb the content
     // hash. Without this, N reactors fanning out the same event produce N
@@ -607,9 +598,6 @@ export async function encodeJobEnvelope({
   }
 
   const json = JSON.stringify(jobData);
-  if (!enabled) {
-    return json;
-  }
   const jsonBytes = Buffer.byteLength(json);
   assertPayloadWithinCap(jsonBytes, { projectId, queueName, logger });
 

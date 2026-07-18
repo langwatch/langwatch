@@ -34,14 +34,12 @@ export class EnvelopeBlobLifecycle {
   private readonly blobHolders: BlobHolders;
   private readonly tieredBlobs?: TieredBlobStore;
   private readonly queueName: string;
-  private readonly writesEnabled?: boolean;
 
   constructor({
     redis,
     queueName,
     objectStoreFor,
     resolveStorageDestination,
-    writesEnabled,
   }: {
     redis: IORedis | Cluster;
     queueName: string;
@@ -49,17 +47,8 @@ export class EnvelopeBlobLifecycle {
     resolveStorageDestination?: (
       projectId: string,
     ) => Promise<ProjectStorageDestination>;
-    /**
-     * Explicit override of the format-rollout gate. Threaded through to
-     * {@link encodeJobEnvelope} so the composition root — not per-call
-     * `process.env` reads — decides when the queue starts emitting GQ2
-     * envelopes. Omit to fall back to the `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED`
-     * env var (call-time read so tests can toggle without module reload).
-     */
-    writesEnabled?: boolean;
   }) {
     this.queueName = queueName;
-    this.writesEnabled = writesEnabled;
     // The holder release/transfer evals touch two keys (holder + blob); in
     // cluster mode they must share a slot, which requires the queue name to
     // carry a hash tag. Fail fast rather than CROSSSLOT-leak silently at runtime
@@ -115,7 +104,6 @@ export class EnvelopeBlobLifecycle {
       blobs: this.blobs,
       tieredBlobs: this.tieredBlobs,
       projectId: this.projectIdFor(groupId),
-      writesEnabled: this.writesEnabled,
       queueName: this.queueName,
       logger,
     });

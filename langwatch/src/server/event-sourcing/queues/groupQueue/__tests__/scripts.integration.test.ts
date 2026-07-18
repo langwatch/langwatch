@@ -2187,7 +2187,6 @@ describe("GroupStagingScripts", () => {
     // tiny header so the Lua pause-check never decodes the (gzipped) body.
     describe("when head-of-line job is envelope-encoded", () => {
       beforeEach(() => {
-        vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
       });
 
       afterEach(() => {

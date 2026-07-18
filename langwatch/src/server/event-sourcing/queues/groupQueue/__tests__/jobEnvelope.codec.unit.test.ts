@@ -38,7 +38,6 @@ const smallPayload = () => ({
 
 describe("jobEnvelope body codecs", () => {
   beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
   });
 
   afterEach(() => {

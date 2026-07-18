@@ -169,7 +169,25 @@ Payloads of different sizes land in different places, picked at encode time. You
 
 ### Configuring writes
 
-GQ2 (content-addressed) writes are gated behind `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true`. With the flag unset, the queue writes legacy bare-JSON envelopes (GQ1 path) — the GQ2 reader handles both, so rollout is one-way: enable the flag once every consumer in the fleet reads GQ2 envelopes.
+GQ2 (content-addressed) is now the only write format; the
+`GROUP_QUEUE_ENVELOPE_WRITES_ENABLED` gate has been removed after running true
+in infra on both the app and the workers. Reads still accept unprefixed JSON and
+GQ1, because a value staged before the cutover can sit in a blocked group
+indefinitely and a decode failure does not retry — it completes the slot and
+drops the job.
+
+Two codec flags remain, and both are OFF in infra, so production writes gzip +
+JSON:
+
+| Flag | Default | Effect when enabled |
+|---|---|---|
+| `GROUP_QUEUE_ZSTD_WRITES_ENABLED` | off | compress bodies with zstd instead of gzip |
+| `GROUP_QUEUE_MSGPACK_WRITES_ENABLED` | off | encode payloads above 100 KiB as msgpack instead of JSON |
+
+Rollout is readers-first and one-way. Readers already sniff both, so enable the
+flag in infra, let the fleet cycle, and only then remove the flag. Writing first
+is not safe: a decode failure is not retryable, so an old worker meeting a new
+body discards the job.
 
 ---
 

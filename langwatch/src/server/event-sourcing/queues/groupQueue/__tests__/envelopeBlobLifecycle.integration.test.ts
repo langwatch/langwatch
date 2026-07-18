@@ -43,7 +43,6 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
   });
 
   beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
     queueName = `{test/lifecycle/${crypto.randomUUID().slice(0, 8)}}`;
     objectStore = new InMemoryObjectStore();
     lifecycle = new EnvelopeBlobLifecycle({

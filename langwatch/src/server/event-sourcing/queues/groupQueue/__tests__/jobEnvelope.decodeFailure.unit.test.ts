@@ -28,7 +28,6 @@ describe("jobEnvelope decode failures", () => {
   const projectId = createTenantId("project_5538");
 
   beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
   });
   afterEach(() => {
     vi.unstubAllEnvs();

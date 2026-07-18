@@ -17,47 +17,29 @@ import { TieredBlobStore } from "../tieredBlobStore";
 import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blobTestDoubles";
 
 describe("jobEnvelope", () => {
-  beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
-  });
-
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  describe("given envelope writes are not enabled", () => {
-    const payload = {
-      __pipelineName: "traces",
-      __jobType: "command",
-      __jobName: "recordSpan",
-      bulk: "x".repeat(4096),
-    };
+  describe("given a value staged before the envelope cutover", () => {
+    describe("when decoding", () => {
+      it("still reads unprefixed JSON", async () => {
+        // The WRITE path for this is gone — GROUP_QUEUE_ENVELOPE_WRITES_ENABLED
+        // was true in infra, so nothing produces unprefixed JSON any more. READ
+        // support is not dead code: a value staged before the cutover can sit in
+        // a blocked group indefinitely, and a decode failure does not retry —
+        // it completes the slot and drops the job.
+        const legacy = JSON.stringify({
+          __pipelineName: "traces",
+          __jobName: "recordSpan",
+          bulk: "x".repeat(4096),
+        });
 
-    beforeEach(() => {
-      // Set "false" rather than unset: under the vmThreads pool process.env is
-      // shared and aggressively recycled, and vi.stubEnv(key, undefined) clears
-      // it via the metaEnv proxy's *delete* path (no deleteProperty trap — it
-      // only works by defaulting through to process.env), which races the
-      // outer "true" stub. Writing a value goes through the proxy set trap,
-      // which reliably forwards. Any non-"true" value exercises the same
-      // envelopeWritesEnabled() === false branch.
-      vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "false");
-    });
+        const decoded = await decodeJobEnvelope({ value: legacy });
 
-    describe("when encoding", () => {
-      it("writes legacy bare JSON that a previous-release JSON.parse reader accepts", async () => {
-        const encoded = await encodeJobEnvelope({ jobData: payload });
-        expect(encoded.startsWith("GQ1|")).toBe(false);
-        expect(JSON.parse(encoded)).toEqual(payload);
-      });
-
-      it("still decodes and exposes routing meta through the dual readers", async () => {
-        const encoded = await encodeJobEnvelope({ jobData: payload });
-        expect(await decodeJobEnvelope({ value: encoded })).toEqual(payload);
-        expect(readJobRoutingMeta(encoded)).toEqual({
-          pipelineName: "traces",
-          jobType: "command",
-          jobName: "recordSpan",
+        expect(decoded).toMatchObject({
+          __pipelineName: "traces",
+          __jobName: "recordSpan",
         });
       });
     });

@@ -212,7 +212,6 @@ describe.skipIf(!hasTestcontainers)(
     describe("envelope blob offload", () => {
       describe("when a payload exceeds the blob offload threshold", () => {
         it("stores the body under a blob key, delivers it intact, and deletes the blob on completion", async () => {
-          vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
           try {
             const queueName = `{test/gq/blob-${crypto.randomUUID().slice(0, 8)}}`;
             const blobKeysDuringProcessing: string[] = [];
@@ -256,7 +255,6 @@ describe.skipIf(!hasTestcontainers)(
         });
 
         it("sets a TTL safety net on the blob key", async () => {
-          vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
           try {
             const queueName = `{test/gq/blob-${crypto.randomUUID().slice(0, 8)}}`;
             let release: () => void;
@@ -305,7 +303,6 @@ describe.skipIf(!hasTestcontainers)(
         });
 
         it("reclaims the displaced old blob on replace so it cannot leak", async () => {
-          vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
           try {
             const queueName = `{test/gq/blob-dedup-${crypto.randomUUID().slice(0, 8)}}`;
             const queue = createQueue(vi.fn().mockResolvedValue(undefined), {
@@ -342,7 +339,6 @@ describe.skipIf(!hasTestcontainers)(
         });
 
         it("reclaims the discarded new blob when the existing payload is kept (replace:false)", async () => {
-          vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
           try {
             const queueName = `{test/gq/blob-keep-${crypto.randomUUID().slice(0, 8)}}`;
             const queue = createQueue(vi.fn().mockResolvedValue(undefined), {
