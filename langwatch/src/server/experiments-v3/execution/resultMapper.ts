@@ -95,6 +95,12 @@ const classifyEvaluatorExecutionError = (
 
   return new EvaluatorExecutionError(rawMessage, {
     meta: { httpStatus: status },
+    // A 401/403 from the evaluator's LLM call is the customer's credential or
+    // config, not our backend — override the class's platform default.
+    fault: "customer",
+    tips: [
+      "Check the API key and model configuration for this evaluator — the provider rejected the call with 401/403",
+    ],
   });
 };
 

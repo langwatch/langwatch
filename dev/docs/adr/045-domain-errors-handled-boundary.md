@@ -103,13 +103,15 @@ Concretely:
    an `explain*`-style mapping keyed on `code` turns it into user-facing copy and
    an optional action/render choice. The server never dictates UI; it emits the
    typed fact, the client renders it. Absence of a domain payload → the generic
-   unknown treatment.
+   unknown treatment. *(Amended 2026-07-18 — see below: remediation facts now
+   travel with the error for consumers that have no client explainer.)*
 
 `code` (Go: `Code`) is a **serialisable string discriminant** and is the correct
 check across process, worker, and serialisation boundaries — use
 `err.code === "evaluation_not_found"`, not `instanceof`, in those cases
-(`instanceof` is same-process only and breaks across the Next.js/turbopack module
-boundary, which is why the Hono handler checks `"code" in error`).
+(`instanceof` is same-process only and breaks across module boundaries — a
+bundler can load two copies of the same module, which is why the Hono handler
+checks `"code" in error`).
 
 ## Rationale / Trade-offs
 
@@ -168,6 +170,45 @@ the reference.
   the discriminant from `code ?? kind`. This makes both rollout directions safe
   (old client ↔ new server, new client ↔ old server). The `kind` alias is
   transitional — remove it once no consumer reads `kind`.
+
+## Amendment 2026-07-18: remediation channel (`tips`/`docsUrl`) and the fault axis
+
+Two additions, both fully additive on the wire (older clients and the Python SDK
+ignore unknown keys; the REST envelope shape is unchanged):
+
+1. **Handled errors now carry self-diagnosis data.** `HandledError` (and
+   `SerializedHandledError`) gained optional `tips` (short, actionable
+   remediation lines) and `docsUrl` (a canonical docs.langwatch.ai link to the
+   relevant markdown page). This revises §7's "the server never dictates UI":
+   the server still never dictates *presentation*, but it now emits *remediation
+   facts* because the most important consumers — agents driving the CLI, API and
+   MCP server — have no client-side `explain*` mapping to fall back on. The UI's
+   `code`-keyed explainers may still override or ignore these fields; agents
+   render them verbatim. On the Go side, `herr` carries them as reserved `Meta`
+   keys (`tips`, `docs_url`) promoted to first-class `ErrorBody` fields on the
+   wire — the same mechanism as `Meta["message"]`, so `Body`/`FromBody`
+   round-trips stay lossless.
+2. **Log level is driven by fault attribution, not handled-ness or status
+   alone.** Handled-ness decides only what the *client* sees. The new `fault`
+   field (`"customer" | "platform" | "provider"`, default `"customer"`) says who
+   can act: customer-fault errors are expected and log at **warn** (tracked by
+   `handledErrorCode` for spike alerts); platform/provider failures are
+   incidents and keep logging at **error**. PostHog exception capture is now
+   reserved for *unhandled* errors — a handled error is by definition not a
+   bug. This mirrors the existing classification in
+   `services/aigateway/adapters/httpapi/faults.go`. Subclasses with 5xx
+   statuses must be audited and annotated `platform`/`provider` explicitly,
+   since the default is `customer`.
+
+Supporting changes: the TS `HandledError` core moved into the shared source-only
+package `@langwatch/handled-error` (`packages/handled-error`), consumed by the
+app (via the `src/server/app-layer/handled-error.ts` shim, which wires the
+Grafana trace-link builder), the MCP server (bundled via tsup `noExternal`),
+and available to the CLI and SDKs. The MCP server now JSON-parses API error
+bodies and surfaces `code`/`tips`/`docsUrl` in tool error text. SSE error
+frames (`server/routes/sse.ts`) carry the serialized `domainError` alongside
+the message; non-handled stream failures now degrade to the generic unknown
+message instead of leaking raw error text onto an already-200 stream.
 
 ## References
 

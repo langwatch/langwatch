@@ -75,15 +75,22 @@ function determineErrorResponse(
 ): { statusCode: ContentfulStatusCode; response: object } {
   // HandledErrors are handled first — normalize to client-safe shape.
   // Use code + httpStatus check instead of instanceof to handle
-  // module-boundary class identity mismatches in Next.js/turbopack.
+  // module-boundary class identity mismatches (a bundler can load two
+  // copies of the same module).
   // See handled-error.ts: "use code instead of instanceof in cross-process cases"
   if (HandledError.is(error) || ("code" in error && "httpStatus" in error)) {
     const { code, message, httpStatus, meta } = error as HandledError;
+    const { tips, docsUrl, fault } = error as HandledError;
     return {
       statusCode: (httpStatus ?? 500) as ContentfulStatusCode,
       response: {
         ...errorSchema.parse({ error: code, message }),
         ...(meta ?? {}),
+        // Additive remediation channel (agents read these; older clients
+        // and the Python SDK ignore unknown keys).
+        ...(tips?.length ? { tips } : {}),
+        ...(docsUrl ? { docsUrl } : {}),
+        ...(fault ? { fault } : {}),
       },
     };
   }

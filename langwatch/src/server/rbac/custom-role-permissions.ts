@@ -46,6 +46,7 @@ export class MalformedCustomRolePermissionsError extends HandledError {
       {
         meta: { customRoleId, ...options.meta },
         httpStatus: 500, // infrastructural / data-integrity, not a user error
+        fault: "platform",
         reasons: options.reasons,
       },
     );

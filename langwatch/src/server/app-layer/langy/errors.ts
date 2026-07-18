@@ -16,6 +16,10 @@ import { HandledError, NotFoundError } from "~/server/app-layer/handled-error";
  * experience (here: the `conversationId` the caller already holds). Never put
  * internal or private detail, query internals, or over-engineered payloads on a
  * domain error — that belongs in server logs, not on the wire.
+ *
+ * `tips` mirror the client-side explainer copy
+ * (`features/langy/logic/langyErrorExplainer.ts`) so API/CLI/MCP consumers get
+ * the same remediation the UI renders.
  */
 
 /** The requested conversation does not exist, or has been archived (HTTP 404). */
@@ -28,6 +32,10 @@ export class LangyConversationNotFoundError extends NotFoundError {
   ) {
     super("langy_conversation_not_found", "Langy conversation", conversationId, {
       meta: { conversationId },
+      tips: [
+        "Check the conversation id — it may be archived or belong to another project",
+        "Start a new conversation to keep going",
+      ],
       ...options,
     });
     this.name = "LangyConversationNotFoundError";
@@ -46,7 +54,13 @@ export class LangyConversationNotOwnedError extends HandledError {
     super(
       "langy_conversation_not_owned",
       "This conversation belongs to another user.",
-      { meta: { conversationId }, httpStatus: 403 },
+      {
+        meta: { conversationId },
+        httpStatus: 403,
+        tips: [
+          "Shared conversations can be viewed but only the owner can continue them — start a new conversation instead",
+        ],
+      },
     );
     this.name = "LangyConversationNotOwnedError";
   }
@@ -59,7 +73,13 @@ export class LangyModelNotConfiguredError extends HandledError {
     super(
       "langy_model_not_configured",
       "No model configured for this project.",
-      { httpStatus: 409, reasons: options.reasons },
+      {
+        httpStatus: 409,
+        tips: [
+          "Pick a model in the project's model settings, then retry",
+        ],
+        reasons: options.reasons,
+      },
     );
     this.name = "LangyModelNotConfiguredError";
   }
@@ -72,7 +92,13 @@ export class LangyModelNotAllowedError extends HandledError {
     super(
       "langy_model_not_allowed",
       `Model "${model}" is not allowed for this project's Langy. Pick from the configured models.`,
-      { meta: { model }, httpStatus: 400 },
+      {
+        meta: { model },
+        httpStatus: 400,
+        tips: [
+          "Choose one of the models configured for this project and retry",
+        ],
+      },
     );
     this.name = "LangyModelNotAllowedError";
   }
@@ -85,7 +111,12 @@ export class LangyEgressMisconfiguredError extends HandledError {
     super(
       "langy_egress_misconfigured",
       "Langy egress policy is misconfigured for this project.",
-      { httpStatus: 409 },
+      {
+        httpStatus: 409,
+        tips: [
+          "Ask a workspace admin to review the project's outbound network policy — Langy refuses to run rather than leak",
+        ],
+      },
     );
     this.name = "LangyEgressMisconfiguredError";
   }
@@ -95,7 +126,12 @@ export class LangyEgressMisconfiguredError extends HandledError {
 export class LangyInsufficientScopeError extends HandledError {
   declare readonly code: "langy_insufficient_scope";
   constructor(message: string) {
-    super("langy_insufficient_scope", message, { httpStatus: 409 });
+    super("langy_insufficient_scope", message, {
+      httpStatus: 409,
+      tips: [
+        "Ask a workspace admin to grant Langy permissions in this project",
+      ],
+    });
     this.name = "LangyInsufficientScopeError";
   }
 }
@@ -107,7 +143,12 @@ export class LangyTurnInProgressError extends HandledError {
     super(
       "langy_turn_in_progress",
       "A response is already in progress for this conversation.",
-      { httpStatus: 409 },
+      {
+        httpStatus: 409,
+        tips: [
+          "Wait for the current response to finish before sending another message",
+        ],
+      },
     );
     this.name = "LangyTurnInProgressError";
   }
@@ -119,7 +160,13 @@ export class LangyAgentUnavailableError extends HandledError {
   constructor(
     message = "Agent is temporarily unavailable. Please try again shortly.",
   ) {
-    super("langy_agent_unavailable", message, { httpStatus: 503 });
+    super("langy_agent_unavailable", message, {
+      httpStatus: 503,
+      fault: "platform",
+      tips: [
+        "Retry in a few seconds — the agent is down, mid-deploy, or restarting",
+      ],
+    });
     this.name = "LangyAgentUnavailableError";
   }
 }

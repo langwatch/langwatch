@@ -37,12 +37,16 @@ const serializedReasonSchema: z.ZodType<{
   code: string;
   kind: string;
   meta?: Record<string, unknown>;
+  tips?: readonly string[];
+  docsUrl?: string;
   reasons?: unknown[];
 }> = z.lazy(() =>
   z.object({
     code: z.string(),
     kind: z.string(),
     meta: z.record(z.unknown()).optional(),
+    tips: z.array(z.string()).optional(),
+    docsUrl: z.string().optional(),
     reasons: z.array(serializedReasonSchema).optional(),
   }),
 );
@@ -56,6 +60,9 @@ const serializedHandledErrorSchema = z
     spanId: z.string().optional(),
     traceUrl: z.string().optional(),
     httpStatus: z.number(),
+    fault: z.enum(["customer", "platform", "provider"]).optional(),
+    tips: z.array(z.string()).optional(),
+    docsUrl: z.string().optional(),
     reasons: z.array(serializedReasonSchema).optional(),
   })
   .refine((value) => value.code !== undefined || value.kind !== undefined)
@@ -69,6 +76,9 @@ const serializedHandledErrorSchema = z
       traceId: value.traceId,
       spanId: value.spanId,
       traceUrl: value.traceUrl,
+      fault: value.fault ?? "customer",
+      ...(value.tips?.length ? { tips: value.tips } : {}),
+      ...(value.docsUrl ? { docsUrl: value.docsUrl } : {}),
       reasons: (value.reasons ?? []) as SerializedHandledError["reasons"],
     };
   });

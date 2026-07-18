@@ -604,20 +604,34 @@ export function handleTrpcCallLogging({
         : 500;
     logData.statusCode = resolvedStatus;
 
-    // Include handled error code in log data for structured filtering
-    if (
+    const handledCause =
       result.error instanceof TRPCError &&
       result.error.cause instanceof HandledError
-    ) {
-      logData.handledErrorCode = result.error.cause.code;
+        ? result.error.cause
+        : undefined;
+
+    // Include handled error code + fault in log data for structured
+    // filtering (and spike alerting on handledErrorCode).
+    if (handledCause) {
+      logData.handledErrorCode = handledCause.code;
+      logData.handledErrorFault = handledCause.fault;
     }
 
-    // Only capture 5xx errors (actual bugs)
-    if (resolvedStatus >= 500) {
+    // Only unhandled 5xx errors are captured as exceptions: handled errors
+    // are expected failure modes with typed causes, not bugs.
+    if (resolvedStatus >= 500 && !handledCause) {
       capture(toError(result.error));
     }
 
-    const logLevel = getLogLevelFromStatusCode(resolvedStatus);
+    // Handled errors log by fault attribution, not status: customer-fault
+    // errors are expected (warn — watched for spikes), while platform and
+    // provider failures are incidents worth an error line. Unhandled errors
+    // stay status-based.
+    const logLevel = handledCause
+      ? handledCause.fault === "customer"
+        ? "warn"
+        : "error"
+      : getLogLevelFromStatusCode(resolvedStatus);
     log[logLevel](logData, "trpc call");
   } else {
     log.info(logData, "trpc call");

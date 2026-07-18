@@ -176,3 +176,118 @@ func TestBody_NonHerrErrorCollapsesToUnknown(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(raw), "/srv/x")
 }
+
+func TestWriteHTTP_TipsDocsURLFaultPromoted(t *testing.T) {
+	RegisterStatus("rate_limited", http.StatusTooManyRequests)
+
+	e := New(context.Background(), "rate_limited", M{
+		"message":  "rate limit exceeded",
+		"tips":     []string{"retry with backoff", "reduce request concurrency"},
+		"docs_url": "https://docs.example.com/rate-limits",
+		"fault":    "customer",
+		"limit":    100,
+	})
+
+	rec := httptest.NewRecorder()
+	WriteHTTP(rec, e)
+
+	raw := rec.Body.String()
+	var resp ErrorResponse
+	require.NoError(t, json.Unmarshal([]byte(raw), &resp))
+
+	assert.Equal(t, []string{"retry with backoff", "reduce request concurrency"}, resp.Error.Tips)
+	assert.Equal(t, "https://docs.example.com/rate-limits", resp.Error.DocsURL)
+	assert.Equal(t, "customer", resp.Error.Fault)
+	assert.EqualValues(t, 100, resp.Error.Meta["limit"])
+	// Promoted keys should not appear in Meta.
+	_, hasTips := resp.Error.Meta["tips"]
+	assert.False(t, hasTips)
+	_, hasDocsURL := resp.Error.Meta["docs_url"]
+	assert.False(t, hasDocsURL)
+	_, hasFault := resp.Error.Meta["fault"]
+	assert.False(t, hasFault)
+
+	// Wire shape: tips/docs_url/fault are top-level fields.
+	assert.Contains(t, raw, `"tips":["retry with backoff","reduce request concurrency"]`)
+	assert.Contains(t, raw, `"docs_url":"https://docs.example.com/rate-limits"`)
+	assert.Contains(t, raw, `"fault":"customer"`)
+}
+
+func TestWriteHTTP_TipsFromAnySlice(t *testing.T) {
+	RegisterStatus("tips_any", http.StatusBadRequest)
+
+	// Meta is map[string]any; a decoded []any of strings must promote too.
+	e := New(context.Background(), "tips_any", M{"tips": []any{"first", "second", 42, ""}})
+
+	rec := httptest.NewRecorder()
+	WriteHTTP(rec, e)
+
+	var resp ErrorResponse
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
+
+	assert.Equal(t, []string{"first", "second"}, resp.Error.Tips)
+	_, hasTips := resp.Error.Meta["tips"]
+	assert.False(t, hasTips)
+}
+
+func TestWriteHTTP_NoTipsDocsURLFaultWhenAbsent(t *testing.T) {
+	RegisterStatus("plain_err", http.StatusBadRequest)
+
+	e := New(context.Background(), "plain_err", M{"message": "boom", "policy": "pii"})
+
+	rec := httptest.NewRecorder()
+	WriteHTTP(rec, e)
+
+	var resp ErrorResponse
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
+
+	assert.Nil(t, resp.Error.Tips)
+	assert.Empty(t, resp.Error.DocsURL)
+	assert.Empty(t, resp.Error.Fault)
+	raw := rec.Body.String()
+	assert.NotContains(t, raw, "tips")
+	assert.NotContains(t, raw, "docs_url")
+	assert.NotContains(t, raw, "fault")
+}
+
+func TestBodyFromBody_RoundTripsTipsDocsURLFault(t *testing.T) {
+	ctx := context.Background()
+	inner := New(ctx, "provider_error", M{
+		"message":  "provider rejected the request",
+		"tips":     []string{"check provider credentials"},
+		"docs_url": "https://docs.example.com/providers",
+	})
+	outer := New(ctx, "agent_error", M{
+		"message":  "the agent hit an error",
+		"fault":    "platform",
+		"tips":     []string{"retry the run", "contact support if it persists"},
+		"docs_url": "https://docs.example.com/agent-errors",
+	}, inner)
+
+	body := Body(outer)
+
+	assert.Equal(t, []string{"retry the run", "contact support if it persists"}, body.Tips)
+	assert.Equal(t, "https://docs.example.com/agent-errors", body.DocsURL)
+	assert.Equal(t, "platform", body.Fault)
+
+	// Nested reasons go through the same path and keep their own values.
+	require.Len(t, body.Reasons, 1)
+	assert.Equal(t, []string{"check provider credentials"}, body.Reasons[0].Tips)
+	assert.Equal(t, "https://docs.example.com/providers", body.Reasons[0].DocsURL)
+	assert.Empty(t, body.Reasons[0].Fault)
+
+	// Simulate the wire, then reconstruct.
+	raw, err := json.Marshal(body)
+	require.NoError(t, err)
+	var decoded ErrorBody
+	require.NoError(t, json.Unmarshal(raw, &decoded))
+
+	e := FromBody(decoded)
+	assert.True(t, IsCode(e, "agent_error"))
+	assert.Equal(t, "platform", e.Meta["fault"])
+	assert.Equal(t, "https://docs.example.com/agent-errors", e.Meta["docs_url"])
+
+	// Re-serializing the reconstruction is lossless: same envelope again.
+	again := Body(e)
+	assert.Equal(t, body, again)
+}

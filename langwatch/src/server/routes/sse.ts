@@ -1,8 +1,7 @@
 /**
  * Hono route for SSE (Server-Sent Events) tRPC subscriptions.
  *
- * Replaces the Next.js Pages Router handler at
- * src/pages/api/sse/[...trpc].ts with a pure Hono app.
+ * Pure Hono app serving tRPC subscription procedures over SSE.
  *
  * The handler:
  * 1. Takes a tRPC procedure path from the URL (e.g. /api/sse/traces.onTraceUpdate)
@@ -28,10 +27,40 @@ async function getAppRouter() {
 }
 
 import { createLogger } from "@langwatch/observability";
+import { TRPCError } from "@trpc/server";
 import { createInnerTRPCContext } from "~/server/api/trpc";
+import { HandledError } from "~/server/app-layer/handled-error";
 import { getServerAuthSession } from "~/server/auth";
 
 const logger = createLogger("langwatch:sse");
+
+/**
+ * The SSE error frame. HTTP 200 is already on the wire when a stream fails, so
+ * the handled shape has to ride inside the frame: a HandledError (directly, or
+ * as a TRPCError cause) carries its full serialized domain error; a client-safe
+ * TRPCError keeps its message; anything else degrades to the generic unknown
+ * message — the raw detail stays server-side in the log (ADR-045).
+ */
+export function sseErrorFrame(err: unknown): Record<string, unknown> {
+  const cause = err instanceof TRPCError ? err.cause : undefined;
+  const handled =
+    cause instanceof HandledError
+      ? cause
+      : err instanceof HandledError
+        ? err
+        : undefined;
+  if (handled) {
+    return {
+      type: "error",
+      message: handled.message,
+      domainError: handled.serialize(),
+    };
+  }
+  if (err instanceof TRPCError && err.code !== "INTERNAL_SERVER_ERROR") {
+    return { type: "error", message: err.message };
+  }
+  return { type: "error", message: "An unknown error occurred" };
+}
 
 const secured = createServiceApp({ basePath: "/api" });
 
@@ -197,11 +226,7 @@ secured.access(
               },
               error: (err: unknown) => {
                 logger.error({ err, path }, "SSE observable error");
-                writeData({
-                  type: "error",
-                  message:
-                    err instanceof Error ? err.message : "Subscription error",
-                });
+                writeData(sseErrorFrame(err));
                 end();
               },
             });
@@ -219,11 +244,7 @@ secured.access(
           end();
         } catch (error) {
           logger.error({ error, path, input }, "SSE handler error");
-          writeData({
-            type: "error",
-            message:
-              error instanceof Error ? error.message : "Internal server error",
-          });
+          writeData(sseErrorFrame(error));
           end();
         }
       })();

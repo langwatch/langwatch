@@ -69,6 +69,10 @@ func TestRouter_GovBudgetBlock_CarriesAdminActionableMessage(t *testing.T) {
 		"the 402 must carry a human message, not echo the bare error code")
 	assert.Contains(t, strings.ToLower(er.Error.Message), "admin",
 		"the budget message must point the member at their admin")
+	assert.NotEmpty(t, er.Error.Tips,
+		"the 402 must carry remediation tips for agent consumers")
+	assert.Equal(t, "https://docs.langwatch.ai/ai-gateway/budgets", er.Error.DocsURL)
+	assert.Equal(t, "customer", er.Error.Fault)
 }
 
 // @scenario "Upstream account-exhaustion error is re-messaged, status and retry headers preserved"

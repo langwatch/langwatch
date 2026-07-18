@@ -452,4 +452,155 @@ describe("langwatch-api", () => {
       ).rejects.toThrow("Forbidden: invalid API key");
     });
   });
+
+  describe("when the API returns a handled-error JSON body", () => {
+    const handledErrorBody = {
+      error: "invalid_filter",
+      message: "Filter 'llm.model' is not supported",
+      tips: ["Use 'metadata.model' instead", "See the filter reference"],
+      docsUrl: "https://docs.langwatch.ai/api/filters",
+      fault: "customer",
+    };
+
+    it("parses code, tips, docsUrl and fault into LangWatchApiError fields", async () => {
+      const { searchTraces, LangWatchApiError } = await import(
+        "../langwatch-api.js"
+      );
+      mockErrorResponse(400, JSON.stringify(handledErrorBody));
+
+      const error = await searchTraces({
+        startDate: 1000,
+        endDate: 2000,
+      }).catch((e) => e);
+
+      expect(error).toBeInstanceOf(LangWatchApiError);
+      expect(error.status).toBe(400);
+      expect(error.responseBody).toBe(JSON.stringify(handledErrorBody));
+      expect(error.code).toBe("invalid_filter");
+      expect(error.tips).toEqual(handledErrorBody.tips);
+      expect(error.docsUrl).toBe(handledErrorBody.docsUrl);
+      expect(error.fault).toBe("customer");
+    });
+
+    it("formats the message with the server message, Tips section and Docs link", async () => {
+      const { searchTraces } = await import("../langwatch-api.js");
+      mockErrorResponse(400, JSON.stringify(handledErrorBody));
+
+      const error = await searchTraces({
+        startDate: 1000,
+        endDate: 2000,
+      }).catch((e) => e);
+
+      expect(error.message).toContain(
+        "LangWatch API error 400: Filter 'llm.model' is not supported"
+      );
+      expect(error.message).toContain("Tips:");
+      expect(error.message).toContain("- Use 'metadata.model' instead");
+      expect(error.message).toContain("- See the filter reference");
+      expect(error.message).toContain(
+        "Docs: https://docs.langwatch.ai/api/filters"
+      );
+    });
+
+    it("parses the tRPC shape using `code` instead of `error`", async () => {
+      const { searchTraces } = await import("../langwatch-api.js");
+      const body = {
+        code: "dataset_not_found",
+        message: "Dataset 'abc' not found",
+        meta: { datasetId: "abc" },
+        httpStatus: 404,
+        fault: "customer",
+        tips: ["Check the dataset slug"],
+        docsUrl: "https://docs.langwatch.ai/datasets",
+        reasons: [],
+      };
+      mockErrorResponse(404, JSON.stringify(body));
+
+      const error = await searchTraces({
+        startDate: 1000,
+        endDate: 2000,
+      }).catch((e) => e);
+
+      expect(error.code).toBe("dataset_not_found");
+      expect(error.tips).toEqual(["Check the dataset slug"]);
+      expect(error.docsUrl).toBe("https://docs.langwatch.ai/datasets");
+      expect(error.fault).toBe("customer");
+      expect(error.message).toContain("Dataset 'abc' not found");
+    });
+
+    it("omits the Tips and Docs sections when absent", async () => {
+      const { searchTraces } = await import("../langwatch-api.js");
+      mockErrorResponse(
+        401,
+        JSON.stringify({ error: "unauthorized", message: "Invalid API key" })
+      );
+
+      const error = await searchTraces({
+        startDate: 1000,
+        endDate: 2000,
+      }).catch((e) => e);
+
+      expect(error.code).toBe("unauthorized");
+      expect(error.tips).toBeUndefined();
+      expect(error.docsUrl).toBeUndefined();
+      expect(error.fault).toBeUndefined();
+      expect(error.message).toBe(
+        "LangWatch API error 401: Invalid API key"
+      );
+    });
+
+    it("ignores an invalid fault value", async () => {
+      const { searchTraces } = await import("../langwatch-api.js");
+      mockErrorResponse(
+        500,
+        JSON.stringify({ error: "boom", message: "Boom", fault: "nobody" })
+      );
+
+      const error = await searchTraces({
+        startDate: 1000,
+        endDate: 2000,
+      }).catch((e) => e);
+
+      expect(error.fault).toBeUndefined();
+    });
+  });
+
+  describe("when the error body is not a handled-error envelope", () => {
+    it("keeps the raw text as the message and sets no extra fields", async () => {
+      const { searchTraces, LangWatchApiError } = await import(
+        "../langwatch-api.js"
+      );
+      mockErrorResponse(502, "<html>Bad Gateway</html>");
+
+      const error = await searchTraces({
+        startDate: 1000,
+        endDate: 2000,
+      }).catch((e) => e);
+
+      expect(error).toBeInstanceOf(LangWatchApiError);
+      expect(error.status).toBe(502);
+      expect(error.responseBody).toBe("<html>Bad Gateway</html>");
+      expect(error.message).toBe(
+        "LangWatch API error 502: <html>Bad Gateway</html>"
+      );
+      expect(error.code).toBeUndefined();
+      expect(error.tips).toBeUndefined();
+      expect(error.docsUrl).toBeUndefined();
+      expect(error.fault).toBeUndefined();
+    });
+
+    it("treats JSON without error/code/message fields as raw text", async () => {
+      const { searchTraces } = await import("../langwatch-api.js");
+      const body = JSON.stringify({ unexpected: true });
+      mockErrorResponse(500, body);
+
+      const error = await searchTraces({
+        startDate: 1000,
+        endDate: 2000,
+      }).catch((e) => e);
+
+      expect(error.code).toBeUndefined();
+      expect(error.message).toBe(`LangWatch API error 500: ${body}`);
+    });
+  });
 });

@@ -131,6 +131,40 @@ Feature: Handled errors — the handled-error boundary
     And identity survives the boundary intact
 
   # ==========================================================================
+  # Remediation channel: tips/docsUrl/fault travel with the error (ADR-045,
+  # 2026-07-18 amendment)
+  # ==========================================================================
+
+  @bdd @domain-errors
+  Scenario: A handled error carries remediation for agent consumers
+    Given a QueryMemoryExceededError is thrown with tips and no docsUrl
+    When it is serialised
+    Then the payload carries its tips verbatim
+    And the payload carries fault "customer"
+    And consumers without a client-side explainer (CLI, API, MCP) can self-diagnose
+
+  @bdd @domain-errors
+  Scenario: Remediation fields are additive and optional
+    Given a HandledError without tips or docsUrl (e.g. an older error class)
+    When it is serialised
+    Then no tips or docsUrl keys are emitted
+    And older clients and the Python SDK keep working unchanged
+
+  @bdd @domain-errors
+  Scenario: Remediation survives the Go herr wire
+    Given a Go service returns an herr.E with Meta tips/docs_url/fault
+    When the envelope crosses to TypeScript
+    Then the adapted HandledError carries tips, docsUrl and fault
+    And a Body/FromBody round-trip preserves them losslessly
+
+  @bdd @domain-errors
+  Scenario: Log level follows fault attribution, not handled-ness
+    Given a handled error with fault "customer" and httpStatus 500
+    Then it logs at warn, with handledErrorCode available for spike alerts
+    And a handled error with fault "platform" or "provider" logs at error
+    And only unhandled errors are captured as exceptions
+
+  # ==========================================================================
   # Transition: `kind` → `code` rename stays non-breaking during rollout
   # ==========================================================================
 

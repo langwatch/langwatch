@@ -6,8 +6,18 @@ packages:
   # and zod-peer-dep'd, so it compiles against the app's own zod (3.25) via the
   # `zod/v4` subpath both majors ship.
   - "../packages/cli-cards"
+  # The handled-error contract (HandledError ⇔ Go herr), shared by the app,
+  # mcp-server, CLI and SDKs. Source-only, OTel peer-dep'd like cli-cards.
+  - "../packages/handled-error"
 
 minimumReleaseAge: 10080
+# Transitive ranges resolving to versions still inside the 7-day maturity
+# window (ws@8.21.1, @browserbasehq/sdk, postcss as of 2026-07-18). Drop each
+# entry once that version ages past the gate.
+minimumReleaseAgeExclude:
+  - ws
+  - "@browserbasehq/sdk"
+  - postcss
 
 overrides:
   pino: ^10.3.0

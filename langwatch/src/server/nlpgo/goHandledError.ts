@@ -17,6 +17,9 @@ const goErrorEnvelopeSchema = z.object({
     type: z.string(),
     message: z.string().optional(),
     meta: z.record(z.string(), z.unknown()).optional(),
+    fault: z.enum(["customer", "platform", "provider"]).optional(),
+    tips: z.array(z.string()).optional(),
+    docs_url: z.string().optional(),
   }),
 });
 
@@ -30,7 +33,13 @@ export class NlpgoHandledError extends HandledError {
   constructor(
     code: string,
     message: string,
-    options: { httpStatus: number; meta?: Record<string, unknown> },
+    options: {
+      httpStatus: number;
+      meta?: Record<string, unknown>;
+      fault?: "customer" | "platform" | "provider";
+      tips?: readonly string[];
+      docsUrl?: string;
+    },
   ) {
     super(code, message, options);
     this.name = "NlpgoHandledError";
@@ -93,5 +102,8 @@ export function nlpgoHandledErrorFrom(error: unknown): NlpgoHandledError | null 
   return new NlpgoHandledError(code, envelope.message ?? envelope.type, {
     httpStatus: cause.statusCode ?? 500,
     meta: envelope.meta,
+    fault: envelope.fault,
+    tips: envelope.tips,
+    docsUrl: envelope.docs_url,
   });
 }

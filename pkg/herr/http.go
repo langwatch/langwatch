@@ -42,6 +42,9 @@ type ErrorBody struct {
 	TraceID string      `json:"trace_id,omitempty"`
 	SpanID  string      `json:"span_id,omitempty"`
 	Reasons []ErrorBody `json:"reasons,omitempty"`
+	Tips    []string    `json:"tips,omitempty"`
+	DocsURL string      `json:"docs_url,omitempty"`
+	Fault   string      `json:"fault,omitempty"`
 }
 
 // ErrorRecorder can store an error for later inspection (e.g. request logging).
@@ -53,7 +56,8 @@ type ErrorRecorder interface {
 // uses its code as the type and looks up the HTTP status. Otherwise writes
 // a generic 500 with code "unknown".
 //
-// Exposed: code, message, meta, trace_id, span_id, reasons (herr only).
+// Exposed: code, message, meta, trace_id, span_id, reasons (herr only),
+// tips, docs_url, fault.
 // Not exposed: stack traces, non-herr reasons (replaced with "unknown").
 func WriteHTTP(w http.ResponseWriter, err error) {
 	if rec := findErrorRecorder(w); rec != nil {
@@ -90,8 +94,9 @@ func findErrorRecorder(w http.ResponseWriter) ErrorRecorder {
 
 // Body serializes an error to the wire envelope, for transports other than a
 // direct HTTP response (frame relays, queues). The same exposure rules as
-// WriteHTTP apply: code, message, meta, trace/span ids, herr reasons; never
-// stacks, and non-herr reasons collapse to "unknown".
+// WriteHTTP apply: code, message, meta, trace/span ids, tips, docs_url,
+// fault, herr reasons; never stacks, and non-herr reasons collapse to
+// "unknown".
 func Body(err error) ErrorBody {
 	var e E
 	if !errors.As(err, &e) {
@@ -112,6 +117,15 @@ func FromBody(body ErrorBody) E {
 	}
 	if body.Message != "" && body.Message != body.Type {
 		meta["message"] = body.Message
+	}
+	if len(body.Tips) > 0 {
+		meta["tips"] = body.Tips
+	}
+	if body.DocsURL != "" {
+		meta["docs_url"] = body.DocsURL
+	}
+	if body.Fault != "" {
+		meta["fault"] = body.Fault
 	}
 	e := E{Code: Code(body.Type), Meta: meta}
 	if tid, err := trace.TraceIDFromHex(body.TraceID); err == nil {
@@ -135,12 +149,33 @@ func toErrorBody(e E) ErrorBody {
 	if msg, ok := e.Meta["message"].(string); ok && msg != "" {
 		body.Message = msg
 	}
+	if tips, ok := e.Meta["tips"]; ok {
+		switch t := tips.(type) {
+		case []string:
+			if len(t) > 0 {
+				body.Tips = t
+			}
+		case []any:
+			for _, tip := range t {
+				if s, ok := tip.(string); ok && s != "" {
+					body.Tips = append(body.Tips, s)
+				}
+			}
+		}
+	}
+	if docsURL, ok := e.Meta["docs_url"].(string); ok && docsURL != "" {
+		body.DocsURL = docsURL
+	}
+	if fault, ok := e.Meta["fault"].(string); ok && fault != "" {
+		body.Fault = fault
+	}
 
-	// Expose Meta without "message" (already promoted).
+	// Expose Meta without "message"/"tips"/"docs_url"/"fault" (already promoted).
 	if len(e.Meta) > 0 {
 		filtered := make(M, len(e.Meta))
 		for k, v := range e.Meta {
-			if k == "message" {
+			switch k {
+			case "message", "tips", "docs_url", "fault":
 				continue
 			}
 			filtered[k] = v
