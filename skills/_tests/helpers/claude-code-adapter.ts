@@ -8,7 +8,6 @@ import { execSync, spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { expect } from "vitest";
 import { inlineMdx } from "../../_lib/mdx-inline.js";
 
 const __filename = fileURLToPath(import.meta.url);
