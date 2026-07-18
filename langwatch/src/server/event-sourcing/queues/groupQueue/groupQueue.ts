@@ -926,7 +926,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.activeJobCount++;
 
     try {
-      // Restore OTEL trace context and wrap in a span
+      // Wrap job execution in its own isolated root span
       const spanName = `${this.queueName}/${this.jobName}`;
       const spanAttributes: Record<string, string | number | boolean> = {
         "queue.name": this.queueName,
@@ -962,11 +962,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
             kind: SpanKind.CONSUMER,
             // Force a NEW root trace for every job. A single command can stage
             // hundreds of thousands of jobs (e.g. one OTLP ingest with 330k+
-            // spans), all carrying the SAME originating trace context. If the
-            // job span inherited that context as its parent — as it did when
-            // the originating span context was restored as the active context
-            // below — every one of those jobs collapsed into one shared
-            // traceId whose (remote) root was never exported, producing the
+            // spans), all carrying the SAME originating trace context. This
+            // processor used to restore that context as the active one before
+            // opening the job span, so every one of those jobs inherited it as
+            // a parent and collapsed into one shared traceId whose (remote)
+            // root was never exported, producing the
             // ~6-minute, empty-root mega-trace (330k–413k spans) that
             // OOM-crash-looped the self-observability Tempo on WAL replay.
             // `root: true` guarantees each job is its own bounded trace;

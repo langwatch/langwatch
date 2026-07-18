@@ -83,14 +83,18 @@ if (
       detectors: [awsEksDetector, envDetector],
     }),
     advanced: {},
-    // Cap per-span payload growth. OTel's defaults are unbounded
-    // (`attributeValueLengthLimit: Infinity`, `attributeCountLimit: 128` only
-    // in newer SDKs) — a single span carrying an oversized `db.statement` or a
-    // huge attribute bag can bloat a trace and, in bulk, pressure the
-    // collector's WAL. These caps bound each span's attribute footprint:
-    // values are truncated at 12k chars and no more than 128 attributes are
-    // kept per span. This is defense-in-depth alongside the per-job root-trace
-    // scoping and ioredis `requireParentSpan` scoping.
+    // Cap per-span payload growth, as defense-in-depth behind the per-job
+    // root-trace scoping below: a single span carrying an oversized
+    // `db.statement` or a huge attribute bag bloats a trace and, in bulk,
+    // pressures the collector's WAL.
+    //
+    // `attributeValueLengthLimit` is the one that actually changes behaviour —
+    // sdk-trace-base defaults it to Infinity, so values were previously
+    // exported whole. `attributeCountLimit` already defaults to 128; it is
+    // restated so both halves of the budget are visible in one place and an
+    // upstream default change shows up as a diff. Note that setting either
+    // here takes precedence over the OTEL_SPAN_ATTRIBUTE_* env vars, which the
+    // SDK only consults when the value is left unset.
     spanLimits: {
       attributeValueLengthLimit: 12_000,
       attributeCountLimit: 128,
@@ -133,21 +137,25 @@ if (
         "@opentelemetry/instrumentation-cucumber": { enabled: false },
         "@opentelemetry/instrumentation-router": { enabled: false },
 
-        // ioredis auto-instrumentation emits one span PER Redis command. The
-        // event-sourcing GroupQueue worker runs continuous background loops on
-        // Redis — BRPOP signal polling, Lua-script leasing (evalsha), holder-set
-        // bookkeeping (sadd/srem), active-key heartbeats (expire), and stats
-        // pushes (lpush) — none of which sit under any application span. Left
-        // unscoped, those loops produced an unbounded per-command span flood
-        // that (together with the mega-trace bug fixed in the GroupQueue) OOM
-        // crash-looped the self-observability Tempo.
+        // ioredis auto-instrumentation emits one span PER Redis command, so
+        // the event-sourcing GroupQueue's Redis chatter (Lua leasing via
+        // evalsha, holder-set bookkeeping, active-key heartbeats, stats pushes)
+        // shows up span-for-span whenever it runs inside an application span.
+        // That is what filled the empty-root mega-trace this PR's GroupQueue
+        // change fixes — the commands were traced because they ran under the
+        // job span, and the job span was parented into the originating
+        // command's trace. Rooting each job bounds them; there is nothing to
+        // turn off here.
         //
-        // `requireParentSpan: true` scopes ioredis so a command is only traced
-        // when it already runs inside an application span (an HTTP request, a
-        // per-job CONSUMER span, etc.). The queue's own plumbing loops — which
-        // have no active parent span — stop creating spans entirely, while
-        // Redis calls made inside real request/job work are still captured
-        // (and remain bounded now that each job is its own root trace).
+        // `requireParentSpan: true` is therefore an EXPLICIT PIN, not a
+        // behaviour change. @opentelemetry/instrumentation-ioredis already
+        // defaults it to true (its README: "default when unset is true"; its
+        // DEFAULT_CONFIG is spread under the caller's config by both the
+        // constructor and setConfig), and we rely on that to keep unparented
+        // background Redis I/O — the queue's BRPOP signal polling, connection
+        // health pings — out of the exporter entirely. Stating it here means an
+        // upstream default flip surfaces as a diff to review rather than a
+        // silent span flood.
         "@opentelemetry/instrumentation-ioredis": {
           requireParentSpan: true,
           // Truncate ioredis db.statement to command + first key
