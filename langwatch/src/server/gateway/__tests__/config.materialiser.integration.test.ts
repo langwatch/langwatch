@@ -54,6 +54,9 @@ const MP_CUSTOM_ID = `mp-mat-custom-${suffix}`;
 const CUSTOM_BASE_URL = "http://llm-server:8000/v1";
 const MP_OPENAI_BASE_ID = `mp-mat-openai-base-${suffix}`;
 const OPENAI_BASE_URL_OVERRIDE = "https://proxy.example.com/v1";
+const MP_ANTHROPIC_BASE_ID = `mp-mat-anthropic-base-${suffix}`;
+const ANTHROPIC_BASE_URL_OVERRIDE = "http://vllm-anthropic:8000";
+const MP_ANTHROPIC_PLAIN_ID = `mp-mat-anthropic-plain-${suffix}`;
 const RP_ID = `rp-mat-${suffix}`;
 const GUARDRAIL_ID = `gr-mat-${suffix}`;
 const VK_ID = `vk-mat-${suffix}`;
@@ -190,6 +193,44 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         },
       },
     });
+    // Anthropic provider pointed at a self-hosted Anthropic-compatible
+    // server (vLLM >= 0.24) via ANTHROPIC_BASE_URL. The materialiser must
+    // surface it as the slot base_url, otherwise /v1/messages traffic
+    // hits api.anthropic.com instead of the customer's endpoint.
+    await prisma.modelProvider.create({
+      data: {
+        id: MP_ANTHROPIC_BASE_ID,
+        name: "anthropic-selfhosted",
+        provider: "anthropic",
+        enabled: true,
+        organizationId: ORG_ID,
+        customKeys: {
+          ANTHROPIC_API_KEY: "sk-ant-selfhosted",
+          ANTHROPIC_BASE_URL: ANTHROPIC_BASE_URL_OVERRIDE,
+        },
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        },
+      },
+    });
+    // Anthropic provider with only an API key: no base_url may leak into
+    // the slot, or the gateway would derive a per-endpoint custom provider
+    // for plain api.anthropic.com traffic.
+    await prisma.modelProvider.create({
+      data: {
+        id: MP_ANTHROPIC_PLAIN_ID,
+        name: "anthropic-plain",
+        provider: "anthropic",
+        enabled: true,
+        organizationId: ORG_ID,
+        customKeys: {
+          ANTHROPIC_API_KEY: "sk-ant-plain",
+        },
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        },
+      },
+    });
     await prisma.routingPolicy.create({
       data: {
         id: RP_ID,
@@ -198,7 +239,13 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
           create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
         },
         name: `mat-rp-${suffix}`,
-        modelProviderIds: [MP_ID, MP_CUSTOM_ID, MP_OPENAI_BASE_ID],
+        modelProviderIds: [
+          MP_ID,
+          MP_CUSTOM_ID,
+          MP_OPENAI_BASE_ID,
+          MP_ANTHROPIC_BASE_ID,
+          MP_ANTHROPIC_PLAIN_ID,
+        ],
         modelAliases: { "gpt-5": "gpt-5-mini" },
         policyRules: {
           tools: { deny: ["^shell_.*$"], allow: null },
@@ -365,6 +412,39 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       expect(slot).toBeDefined();
       expect(slot!.type).toBe("openai");
       expect(slot!.base_url).toBe(OPENAI_BASE_URL_OVERRIDE);
+    });
+
+    // Spec: specs/ai-gateway/custom-provider-base-url.feature
+    // "Anthropic provider with a base URL routes /v1/messages to the
+    // customer's endpoint" — the gateway reads the slot base_url, so the
+    // materialiser must emit ANTHROPIC_BASE_URL there.
+    it("materialises an anthropic provider slot with ANTHROPIC_BASE_URL as its base_url", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+      const slot = bundle.providers.find((p) => p.id === MP_ANTHROPIC_BASE_ID);
+      expect(slot).toBeDefined();
+      expect(slot!.type).toBe("anthropic");
+      expect(slot!.base_url).toBe(ANTHROPIC_BASE_URL_OVERRIDE);
+      expect(slot!.credentials.api_key).toBe("sk-ant-selfhosted");
+    });
+
+    // Spec: specs/ai-gateway/custom-provider-base-url.feature
+    // "Anthropic provider without a base URL keeps default routing" — a
+    // leaked base_url would make the gateway derive a per-endpoint custom
+    // provider for plain api.anthropic.com traffic.
+    it("materialises an anthropic provider slot without ANTHROPIC_BASE_URL with no base_url", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+      const slot = bundle.providers.find(
+        (p) => p.id === MP_ANTHROPIC_PLAIN_ID,
+      );
+      expect(slot).toBeDefined();
+      expect(slot!.type).toBe("anthropic");
+      expect(slot!.base_url).toBeUndefined();
     });
 
 
