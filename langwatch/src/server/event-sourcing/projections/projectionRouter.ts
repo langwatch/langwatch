@@ -686,7 +686,7 @@ export class ProjectionRouter<
           concurrency: mapProj.options?.concurrency,
           disabled: mapProj.options?.disabled,
           groupKeyFn: mapProj.options?.groupKeyFn,
-          coalesceMaxBatch: mapProj.options?.coalesceMaxBatch,
+          coalesceMaxBatch: this.resolveCoalesceMaxBatch(mapProj),
         },
       };
     }
@@ -716,6 +716,41 @@ export class ProjectionRouter<
         await handlerDef.handler.handleBatch(events);
       },
     );
+  }
+
+  /**
+   * Resolves the coalescing batch size the queue may use for a map projection.
+   *
+   * Coalescing is only safe when the store can persist the whole batch in ONE
+   * operation. Queue delivery is at-least-once: if a batch throws part-way, the
+   * GroupQueue re-stages the dispatched job AND every drained sibling and runs
+   * the whole batch again. A per-record loop that already committed records
+   * 1..N before failing on N+1 would therefore append that prefix twice, and
+   * the additive stores behind map projections (ClickHouse spans, logs,
+   * metrics) turn a double append into duplicate rows, not an overwrite.
+   *
+   * `bulkAppend` is all-or-nothing, so a retry re-runs a batch that committed
+   * nothing. Without it we drop back to per-event delivery, where each event is
+   * its own retryable unit — slower, but never duplicating.
+   */
+  private resolveCoalesceMaxBatch(
+    mapProj: MapProjectionDefinition<any, EventType>,
+  ): number | undefined {
+    const configured = mapProj.options?.coalesceMaxBatch;
+    if (!configured || configured <= 1) return undefined;
+
+    if (!mapProj.store.bulkAppend) {
+      this.logger.warn(
+        {
+          projection: mapProj.name,
+          coalesceMaxBatch: configured,
+        },
+        "Ignoring coalesceMaxBatch — the projection store has no bulkAppend, and a partially-committed sequential batch would duplicate records on retry. Falling back to per-event delivery.",
+      );
+      return undefined;
+    }
+
+    return configured;
   }
 
   /**

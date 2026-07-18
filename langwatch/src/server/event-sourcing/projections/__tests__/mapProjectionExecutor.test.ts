@@ -176,4 +176,31 @@ describe("MapProjectionExecutor.executeBatch", () => {
     );
     expect(store.append).not.toHaveBeenCalled();
   });
+
+  describe("when the store has no bulkAppend", () => {
+    it("refuses the batch instead of appending record by record", async () => {
+      const executor = new MapProjectionExecutor();
+      const store = createMockAppendStore<{ aggregateId: string }>();
+      const mapDef = createMockMapProjectionDefinition("mapper", {
+        store,
+        map: (event) => ({ aggregateId: String(event.aggregateId) }),
+      });
+      const events = ["one", "two"].map((aggregateId) =>
+        createTestEvent(aggregateId, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
+      );
+      const contexts = events.map((event) => ({
+        aggregateId: String(event.aggregateId),
+        tenantId,
+        retentionPolicy: { traces: 49, scenarios: 49, experiments: 49 },
+      }));
+
+      await expect(
+        executor.executeBatch(mapDef, events, contexts),
+      ).rejects.toThrow(/no bulkAppend/);
+
+      // The point of refusing: a sequential loop that committed "one" and then
+      // threw on "two" would append "one" twice when the queue retried.
+      expect(store.append).not.toHaveBeenCalled();
+    });
+  });
 });

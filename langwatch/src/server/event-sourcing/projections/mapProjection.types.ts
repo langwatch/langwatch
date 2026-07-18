@@ -78,8 +78,16 @@ export interface MapProjectionOptions {
 
   /**
    * Maximum same-group events to persist through one `bulkAppend` call.
-   * Requires the store to implement `bulkAppend`; the queue keeps the batch
-   * tenant-scoped because tenant identity is always part of its group key.
+   *
+   * Only honoured when the store implements `bulkAppend`. A store without it
+   * keeps per-event delivery and this option is ignored, with a warning at
+   * registration. That is a correctness requirement rather than an
+   * optimisation: queue delivery is at-least-once, so a batch that failed
+   * half-way through a per-record loop would duplicate its already-committed
+   * prefix when the queue re-ran it.
+   *
+   * The queue keeps the batch tenant-scoped because tenant identity is always
+   * part of its group key.
    */
   coalesceMaxBatch?: number;
 
