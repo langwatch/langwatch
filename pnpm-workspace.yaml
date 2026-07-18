@@ -1,5 +1,6 @@
 packages:
   - packages/*
+  - scenarios/skills/coding-agents
   # The langwatch/ next.js app keeps its own pnpm-workspace.yaml for its
   # internal sub-packages (saas-src, langwatch/packages/*, mcp-server). We do
   # NOT include it here — the @langwatch/server tarball ships langwatch/'s
