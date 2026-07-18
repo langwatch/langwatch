@@ -203,4 +203,37 @@ describe("MapProjectionExecutor.executeBatch", () => {
       expect(store.append).not.toHaveBeenCalled();
     });
   });
+
+  describe("given a batch whose contexts span two tenants", () => {
+    it("refuses to write it, rather than routing one tenant's rows under another's", async () => {
+      // The guard existed but could never fire: the router built every context
+      // by spreading the first one, so it compared a value with itself. A batch
+      // that genuinely mixed tenants would have been bulk-appended under
+      // whichever tenant happened to be first.
+      const executor = new MapProjectionExecutor();
+      const store = createMockAppendStore();
+      store.bulkAppend = vi.fn(async () => {});
+      const mapDef = createMockMapProjectionDefinition("mapper", {
+        store,
+        map: (_event) => ({ name: "mapped-record" }),
+      });
+
+      const tenantA = createTestTenantId();
+      const tenantB = createTestTenantId("tenant-b");
+      const events = [
+        createTestEvent("agg-a", TEST_CONSTANTS.AGGREGATE_TYPE, tenantA),
+        createTestEvent("agg-b", TEST_CONSTANTS.AGGREGATE_TYPE, tenantB),
+      ];
+      const contexts: ProjectionStoreContext[] = [
+        { aggregateId: "agg-a", tenantId: tenantA },
+        { aggregateId: "agg-b", tenantId: tenantB },
+      ];
+
+      await expect(
+        executor.executeBatch(mapDef, events, contexts),
+      ).rejects.toThrow(/cross tenants/i);
+      expect(store.bulkAppend).not.toHaveBeenCalled();
+    });
+  });
+
 });

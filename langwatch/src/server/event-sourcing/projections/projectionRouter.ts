@@ -654,9 +654,16 @@ export class ProjectionRouter<
             if (toApply.length === 0) return;
 
             const firstContext = await this.buildStoreContext(toApply[0]!);
+            // Carry each event's OWN tenantId. Spreading firstContext wholesale
+            // gave every context the first event's tenant, which made
+            // executeBatch's cross-tenant guard compare a value against itself
+            // — it could never fail, so a batch that did mix tenants would have
+            // been written through under one tenant's storage routing.
+            // retentionPolicy is the only field safe to reuse across the batch.
             const contexts = toApply.map((event) => ({
               ...firstContext,
               aggregateId: String(event.aggregateId),
+              tenantId: event.tenantId,
             }));
             const mapped = await withMetrics({
               fn: () =>

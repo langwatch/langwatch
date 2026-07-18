@@ -1,3 +1,4 @@
+import { safeParseErrText } from "../../parseErrorText";
 /**
  * Wire shape of a cached fold state.
  *
@@ -43,12 +44,30 @@ export const MAX_APPLIED_EVENT_IDS = 1_000;
  * redelivery against one is not suppressed — the same behaviour as before the
  * set existed. They age out with the cache TTL.
  */
+export class FoldCacheEntryUnreadableError extends Error {
+  override readonly name = "FoldCacheEntryUnreadableError";
+}
+
 export function decodeFoldCacheEntry<State>(raw: string): {
   state: State;
   updatedAt: number | null;
   appliedEventIds: string[];
 } {
-  const parsed: unknown = JSON.parse(raw);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    // V8 quotes the offending input back in the message, and a cached fold
+    // state is tenant data — trace IO, span attributes, computed input and
+    // output. That message would reach the queue's job-failure log AND the
+    // error span attribute, so it exports to the observability backend rather
+    // than merely sitting in a log file. `safeParseErrText` keeps the
+    // diagnosis and drops the echo; it exists because the envelope decode path
+    // leaked exactly this and took three attempts to close.
+    throw new FoldCacheEntryUnreadableError(
+      `Fold cache entry failed to parse: ${safeParseErrText(err)}`,
+    );
+  }
 
   if (
     typeof parsed === "object" &&

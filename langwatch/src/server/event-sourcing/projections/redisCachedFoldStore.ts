@@ -128,7 +128,7 @@ export class RedisCachedFoldStore<State>
       incrementEsFoldCacheRedisError(this.keyPrefix, "get");
       incrementEsFoldCacheTotal(this.keyPrefix, "fallback_error");
       logger.warn(
-        { aggregateId, error: String(error) },
+        { aggregateId, tenantId: String(context.tenantId), error: String(error) },
         "Fold cache read failed — falling through to the durable store",
       );
       return null;
@@ -146,7 +146,23 @@ export class RedisCachedFoldStore<State>
       performance.now() - startedAt,
     );
 
-    const decoded = decodeFoldCacheEntry<State>(raw);
+    let decoded: ReturnType<typeof decodeFoldCacheEntry<State>>;
+    try {
+      decoded = decodeFoldCacheEntry<State>(raw);
+    } catch (error) {
+      // An unreadable entry is not a reason to fail the fold: the durable store
+      // still holds the state. Treated as a miss so the read falls through —
+      // but counted, because it also loses the applied-set, and a redelivery
+      // against a lost set double-counts.
+      incrementEsFoldCacheRedisError(this.keyPrefix, "get");
+      incrementEsFoldCacheTotal(this.keyPrefix, "fallback_error");
+      logger.error(
+        { aggregateId, tenantId: String(context.tenantId), error: String(error) },
+        "Fold cache entry was unreadable — falling through to the durable store, dedup unavailable for this read",
+      );
+      return null;
+    }
+
     return {
       state: decoded.state,
       appliedEventIds: decoded.appliedEventIds,
@@ -225,7 +241,13 @@ export class RedisCachedFoldStore<State>
   private async readCachedAppliedIds(key: string): Promise<string[]> {
     const raw = await this.redis.get(key);
     if (raw === null) return [];
-    return decodeFoldCacheEntry<State>(raw).appliedEventIds;
+    try {
+      return decodeFoldCacheEntry<State>(raw).appliedEventIds;
+    } catch {
+      // Already redacted and logged by the read path; an unreadable entry here
+      // just means starting the set over.
+      return [];
+    }
   }
 
   private redisKey(
