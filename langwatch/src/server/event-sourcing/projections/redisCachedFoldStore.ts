@@ -44,11 +44,16 @@ function defaultFoldCacheTtlSeconds(): number {
  * Wraps any FoldProjectionStore with a Redis write-through cache.
  *
  * - get(): Redis first, ClickHouse fallback on miss.
- * - store(): ClickHouse first (throws on failure), then mandatory Redis SET.
+ * - store(): ClickHouse first (throws on failure), then Redis SET.
  *
- * Ordering and cleanup keep both stores consistent across queue retries:
+ * Ordering and cleanup keep both stores consistent across queue retries. The
+ * cache must never be left holding PRE-event state after a durable write, or
+ * the next event folds onto it and this event is lost:
  * - CH fails → throw → no Redis update → event retried by queue
- * - CH succeeds, Redis fails → DEL stale cache entry → throw → retry
+ * - CH succeeds, SET fails, DEL succeeds → cache empty → next read falls back
+ *   to CH → return normally (throwing here would double-apply the event)
+ * - CH succeeds, SET fails, DEL fails → cache may hold stale state → throw so
+ *   the queue retries off it
  */
 export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
   private readonly ttlSeconds: number;
@@ -113,7 +118,25 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     // 1. ClickHouse first — throws on failure, event retried by queue
     await this.inner.store(state, context);
 
-    // 2. Redis second — mandatory cache write for the next fold step
+    // 2. Redis second — cache the state for the next fold step.
+    //
+    // The durable write above has ALREADY COMMITTED by this point, so whether
+    // we throw here decides what the queue's retry will re-apply. That makes
+    // the two failure branches below genuinely different, and neither can be
+    // collapsed into the other:
+    //
+    // - DEL succeeded: the cache is now empty, so the next read falls back to
+    //   ClickHouse and gets the correct post-event state. Everything is
+    //   consistent — DO NOT throw. Throwing would make the queue redeliver the
+    //   event, and the retry would load the already-post-event state and apply
+    //   the event a SECOND time. `apply` is deterministic but not idempotent
+    //   (traceSummary/traceAnalytics do `spanCount: state.spanCount + 1`), so
+    //   that inflates counts and cost/token aggregates.
+    //
+    // - DEL failed: a stale PRE-event entry may still be in the cache, and the
+    //   next read would silently fold the following event onto it, dropping
+    //   this event. Throw so the queue retries: the retry reads that same stale
+    //   pre-event state and applies the event once, converging correctly.
     const key = this.redisKey(aggregateId, context);
     try {
       await this.redis.set(key, JSON.stringify(state), "EX", this.ttlSeconds);
@@ -123,22 +146,25 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
       try {
         await this.redis.del(key);
       } catch (deleteError) {
-        logger.warn(
-          { aggregateId, error: String(deleteError) },
-          "Redis DEL failed after SET failure",
+        incrementEsFoldCacheRedisError(this.keyPrefix, "del");
+        logger.error(
+          { aggregateId, error: String(deleteError), setError: String(error) },
+          "Redis SET and DEL both failed after the durable write — failing the fold so the queue retries off the surviving cache entry",
         );
+        // Residual risk, accepted knowingly: if the SET actually landed and
+        // only its acknowledgement was lost, the surviving entry is the
+        // POST-event state and the retry double-applies. Closing that window
+        // needs event-level idempotency (a durable per-event cursor consulted
+        // by the executor), which is a larger change than this store — tracked
+        // as follow-up. Dropping the event is the worse of the two risks, so
+        // this path still throws.
+        throw error;
       }
 
       logger.warn(
         { aggregateId, error: String(error) },
-        "Redis SET failed after CH write — fold will retry",
+        "Redis SET failed after the durable write — cache entry dropped, next read falls back to the durable store",
       );
-
-      // Retrying is safe even if DEL failed and the old cache entry survives:
-      // apply() is deterministic, the ReplacingMergeTree fold write is
-      // idempotent replace-by-key, and per-aggregate FIFO makes the retry
-      // re-read state, re-apply the same event, and converge on the same result.
-      throw error;
     }
 
     const storeDurationMs = performance.now() - storeStartTime;

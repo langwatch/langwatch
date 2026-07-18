@@ -565,7 +565,7 @@ const esFoldCacheRedisErrorTotal = new Counter({
 
 export const incrementEsFoldCacheRedisError = (
   projectionName: string,
-  operation: "get" | "set",
+  operation: "get" | "set" | "del",
 ) => esFoldCacheRedisErrorTotal.labels(projectionName, operation).inc();
 
 // ============================================================================

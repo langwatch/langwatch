@@ -51,16 +51,16 @@ Feature: Large trace payloads — event_log as single source of truth · transie
   # Track 1 — fold cache leanness (Redis / event-loop relief)
   # ===========================================================================
 
-  @e2e @track1
-  # The dispatch interposition replaces over-threshold IO attribute values with
-  # a 64 KB preview before the projection queue, so the full fold state cached
-  # in Redis is naturally bounded at the input boundary. Redis must retain the
-  # complete fold state because every cache hit becomes the next apply input.
-  Scenario: Folding a trace with a 1 MB output keeps the Redis cache entry lean
-    Given a trace whose span carries a 1 MB output value
-    When all spans of the trace are folded into the trace summary
-    Then the Redis fold cache entry "fold:...:{traceId}" carries at most a 64 KB preview per IO attr
-    And the cached JSON carries the complete fold state needed by the next fold step
+  @unit @track1
+  # Bound by redisCachedFoldStore.unit.test.ts. Tagged @unit rather than @e2e:
+  # it exercises the cache store against an already-previewed state, which is
+  # the half of the guarantee this component owns. The 64 KB preview itself is
+  # applied upstream by the dispatch interposition and is covered there.
+  Scenario: Folding a trace with a large output keeps the Redis cache entry bounded and complete
+    Given a trace whose span carries an output far larger than the preview limit
+    When the spans of that trace are folded into the trace summary
+    Then the cached fold state stays small enough not to clog the cache
+    And folding the next span of that trace still sees every field it needs
 
   @e2e @track1 @unimplemented
   # Bound by the rewritten integration test + blob-store.event-log.unit.test.ts

@@ -1,4 +1,13 @@
-# ADR-021: Lean Fold Cache — cache the read-set, persist the write-set
+# ADR-021: Lean Fold Cache — lean at the edge, cache the complete fold state
+
+> **Title amended.** Originally "cache the read-set, persist the write-set",
+> which described leaning the cache by projecting a slimmer shape into it
+> (`toCacheable`). That mechanism has been removed: a cache hit becomes the next
+> `apply` input, so a stripped cached shape silently drops fields from the
+> durable row. Leanness now comes solely from edge offload and the cache holds
+> the state whole — see §Decision 3 and §Rules. The filename is kept as this
+> ADR's stable identifier ([ADR-022](./022-event-log-source-of-truth.md) and
+> [ADR-026](./026-reactor-should-react-predicate.md) link to it).
 
 **Date:** 2026-05-27
 

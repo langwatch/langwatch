@@ -156,9 +156,9 @@ describe("RedisCachedFoldStore", () => {
       });
     });
 
-    describe("given Redis SET fails", () => {
+    describe("given Redis SET fails and DEL succeeds", () => {
       describe("when storing state", () => {
-        it("deletes the same cache key and throws", async () => {
+        it("deletes the same cache key and does NOT throw", async () => {
           const redis = createMockRedis();
           redis.set.mockRejectedValueOnce(new Error("Redis unavailable"));
           const inner = createMockInnerStore();
@@ -170,9 +170,12 @@ describe("RedisCachedFoldStore", () => {
             },
           );
 
+          // The durable write already committed. With the cache entry gone,
+          // the next read falls back to it and is correct — so failing here
+          // would only cause the queue to redeliver and double-apply.
           await expect(
             store.store({ count: 2, name: "new-state" }, TEST_CONTEXT),
-          ).rejects.toThrow("Redis unavailable");
+          ).resolves.toBeUndefined();
 
           expect(redis.del).toHaveBeenCalledWith(
             "fold:test_table:tenant-1:agg-1",
@@ -183,7 +186,7 @@ describe("RedisCachedFoldStore", () => {
 
     describe("given Redis SET and DEL both fail", () => {
       describe("when storing state", () => {
-        it("throws and records the SET failure metric", async () => {
+        it("throws and records both failure metrics", async () => {
           const redis = createMockRedis();
           redis.set.mockRejectedValueOnce(new Error("SET failed"));
           redis.del.mockRejectedValueOnce(new Error("DEL failed"));
@@ -196,6 +199,8 @@ describe("RedisCachedFoldStore", () => {
             },
           );
 
+          // Only this branch throws: a stale pre-event entry may have survived,
+          // and the next event would fold onto it and lose this one.
           await expect(
             store.store({ count: 2, name: "new-state" }, TEST_CONTEXT),
           ).rejects.toThrow("SET failed");
@@ -204,58 +209,87 @@ describe("RedisCachedFoldStore", () => {
             "test_table",
             "set",
           );
+          expect(incrementEsFoldCacheRedisError).toHaveBeenCalledWith(
+            "test_table",
+            "del",
+          );
         });
       });
     });
   });
 
-  describe("given a retry after Redis SET fails and DEL succeeds", () => {
-    describe("when the fold is retried", () => {
-      it("falls through to durable state and re-stores the converged state", async () => {
-        const redis = createMockRedis();
-        const cacheKey = "fold:test_table:tenant-1:agg-1";
-        let durableState: TestState = { count: 1, name: "before-event" };
-        const inner: FoldProjectionStore<TestState> = {
-          get: vi.fn(async () => durableState),
-          store: vi.fn(async (state: TestState) => {
-            durableState = state;
-          }),
-        };
-        const store = new RedisCachedFoldStore<TestState>(inner, redis as any, {
-          keyPrefix: "test_table",
-        });
-        const applyEvent = (state: TestState): TestState => ({
-          count: Math.max(state.count, 2),
-          name: "after-event",
-        });
+  describe("given a cache write failure after the durable write committed", () => {
+    // These use a NON-idempotent transition (`count + 1`) on purpose. Real
+    // folds accumulate this way — traceSummary and traceAnalytics both do
+    // `spanCount: state.spanCount + 1` — so an idempotent stand-in like
+    // `Math.max(count, 2)` would pass whether or not the event is applied
+    // twice, and would hide exactly the defect these tests exist to catch.
+    const applyEvent = (state: TestState): TestState => ({
+      count: state.count + 1,
+      name: "after-event",
+    });
+    const cacheKey = "fold:test_table:tenant-1:agg-1";
 
-        redis.data.set(cacheKey, {
-          value: JSON.stringify(durableState),
-          ttl: 30,
-        });
+    const setup = () => {
+      const redis = createMockRedis();
+      let durableState: TestState = { count: 1, name: "before-event" };
+      const inner: FoldProjectionStore<TestState> = {
+        get: vi.fn(async () => durableState),
+        store: vi.fn(async (state: TestState) => {
+          durableState = state;
+        }),
+      };
+      const store = new RedisCachedFoldStore<TestState>(inner, redis as any, {
+        keyPrefix: "test_table",
+      });
+      redis.data.set(cacheKey, {
+        value: JSON.stringify(durableState),
+        ttl: 30,
+      });
+      return { redis, store, inner, durable: () => durableState };
+    };
+
+    describe("when DEL clears the stale entry", () => {
+      it("completes the fold so the event is applied exactly once", async () => {
+        const { redis, store, durable } = setup();
         redis.set.mockRejectedValueOnce(new Error("SET failed"));
 
-        const firstState = await store.get("agg-1", TEST_CONTEXT);
-        await expect(
-          store.store(applyEvent(firstState!), TEST_CONTEXT),
-        ).rejects.toThrow("SET failed");
+        const state = await store.get("agg-1", TEST_CONTEXT);
+        await store.store(applyEvent(state!), TEST_CONTEXT);
+
+        // Cache dropped, durable store holds the single application.
         expect(redis.data.has(cacheKey)).toBe(false);
+        expect(durable()).toEqual({ count: 2, name: "after-event" });
+
+        // The next read falls back to the durable store and sees the same
+        // value — no retry was needed, so `count` never reaches 3.
+        const next = await store.get("agg-1", TEST_CONTEXT);
+        expect(next).toEqual({ count: 2, name: "after-event" });
+      });
+    });
+
+    describe("when DEL also fails and the queue retries", () => {
+      it("re-applies from the surviving pre-event entry, still landing on one application", async () => {
+        const { redis, store, durable } = setup();
+        redis.set.mockRejectedValueOnce(new Error("SET failed"));
+        redis.del.mockRejectedValueOnce(new Error("DEL failed"));
+
+        const state = await store.get("agg-1", TEST_CONTEXT);
+        await expect(
+          store.store(applyEvent(state!), TEST_CONTEXT),
+        ).rejects.toThrow("SET failed");
+
+        // The stale PRE-event entry survived, which is what makes the retry
+        // safe: it re-reads count=1, not the committed count=2.
+        expect(JSON.parse(redis.data.get(cacheKey)!.value)).toEqual({
+          count: 1,
+          name: "before-event",
+        });
 
         const retryState = await store.get("agg-1", TEST_CONTEXT);
-        expect(retryState).toEqual({ count: 2, name: "after-event" });
+        await store.store(applyEvent(retryState!), TEST_CONTEXT);
 
-        const convergedState = applyEvent(retryState!);
-        await store.store(convergedState, TEST_CONTEXT);
-
-        expect(inner.get).toHaveBeenCalledWith("agg-1", TEST_CONTEXT);
-        expect(inner.store).toHaveBeenLastCalledWith(
-          { count: 2, name: "after-event" },
-          TEST_CONTEXT,
-        );
-        expect(JSON.parse(redis.data.get(cacheKey)!.value)).toEqual({
-          count: 2,
-          name: "after-event",
-        });
+        expect(durable()).toEqual({ count: 2, name: "after-event" });
       });
     });
   });
@@ -280,6 +314,49 @@ describe("RedisCachedFoldStore", () => {
       const state2 = await store.get("agg-1", TEST_CONTEXT);
       expect(state2).toEqual(newState);
       expect(inner.getCalls).toHaveLength(1);
+    });
+  });
+
+  describe("given a fold state whose large IO was preview-bounded upstream", () => {
+    interface IoState {
+      spanCount: number;
+      computedOutput: string | null;
+    }
+
+    // The 64 KB cap is applied by the dispatch interposition BEFORE the
+    // projection queue, so by the time state reaches this store the oversized
+    // value is already a preview. The store's own job is the complementary
+    // half: cache the state WHOLE, because every cache hit becomes the next
+    // apply's input. (This replaces the old `toCacheable` stripping, which
+    // leaned the cache here and is gone — see ADR-021.)
+    const IO_PREVIEW_BYTES = 64 * 1024;
+
+    describe("when the state is stored", () => {
+      /** @scenario Folding a trace with a large output keeps the Redis cache entry bounded and complete */
+      it("caches an entry bounded by the preview size that still round-trips the whole state", async () => {
+        const redis = createMockRedis();
+        const inner: FoldProjectionStore<IoState> = {
+          get: vi.fn(async () => null),
+          store: vi.fn(async () => undefined),
+        };
+        const store = new RedisCachedFoldStore<IoState>(inner, redis as any, {
+          keyPrefix: "test_table",
+        });
+        const previewed: IoState = {
+          spanCount: 5,
+          computedOutput: "x".repeat(IO_PREVIEW_BYTES),
+        };
+
+        await store.store(previewed, TEST_CONTEXT);
+
+        const cached = redis.data.get("fold:test_table:tenant-1:agg-1")!.value;
+        // Bounded: nowhere near the 1 MB the span originally carried.
+        expect(cached.length).toBeLessThan(2 * IO_PREVIEW_BYTES);
+        // Complete: the next apply reads this back and must see every field.
+        expect(JSON.parse(cached)).toEqual(previewed);
+        // The durable store receives the same complete state.
+        expect(inner.store).toHaveBeenCalledWith(previewed, TEST_CONTEXT);
+      });
     });
   });
 });
