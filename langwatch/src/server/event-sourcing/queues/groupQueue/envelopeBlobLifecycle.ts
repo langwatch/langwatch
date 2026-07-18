@@ -184,37 +184,6 @@ export class EnvelopeBlobLifecycle {
   }
 
   /**
-   * Best-effort lease primitive for callers that already own a GQ2 envelope
-   * but are not publishing it through a staging script. Normal stage and
-   * restage paths take their lease atomically in Lua.
-   */
-  async takeLease(value: string): Promise<void> {
-    const lease = readEnvelopeLease(value);
-    if (!lease) return;
-    try {
-      await this.blobLeases.take({
-        projectId: lease.ref.projectId,
-        hash: lease.ref.hash,
-        holderId: lease.holderId,
-      });
-    } catch (err) {
-      // Tenant-attributed (never a bare hash, never the bucket): every blob
-      // log line carries the owning projectId so logs can't cross tenants.
-      logger.warn(
-        {
-          projectId: lease.ref.projectId,
-          blobHash: lease.ref.hash,
-          tier: lease.ref.tier,
-          err: redactStorageUrisInText(
-            err instanceof Error ? err.message : String(err),
-          ),
-        },
-        "Blob lease take failed; relying on the TTL backstop",
-      );
-    }
-  }
-
-  /**
    * Renews the lease carried by an in-flight GQ2 envelope. The active-job
    * heartbeat calls this while a handler is running, so a healthy worker keeps
    * its blob live even when one attempt lasts longer than the lease window.

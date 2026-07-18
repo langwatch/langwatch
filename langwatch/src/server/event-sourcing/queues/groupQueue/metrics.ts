@@ -170,13 +170,6 @@ export const gqOldestPendingAgeMilliseconds = new Gauge({
 
 // --- Blob lifecycle observability (ADR-030 hardening + review 2026-06-24) ---
 
-/** S3-tier reclaim throw (network / 5xx). Warn-only; TTL / bucket-lifecycle backstop. */
-export const gqBlobReclaimS3FailuresTotal = new Counter({
-  name: "gq_blob_reclaim_s3_failures_total",
-  help: "Blob s3-tier reclaim failures (relies on TTL / bucket-lifecycle backstop)",
-  labelNames: ["queue_name"] as const,
-});
-
 /** A stored blob exceeded the decode cap — possible tamper / zip-bomb. Distinct from a missing blob. */
 export const gqBlobDecodeCapExceededTotal = new Counter({
   name: "gq_blob_decode_cap_exceeded_total",

@@ -13,12 +13,32 @@ const BLOB_KEY = `${PREFIX}blob:${PROJECT}/${HASH}`;
 const LEASE_KEY = `${PREFIX}blobleases:${PROJECT}/${HASH}`;
 const LEGACY_HOLDER_KEY = `${PREFIX}blobholders:${PROJECT}/${HASH}`;
 
+// Frozen from the pre-lease BlobHolders implementation. This is the old-code
+// release path the migration guard must survive during a rolling deployment.
+const LEGACY_RELEASE_LUA = `
+if redis.call("SREM", KEYS[1], ARGV[1]) == 0 then return 0 end
+if redis.call("SCARD", KEYS[1]) == 0 then
+  redis.call("DEL", KEYS[1])
+  if #KEYS >= 2 then
+    redis.call("UNLINK", KEYS[2])
+    return 1
+  end
+  return 2
+end
+return 0
+`;
+
 let redis: Redis;
 let leases: BlobLeases;
 
 async function clearSuiteKeys() {
   const keys = await redis.keys(`${PREFIX}*`);
   if (keys.length > 0) await redis.del(...keys);
+}
+
+async function redisNowMs(): Promise<number> {
+  const [seconds, microseconds] = await redis.time();
+  return Number(seconds) * 1000 + Math.floor(Number(microseconds) / 1000);
 }
 
 beforeAll(() => {
@@ -120,9 +140,9 @@ describe("BlobLeases", () => {
         }
         await redis.zadd(
           LEASE_KEY,
-          Date.now() - 1,
+          (await redisNowMs()) - 1,
           "crashed-1",
-          Date.now() - 1,
+          (await redisNowMs()) - 1,
           "crashed-2",
         );
 
@@ -147,7 +167,7 @@ describe("BlobLeases", () => {
     describe("when its deadline passes", () => {
       it("expires the lease without requiring an exact release", async () => {
         await leases.take({ projectId: PROJECT, hash: HASH, holderId: "dead" });
-        await redis.zadd(LEASE_KEY, Date.now() - 1, "dead");
+        await redis.zadd(LEASE_KEY, (await redisNowMs()) - 1, "dead");
 
         expect(await leases.countLive({ projectId: PROJECT, hash: HASH })).toBe(
           0,
@@ -179,17 +199,29 @@ describe("BlobLeases", () => {
   });
 
   describe("given a rolling deploy with old holder-release code", () => {
-    describe("when a new lease is taken", () => {
-      it("guards the legacy holder set from eager last-release deletion", async () => {
+    describe("when old code releases its last holder while a new lease exists", () => {
+      it("keeps the blob and new lease alive behind the migration guard", async () => {
+        await redis.set(BLOB_KEY, "body");
         await leases.take({
           projectId: PROJECT,
           hash: HASH,
           holderId: "slot-1",
         });
 
-        expect(await redis.smembers(LEGACY_HOLDER_KEY)).toEqual(
-          expect.arrayContaining(["slot-1", LEGACY_HOLDER_LEASE_GUARD]),
+        const outcome = await redis.eval(
+          LEGACY_RELEASE_LUA,
+          2,
+          LEGACY_HOLDER_KEY,
+          BLOB_KEY,
+          "slot-1",
         );
+
+        expect(outcome).toBe(0);
+        expect(await redis.exists(BLOB_KEY)).toBe(1);
+        expect(await redis.zscore(LEASE_KEY, "slot-1")).not.toBeNull();
+        expect(await redis.smembers(LEGACY_HOLDER_KEY)).toEqual([
+          LEGACY_HOLDER_LEASE_GUARD,
+        ]);
       });
     });
   });
