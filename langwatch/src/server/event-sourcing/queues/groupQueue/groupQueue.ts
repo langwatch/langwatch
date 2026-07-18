@@ -35,7 +35,11 @@ import {
   ErrorCategory,
   QueueError,
 } from "../../services/errorHandling";
-import { getBackoffMs, JOB_RETRY_CONFIG } from "../shared";
+import {
+  getBackoffMs,
+  JOB_RETRY_CONFIG,
+  TRACE_CONTINUING_JOB_TYPES,
+} from "../shared";
 
 /**
  * How long the group's retry-chain counter survives without a refresh.
@@ -954,6 +958,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     try {
       // Wrap job execution in its own isolated root span
       const spanName = `${this.queueName}/${this.jobName}`;
+      const continuesPublisherTrace = TRACE_CONTINUING_JOB_TYPES.has(jobType);
       const spanAttributes: Record<string, string | number | boolean> = {
         "queue.name": this.queueName,
         "queue.job_name": this.jobName,
@@ -1000,12 +1005,20 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
             // LINK (added below), not by sharing a traceId. The full
             // producer→consumer links redesign is tracked in
             // langwatch/langwatch#5894.
-            root: true,
+            //
+            // Low-volume lanes opt out and continue the publishing trace — see
+            // TRACE_CONTINUING_JOB_TYPES.
+            root: !continuesPublisherTrace,
             attributes: spanAttributes,
           },
           async (span) => {
-            // Link to original request span
-            if (contextMetadata?.traceId && contextMetadata?.parentSpanId) {
+            // Link to the originating span — only meaningful on a rooted
+            // job. A continuing job already has it as its parent.
+            if (
+              !continuesPublisherTrace &&
+              contextMetadata?.traceId &&
+              contextMetadata?.parentSpanId
+            ) {
               span.addLink({
                 context: {
                   traceId: contextMetadata.traceId,

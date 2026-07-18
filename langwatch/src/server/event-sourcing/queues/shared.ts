@@ -27,3 +27,28 @@ export function getBackoffMs(attempt: number): number {
   const delay = JOB_RETRY_CONFIG.backoffBaseMs * Math.pow(2, attempt - 1);
   return Math.min(delay, JOB_RETRY_CONFIG.maxBackoffMs);
 }
+
+/**
+ * Job types whose spans CONTINUE the publishing trace instead of starting a new
+ * root.
+ *
+ * Everything else gets `root: true`, because a single command can stage
+ * hundreds of thousands of jobs — one OTLP ingest with 330k+ spans — all
+ * carrying the same originating context. Inheriting it collapsed them into one
+ * shared traceId whose remote root was never exported, producing the ~6-minute
+ * empty-root mega-trace that OOM-crash-looped the observability Tempo on WAL
+ * replay (#5894).
+ *
+ * That failure mode is specific to per-span fan-out. Subscribers and scheduled
+ * jobs are low-volume and roughly one-per-event, so the mega-trace risk does
+ * not apply and end-to-end continuity from publish to handler is worth more
+ * than isolation — an automation that fires on a trace should be one trace.
+ *
+ * Ingest lanes (`handler` = map projections, `projection` = folds, `command`,
+ * `reactor`) all multiply with span count, so they stay rooted and keep
+ * causality via a span LINK instead.
+ */
+export const TRACE_CONTINUING_JOB_TYPES: ReadonlySet<string> = new Set([
+  "subscriber",
+  "job",
+]);

@@ -8,6 +8,7 @@ import type {
 	EventSourcedQueueProcessor,
 	QueueSendOptions,
 } from "../queues";
+import { TRACE_CONTINUING_JOB_TYPES } from "./shared";
 
 
 interface QueuedJob<Payload> {
@@ -215,16 +216,20 @@ export class EventSourcedQueueProcessorMemory<
       }
     }
     const attributes = { ...baseAttributes, ...customAttributes };
+    const continuesPublisherTrace = TRACE_CONTINUING_JOB_TYPES.has(
+      String((job.payload as Record<string, unknown>)?.__jobType ?? ""),
+    );
 
     try {
       await this.tracer.withActiveSpan(
         "pipeline.process",
         {
           kind: SpanKind.INTERNAL,
-          // Root the span per job, mirroring the Redis-backed GroupQueue: each
-          // processed job is its own bounded trace rather than a child of any
-          // ambient context, so dev/test traces never chain into one another.
-          root: true,
+          // Mirror the Redis-backed GroupQueue's lane split: ingest jobs are
+          // their own bounded trace so dev/test traces never chain into one
+          // another, while low-volume lanes (subscribers, scheduled jobs)
+          // continue the publishing trace so an automation reads end to end.
+          root: !continuesPublisherTrace,
           attributes,
         },
         async () => {
