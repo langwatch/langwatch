@@ -733,8 +733,8 @@ export class ProjectionRouter<
    * nothing. Without it we drop back to per-event delivery, where each event is
    * its own retryable unit — slower, but never duplicating.
    */
-  private resolveCoalesceMaxBatch(
-    mapProj: MapProjectionDefinition<any, EventType>,
+  private resolveCoalesceMaxBatch<Record>(
+    mapProj: MapProjectionDefinition<Record, EventType>,
   ): number | undefined {
     const configured = mapProj.options?.coalesceMaxBatch;
     if (!configured || configured <= 1) return undefined;
