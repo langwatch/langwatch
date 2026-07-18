@@ -193,9 +193,9 @@ const dropReasonOf = (err: unknown): DecodeFailureReason | "unknown" =>
  * - Weighted round-robin (sqrt(pendingCount)) provides fair scheduling across groups
  * - fastq provides concurrency-limited async task execution with backpressure
  */
-export class GroupQueueProcessor<
-  Payload extends Record<string, unknown>,
-> implements EventSourcedQueueProcessor<Payload> {
+export class GroupQueueProcessor<Payload extends Record<string, unknown>>
+  implements EventSourcedQueueProcessor<Payload>
+{
   private readonly logger = createLogger(
     "langwatch:event-sourcing:group-queue",
   );
