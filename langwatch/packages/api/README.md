@@ -191,16 +191,18 @@ Throw `HandledError` subclasses (from `@langwatch/handled-error`). The framework
 1. Catches and serializes them with `code`, `meta`, `reasons`, `traceId`/`spanId`,
    plus the remediation channel (`fault`, `tips`, `docsUrl`)
 2. Catches `ZodError` and promotes it to a `ValidationError`, mapping each issue
-   to a `schema_failure` reason (cher-style)
+   to a `schema_failure` reason
 3. Returns union format for unversioned requests (includes legacy `error` field)
 4. Returns clean format for versioned requests
 5. Publishes the error it sent, and the status it sent it as, for the request
    logger to consume
 
-The request logger writes **exactly one** error record per failed request —
-handled errors by `fault` (`customer` → warn, `platform` / `provider` → error),
-anything unhandled at `error` with its cause, since the response deliberately
-flattens it to "An unknown error occurred". The error handler deliberately logs
+The request logger writes **exactly one** error record per failed request.
+Level comes from `fault` when the error is handled (`customer` → warn,
+`platform` / `provider` → error) and from the status code otherwise (5xx →
+error, 4xx → warn) — so an unknown error, which is flattened to a 500, logs at
+`error` with its cause, while an unhandled `HTTPException` carrying a 4xx logs
+at `warn`. The error handler deliberately logs
 nothing itself: a second record there would double every error-log-derived
 alert and count. It publishes the *promoted* error, so a `ZodError` is reported
 as the 422 `ValidationError` the caller actually received rather than the 500 a
