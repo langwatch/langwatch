@@ -42,11 +42,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { splitFrontmatter } from "../../skills/_lib/frontmatter.js";
+import { splitFrontmatter } from "../../../skills/_lib/frontmatter.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, "../..");
-const DOCKERFILE = path.join(REPO_ROOT, "Dockerfile.langyagent");
+const REPO_ROOT = path.resolve(__dirname, "../../..");
+const DOCKERFILE = path.join(REPO_ROOT, "infra/docker/Dockerfile.langyagent");
 const OUT = path.join(
   REPO_ROOT,
   "platform/app/src/shared/langy/langySkills.generated.json",
@@ -152,7 +152,7 @@ function readSkill(dir: string): GeneratedSkill | null {
 /** Every skill the image installs, in the Dockerfile's own COPY order. */
 export function deriveSkills(repoRoot: string): GeneratedSkill[] {
   const dockerfile = fs.readFileSync(
-    path.join(repoRoot, "Dockerfile.langyagent"),
+    path.join(repoRoot, "infra/docker/Dockerfile.langyagent"),
     "utf8",
   );
   const dirs = skillSourceDirs(dockerfile);

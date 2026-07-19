@@ -86,7 +86,7 @@ jobs:
         with:
           version: v3.12.0
       - name: Build clickhouse-serverless image
-        run: docker build -t langwatch/clickhouse-serverless:next ../../clickhouse-serverless/
+        run: docker build -t langwatch/clickhouse-serverless:next ../../infra/clickhouse-serverless/
       - name: Resolve app image
         if: matrix.build_app
         run: |
