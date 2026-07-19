@@ -111,13 +111,28 @@ export interface PullRunOptions {
     ingestionSourceId: string;
   };
   /**
-   * Optional overall deadline (ms since epoch). Adapters that paginate
-   * SHOULD short-circuit when Date.now() > deadlineMs and return the
-   * cursor at the last successful page so the next run resumes
-   * promptly. Set by the worker per per-run job timeout. Soft hint;
-   * adapters that miss the deadline by a small amount are fine.
+   * Overall deadline (ms since epoch). Adapters that paginate SHOULD
+   * short-circuit when Date.now() > deadlineMs and return the cursor at the
+   * last successful page, so the next run resumes promptly and the work
+   * already done is not thrown away.
+   *
+   * This is the cooperative half of the deadline. It is NOT the only
+   * enforcement: `signal` aborts at the same instant, and the worker stops
+   * waiting regardless. Honouring `deadlineMs` is how an adapter exits
+   * *cleanly* instead of being cut off.
    */
   deadlineMs?: number;
+  /**
+   * Aborted when the run's deadline expires. Adapters MUST forward this to
+   * every outbound transport call (fetch `signal`, AWS SDK `abortSignal`,
+   * stream reads) so an unresponsive source cannot keep a run alive.
+   *
+   * This is what makes one-run-at-a-time real. The scheduler supersedes a run
+   * once it looks stale and starts a fresh one from the same cursor; if the
+   * original could still be in flight, both would pull the same window and
+   * their completion order would decide the durable cursor.
+   */
+  signal?: AbortSignal;
 }
 
 /**

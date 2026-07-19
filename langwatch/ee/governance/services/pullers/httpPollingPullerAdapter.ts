@@ -186,11 +186,19 @@ export class HttpPollingPullerAdapter
     let lastError: Error | undefined;
     for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
       try {
+        // Two independent bounds: this request's own timeout, and the run's
+        // deadline. Either one firing must unwind the call.
+        const signal = options.signal
+          ? AbortSignal.any([
+              options.signal,
+              AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+            ])
+          : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
         const response = await ssrfSafeFetch(url, {
           method: config.method,
           headers,
           body,
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          signal,
         });
         if (response.status >= 500) {
           // Retryable — fall through to the retry-delay branch
@@ -216,6 +224,9 @@ export class HttpPollingPullerAdapter
           throw error;
         }
       }
+      // Retrying past the run's deadline just burns time the scheduler has
+      // already given up waiting for.
+      if (options.signal?.aborted) break;
       const delay = RETRY_DELAYS_MS[attempt];
       if (delay !== undefined && attempt < RETRY_DELAYS_MS.length) {
         await new Promise<void>((resolve) => setTimeout(resolve, delay));

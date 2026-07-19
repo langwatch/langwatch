@@ -3192,6 +3192,11 @@ model IngestionPullRunProjection {
   LastRunErrorCode  String? @map("lastRunErrorCode")
   ConsecutiveErrors Int     @default(0) @map("consecutiveErrors")
 
+  /// Identity of the run whose outcome this row reflects. Outcomes from a
+  /// superseded run arrive with a smaller value and are ignored, so a late
+  /// completion cannot regress Cursor or the status fields.
+  LastRunScheduledFor Float? @map("lastRunScheduledFor")
+
   CreatedAt         Float  @map("createdAt")
   UpdatedAt         Float  @map("updatedAt")
   OccurredAt        Float  @map("occurredAt")

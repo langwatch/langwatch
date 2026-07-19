@@ -11,6 +11,7 @@ CREATE TABLE "IngestionPullRunProjection" (
     "lastRunError" TEXT,
     "lastRunErrorCode" TEXT,
     "consecutiveErrors" INTEGER NOT NULL DEFAULT 0,
+    "lastRunScheduledFor" DOUBLE PRECISION,
     "createdAt" DOUBLE PRECISION NOT NULL,
     "updatedAt" DOUBLE PRECISION NOT NULL,
     "occurredAt" DOUBLE PRECISION NOT NULL,

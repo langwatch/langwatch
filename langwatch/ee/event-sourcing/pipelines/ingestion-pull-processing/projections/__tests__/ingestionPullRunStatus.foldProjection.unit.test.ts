@@ -129,4 +129,104 @@ describe("IngestionPullRunStatusFoldProjection", () => {
     expect(late.Enabled).toBe(false);
     expect(late.Cron).toBeNull();
   });
+
+  describe("given a run that has been superseded", () => {
+    // The scheduler abandons a run it considers stale and starts a fresh one
+    // from the same cursor. If the abandoned run then finishes, its outcome
+    // must not overwrite the newer one -- the repository mirrors Cursor into
+    // IngestionSource.pollerCursor, so a regression here re-ingests a window.
+    const configured = projection.apply(
+      projection.init(),
+      event("lw.obs.ingestion_pull.configured", {
+        sourceId: "source-1",
+        cron: "*/15 * * * *",
+        configVersion: "v1",
+        cursor: "cursor-A",
+      }),
+    );
+    const afterRun2 = projection.apply(
+      configured,
+      event(
+        "lw.obs.ingestion_pull.run_completed",
+        {
+          sourceId: "source-1",
+          runId: "2000",
+          scheduledFor: 2_000,
+          nextCursor: "cursor-B",
+          eventCount: 5,
+        },
+        2_100,
+      ),
+    );
+
+    describe("when its completion lands after a newer run completed", () => {
+      it("does not regress the cursor or the run metadata", () => {
+        const stale = projection.apply(
+          afterRun2,
+          event(
+            "lw.obs.ingestion_pull.run_completed",
+            {
+              sourceId: "source-1",
+              runId: "1000",
+              scheduledFor: 1_000,
+              nextCursor: "cursor-A",
+              eventCount: 1,
+            },
+            2_200,
+          ),
+        );
+
+        expect(stale.Cursor).toBe("cursor-B");
+        expect(stale.LastRunEventCount).toBe(5);
+        expect(stale.LastRunAt).toBe(2_100);
+        expect(stale.LastRunScheduledFor).toBe(2_000);
+      });
+    });
+
+    describe("when its failure lands after a newer run completed", () => {
+      it("does not mark the source failed or bump the error count", () => {
+        const stale = projection.apply(
+          afterRun2,
+          event(
+            "lw.obs.ingestion_pull.run_failed",
+            {
+              sourceId: "source-1",
+              runId: "1000",
+              scheduledFor: 1_000,
+              error: "provider unavailable",
+              errorCode: "provider_error",
+            },
+            2_200,
+          ),
+        );
+
+        expect(stale.LastRunOutcome).toBe("completed");
+        expect(stale.LastRunError).toBeNull();
+        expect(stale.ConsecutiveErrors).toBe(0);
+        expect(stale.Cursor).toBe("cursor-B");
+      });
+    });
+
+    describe("when the current run reports again", () => {
+      it("still folds, so replay is deterministic", () => {
+        const same = projection.apply(
+          afterRun2,
+          event(
+            "lw.obs.ingestion_pull.run_completed",
+            {
+              sourceId: "source-1",
+              runId: "2000",
+              scheduledFor: 2_000,
+              nextCursor: "cursor-C",
+              eventCount: 7,
+            },
+            2_300,
+          ),
+        );
+
+        expect(same.Cursor).toBe("cursor-C");
+        expect(same.LastRunEventCount).toBe(7);
+      });
+    });
+  });
 });

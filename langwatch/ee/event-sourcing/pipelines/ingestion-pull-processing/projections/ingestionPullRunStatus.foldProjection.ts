@@ -29,6 +29,19 @@ export interface IngestionPullRunStatusData {
   LastRunError: string | null;
   LastRunErrorCode: string | null;
   ConsecutiveErrors: number;
+  /**
+   * Which run this row's outcome fields describe, as the run's `scheduledFor`.
+   *
+   * The process manager fences late outcomes by comparing `runId` against the
+   * run it is currently tracking; this read model needs its own fence for the
+   * same reason. Runs are scheduled in time order and `runId` is derived from
+   * `scheduledFor`, so a strictly smaller `scheduledFor` means the outcome
+   * belongs to a superseded run. Without this, run 1 finishing after run 2 had
+   * already completed would drag `Cursor` back to run 1's window -- and the
+   * repository mirrors `Cursor` into `IngestionSource.pollerCursor`, so the
+   * compatibility checkpoint would regress and re-ingest that window.
+   */
+  LastRunScheduledFor: number | null;
   CreatedAt: number;
   UpdatedAt: number;
   LastEventOccurredAt: number;
@@ -78,7 +91,24 @@ export class IngestionPullRunStatusFoldProjection
       LastRunError: null,
       LastRunErrorCode: null,
       ConsecutiveErrors: 0,
+      LastRunScheduledFor: null,
     };
+  }
+
+  /**
+   * Whether an outcome event comes from a run this row has already moved past.
+   *
+   * Equal `scheduledFor` is accepted: it is the same run reporting, which
+   * replay must fold identically.
+   */
+  private isSuperseded(
+    state: IngestionPullRunStatusData,
+    scheduledFor: number,
+  ): boolean {
+    return (
+      state.LastRunScheduledFor !== null &&
+      scheduledFor < state.LastRunScheduledFor
+    );
   }
 
   handleIngestionPullConfigured(
@@ -110,6 +140,7 @@ export class IngestionPullRunStatusFoldProjection
     event: IngestionPullRunCompletedEvent,
     state: IngestionPullRunStatusData,
   ): IngestionPullRunStatusData {
+    if (this.isSuperseded(state, event.data.scheduledFor)) return state;
     return {
       ...state,
       SourceId: event.data.sourceId,
@@ -120,6 +151,7 @@ export class IngestionPullRunStatusFoldProjection
       LastRunError: null,
       LastRunErrorCode: null,
       ConsecutiveErrors: 0,
+      LastRunScheduledFor: event.data.scheduledFor,
     };
   }
 
@@ -127,6 +159,7 @@ export class IngestionPullRunStatusFoldProjection
     event: IngestionPullRunFailedEvent,
     state: IngestionPullRunStatusData,
   ): IngestionPullRunStatusData {
+    if (this.isSuperseded(state, event.data.scheduledFor)) return state;
     return {
       ...state,
       SourceId: event.data.sourceId,
@@ -136,6 +169,7 @@ export class IngestionPullRunStatusFoldProjection
       LastRunError: event.data.error,
       LastRunErrorCode: event.data.errorCode,
       ConsecutiveErrors: state.ConsecutiveErrors + 1,
+      LastRunScheduledFor: event.data.scheduledFor,
     };
   }
 }

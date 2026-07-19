@@ -48,9 +48,60 @@ import {
 
 const logger = createLogger("langwatch:workers:ingestionPuller");
 
-// Soft per-job deadline. The scheduled cadence is the primary control
-// — long-running pulls just defer follow-on work to the next tick.
+// Hard per-job deadline. A run cannot execute for longer than this: the
+// adapter is asked to stop cooperatively (deadlineMs), its transport is
+// aborted (signal), and this worker stops awaiting it either way.
+//
+// It has to be hard because the scheduler supersedes a run it considers stale
+// (INGESTION_PULL_STALE_RUN_MS, 30min) and starts a fresh one from the same
+// cursor. If a hung run could outlive that, two pulls would read the same
+// window concurrently and whichever finished last would decide the durable
+// cursor. The gap between the two is deliberate slack, not a coincidence.
 const PER_JOB_DEADLINE_MS = 5 * 60 * 1000;
+
+/**
+ * Raised when a run is cut off at its deadline.
+ *
+ * Surfaces as a run failure: the cursor is left where it was, so the window
+ * is retried rather than silently skipped.
+ */
+export class IngestionPullDeadlineExceededError extends Error {
+  constructor(deadlineMs: number) {
+    super(`Ingestion pull exceeded its ${deadlineMs}ms deadline`);
+    this.name = "IngestionPullDeadlineExceededError";
+  }
+}
+
+/**
+ * Runs `work` under a deadline that does not depend on `work` cooperating.
+ *
+ * The abort signal is passed in so the adapter can unwind its own transport;
+ * the race is what guarantees this worker stops waiting even if it does not.
+ */
+async function withDeadline<T>(
+  timeoutMs: number,
+  work: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await Promise.race([
+      work(controller.signal),
+      new Promise<never>((_resolve, reject) => {
+        controller.signal.addEventListener(
+          "abort",
+          () => reject(new IngestionPullDeadlineExceededError(timeoutMs)),
+          { once: true },
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+    // Unblocks any transport still holding the signal once we have stopped
+    // waiting -- including when `work` lost the race.
+    controller.abort();
+  }
+}
 
 export async function runIngestionPull(params: {
   sourceId: string;
@@ -108,17 +159,20 @@ export async function runIngestionPull(params: {
 
   let result: PullResult;
   try {
-    result = await adapter.runOnce(
-      {
-        cursor: params.cursor,
-        credentials,
-        context: {
-          organizationId: source.organizationId,
-          ingestionSourceId: source.id,
+    result = await withDeadline(PER_JOB_DEADLINE_MS, (signal) =>
+      adapter.runOnce(
+        {
+          cursor: params.cursor,
+          credentials,
+          context: {
+            organizationId: source.organizationId,
+            ingestionSourceId: source.id,
+          },
+          deadlineMs: Date.now() + PER_JOB_DEADLINE_MS,
+          signal,
         },
-        deadlineMs: Date.now() + PER_JOB_DEADLINE_MS,
-      },
-      validatedConfig,
+        validatedConfig,
+      ),
     );
   } catch (error) {
     logger.error(
