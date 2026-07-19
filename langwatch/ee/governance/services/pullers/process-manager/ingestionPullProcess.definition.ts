@@ -97,8 +97,13 @@ function settle(
 function evolveEvent(
   previousState: IngestionPullProcessState,
   envelope: ProcessEventEnvelope,
+  now: number,
 ): Evolution<IngestionPullProcessState> {
   const view = ingestionPullProcessEventViewSchema.parse(envelope.payload);
+  // Schedule from whichever is later: the event's business time or the
+  // instant it is actually handled. An event replayed hours late would
+  // otherwise write a nextWakeAt that is already in the past.
+  const schedulingRef = Math.max(envelope.occurredAt, now);
 
   switch (envelope.eventType) {
     case INGESTION_PULL_EVENT_TYPES.CONFIGURED:
@@ -114,7 +119,7 @@ function evolveEvent(
           cron: view.cron,
           cursor: previousState.sourceId ? previousState.cursor : view.cursor,
         },
-        envelope.occurredAt,
+        schedulingRef,
       );
     case INGESTION_PULL_EVENT_TYPES.DISABLED:
       return {
@@ -139,7 +144,7 @@ function evolveEvent(
           cursor: isCurrentRun ? view.cursor : previousState.cursor,
           currentRun: isCurrentRun ? null : previousState.currentRun,
         },
-        envelope.occurredAt,
+        schedulingRef,
       );
     }
     case INGESTION_PULL_EVENT_TYPES.RUN_FAILED:
@@ -151,10 +156,10 @@ function evolveEvent(
               ? null
               : previousState.currentRun,
         },
-        envelope.occurredAt,
+        schedulingRef,
       );
     default:
-      return settle(previousState, envelope.occurredAt);
+      return settle(previousState, schedulingRef);
   }
 }
 
@@ -203,7 +208,7 @@ export const ingestionPullProcessDefinition: ProcessDefinition<IngestionPullProc
       input: ProcessInput;
     }) => {
       if (input.kind === "event") {
-        return evolveEvent(previousState, input.event);
+        return evolveEvent(previousState, input.event, input.now);
       }
       return evolveWake(previousState, input.scheduledFor, input.now);
     },

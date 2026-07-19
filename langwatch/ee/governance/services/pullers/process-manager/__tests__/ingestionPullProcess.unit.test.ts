@@ -160,6 +160,36 @@ describe("ingestionPullProcessDefinition", () => {
     });
   });
 
+  describe("when an event is handled long after it occurred", () => {
+    it("schedules the next wake from the handling time, not the stale event time", () => {
+      const state: IngestionPullProcessState = {
+        ...boot(Date.parse("2026-07-17T10:00:00Z")).state,
+        currentRun: {
+          runId: "run-1",
+          scheduledFor: Date.parse("2026-07-17T10:00:00Z"),
+          startedAt: Date.parse("2026-07-17T10:00:00Z"),
+        },
+      };
+      const occurredAt = Date.parse("2026-07-17T10:01:00Z");
+      const now = Date.parse("2026-07-17T13:02:00Z");
+      const result = evolve(state, {
+        kind: "event",
+        event: {
+          ...configured(occurredAt),
+          eventType: INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED,
+          payload: {
+            sourceId: "source-1",
+            cron: null,
+            cursor: "cursor-2",
+            runId: "run-1",
+          },
+        },
+        now,
+      });
+      expect(result.nextWakeAt).toBe(Date.parse("2026-07-17T13:15:00Z"));
+    });
+  });
+
   it("clears its wake when disabled and late outcomes cannot re-enable it", () => {
     const enabled = boot(Date.parse("2026-07-17T10:00:00Z")).state;
     const disabledAt = Date.parse("2026-07-17T10:01:00Z");
