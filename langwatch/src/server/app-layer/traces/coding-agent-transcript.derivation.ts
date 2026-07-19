@@ -331,7 +331,10 @@ function modelCallEntry(span: SpanDetail): TranscriptEntry & {
       readNumber(span.params, "cache_read_tokens") ??
       readNumber(span.params, "gen_ai.usage.cache_read.input_tokens") ??
       0,
-    cacheCreationTokens: readNumber(span.params, "cache_creation_tokens") ?? 0,
+    cacheCreationTokens:
+      readNumber(span.params, "cache_creation_tokens") ??
+      readNumber(span.params, "gen_ai.usage.cache_creation.input_tokens") ??
+      0,
   };
 }
 
