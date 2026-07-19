@@ -110,7 +110,7 @@ describe("classifyScenarioInfraError", () => {
     });
   });
 
-  describe("priority", () => {
+  describe("when multiple failure reasons overlap in the raw error", () => {
     it("prefers the cert reason over the fetch-failed it rides on", () => {
       const raw =
         "TypeError: fetch failed: self-signed certificate in certificate chain";

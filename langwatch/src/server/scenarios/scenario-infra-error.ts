@@ -93,11 +93,86 @@ function summarize(raw: string): string {
   return `${collapsed.slice(0, MAX_GENERIC_MESSAGE_LENGTH - 1).trimEnd()}…`;
 }
 
+interface ClassificationRule {
+  /** Any one of these appearing in the raw error selects this rule. */
+  needles: string[];
+  /** Build the envelope for a matched raw error. */
+  build: (text: string) => ScenarioErrorEnvelope;
+}
+
+/**
+ * Classification rules, ordered most-specific-first: a TLS cert failure is more
+ * actionable than the generic "fetch failed" it usually rides on, so it wins.
+ */
+const CLASSIFICATION_RULES: ClassificationRule[] = [
+  {
+    // Untrusted TLS certificate — the local-dev self-signed-cert case.
+    needles: [
+      "self-signed certificate",
+      "self signed certificate",
+      "SELF_SIGNED_CERT_IN_CHAIN",
+      "DEPTH_ZERO_SELF_SIGNED_CERT",
+      "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+      "unable to get local issuer certificate",
+    ],
+    build: () => ({
+      code: ScenarioInfraErrorCode.UntrustedCertificate,
+      message:
+        "Couldn't establish a secure connection while running the simulation — the certificate presented by the server isn't trusted.",
+      hint: "This is common in local development with self-signed certificates. Trust your local certificate authority (run `make haven setup`), or point NODE_EXTRA_CA_CERTS at your CA bundle so the simulation runner trusts it.",
+    }),
+  },
+  {
+    // Model-provider rejection (bad key, unknown model, provider error).
+    needles: [
+      "provider_error",
+      "API key is invalid",
+      "Incorrect API key",
+      "invalid_api_key",
+      "Model not found",
+    ],
+    build: (text) => {
+      const providerMessage = extractProviderMessage(text);
+      return {
+        code: ScenarioInfraErrorCode.ModelProviderError,
+        message: providerMessage
+          ? `The model provider rejected the request: ${providerMessage}`
+          : "The model provider rejected the request while running the simulation.",
+        hint: "Check the model name and that the provider's API key is valid in your model provider settings.",
+      };
+    },
+  },
+  {
+    needles: ["timed out", "ETIMEDOUT"],
+    build: () => ({
+      code: ScenarioInfraErrorCode.ExecutionTimeout,
+      message: "The simulation timed out before it finished.",
+      hint: "The agent or model may be taking too long to respond. Try again, or simplify the scenario.",
+    }),
+  },
+  {
+    // Network unreachable (connection refused / DNS / reset / undici fetch).
+    needles: [
+      "ECONNREFUSED",
+      "ENOTFOUND",
+      "EAI_AGAIN",
+      "ECONNRESET",
+      "fetch failed",
+      "network error",
+    ],
+    build: () => ({
+      code: ScenarioInfraErrorCode.PlatformUnreachable,
+      message: "Couldn't reach the endpoint while running the simulation.",
+      hint: "Check that the target service is running and reachable from LangWatch.",
+    }),
+  },
+];
+
 /**
  * Classify a raw scenario-runner error string into a handled error envelope.
  *
- * Ordered most-specific-first: a TLS cert failure is more actionable than the
- * generic "fetch failed" it usually rides on, so it wins.
+ * Falls back to a trimmed generic message so we never lose information, but
+ * never surface a raw dump.
  */
 export function classifyScenarioInfraError(
   raw: string | undefined,
@@ -111,68 +186,12 @@ export function classifyScenarioInfraError(
     };
   }
 
-  // 1. Untrusted TLS certificate — the local-dev self-signed-cert case.
-  if (
-    contains(text, "self-signed certificate") ||
-    contains(text, "self signed certificate") ||
-    contains(text, "SELF_SIGNED_CERT_IN_CHAIN") ||
-    contains(text, "DEPTH_ZERO_SELF_SIGNED_CERT") ||
-    contains(text, "UNABLE_TO_VERIFY_LEAF_SIGNATURE") ||
-    contains(text, "unable to get local issuer certificate")
-  ) {
-    return {
-      code: ScenarioInfraErrorCode.UntrustedCertificate,
-      message:
-        "Couldn't establish a secure connection while running the simulation — the certificate presented by the server isn't trusted.",
-      hint: "This is common in local development with self-signed certificates. Trust your local certificate authority (run `make haven setup`), or point NODE_EXTRA_CA_CERTS at your CA bundle so the simulation runner trusts it.",
-    };
+  for (const rule of CLASSIFICATION_RULES) {
+    if (rule.needles.some((needle) => contains(text, needle))) {
+      return rule.build(text);
+    }
   }
 
-  // 2. Model-provider rejection (bad key, unknown model, provider error).
-  if (
-    contains(text, "provider_error") ||
-    contains(text, "API key is invalid") ||
-    contains(text, "Incorrect API key") ||
-    contains(text, "invalid_api_key") ||
-    contains(text, "Model not found")
-  ) {
-    const providerMessage = extractProviderMessage(text);
-    return {
-      code: ScenarioInfraErrorCode.ModelProviderError,
-      message: providerMessage
-        ? `The model provider rejected the request: ${providerMessage}`
-        : "The model provider rejected the request while running the simulation.",
-      hint: "Check the model name and that the provider's API key is valid in your model provider settings.",
-    };
-  }
-
-  // 3. Timeout.
-  if (contains(text, "timed out") || contains(text, "ETIMEDOUT")) {
-    return {
-      code: ScenarioInfraErrorCode.ExecutionTimeout,
-      message: "The simulation timed out before it finished.",
-      hint: "The agent or model may be taking too long to respond. Try again, or simplify the scenario.",
-    };
-  }
-
-  // 4. Network unreachable (connection refused / DNS / reset / undici fetch).
-  if (
-    contains(text, "ECONNREFUSED") ||
-    contains(text, "ENOTFOUND") ||
-    contains(text, "EAI_AGAIN") ||
-    contains(text, "ECONNRESET") ||
-    contains(text, "fetch failed") ||
-    contains(text, "network error")
-  ) {
-    return {
-      code: ScenarioInfraErrorCode.PlatformUnreachable,
-      message: "Couldn't reach the endpoint while running the simulation.",
-      hint: "Check that the target service is running and reachable from LangWatch.",
-    };
-  }
-
-  // 5. Fallthrough — keep the (trimmed) message under a generic code so we
-  //    never lose information, but never surface a raw dump.
   return {
     code: ScenarioInfraErrorCode.Infra,
     message: summarize(text),

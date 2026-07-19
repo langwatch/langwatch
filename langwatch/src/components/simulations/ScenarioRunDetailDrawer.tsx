@@ -234,6 +234,7 @@ export function ScenarioRunDetailDrawer({
 
   const [openSections, setOpenSections] = useState<string[]>([
     "conversation",
+    "no-response",
     "results",
   ]);
 
@@ -443,7 +444,7 @@ export function ScenarioRunDetailDrawer({
                     produced no messages (agent under test returned nothing). */}
                 {showNoResponse && (
                   <RunDetailSection
-                    value="conversation"
+                    value="no-response"
                     title="Conversation"
                     isFirst
                   >

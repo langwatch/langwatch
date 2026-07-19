@@ -105,22 +105,20 @@ Feature: Scenario infrastructure error surfacing and empty-response state
 
   @unit
   Scenario: A trusted local CA is forwarded to the runner
-    Given the app process has NODE_EXTRA_CA_CERTS pointing at a local CA
+    Given a local development environment with a trusted certificate authority configured
     When the runner's TLS environment is resolved
-    Then NODE_EXTRA_CA_CERTS is forwarded to the runner
-    And TLS verification is not disabled
+    Then the runner inherits that trusted certificate authority
+    And TLS verification stays enabled
 
   @unit
   Scenario: Local dev without a trusted CA relaxes TLS for the runner only
-    Given IS_SAAS is false and NODE_ENV is not production
-    And no NODE_EXTRA_CA_CERTS is present
+    Given a local development environment with no trusted certificate authority configured
     When the runner's TLS environment is resolved
-    Then TLS verification is disabled for the runner
+    Then TLS verification is relaxed for the runner only
 
   @unit
   Scenario: A hosted deployment never relaxes TLS for the runner
-    Given IS_SAAS is true
-    And no NODE_EXTRA_CA_CERTS is present
+    Given a hosted deployment with no trusted certificate authority configured
     When the runner's TLS environment is resolved
-    Then TLS verification is not disabled
+    Then TLS verification stays enabled
     And no certificate override is injected
