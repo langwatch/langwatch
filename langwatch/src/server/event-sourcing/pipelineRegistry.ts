@@ -1,4 +1,3 @@
-import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
@@ -11,6 +10,7 @@ import {
   createGovernanceOcsfEventsSyncReactor,
   type GovernanceOcsfEventsSyncReactorDeps,
 } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
+import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
@@ -30,6 +30,8 @@ import { createStoredObjectsService } from "~/server/stored-objects/stored-objec
 import { TraceService } from "~/server/traces/trace.service";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
+import type { AutomationAuditRepository } from "../app-layer/automations/repositories/automation-audit.repository";
+import type { TriggerService } from "../app-layer/automations/trigger.service";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
@@ -39,6 +41,30 @@ import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-in
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
+import type { LangyTitleGenerator } from "../app-layer/langy/langy-title-generation.service";
+import {
+  mintLangySessionApiKeyForUser,
+  revokeLangySessionApiKey,
+} from "../app-layer/langy/langyApiKey";
+import type { LangyWorkerPort } from "../app-layer/langy/langyWorker";
+import {
+  createLangyProcessSubscriber,
+  LANGY_CONVERSATION_PROCESS_NAME,
+  langyConversationProcessDefinition,
+} from "../app-layer/langy/process-manager";
+import {
+  createLangyEffectPorts,
+  createLangyIntentHandlers,
+  LANGY_OUTBOX_LEASE_DURATION_MS,
+} from "../app-layer/langy/process-manager/langyEffectPorts";
+import type { LangyTurnAdmissionRepository } from "../app-layer/langy/repositories/langy-turn-admission.repository";
+import type { LangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBuffer";
+import type { LangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
+import {
+  createAgentTurnLivenessSubscriber,
+  createLangyConversationUpdateBroadcastSubscriber,
+  createLangyTurnAdmissionLifecycleSubscriber,
+} from "../app-layer/langy/subscribers";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
@@ -52,17 +78,18 @@ import type { SpanStorageService } from "../app-layer/traces/span-storage.servic
 import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../app-layer/traces/types";
-import type { TriggerService } from "../app-layer/automations/trigger.service";
-import type { AutomationAuditRepository } from "../app-layer/automations/repositories/automation-audit.repository";
+import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
+import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
-import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
-import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
 import { type CommandDispatcher, Deferred } from "./deferred";
+import { createTenantId } from "./domain/tenantId";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
 import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
+import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
+import { AutomationAuditAppendStore } from "./pipelines/automations/projections/automationAudit.store";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
   BILLING_REPORTING_PIPELINE_NAME,
@@ -84,6 +111,11 @@ import type { ExperimentRunStateData } from "./pipelines/experiment-run-processi
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
+import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
+import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
+import type { LangyConversationStateData } from "./pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
+import type { LangyConversationTurnData } from "./pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
+import type { LangyMessageProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyMessageOperational.mapProjection";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -99,41 +131,6 @@ import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
-import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
-import { type LangyConversationStateData } from "./pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
-import type { LangyConversationTurnData } from "./pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
-import type { LangyMessageProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyMessageOperational.mapProjection";
-import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
-import type { LangyTitleGenerator } from "../app-layer/langy/langy-title-generation.service";
-import type { LangyWorkerPort } from "../app-layer/langy/langyWorker";
-import {
-  mintLangySessionApiKeyForUser,
-  revokeLangySessionApiKey,
-} from "../app-layer/langy/langyApiKey";
-import {
-  createLangyEffectPorts,
-  createLangyIntentHandlers,
-  LANGY_OUTBOX_LEASE_DURATION_MS,
-} from "../app-layer/langy/process-manager/langyEffectPorts";
-import {
-  createLangyProcessSubscriber,
-  langyConversationProcessDefinition,
-  LANGY_CONVERSATION_PROCESS_NAME,
-} from "../app-layer/langy/process-manager";
-import type { LangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBuffer";
-import type { LangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
-import {
-  createAgentTurnLivenessSubscriber,
-  createLangyConversationUpdateBroadcastSubscriber,
-  createLangyTurnAdmissionLifecycleSubscriber,
-} from "../app-layer/langy/subscribers";
-import type { LangyTurnAdmissionRepository } from "../app-layer/langy/repositories/langy-turn-admission.repository";
-import {
-  OutboxDispatcherService,
-  ProcessManagerService,
-  ProcessOutboxWorker,
-  type ProcessStore,
-} from "./process-manager";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -169,14 +166,17 @@ import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing
 import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
 import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
+import {
+  OutboxDispatcherService,
+  ProcessManagerService,
+  ProcessOutboxWorker,
+  type ProcessStore,
+} from "./process-manager";
 import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { AppendStore } from "./projections/mapProjection.types";
-import type { StateProjectionStore } from "./projections/stateProjection.types";
-import { createTenantId } from "./domain/tenantId";
 import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
-import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
-import { AutomationAuditAppendStore } from "./pipelines/automations/projections/automationAudit.store";
+import type { StateProjectionStore } from "./projections/stateProjection.types";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
 
