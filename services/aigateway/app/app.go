@@ -4,6 +4,8 @@ package app
 
 import (
 	"context"
+	"regexp"
+	"sort"
 
 	"go.uber.org/zap"
 
@@ -95,10 +97,74 @@ func (a *App) buildInterceptors() []pipeline.Interceptor {
 // Auth returns the auth resolver (for use by transport middleware).
 func (a *App) Auth() AuthResolver { return a.auth }
 
-// ListModels returns models available to the bundle's virtual key.
+// ListModels returns models available to the bundle's virtual key:
+// alias names, plus either the configured allowlist (authoritative when
+// set — anything outside it is blocked at dispatch, so upstream endpoints
+// are not queried) or models discovered from self-hosted endpoints in the
+// credential chain. Models matching a deny policy rule are filtered out.
 func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.Model, error) {
-	if a.providers == nil {
-		return nil, nil
+	cfg := bundle.Config
+	var models []domain.Model
+	seen := make(map[string]bool)
+	add := func(m domain.Model) {
+		if m.ID == "" || seen[m.ID] {
+			return
+		}
+		seen[m.ID] = true
+		models = append(models, m)
 	}
-	return a.providers.ListModels(ctx, bundle.Credentials)
+
+	for name, alias := range cfg.ModelAliases {
+		add(domain.Model{ID: name, Name: name, ProviderID: alias.ProviderID})
+	}
+
+	if len(cfg.AllowedModels) > 0 {
+		for _, id := range cfg.AllowedModels {
+			add(domain.Model{ID: id, Name: id})
+		}
+	} else if a.providers != nil {
+		discovered, err := a.providers.ListModels(ctx, bundle.Credentials)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range discovered {
+			add(m)
+		}
+	}
+
+	models = filterDeniedModels(models, cfg.PolicyRules)
+	sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
+	return models, nil
+}
+
+// filterDeniedModels drops models matching a deny rule targeting models.
+// Invalid patterns are skipped: the list is discovery, not enforcement —
+// dispatch-time policy evaluation remains the authority.
+func filterDeniedModels(models []domain.Model, rules []domain.PolicyRule) []domain.Model {
+	var deny []*regexp.Regexp
+	for _, r := range rules {
+		if r.Target != domain.PolicyTargetModel || r.Type != domain.PolicyDeny {
+			continue
+		}
+		if re, err := regexp.Compile(r.Pattern); err == nil {
+			deny = append(deny, re)
+		}
+	}
+	if len(deny) == 0 {
+		return models
+	}
+	kept := models[:0]
+	for _, m := range models {
+		denied := false
+		for _, re := range deny {
+			if re.MatchString(m.ID) {
+				denied = true
+				break
+			}
+		}
+		if !denied {
+			kept = append(kept, m)
+		}
+	}
+	return kept
 }
