@@ -9,7 +9,7 @@
  * Optional extras (all env-gated, all idempotent):
  *   - Model providers from the environment (HAVEN_SEED_MODEL_PROVIDERS=0
  *     disables): every registry provider whose API-key variable is set in the
- *     process env / langwatch/.env / repo-root .env gets an enabled,
+ *     process env / platform/app/.env / repo-root .env gets an enabled,
  *     org-scoped ModelProvider row with those keys.
  *   - HAVEN_SEED_FIRST_MESSAGE=1|0 forces the project's firstMessage/
  *     integrated flags on or off, independent of HAVEN_SEED_PRESET=demo.
@@ -384,7 +384,7 @@ async function main() {
 // Model providers from the environment.
 //
 // For every provider in the registry whose primary API-key variable is set —
-// in the process env, langwatch/.env, or the repo-root .env — upsert an
+// in the process env, platform/app/.env, or the repo-root .env — upsert an
 // enabled, ORGANIZATION-scoped ModelProvider carrying those keys (encrypted
 // exactly as modelProvider.repository does), so a fresh local stack can talk
 // to the providers the developer already has credentials for without pasting
@@ -396,8 +396,8 @@ async function main() {
 const MODEL_PROVIDER_ID_PREFIX = "local-dev-model-provider-";
 
 // loadSeedEnv merges the dotenv layers under the child's real precedence:
-// process env wins over langwatch/.env, which wins over the repo-root .env.
-// The seed always runs with cwd=langwatch/ (haven, CI, and the pnpm script
+// process env wins over platform/app/.env, which wins over the repo-root .env.
+// The seed always runs with cwd=platform/app/ (haven, CI, and the pnpm script
 // all invoke it there).
 function loadSeedEnv(): Record<string, string> {
   const merged: Record<string, string> = {};

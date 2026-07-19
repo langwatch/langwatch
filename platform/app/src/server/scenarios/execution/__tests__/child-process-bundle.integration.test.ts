@@ -122,7 +122,7 @@ describe("Pre-compiled Scenario Child Process", () => {
     // runtime require("x") calls that MUST resolve from the bundle's own
     // directory — the exact resolution root prod uses. An external that is only
     // a transitive dep of a workspace package (e.g. pino via
-    // @langwatch/observability) is NOT top-linked into langwatch/node_modules by
+    // @langwatch/observability) is NOT top-linked into platform/app/node_modules by
     // pnpm, so its require throws MODULE_NOT_FOUND at prod boot. #2404 caused
     // exactly this by moving the pino family out of the app manifest.
     it("boots without MODULE_NOT_FOUND — every externalized require() resolves in a prod-shaped layout", () => {

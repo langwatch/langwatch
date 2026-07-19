@@ -358,8 +358,8 @@ operational state back in ClickHouse.
 ## References
 
 - Behavioral spec: [`specs/langy/langy-projection-independent-reactions.feature`](../../../specs/langy/langy-projection-independent-reactions.feature)
-- Current pipeline: `langwatch/src/server/event-sourcing/pipelines/langy-conversation-processing/pipeline.ts`
-- Current process manager: `langwatch/src/server/app-layer/langy/process-manager/`
-- Current direct subscribers: `langwatch/src/server/app-layer/langy/subscribers/`
-- Current registration: `langwatch/src/server/event-sourcing/pipelineRegistry.ts`
+- Current pipeline: `platform/app/src/server/event-sourcing/pipelines/langy-conversation-processing/pipeline.ts`
+- Current process manager: `platform/app/src/server/app-layer/langy/process-manager/`
+- Current direct subscribers: `platform/app/src/server/app-layer/langy/subscribers/`
+- Current registration: `platform/app/src/server/event-sourcing/pipelineRegistry.ts`
 - Related ADRs: ADR-030 (alert outbox), ADR-034 (ClickHouse analytics materialization), ADR-046 (Langy event-sourced conversations)

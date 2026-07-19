@@ -664,7 +664,7 @@ func (o *Orchestrator) seedRealisticPlatformData(ctx context.Context, p UpParams
 
 // liveSeedEnv returns the running stack's complete environment overlay plus a
 // loopback collector endpoint. The complete overlay matters for seeders that
-// write both Postgres and ClickHouse; inheriting langwatch/.env would silently
+// write both Postgres and ClickHouse; inheriting platform/app/.env would silently
 // target the primary checkout instead of this worktree's isolated databases.
 func (o *Orchestrator) liveSeedEnv(p UpParams, retryCmd string) ([]string, error) {
 	slug, err := o.resolveSlug(p)

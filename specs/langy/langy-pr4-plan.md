@@ -50,7 +50,7 @@ monitor-only:
 | Credentials envelope | `services/langyagent/adapters/workerpool/worker.go` `Credentials` struct + `buildWorkerEnv`; TS `LangyCredentials` | Add `egressAllowlist` to both; inject `HTTPS_PROXY` (loopback adapter) into the worker env in `buildWorkerEnv`. |
 | Capability-change worker recycle | `worker.go` `CredentialSignature` / `signatureOf` | Add `egressAllowlist` to the signature so a policy change recycles the worker (spec: "does not leave a live worker on the old policy"). |
 | Model allow-list precedent | `LangyCredentialService.getModelsAllowed()` + defense-in-depth check in `langy.ts:389-409` | Copy the shape for `getEgressAllowlist()` (`string[] | null`, null = watch) and the envelope threading. |
-| Envelope construction | `langwatch/src/server/routes/langy.ts:367,482-494` | Add `egressAllowlist` to the `/chat` body next to `modelOverride`. |
+| Envelope construction | `platform/app/src/server/routes/langy.ts:367,482-494` | Add `egressAllowlist` to the `/chat` body next to `modelOverride`. |
 | NetworkPolicy egress + carve-outs | `charts/langyagent/templates/networkpolicy.yaml`, `values.yaml` `networkPolicy.allowExternalHttps` | Narrow the `0.0.0.0/0:443` rule to the adapter's upstream (rung 4); add the FQDN-floor values + optional Cilium template. |
 | gVisor / netfilter constraint + netns fallback | ADR-033 | FQDN enforcement lives at L7 (no netfilter); Fix B netns is the non-Cilium bypass-proof floor. |
 
@@ -87,12 +87,12 @@ Control plane (TypeScript):
 
 - [ ] `prisma/schema.prisma` — add `langyEgressAllowlist Json?` to `Project`
       (+ migration). Include `projectId` in every read (multitenancy).
-- [ ] `langwatch/src/server/services/langy/LangyCredentialService.ts` — add
+- [ ] `platform/app/src/server/services/langy/LangyCredentialService.ts` — add
       `getEgressAllowlist({ projectId })`, Zod-validated, `string[] | null`,
       `null` = watch. Mirror `getModelsAllowed` (tenancy in the WHERE, parse
       through Zod so a drifted value fails closed rather than disabling
       enforcement).
-- [ ] `langwatch/src/server/routes/langy.ts` — resolve the allow-list and add
+- [ ] `platform/app/src/server/routes/langy.ts` — resolve the allow-list and add
       `egressAllowlist` to the `credentials` object built at ~L367; it then
       rides the existing `/chat` body at L482-494. No new channel.
 - [ ] Settings UI (optional, can trail the enforcement): a per-project "Langy

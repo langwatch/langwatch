@@ -5,7 +5,7 @@
  * When Langy searches traces it does not hand the model a blob of prose — it
  * calls `search_traces` with a STRUCTURED intent: legacy filter fields, an
  * optional free-text term, and a date range (see
- * `mcp-server/src/tools/search-traces.ts`). Today that intent is read once and
+ * `mcp/typescript/src/tools/search-traces.ts`). Today that intent is read once and
  * thrown away; the traces card links to the bare traces index and the user
  * rebuilds the search by hand. This module keeps it, so "show me these in the
  * traces view" can mean the view ALREADY FILTERED to what Langy found.
@@ -36,7 +36,7 @@ type TimePreset = (typeof TIME_PRESETS)[number];
 
 /**
  * `search_traces` defaults to a 24h window when the model omits the dates
- * (`mcp-server/src/tools/search-traces.ts`), so an intent with no range really
+ * (`mcp/typescript/src/tools/search-traces.ts`), so an intent with no range really
  * did search the last day. Carrying that across keeps the destination honest.
  */
 const DEFAULT_PRESET: TimePreset = "24h";

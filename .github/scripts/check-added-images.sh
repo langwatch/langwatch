@@ -25,10 +25,10 @@ BASE_REF="${1:?usage: check-added-images.sh <base-ref>}"
 ALLOWED_PREFIXES=(
   "docs/images/"
   "docs/media/"
-  "langwatch/public/"
+  "platform/app/public/"
   "assets/"
   "specs/"
-  "python-sdk/examples/"
+  "sdks/python/examples/"
 )
 
 IMAGE_EXTENSIONS='\.(png|jpg|jpeg|gif|webp|bmp|tiff?|avif)$'

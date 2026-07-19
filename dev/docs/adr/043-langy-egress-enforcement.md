@@ -173,7 +173,7 @@ chart value (which would be per-install, not per-project).
 This mirrors the model-allow-list precedent exactly. Today
 `LangyCredentialService.getModelsAllowed()` reads a project's `modelsAllowed`
 and `langy.ts` enforces it server-side as defense-in-depth before dispatch
-(`langwatch/src/server/routes/langy.ts:389-409`). The egress allow-list follows
+(`platform/app/src/server/routes/langy.ts:389-409`). The egress allow-list follows
 the same shape, with one deliberate divergence:
 
 - **Home: a project-level Langy egress policy, not the virtual key's config.**
@@ -342,8 +342,8 @@ Marked here as the **enforcement target**; not implemented in code in this PR.
 - Code seams: `services/langyagent/adapters/workerpool/authproxy.go` (per-worker proxy pattern the
   egress adapter mirrors), `services/langyagent/adapters/workerpool/worker.go` (`Credentials`
   envelope + `buildWorkerEnv`), `services/langyagent/adapters/httpapi/handlers.go` (`/chat`
-  dispatch), `langwatch/src/server/routes/langy.ts` (envelope construction +
-  defense-in-depth allow-list check), `langwatch/src/server/services/langy/
+  dispatch), `platform/app/src/server/routes/langy.ts` (envelope construction +
+  defense-in-depth allow-list check), `platform/app/src/server/services/langy/
   LangyCredentialService.ts` (`getModelsAllowed` precedent).
 - Chart: `charts/langyagent/templates/networkpolicy.yaml`,
   `charts/langyagent/values.yaml` (`networkPolicy.allowExternalHttps`).

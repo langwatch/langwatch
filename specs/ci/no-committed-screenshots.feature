@@ -15,7 +15,7 @@ Feature: No committed screenshots check
   Background:
     Given the check judges only the image files a PR adds
     And renaming, moving, or deleting an existing image is not judged
-    And images are allowed under docs/images, docs/media, langwatch/public, assets, specs, and python-sdk/examples
+    And images are allowed under docs/images, docs/media, platform/app/public, assets, specs, and sdks/python/examples
 
   Scenario: A PR that adds no images passes
     Given the PR adds no image files

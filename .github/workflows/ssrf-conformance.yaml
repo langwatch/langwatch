@@ -41,7 +41,7 @@ jobs:
           filters: |
             ssrf:
               - 'pkg/ssrf/**'
-              - 'langwatch/packages/ssrf/**'
+              - 'platform/app/packages/ssrf/**'
               - '.github/workflows/ssrf-conformance.yaml'
 
   conformance:
@@ -62,7 +62,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+          cache-dependency-path: "pnpm-lock.yaml"
           install-dir: langwatch
 
       # Runs even when the Go half already failed, so a divergence report names

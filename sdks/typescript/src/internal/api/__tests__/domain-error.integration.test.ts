@@ -7,7 +7,7 @@
  * about whether a service actually throws what these tests say it throws.
  *
  * The wire shapes below are not invented. They are what
- * `langwatch/src/app/api/middleware/error-handler.ts` emits — the handler every
+ * `platform/app/src/app/api/middleware/error-handler.ts` emits — the handler every
  * `SecuredApp` mounts via `onError` — which flattens a `DomainError` to
  * `{ error: <kind>, message, ...meta }` at its `httpStatus`.
  */

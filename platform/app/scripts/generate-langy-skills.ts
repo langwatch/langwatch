@@ -49,7 +49,7 @@ const REPO_ROOT = path.resolve(__dirname, "../..");
 const DOCKERFILE = path.join(REPO_ROOT, "Dockerfile.langyagent");
 const OUT = path.join(
   REPO_ROOT,
-  "langwatch/src/shared/langy/langySkills.generated.json",
+  "platform/app/src/shared/langy/langySkills.generated.json",
 );
 
 /**

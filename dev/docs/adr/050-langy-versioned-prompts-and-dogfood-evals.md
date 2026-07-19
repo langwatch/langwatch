@@ -93,7 +93,7 @@ and migrations in this repo are schema-only.
 
 ### 4. Dogfood Langy with scenarios + evals
 
-- **Scenarios:** the existing `langwatch/e2e/langy/` `@langwatch/scenario` harness
+- **Scenarios:** the existing `platform/app/e2e/langy/` `@langwatch/scenario` harness
   is the home. Add `langy-dogfood.scenario.test.ts` for the two named flows (find
   failing traces; open a PR) and `langy-rules.ts` — a reusable LLM-judge rubric
   encoding Langy's AGENTS.md absolute rules. The scenario reporting key lives only
@@ -141,6 +141,6 @@ safe and reversible.
 - Spec: `specs/langy/langy-versioned-prompts.feature`,
   `specs/langy/langy-dogfood-scenarios.feature`.
 - Code: `src/server/app-layer/langy/langyPromptRegistry.ts`,
-  `scripts/seed-langy-prompts.ts`, `langwatch/e2e/langy/`,
+  `scripts/seed-langy-prompts.ts`, `platform/app/e2e/langy/`,
   `services/langyagent/internal/assets/AGENTS.md`.
 - Guard: `src/langwatchPlatformGuard.ts` (no `LANGWATCH_API_KEY` on the platform).

@@ -85,10 +85,10 @@ jobs:
       - name: Cache TypeScript incremental build info
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: langwatch/node_modules/.cache/tsbuildinfo
-          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('langwatch/pnpm-lock.yaml', 'langwatch/tsconfig.tsgo.json', 'langwatch/tsconfig.tsgo.tests.json') }}-${{ github.sha }}
+          path: platform/app/node_modules/.cache/tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('langwatch/pnpm-lock.yaml', 'langwatch/tsconfig.tsgo.json', 'langwatch/tsconfig.tsgo.tests.json') }}-
+            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json') }}-
             ${{ runner.os }}-tsbuildinfo-
 
       - name: Run typecheck

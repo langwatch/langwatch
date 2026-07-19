@@ -21,7 +21,7 @@
  * This is a SCRIPT, not a migration: prompt content is data, and the codebase
  * never seeds prompt rows through Prisma migrations (migrations are schema only).
  *
- * Usage (from `langwatch/`):
+ * Usage (from `platform/app/`):
  *
  *   pnpm tsx scripts/seed-langy-prompts.ts --project <projectId>
  *   LANGY_PROMPT_PROJECT_ID=<projectId> pnpm tsx scripts/seed-langy-prompts.ts
