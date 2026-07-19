@@ -24,8 +24,6 @@
  * back inside a 404 message is a real thing servers do, and it must not reach a
  * terminal, a log, or an agent's context.
  */
-import { AsyncLocalStorage } from "node:async_hooks";
-
 import chalk from "chalk";
 import {
   domainErrorFromThrown,
@@ -34,64 +32,27 @@ import {
 } from "@langwatch/cli-cards/domain-error";
 import { redactSecrets } from "../telemetry/events";
 import { withFallbackSuggestions } from "./errorSuggestions";
-
-/** The output format a command was invoked with. */
-export type CliOutputFormat = "json" | "agents" | "text";
-
-/**
- * The per-request output context: the format failures render in, and whether
- * colour may reach the caller.
- *
- * Set once per invocation by the `preAction` hook in `program.ts`, because the
- * ~100 `failSpinner` call sites should not each have to remember to thread an
- * option through to be able to fail correctly — forgetting would mean a command
- * that silently prints prose to a parser. Written on EVERY action (not only
- * when `--format` is passed) so a daemon serving one command after another
- * cannot leak a `json` from the last caller into the next one.
- *
- * Two layers, one mechanism:
- *
- *   - SCOPED: an AsyncLocalStorage scope, entered per request by the daemon
- *     (`daemon/execution.ts withExecutionContext`). Requests that share an
- *     execution window run CONCURRENTLY and can disagree about `--format` and
- *     `--agent`; a plain module global would let the second writer clobber the
- *     first request's error rendering mid-flight.
- *   - AMBIENT: a plain module global, used when no scope is active — the
- *     in-process path (and tests), where exactly one command is in flight and
- *     a global is faithful.
- */
-interface OutputScope {
-  format: CliOutputFormat;
-  /** Whether ANSI colour may be emitted for this request. */
-  color: boolean;
-}
-
-const scopeStorage = new AsyncLocalStorage<OutputScope>();
-
-let ambientFormat: CliOutputFormat = "text";
+import {
+  currentOutputScope,
+  getOutputFormat,
+  resolveOutputFormat,
+} from "./outputScope";
 
 /**
- * Run `fn` with a fresh output scope. Called by the daemon per request (see
- * `withExecutionContext` in daemon/execution.ts); the in-process path never
- * enters a scope and uses the ambient global instead.
+ * The output-context machinery (format + colour scope) lives in
+ * `./outputScope`, a chalk-free module, so that `program.ts` can reach it via
+ * `utils/output.ts` without putting chalk's ~4ms load on the cold-start path
+ * of every in-process invocation. Re-exported here so the existing consumers
+ * (spinner.ts, apiKey.ts, daemon/execution.ts, tests) keep their imports.
  */
-export const withOutputScope = <T>(fn: () => T): T =>
-  scopeStorage.run({ format: "text", color: true }, fn);
-
-/** The active request's output scope, if the caller is inside one. */
-export const currentOutputScope = (): OutputScope | undefined =>
-  scopeStorage.getStore();
-
-export const setOutputFormat = (format: string | undefined): void => {
-  const resolved: CliOutputFormat =
-    format === "json" ? "json" : format === "agents" ? "agents" : "text";
-  const scope = scopeStorage.getStore();
-  if (scope) scope.format = resolved;
-  else ambientFormat = resolved;
-};
-
-export const getOutputFormat = (): CliOutputFormat =>
-  scopeStorage.getStore()?.format ?? ambientFormat;
+export {
+  currentOutputScope,
+  getOutputFormat,
+  resolveOutputFormat,
+  setOutputFormat,
+  withOutputScope,
+  type CliOutputFormat,
+} from "./outputScope";
 
 /**
  * Turn colour off for the rest of this command (agent mode).
@@ -105,26 +66,15 @@ export const getOutputFormat = (): CliOutputFormat =>
  * request's bytes, and `chalk.level` is never touched. Outside a scope — a
  * plain in-process run — exactly one command is in flight and setting
  * `chalk.level` directly is both faithful and free.
+ *
+ * Because this is the one context operation that needs chalk, it stays in
+ * this module and `applyOutputContext` (utils/output.ts) reaches it through a
+ * lazy import that only runs when agent mode is actually requested.
  */
 export const disableOutputColor = (): void => {
-  const scope = scopeStorage.getStore();
+  const scope = currentOutputScope();
   if (scope) scope.color = false;
   else chalk.level = 0;
-};
-
-/**
- * The format to render a failure in: what the caller explicitly said, else what
- * the running command was invoked with. The explicit argument wins so a command
- * that already holds its own `--format` (and a test that passes one) does not
- * depend on the program hook having run.
- */
-export const resolveOutputFormat = (
-  explicit?: string,
-): CliOutputFormat => {
-  if (explicit === undefined) return getOutputFormat();
-  if (explicit === "json") return "json";
-  if (explicit === "agents") return "agents";
-  return "text";
 };
 
 /**

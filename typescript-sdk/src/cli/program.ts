@@ -163,8 +163,8 @@ export function buildProgram(): Command {
   // resolveOutputOptions. resolveActionOutputOptions additionally keeps a
   // command's OWN `--json <json>` payload option (dataset records add/update)
   // from being misread as machine-output intent.
-  program.hook("preAction", (_thisCommand, actionCommand) => {
-    applyOutputContext(resolveActionOutputOptions(actionCommand));
+  program.hook("preAction", async (_thisCommand, actionCommand) => {
+    await applyOutputContext(resolveActionOutputOptions(actionCommand));
   });
 
   // Top-level commands

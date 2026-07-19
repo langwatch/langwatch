@@ -7,16 +7,13 @@
  * document instead — an explicit `-o agents` is a request for compact JSON,
  * not for the raw body an agent caller would have gotten anyway.
  */
-import { printResult, type RawOutputFlags } from "../../utils/output";
+import {
+  hasExplicitFormatRequest,
+  printResult,
+  type RawOutputFlags,
+} from "../../utils/output";
 import { findSkill, SKILLS_BUNDLE } from "./installer";
 import { throwValidationError } from "./shared";
-
-/** Whether the caller asked for a format explicitly (any spelling). */
-const hasExplicitFormatRequest = (options: RawOutputFlags): boolean =>
-  options.output !== undefined ||
-  options.json !== undefined ||
-  options.jq !== undefined ||
-  options.format === "json";
 
 export const skillsGetCommand = async (
   name: string,

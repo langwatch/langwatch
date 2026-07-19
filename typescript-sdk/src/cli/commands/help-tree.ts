@@ -11,14 +11,11 @@
  */
 import { buildProgram } from "../program";
 import { buildCatalog, renderHelpTree } from "../utils/commandCatalog";
-import { printResult, type RawOutputFlags } from "../utils/output";
-
-/** Whether the caller asked for a format explicitly (any spelling). */
-const hasExplicitFormatRequest = (options?: RawOutputFlags): boolean =>
-  options?.output !== undefined ||
-  options?.json !== undefined ||
-  options?.jq !== undefined ||
-  options?.format === "json";
+import {
+  hasExplicitFormatRequest,
+  printResult,
+  type RawOutputFlags,
+} from "../utils/output";
 
 export const helpTreeCommand = async (
   options?: RawOutputFlags,
