@@ -1,6 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import type { IntentHandler } from "~/server/event-sourcing/process-manager";
 import {
+  incrementIngestionPullTotal,
+  observeIngestionPullDuration,
+} from "~/server/metrics";
+import {
   INGESTION_PULL_PROCESS_INTENT_TYPES,
   ingestionPullRunIntentSchema,
 } from "./ingestionPullProcess.types";
@@ -51,6 +55,7 @@ export function createIngestionPullIntentHandlers(params: {
 
   const runHandler: IntentHandler = async ({ message }) => {
     const intent = ingestionPullRunIntentSchema.parse(message.payload);
+    const pullStartedAtMs = clock();
     let result: Awaited<ReturnType<IngestionPullRunPort["run"]>>;
     try {
       result = await params.runPort.run({
@@ -60,6 +65,7 @@ export function createIngestionPullIntentHandlers(params: {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       if (message.attempt < maxAttempts) {
+        incrementIngestionPullTotal({ outcome: "failed_retryable" });
         logger.warn(
           {
             sourceId: intent.sourceId,
@@ -70,6 +76,9 @@ export function createIngestionPullIntentHandlers(params: {
         );
         throw error;
       }
+      // The alertable outcome (ADR-054): retries exhausted, run_failed
+      // recorded. failed_retryable above is expected provider noise.
+      incrementIngestionPullTotal({ outcome: "failed_final" });
       await params.commands.recordRunFailed({
         tenantId: message.projectId,
         occurredAt: clock(),
@@ -82,6 +91,8 @@ export function createIngestionPullIntentHandlers(params: {
       });
       return;
     }
+    incrementIngestionPullTotal({ outcome: "completed" });
+    observeIngestionPullDuration({ durationMs: clock() - pullStartedAtMs });
     // Keep outcome-command failures distinct from provider failures. If this
     // write fails, the outbox redelivers the idempotent effect; it must not
     // turn a successful pull into a run_failed event on the final attempt.

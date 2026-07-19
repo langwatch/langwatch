@@ -3,8 +3,9 @@
 # with prometheus.alerting.enabled=false. Routing to receivers is the
 # operator's concern — these rules define what is wrong, not who hears it.
 #
-# Metric sources: langwatch/src/server/metrics.ts (es_*, topic_clustering_*)
-# and src/server/event-sourcing/queues/groupQueue/metrics.ts (gq_*).
+# Metric sources: langwatch/src/server/metrics.ts (es_*, topic_clustering_*,
+# ingestion_pull_*) and src/server/event-sourcing/queues/groupQueue/metrics.ts
+# (gq_*).
 groups:
   - name: langwatch-process-substrate
     rules:
@@ -125,3 +126,34 @@ groups:
             hours — clustering is effectively down across the fleet, not for
             one misconfigured project. Check langevals availability and the
             outbox dead-letter alert.
+
+  - name: langwatch-governance-ingestion
+    rules:
+      - alert: IngestionPullFailedFinal
+        expr: increase(ingestion_pull_total{outcome="failed_final"}[1h]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Governance ingestion pull failed after all retries"
+          description: >-
+            A pull exhausted its attempts and recorded run_failed. The
+            source's schedule self-heals at its next cron tick and resumes
+            from the durable cursor, so no events are lost — but repeated
+            final failures mean the provider is rejecting us (expired
+            credentials, revoked access) or is down.
+
+      - alert: IngestionPullNothingCompleting
+        expr: >-
+          sum(increase(ingestion_pull_total{outcome="completed"}[24h])) == 0
+          and
+          sum(increase(ingestion_pull_total{outcome="failed_final"}[24h])) > 3
+        labels:
+          severity: critical
+        annotations:
+          summary: "Governance ingestion pulls are failing fleet-wide"
+          description: >-
+            Multiple final failures and not a single completed pull in 24
+            hours — pull ingestion is effectively down across the fleet, not
+            for one misconfigured source. Cursors stop advancing and audit
+            events pile up at the providers. Check egress connectivity and
+            the outbox dead-letter alert.

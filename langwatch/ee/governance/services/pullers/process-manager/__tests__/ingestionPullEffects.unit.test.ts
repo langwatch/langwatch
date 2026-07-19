@@ -1,8 +1,23 @@
+import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
 import {
   createIngestionPullIntentHandlers,
   INGESTION_PULL_PROCESS_INTENT_TYPES,
 } from "..";
+
+async function metricValue(
+  name: string,
+  labels: Record<string, string>,
+): Promise<number> {
+  const metric = register.getSingleMetric(name);
+  if (!metric) return 0;
+  const { values } = await metric.get();
+  return (
+    values.find((v) =>
+      Object.entries(labels).every(([k, val]) => v.labels[k] === val),
+    )?.value ?? 0
+  );
+}
 
 const message = (attempt: number) => ({
   processName: "ingestionPull",
@@ -98,5 +113,62 @@ describe("ingestion pull outbox effect", () => {
       }),
     ).rejects.toThrow("event log unavailable");
     expect(recordRunFailed).not.toHaveBeenCalled();
+  });
+});
+
+describe("pull outcome metrics (ADR-054)", () => {
+  describe("when the final attempt fails", () => {
+    it("counts a failed_final pull so the alert rule has a signal", async () => {
+      const before = await metricValue("ingestion_pull_total", {
+        outcome: "failed_final",
+      });
+      const handlers = createIngestionPullIntentHandlers({
+        runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
+        commands: { recordRunCompleted: vi.fn(), recordRunFailed: vi.fn() },
+        clock: () => 200,
+      });
+
+      await handlers[INGESTION_PULL_PROCESS_INTENT_TYPES.RUN]!({
+        message: message(3),
+      });
+
+      const after = await metricValue("ingestion_pull_total", {
+        outcome: "failed_final",
+      });
+      expect(after).toBe(before + 1);
+    });
+  });
+
+  describe("when an attempt below the cap fails", () => {
+    it("counts it as failed_retryable, never as a final failure", async () => {
+      const beforeRetryable = await metricValue("ingestion_pull_total", {
+        outcome: "failed_retryable",
+      });
+      const beforeFinal = await metricValue("ingestion_pull_total", {
+        outcome: "failed_final",
+      });
+      const handlers = createIngestionPullIntentHandlers({
+        runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
+        commands: { recordRunCompleted: vi.fn(), recordRunFailed: vi.fn() },
+        clock: () => 200,
+      });
+
+      await expect(
+        handlers[INGESTION_PULL_PROCESS_INTENT_TYPES.RUN]!({
+          message: message(1),
+        }),
+      ).rejects.toThrow("provider down");
+
+      expect(
+        await metricValue("ingestion_pull_total", {
+          outcome: "failed_retryable",
+        }),
+      ).toBe(beforeRetryable + 1);
+      expect(
+        await metricValue("ingestion_pull_total", {
+          outcome: "failed_final",
+        }),
+      ).toBe(beforeFinal);
+    });
   });
 });

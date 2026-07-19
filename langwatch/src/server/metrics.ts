@@ -829,6 +829,40 @@ export const observeTopicClusteringPageDuration = ({
   durationMs: number;
 }) => topicClusteringPageDuration.labels(mode).observe(durationMs);
 
+// --- Governance ingestion-pull domain metrics (ADR-054) ---
+// Pull-run outcomes as the domain sees them, not just generic es_* counters:
+// `failed_final` is the alertable one (retries exhausted, run_failed
+// recorded); `failed_retryable` is expected noise under provider hiccups.
+register.removeSingleMetric("ingestion_pull_total");
+const ingestionPullTotal = new Counter({
+  name: "ingestion_pull_total",
+  help: "Governance ingestion pull executions by outcome",
+  labelNames: ["outcome"] as const,
+});
+
+export const incrementIngestionPullTotal = ({
+  outcome,
+}: {
+  outcome: "completed" | "failed_retryable" | "failed_final";
+}) => ingestionPullTotal.labels(outcome).inc();
+
+register.removeSingleMetric("ingestion_pull_duration_milliseconds");
+const ingestionPullDuration = new Histogram({
+  name: "ingestion_pull_duration_milliseconds",
+  help: "Duration of one governance ingestion pull (adapter poll and OCSF sink writes)",
+  // Unlabelled on purpose: the executor only knows the sourceId, and the
+  // adapter kind lives behind the run port — no cheap low-cardinality label.
+  // A pull is a network poll plus row inserts, capped by the worker's
+  // 5-minute soft deadline, so buckets run 100ms to 5min.
+  buckets: [100, 250, 500, 1000, 2500, 5000, 15000, 30000, 60000, 120000, 300000],
+});
+
+export const observeIngestionPullDuration = ({
+  durationMs,
+}: {
+  durationMs: number;
+}) => ingestionPullDuration.observe(durationMs);
+
 // --- Fold cache metrics ---
 register.removeSingleMetric("es_fold_cache_total");
 const esFoldCacheTotal = new Counter({

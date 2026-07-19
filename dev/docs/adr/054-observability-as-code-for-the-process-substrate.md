@@ -72,8 +72,12 @@ outcomes exist only as events and log lines).
    `topic_clustering_page_total{outcome}` (completed | skipped |
    failed_retryable | failed_final) and
    `topic_clustering_page_duration_milliseconds{mode}` from the intent
-   executor. The governance ingestion pullers get the same treatment
-   when their process-manager port lands (PR #5904).
+   executor. The governance ingestion pullers, now on the same substrate
+   (PR #5904), get theirs: `ingestion_pull_total{outcome}` (completed |
+   failed_retryable | failed_final) and
+   `ingestion_pull_duration_milliseconds` (unlabelled — the executor
+   knows no cheap low-cardinality source label) from the pull intent
+   executor.
 
 ## Consequences
 
