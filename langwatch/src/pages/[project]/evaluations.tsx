@@ -389,21 +389,24 @@ export function ExperimentsPage() {
                                       <MoreVertical size={16} />
                                     </Menu.Trigger>
                                     <Menu.Content>
-                                      {experiment.type === "EVALUATIONS_V3" && (
-                                        <Menu.Item
-                                          value="edit"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            void router.push(
-                                              `/${project?.slug}/experiments/workbench/${experiment.slug}`,
-                                            );
-                                          }}
-                                        >
-                                          <LuPencil size={16} />
-                                          Edit
-                                        </Menu.Item>
-                                      )}
-                                      {experiment.type !== "EVALUATIONS_V3" &&
+                                      {hasPermission("workflows:create") &&
+                                        experiment.type ===
+                                          "EVALUATIONS_V3" && (
+                                          <Menu.Item
+                                            value="edit"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              void router.push(
+                                                `/${project?.slug}/experiments/workbench/${experiment.slug}`,
+                                              );
+                                            }}
+                                          >
+                                            <LuPencil size={16} />
+                                            Edit
+                                          </Menu.Item>
+                                        )}
+                                      {hasPermission("workflows:create") &&
+                                        experiment.type !== "EVALUATIONS_V3" &&
                                         experiment.type !==
                                           "BATCH_EVALUATION_V2" &&
                                         experiment.workbenchState && (
@@ -450,7 +453,7 @@ export function ExperimentsPage() {
                                           Replicate to another project
                                         </Menu.Item>
                                       )}
-                                      {hasPermission("evaluations:manage") && (
+                                      {hasPermission("workflows:delete") && (
                                         <Menu.Item
                                           value="delete"
                                           color="red.500"
@@ -519,7 +522,7 @@ export function ExperimentsPage() {
   );
 }
 
-export const GuardedExperimentsPage = withPermissionGuard("evaluations:view", {
+export const GuardedExperimentsPage = withPermissionGuard("experiments:view", {
   layoutComponent: DashboardLayout,
 })(ExperimentsPage);
 

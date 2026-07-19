@@ -90,6 +90,14 @@ Feature: Separate experiments from online evaluations
     Then I reach the corresponding supported destination without losing project context
     And links to a specific experiment, online evaluation, evaluator, or guardrail continue to resolve
 
+  Scenario: Show only experiment actions authorized by their server contracts
+    Given I can view experiments in the current project
+    When I open the experiments page
+    Then the experiment list is available with "experiments:view"
+    And create and edit actions require "workflows:create"
+    And delete actions require "workflows:delete"
+    And replicate actions require "evaluations:manage"
+
   Scenario: Use the experiments skill for batch testing
     Given an agent has the LangWatch experiments skill
     When the user asks to batch test, benchmark, compare configurations, or create a CI quality gate

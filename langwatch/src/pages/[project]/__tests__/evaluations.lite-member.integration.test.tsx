@@ -3,8 +3,8 @@
  *
  * Integration tests for the Experiments page permission-based UI visibility.
  *
- * Verifies that delete and replicate menu items are gated behind
- * the `evaluations:manage` permission for lite members.
+ * Verifies that each experiment action uses the permission enforced by its
+ * server procedure.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -12,32 +12,37 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockHasPermissionRef, mockExperimentsList, mockDeleteMutate } =
-  vi.hoisted(() => {
-    return {
-      mockHasPermissionRef: {
-        current: (_permission: string): boolean => true,
-      },
-      mockExperimentsList: {
-        current: [] as Array<{
-          id: string;
-          name: string;
-          slug: string;
-          type: string;
-          createdAt: string;
-          updatedAt: number;
-          workbenchState: null;
-          runsSummary: {
-            count: number;
-            primaryMetric: undefined;
-            latestRun: { timestamps: undefined };
-          };
-          dataset: null;
-        }>,
-      },
-      mockDeleteMutate: vi.fn(),
-    };
-  });
+const {
+  mockGuardPermissionRef,
+  mockHasPermissionRef,
+  mockExperimentsList,
+  mockDeleteMutate,
+} = vi.hoisted(() => {
+  return {
+    mockGuardPermissionRef: { current: "" },
+    mockHasPermissionRef: {
+      current: (_permission: string): boolean => true,
+    },
+    mockExperimentsList: {
+      current: [] as Array<{
+        id: string;
+        name: string;
+        slug: string;
+        type: string;
+        createdAt: string;
+        updatedAt: number;
+        workbenchState: null;
+        runsSummary: {
+          count: number;
+          primaryMetric: undefined;
+          latestRun: { timestamps: undefined };
+        };
+        dataset: null;
+      }>,
+    },
+    mockDeleteMutate: vi.fn(),
+  };
+});
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -66,7 +71,10 @@ vi.mock("~/components/DashboardLayout", () => ({
 }));
 
 vi.mock("~/components/WithPermissionGuard", () => ({
-  withPermissionGuard: () => (C: any) => C,
+  withPermissionGuard: (permission: string) => {
+    mockGuardPermissionRef.current = permission;
+    return (Component: any) => Component;
+  },
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -231,7 +239,7 @@ describe("Experiments page permission visibility", () => {
         id: "exp-1",
         name: "Test Evaluation",
         slug: "test-evaluation",
-        type: "BATCH_EVALUATION" as const,
+        type: "EVALUATIONS_V3" as const,
         createdAt: new Date().toISOString(),
         updatedAt: Date.now(),
         workbenchState: null,
@@ -245,41 +253,45 @@ describe("Experiments page permission visibility", () => {
     ];
   });
 
-  describe("when user has evaluations:manage permission", () => {
-    beforeEach(() => {
-      mockHasPermissionRef.current = () => true;
-    });
-
-    it("displays the delete menu item", () => {
-      renderPage();
-
-      expect(screen.getByText("Delete")).toBeTruthy();
-    });
-
-    it("displays the replicate menu item", () => {
-      renderPage();
-
-      expect(screen.getByText("Replicate to another project")).toBeTruthy();
-    });
+  it("guards the experiment list with experiments:view", () => {
+    expect(mockGuardPermissionRef.current).toBe("experiments:view");
   });
 
-  describe("when user lacks evaluations:manage permission", () => {
-    beforeEach(() => {
-      mockHasPermissionRef.current = (permission: string) =>
-        permission !== "evaluations:manage";
-    });
+  it("shows all actions when every matching permission is granted", () => {
+    renderPage();
 
-    /** @scenario Lite member clicks edit or delete on an evaluation and sees restriction modal */
-    it("hides the delete menu item", () => {
-      renderPage();
+    expect(screen.getByText("Edit")).toBeTruthy();
+    expect(screen.getByText("Delete")).toBeTruthy();
+    expect(screen.getByText("Replicate to another project")).toBeTruthy();
+  });
 
-      expect(screen.queryByText("Delete")).toBeNull();
-    });
+  it("uses workflows:create for edit", () => {
+    mockHasPermissionRef.current = (permission: string) =>
+      permission === "workflows:create";
+    renderPage();
 
-    it("hides the replicate menu item", () => {
-      renderPage();
+    expect(screen.getByText("Edit")).toBeTruthy();
+    expect(screen.queryByText("Delete")).toBeNull();
+    expect(screen.queryByText("Replicate to another project")).toBeNull();
+  });
 
-      expect(screen.queryByText("Replicate to another project")).toBeNull();
-    });
+  it("uses workflows:delete for delete", () => {
+    mockHasPermissionRef.current = (permission: string) =>
+      permission === "workflows:delete";
+    renderPage();
+
+    expect(screen.getByText("Delete")).toBeTruthy();
+    expect(screen.queryByText("Edit")).toBeNull();
+    expect(screen.queryByText("Replicate to another project")).toBeNull();
+  });
+
+  it("uses evaluations:manage for replicate", () => {
+    mockHasPermissionRef.current = (permission: string) =>
+      permission === "evaluations:manage";
+    renderPage();
+
+    expect(screen.getByText("Replicate to another project")).toBeTruthy();
+    expect(screen.queryByText("Edit")).toBeNull();
+    expect(screen.queryByText("Delete")).toBeNull();
   });
 });

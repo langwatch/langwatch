@@ -27,7 +27,7 @@ export const CreateExperimentButton = () => {
     onError: () => setIsCreating(false),
   });
 
-  if (!project || !hasPermission("evaluations:manage")) return null;
+  if (!project || !hasPermission("workflows:create")) return null;
 
   const handleCreate = () => {
     checkAndProceed(() => {
