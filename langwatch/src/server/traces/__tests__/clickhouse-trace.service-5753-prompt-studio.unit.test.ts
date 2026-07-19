@@ -15,7 +15,10 @@
  */
 import { createLogger } from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
+import {
+  EVENTREF_ATTR_PREFIX,
+  IO_PREVIEW_BYTES,
+} from "~/server/app-layer/traces/lean-for-projection";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
@@ -57,7 +60,6 @@ vi.mock("langwatch", () => ({
 // Constants / helpers
 // ---------------------------------------------------------------------------
 
-const IO_PREVIEW_BYTES = 65536;
 const LARGE_BYTE_COUNT = 400_000;
 const FULL_OUTPUT = "x".repeat(LARGE_BYTE_COUNT);
 const PREVIEW_OUTPUT = "x".repeat(IO_PREVIEW_BYTES) + "…";

@@ -1347,11 +1347,39 @@ export class ClickHouseTraceService {
           // is never offloaded, so resolving just the target is enough.
           let resolvedRow = row;
           if (this.resolveTraceSpans) {
-            const targetSpan = {
+            // #5753: build a fully-typed NormalizedSpan so the resolver
+            // gets type-checked fields. Only `spanId`, `traceId`, and
+            // `spanAttributes` are read by `resolveTraceSpans` today, but
+            // supplying safe defaults for every required field means a
+            // future change to the resolver (e.g. tenantId-scoped logging
+            // or filtering) won't silently receive undefined.
+            const targetSpan: NormalizedSpan = {
+              id: row.SpanId,
               spanId: row.SpanId,
               traceId: row.TraceId,
+              tenantId: projectId,
+              parentSpanId: null,
+              parentTraceId: null,
+              parentIsRemote: null,
+              sampled: false,
+              startTimeUnixMs: 0,
+              endTimeUnixMs: 0,
+              durationMs: 0,
+              name: "",
+              kind: NormalizedSpanKind.UNSPECIFIED,
+              resourceAttributes: {},
               spanAttributes: row.SpanAttributes,
-            } as unknown as NormalizedSpan;
+              events: [],
+              links: [],
+              statusMessage: null,
+              statusCode: null,
+              instrumentationScope: { name: "", version: null },
+              droppedAttributesCount: 0,
+              droppedEventsCount: 0,
+              droppedLinksCount: 0,
+              cost: null,
+              nonBilledCost: null,
+            };
             const { resolvedSpans } = await this.resolveTraceSpans(
               projectId,
               [targetSpan],
