@@ -95,12 +95,12 @@ jobs:
           echo "APP_IMAGE=${APP_REPO}:${APP_TAG}" >> "$GITHUB_ENV"
       - name: Build app image
         if: matrix.build_app
-        run: docker build -t "$APP_IMAGE" -f ../../docker/Dockerfile ../../..
+        run: docker build -t "$APP_IMAGE" -f ../../infra/docker/Dockerfile ../..
       # The gateway image isn't published to ghcr yet — build it locally so
       # the chart e2e can install. values-e2e.yaml overrides
       # gateway.image.{repository,tag,pullPolicy} to match.
       - name: Build gateway image
-        run: docker build -t langwatch/ai-gateway:e2e -f ../../docker/Dockerfile.go_service ../../..
+        run: docker build -t langwatch/ai-gateway:e2e -f ../../infra/docker/Dockerfile.go_service ../..
       - uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1
         with:
           cluster_name: ${{ matrix.cluster }}
