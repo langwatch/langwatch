@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const migration = readFileSync(
   resolve(
     process.cwd(),
-    "src/server/clickhouse/migrations/00042_create_canonical_metrics.sql",
+    "src/server/clickhouse/migrations/00049_create_canonical_metrics.sql",
   ),
   "utf8",
 );

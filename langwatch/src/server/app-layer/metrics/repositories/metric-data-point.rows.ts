@@ -14,7 +14,7 @@ import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
  * On metric_usage_estimates this only holds within a month: that table
  * partitions by AcceptedAt, which is not part of a PointId's identity, and a
  * merge never crosses partitions. Cross-month dedup happens at query time
- * instead — see the KNOWN TENSION note in migration 00042.
+ * instead — see the KNOWN TENSION note in migration 00049.
  */
 const MAX_UINT64 = 18_446_744_073_709_551_615n;
 
