@@ -17,6 +17,7 @@ import {
 
 describe("classifyScenarioInfraError", () => {
   describe("when the raw error is a self-signed certificate failure", () => {
+    /** @scenario "A self-signed certificate failure becomes an untrusted-certificate error" */
     it("classifies the human-readable message and cert code", () => {
       const raw =
         "Child process exited with code 1: fetch failed: self-signed certificate in certificate chain (SELF_SIGNED_CERT_IN_CHAIN)";
@@ -43,6 +44,7 @@ describe("classifyScenarioInfraError", () => {
   });
 
   describe("when the raw error is a connection failure", () => {
+    /** @scenario "A connection failure becomes an unreachable-endpoint error" */
     it.each([
       "connect ECONNREFUSED 127.0.0.1:443",
       "getaddrinfo ENOTFOUND app.main.langwatch.localhost",
@@ -55,6 +57,7 @@ describe("classifyScenarioInfraError", () => {
   });
 
   describe("when the raw error is a model-provider rejection", () => {
+    /** @scenario "A model-provider rejection becomes a model-provider error" */
     it("surfaces the provider's JSON message", () => {
       const raw =
         '{"error":{"message":"Model not found: grok-4-5","meta":{"status":400},"type":"provider_error"}}';
@@ -73,6 +76,7 @@ describe("classifyScenarioInfraError", () => {
   });
 
   describe("when the raw error is a timeout", () => {
+    /** @scenario "A timeout becomes an execution-timeout error" */
     it("classifies it as an execution timeout", () => {
       expect(
         classifyScenarioInfraError("Scenario execution timed out").code,
@@ -81,6 +85,7 @@ describe("classifyScenarioInfraError", () => {
   });
 
   describe("when the raw error is unrecognised", () => {
+    /** @scenario "An unrecognised failure keeps its message under a generic infra code" */
     it("keeps the message under the generic infra code", () => {
       const result = classifyScenarioInfraError("Something unexpected happened");
       expect(result.code).toBe(ScenarioInfraErrorCode.Infra);
@@ -117,6 +122,7 @@ describe("classifyScenarioInfraError", () => {
 });
 
 describe("encodeScenarioError / decodeScenarioError", () => {
+  /** @scenario "The handled error round-trips through the results error field" */
   it("round-trips code, message, and hint", () => {
     const envelope = classifyScenarioInfraError(
       "self-signed certificate in certificate chain",

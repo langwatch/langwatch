@@ -39,6 +39,7 @@ describe("hasNoResults()", () => {
 
 describe("shouldShowNoResponse()", () => {
   describe("when a finished run produced no messages and no error", () => {
+    /** @scenario A finished run with no messages and no error shows "No response" */
     it.each([
       ScenarioRunStatus.SUCCESS,
       ScenarioRunStatus.FAILED,
@@ -63,6 +64,7 @@ describe("shouldShowNoResponse()", () => {
   });
 
   describe("when the run failed with an infrastructure error", () => {
+    /** @scenario A run that errored does not show "No response" */
     it("does not show the no-response state (the error is surfaced instead)", () => {
       expect(
         shouldShowNoResponse({
@@ -75,6 +77,7 @@ describe("shouldShowNoResponse()", () => {
   });
 
   describe("when the run is still in flight", () => {
+    /** @scenario An in-flight run does not show "No response" */
     it.each([
       ScenarioRunStatus.IN_PROGRESS,
       ScenarioRunStatus.PENDING,

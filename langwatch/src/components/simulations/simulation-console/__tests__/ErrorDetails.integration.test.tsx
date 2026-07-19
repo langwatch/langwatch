@@ -39,6 +39,7 @@ describe("<ErrorDetails />", () => {
   afterEach(cleanup);
 
   describe("given the SDK's serialized {name,message,stack} cert error", () => {
+    /** @scenario "The drawer renders the handled error, not a raw dump" */
     it("renders the handled-error title and actionable hint", () => {
       renderError(SDK_CERT_ERROR);
       expect(screen.getByText("Secure connection failed")).toBeDefined();

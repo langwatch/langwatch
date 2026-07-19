@@ -9,6 +9,7 @@ import { resolveChildTlsEnv } from "../child-tls-env";
 
 describe("resolveChildTlsEnv", () => {
   describe("when a trusted local CA is present", () => {
+    /** @scenario "A trusted local CA is forwarded to the runner" */
     it("forwards NODE_EXTRA_CA_CERTS and never disables verification", () => {
       const result = resolveChildTlsEnv({
         isSaaS: false,
@@ -31,6 +32,7 @@ describe("resolveChildTlsEnv", () => {
   });
 
   describe("when no trusted CA is present", () => {
+    /** @scenario "Local dev without a trusted CA relaxes TLS for the runner only" */
     it("relaxes TLS only in local, non-SaaS, non-production dev", () => {
       const result = resolveChildTlsEnv({
         isSaaS: false,
@@ -51,6 +53,7 @@ describe("resolveChildTlsEnv", () => {
       expect(result.NODE_EXTRA_CA_CERTS).toBeUndefined();
     });
 
+    /** @scenario "A hosted deployment never relaxes TLS for the runner" */
     it("never relaxes TLS in SaaS", () => {
       const result = resolveChildTlsEnv({
         isSaaS: true,
