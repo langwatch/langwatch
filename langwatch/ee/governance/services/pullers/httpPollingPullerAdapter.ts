@@ -80,7 +80,7 @@ const httpPollingConfigSchema = z.object({
   cursorQueryParam: z.string().default("cursor"),
   /** JSONPath into the response body to extract the events array. */
   eventsJsonPath: z.string().min(1),
-  /** cron string for scheduling (validated upstream by BullMQ). */
+  /** cron string for scheduling (validated before the process event). */
   schedule: z.string().min(1),
   /** Per-event JSONPath mappings (NormalizedPullEvent shape). */
   eventMapping: eventMappingSchema,

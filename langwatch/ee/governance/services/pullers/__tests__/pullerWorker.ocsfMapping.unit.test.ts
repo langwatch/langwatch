@@ -1,6 +1,6 @@
 /**
  * Unit coverage for the puller worker's NormalizedPullEvent → OCSF
- * row mapping. The full worker shape (Prisma + CH + BullMQ) is
+ * row mapping. The full effect shape (Prisma + CH + process outbox) is
  * exercised by the integration tier; this file documents the
  * pure-function shape of the mapping that's hardest to get right
  * (eventId composition, raw_event preservation, time-coercion fallback).
@@ -40,8 +40,7 @@ const baseEvent: NormalizedPullEvent = {
 describe("PullerWorker — OCSF mapping (semantic contract)", () => {
   it("loads the worker module without crashing", async () => {
     const mod = await loadMapper();
-    expect(mod.startIngestionPullerWorker).toBeTypeOf("function");
-    expect(mod.runIngestionPullerJob).toBeTypeOf("function");
+    expect(mod.runIngestionPull).toBeTypeOf("function");
   });
 
   // Direct test of the semantic shape — this matches the implementation
@@ -62,7 +61,7 @@ describe("PullerWorker — OCSF mapping (semantic contract)", () => {
       const safeEventTime = Number.isFinite(eventTime.getTime())
         ? eventTime
         : new Date();
-      const eventId = `${sourceType}:${event.source_event_id}`;
+      const eventId = `${sourceType}:${ingestionSourceId}:${event.source_event_id}`;
       return {
         tenantId,
         eventId,
@@ -76,15 +75,15 @@ describe("PullerWorker — OCSF mapping (semantic contract)", () => {
       };
     }
 
-    it("composes eventId as `<sourceType>:<source_event_id>`", () => {
+    it("composes eventId as `<sourceType>:<sourceId>:<source_event_id>`", () => {
       const row = mapToOcsfRowSemantic({
         event: baseEvent,
         tenantId: "gov-proj-1",
         ingestionSourceId: "src-1",
         sourceType: "copilot_studio",
       });
-      expect(row.eventId).toBe("copilot_studio:evt-123");
-      expect(row.traceId).toBe("pull:copilot_studio:evt-123");
+      expect(row.eventId).toBe("copilot_studio:src-1:evt-123");
+      expect(row.traceId).toBe("pull:copilot_studio:src-1:evt-123");
     });
 
     it("uses the org's hidden internal_governance Project ID as tenantId", () => {

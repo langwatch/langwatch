@@ -5,28 +5,16 @@
  * distributes keys across slots by hashing the key name; BullMQ uses
  * multiple keys per queue, so without a {hash tag} those keys can land on
  * different slots and every multi-key Lua script fails with CROSSSLOT.
- * These assertions are the regression net for the queues that still run on
- * BullMQ in production (topic clustering, ingestion puller, scenarios) —
+ * These assertions are the regression net for queues still on BullMQ —
  * unit-level intent recovered from the deleted
  * background/__tests__/redis-cluster.integration.test.ts.
  *
  * @see specs/background/redis-cluster-compatibility.feature
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { makeQueueName } from "../makeQueueName";
 import { SCENARIO_QUEUE } from "~/server/scenarios/scenario.constants";
-
-// PULLER_QUEUE lives in the puller worker module, whose transitive imports
-// touch Prisma / Redis / ClickHouse at load — stub those storage edges so
-// reading the constant stays a unit test.
-vi.mock("~/server/db", () => ({ prisma: {} }));
-vi.mock("~/server/redis", () => ({ connection: null }));
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
-}));
-
-import { PULLER_QUEUE } from "@ee/governance/services/pullers/pullerWorker";
 
 /**
  * A queue name is Redis Cluster compatible when it contains a hash tag:
@@ -63,7 +51,6 @@ describe("queue name constants", () => {
   describe("when checking every queue that runs on BullMQ", () => {
     /** @scenario Every queue name produced by the system contains a hash tag */
     it.each([
-      ["PULLER_QUEUE", PULLER_QUEUE.NAME],
       ["SCENARIO_QUEUE", SCENARIO_QUEUE.NAME],
     ])("%s contains a hash tag", (_label, queueName) => {
       expect(hasHashTag(queueName)).toBe(true);

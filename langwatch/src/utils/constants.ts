@@ -54,4 +54,5 @@ export const KSUID_RESOURCES = {
   LANGY_CONVERSATION: "langyconv",
   LANGY_MESSAGE: "langymsg",
   TOPIC_CLUSTERING_RUN: "topicrun",
+  INGESTION_PULL_RUN: "ingpullrun",
 } as const;

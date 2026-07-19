@@ -17,6 +17,10 @@ import {
   EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
 } from "../pipelines/experiment-run-processing/schemas/constants";
 import {
+  INGESTION_PULL_PROCESSING_COMMAND_TYPES,
+  INGESTION_PULL_PROCESSING_EVENT_TYPES,
+} from "../pipelines/ingestion-pull-processing/schemas/constants";
+import {
   LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
 } from "../pipelines/langy-conversation-processing/schemas/constants";
@@ -58,6 +62,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
   ...SUITE_RUN_PROCESSING_EVENT_TYPES,
   ...LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
   ...TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES,
+  ...INGESTION_PULL_PROCESSING_EVENT_TYPES,
   ...TEST_EVENT_TYPES,
 ] as const;
 
@@ -73,6 +78,7 @@ export const COMMAND_TYPE_IDENTIFIERS = [
   ...SUITE_RUN_PROCESSING_COMMAND_TYPES,
   ...LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
   ...TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES,
+  ...INGESTION_PULL_PROCESSING_COMMAND_TYPES,
   ...BILLING_REPORTING_COMMAND_TYPES,
 ] as const;
 
@@ -97,6 +103,7 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "suite_run",
   "langy_conversation",
   "topic_clustering",
+  "ingestion_pull",
   "billing_report",
   "global",
   TEST_AGGREGATE_TYPE,

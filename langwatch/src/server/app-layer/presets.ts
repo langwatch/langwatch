@@ -118,6 +118,9 @@ import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering
 import { PrismaTopicClusteringStatusRepository } from "./topic-clustering/repositories/topic-clustering-status.repository";
 import { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
+import { PrismaIngestionPullRunProjectionRepository } from "@ee/governance/services/pullers/repositories/ingestion-pull-run-projection.prisma.repository";
+import { runIngestionPull } from "@ee/governance/services/pullers/pullerWorker";
+import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import {
   SimulationRunStateRepositoryClickHouse,
@@ -677,6 +680,9 @@ export function initializeDefaultApp(options?: {
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),
+    ingestionPullRunStatus: new PrismaIngestionPullRunProjectionRepository(
+      prisma,
+    ),
     langyTurnAdmission,
   };
 
@@ -899,6 +905,10 @@ export function initializeDefaultApp(options?: {
       },
       runsWorkers: roleRunsWorkers(config.processRole),
     },
+    ingestionPull: {
+      runPort: { run: runIngestionPull },
+      runsWorkers: roleRunsWorkers(config.processRole),
+    },
     projects,
     monitors,
     triggers,
@@ -918,6 +928,29 @@ export function initializeDefaultApp(options?: {
     governanceOcsfEventsSync,
   });
   const commands = registry.registerAll();
+  if (roleRunsWorkers(config.processRole)) {
+    const ingestionPullReconcileLogger = createLogger(
+      "langwatch:ingestion-pull:reconcile",
+    );
+    void reconcileIngestionPullProcesses({
+      prisma,
+      commands: commands.ingestionPull,
+    })
+      .then(({ reconciled, failed }) => {
+        if (failed > 0) {
+          ingestionPullReconcileLogger.warn(
+            { reconciled, failed },
+            "Some ingestion pull processes failed reconciliation; the next boot retries",
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        ingestionPullReconcileLogger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "Ingestion pull process reconciliation failed; the next boot retries",
+        );
+      });
+  }
   (globalForApp as any).__scenarioExecutionHandle =
     commands.scenarioExecutionHandle;
 
@@ -1485,6 +1518,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordClusteringRunCompleted: noop,
         recordClusteringRunFailed: noop,
       } as AppCommands["topicClustering"],
+      ingestionPull: {
+        configure: noop,
+        disable: noop,
+        recordRunCompleted: noop,
+        recordRunFailed: noop,
+      } as AppCommands["ingestionPull"],
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],
@@ -1504,7 +1543,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         },
       },
       processOutboxWorker: {
-        stop: async () => {},
+        stop: async () => {
+          // Test preset has no background process workers.
+        },
       },
     },
     retentionPolicyCache: testRetentionPolicyCache,

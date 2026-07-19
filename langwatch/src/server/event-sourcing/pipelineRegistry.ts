@@ -11,6 +11,16 @@ import {
   createGovernanceOcsfEventsSyncReactor,
   type GovernanceOcsfEventsSyncReactorDeps,
 } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
+import {
+  createIngestionPullIntentHandlers,
+  createIngestionPullProcessSubscriber,
+  INGESTION_PULL_CONCURRENCY,
+  INGESTION_PULL_LEASE_DURATION_MS,
+  INGESTION_PULL_MAX_ATTEMPTS,
+  INGESTION_PULL_PROCESS_NAME,
+  ingestionPullProcessDefinition,
+  type IngestionPullRunPort,
+} from "@ee/governance/services/pullers/process-manager";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
@@ -136,10 +146,13 @@ import {
   OutboxDispatcherService,
   ProcessManagerService,
   ProcessOutboxWorker,
+  ProcessWakeWorker,
   type ProcessStore,
 } from "./process-manager";
 import { createTopicClusteringProcessingPipeline } from "./pipelines/topic-clustering-processing/pipeline";
 import type { TopicClusteringRunStatusData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
+import { createIngestionPullProcessingPipeline } from "./pipelines/ingestion-pull-processing/pipeline";
+import type { IngestionPullRunStatusData } from "./pipelines/ingestion-pull-processing/projections/ingestionPullRunStatus.foldProjection";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -273,6 +286,8 @@ export interface PipelineRepositories {
   processStore: ProcessStore;
   /** Per-project topic clustering run status (ADR-051, Postgres). */
   topicClusteringRunStatus: StateProjectionStore<TopicClusteringRunStatusData>;
+  /** Per-source ingestion pull checkpoint and run status. */
+  ingestionPullRunStatus: StateProjectionStore<IngestionPullRunStatusData>;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionRepository;
 }
@@ -292,6 +307,10 @@ export interface PipelineRegistryDeps {
   topicClustering: {
     /** Runs one clustering page (the ADR-051 effect's domain function). */
     runPort: TopicClusteringRunPort;
+    runsWorkers: boolean;
+  };
+  ingestionPull: {
+    runPort: IngestionPullRunPort;
     runsWorkers: boolean;
   };
   projects: ProjectService;
@@ -438,6 +457,24 @@ export class PipelineRegistry {
       this.registerLangyConversationPipeline();
     const { pipeline: topicClusteringPipeline } =
       this.registerTopicClusteringPipeline();
+    const {
+      pipeline: ingestionPullPipeline,
+      processOutboxWorker: ingestionPullOutboxWorker,
+      processManager: ingestionPullProcessManager,
+    } = this.registerIngestionPullPipeline();
+    // Topic clustering's wake-ups are runtime-owned (ADR-052); this worker
+    // scans only the ingestion-pull process, so the two never double-claim.
+    const ingestionPullWakeWorker = new ProcessWakeWorker({
+      store: this.deps.repositories.processStore,
+      managers: {
+        [INGESTION_PULL_PROCESS_NAME]: ingestionPullProcessManager,
+      },
+      logger,
+      notifyOutbox: () => ingestionPullOutboxWorker.notify(),
+    });
+    if (this.deps.ingestionPull.runsWorkers) {
+      ingestionPullWakeWorker.start();
+    }
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -450,6 +487,7 @@ export class PipelineRegistry {
       suiteRuns: mapCommands(suiteRunPipeline.commands),
       langy: mapCommands(langyConversationPipeline.commands),
       topicClustering: mapCommands(topicClusteringPipeline.commands),
+      ingestionPull: mapCommands(ingestionPullPipeline.commands),
       billing: mapCommands(billingPipeline.commands),
       automations: automationCommands,
       /** Late-bind the execution pool for scenario execution reactor. */
@@ -460,7 +498,11 @@ export class PipelineRegistry {
       // with EventSourcing.stop(); only Langy still hand-rolls its outbox.
       processOutboxWorker: {
         stop: async () => {
-          await processOutboxWorker.stop();
+          await Promise.all([
+            processOutboxWorker.stop(),
+            ingestionPullOutboxWorker.stop(),
+            ingestionPullWakeWorker.stop(),
+          ]);
         },
       },
     };
@@ -514,6 +556,55 @@ export class PipelineRegistry {
     );
 
     return { pipeline };
+  }
+
+  private registerIngestionPullPipeline() {
+    const processManager = new ProcessManagerService({
+      definition: ingestionPullProcessDefinition,
+      store: this.deps.repositories.processStore,
+    });
+    const recordCompleted = new Deferred<
+      (args: Record<string, unknown>) => Promise<void>
+    >("ingestionPullRecordCompleted");
+    const recordFailed = new Deferred<
+      (args: Record<string, unknown>) => Promise<void>
+    >("ingestionPullRecordFailed");
+    const outboxDispatcher = new OutboxDispatcherService({
+      store: this.deps.repositories.processStore,
+      handlers: createIngestionPullIntentHandlers({
+        runPort: this.deps.ingestionPull.runPort,
+        commands: {
+          recordRunCompleted: (args) => recordCompleted.fn(args),
+          recordRunFailed: (args) => recordFailed.fn(args),
+        },
+      }),
+      maxAttempts: INGESTION_PULL_MAX_ATTEMPTS,
+      leaseDurationMs: INGESTION_PULL_LEASE_DURATION_MS,
+      processNames: [INGESTION_PULL_PROCESS_NAME],
+      concurrency: INGESTION_PULL_CONCURRENCY,
+    });
+    const processOutboxWorker = new ProcessOutboxWorker({
+      dispatcher: outboxDispatcher,
+      logger,
+      batchSize: INGESTION_PULL_CONCURRENCY,
+    });
+    const subscriber = createIngestionPullProcessSubscriber({
+      processManager,
+      notifyOutbox: () => processOutboxWorker.notify(),
+    });
+    const pipeline = this.deps.eventSourcing.register(
+      createIngestionPullProcessingPipeline({
+        runStatusStore: this.deps.repositories.ingestionPullRunStatus,
+        subscribers: [subscriber],
+      }),
+    );
+    const commands = mapCommands(pipeline.commands);
+    recordCompleted.resolve((args) =>
+      commands.recordRunCompleted(args as never),
+    );
+    recordFailed.resolve((args) => commands.recordRunFailed(args as never));
+    if (this.deps.ingestionPull.runsWorkers) processOutboxWorker.start();
+    return { pipeline, processOutboxWorker, processManager };
   }
 
   /** Langy writes its low-latency operational projections directly to Postgres. */

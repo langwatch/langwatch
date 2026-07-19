@@ -184,8 +184,7 @@ export class TopicClusteringRunStatusFoldProjection
       };
     }
 
-    const skippedWithoutWork =
-      data.skippedReason != null && tracesSoFar === 0;
+    const skippedWithoutWork = data.skippedReason != null && tracesSoFar === 0;
     return {
       ...state,
       ProjectId: String(event.aggregateId),
