@@ -75,10 +75,14 @@ export interface TopicClusteringOutcomeCommands {
  * deterministic idempotency keys, so a redelivered intent cannot
  * double-record.
  *
- * Failure contract: attempts below the cap rethrow so the outbox retries
- * with backoff; the final attempt records a durable run_failed instead and
- * retires the message dispatched — the failure is a visible outcome, not a
- * dead row an operator has to find.
+ * Failure contract, split by which half failed:
+ * - the CLUSTERING call — attempts below the cap rethrow so the outbox
+ *   retries with backoff; the final attempt records a durable run_failed
+ *   instead and retires the message dispatched, so the failure is a visible
+ *   outcome rather than a dead row an operator has to find.
+ * - the OUTCOME write — never retried through the outbox, because that would
+ *   redeliver the intent and re-run the expensive page that already
+ *   succeeded. See the comment at the call site.
  */
 export function createTopicClusteringIntentHandlers(params: {
   runPort: TopicClusteringRunPort;
@@ -93,26 +97,11 @@ export function createTopicClusteringIntentHandlers(params: {
     const intent = topicClusteringRunIntentSchema.parse(message.payload);
     const projectId = message.projectId;
 
+    let outcome: ClusteringPageOutcome;
     try {
-      const outcome = await params.runPort.runClusteringPage({
+      outcome = await params.runPort.runClusteringPage({
         projectId,
         searchAfter: intent.searchAfter,
-      });
-      await params.commands.recordClusteringRunCompleted({
-        tenantId: projectId,
-        occurredAt: clock(),
-        runId: intent.runId,
-        page: intent.page,
-        mode: outcome.mode,
-        tracesProcessed: outcome.tracesProcessed,
-        topicsCount: outcome.topicsCount,
-        subtopicsCount: outcome.subtopicsCount,
-        ...(outcome.skippedReason
-          ? { skippedReason: outcome.skippedReason }
-          : {}),
-        ...(outcome.nextSearchAfter
-          ? { nextSearchAfter: outcome.nextSearchAfter }
-          : {}),
       });
     } catch (error) {
       const errorMessage =
@@ -145,6 +134,56 @@ export function createTopicClusteringIntentHandlers(params: {
         errorCode: classified.code,
         userActionable: classified.userActionable,
       });
+      return;
+    }
+
+    // The clustering work is DONE and already durable: topics are written,
+    // traces assigned, a Cost row billed. Only the bookkeeping is left, and
+    // it gets its own failure handling because the two have opposite retry
+    // economics. Rethrowing here would hand the message back to the outbox,
+    // which redelivers the whole intent — re-running embeddings and LLM
+    // naming over the same page and billing it again — to fix a write that
+    // costs nothing to lose. We cannot make the page cheaply replayable
+    // either: the effect has no read of the run projection to short-circuit
+    // on, so "already recorded" is not knowable from here.
+    //
+    // So: swallow the redelivery, never the signal. The failure is logged
+    // loudly with the full outcome (an operator can replay the command by
+    // hand), and the process self-heals within a day — `currentRun` stays
+    // pinned at this page's start, the stale-run guard abandons it after
+    // TOPIC_CLUSTERING_STALE_RUN_MS, and the next daily wake starts a fresh
+    // run that re-derives the remaining backlog from live unassigned traces.
+    // The cost of this branch is a deferred remainder, not lost or doubled
+    // work.
+    try {
+      await params.commands.recordClusteringRunCompleted({
+        tenantId: projectId,
+        occurredAt: clock(),
+        runId: intent.runId,
+        page: intent.page,
+        mode: outcome.mode,
+        tracesProcessed: outcome.tracesProcessed,
+        topicsCount: outcome.topicsCount,
+        subtopicsCount: outcome.subtopicsCount,
+        ...(outcome.skippedReason
+          ? { skippedReason: outcome.skippedReason }
+          : {}),
+        ...(outcome.nextSearchAfter
+          ? { nextSearchAfter: outcome.nextSearchAfter }
+          : {}),
+      });
+    } catch (error) {
+      logger.error(
+        {
+          projectId,
+          runId: intent.runId,
+          page: intent.page,
+          attempt: message.attempt,
+          error: error instanceof Error ? error.message : String(error),
+          outcome,
+        },
+        "Clustering page succeeded but recording its outcome failed; NOT re-running the page. The run stalls until the next daily wake abandons it and starts fresh",
+      );
     }
   };
 

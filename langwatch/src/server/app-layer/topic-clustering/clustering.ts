@@ -9,6 +9,10 @@ import {
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
 import { getApp } from "../app";
+import {
+  CLUSTERING_ERROR_CODES,
+  ClusteringError,
+} from "./clustering-error";
 import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { getProjectEmbeddingsModel } from "../../embeddings";
@@ -530,11 +534,17 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
   const topicClusteringModel = resolved.model;
   const provider = topicClusteringModel.split("/")[0];
   if (!provider) {
-    throw new Error("Topic clustering provider not set");
+    throw new ClusteringError(
+      CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
+      `Topic clustering model "${topicClusteringModel}" has no provider prefix`,
+    );
   }
   const modelProvider = (await getProjectModelProviders(project.id))[provider];
   if (!modelProvider) {
-    throw new Error(`Topic clustering model provider ${provider} not found`);
+    throw new ClusteringError(
+      CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
+      `Topic clustering model provider ${provider} not found`,
+    );
   }
   if (!modelProvider.enabled) {
     logger.info(
@@ -550,7 +560,6 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
 export interface ClusteringStoreSummary {
   topicsCount: number;
   subtopicsCount: number;
-  tracesAssigned: number;
 }
 
 export const batchClusterTraces = async (
@@ -784,7 +793,6 @@ export const storeResults = async (
   return {
     topicsCount: topics.length,
     subtopicsCount: subtopics.length,
-    tracesAssigned: tracesToAssign.length,
   };
 };
 
@@ -836,7 +844,13 @@ export const fetchTopicsBatchClustering = async (
     } catch {
       /* this is just a safe json parse fallback */
     }
-    throw new Error(
+    // Ours by default. The body often quotes an upstream provider error, but
+    // quoting is not evidence — attributing a 5xx to the customer's credentials
+    // on the strength of the text inside it is how this used to tell people to
+    // rotate working keys during our own outages. The message keeps the detail
+    // for operators; the customer is told the code only.
+    throw new ClusteringError(
+      CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
       `Failed to fetch topics batch clustering (langevals): ${response.statusText}\n\n${body}`,
     );
   }
@@ -885,7 +899,9 @@ export const fetchTopicsIncrementalClustering = async (
       /* this is just a safe json parse fallback */
     }
 
-    throw new Error(
+    // Ours by default — see the batch path above.
+    throw new ClusteringError(
+      CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
       `Failed to fetch topics incremental clustering (langevals): ${response.statusText}\n\n${body}`,
     );
   }

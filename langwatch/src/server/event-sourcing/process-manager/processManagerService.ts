@@ -154,7 +154,7 @@ export class ProcessManagerService<State> {
 
         const evolution = this.definition.evolve({
           previousState: existing.state,
-          input: { kind: "wake", scheduledFor: wake.wakeAt },
+          input: { kind: "wake", scheduledFor: wake.wakeAt, now },
           ref: wake.ref,
         });
 

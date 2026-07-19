@@ -8,7 +8,14 @@ export interface TopicClusteringStatus {
   lastRunOutcome: string | null;
   lastRunMode: string | null;
   lastRunSkippedReason: string | null;
-  lastRunError: string | null;
+  /**
+   * Deliberately absent: the raw error text. It is a provider/langevals
+   * response body — Python tracebacks, internal hostnames, echoed key
+   * prefixes — and gating its release on a regex classifier means one
+   * mis-scoped pattern turns into a disclosure. `lastRunErrorCode` is the
+   * whole contract with the UI; fixed copy is chosen from it. The raw text
+   * stays in the projection for operators. See ADR-051 §8.
+   */
   lastRunErrorCode: string | null;
   /** True when the customer can resolve the failure themselves. */
   lastRunErrorUserActionable: boolean;
@@ -38,12 +45,6 @@ export class TopicClusteringStatusService {
       lastRunOutcome: projection?.LastRunOutcome ?? null,
       lastRunMode: projection?.LastRunMode ?? null,
       lastRunSkippedReason: projection?.LastRunSkippedReason ?? null,
-      // The raw provider error is only returned when the customer can act on
-      // it. Internal failure detail stays in the projection for operators —
-      // it never reaches the product surface.
-      lastRunError: projection?.LastRunErrorUserActionable
-        ? (projection.LastRunError ?? null)
-        : null,
       lastRunErrorCode: projection?.LastRunErrorCode ?? null,
       lastRunErrorUserActionable:
         projection?.LastRunErrorUserActionable ?? false,

@@ -124,6 +124,19 @@ function settle(
   };
 }
 
+/**
+ * Whether an outcome event belongs to the run the process currently believes
+ * is in flight. Outcomes are delivered at least once and can arrive long
+ * after a stale-run recovery has moved on, so identity — not arrival order —
+ * decides whether an outcome may touch `currentRun`.
+ */
+function isCurrentRun(
+  state: TopicClusteringProcessState,
+  runId: string,
+): boolean {
+  return state.currentRun?.runId === runId;
+}
+
 function evolveEvent(
   previousState: TopicClusteringProcessState,
   envelope: ProcessEventEnvelope,
@@ -161,6 +174,13 @@ function evolveEvent(
       if (view.runId === null || view.page === null) {
         return settle(base, occurredAt);
       }
+      if (!isCurrentRun(previousState, view.runId)) {
+        // A late outcome from a superseded run. Acting on it would resurrect
+        // the old run as `currentRun` and emit a continuation intent, so two
+        // backlog walks would page the same project at once, each refreshing
+        // the other's in-flight guard. The live run owns the project.
+        return settle(base, occurredAt);
+      }
       if (!view.hasNextPage) {
         return settle({ ...base, currentRun: null }, occurredAt);
       }
@@ -186,6 +206,12 @@ function evolveEvent(
     }
 
     case TOPIC_CLUSTERING_EVENT_TYPES.RUN_FAILED:
+      if (view.runId !== null && !isCurrentRun(previousState, view.runId)) {
+        // Mirror of the completion guard: a late failure from a superseded
+        // run must not null out the LIVE run, or the next wake would start a
+        // third run alongside the one still walking the backlog.
+        return settle(base, occurredAt);
+      }
       return settle({ ...base, currentRun: null }, occurredAt);
 
     default:
@@ -196,6 +222,7 @@ function evolveEvent(
 function evolveWake(
   previousState: TopicClusteringProcessState,
   scheduledFor: number,
+  now: number,
 ): Evolution<TopicClusteringProcessState> {
   if (!previousState.enabled || !previousState.projectId) {
     // A wake for a process that was never bootstrapped decides nothing and
@@ -203,22 +230,30 @@ function evolveWake(
     return { state: previousState, nextWakeAt: null, intents: [] };
   }
 
+  // Clamp the reference instant to the present. A wake that fires late (the
+  // fleet was down for days) must schedule the NEXT slot from now, not from
+  // the slot it missed — otherwise every skipped day is replayed as its own
+  // run within seconds of recovery. Clustering re-derives its work from live
+  // unassigned traces, so one catch-up run covers the whole gap (ADR-051:
+  // "a schedule gap after recovery self-heals").
+  const refMs = Math.max(scheduledFor, now);
+
   const inFlight =
     previousState.currentRun !== null &&
-    scheduledFor - previousState.currentRun.updatedAtMs <
+    refMs - previousState.currentRun.updatedAtMs <
       TOPIC_CLUSTERING_STALE_RUN_MS;
   if (inFlight) {
     // An active backlog walk owns the project; skip this slot.
-    return settle(previousState, scheduledFor);
+    return settle(previousState, refMs);
   }
 
-  const runId = runIdForSlot(scheduledFor);
+  const runId = runIdForSlot(refMs);
   return settle(
     {
       ...previousState,
-      currentRun: { runId, page: 1, updatedAtMs: scheduledFor },
+      currentRun: { runId, page: 1, updatedAtMs: refMs },
     },
-    scheduledFor,
+    refMs,
     [runIntent({ runId, page: 1, searchAfter: null })],
   );
 }
@@ -237,6 +272,6 @@ export const topicClusteringProcessDefinition: ProcessDefinition<TopicClustering
       if (input.kind === "event") {
         return evolveEvent(previousState, input.event);
       }
-      return evolveWake(previousState, input.scheduledFor);
+      return evolveWake(previousState, input.scheduledFor, input.now);
     },
   };

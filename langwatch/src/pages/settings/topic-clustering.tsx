@@ -16,6 +16,36 @@ import SettingsLayout from "../../components/SettingsLayout";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
+/**
+ * Fixed copy per failure code. The classifier's code is the ONLY thing the
+ * server sends about a failure — never the provider's response body, which is
+ * a langevals/provider payload (tracebacks, internal hostnames, echoed key
+ * prefixes) and not something to put in front of a customer.
+ *
+ * A code with no entry here is treated as ours to fix, which is also what an
+ * unrecognised or mis-scoped classification degrades to.
+ */
+const CLUSTERING_FAILURE_GUIDANCE: Record<
+  string,
+  { title: string; description: string }
+> = {
+  model_not_configured: {
+    title: "No model is set up for topic clustering",
+    description:
+      "Choose a default model and embeddings for topic clustering in Settings → Model Providers → Default Models, then run it again.",
+  },
+  model_provider_auth: {
+    title: "Your model provider rejected the credentials",
+    description:
+      "Check the API key for your topic clustering model in Settings → Model Providers, then run topic clustering again.",
+  },
+  model_provider_quota: {
+    title: "Your model provider refused the request",
+    description:
+      "This usually means the account is out of quota or credit. Check your limits and billing with the provider, then run topic clustering again.",
+  },
+};
+
 function TopicClusteringSettings() {
   const { project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
@@ -175,32 +205,29 @@ function ClusteringStatusCard({ projectId }: { projectId: string }) {
                 </Text>
               )}
             {status.data.lastRunOutcome === "failed" &&
-              (status.data.lastRunErrorUserActionable &&
-              status.data.lastRunError ? (
-                <Alert.Root status="warning">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>
-                      {status.data.lastRunErrorCode === "model_not_configured"
-                        ? "No model is set up for topic clustering"
-                        : status.data.lastRunErrorCode ===
-                            "model_provider_quota"
-                          ? "Your model provider refused the request for quota or billing reasons"
-                          : "Your model provider rejected the credentials"}
-                    </Alert.Title>
-                    <Alert.Description>
-                      {status.data.lastRunErrorCode === "model_not_configured"
-                        ? "Choose a default model and embeddings for topic clustering in Settings → Model Providers → Default Models, then run it again."
-                        : `Check your keys and limits in Settings → Model Providers, then run topic clustering again. Provider response: ${status.data.lastRunError}`}
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
-              ) : (
-                <Text fontSize="sm" color="red.fg">
-                  The last run failed on our side. It will retry automatically
-                  at the next scheduled run.
-                </Text>
-              ))}
+              (() => {
+                const guidance = status.data.lastRunErrorUserActionable
+                  ? CLUSTERING_FAILURE_GUIDANCE[
+                      status.data.lastRunErrorCode ?? ""
+                    ]
+                  : undefined;
+                return guidance ? (
+                  <Alert.Root status="warning">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>{guidance.title}</Alert.Title>
+                      <Alert.Description>
+                        {guidance.description}
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert.Root>
+                ) : (
+                  <Text fontSize="sm" color="red.fg">
+                    The last run failed on our side. It will retry
+                    automatically at the next scheduled run.
+                  </Text>
+                );
+              })()}
             <HStack gap={3}>
               <Text fontWeight="medium">Next scheduled run</Text>
               <Text color="fg.muted">

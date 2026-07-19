@@ -1,0 +1,131 @@
+{{/*
+  ADR-051: seed the per-project topic clustering schedules, as a Helm
+  post-install,post-upgrade hook Job.
+
+  WHY THIS EXISTS. ADR-051 moved topic clustering off the `/api/cron/
+  schedule_topic_clustering` CronJob and onto durable per-project process
+  wakes. Those wakes are created when a project first ingests a trace (the
+  projectMetadata reactor's bootstrap) — which does nothing for the projects
+  that ALREADY ingested before the upgrade. Without this Job, a deploy of
+  ADR-051 leaves zero `ProcessManagerWake` rows for every existing project and
+  topic clustering silently stops platform-wide until an operator remembers to
+  run `pnpm run task backfillTopicClusteringSchedules` by hand. The whole point
+  of a hook is that the deploy seeds itself.
+
+  Properties that make it safe to fire on every upgrade:
+
+    - IDEMPOTENT: the task issues a bootstrap clustering request per eligible
+      project (firstMessage: true). The request is de-duplicated by the event
+      log and evolves already-bootstrapped processes to a pure no-op, so
+      re-running on every `helm upgrade` neither double-schedules a project nor
+      forces an unscheduled clustering run.
+    - OFF THE BOOT PATH: a hook Job, never the `set -e` app boot, so a failure
+      here can never block pods from starting. Topic clustering degrades; the
+      product still serves.
+    - OPT-OUT: `.Values.topicClusteringBackfill.enabled=false` omits it.
+
+  ORDERING CAVEAT (same as dataset-s3-migration). Prisma/ClickHouse migrations
+  in this chart run on APP BOOT (`start:prepare:db`), not as a Helm hook, so
+  `hook-weight` cannot order this Job after them — post-upgrade hooks fire once
+  resources are SUBMITTED, not once the Deployment has rolled out. If this Job
+  wins the race against a not-yet-migrated database it fails and the Job's
+  `backoffLimit` retries it, by which point the app has normally migrated. Use
+  `helm upgrade --wait` (or Argo/Flux, which wait on rollout) to make the
+  ordering deterministic rather than merely probable. Weight 10 puts it after
+  the dataset-s3-migration hook (5) so the two backfills don't contend.
+
+  hook-delete-policy `before-hook-creation` clears the prior run's Job before
+  re-creating it, so reruns are clean; a FAILED run is deliberately left on the
+  cluster for post-mortem (no `hook-succeeded`, matching dataset-s3-migration).
+
+  Image + env mirror the workers Deployment: same app image, same
+  `langwatch.sharedEnv` (DATABASE_URL, Redis, ClickHouse, ...).
+*/}}
+{{- if .Values.topicClusteringBackfill.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-topic-clustering-backfill
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-topic-clustering-backfill
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: topic-clustering-backfill
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: {{ .Values.topicClusteringBackfill.backoffLimit | default 3 }}
+  {{- with .Values.topicClusteringBackfill.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ . }}
+  {{- end }}
+  ttlSecondsAfterFinished: {{ .Values.topicClusteringBackfill.ttlSecondsAfterFinished | default 600 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-topic-clustering-backfill
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: topic-clustering-backfill
+    spec:
+      restartPolicy: Never
+      {{/* Parity with app/workers: the task talks to Postgres/Redis/ClickHouse
+           only, never the Kubernetes API, so don't mount the SA token. */}}
+      automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
+      {{- with .Values.topicClusteringBackfill.serviceAccountName }}
+      serviceAccountName: {{ . }}
+      {{- end }}
+
+      {{/* Inherit chart-wide pod security + scheduling defaults so strict
+           clusters don't reject the hook and node taints / dedicated pools
+           still apply — the same coalesce pattern the workers / app /
+           preflight / dataset-s3-migration templates use. */}}
+      {{- with (coalesce .Values.topicClusteringBackfill.podSecurityContext .Values.global.podSecurityContext) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.topicClusteringBackfill.nodeSelector .Values.global.scheduling.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.topicClusteringBackfill.tolerations .Values.global.scheduling.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.topicClusteringBackfill.affinity .Values.global.scheduling.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      containers:
+        - name: {{ .Release.Name }}-topic-clustering-backfill
+          {{- with (coalesce .Values.topicClusteringBackfill.containerSecurityContext .Values.global.containerSecurityContext) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
+          imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
+          workingDir: /app/langwatch
+          command: ['pnpm']
+          args: ['run', 'task', 'backfillTopicClusteringSchedules']
+          env:
+            {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            {{- with .Values.topicClusteringBackfill.extraEnvs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.topicClusteringBackfill.resources | nindent 12 }}
+          volumeMounts:
+            {{- with .Values.topicClusteringBackfill.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        {{- with .Values.topicClusteringBackfill.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: tmp-dir
+          emptyDir: {}
+{{- end }}

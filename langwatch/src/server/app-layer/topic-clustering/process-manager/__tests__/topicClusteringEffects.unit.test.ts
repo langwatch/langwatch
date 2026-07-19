@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { DispatchableMessage } from "~/server/event-sourcing/process-manager";
 
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
+import {
+  CLUSTERING_ERROR_CODES,
+  ClusteringError,
+} from "../../clustering-error";
 import { createTopicClusteringIntentHandlers } from "../topicClusteringEffects";
 
 function makeMessage(overrides: Partial<DispatchableMessage> = {}): DispatchableMessage {
@@ -86,6 +91,35 @@ describe("createTopicClusteringIntentHandlers", () => {
     });
   });
 
+  describe("when the page succeeds but recording its outcome fails", () => {
+    it("does not rethrow, so the outbox cannot re-run the expensive page", async () => {
+      const commands = makeCommands();
+      commands.recordClusteringRunCompleted.mockRejectedValue(
+        new Error("clickhouse append failed"),
+      );
+      const runClusteringPage = vi.fn().mockResolvedValue({
+        mode: "batch",
+        tracesProcessed: 2_000,
+        topicsCount: 8,
+        subtopicsCount: 20,
+        nextSearchAfter: [123, "trace-a"],
+      });
+      const handlers = createTopicClusteringIntentHandlers({
+        runPort: { runClusteringPage },
+        commands,
+        clock: () => 999,
+      });
+
+      await expect(
+        handlers["topic_clustering.run"]!({ message: makeMessage() }),
+      ).resolves.toBeUndefined();
+
+      expect(runClusteringPage).toHaveBeenCalledTimes(1);
+      // Recording the run as failed would be a lie — the clustering worked.
+      expect(commands.recordClusteringRunFailed).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when clustering fails below the attempt cap", () => {
     it("rethrows so the outbox retries and records nothing", async () => {
       const commands = makeCommands();
@@ -116,7 +150,12 @@ describe("createTopicClusteringIntentHandlers", () => {
         runPort: {
           runClusteringPage: vi
             .fn()
-            .mockRejectedValue(new Error("langevals unavailable")),
+            .mockRejectedValue(
+              new ClusteringError(
+                CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
+                "langevals unavailable",
+              ),
+            ),
         },
         commands,
         clock: () => 999,
@@ -137,13 +176,20 @@ describe("createTopicClusteringIntentHandlers", () => {
       });
     });
 
-    it("classifies provider credential failures as user-actionable", async () => {
+    it("marks a missing model configuration as the customer's to fix", async () => {
       const commands = makeCommands();
       const handlers = createTopicClusteringIntentHandlers({
         runPort: {
           runClusteringPage: vi
             .fn()
-            .mockRejectedValue(new Error("401 Unauthorized: invalid api key")),
+            .mockRejectedValue(
+              new ModelNotConfiguredError(
+                "analytics.topic_clustering_llm",
+                "FAST",
+                "Topic clustering",
+                "project-1",
+              ),
+            ),
         },
         commands,
         clock: () => 999,
@@ -155,8 +201,39 @@ describe("createTopicClusteringIntentHandlers", () => {
 
       expect(commands.recordClusteringRunFailed).toHaveBeenCalledWith(
         expect.objectContaining({
-          errorCode: "model_provider_auth",
+          errorCode: "model_not_configured",
           userActionable: true,
+        }),
+      );
+    });
+
+    /**
+     * The regression that motivated moving classification to the throw site: an
+     * error we did not raise ourselves must never be reported as the customer's
+     * configuration being wrong, however much its text reads like it.
+     */
+    it("never blames the customer for an error it cannot attribute", async () => {
+      const commands = makeCommands();
+      const handlers = createTopicClusteringIntentHandlers({
+        runPort: {
+          runClusteringPage: vi
+            .fn()
+            .mockRejectedValue(
+              new Error("Code: 499. DB::Exception: 403 Forbidden (S3Error)"),
+            ),
+        },
+        commands,
+        clock: () => 999,
+      });
+
+      await handlers["topic_clustering.run"]!({
+        message: makeMessage({ attempt: 3 }),
+      });
+
+      expect(commands.recordClusteringRunFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          errorCode: "internal",
+          userActionable: false,
         }),
       );
     });

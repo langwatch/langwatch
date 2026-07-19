@@ -191,8 +191,21 @@ without new infrastructure.
   the moment `firstMessage` flips true — additionally dispatches
   `requestClustering` (bootstrap) so every newly-active project gets a
   process row and a first wake.
-- A one-time task seeds processes for existing eligible projects
-  (`firstMessage: true`). Safe to re-run: bootstrap is idempotent.
+- A task (`backfillTopicClusteringSchedules`) seeds processes for
+  existing eligible projects (`firstMessage: true`). Safe to re-run:
+  bootstrap is idempotent.
+- **That task runs on deploy, not by hand.** The chart ships it as a
+  `post-install,post-upgrade` Helm hook Job
+  (`templates/topic-clustering-backfill-job.yaml`, toggled by
+  `topicClusteringBackfill.enabled`). This is load-bearing: the reactor
+  bootstrap above only fires for projects that ingest a trace *after*
+  the upgrade, so without the hook a deploy leaves zero wakes for every
+  pre-existing project and clustering stops platform-wide until an
+  operator remembers the CLI. Because bootstrap is idempotent the hook
+  re-runs harmlessly on every upgrade. Caveat: migrations run on app
+  boot rather than as a hook, so `hook-weight` cannot order the Job
+  after them — the Job's `backoffLimit` absorbs that race, and
+  `helm upgrade --wait` makes it deterministic.
 - The settings-page manual trigger dispatches `requestClustering`
   (manual) via tRPC instead of enqueueing a BullMQ job. The CLI task
   (`runTopicClustering`) calls the core function directly and loops

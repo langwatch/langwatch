@@ -115,6 +115,8 @@ import { NullLangyAnalyticsEventRepository } from "./langy/repositories/langy-an
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
 import { PrismaProcessStore } from "../event-sourcing/process-manager";
 import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
+import { PrismaTopicClusteringStatusRepository } from "./topic-clustering/repositories/topic-clustering-status.repository";
+import { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import {
@@ -1151,6 +1153,11 @@ export function initializeDefaultApp(options?: {
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
+    topicClustering: {
+      status: new TopicClusteringStatusService(
+        new PrismaTopicClusteringStatusRepository(prisma),
+      ),
+    },
     langy: {
       conversations: langyConversations,
       turns: langyTurns,
@@ -1327,6 +1334,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         startSuiteRun: noop,
         queueSimulationRun: noop,
       }),
+    },
+    topicClustering: {
+      status: new TopicClusteringStatusService(
+        new PrismaTopicClusteringStatusRepository(testPrisma),
+      ),
     },
     langy: {
       conversations: LangyConversationService.create(

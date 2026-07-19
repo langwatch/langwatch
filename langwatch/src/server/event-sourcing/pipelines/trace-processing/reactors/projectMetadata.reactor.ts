@@ -96,10 +96,25 @@ export function createProjectMetadataReactor(
           },
         });
 
+        // Own error handling: by this point the metadata write has already
+        // COMMITTED, so letting a bootstrap failure fall through to the outer
+        // catch would report "Failed to update project metadata" for a write
+        // that succeeded — and hide the thing that actually broke. A failure
+        // here means the project has no scheduled clustering wake; the deploy
+        // backfill (backfillTopicClusteringSchedules) is the recovery path.
         if (!project.firstMessage) {
-          await deps.bootstrapTopicClustering?.(tenantId);
+          try {
+            await deps.bootstrapTopicClustering?.(tenantId);
+          } catch (error) {
+            logger.error(
+              {
+                tenantId,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "Project metadata updated, but topic clustering bootstrap failed — project has no scheduled clustering wake until the backfill task re-runs (non-fatal)",
+            );
+          }
         }
-
       } catch (error) {
         logger.error(
           {

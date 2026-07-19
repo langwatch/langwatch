@@ -175,6 +175,14 @@ export class TopicClusteringRunStatusFoldProjection
       LastRunErrorCode: event.data.errorCode ?? null,
       LastRunErrorUserActionable: event.data.userActionable ?? false,
       LastRunSkippedReason: null,
+      // A failed run produced no counts. Without these resets the row keeps the
+      // PREVIOUS (successful) run's numbers, so the settings page renders a
+      // failure alongside a healthy-looking "12,000 traces / 40 topics" — the
+      // mirror image of the completed handler clearing the error fields.
+      LastRunTracesProcessed: 0,
+      LastRunTopicsCount: 0,
+      LastRunSubtopicsCount: 0,
+      LastRunPages: 0,
       InProgressRunId: null,
       InProgressTraces: 0,
       InProgressPages: 0,

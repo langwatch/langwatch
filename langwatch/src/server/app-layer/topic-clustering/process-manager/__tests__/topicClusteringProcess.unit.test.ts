@@ -43,10 +43,11 @@ function evolveEvent(
 function evolveWake(
   previousState: TopicClusteringProcessState,
   scheduledFor: number,
+  now: number = scheduledFor,
 ) {
   return topicClusteringProcessDefinition.evolve({
     previousState,
-    input: { kind: "wake", scheduledFor },
+    input: { kind: "wake", scheduledFor, now },
   });
 }
 
@@ -181,6 +182,31 @@ describe("topicClusteringProcessDefinition", () => {
     });
   });
 
+  describe("when wakes were missed for three days", () => {
+    it("collapses the gap into exactly one catch-up run", () => {
+      // The wake worker drains every due wake it finds; drive that loop.
+      const missedSlot = Date.UTC(2026, 6, 14, 9, 30);
+      const now = missedSlot + 3 * DAY_MS;
+
+      let state = bootstrappedState();
+      let nextWakeAt: number | null = missedSlot;
+      const intents = [];
+      let iterations = 0;
+
+      while (nextWakeAt !== null && nextWakeAt <= now) {
+        if (++iterations > 10) break; // guard against a runaway replay loop
+        const evolution = evolveWake(state, nextWakeAt, now);
+        state = evolution.state;
+        nextWakeAt = evolution.nextWakeAt;
+        intents.push(...evolution.intents);
+      }
+
+      expect(intents).toHaveLength(1);
+      expect(intents[0]!.messageKey).toBe("run:20260717:page-1");
+      expect(nextWakeAt).toBeGreaterThan(now);
+    });
+  });
+
   describe("when a wake fires for a never-bootstrapped process", () => {
     it("decides nothing and clears its own wake", () => {
       const evolution = evolveWake(
@@ -300,6 +326,64 @@ describe("topicClusteringProcessDefinition", () => {
 
       expect(evolution.intents).toEqual([]);
       expect(evolution.state.currentRun).toBeNull();
+    });
+  });
+
+  describe("when a superseded run's completion arrives late", () => {
+    it("ignores it instead of resurrecting the old run over the live one", () => {
+      const occurredAt = Date.UTC(2026, 6, 18, 10, 0);
+      const liveRun = {
+        runId: "20260718",
+        page: 1,
+        updatedAtMs: occurredAt - 60_000,
+      };
+
+      const evolution = evolveEvent(
+        { ...bootstrappedState(), currentRun: liveRun },
+        makeEvent({
+          type: "lw.obs.topic_clustering.run_completed",
+          occurredAt,
+          data: {
+            runId: "20260717",
+            page: 4,
+            mode: "batch",
+            tracesProcessed: 2_000,
+            topicsCount: 8,
+            subtopicsCount: 20,
+            nextSearchAfter: [occurredAt - 5_000, "trace-old"],
+          },
+        }),
+      );
+
+      expect(evolution.intents).toEqual([]);
+      expect(evolution.state.currentRun).toEqual(liveRun);
+    });
+  });
+
+  describe("when a superseded run's failure arrives late", () => {
+    it("leaves the live run in flight so the next wake does not start a third", () => {
+      const occurredAt = Date.UTC(2026, 6, 18, 10, 0);
+      const liveRun = {
+        runId: "20260718",
+        page: 2,
+        updatedAtMs: occurredAt - 60_000,
+      };
+
+      const evolution = evolveEvent(
+        { ...bootstrappedState(), currentRun: liveRun },
+        makeEvent({
+          type: "lw.obs.topic_clustering.run_failed",
+          occurredAt,
+          data: {
+            runId: "20260717",
+            page: 4,
+            error: "langevals unavailable",
+          },
+        }),
+      );
+
+      expect(evolution.intents).toEqual([]);
+      expect(evolution.state.currentRun).toEqual(liveRun);
     });
   });
 

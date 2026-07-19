@@ -182,4 +182,41 @@ describe("TopicClusteringRunStatusFoldProjection", () => {
       expect(state.InProgressRunId).toBeNull();
     });
   });
+
+  describe("when a run fails after an earlier run succeeded", () => {
+    it("clears the previous run's counts instead of reporting them as the failed run's", () => {
+      // A fully successful run lands real counts on the row.
+      let state = projection.apply(
+        initState(),
+        baseEvent({
+          type: "lw.obs.topic_clustering.run_completed",
+          occurredAt: 1_000,
+          data: completedData({
+            tracesProcessed: 12_000,
+            topicsCount: 40,
+            subtopicsCount: 120,
+          }),
+        }),
+      );
+      expect(state.LastRunTracesProcessed).toBe(12_000);
+
+      // The NEXT run fails outright. Its counts are unknown, so the row must
+      // not keep advertising the previous run's successes next to "failed" —
+      // that renders a failure beside a healthy-looking 12,000 traces.
+      state = projection.apply(
+        state,
+        baseEvent({
+          type: "lw.obs.topic_clustering.run_failed",
+          occurredAt: 2_000,
+          data: { runId: "20260718", page: 1, error: "langevals unavailable" },
+        }),
+      );
+
+      expect(state.LastRunOutcome).toBe("failed");
+      expect(state.LastRunTracesProcessed).toBe(0);
+      expect(state.LastRunTopicsCount).toBe(0);
+      expect(state.LastRunSubtopicsCount).toBe(0);
+      expect(state.LastRunPages).toBe(0);
+    });
+  });
 });

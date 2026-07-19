@@ -800,6 +800,55 @@ datasetS3Migration:
   extraVolumeMounts: []
 
 # =============================================================================
+# Topic Clustering Schedule Backfill (ADR-051)
+# =============================================================================
+# ADR-051 replaced the topic-clustering CronJob with durable per-project
+# process wakes. New projects get a wake when they first ingest a trace;
+# projects that already existed at upgrade time get theirs from this
+# post-install/post-upgrade hook Job. Disabling it on an upgrade means topic
+# clustering never runs again for existing projects until the task is run by
+# hand (`pnpm run task backfillTopicClusteringSchedules`).
+topicClusteringBackfill:
+  ## @param topicClusteringBackfill.enabled [default: true] Render the post-install/post-upgrade Job that seeds per-project topic clustering schedules (ADR-051). Disabling it on an upgrade stops topic clustering for pre-existing projects.
+  enabled: true
+  ## @param topicClusteringBackfill.backoffLimit [default: 3] Job backoffLimit — retries on transient failure. The task is idempotent, and retries also absorb the race against app-boot database migrations.
+  backoffLimit: 3
+  ## @param topicClusteringBackfill.activeDeadlineSeconds [default: 3600] Hard runtime limit (s) — a backstop so a hung backfill can't run forever. The task is idempotent, so a re-run is safe; raise for installs with very many projects or set null to disable.
+  activeDeadlineSeconds: 3600
+  # ServiceAccount for the Job. Leave empty to use the namespace default
+  # (matching the app/workers).
+  ## @param topicClusteringBackfill.serviceAccountName [string, default: ""] ServiceAccount for the Job.
+  serviceAccountName: ""
+  ## @param topicClusteringBackfill.ttlSecondsAfterFinished [default: 600] Clean up the finished Job after this many seconds.
+  ttlSecondsAfterFinished: 600
+  ## @extra topicClusteringBackfill.resources Resource requests and limits for the backfill Job.
+  ## @param topicClusteringBackfill.resources.requests.cpu [string, default: 100m] Requested CPU.
+  ## @param topicClusteringBackfill.resources.requests.memory [string, default: 512Mi] Requested memory.
+  ## @param topicClusteringBackfill.resources.limits.cpu [string, default: 1000m] CPU limit.
+  ## @param topicClusteringBackfill.resources.limits.memory [string, default: 2Gi] Memory limit.
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits: { cpu: 1000m, memory: 2Gi }
+  # Per-hook overrides; empty defaults fall through to global.* via the
+  # coalesce chain in the template (same convention as datasetS3Migration).
+  ## @param topicClusteringBackfill.podSecurityContext [object] Pod security context override.
+  podSecurityContext: {}
+  ## @param topicClusteringBackfill.containerSecurityContext [object] Container security context override.
+  containerSecurityContext: {}
+  ## @param topicClusteringBackfill.nodeSelector [object] Node selector override.
+  nodeSelector: {}
+  ## @param topicClusteringBackfill.tolerations [array] Tolerations override.
+  tolerations: []
+  ## @param topicClusteringBackfill.affinity [object] Affinity override.
+  affinity: {}
+  ## @param topicClusteringBackfill.extraEnvs [array] Additional environment variables for the backfill Job.
+  extraEnvs: []
+  ## @param topicClusteringBackfill.extraVolumes [array] Additional pod volumes.
+  extraVolumes: []
+  ## @param topicClusteringBackfill.extraVolumeMounts [array] Additional volume mounts.
+  extraVolumeMounts: []
+
+# =============================================================================
 # LangWatch NLP Service Configuration
 # =============================================================================
 # Configuration for the NLP service (nlpgo).
@@ -1091,11 +1140,19 @@ cronjobs:
 
   # Individual cron job configurations
   ## @extra cronjobs.jobs Individual cron job endpoints and schedules.
-  jobs:
-    # Topic clustering scheduling moved into the app's event-sourcing
-    # runtime (ADR-051: per-project process wakes) — no CronJob needed.
+  # INTENTIONALLY EMPTY. Every job that used to live here has moved onto the
+  # workers Deployment's event-sourced path (see the note below), so the chart
+  # currently ships no CronJobs at all. The template is retained as the
+  # extension point: `cronjobs/cronjobs.yaml` ranges over this map, and ranging
+  # over an empty map renders nothing — verified, it does NOT error. Operators
+  # can still add their own entries ({schedule, endpoint, enabled}) here, and a
+  # future first-party sweep drops straight back in.
+  jobs: {}
+  # Topic clustering scheduling moved into the app's event-sourcing
+  # runtime (ADR-051: per-project process wakes) — no CronJob needed.
+  # Existing projects are seeded by the topicClusteringBackfill hook Job.
 
-    # NOTE: the automation CronJobs are gone. The alertTriggers CronJob
+  # NOTE: the automation CronJobs are gone. The alertTriggers CronJob
     # (`/api/cron/triggers`) was removed — custom-graph threshold alerts now
     # fire from the event-sourced worker path (ADR-034) — and the webhook
     # delivery-log prune runs as a daily scheduled process manager on the

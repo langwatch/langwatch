@@ -118,9 +118,3 @@ export type TopicClusteringProcessingEvent =
   | TopicClusteringRequestedEvent
   | TopicClusteringRunCompletedEvent
   | TopicClusteringRunFailedEvent;
-
-export {
-  isTopicClusteringRequestedEvent,
-  isTopicClusteringRunCompletedEvent,
-  isTopicClusteringRunFailedEvent,
-} from "./typeGuards";

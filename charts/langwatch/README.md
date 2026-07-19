@@ -417,6 +417,36 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `datasetS3Migration.extraVolumes`              | Additional pod volumes.                                                                                                                                                                                  | `[]`    |
 | `datasetS3Migration.extraVolumeMounts`         | Additional volume mounts.                                                                                                                                                                                | `[]`    |
 
+### Topic clustering schedule backfill
+
+ADR-051 replaced the topic-clustering CronJob with durable per-project process
+wakes. New projects get a wake when they first ingest a trace; projects that
+already existed at upgrade time are seeded by this post-install/post-upgrade
+hook Job. The task is idempotent, so it re-runs harmlessly on every upgrade.
+**Disabling this on an upgrade stops topic clustering for all pre-existing
+projects** until `pnpm run task backfillTopicClusteringSchedules` is run by hand.
+
+| Name                                                | Description                                                                                                                                                                        | Value   |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `topicClusteringBackfill.enabled`                   | Render the post-install/post-upgrade Job that seeds per-project topic clustering schedules (ADR-051). Disabling it on an upgrade stops topic clustering for pre-existing projects. | `true`  |
+| `topicClusteringBackfill.backoffLimit`              | Job backoffLimit — retries on transient failure. The task is idempotent, and retries also absorb the race against app-boot database migrations.                                    | `3`     |
+| `topicClusteringBackfill.activeDeadlineSeconds`     | Hard runtime limit (s) — a backstop so a hung backfill can't run forever. The task is idempotent, so a re-run is safe; raise for installs with very many projects or set null.     | `3600`  |
+| `topicClusteringBackfill.serviceAccountName`        | ServiceAccount for the Job.                                                                                                                                                        | `""`    |
+| `topicClusteringBackfill.ttlSecondsAfterFinished`   | Clean up the finished Job after this many seconds.                                                                                                                                 | `600`   |
+| `topicClusteringBackfill.resources`                 | Resource requests and limits for the backfill Job.                                                                                                                                 |         |
+| `topicClusteringBackfill.resources.requests.cpu`    | Requested CPU.                                                                                                                                                                     | `100m`  |
+| `topicClusteringBackfill.resources.requests.memory` | Requested memory.                                                                                                                                                                  | `512Mi` |
+| `topicClusteringBackfill.resources.limits.cpu`      | CPU limit.                                                                                                                                                                         | `1000m` |
+| `topicClusteringBackfill.resources.limits.memory`   | Memory limit.                                                                                                                                                                      | `2Gi`   |
+| `topicClusteringBackfill.podSecurityContext`        | Pod security context override.                                                                                                                                                     | `{}`    |
+| `topicClusteringBackfill.containerSecurityContext`  | Container security context override.                                                                                                                                               | `{}`    |
+| `topicClusteringBackfill.nodeSelector`              | Node selector override.                                                                                                                                                            | `{}`    |
+| `topicClusteringBackfill.tolerations`               | Tolerations override.                                                                                                                                                              | `[]`    |
+| `topicClusteringBackfill.affinity`                  | Affinity override.                                                                                                                                                                 | `{}`    |
+| `topicClusteringBackfill.extraEnvs`                 | Additional environment variables for the backfill Job.                                                                                                                             | `[]`    |
+| `topicClusteringBackfill.extraVolumes`              | Additional pod volumes.                                                                                                                                                            | `[]`    |
+| `topicClusteringBackfill.extraVolumeMounts`         | Additional volume mounts.                                                                                                                                                          | `[]`    |
+
 ### NLP service
 
 | Name                                            | Description                                   | Value           |
@@ -506,7 +536,7 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `cronjobs.resources.requests.memory`     | Requested memory.                                  | `64Mi`                                |
 | `cronjobs.resources.limits.cpu`          | CPU limit.                                         | `100m`                                |
 | `cronjobs.resources.limits.memory`       | Memory limit.                                      | `64Mi`                                |
-| `cronjobs.jobs`                          | Individual cron job endpoints and schedules.       |                                       |
+| `cronjobs.jobs`                          | Individual cron job endpoints and schedules. Ships empty — every first-party sweep now runs on the workers Deployment's event-sourced path. Retained as an extension point for operator-defined jobs. | `{}` |
 | `cronjobs.podSecurityContext`            | Pod security context overrides.                    | `{}`                                  |
 | `cronjobs.containerSecurityContext`      | Container security context overrides.              | `{}`                                  |
 | `cronjobs.nodeSelector`                  | Node selector overrides.                           | `{}`                                  |
