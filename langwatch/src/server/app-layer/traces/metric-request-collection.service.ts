@@ -105,7 +105,7 @@ export class MetricRequestCollectionService {
           resource_metric_count: metricRequest.resourceMetrics?.length ?? 0,
         },
       },
-      async (span) => {
+      async (span): Promise<MetricRequestCollectionResult> => {
         const acceptedAt = Date.now();
         const preparation: MetricPreparationResult =
           await prepareMetricDataPoints({
