@@ -53,11 +53,19 @@ func Root(ctx context.Context, _ []string) error {
 		return err
 	}
 
-	httpExec := httpblock.New(httpblock.Options{
-		SSRF: httpblock.SSRFOptions{
-			AllowedHosts: allowedProxyHosts,
-		},
-	})
+	// One egress policy value, built once and shared by the HTTP block and
+	// the remote-attachment fetcher so the two can never drift apart.
+	ssrfOpts := httpblock.SSRFOptions{
+		AllowedHosts:     allowedProxyHosts,
+		StrictPublicOnly: cfg.Engine.EgressStrictPublicOnly,
+		Logger:           deps.Logger,
+	}
+	deps.Logger.Info("nlpgo_egress_policy",
+		zap.Bool("strict_public_only", ssrfOpts.StrictPublicOnly),
+		zap.Int("allowed_hosts", len(allowedProxyHosts)),
+	)
+
+	httpExec := httpblock.New(httpblock.Options{SSRF: ssrfOpts})
 	codeExec, err := codeblock.New(codeblock.Options{
 		Python: cfg.Engine.SandboxPython,
 	})
@@ -99,9 +107,7 @@ func Root(ctx context.Context, _ []string) error {
 		HTTP: httpExec,
 		// Remote prompt attachments are fetched under the same SSRF policy
 		// (and customer allow-list) as the HTTP block.
-		SSRF: httpblock.SSRFOptions{
-			AllowedHosts: allowedProxyHosts,
-		},
+		SSRF:             ssrfOpts,
 		Code:             codeExec,
 		LLM:              llm,
 		Evaluator:        evalExec,

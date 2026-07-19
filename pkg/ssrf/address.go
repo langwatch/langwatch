@@ -12,7 +12,7 @@
 //
 // The Go implementation lives here; the byte-for-byte equivalent TypeScript
 // implementation lives in the @langwatch/ssrf workspace package. Both are held
-// to the same behaviour by the shared conformance corpus in
+// to the same behavior by the shared conformance corpus in
 // testdata/address_vectors.json — if the two languages ever disagree about any
 // vector, one of the two test suites fails.
 //
@@ -86,29 +86,37 @@ var metadataAddresses = map[netip.Addr]struct{}{
 	netip.MustParseAddr("fd00:ec2::254"): {},
 }
 
+// labelledPrefix pairs a range with the operator-facing description used by
+// Describe. The label is what an operator reads in a refusal log line, so it
+// names the range and the RFC that reserves it rather than restating the CIDR.
+type labelledPrefix struct {
+	prefix netip.Prefix
+	label  string
+}
+
 // specialPrefixes are the non-globally-routable ranges NOT already reported by
 // netip.Addr's own predicates (IsUnspecified/IsLoopback/IsPrivate/
 // IsLinkLocalUnicast/IsLinkLocalMulticast/IsMulticast). Sourced from the IANA
 // IPv4 and IPv6 Special-Purpose Address Registries; the NAT64 and 6to4 prefixes
 // are refused wholesale rather than decoded to their embedded IPv4 because no
 // legitimate LangWatch egress ever targets a translated address.
-var specialPrefixes = []netip.Prefix{
-	netip.MustParsePrefix("0.0.0.0/8"),       // "this host on this network" (RFC 1122)
-	netip.MustParsePrefix("100.64.0.0/10"),   // CGNAT / shared address space (RFC 6598)
-	netip.MustParsePrefix("192.0.0.0/24"),    // IETF protocol assignments (RFC 6890)
-	netip.MustParsePrefix("192.0.2.0/24"),    // TEST-NET-1 documentation (RFC 5737)
-	netip.MustParsePrefix("192.88.99.0/24"),  // 6to4 relay anycast, deprecated (RFC 7526)
-	netip.MustParsePrefix("198.18.0.0/15"),   // benchmarking (RFC 2544)
-	netip.MustParsePrefix("198.51.100.0/24"), // TEST-NET-2 documentation (RFC 5737)
-	netip.MustParsePrefix("203.0.113.0/24"),  // TEST-NET-3 documentation (RFC 5737)
-	netip.MustParsePrefix("240.0.0.0/4"),     // reserved incl. 255.255.255.255 (RFC 1112 / RFC 919)
-	netip.MustParsePrefix("64:ff9b::/96"),    // well-known NAT64 (RFC 6052) — embeds IPv4
-	netip.MustParsePrefix("64:ff9b:1::/48"),  // local-use NAT64 (RFC 8215)
-	netip.MustParsePrefix("100::/64"),        // discard-only (RFC 6666)
-	netip.MustParsePrefix("2001::/32"),       // Teredo IPv4-over-IPv6 tunnel (RFC 4380)
-	netip.MustParsePrefix("2001:db8::/32"),   // documentation (RFC 3849)
-	netip.MustParsePrefix("2002::/16"),       // 6to4 (RFC 3056) — embeds IPv4
-	netip.MustParsePrefix("3fff::/20"),       // documentation (RFC 9637)
+var specialPrefixes = []labelledPrefix{
+	{netip.MustParsePrefix("0.0.0.0/8"), `"this host on this network" (RFC 1122)`},
+	{netip.MustParsePrefix("100.64.0.0/10"), "CGNAT / shared address space (RFC 6598)"},
+	{netip.MustParsePrefix("192.0.0.0/24"), "IETF protocol assignments (RFC 6890)"},
+	{netip.MustParsePrefix("192.0.2.0/24"), "TEST-NET-1 documentation (RFC 5737)"},
+	{netip.MustParsePrefix("192.88.99.0/24"), "6to4 relay anycast, deprecated (RFC 7526)"},
+	{netip.MustParsePrefix("198.18.0.0/15"), "benchmarking (RFC 2544)"},
+	{netip.MustParsePrefix("198.51.100.0/24"), "TEST-NET-2 documentation (RFC 5737)"},
+	{netip.MustParsePrefix("203.0.113.0/24"), "TEST-NET-3 documentation (RFC 5737)"},
+	{netip.MustParsePrefix("240.0.0.0/4"), "reserved (RFC 1112 / RFC 919)"},
+	{netip.MustParsePrefix("64:ff9b::/96"), "well-known NAT64 (RFC 6052)"},
+	{netip.MustParsePrefix("64:ff9b:1::/48"), "local-use NAT64 (RFC 8215)"},
+	{netip.MustParsePrefix("100::/64"), "discard-only (RFC 6666)"},
+	{netip.MustParsePrefix("2001::/32"), "Teredo IPv4-over-IPv6 tunnel (RFC 4380)"},
+	{netip.MustParsePrefix("2001:db8::/32"), "documentation (RFC 3849)"},
+	{netip.MustParsePrefix("2002::/16"), "6to4 (RFC 3056)"},
+	{netip.MustParsePrefix("3fff::/20"), "documentation (RFC 9637)"},
 }
 
 // Classify reports how an egress boundary must treat addr. An invalid address
@@ -130,13 +138,60 @@ func Classify(addr netip.Addr) Category {
 		return CategorySpecial
 	}
 
-	for _, prefix := range specialPrefixes {
-		if prefix.Contains(addr) {
+	for _, sp := range specialPrefixes {
+		if sp.prefix.Contains(addr) {
 			return CategorySpecial
 		}
 	}
 
 	return CategoryGlobal
+}
+
+// Describe returns an operator-facing explanation of why addr is not a
+// globally routable destination — the named range and the RFC that reserves
+// it, e.g. "100.64.0.0/10 (CGNAT / shared address space, RFC 6598)". A global
+// address describes itself as "globally routable".
+//
+// This exists so a refusal can tell an operator which rule caught their
+// address instead of a bare "blocked". Never include it in an error returned
+// to a tenant: the point of an SSRF refusal is that the caller learns nothing
+// about the network behind the boundary. Logs only.
+func Describe(addr netip.Addr) string {
+	if !addr.IsValid() {
+		return "unparseable address"
+	}
+	addr = addr.Unmap()
+
+	if _, ok := metadataAddresses[addr]; ok {
+		return addr.String() + " (cloud instance metadata)"
+	}
+
+	switch {
+	case addr.IsUnspecified():
+		return "unspecified address"
+	case addr.IsLoopback():
+		return "loopback"
+	case addr.IsPrivate():
+		// Go's IsPrivate covers RFC1918 and IPv6 unique-local (fc00::/7).
+		if addr.Is4() {
+			return "private use (RFC 1918)"
+		}
+		return "unique-local (RFC 4193)"
+	case addr.IsLinkLocalUnicast():
+		return "link-local unicast (RFC 3927 / RFC 4291)"
+	case addr.IsLinkLocalMulticast():
+		return "link-local multicast"
+	case addr.IsMulticast():
+		return "multicast (RFC 1112 / RFC 4291)"
+	}
+
+	for _, sp := range specialPrefixes {
+		if sp.prefix.Contains(addr) {
+			return sp.prefix.String() + " (" + sp.label + ")"
+		}
+	}
+
+	return "globally routable"
 }
 
 // IsPublicAddress reports whether addr is globally routable and therefore the

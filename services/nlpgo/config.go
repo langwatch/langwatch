@@ -36,6 +36,21 @@ type EngineConfig struct {
 	CodeBlockTimeoutSeconds int `env:"CODE_BLOCK_TIMEOUT_SECONDS"`
 	// AllowedProxyHosts — SSRF allowlist for HTTP blocks (comma-separated).
 	AllowedProxyHosts string `env:"ALLOWED_PROXY_HOSTS"`
+	// EgressStrictPublicOnly — refuse every outbound destination that is not
+	// globally routable, not just the private/loopback/link-local set. Adds
+	// CGNAT (100.64.0.0/10, i.e. Tailscale), reserved (240.0.0.0/4),
+	// multicast, NAT64, 6to4, benchmarking and documentation ranges.
+	//
+	// Deliberately a dedicated egress knob rather than a general environment
+	// lookup inside the block: what an egress boundary refuses is deployment
+	// policy, so it is declared here and passed explicitly into SSRFOptions.
+	// Nothing under app/engine/blocks reads the environment for it.
+	//
+	// Default false preserves the historical deny set, so a self-hosted
+	// upgrade cannot silently start refusing a destination that worked
+	// yesterday. Hosted LangWatch sets it to true. Cloud metadata is refused
+	// either way.
+	EgressStrictPublicOnly bool `env:"EGRESS_STRICT_PUBLIC_ONLY"`
 	// SandboxPython — the python interpreter used for the code block.
 	// Default: python3 (resolved via PATH inside the container).
 	SandboxPython string `env:"SANDBOX_PYTHON"`

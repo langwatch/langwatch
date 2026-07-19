@@ -77,6 +77,8 @@ func endpointAddressError(ip net.IP, blockLocal, allowlisted bool) error {
 	}
 	addr = addr.Unmap()
 	switch ssrf.Classify(addr) {
+	case ssrf.CategoryGlobal:
+		return nil
 	case ssrf.CategoryMetadata:
 		return fmt.Errorf("customer endpoint resolves to a reserved address")
 	case ssrf.CategorySpecial:

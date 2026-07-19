@@ -2,7 +2,7 @@
  * @langwatch/ssrf — canonical SSRF address-classification rules.
  *
  * This is the TypeScript half of a two-language contract. The Go half lives in
- * `pkg/ssrf` (package ssrf); both are held to the identical behaviour by the
+ * `pkg/ssrf` (package ssrf); both are held to the identical behavior by the
  * shared conformance corpus in `pkg/ssrf/testdata/address_vectors.json`. Before
  * this package the same "is this IP safe to egress to?" decision was
  * re-implemented independently in the AI gateway, the Langy egress proxy, this
