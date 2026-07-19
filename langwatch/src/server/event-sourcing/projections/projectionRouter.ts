@@ -663,23 +663,31 @@ export class ProjectionRouter<
                 this.mapExecutor.executeBatch(mapProj, toApply, contexts),
               onComplete: (ms) => {
                 for (const _event of toApply) {
-                  incrementEsMapProjectionTotal(
-                    this.pipelineName,
-                    name,
-                    "completed",
-                  );
+                  incrementEsMapProjectionTotal({
+                    pipelineName: this.pipelineName,
+                    projectionName: name,
+                    status: "completed",
+                  });
                 }
-                observeEsMapProjectionDuration(this.pipelineName, name, ms);
+                observeEsMapProjectionDuration({
+                  pipelineName: this.pipelineName,
+                  projectionName: name,
+                  durationMs: ms,
+                });
               },
               onFail: (ms) => {
                 for (const _event of toApply) {
-                  incrementEsMapProjectionTotal(
-                    this.pipelineName,
-                    name,
-                    "failed",
-                  );
+                  incrementEsMapProjectionTotal({
+                    pipelineName: this.pipelineName,
+                    projectionName: name,
+                    status: "failed",
+                  });
                 }
-                observeEsMapProjectionDuration(this.pipelineName, name, ms);
+                observeEsMapProjectionDuration({
+                  pipelineName: this.pipelineName,
+                  projectionName: name,
+                  durationMs: ms,
+                });
               },
             });
 
