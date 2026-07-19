@@ -64,9 +64,12 @@ export interface OutboxDispatcherServiceOptions {
    * How many leased messages this dispatcher may have in flight at once.
    * Default 1 (strictly sequential), which is what every caller got before
    * this option existed. Raise it only for a domain whose effect is slow and
-   * genuinely parallel-safe — the lease already fences each message
-   * individually, so the bound here is about load on the downstream service,
-   * not about correctness.
+   * genuinely parallel-safe. The lease fences each message individually, but
+   * NOTHING serializes two pending messages for the same processKey within a
+   * batch — they dispatch concurrently and in no guaranteed order — so above
+   * 1 the domain must also guarantee at most one in-flight intent per key by
+   * construction (as topic clustering's in-flight guard and one-page-at-a-
+   * time chaining do), or tolerate reordering.
    */
   concurrency?: number;
   tracer?: Tracer;

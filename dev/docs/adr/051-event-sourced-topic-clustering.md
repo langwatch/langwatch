@@ -250,10 +250,14 @@ as `No model configured for "analytics.topic_clustering_llm" …`),
 versus `clustering_service` (langevals-side) and `internal`, which are
 ours. The `run_failed` event and projection carry the code, the
 user-actionable flag, and the full error text for operators; the status
-service returns the raw text ONLY when the customer can act on it. The
-settings page renders actionable failures as guidance ("set a default
-model in Settings → Model Providers") and internal ones as "failed on
-our side, retries automatically" with no detail.
+service NEVER returns the raw text — not even for user-actionable
+failures. The raw text is a provider/langevals response body (Python
+tracebacks, internal hostnames, echoed key prefixes), and gating its
+release on a classifier means one mis-scoped pattern becomes a
+disclosure. `lastRunErrorCode` is the whole contract with the UI: the
+settings page maps actionable codes to fixed guidance copy ("set a
+default model in Settings → Model Providers") and internal ones to
+"failed on our side, retries automatically" with no detail.
 
 **Deferred (own spec, follow-up):** a stackable home-notice surface and
 an opt-out email (default off) for user-actionable clustering failures.

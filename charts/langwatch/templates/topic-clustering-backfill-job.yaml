@@ -18,10 +18,12 @@
     - IDEMPOTENT: the task pages through eligible projects (firstMessage: true)
       and issues a bootstrap clustering request for each one that has no
       scheduled `nextWakeAt` yet. Projects already scheduled are skipped
-      outright, and any request that does go out is de-duplicated by the event
-      log and evolves already-bootstrapped processes to a pure no-op, so
-      re-running on every `helm upgrade` neither double-schedules a project nor
-      forces an unscheduled clustering run.
+      outright, and any request that does go out evolves an
+      already-bootstrapped process as a pure no-op, so re-running on every
+      `helm upgrade` neither double-schedules a project nor forces an
+      unscheduled clustering run. (Each unskipped request does append one
+      event; the `nextWakeAt` skip is what keeps repeat runs from growing the
+      log once the workers have caught up.)
     - PARTIAL FAILURE IS A FAILURE: one project's error is logged and skipped so
       the rest of the fleet still gets scheduled, but the task then exits
       non-zero. The Job retries (`backoffLimit`) rather than reporting a
@@ -47,8 +49,11 @@
   two backfills don't contend.
 
   hook-delete-policy `before-hook-creation` clears the prior run's Job before
-  re-creating it, so reruns are clean; a FAILED run is deliberately left on the
-  cluster for post-mortem (no `hook-succeeded`, matching dataset-s3-migration).
+  re-creating it, so reruns are clean. There is no `hook-succeeded` policy
+  (matching dataset-s3-migration), but note a FAILED run still only survives
+  until `ttlSecondsAfterFinished` (default 10 minutes) reaps it, pods and
+  logs included — raise that value if you want a longer post-mortem window,
+  and rely on your log pipeline rather than the cluster for anything older.
 
   Image + env mirror the workers Deployment: same app image, same
   `langwatch.sharedEnv` (DATABASE_URL, Redis, ClickHouse, ...).

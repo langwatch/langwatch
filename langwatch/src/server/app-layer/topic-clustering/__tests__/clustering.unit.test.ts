@@ -14,7 +14,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", () => ({
   getClickHouseClientForProject: vi.fn(),
 }));
 
-vi.mock("../../env.mjs", () => ({
+vi.mock("~/env.mjs", () => ({
   env: { LANGEVALS_ENDPOINT: "http://localhost:1234" },
 }));
 
@@ -42,7 +42,7 @@ vi.mock("~/server/metrics", () => ({
   getPayloadSizeHistogram: vi.fn().mockReturnValue({ observe: vi.fn() }),
 }));
 
-vi.mock("../../langevals/stagedFetch", () => ({
+vi.mock("~/server/langevals/stagedFetch", () => ({
   stagedLangevalsFetch: vi.fn().mockResolvedValue({
     ok: true,
     json: () =>

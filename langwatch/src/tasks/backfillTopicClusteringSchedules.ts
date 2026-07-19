@@ -93,8 +93,12 @@ export interface BackfillSummary {
 export interface BackfillDeps {
   /**
    * One page of eligible projects, ascending by id, strictly after `afterId`.
-   * Keyset paging rather than offset: the walk stays O(1) per page and cannot
-   * skip or repeat a project if rows are inserted while it runs.
+   * Keyset paging rather than offset: the walk stays O(1) per page and never
+   * repeats a project. It CAN miss a project inserted mid-walk with an id
+   * lexically behind the cursor (ids are nanoid, not monotonic) — harmless
+   * here, because a project created after the walk started has
+   * `firstMessage: false` and gets its schedule from the projectMetadata
+   * reactor's bootstrap on first trace, not from this backfill.
    */
   findEligibleProjectsPage: (params: {
     afterId: string | null;
@@ -116,9 +120,13 @@ export interface BackfillDeps {
 /**
  * ADR-051 one-time backfill: give every eligible project (firstMessage:
  * true) a topic clustering process row and a scheduled daily wake. Safe to
- * re-run — the bootstrap request is idempotent (event-log dedup + a pure
- * no-op evolution for already-bootstrapped processes), and projects that
- * already carry a `nextWakeAt` are skipped outright.
+ * re-run: projects that already carry a `nextWakeAt` are skipped outright,
+ * and a request that does go out evolves an already-bootstrapped process as
+ * a pure no-op. Note each such request still appends a fresh `requested`
+ * event — the skip check, not the event log, is what keeps re-runs from
+ * growing the log, and it only holds once the workers have processed the
+ * previous request into a `nextWakeAt` (a quick hook retry may re-request
+ * not-yet-processed projects; benign, the slot is deterministic).
  *
  * A single project's failure must never truncate the fleet: one bad project
  * is logged and skipped so the remaining thousands still get scheduled. The

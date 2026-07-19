@@ -60,7 +60,7 @@ Feature: Event-sourced topic clustering scheduling
   Scenario: A failing clustering effect retries then records a visible failure
     Given the clustering effect fails persistently
     When the intent has been attempted 3 times
-    Then the intent is retired as dead
+    Then no further attempts are made for that intent
     And the failure is recorded on the project's durable state
     And the settings page can show the failed outcome
 

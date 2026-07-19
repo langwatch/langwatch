@@ -27,10 +27,10 @@ export const TOPIC_CLUSTERING_MAX_ATTEMPTS = 3;
 export const TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS = 20 * 60 * 1000;
 
 /**
- * One drain leases at most this many clustering intents. Dispatch within a
- * drain is sequential, so this mainly bounds how long leased-but-waiting
- * messages sit invisible behind a slow page; cross-project throughput comes
- * from worker replicas, matching the old worker's small concurrency cap.
+ * One drain leases at most this many clustering intents, and the dispatcher
+ * is configured (pipelineRegistry) to run the whole batch concurrently — so
+ * this constant IS the effective clustering concurrency ADR-051 §4 promises,
+ * matching the old worker's cap of 3.
  */
 export const TOPIC_CLUSTERING_OUTBOX_BATCH_SIZE = 3;
 
