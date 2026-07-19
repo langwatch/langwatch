@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -60,7 +61,7 @@ func Root(ctx context.Context, _ []string) error {
 		StrictPublicOnly: cfg.Engine.EgressStrictPublicOnly,
 		Logger:           deps.Logger,
 	}
-	deps.Logger.Info("nlpgo_egress_policy",
+	clog.Get(ctx).Info("nlpgo_egress_policy",
 		zap.Bool("strict_public_only", ssrfOpts.StrictPublicOnly),
 		zap.Int("allowed_hosts", len(allowedProxyHosts)),
 	)
