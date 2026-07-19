@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -56,7 +57,8 @@ type egressAdapterConfig struct {
 	monitor        egressMonitor
 	// dial reaches the real upstream. Injected so tests can redirect any
 	// authority to a loopback listener; production uses a bounded net.Dialer.
-	dial func(ctx context.Context, network, addr string) (net.Conn, error)
+	dial    func(ctx context.Context, network, addr string) (net.Conn, error)
+	resolve func(ctx context.Context, host string) ([]net.IP, error)
 	// requireTLS refuses cleartext forwards and CONNECT to any port other than
 	// tlsPort (rung 1a). On by default in production — worker egress is HTTPS
 	// already, so this rung is the always-safe one.
@@ -229,7 +231,12 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	upstream, err := a.cfg.dial(ctx, "tcp", authority)
+	dialAddress, err := a.checkedDialAddress(ctx, host, port)
+	if err != nil {
+		a.record(fqdn, port, egressDeniedPrivateAddress, "destination address rejected: "+err.Error(), 0)
+		return
+	}
+	upstream, err := a.cfg.dial(ctx, "tcp", dialAddress)
 	if err != nil {
 		a.record(fqdn, port, decision, "upstream dial failed: "+err.Error(), 0)
 		return
@@ -238,6 +245,38 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	bytesUp := a.tunnel(ctx, clientConn, upstream, fqdn)
 	a.record(fqdn, port, decision, "tunnel closed", bytesUp)
+}
+
+func (a *egressAdapter) checkedDialAddress(ctx context.Context, host, port string) (string, error) {
+	if a.cfg.resolve == nil {
+		return net.JoinHostPort(host, port), nil
+	}
+	addresses, err := a.cfg.resolve(ctx, host)
+	if err != nil {
+		return "", fmt.Errorf("resolve host: %w", err)
+	}
+	for _, ip := range addresses {
+		addr, ok := netip.AddrFromSlice(ip)
+		if ok && isPublicEgressAddress(addr.Unmap()) {
+			return net.JoinHostPort(addr.Unmap().String(), port), nil
+		}
+	}
+	return "", fmt.Errorf("host has no public address")
+}
+
+func isPublicEgressAddress(addr netip.Addr) bool {
+	if !addr.IsValid() || addr.IsUnspecified() || addr.IsLoopback() || addr.IsPrivate() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() || addr.IsMulticast() {
+		return false
+	}
+	if addr == netip.MustParseAddr("168.63.129.16") || addr == netip.MustParseAddr("169.254.169.254") || addr == netip.MustParseAddr("fd00:ec2::254") {
+		return false
+	}
+	for _, prefix := range []netip.Prefix{netip.MustParsePrefix("0.0.0.0/8"), netip.MustParsePrefix("100.64.0.0/10"), netip.MustParsePrefix("192.0.0.0/24"), netip.MustParsePrefix("192.0.2.0/24"), netip.MustParsePrefix("198.18.0.0/15"), netip.MustParsePrefix("198.51.100.0/24"), netip.MustParsePrefix("203.0.113.0/24"), netip.MustParsePrefix("240.0.0.0/4"), netip.MustParsePrefix("100::/64"), netip.MustParsePrefix("2001:db8::/32")} {
+		if prefix.Contains(addr) {
+			return false
+		}
+	}
+	return true
 }
 
 // tunnel splices client<->upstream opaquely. The client→upstream direction

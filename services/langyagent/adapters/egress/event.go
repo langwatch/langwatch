@@ -29,14 +29,15 @@ const (
 	egressDeniedCleartext egressDecision = "denied_cleartext"
 	// egressDeniedSNIMismatch: the TLS ClientHello SNI did not match the CONNECT
 	// authority the decision was made against (domain-fronting attempt).
-	egressDeniedSNIMismatch egressDecision = "denied_sni_mismatch"
+	egressDeniedSNIMismatch    egressDecision = "denied_sni_mismatch"
+	egressDeniedPrivateAddress egressDecision = "denied_private_address"
 )
 
 // blocked reports whether a decision denied the flow (no bytes reach the
 // destination). Used at the call site to choose 403 vs. tunnel.
 func (d egressDecision) blocked() bool {
 	switch d {
-	case egressDenied, egressDeniedCleartext, egressDeniedSNIMismatch:
+	case egressDenied, egressDeniedCleartext, egressDeniedSNIMismatch, egressDeniedPrivateAddress:
 		return true
 	default:
 		return false
