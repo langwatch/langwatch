@@ -16,7 +16,7 @@ import {
   redactActionParamsFor,
 } from "~/server/app-layer/automations/providers/registry";
 import { getApp } from "~/server/app-layer/app";
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
 import {

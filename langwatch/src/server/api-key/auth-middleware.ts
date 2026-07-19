@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Organization, PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import type { Permission } from "~/server/api/rbac";
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { getTokenType } from "./api-key-token.utils";
 import { ApiKeyPermissionDeniedError } from "./errors";

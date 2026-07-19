@@ -13,6 +13,9 @@ function makeHandledError(
     message?: string;
     httpStatus?: number;
     meta?: Record<string, unknown>;
+    fault?: string;
+    tips?: readonly string[];
+    docsUrl?: string;
   } = {},
 ): Error & {
   code: string;
@@ -24,6 +27,9 @@ function makeHandledError(
     traceId: undefined;
     spanId: undefined;
     httpStatus: number;
+    fault?: string;
+    tips?: readonly string[];
+    docsUrl?: string;
     reasons: Array<{ code: string }>;
   };
 } {
@@ -54,6 +60,9 @@ function makeHandledError(
     traceId: undefined,
     spanId: undefined,
     httpStatus,
+    ...(overrides.fault ? { fault: overrides.fault } : {}),
+    ...(overrides.tips ? { tips: overrides.tips } : {}),
+    ...(overrides.docsUrl ? { docsUrl: overrides.docsUrl } : {}),
     reasons: [],
   });
 
@@ -107,6 +116,32 @@ describe("formatError", () => {
         expect(body.message).toBe("Resource not found");
         expect(body.meta).toEqual({ id: "abc" });
         expect(body.error).toBeUndefined();
+      });
+
+      it("carries fault, tips and docsUrl when present", () => {
+        const err = makeHandledError({
+          code: "query_memory_exceeded",
+          httpStatus: 422,
+          fault: "customer",
+          tips: ["Narrow the time range"],
+          docsUrl: "https://docs.langwatch.ai/traces",
+        });
+
+        const { body } = formatError({ err, isVersioned: true });
+
+        expect(body.fault).toBe("customer");
+        expect(body.tips).toEqual(["Narrow the time range"]);
+        expect(body.docsUrl).toBe("https://docs.langwatch.ai/traces");
+      });
+
+      it("omits remediation keys when absent", () => {
+        const err = makeHandledError({ code: "not_found", httpStatus: 404 });
+
+        const { body } = formatError({ err, isVersioned: true });
+
+        expect(body.fault).toBeUndefined();
+        expect(body.tips).toBeUndefined();
+        expect(body.docsUrl).toBeUndefined();
       });
     });
 

@@ -1,7 +1,19 @@
 import { trace } from "@opentelemetry/api";
-import type { ZodError } from "zod";
 
-import { grafanaTraceUrlFromEnv } from "~/utils/grafanaLinks";
+/**
+ * Who is responsible for a handled error — the axis that drives log level and
+ * alerting (handled-ness itself only decides what the *client* sees):
+ *
+ * - `customer`: the caller can fix it (bad filter, not found, permission).
+ *   Expected; logged at warn, watched for spikes.
+ * - `platform`: our infrastructure failed (ClickHouse down, worker spawn).
+ *   Logged at error — an incident, not noise.
+ * - `provider`: a third party failed (LLM provider outage, upstream 5xx).
+ *   Logged at error, but never a bug in our code.
+ *
+ * Mirrors the fault classification in `services/aigateway/adapters/httpapi/faults.go`.
+ */
+export type HandledErrorFault = "customer" | "platform" | "provider";
 
 export interface SerializedReason {
   code: string;
@@ -12,7 +24,12 @@ export interface SerializedReason {
    * removed once no consumer reads `kind`.
    */
   kind: string;
+  fault?: HandledErrorFault;
+  traceId?: string;
+  spanId?: string;
   meta?: Record<string, unknown>;
+  tips?: readonly string[];
+  docsUrl?: string;
   reasons?: SerializedReason[];
 }
 
@@ -22,6 +39,10 @@ export interface SerializedReason {
  * field-for-field with `Code`/`Meta`/`TraceID`/`SpanID`/`Reasons`. `httpStatus`
  * and `traceUrl` are TypeScript-side conveniences with no `herr.E` equivalent
  * (Go maps code→status via a registry and builds the trace link elsewhere).
+ *
+ * `fault`, `tips` and `docsUrl` are the remediation channel: they let API,
+ * CLI and MCP consumers (agents!) self-diagnose without a human interpreting
+ * the error. All three are additive — older clients ignore them.
  */
 export interface SerializedHandledError {
   code: string;
@@ -43,6 +64,9 @@ export interface SerializedHandledError {
    */
   traceUrl?: string;
   httpStatus: number;
+  fault: HandledErrorFault;
+  tips?: readonly string[];
+  docsUrl?: string;
   reasons: SerializedReason[];
 }
 
@@ -59,7 +83,26 @@ export interface HerrEnvelope {
   meta?: Record<string, unknown>;
   trace_id?: string;
   span_id?: string;
+  fault?: HandledErrorFault;
+  tips?: string[];
+  docs_url?: string;
   reasons?: HerrEnvelope[];
+}
+
+/**
+ * Pluggable trace-URL source for {@link HandledError.serialize}. The package
+ * is env-agnostic so it can be shared by the app, MCP server and CLI; the app
+ * wires its Grafana link builder in via {@link setTraceUrlProvider} at module
+ * load. Defaults to no trace URLs.
+ */
+export type TraceUrlProvider = (
+  traceId: string | undefined,
+) => string | undefined;
+
+let traceUrlProvider: TraceUrlProvider = () => undefined;
+
+export function setTraceUrlProvider(provider: TraceUrlProvider): void {
+  traceUrlProvider = provider;
 }
 
 /**
@@ -83,6 +126,12 @@ export interface HerrEnvelope {
  * captured automatically from the active OTel span. `reasons` serialises nested
  * HandledErrors by code and masks everything else as `{ code: "unknown" }`.
  *
+ * `fault` says who's responsible (defaults to `"customer"` — annotate 5xx-ish
+ * subclasses as `"platform"`/`"provider"` so incidents keep logging at error).
+ * `tips` and `docsUrl` are the self-diagnosis channel for agents hitting the
+ * API/CLI/MCP: short, actionable remediation steps and a link to the relevant
+ * (markdown) doc. They serialise verbatim and are safe to show any client.
+ *
  * Serialised shape:
  * ```json
  * {
@@ -91,6 +140,9 @@ export interface HerrEnvelope {
  *   "traceId": "...",
  *   "spanId": "...",
  *   "httpStatus": 404,
+ *   "fault": "customer",
+ *   "tips": ["Check the span id — spans expire after the retention window"],
+ *   "docsUrl": "https://docs.langwatch.ai/...",
  *   "reasons": [{ "code": "invalid_span_id" }, { "code": "unknown" }]
  * }
  * ```
@@ -101,6 +153,9 @@ export abstract class HandledError extends Error {
   readonly traceId: string | undefined;
   readonly spanId: string | undefined;
   readonly httpStatus: number;
+  readonly fault: HandledErrorFault;
+  readonly tips: readonly string[];
+  readonly docsUrl: string | undefined;
   readonly reasons: readonly Error[];
 
   constructor(
@@ -109,23 +164,36 @@ export abstract class HandledError extends Error {
     options: {
       meta?: Record<string, unknown>;
       httpStatus?: number;
+      fault?: HandledErrorFault;
+      tips?: readonly string[];
+      docsUrl?: string;
       reasons?: readonly Error[];
+      /**
+       * Wire-provided trace/span ids (e.g. from a herr envelope). When set,
+       * they win over the active span — a deserialized error keeps the ids of
+       * the process that raised it, not whoever re-serializes it.
+       */
+      traceId?: string;
+      spanId?: string;
     } = {},
   ) {
     super(message);
     const ctx = trace.getActiveSpan()?.spanContext();
-    this.traceId = ctx?.traceId;
-    this.spanId = ctx?.spanId;
+    this.traceId = options.traceId ?? ctx?.traceId;
+    this.spanId = options.spanId ?? ctx?.spanId;
     this.meta = options.meta ?? {};
     this.httpStatus = options.httpStatus ?? 500;
+    this.fault = options.fault ?? "customer";
+    this.tips = options.tips ?? [];
+    this.docsUrl = options.docsUrl;
     this.reasons = options.reasons ?? [];
   }
 
   /** Produce the full user-facing serialised shape. */
   serialize(): SerializedHandledError {
     // traceId is the real trace id for handled errors, so it links straight to
-    // the trace when a Grafana is configured — see grafanaTraceUrlFromEnv.
-    const traceUrl = grafanaTraceUrlFromEnv(this.traceId);
+    // the trace when a trace URL provider is wired (the app uses Grafana).
+    const traceUrl = traceUrlProvider(this.traceId);
     return {
       code: this.code,
       // Deprecated back-compat alias — see SerializedHandledError.kind.
@@ -135,6 +203,9 @@ export abstract class HandledError extends Error {
       spanId: this.spanId,
       ...(traceUrl ? { traceUrl } : {}),
       httpStatus: this.httpStatus,
+      fault: this.fault,
+      ...(this.tips.length > 0 ? { tips: this.tips } : {}),
+      ...(this.docsUrl ? { docsUrl: this.docsUrl } : {}),
       reasons: this.reasons.map(serializeReason),
     };
   }
@@ -195,15 +266,21 @@ export abstract class HandledError extends Error {
  * had been raised locally. Belongs in boundary middleware (wire schemas):
  * downstream code only ever receives the HandledError.
  */
-export function handledErrorFromHerr(body: HerrEnvelope): HandledError {
+export function handledErrorFromHerr(
+  body: HerrEnvelope,
+  options: { httpStatus?: number } = {},
+): HandledError {
   return new (class extends HandledError {
     constructor() {
       super(body.type, body.message, {
-        meta: {
-          ...body.meta,
-          ...(body.trace_id ? { traceId: body.trace_id } : {}),
-        },
-        reasons: (body.reasons ?? []).map(handledErrorFromHerr),
+        meta: body.meta,
+        httpStatus: options.httpStatus,
+        fault: body.fault,
+        tips: body.tips,
+        docsUrl: body.docs_url,
+        traceId: body.trace_id,
+        spanId: body.span_id,
+        reasons: (body.reasons ?? []).map((r) => handledErrorFromHerr(r)),
       });
       this.name = body.type;
     }
@@ -216,7 +293,12 @@ function serializeReason(error: Error): SerializedReason {
       code: error.code,
       // Deprecated back-compat alias — see SerializedReason.kind.
       kind: error.code,
+      fault: error.fault,
+      ...(error.traceId ? { traceId: error.traceId } : {}),
+      ...(error.spanId ? { spanId: error.spanId } : {}),
       ...(Object.keys(error.meta).length > 0 && { meta: error.meta }),
+      ...(error.tips.length > 0 && { tips: error.tips }),
+      ...(error.docsUrl ? { docsUrl: error.docsUrl } : {}),
       ...(error.reasons.length > 0 && {
         reasons: error.reasons.map(serializeReason),
       }),
@@ -225,6 +307,14 @@ function serializeReason(error: Error): SerializedReason {
   return { code: "unknown", kind: "unknown" };
 }
 
+/** Options shared by the convenience subclasses below. */
+export interface HandledErrorOptions {
+  meta?: Record<string, unknown>;
+  fault?: HandledErrorFault;
+  tips?: readonly string[];
+  docsUrl?: string;
+  reasons?: readonly Error[];
+}
 
 /**
  * Thrown when a requested resource does not exist (HTTP 404).
@@ -237,30 +327,41 @@ export class NotFoundError extends HandledError {
     code: string,
     resource: string,
     id: string,
-    options: { meta?: Record<string, unknown>; reasons?: readonly Error[] } = {},
+    options: HandledErrorOptions = {},
   ) {
     super(code, `${resource} not found: ${id}`, {
+      ...options,
       meta: { id, ...options.meta },
       httpStatus: 404,
-      reasons: options.reasons,
     });
     this.name = "NotFoundError";
   }
 }
 
 /**
+ * Structural stand-in for zod's `ZodError`. The package is consumed by the app
+ * (zod 3.x classic), mcp-server (zod 4) and SDKs — importing `ZodError` from
+ * any single zod version makes the other versions' errors unassignable. Any
+ * error with zod's `flatten()` shape qualifies.
+ */
+export interface ZodLikeError {
+  message: string;
+  flatten(): {
+    formErrors: string[];
+    fieldErrors: Record<string, string[] | undefined>;
+  };
+}
+
+/**
  * Thrown when input fails domain-level validation rules (HTTP 422).
  */
 export class ValidationError extends HandledError {
-  constructor(
-    message: string,
-    options: { meta?: Record<string, unknown>; reasons?: readonly Error[] } = {},
-  ) {
+  constructor(message: string, options: HandledErrorOptions = {}) {
     super("validation_error", message, { httpStatus: 422, ...options });
     this.name = "ValidationError";
   }
 
-  static fromZodError(zodError: ZodError): ValidationError {
+  static fromZodError(zodError: ZodLikeError): ValidationError {
     const flat = zodError.flatten();
     return new ValidationError(zodError.message, {
       meta: {

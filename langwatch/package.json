@@ -97,6 +97,7 @@
     "@hono/zod-validator": "^0.4.3",
     "@hookform/resolvers": "^5.4.0",
     "@langwatch/cli-cards": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/mcp-server": "workspace:*",
     "@langwatch/scenario": "file:vendor/langwatch-scenario-0.4.10.tgz",

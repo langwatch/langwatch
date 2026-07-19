@@ -18,9 +18,11 @@ Feature: Handled errors — the handled-error boundary
   error. The presence of a serialised domain payload IS the signal of "handled".
 
   This contract is the same in both languages and applies everywhere. See
-  ADR-045. The machinery already exists (`src/server/app-layer/handled-error.ts`,
-  wired into tRPC's `errorFormatter` and Hono's `onError`); these scenarios pin
-  its intended behaviour and its reach.
+  ADR-045. The machinery lives in the shared `packages/handled-error` package
+  (consumed directly by the app, MCP server, CLI and SDKs; the app wires its
+  Grafana trace links via `src/server/handled-error-wiring.ts`), wired into
+  tRPC's `errorFormatter` and Hono's `onError`; these scenarios pin its
+  intended behaviour and its reach.
 
   Background:
     Given the HandledError base and its serialisation are available in the app layer
@@ -89,14 +91,14 @@ Feature: Handled errors — the handled-error boundary
   # Cross-language: handled-ness survives the Go ↔ TS boundary
   # ==========================================================================
 
-  @bdd @domain-errors @unimplemented
+  @bdd @domain-errors
   Scenario: A Go herr proxied by the control plane arrives as a handled error
     Given a Go service returns an herr.E with Code "github_unreachable" and a trace id
     When the control plane proxies that failure to the client
     Then it is adapted into a HandledError (Code → code, meta→meta, trace_id/span_id→traceId/spanId)
     And the client receives code "github_unreachable" with its meta and trace link
 
-  @bdd @domain-errors @unimplemented
+  @bdd @domain-errors
   Scenario: A plain Go error proxied by the control plane becomes unknown
     Given a Go service returns a plain error (not an herr.E)
     When the control plane proxies that failure to the client
@@ -107,7 +109,7 @@ Feature: Handled errors — the handled-error boundary
   # Non-tRPC transports carry the same shape
   # ==========================================================================
 
-  @bdd @domain-errors @unimplemented
+  @bdd @domain-errors
   Scenario: A streamed response carries the serialised handled error on its error event
     Given a streamed endpoint (e.g. the Langy chat stream) hits a known failure mid-stream
     Then its error event carries the SerializedHandledError, not a plain string
@@ -129,6 +131,40 @@ Feature: Handled errors — the handled-error boundary
     Given a serialised handled error crosses a worker or process boundary
     Then consumers branch on `error.code`, not `instanceof`
     And identity survives the boundary intact
+
+  # ==========================================================================
+  # Remediation channel: tips/docsUrl/fault travel with the error (ADR-045,
+  # 2026-07-18 amendment)
+  # ==========================================================================
+
+  @bdd @domain-errors
+  Scenario: A handled error carries remediation for agent consumers
+    Given a QueryMemoryExceededError is thrown with tips and no docsUrl
+    When it is serialised
+    Then the payload carries its tips verbatim
+    And the payload carries fault "customer"
+    And consumers without a client-side explainer (CLI, API, MCP) can self-diagnose
+
+  @bdd @domain-errors
+  Scenario: Remediation fields are additive and optional
+    Given a HandledError without tips or docsUrl (e.g. an older error class)
+    When it is serialised
+    Then no tips or docsUrl keys are emitted
+    And older clients and the Python SDK keep working unchanged
+
+  @bdd @domain-errors
+  Scenario: Remediation survives the Go herr wire
+    Given a Go service returns an herr.E with Meta tips/docs_url/fault
+    When the envelope crosses to TypeScript
+    Then the adapted HandledError carries tips, docsUrl and fault
+    And a Body/FromBody round-trip preserves them losslessly
+
+  @bdd @domain-errors
+  Scenario: Log level follows fault attribution, not handled-ness
+    Given a handled error with fault "customer" and httpStatus 500
+    Then it logs at warn, with handledErrorCode available for spike alerts
+    And a handled error with fault "platform" or "provider" logs at error
+    And only unhandled errors are captured as exceptions
 
   # ==========================================================================
   # Transition: `kind` → `code` rename stays non-breaking during rollout

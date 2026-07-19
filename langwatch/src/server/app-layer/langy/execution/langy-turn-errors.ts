@@ -22,7 +22,8 @@ import { trace } from "@opentelemetry/api";
 import {
   HandledError,
   type SerializedHandledError,
-} from "~/server/app-layer/handled-error";
+} from "@langwatch/handled-error";
+import { remediation } from "../../error-remediation";
 import { LangyModelNotConfiguredError } from "~/server/app-layer/langy/errors";
 
 /** How long we give the manager to answer one turn before we give up. */
@@ -39,6 +40,8 @@ export class LangyAgentUnavailableError extends HandledError {
   constructor(message: string, options: { status?: number } = {}) {
     super("langy_agent_unavailable", message, {
       httpStatus: 503,
+      fault: "platform",
+      ...remediation("langy_agent_unavailable"),
       meta: options.status !== undefined ? { status: options.status } : {},
     });
     this.name = "LangyAgentUnavailableError";
@@ -55,6 +58,7 @@ export class LangyAgentAtCapacityError extends HandledError {
   constructor() {
     super("langy_agent_at_capacity", "agent reported at-capacity", {
       httpStatus: 429,
+      ...remediation("langy_agent_at_capacity"),
     });
     this.name = "LangyAgentAtCapacityError";
   }
@@ -71,6 +75,7 @@ export class LangyAgentSessionLostError extends HandledError {
   constructor() {
     super("langy_agent_session_lost", "agent reported session-not-found", {
       httpStatus: 410,
+      ...remediation("langy_agent_session_lost"),
     });
     this.name = "LangyAgentSessionLostError";
   }
@@ -98,7 +103,10 @@ export class LangyGithubNotConnectedError extends HandledError {
     super(
       "langy_github_not_connected",
       "agent required GitHub but the account is not connected",
-      { httpStatus: 409 },
+      {
+        httpStatus: 409,
+        ...remediation("langy_github_not_connected"),
+      },
     );
     this.name = "LangyGithubNotConnectedError";
   }
@@ -124,7 +132,10 @@ export class LangyGithubRepoNotAccessibleError extends HandledError {
     super(
       "langy_github_repo_not_accessible",
       "the repository is not available to the LangWatch GitHub App",
-      { httpStatus: 409 },
+      {
+        httpStatus: 409,
+        ...remediation("langy_github_repo_not_accessible"),
+      },
     );
     this.name = "LangyGithubRepoNotAccessibleError";
   }
@@ -149,6 +160,8 @@ export class LangyWorkerSpawnFailedError extends HandledError {
   constructor() {
     super("langy_worker_spawn_failed", "agent reported worker-spawn failure", {
       httpStatus: 503,
+      fault: "platform",
+      ...remediation("langy_worker_spawn_failed"),
     });
     this.name = "LangyWorkerSpawnFailedError";
   }
@@ -176,6 +189,8 @@ export class LangyWorkerStoppedError extends HandledError {
   constructor() {
     super("langy_worker_stopped", "worker stopped before finishing the turn", {
       httpStatus: 503,
+      fault: "platform",
+      ...remediation("langy_worker_stopped"),
     });
     this.name = "LangyWorkerStoppedError";
   }
@@ -198,6 +213,10 @@ export class LangyAgentErroredError extends HandledError {
   constructor(options: { reasons?: readonly Error[] } = {}) {
     super("langy_agent_errored", "agent reported the turn failed", {
       httpStatus: 502,
+      // The agent answered deterministically — typically its LLM call was
+      // rejected by the provider or gateway.
+      fault: "provider",
+      ...remediation("langy_agent_errored"),
       reasons: options.reasons,
     });
     this.name = "LangyAgentErroredError";
@@ -211,6 +230,8 @@ export class LangyTurnTimeoutError extends HandledError {
   constructor(timeoutMs: number) {
     super("langy_turn_timeout", `agent turn timed out after ${timeoutMs}ms`, {
       httpStatus: 504,
+      fault: "platform",
+      ...remediation("langy_turn_timeout"),
       meta: { timeoutMs },
     });
     this.name = "LangyTurnTimeoutError";
@@ -228,7 +249,11 @@ export class LangyWorkerRestartingError extends HandledError {
     super(
       "langy_worker_restarting",
       "Worker restarting — turn terminated before completion",
-      { httpStatus: 503 },
+      {
+        httpStatus: 503,
+        fault: "platform",
+        ...remediation("langy_worker_restarting"),
+      },
     );
     this.name = "LangyWorkerRestartingError";
   }
@@ -383,6 +408,8 @@ function unhandledShape(): SerializedHandledError {
     traceId: spanContext?.traceId,
     spanId: spanContext?.spanId,
     httpStatus: 500,
+    // An unclassified failure is potentially ours — log it like an incident.
+    fault: "platform",
     reasons: [],
   };
 }

@@ -1,6 +1,6 @@
 import { APICallError, RetryError } from "ai";
 import { describe, expect, it } from "vitest";
-import { HandledError } from "../../app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { isAbortLikeError, nlpgoHandledErrorFrom } from "../goHandledError";
 
 /** The exact envelope nlpgo returned for an unroutable provider prefix. */

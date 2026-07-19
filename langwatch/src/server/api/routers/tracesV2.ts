@@ -4,7 +4,7 @@ import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getVisibilityCutoffMsForProject } from "~/server/api/utils";
 import { getApp } from "~/server/app-layer/app";
-import { ValidationError } from "~/server/app-layer/handled-error";
+import { ValidationError } from "@langwatch/handled-error";
 import {
   generateTraceAction,
   generateTraceQueryFromPrompt,

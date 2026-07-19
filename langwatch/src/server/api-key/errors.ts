@@ -1,4 +1,6 @@
-import { HandledError, NotFoundError } from "../app-layer/handled-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
+
+import { remediation } from "../app-layer/error-remediation";
 
 /**
  * Thrown when an API key cannot be located by id.
@@ -9,6 +11,7 @@ export class ApiKeyNotFoundError extends NotFoundError {
   constructor(apiKeyId: string, options: { reasons?: readonly Error[] } = {}) {
     super("api_key_not_found", "API Key", apiKeyId, {
       meta: { apiKeyId },
+      ...remediation("api_key_not_found"),
       ...options,
     });
     this.name = "ApiKeyNotFoundError";
@@ -28,6 +31,7 @@ export class ApiKeyNotOwnedError extends HandledError {
     super("api_key_not_owned", "Not authorized to modify this API Key", {
       meta: { apiKeyId },
       httpStatus: 403,
+      ...remediation("api_key_not_owned"),
       ...options,
     });
     this.name = "ApiKeyNotOwnedError";
@@ -47,6 +51,7 @@ export class ApiKeyAlreadyRevokedError extends HandledError {
     super("api_key_already_revoked", "API Key is already revoked", {
       meta: { apiKeyId },
       httpStatus: 409,
+      ...remediation("api_key_already_revoked"),
       ...options,
     });
     this.name = "ApiKeyAlreadyRevokedError";
@@ -75,6 +80,7 @@ export class ApiKeyPermissionDeniedError extends HandledError {
       {
         meta: { permission, ...options.meta },
         httpStatus: 403,
+        ...remediation("api_key_permission_denied"),
         reasons: options.reasons,
       },
     );
@@ -99,6 +105,7 @@ export class ApiKeyScopeViolationError extends HandledError {
   ) {
     super("api_key_scope_violation", message, {
       httpStatus: 403,
+      ...remediation("api_key_scope_violation"),
       ...options,
     });
     this.name = "ApiKeyScopeViolationError";

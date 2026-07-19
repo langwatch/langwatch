@@ -1,4 +1,5 @@
 import type { createLogger } from "@langwatch/observability";
+import { HandledError } from "@langwatch/handled-error";
 
 /**
  * Error categories for standardized error handling.
@@ -464,21 +465,39 @@ export const CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS = [
  * errors are CRITICAL.
  */
 export function classifyClickHouseError(error: unknown): ErrorCategory {
+  // The resilient client's query translation wraps the raw driver error in a
+  // HandledError's `reasons` — classify the wrapped causes, not the handled
+  // shell. Single shallow pass: the translation wraps the driver error
+  // directly, no deep recursion needed.
+  const candidates =
+    error instanceof HandledError && (error.reasons ?? []).length > 0
+      ? error.reasons
+      : [error];
+
+  for (const candidate of candidates) {
+    if (isTransientClickHouseError(candidate)) {
+      return ErrorCategory.RECOVERABLE;
+    }
+  }
+  return ErrorCategory.CRITICAL;
+}
+
+function isTransientClickHouseError(error: unknown): boolean {
   if (
     error != null &&
     typeof error === "object" &&
     "code" in error &&
     CLICKHOUSE_TRANSIENT_CODES.has(String((error as { code: unknown }).code))
   ) {
-    return ErrorCategory.RECOVERABLE;
+    return true;
   }
 
   const message = error instanceof Error ? error.message : String(error);
   for (const fragment of CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS) {
     if (message.includes(fragment)) {
-      return ErrorCategory.RECOVERABLE;
+      return true;
     }
   }
 
-  return ErrorCategory.CRITICAL;
+  return false;
 }
