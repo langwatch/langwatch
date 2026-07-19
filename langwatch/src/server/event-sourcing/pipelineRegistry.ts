@@ -387,14 +387,14 @@ export class PipelineRegistry {
           decideSweepCandidates: automationPorts.decideSweepCandidates,
           evaluateGraphTrigger: automationPorts.evaluateGraphTrigger,
           deleteDispatchedBefore: (params) =>
-            this.deps.repositories.langyProcessStore.deleteDispatchedBefore(
+            this.deps.repositories.processStore.deleteDispatchedBefore(
               params,
             ),
         },
         prune: {
           pruneExpired: automationPorts.pruneWebhookDeliveries,
           deleteDispatchedBefore: (params) =>
-            this.deps.repositories.langyProcessStore.deleteDispatchedBefore(
+            this.deps.repositories.processStore.deleteDispatchedBefore(
               params,
             ),
         },

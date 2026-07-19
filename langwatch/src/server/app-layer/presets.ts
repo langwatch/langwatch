@@ -714,7 +714,7 @@ export function initializeDefaultApp(options?: {
     retentionPolicyResolver: retentionPolicyCache,
     // ADR-052: durable persistence for withProcessManager declarations —
     // the SAME store instance the registry's dependency assembly uses.
-    processStore: repositories.langyProcessStore,
+    processStore: repositories.processStore,
   });
 
   // ADR-052: automation dispatch ports for the process-manager runtime the
