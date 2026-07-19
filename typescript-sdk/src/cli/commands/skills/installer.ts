@@ -75,6 +75,17 @@ export const MANAGED_MARKER = `<!-- managed-by: langwatch-skills v${SKILLS_BUNDL
  * version string, and `update` then overwrites their file with no --force and
  * no prompt. The symmetric failure has `install` mislabel a locally edited
  * file as a stale install. One trailing match answers both questions.
+ *
+ * The accepted cost: a user who APPENDS their own notes below the footer of a
+ * file we installed drops it out of managed status. They will see `update` say
+ * "not managed by `langwatch skills`; use `install --force`" and `uninstall`
+ * say "remove it by hand" — friction, and confusing friction given the file
+ * plainly carries our marker. It is not data loss: `planForcedClobbers`
+ * classifies such a file as a clobber, so even `--force` prompts or refuses
+ * rather than silently eating the appended notes. The trade is deliberate and
+ * runs in the safe direction — we would rather decline to touch a file that is
+ * ours than touch one that is not. Moving the notes ABOVE the footer, or
+ * removing the footer entirely, restores the expected behaviour.
  */
 const MANAGED_MARKER_RE = /(?:^|\n)<!-- managed-by: langwatch-skills v(\S+) -->\s*$/;
 
@@ -218,9 +229,39 @@ const asFileResult = (
  * volume) a pre-planted symlink at a skill path would let this truncate a file
  * outside the root entirely. `lstat` sees the link itself, and refuses.
  */
+/**
+ * Delete temp files THIS process orphaned in `dir` on an earlier run.
+ *
+ * The write below is crash-safe for the skill file but not for its own temp:
+ * a signal or hard kill between `writeFileSync` and `renameSync` skips the
+ * catch and strands `.SKILL.md.<pid>-<uuid>.tmp` forever, one per Ctrl-C'd
+ * `skills install --all`.
+ *
+ * The sweep is scoped to this process's OWN pid rather than an age threshold
+ * because pid is the only signal here that is exact. An age cutoff has to
+ * guess how slow a legitimate write can be, and guessing wrong deletes a
+ * concurrent installer's in-flight temp out from under it — a corrupted
+ * install to tidy up litter. A recycled pid is the one false positive, and it
+ * can only ever hit a temp the recycled owner already abandoned. Temps left by
+ * OTHER pids stay: harmless, and not ours to judge.
+ */
+const sweepOrphanedTemps = (dir: string, fileName: string): void => {
+  const prefix = `.${fileName}.${process.pid}-`;
+  try {
+    for (const entry of fs.readdirSync(dir)) {
+      if (entry.startsWith(prefix) && entry.endsWith(".tmp")) {
+        fs.rmSync(path.join(dir, entry), { force: true });
+      }
+    }
+  } catch {
+    // Best-effort tidying: never fail an install over leftover litter.
+  }
+};
+
 const writeSkill = (filePath: string, content: string): void => {
   const dir = path.dirname(filePath);
   fs.mkdirSync(dir, { recursive: true });
+  sweepOrphanedTemps(dir, path.basename(filePath));
 
   const link = fs.lstatSync(filePath, { throwIfNoEntry: false });
   if (link?.isSymbolicLink()) {
@@ -240,7 +281,14 @@ const writeSkill = (filePath: string, content: string): void => {
     fs.writeFileSync(temp, content, "utf8");
     fs.renameSync(temp, filePath);
   } catch (error) {
-    fs.rmSync(temp, { force: true });
+    // The cleanup gets its own try/catch so it can never REPLACE the failure
+    // being handled: an EACCES on unlink surfacing instead of the ENOSPC that
+    // actually stopped the write sends the user to debug the wrong thing.
+    try {
+      fs.rmSync(temp, { force: true });
+    } catch {
+      // Leave the temp behind; the sweep above reclaims it next run.
+    }
     throw error;
   }
 };
@@ -330,6 +378,10 @@ export const planForcedClobbers = (
  * Plan an uninstall without touching the disk, so the command can ask for
  * confirmation (or refuse, non-TTY) before anything is removed.
  *
+ * A path the filesystem refuses to even READ (EISDIR, EACCES) becomes a failed
+ * skip like everywhere else — planning a bundle must not abort halfway on one
+ * bad path, leaving the other skills' fate unreported.
+ *
  * Only files the bundle manages are ever removed: byte-identical installs,
  * or marker-carrying files — a modified managed file additionally needs -y
  * (it may carry the user's edits). A file with no marker and different
@@ -341,36 +393,38 @@ export const planUninstall = (
   { yes = false }: { yes?: boolean } = {},
 ): SkillFileResult => {
   const filePath = skillFilePath(root, skill);
-  const existing = readIfExists(filePath);
+  return asFileResult(skill, filePath, () => {
+    const existing = readIfExists(filePath);
 
-  if (existing === undefined) {
-    return {
-      slug: skill.slug,
-      path: filePath,
-      action: "skipped",
-      reason: "not installed",
-    };
-  }
-  if (existing === renderSkillFile(skill)) {
-    return { slug: skill.slug, path: filePath, action: "removed" };
-  }
-  if (isManagedContent(existing)) {
-    if (!yes) {
+    if (existing === undefined) {
       return {
         slug: skill.slug,
         path: filePath,
         action: "skipped",
-        reason: "locally modified; pass -y to remove anyway",
+        reason: "not installed",
       };
     }
-    return { slug: skill.slug, path: filePath, action: "removed" };
-  }
-  return {
-    slug: skill.slug,
-    path: filePath,
-    action: "skipped",
-    reason: "not managed by `langwatch skills`; remove it by hand",
-  };
+    if (existing === renderSkillFile(skill)) {
+      return { slug: skill.slug, path: filePath, action: "removed" };
+    }
+    if (isManagedContent(existing)) {
+      if (!yes) {
+        return {
+          slug: skill.slug,
+          path: filePath,
+          action: "skipped",
+          reason: "locally modified; pass -y to remove anyway",
+        };
+      }
+      return { slug: skill.slug, path: filePath, action: "removed" };
+    }
+    return {
+      slug: skill.slug,
+      path: filePath,
+      action: "skipped",
+      reason: "not managed by `langwatch skills`; remove it by hand",
+    };
+  });
 };
 
 /**

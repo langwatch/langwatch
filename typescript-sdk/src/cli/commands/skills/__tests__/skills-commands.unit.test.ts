@@ -11,6 +11,7 @@ import {
   findSkill,
   installSkill,
   MANAGED_MARKER,
+  skillFilePath,
   SKILLS_BUNDLE,
   type BundledSkill,
 } from "../installer";
@@ -164,6 +165,41 @@ describe("the skills commands", () => {
     expect(
       fs.existsSync(path.join(root, "skills", "tracing", "SKILL.md")),
     ).toBe(true);
+  });
+
+  describe("when one skill's path cannot be read during uninstall --all", () => {
+    // A directory sitting where a SKILL.md belongs makes the plan's read throw
+    // EISDIR. That must not abort the batch: the other skills still get
+    // removed, and the caller still gets a full report of what happened.
+    it("removes the readable skills, reports the failure, and exits non-zero", async () => {
+      installSkill(skill("tracing"), root, {});
+      const blocked = skillFilePath(root, skill("prompts"));
+      fs.mkdirSync(blocked, { recursive: true });
+
+      await skillsUninstallCommand([], {
+        dir: root,
+        all: true,
+        yes: true,
+        output: "json",
+      });
+
+      const parsed = JSON.parse(logged()) as {
+        results: { slug: string; action: string; reason?: string; failed?: boolean }[];
+      };
+      const tracing = parsed.results.find((r) => r.slug === "tracing")!;
+      const prompts = parsed.results.find((r) => r.slug === "prompts")!;
+
+      expect(tracing.action).toBe("removed");
+      expect(
+        fs.existsSync(path.join(root, "skills", "tracing", "SKILL.md")),
+      ).toBe(false);
+
+      expect(prompts.action).toBe("skipped");
+      expect(prompts.failed).toBe(true);
+      expect(prompts.reason).toContain("EISDIR");
+
+      expect(process.exitCode).toBe(1);
+    });
   });
 
   describe("when --force would overwrite content the bundle does not manage", () => {

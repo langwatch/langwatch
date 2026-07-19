@@ -211,10 +211,19 @@ Feature: CLI daemon mode
 
     Scenario: An in-flight command outlasts the shutdown grace period
       Given a daemon is serving a command that will not finish
+      And none of its output has reached me yet
       When the daemon is asked to stop
       And the shutdown grace period elapses
-      Then the connection is dropped before any exit code is sent
+      Then I am told the daemon declined the command before any exit code is sent
       And the command is retried in-process
+
+    Scenario: An in-flight command outlasts the shutdown grace period after printing
+      Given a daemon is serving a command whose output is too large to hold back
+      And part of that output has already been printed to me
+      When the daemon is asked to stop
+      And the shutdown grace period elapses
+      Then the command is NOT retried, because that would print the same output twice
+      And I am told the output is incomplete and the exit status is not the command's
 
   Rule: The daemon is managed explicitly
 

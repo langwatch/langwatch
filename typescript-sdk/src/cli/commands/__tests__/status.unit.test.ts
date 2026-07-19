@@ -624,16 +624,124 @@ describe("statusCommand", () => {
     });
 
     describe("when the project has virtual keys the budgets endpoint cannot cover", () => {
-      it("declares the virtual-key and principal scope unchecked", async () => {
+      it("declares the scope uncovered as a note without withholding the all-clear", async () => {
         mockAllSuccess();
-        // GET /budgets returns org/team/project scope only. With keys present,
-        // a VK budget at 100% could be blocking traffic entirely unseen.
+        // GET /budgets returns org/team/project scope only, on every project
+        // forever — a standing limit of the API, not a check that failed. It is
+        // told to the user, but a healthy project still reads as healthy.
         global.fetch = mockGatewayFetch({ virtualKeys: [{ id: "vk_1" }] });
 
         await statusCommand();
 
         const out = consoleLogSpy.mock.calls.flat().join("\n");
         expect(out).toContain("virtual-key and principal budgets were not checked");
+        expect(out).toContain("(note — gateway budgets:");
+        expect(out).not.toContain("could not check gateway budgets");
+        expect(out).toContain("nothing needs your attention");
+      });
+
+      it("reports the key count from pagination rather than the page-1 length", async () => {
+        mockAllSuccess();
+        global.fetch = vi.fn().mockImplementation(async (input: unknown) => {
+          const url = String(input);
+          if (url.includes("/api/gateway/v1/budgets")) {
+            return { ok: true, status: 200, json: async () => ({ data: [] }) };
+          }
+          if (url.includes("/api/gateway/v1/virtual-keys")) {
+            // 300 keys behind pagination — page 1 carries 3 of them.
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                data: [{ id: "vk_1" }, { id: "vk_2" }, { id: "vk_3" }],
+                pagination: { totalHits: 300 },
+              }),
+            };
+          }
+          return { ok: true, status: 200, json: async () => [{ id: "1" }] };
+        }) as unknown as typeof fetch;
+
+        await statusCommand();
+
+        const out = consoleLogSpy.mock.calls.flat().join("\n");
+        expect(out).toContain("300 virtual keys");
+        expect(out).not.toContain("3 virtual keys");
+      });
+
+      it("keeps a failed virtual-keys probe an error that withholds the all-clear", async () => {
+        mockAllSuccess();
+        const baseFetch = global.fetch;
+        global.fetch = vi.fn().mockImplementation(async (input: unknown) => {
+          const url = String(input);
+          if (url.includes("/api/gateway/v1/virtual-keys")) {
+            // A probe that 403s is a check that did NOT run — unlike the
+            // structural blind spot, this one must still gate the tick.
+            return {
+              ok: false,
+              status: 403,
+              statusText: "Forbidden",
+              json: async () => ({ error: "Forbidden" }),
+            };
+          }
+          return baseFetch(input as Parameters<typeof fetch>[0]);
+        }) as unknown as typeof fetch;
+
+        await statusCommand();
+
+        const out = consoleLogSpy.mock.calls.flat().join("\n");
+        expect(out).toContain("could not check gateway budgets");
+        expect(out).toContain("could not list virtual keys");
+        expect(out).not.toContain("nothing needs your attention");
+      });
+    });
+
+    describe("when many experiments have run but none is running now", () => {
+      it("reaches the all-clear rather than reporting the candidate cap as a gap", async () => {
+        // Every experiment that ever ran has a non-null lastRunAt, so "there
+        // are more than 5 candidates" describes nearly every real project.
+        // Treating that as an incomplete scan makes the ✓ unreachable.
+        mockExperiments({
+          experiments: Array.from({ length: 8 }, (_unused, index) =>
+            experimentFixture({ id: `exp_${index}`, slug: `eval-${index}` }),
+          ),
+          pagination: { page: 1, pageSize: 50, totalHits: 8, hasMore: false },
+          runs: {
+            runs: [
+              {
+                experimentId: "exp_1",
+                runId: "run_1",
+                workflowVersion: null,
+                timestamps: { createdAt: 1, updatedAt: 2, finishedAt: 3, stoppedAt: null },
+                progress: 10,
+                total: 10,
+                summary: { evaluations: {} },
+              },
+            ],
+            pagination: { page: 1, pageSize: 1, totalHits: 1, hasMore: false },
+          },
+        });
+
+        await statusCommand();
+
+        const out = consoleLogSpy.mock.calls.flat().join("\n");
+        expect(out).not.toContain("could not check running experiments");
+        expect(out).toContain("nothing needs your attention");
+      });
+
+      it("still records the cap once the sample itself turns up a live run", async () => {
+        // A running experiment in the top 5 IS evidence the untested tail may
+        // hold more — the cap becomes a real gap again.
+        mockExperiments({
+          experiments: Array.from({ length: 8 }, (_unused, index) =>
+            experimentFixture({ id: `exp_${index}`, slug: `eval-${index}` }),
+          ),
+          pagination: { page: 1, pageSize: 50, totalHits: 8, hasMore: false },
+        });
+
+        await statusCommand();
+
+        const out = consoleLogSpy.mock.calls.flat().join("\n");
+        expect(out).toContain("of 8 candidate experiments were checked");
         expect(out).not.toContain("nothing needs your attention");
       });
     });
@@ -648,7 +756,10 @@ describe("statusCommand", () => {
           mockPOST.mockReturnValue(new Promise(() => undefined));
 
           const pending = statusCommand({ output: "json" });
-          await vi.advanceTimersByTimeAsync(6_000);
+          // Past the 30s section ceiling — the sections get a far higher one
+          // than the cheap list endpoints, a ClickHouse COUNT being routinely
+          // slower than the 5s that would have called a healthy backend hung.
+          await vi.advanceTimersByTimeAsync(31_000);
           await pending;
 
           const doc = JSON.parse(consoleLogSpy.mock.calls[0]?.[0] as string);

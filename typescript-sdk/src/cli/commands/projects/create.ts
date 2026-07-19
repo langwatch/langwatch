@@ -58,6 +58,14 @@ export const createProjectCommand = async (
 
     spinner.succeed(`Created project "${chalk.cyan(project.name)}"`);
 
+    // The service API key is one-time — the server never returns it again — so
+    // the warning must reach the caller in EVERY format, not only the table.
+    // stderr keeps it outside the machine document, so a parser reading stdout
+    // is unaffected while the human still gets told.
+    process.stderr.write(
+      "warning: the service API key is shown once and cannot be retrieved again — save it now.\n",
+    );
+
     return {
       data: project,
       table: () => {

@@ -219,6 +219,20 @@ export async function execViaDaemon(
             break;
           }
           case "fallback": {
+            if (committed) {
+              // The daemon declined AFTER our output crossed the buffer cap and
+              // was flushed. Re-running would print everything the caller has
+              // already seen a second time, so we cannot — the honest report is
+              // that the output is incomplete and this status is ours, not the
+              // command's. (In practice only the shutdown-grace path can reach
+              // here: every other `fallback` is sent before any output at all.)
+              stderr.write(
+                `langwatch: daemon stopped mid-command (${frame.reason}); ` +
+                  `the output above is incomplete and this exit status is not the command's — please re-run\n`,
+              );
+              settle({ served: true, exitCode: 1 });
+              break;
+            }
             settle({ served: false, reason: `daemon-declined:${frame.reason}` });
             break;
           }

@@ -269,6 +269,65 @@ describe("createCommandExecutor", () => {
     });
   });
 
+  describe("when the cancel lands between admission and taking the window", () => {
+    it("hands the window straight back instead of holding it forever", async () => {
+      // The narrowest interleaving there is: `drain()` has already resolved this
+      // request's acquire — so ExecutionWindow's abort listener sees an admitted
+      // waiter and does nothing — but the continuation that assigns
+      // `releaseWindow` has not run yet, so `armAbandonGrace` has nothing to arm.
+      //
+      // A window is genuinely held at that instant with no grace timer bounding
+      // it. If the continuation did not re-check `cancelled` and release, the
+      // daemon would sit at inflight 1 forever: the work never starts, so
+      // nothing ever settles, so `releaseOnce` never runs — and the idle timer
+      // cannot fire either, because a request is in flight. That is exactly the
+      // state `exitWhenWedged` exists to prevent, and it would be unreachable.
+      //
+      // A stub window is the only way to hold the resolution open across the
+      // single microtask that separates the two.
+      mockedBuildProgram.mockReturnValue(hungProgram());
+
+      let admit!: (release: () => void) => void;
+      let released = false;
+      const stubWindow = {
+        acquire: () =>
+          new Promise<() => void>((resolve) => {
+            admit = resolve;
+          }),
+      } as unknown as ExecutionWindow;
+
+      const wedged = vi.fn();
+      const executor = createCommandExecutor({
+        window: stubWindow,
+        telemetry: noopTelemetry,
+        requestTimeoutMs: 60_000,
+        abandonGraceMs: 30,
+        onWedged: wedged,
+      });
+
+      const running = executor(request("r1", dirA, collect().sink));
+      // Let the executor reach its `await window.acquire(...)`.
+      await Promise.resolve();
+
+      // Admitted...
+      admit(() => {
+        released = true;
+      });
+      // ...and cancelled before the continuation can assign `releaseWindow`.
+      running.cancel(130);
+
+      await expect(running.completed).resolves.toBe(130);
+
+      // The window came back, and the command never ran under it.
+      expect(released).toBe(true);
+      expect(mockedBuildProgram).not.toHaveBeenCalled();
+
+      // Released cleanly, so nothing was abandoned and the grace never fires.
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      expect(wedged).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when a QUEUED request is cancelled", () => {
     it("leaves the queue rather than being admitted after its caller is gone", async () => {
       const hung = resumableProgram();

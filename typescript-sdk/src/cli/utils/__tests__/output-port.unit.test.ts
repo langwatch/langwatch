@@ -201,6 +201,63 @@ describe("assertFormatIsSupported", () => {
         expect(effective.format).toBe("json");
       });
 
+      // Owning `--json` proves the command can emit ITS json — not that it can
+      // honour every format. Without this narrowing, `daemon status -o yaml`
+      // and `dataset records add --json '{..}' -o yaml` both answered with a
+      // chalk table at exit 0 for a caller who explicitly asked for YAML.
+      it.each([
+        ["output", "yaml"],
+        ["jq", ".foo"],
+      ])("still refuses --%s from a command that only owns --json", async (flag, value) => {
+        const program = new Command();
+        program.enablePositionalOptions().passThroughOptions();
+        const owner = program
+          .command("owner")
+          .option("--json", "emit machine-readable JSON")
+          .action(() => undefined);
+        registerOutputOptions(program);
+        owner.setOptionValue(flag, value);
+
+        await assertFormatIsSupported(owner, resolveActionOutputOptions(owner));
+
+        expect(exited).toEqual([1]);
+      });
+
+      // `--json <payload>` on dataset records add/update is DATA, not an
+      // output-capability claim, so an explicit -o must still be refused.
+      it("refuses an explicit format when --json is the command's payload flag", async () => {
+        const program = new Command();
+        program.enablePositionalOptions().passThroughOptions();
+        const payload = program
+          .command("records-add")
+          .option("--json <json>", "the records to add")
+          .action(() => undefined);
+        registerOutputOptions(program);
+        payload.setOptionValue("json", '{"a":1}');
+        payload.setOptionValue("output", "yaml");
+
+        await assertFormatIsSupported(payload, resolveActionOutputOptions(payload));
+
+        expect(exited).toEqual([1]);
+      });
+
+      // `--agent` is a MODE (no colour, no spinners), not a format demand, so
+      // it degrades with a warning instead of failing. Pins the deliberate
+      // omission of `raw.agent` from the refusal check.
+      it("degrades rather than refusing an explicit --agent", async () => {
+        const legacy = legacyCommand();
+        legacy.setOptionValue("agent", true);
+
+        const effective = await assertFormatIsSupported(
+          legacy,
+          resolveActionOutputOptions(legacy),
+        );
+
+        expect(exited).toEqual([]);
+        expect(effective.format).toBe("table");
+        expect(warned.join("")).toContain("not machine-readable");
+      });
+
       // daemon status / ingest / governance own a boolean --json and emit
       // machine output through it.
       it("passes through a command that owns its own --json flag", async () => {
@@ -299,8 +356,28 @@ describe("applyJq", () => {
       [".traces[]?"],
       [".[0]"],
       [".traces[].spans[0]"],
+      // Operators: a denylist missed these and answered `null` silently.
+      [".traces - 1"],
+      [".traces,.other"],
+      [".traces + 1"],
+      [".traces(x)"],
     ])("throws rather than answering null for %s", (expression) => {
       expect(() => applyJq(expression, DATA)).toThrow(/unsupported syntax|must start with/);
+    });
+  });
+
+  // Root-level iteration has an empty key by design; the allowlist must not
+  // mistake that for invalid syntax (it did, briefly).
+  describe("when iterating at the root", () => {
+    it("iterates a top-level array with .[]", () => {
+      expect(applyJq(".[]", [{ id: "a" }, { id: "b" }])).toEqual([
+        { id: "a" },
+        { id: "b" },
+      ]);
+    });
+
+    it("selects a field under root iteration with .[].id", () => {
+      expect(applyJq(".[].id", [{ id: "a" }, { id: "b" }])).toEqual(["a", "b"]);
     });
   });
 

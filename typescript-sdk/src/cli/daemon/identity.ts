@@ -103,9 +103,12 @@ export function isDaemonSupported(): boolean {
  * then cannot chmod a directory it does not own, so the real daemon can never
  * bind — and the squatter is free to bind the socket itself and be handed the
  * caller's args, cwd and forwarded `LANGWATCH_*` env. A directory under `$HOME`
- * cannot be pre-created by another user, which removes the squat entirely
- * rather than merely detecting it. (`inspectSocketTrust` still detects it, for
- * `$XDG_RUNTIME_DIR`, `LANGWATCH_DAEMON_DIR` and the temp-dir fallback.)
+ * cannot be pre-created by another user, which removes the squat for the LEAF
+ * rather than merely detecting it — on a correctly-permissioned `$HOME`. It does
+ * NOT remove it for the path's ancestors, which nothing here checks; see the
+ * boundary note on `inspectSocketTrust`. (`inspectSocketTrust` remains the only
+ * defence for `$XDG_RUNTIME_DIR`, `LANGWATCH_DAEMON_DIR` and the temp-dir
+ * fallback, where pre-creation IS possible.)
  */
 export function daemonSocketDir(): string {
   const override = process.env.LANGWATCH_DAEMON_DIR;
@@ -266,6 +269,23 @@ function hasLooseMode(mode: number): boolean {
  * Every problem is soft — the caller falls back to running the command
  * in-process. A squatted socket must degrade the CLI to its pre-daemon
  * behaviour, never break it.
+ *
+ * THE BOUNDARY, precisely. This checks the socket and its IMMEDIATE parent, and
+ * nothing above that: `~/.langwatch`, `~/.langwatch/run`'s own ancestors and
+ * `$HOME` itself are not stat'd. So preferring `$HOME` over `/tmp` removes the
+ * squat for the LEAF — an attacker cannot create or replace the socket or its
+ * directory — but it does not remove it for the CHAIN. On a misconfigured
+ * group-writable `$HOME`, a peer can rename an ancestor and point the whole path
+ * somewhere they control.
+ *
+ * That residual case is deliberately left to fail the checks above rather than
+ * be pre-empted by an ancestor walk. The outcome is refuse-and-degrade, not
+ * disclosure: the substituted directory is theirs, so `socket-dir-foreign-owner`
+ * fires and no bytes are ever sent. A full walk to the filesystem root would add
+ * a stat per level to the hot path of every invocation and still not close the
+ * race (any ancestor can be renamed between our stat and our connect); a
+ * group-writable `$HOME` is a broken machine, and one this CLI degrades safely
+ * on rather than pretends to fix.
  */
 export function inspectSocketTrust(
   socketPath: string,

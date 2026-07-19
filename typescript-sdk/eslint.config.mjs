@@ -42,7 +42,25 @@ const config = tseslint.config(
             ecmaVersion: "latest",
             sourceType: "module",
             parserOptions: { project: false, projectService: false },
-            globals: { console: "readonly", process: "readonly" },
+            // Listed explicitly rather than via the `globals` package, which is
+            // not a direct dependency here. Covers what a build script actually
+            // reaches for — without these, a script using Buffer/URL/__dirname
+            // would fail CI lint with a bogus no-undef rather than a real finding.
+            globals: {
+                console: "readonly",
+                process: "readonly",
+                Buffer: "readonly",
+                URL: "readonly",
+                URLSearchParams: "readonly",
+                TextEncoder: "readonly",
+                TextDecoder: "readonly",
+                __dirname: "readonly",
+                __filename: "readonly",
+                fetch: "readonly",
+                structuredClone: "readonly",
+                setTimeout: "readonly",
+                clearTimeout: "readonly",
+            },
         },
     },
     {

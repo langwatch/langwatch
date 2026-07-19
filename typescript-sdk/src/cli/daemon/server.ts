@@ -9,8 +9,10 @@ import * as net from "node:net";
 
 import {
   ensureSocketDir,
+  inspectSocketTrust,
   isSocketPathUsable,
   secureSocketFile,
+  UntrustedSocketDirError,
 } from "./identity";
 import {
   encodeFrame,
@@ -34,9 +36,12 @@ export const DEFAULT_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
  * so a request still running when that happens would finish against the WRONG
  * globals — and version-skew eviction makes shutdown-while-serving a routine
  * dev-loop event, not an exotic one. 5s covers any command close enough to
- * finishing to be worth waiting for; past that the connections are destroyed so
- * the client sees a transport failure and re-runs in-process, which is the one
- * outcome that is always correct.
+ * finishing to be worth waiting for; past that the client is told to fall back
+ * and the connection is cut.
+ *
+ * For a client that has not committed output — everything under the client's
+ * buffer cap, which is very nearly everything — that is a clean in-process
+ * re-run. For one that HAS committed, it is not: see the note in `stop()`.
  */
 export const DEFAULT_SHUTDOWN_GRACE_MS = 5_000;
 
@@ -69,6 +74,25 @@ export interface DaemonServer {
   };
 }
 
+/**
+ * The trust problems that mean somebody ELSE holds this path, as opposed to the
+ * ones that just mean we left debris behind.
+ *
+ * `socket-missing` is the ordinary empty state, and `socket-not-a-socket` is a
+ * corpse `cleanStaleSocket` will unlink — neither is a squat. (A non-socket we
+ * do NOT own cannot occur past `ensureSocketDir`: the directory is ours and
+ * 0700 by then, so nobody else can create a file inside it, and a foreign
+ * directory has already thrown.) Everything left is an ownership or mode
+ * problem, i.e. a path we can neither trust nor repair.
+ */
+const SQUATTED_SOCKET_PROBLEMS: ReadonlySet<string> = new Set([
+  "socket-dir-not-a-directory",
+  "socket-dir-foreign-owner",
+  "socket-dir-loose-mode",
+  "socket-foreign-owner",
+  "socket-loose-mode",
+]);
+
 export class DaemonAlreadyRunningError extends Error {
   constructor(readonly socketPath: string) {
     super(`a langwatch daemon is already listening on ${socketPath}`);
@@ -83,9 +107,20 @@ export class DaemonAlreadyRunningError extends Error {
  * file behind. Binding on top of it fails with EADDRINUSE, and connecting to it
  * fails with ECONNREFUSED. Distinguishing the two is what keeps a crashed
  * daemon from wedging every future invocation.
+ *
+ * A socket owned by somebody else is neither: it is not OUR daemon, so "alive"
+ * would be a lie with teeth. `listen()` turns a true here into
+ * DaemonAlreadyRunningError, so a squatter who binds the path first — reachable
+ * via LANGWATCH_DAEMON_DIR, XDG_RUNTIME_DIR or the tmp fallback — would stop
+ * the real daemon from EVER starting. Nothing is disclosed (we send no bytes),
+ * but the old credential-theft vector would become a permanent, silent denial
+ * of service. So: a foreign socket is not alive, and it is not silent either —
+ * `cleanStaleSocket` will not unlink it (it cannot), and `listen()` reports the
+ * squat instead of misattributing it to a daemon that is already running.
  */
 export async function isSocketAlive(socketPath: string): Promise<boolean> {
   if (!fs.existsSync(socketPath)) return false;
+  if (inspectSocketTrust(socketPath) !== null) return false;
 
   return new Promise<boolean>((resolve) => {
     const socket = net.connect(socketPath);
@@ -199,11 +234,39 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     // its credentials against the daemon's globals instead of its caller's, and
     // would then report an exit code the client trusts. So: let them finish.
     if (!(await drainInflight(shutdownGraceMs))) {
-      // They did not. Cut the connections instead of letting the clients
-      // believe a result computed under a rewritten environment: a transport
-      // failure before the `exit` frame is a clean in-process re-run (nothing
-      // has been committed to their stdout), which is always correct.
-      for (const connection of connections) connection.destroy();
+      // They did not. Cut the connections rather than let the clients believe a
+      // result computed under a rewritten environment.
+      //
+      // The `fallback` frame goes first so the outcome is DIAGNOSED rather than
+      // inferred from a dead socket. What the client can do with it depends on
+      // whether it has committed output yet, and the two cases are genuinely
+      // different — this is not a uniformly clean re-run:
+      //
+      //   - Not committed (the overwhelming majority: everything under
+      //     DEFAULT_MAX_BUFFER_BYTES is still sitting in the client's buffer).
+      //     Nothing has reached the caller's stdout, so the client re-runs the
+      //     command in-process and the outcome is indistinguishable from having
+      //     no daemon at all. This case IS always correct.
+      //
+      //   - Committed (`trace search`, `analytics query`, a large
+      //     `--format json` — anything whose output crossed the buffer cap and
+      //     was flushed to the real stdout). Re-running would duplicate what the
+      //     caller has already seen, so the client cannot. It reports truncated
+      //     output and a non-zero status that is NOT the command's own. That is
+      //     a real, if rare, loss of fidelity, and routine version-skew eviction
+      //     (dispatch.ts requestStop) can trigger it. The frame at least lets
+      //     the client say so accurately instead of guessing from a socket close.
+      for (const connection of connections) {
+        if (connection.destroyed) continue;
+        // `end`, not `write`+`destroy`: destroy() discards anything still in the
+        // write buffer, which would throw away the very frame being sent. The
+        // callback fires once it is flushed, and destroying there bounds the
+        // teardown instead of leaving a half-closed socket holding the loop open.
+        connection.end(
+          encodeFrame({ t: "fallback", reason: "shutting-down-mid-command" }),
+          () => connection.destroy(),
+        );
+      }
       connections.clear();
     }
 
@@ -424,6 +487,17 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     }
 
     ensureSocketDir(options.socketDir);
+
+    // ensureSocketDir repairs the DIRECTORY's mode, but a squatter who got
+    // there while it was still loose has already left their socket file inside
+    // it, and that file is still theirs. Refusing loudly here — rather than
+    // letting `isSocketAlive` report it and `listen()` misread it as
+    // DaemonAlreadyRunningError — is what keeps the squat from reading as "a
+    // daemon is already running" forever, which no amount of restarting fixes.
+    const trust = inspectSocketTrust(options.socketPath);
+    if (trust !== null && SQUATTED_SOCKET_PROBLEMS.has(trust)) {
+      throw new UntrustedSocketDirError(options.socketPath, trust);
+    }
 
     if (await isSocketAlive(options.socketPath)) {
       throw new DaemonAlreadyRunningError(options.socketPath);

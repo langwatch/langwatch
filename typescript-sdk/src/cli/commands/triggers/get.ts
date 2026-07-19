@@ -7,6 +7,7 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { redactTriggerSecrets } from "./redact";
 
 /**
  * Returns the trigger rather than printing it: the output port renders it in
@@ -52,7 +53,9 @@ export const getTriggerCommand = async (
     spinner.succeed(`Found trigger "${trigger.name}"`);
 
     return {
-      data: trigger,
+      // actionParams holds plaintext webhook URLs and delivery secrets that
+      // the human block never prints — see ./redact.ts.
+      data: redactTriggerSecrets(trigger),
       table: () => {
         console.log();
         console.log(chalk.bold("  Trigger Details:"));

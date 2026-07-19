@@ -23,10 +23,36 @@ const RUNNING_EXPERIMENT_CANDIDATES = 5;
 /** How many experiments the first page can carry. Anything past this is unseen
  * by the running-experiments scan and must be declared as a gap. */
 const EXPERIMENT_PAGE_SIZE = 50;
-/** Per-call ceiling. `status` is the most-run command in the CLI and often the
- * first thing an agent does in a session, so no single backend call may hold it
- * open indefinitely — see `withTimeout`. */
-const CALL_TIMEOUT_MS = 5_000;
+/** Per-call ceiling for the cheap resource LIST endpoints. These are indexed
+ * Postgres reads behind a single page; anything past a few seconds is a real
+ * problem, not load. */
+const LIST_CALL_TIMEOUT_MS = 5_000;
+/** Per-call ceiling for the attention sections. `fetchErroredTraces24h` is a
+ * ClickHouse COUNT over a 24h partition and `fetchRunningExperiments` fans out
+ * to N run-list calls — 5-15s is routine on a busy project, so a 5s ceiling
+ * would report "timed out" about a perfectly healthy backend. 30s is still far
+ * below "blocks the session", while leaving genuine hangs bounded. */
+const SECTION_CALL_TIMEOUT_MS = 30_000;
+
+/** The resource rows status fetches, in display order. Single source of truth
+ * for both the fetcher table's key type and the rendering order below. */
+const RESOURCE_KEYS = [
+  "evaluators",
+  "scenarios",
+  "suites",
+  "datasets",
+  "agents",
+  "workflows",
+  "dashboards",
+  "triggers",
+  "monitors",
+  "secrets",
+] as const;
+type ResourceKey = (typeof RESOURCE_KEYS)[number];
+
+/** The attention sections, which are exactly the non-map fields of
+ * `AttentionReport` — so a typo'd key cannot write a junk field onto it. */
+type AttentionSectionKey = keyof Omit<AttentionReport, "errors" | "advisories">;
 
 class CallTimeoutError extends Error {
   constructor(ms: number) {
@@ -44,13 +70,13 @@ class CallTimeoutError extends Error {
  * settle. A timeout is reported the same way any other section failure is —
  * as an `errors` entry — so it withholds the all-clear rather than hiding.
  */
-async function withTimeout<T>(operation: () => Promise<T>): Promise<T> {
+async function withTimeout<T>(operation: () => Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       operation(),
       new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new CallTimeoutError(CALL_TIMEOUT_MS)), CALL_TIMEOUT_MS);
+        timer = setTimeout(() => reject(new CallTimeoutError(ms)), ms);
         // Never hold the process open just to fire a timeout that no longer matters.
         (timer as { unref?: () => void }).unref?.();
       }),
@@ -101,6 +127,11 @@ export interface AttentionReport {
   /** Section key → why it could not be fetched, or was only partially checked.
    * Empty when everything worked — the green all-clear keys off this. */
   errors: Record<string, string>;
+  /** Section key → a scope this API structurally cannot cover, on any project,
+   * however healthy. Told to the user, but deliberately NOT gating the
+   * all-clear: a permanent caveat that suppresses the tick forever is as
+   * useless as a tick that lies, and trains the reader to ignore the section. */
+  advisories: Record<string, string>;
 }
 
 export interface StatusDocument {
@@ -122,6 +153,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     runningExperiments: null,
     budgetsAtRisk: null,
     errors: {},
+    advisories: {},
   };
 
   async function fetchCount(url: string): Promise<{ data: unknown; error?: unknown; status?: number }> {
@@ -213,7 +245,18 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         `only the first ${list.experiments.length} of ${list.pagination.totalHits} experiments were listed`,
       );
     }
-    if (recent.length > candidates.length) {
+    const running = checks.flatMap((check) =>
+      check.status === "fulfilled" && check.value !== null ? [check.value] : [],
+    );
+    // Only a gap when the cap plausibly HID something. Every experiment that
+    // ever ran has a non-null `lastRunAt`, so "there are more than 5 of them"
+    // describes almost every real project and would suppress the all-clear
+    // permanently. The candidates are ranked most-recently-active first: if
+    // every one we checked came back finished, the older, less-recently-active
+    // tail behind them is not evidence of anything running. It is only when the
+    // sample itself turned up a live run that the cap is hiding a population we
+    // have concrete reason to believe contains more.
+    if (running.length > 0 && recent.length > candidates.length) {
       gaps.push(
         `only the ${RUNNING_EXPERIMENT_CANDIDATES} most recently active of ${recent.length} candidate experiments were checked`,
       );
@@ -227,9 +270,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       attention.errors.runningExperiments = `incomplete scan: ${gaps.join("; ")}`;
     }
 
-    return checks.flatMap((check) =>
-      check.status === "fulfilled" && check.value !== null ? [check.value] : [],
-    );
+    return running;
   }
 
   /**
@@ -244,27 +285,50 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
    * That blind spot only has anything behind it if this project routes through
    * the gateway at all: with no virtual keys there is no VK or principal
    * traffic to block, and the scopes we CAN see are the whole picture. So probe
-   * for keys, and whenever there are any — or we cannot tell — put the
-   * uncovered scope on the record instead of claiming an all-clear over it.
+   * for keys, and whenever there are any, put the uncovered scope on the
+   * record.
+   *
+   * But record it as an ADVISORY, not an error. It is not a failed check and
+   * not something the user can fix: any project that routes through the gateway
+   * would carry it on every single run, and an error that never clears is an
+   * error the reader learns to skip. A failed PROBE is different — that IS a
+   * check that did not run, so it stays an error and withholds the tick.
    */
-  async function uncoveredBudgetScopeGap(): Promise<string | null> {
+  async function uncoveredBudgetScopeGap(): Promise<
+    { kind: "error" | "advisory"; message: string } | null
+  > {
     const unchecked = "virtual-key and principal budgets were not checked";
     let payload: unknown;
     try {
       const { data, error, status } = await fetchCount("/api/gateway/v1/virtual-keys");
       if (error) {
-        return `${unchecked} (could not list virtual keys: ${formatApiErrorMessage({ error, options: { status } })})`;
+        return {
+          kind: "error",
+          message: `${unchecked} (could not list virtual keys: ${formatApiErrorMessage({ error, options: { status } })})`,
+        };
       }
       payload = data;
     } catch (err) {
-      return `${unchecked} (could not list virtual keys: ${describeFailure(err)})`;
+      return {
+        kind: "error",
+        message: `${unchecked} (could not list virtual keys: ${describeFailure(err)})`,
+      };
     }
-    const keys = Array.isArray(payload)
-      ? payload
-      : (payload as { data?: unknown } | null)?.data;
-    const count = Array.isArray(keys) ? keys.length : 0;
-    if (count === 0) return null;
-    return `${unchecked} — this API cannot list them, and ${count} virtual key${count === 1 ? "" : "s"} in this project could carry them`;
+    const body = payload as { data?: unknown; pagination?: { totalHits?: number } } | null;
+    const keys = Array.isArray(payload) ? payload : body?.data;
+    if (!Array.isArray(keys) || keys.length === 0) return null;
+    // The page-1 length is NOT the key count — 300 keys behind pagination would
+    // print "3". Use the reported total when there is one, and otherwise say
+    // nothing numeric rather than something false.
+    const total = body?.pagination?.totalHits;
+    const scale =
+      typeof total === "number"
+        ? `${total} virtual key${total === 1 ? "" : "s"} in this project could`
+        : "virtual keys in this project could";
+    return {
+      kind: "advisory",
+      message: `${unchecked} — this API cannot list them, and ${scale} carry them`,
+    };
   }
 
   async function fetchBudgetsAtRisk(): Promise<BudgetAtRisk[]> {
@@ -302,7 +366,11 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       });
 
     const gaps: string[] = [];
-    if (scopeGap) gaps.push(scopeGap);
+    if (scopeGap?.kind === "advisory") {
+      attention.advisories.budgetsAtRisk = scopeGap.message;
+    } else if (scopeGap) {
+      gaps.push(scopeGap.message);
+    }
     if (unreadable.length > 0) {
       gaps.push(
         `the limit or spend of ${unreadable.length} budget${unreadable.length === 1 ? "" : "s"} could not be read (${unreadable.join(", ")})`,
@@ -323,8 +391,11 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   // FetchResponse is a DIFFERENT structural type per path) with `fetchCount`,
   // so an inferred `fn` is a union of thunks that `withTimeout<T>` cannot
   // unify. This is the shape the counting below actually reads.
+  // The annotation is what pins `fn` (see above), but `keyof typeof results` on
+  // a `Record<string, …>` is just `string` — it looks like key safety and isn't,
+  // so a typo'd key type-checks and emits a bogus row. Spell the keys out.
   const fetchers: {
-    key: keyof typeof results;
+    key: ResourceKey;
     fn: () => Promise<{
       data?: unknown;
       error?: unknown;
@@ -348,7 +419,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   // RunningExperiment[] | BudgetAtRisk[], so an inferred `fn` is a union of
   // thunks. The result is assigned through a keyed cast below, which is where
   // the per-key types are reconciled.
-  const sectionFetchers: { key: string; fn: () => Promise<unknown> }[] = [
+  const sectionFetchers: { key: AttentionSectionKey; fn: () => Promise<unknown> }[] = [
     { key: "erroredTraces24h", fn: fetchErroredTraces24h },
     { key: "runningExperiments", fn: fetchRunningExperiments },
     { key: "budgetsAtRisk", fn: fetchBudgetsAtRisk },
@@ -357,7 +428,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   await Promise.allSettled([
     ...fetchers.map(async ({ key, fn }) => {
       try {
-        const result = await withTimeout(fn);
+        const result = await withTimeout(fn, LIST_CALL_TIMEOUT_MS);
         const { data, error } = result;
         const status = (result as { status?: number; response?: { status?: number } }).status
           ?? (result as { response?: { status?: number } }).response?.status;
@@ -388,7 +459,8 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       try {
         // The three section fetchers return number | RunningExperiment[] |
         // BudgetAtRisk[]; the AttentionReport field types line up by key.
-        (attention as unknown as Record<string, unknown>)[key] = await withTimeout(fn);
+        (attention as unknown as Record<AttentionSectionKey, unknown>)[key] =
+          await withTimeout(fn, SECTION_CALL_TIMEOUT_MS);
       } catch (err) {
         // Soft-fail: the section reads null and the reason lives in `errors`
         // (rendered dimly in human mode, verbatim in machine output). A timeout
@@ -496,12 +568,16 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       for (const [key, message] of Object.entries(attention.errors)) {
         console.log(chalk.gray(`    (could not check ${sectionLabels[key] ?? key}: ${message})`));
       }
+      // Advisories read differently on purpose: "note" is a standing limit of
+      // the API, not a check that failed this run, and it does not gate the ✓.
+      for (const [key, message] of Object.entries(attention.advisories)) {
+        console.log(chalk.gray(`    (note — ${sectionLabels[key] ?? key}: ${message})`));
+      }
 
       console.log();
       console.log(chalk.bold("  Resource Counts:"));
 
-      const order = ["evaluators", "scenarios", "suites", "datasets", "agents", "workflows", "dashboards", "triggers", "monitors", "secrets"];
-      for (const key of order) {
+      for (const key of RESOURCE_KEYS) {
         const r = results[key];
         if (!r) continue;
         const countStr = r.error

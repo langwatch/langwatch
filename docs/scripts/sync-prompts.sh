@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Regenerate docs/snippets/prompts-data.jsx from compiled skill prompts.
-# Run from the repo root: bash docs/scripts/sync-prompts.sh
+# Run from the repo root: ./docs/scripts/sync-prompts.sh
+# (invoke directly, NOT via `bash …` — the shebang selects a bash 4+ from PATH,
+#  and macOS ships bash 3.2, which cannot do the `declare -A` used below)
 #
 # `env bash`, not /bin/bash: this script uses `declare -A` (associative
 # arrays), which needs bash >= 4. macOS still ships bash 3.2 at /bin/bash, so
@@ -34,7 +36,7 @@ escape_for_template_literal() {
 
 cat > "$OUT" <<'HEADER'
 // Auto-generated — do not edit manually.
-// Regenerate with: bash docs/scripts/sync-prompts.sh
+// Regenerate with: ./docs/scripts/sync-prompts.sh
 
 export const PROMPTS = {
 HEADER

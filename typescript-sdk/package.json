@@ -60,7 +60,7 @@
     "test:seed": "dotenv -e .env.test -- bash -c 'cd ../langwatch && pnpm prisma:seed'",
     "prebuild": "pnpm run prepare",
     "build": "tsc --noEmit && rm -rf dist && tsup",
-    "postbuild": "node -e \"const{statSync}=require('node:fs'),{execFileSync}=require('node:child_process');const f='dist/cli/index.js',want=require('./package.json').version;const s=statSync(f);if(!(s.mode&0o111))throw new Error(f+' is not executable');const got=execFileSync(process.execPath,[f,'--version'],{encoding:'utf8',env:{...process.env,LANGWATCH_NO_DAEMON:'1'}}).trim();if(got!==want)throw new Error('version mismatch: '+f+' reports '+got+', package.json says '+want);console.log('postbuild: '+f+' ok ('+got+')')\"",
+    "postbuild": "node -e \"const{statSync}=require('node:fs'),{execFileSync}=require('node:child_process');const f='dist/cli/index.js',want=require('./package.json').version;const s=statSync(f);if(process.platform!=='win32'&&!(s.mode&0o111))throw new Error(f+' is not executable');const got=execFileSync(process.execPath,[f,'--version'],{encoding:'utf8',env:{...process.env,LANGWATCH_NO_DAEMON:'1'}}).trim();if(got!==want)throw new Error('version mismatch: '+f+' reports '+got+', package.json says '+want);console.log('postbuild: '+f+' ok ('+got+')')\"",
     "build:binary": "bun run scripts/build-cli-binary.ts",
     "tarball": "pnpm build && pnpm pack",
     "typecheck": "tsc --noEmit",

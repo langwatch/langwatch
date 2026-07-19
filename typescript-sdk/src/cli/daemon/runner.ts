@@ -179,8 +179,23 @@ export function createCommandExecutor({
      * for nobody, and turns "forever" into "the daemon goes away".
      */
     const armAbandonGrace = (): void => {
-      // No window was ever taken (cancelled while still queued): nothing to
-      // protect and nothing to wedge.
+      // No window is held YET, so there is nothing to bound. Two situations
+      // reach here, and NEITHER can wedge — but only because of the
+      // post-acquire `cancelled` check below, which is load-bearing:
+      //
+      //   - Cancelled while still queued. `abortController.abort()` removes the
+      //     waiter, acquire rejects, no window is ever taken.
+      //   - Cancelled in the gap between admission and the assignment of
+      //     `releaseWindow` — i.e. `drain()` already called `resolve()`, so the
+      //     abort listener sees an admitted waiter and does nothing. A window
+      //     IS held here, and nothing has armed a timer for it. What saves it is
+      //     that the continuation re-reads `cancelled` the moment it resumes and
+      //     calls `releaseOnce()` without ever starting the work: the window
+      //     goes back immediately, which is safe precisely because no command
+      //     ever ran under it.
+      //
+      // Delete that check and this early return becomes the permanent-wedge bug
+      // it looks like. `runner.unit.test.ts` drives the interleaving directly.
       if (releaseWindow === undefined || abandonTimer) return;
       abandonTimer = setTimeout(() => {
         abandonTimer = undefined;

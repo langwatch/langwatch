@@ -180,17 +180,26 @@ export const resolveOutputOptions = (
  * not define its own, so a NON-hidden `--json` on the action command means
  * "this command owns the flag".
  */
+/**
+ * Whether the command declares its OWN `--json`, as opposed to the contract's
+ * injected copy.
+ *
+ * `registerOutputOptions` `hideHelp()`s every copy it injects, so a NON-hidden
+ * `--json` means the command declared it. Two callers ask this question and
+ * want different things from the answer — the payload-vs-fields
+ * disambiguation below, and `assertFormatIsSupported`'s narrow bypass — so it
+ * lives here once rather than being hand-rolled at each site with its own
+ * subtly different meaning.
+ */
+const ownsOwnJsonFlag = (command: Command): boolean =>
+  command.options.some((option) => option.long === "--json" && !option.hidden);
+
 export const resolveActionOutputOptions = (
   actionCommand: Command,
   env: NodeJS.ProcessEnv = process.env,
 ): ResolvedOutput => {
   const raw: RawOutputFlags = actionCommand.optsWithGlobals();
-  if (
-    typeof raw.json === "string" &&
-    actionCommand.options.some(
-      (option) => option.long === "--json" && !option.hidden,
-    )
-  ) {
+  if (typeof raw.json === "string" && ownsOwnJsonFlag(actionCommand)) {
     delete raw.json;
   }
   return resolveOutputOptions(raw, env);
@@ -205,15 +214,24 @@ const descend = (value: unknown, key: string): unknown => {
 };
 
 /**
- * Syntax this subset does NOT implement. It must be REJECTED rather than
- * walked as a literal key: `descend` answers `null` for any key it cannot
- * resolve, so `.traces[0]` would otherwise look up a property literally named
- * `traces[0]`, miss, and print `null` at exit 0 — a fabricated answer an agent
- * then builds on. Array indexing in particular is the first thing anyone tries
- * after reading this flag's own `.traces[].traceId` example, so it has to fail
- * loudly. A trailing `[]` is stripped before this test (that IS supported).
+ * What a path segment may look like. An ALLOWLIST, deliberately.
+ *
+ * Anything not matching is REJECTED rather than walked as a literal key:
+ * `descend` answers `null` for any key it cannot resolve, so `.traces[0]`
+ * would otherwise look up a property literally named `traces[0]`, miss, and
+ * print `null` at exit 0 — a fabricated answer an agent then builds on. Array
+ * indexing is the first thing anyone tries after reading this flag's own
+ * `.traces[].traceId` example, so it has to fail loudly.
+ *
+ * A denylist was tried first and leaked: it caught brackets and quotes but not
+ * operators, so `.n - 1` and `.n,.s` still answered `null` silently. Since the
+ * grammar here is tiny and closed, the safe default is to name what IS legal
+ * and reject the rest — being too strict costs a clear error message, being
+ * too loose costs a wrong answer nobody can detect.
+ *
+ * A trailing `[]` is stripped before this test (that IS supported).
  */
-const UNSUPPORTED_SEGMENT_RE = /[[\]"'?*]/;
+const SUPPORTED_SEGMENT_RE = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
 /**
  * The tiny built-in jq subset: `.`, `.a.b`, `.items[]`, `.items[].name`, and a
@@ -263,10 +281,14 @@ export const applyJq = (expression: string, data: unknown): unknown => {
     if (key === "" && !iterate) {
       throw new Error(`Invalid --jq expression "${expression}": empty segment at "${path}"`);
     }
-    if (UNSUPPORTED_SEGMENT_RE.test(key)) {
+    // `key === ""` reaching here means root-level iteration (`.[]`, `.[].name`):
+    // there is no key to validate, and the non-iterating empty segment was
+    // already rejected above. Everything else must be a plain identifier.
+    if (key !== "" && !SUPPORTED_SEGMENT_RE.test(key)) {
       throw new Error(
         `Invalid --jq expression "${expression}": unsupported syntax at "${path}.${head}" ` +
-          `(supported: dot paths, .items[], .items[].field, | length — no indexing, quoting or optionals)`,
+          `(supported: dot paths, .items[], .items[].field, | length — no indexing, ` +
+          `quoting, optionals or operators)`,
       );
     }
 
@@ -466,12 +488,22 @@ export const assertFormatIsSupported = async (
   // A command that defines its OWN non-hidden `--json` (daemon status, the
   // ingest and governance groups) already emits machine output through that
   // flag — it just predates the port. Refusing it would break a working
-  // spelling, so it passes through. The contract's own copy is `hideHelp()`'d
-  // wherever it is injected, which is what makes a non-hidden one distinctive.
-  const ownsJsonFlag = actionCommand.options.some(
-    (option) => option.long === "--json" && !option.hidden,
-  );
-  if (ownsJsonFlag) return resolved;
+  // spelling, so bare `--json` passes through.
+  //
+  // Narrowly, though: owning `--json` proves the command can emit ITS json, not
+  // that it can honour every format. `-o yaml` and `--jq` are still beyond it —
+  // `daemon status -o yaml` would print JSON, and a `--jq` expression would
+  // never be parsed — so those stay refusable. Without this narrowing the
+  // bypass also swallows `dataset records add --json '{payload}' -o yaml`,
+  // where `--json` is a PAYLOAD flag and nothing about it implies output
+  // capability at all.
+  if (
+    ownsOwnJsonFlag(actionCommand) &&
+    actionCommand.optsWithGlobals().output === undefined &&
+    actionCommand.optsWithGlobals().jq === undefined
+  ) {
+    return resolved;
+  }
 
   const raw: RawOutputFlags = actionCommand.optsWithGlobals();
   const name = actionCommand.name();
@@ -482,6 +514,13 @@ export const assertFormatIsSupported = async (
   // which is why `hasExplicitFormatRequest` (which counts it) is the wrong
   // predicate here. `-o` and `--jq` never existed before this contract, so a
   // command that cannot honour them has nothing to break.
+  //
+  // `raw.agent` is deliberately NOT in this list. `--agent` is a MODE, not a
+  // format demand — it also means no colour and no spinners, which every
+  // command honours whether migrated or not — so it degrades with a warning
+  // rather than failing. Adding it here would harden `--agent` into a refusal
+  // and break every unmigrated command for the callers most likely to pass it.
+  // Pinned by a test; do not "fix" this into the list.
   const requestedNewContractFlag =
     raw.output !== undefined || raw.jq !== undefined || raw.json !== undefined;
 
