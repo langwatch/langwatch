@@ -15,6 +15,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../__tests__/integration/testContainers";
+import { BlobLeases } from "../blobLeases";
 import { encodeJobEnvelope } from "../jobEnvelope";
 import {
   type DispatchResult,
@@ -698,6 +699,15 @@ describe("GroupStagingScripts", () => {
     describe("given GQ2 offloaded values with blob leases", () => {
       const TENANT = "project-x";
       const GROUP = `${TENANT}/group-1`;
+      /** Lazily built: `redis` is only assigned in beforeAll. */
+      const releaseLease = async (args: {
+        projectId: string;
+        hash: string;
+        holderId: string;
+      }) =>
+        new BlobLeases({ redis, queueName: QUEUE_NAME }).release(
+          args as Parameters<BlobLeases["release"]>[0],
+        );
 
       function gq2Value({
         hash,
@@ -770,6 +780,102 @@ describe("GroupStagingScripts", () => {
           expect(
             await redis.smembers(`${keyPrefix()}blobholders:${TENANT}/h-new`),
           ).toEqual(expect.arrayContaining(["t-new"]));
+        });
+      });
+
+      describe("given two sibling jobs staged on one content-addressed blob", () => {
+        /**
+         * The production incident (missing_blob, ~100-500/hr over 7 days).
+         *
+         * Sibling reactors folding the same trace encode identical payloads,
+         * so they hash to ONE blob. Under the holder scheme the refcount
+         * member was SADD'd in a round trip AFTER stage() returned, so a
+         * sibling completing in that window saw SCARD == 0 and UNLINKed the
+         * blob out from under a job that was already staged and dispatchable.
+         * The survivor then decoded into "Failed to parse staged job data"
+         * and was dropped permanently — no retry, no DLQ.
+         *
+         * Both halves of the fix are asserted here together, which is what
+         * makes this a regression test rather than two unit tests: the lease
+         * is live the instant stage() returns (no window), and a release can
+         * no longer delete bytes a sibling still leases (no deletion).
+         */
+        /** @scenario "A sibling completing never strips a co-staged job's blob" */
+        it("keeps the blob readable for the surviving sibling after the first completes", async () => {
+          const SHARED = "h-shared";
+
+          // Both siblings carry the same ref (same content) but their own
+          // per-stage hold token, exactly as encodeJobEnvelope mints them.
+          const siblingA = gq2Value({ hash: SHARED, token: "t-a" });
+          const siblingB = gq2Value({ hash: SHARED, token: "t-b" });
+
+          await redis.set(blobKey({ hash: SHARED }), "gzipped-bytes");
+
+          const stagedA = await scripts.stage(
+            makeJob({
+              stagedJobId: "j-a",
+              groupId: GROUP,
+              jobDataJson: siblingA,
+            }),
+          );
+          const stagedB = await scripts.stage(
+            makeJob({
+              stagedJobId: "j-b",
+              groupId: `${TENANT}/group-2`,
+              jobDataJson: siblingB,
+            }),
+          );
+
+          expect(stagedA.isNew).toBe(true);
+          expect(stagedB.isNew).toBe(true);
+
+          // No acquire window: staging published both leases itself, so
+          // neither job was ever dispatchable while unreferenced.
+          expect(
+            (await redis.zrange(leaseKey({ hash: SHARED }), 0, -1)).sort(),
+          ).toEqual(["t-a", "t-b"]);
+
+          // A completes and releases its lease.
+          await releaseLease({
+            projectId: TENANT,
+            hash: SHARED,
+            holderId: "t-a",
+          });
+
+          // B is still staged and still leases the blob — the bytes must live.
+          expect(await redis.zrange(leaseKey({ hash: SHARED }), 0, -1)).toEqual([
+            "t-b",
+          ]);
+          expect(await redis.exists(blobKey({ hash: SHARED }))).toBe(1);
+          expect(await redis.get(blobKey({ hash: SHARED }))).toBe(
+            "gzipped-bytes",
+          );
+        });
+
+        /** @scenario "A sibling completing never strips a co-staged job's blob" */
+        it("keeps the blob even when the last lease is released, leaving reclaim to the backstop", async () => {
+          const SHARED = "h-last";
+          await redis.set(blobKey({ hash: SHARED }), "gzipped-bytes");
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j-only",
+              groupId: GROUP,
+              jobDataJson: gq2Value({ hash: SHARED, token: "t-only" }),
+            }),
+          );
+
+          await releaseLease({
+            projectId: TENANT,
+            hash: SHARED,
+            holderId: "t-only",
+          });
+
+          // Emptying the lease set drops the set, never the payload: a
+          // concurrent producer may already have re-staged this content.
+          expect(await redis.zrange(leaseKey({ hash: SHARED }), 0, -1)).toEqual(
+            [],
+          );
+          expect(await redis.exists(blobKey({ hash: SHARED }))).toBe(1);
         });
       });
 
