@@ -1,4 +1,5 @@
 import { Box, HStack, Link, Text } from "@chakra-ui/react";
+import { createLogger } from "@langwatch/observability";
 import {
   type ColumnDef,
   type ColumnSizingState,
@@ -84,6 +85,10 @@ import {
   convertHttpComponentConfig,
 } from "../utils/httpAgentUtils";
 import { evaluatorHasMissingMappings } from "../utils/mappingValidation";
+import {
+  applyForkedAgentToTarget,
+  planDuplicateTarget,
+} from "../utils/duplicateTarget";
 import {
   toTargetOutputFields,
   type PromptOutputField,
@@ -197,6 +202,8 @@ export const buildTargetEvaluatorsForRow = (
 // Main Component
 // ============================================================================
 
+const logger = createLogger("EvaluationsV3Table");
+
 type EvaluationsV3TableProps = {
   isLoadingExperiment?: boolean;
   isLoadingDatasets?: boolean;
@@ -217,6 +224,17 @@ export function EvaluationsV3Table({
   const drawerParamsKey = JSON.stringify(drawerParams);
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useContext();
+  // Forking an agent target (and its workflow, when workflow-type) on duplicate.
+  // Source: same project — the workbench duplicates within the current project,
+  // so `sourceProjectId === projectId` (see #5879). The cross-project replicate
+  // flow (CopyAgentDialog) uses the same mutation with different project ids.
+  const copyAgent = api.agents.copy.useMutation();
+  // `agents.copy` leaves the forked workflow unpublished — the replicate flow
+  // wants to review before publishing, but the workbench duplicate needs a
+  // runnable target immediately. Publish here, in the caller, per #5879.
+  // (Router is `workflow` singular, matching the rest of the codebase —
+  // see api/root.ts.)
+  const publishWorkflow = api.workflow.publish.useMutation();
 
   // Sync saved dataset changes to DB
   useDatasetSync();
@@ -788,20 +806,62 @@ export function EvaluationsV3Table({
     [removeTarget],
   );
 
-  // Handler for duplicating a target
+  // Handler for duplicating a target. Prompt/evaluator targets spread only
+  // (they carry their own per-column draft). Agent targets fork the underlying
+  // Agent row via `agents.copy` so the duplicate is independently editable —
+  // and for workflow-type agents, the copied workflow is published immediately
+  // so the duplicate runs without a "no committed version" error (see #5879).
+  // On fork failure we log and skip adding the column rather than silently
+  // falling back to a shallow copy, which would reintroduce the original bug
+  // (two columns pointing at the same dbAgentId).
   const handleDuplicateTarget = useCallback(
-    (target: TargetConfig) => {
-      const newTarget: TargetConfig = {
-        ...target,
-        id: `target-${nanoid(8)}`,
-      };
+    async (target: TargetConfig) => {
+      // The component only renders inside a project-scoped route, so `project`
+      // is set by the time the user can click Duplicate. Bail silently if not —
+      // there is no project to fork into.
+      const projectId = project?.id;
+      if (!projectId) return;
+
+      const plan = planDuplicateTarget(target);
+      const newTargetId = `target-${nanoid(8)}`;
+
+      if (plan.kind === "fork-agent") {
+        try {
+          const copied = await copyAgent.mutateAsync({
+            agentId: plan.sourceAgentId,
+            projectId,
+            sourceProjectId: projectId,
+          });
+          if (copied.workflowId && copied.workflowVersionId) {
+            await publishWorkflow.mutateAsync({
+              projectId,
+              workflowId: copied.workflowId,
+              versionId: copied.workflowVersionId,
+            });
+          }
+          addTarget(applyForkedAgentToTarget(target, copied, newTargetId));
+        } catch (err) {
+          logger.error(
+            { err, sourceAgentId: plan.sourceAgentId },
+            "Failed to fork agent target on duplicate; not adding the column",
+          );
+        }
+        return;
+      }
+
+      const newTarget: TargetConfig = { ...target, id: newTargetId };
       addTarget(newTarget);
-      // Open the prompt editor for the duplicated target if it's a prompt
       if (newTarget.type === "prompt") {
         void openTargetEditor(newTarget);
       }
     },
-    [addTarget, openTargetEditor],
+    [
+      addTarget,
+      openTargetEditor,
+      copyAgent,
+      publishWorkflow,
+      project?.id,
+    ],
   );
 
   // Extracted so BOTH the Add→Comparison flow and the reload re-hydration

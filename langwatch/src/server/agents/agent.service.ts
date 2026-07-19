@@ -187,9 +187,23 @@ export class AgentService {
         targetProjectId: string;
         sourceProjectId: string;
         copiedFromWorkflowId: string;
-      }) => Promise<{ workflowId: string }>;
+      }) => Promise<{ workflowId: string; workflowVersionId: string }>;
     },
-  ): Promise<{ id: string; projectId: string; name: string; copiedFromAgentId: string }> {
+  ): Promise<{
+    id: string;
+    projectId: string;
+    name: string;
+    copiedFromAgentId: string;
+    /**
+     * Set when the source agent is workflow-type and a workflow was forked.
+     * Callers that need a runnable target (e.g. workbench duplicate) must
+     * publish this workflow separately via `workflows.publish` — `copyAgent`
+     * leaves it intentionally unpublished so the cross-project replicate flow
+     * can review the copy before publishing (see #5879).
+     */
+    workflowId?: string;
+    workflowVersionId?: string;
+  }> {
     const source = await this.repository.findByIdWithWorkflow(
       input.sourceAgentId,
       input.sourceProjectId,
@@ -199,13 +213,14 @@ export class AgentService {
     }
 
     let newWorkflowId: string | null = null;
+    let newWorkflowVersionId: string | null = null;
     try {
       if (
         source.type === "workflow" &&
         source.workflowId &&
         source.workflow?.latestVersion?.dsl
       ) {
-        const { workflowId } = await deps.copyWorkflow({
+        const { workflowId, workflowVersionId } = await deps.copyWorkflow({
           workflow: {
             id: source.workflow.id,
             name: source.workflow.name,
@@ -220,6 +235,7 @@ export class AgentService {
           copiedFromWorkflowId: source.workflowId,
         });
         newWorkflowId = workflowId;
+        newWorkflowVersionId = workflowVersionId;
       }
 
       const copied = await this.repository.create({
@@ -237,6 +253,10 @@ export class AgentService {
         projectId: input.targetProjectId,
         name: copied.name,
         copiedFromAgentId: source.id,
+        ...(newWorkflowId != null && { workflowId: newWorkflowId }),
+        ...(newWorkflowVersionId != null && {
+          workflowVersionId: newWorkflowVersionId,
+        }),
       };
     } catch (createError) {
       if (newWorkflowId != null) {

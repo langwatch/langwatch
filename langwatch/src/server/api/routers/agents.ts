@@ -360,7 +360,12 @@ export const agentsRouter = createTRPCRouter({
                 sourceProjectId: opts.sourceProjectId,
                 copiedFromWorkflowId: opts.copiedFromWorkflowId,
               });
-              await saveOrCommitWorkflowVersion({
+              // saveOrCommitWorkflowVersion returns the WorkflowVersion it
+              // created/updated; surface its id so callers (e.g. the workbench
+              // duplicate handler) can immediately publish the forked workflow
+              // — see #5879. Without a publishedId, workflow-type agent
+              // targets fail to run with "no committed version to evaluate".
+              const version = await saveOrCommitWorkflowVersion({
                 ctx,
                 input: {
                   projectId: opts.targetProjectId,
@@ -370,7 +375,7 @@ export const agentsRouter = createTRPCRouter({
                 autoSaved: false,
                 commitMessage: "Copied from " + opts.workflow.name,
               });
-              return { workflowId };
+              return { workflowId, workflowVersionId: version.id };
             },
           },
         );
