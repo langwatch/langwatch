@@ -71,6 +71,9 @@ describe("findCacheRebuilds", () => {
 
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({
+        // Second model call of the session, so the chart and the annotation
+        // can both name it "call 2".
+        callIndex: 1,
         atMs: 2_000,
         cacheCreationTokens: 90_000,
         previousContextTokens: 100_000,
@@ -83,7 +86,11 @@ describe("findCacheRebuilds", () => {
     it("does not flag ordinary incremental cache growth", () => {
       const events = findCacheRebuilds([
         modelCall({ atMs: 1_000, cacheReadTokens: 100_000 }),
-        modelCall({ atMs: 2_000, cacheReadTokens: 100_000, cacheCreationTokens: 2_000 }),
+        modelCall({
+          atMs: 2_000,
+          cacheReadTokens: 100_000,
+          cacheCreationTokens: 2_000,
+        }),
       ]);
       expect(events).toEqual([]);
     });

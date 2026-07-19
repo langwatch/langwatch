@@ -22,7 +22,9 @@ export interface TokenTimelinePoint {
   costUsd: number;
 }
 
-export function deriveTokenTimeline(entries: TranscriptEntry[]): TokenTimelinePoint[] {
+export function deriveTokenTimeline(
+  entries: TranscriptEntry[],
+): TokenTimelinePoint[] {
   const points: TokenTimelinePoint[] = [];
   for (const entry of entries) {
     if (entry.kind !== "model_call") continue;
@@ -42,6 +44,8 @@ export function deriveTokenTimeline(entries: TranscriptEntry[]): TokenTimelinePo
 
 /** A call that re-created most of the context instead of reading it from cache. */
 export interface CacheRebuildEvent {
+  /** Zero-based position among the session's model calls — matches {@link TokenTimelinePoint.index}, so the chart and the annotation can name the same call. */
+  callIndex: number;
   atMs: number;
   cacheCreationTokens: number;
   /** The context size the PREVIOUS call had cached, for the "instead of reusing N" comparison. */
@@ -59,22 +63,27 @@ export interface CacheRebuildEvent {
 const REBUILD_RATIO_THRESHOLD = 0.5;
 const REBUILD_MIN_TOKENS = 1_000;
 
-export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent[] {
+export function findCacheRebuilds(
+  entries: TranscriptEntry[],
+): CacheRebuildEvent[] {
   const events: CacheRebuildEvent[] = [];
   let previousContextTokens = 0;
-  let sawFirstCall = false;
+  let callIndex = -1;
 
   for (const entry of entries) {
     if (entry.kind !== "model_call") continue;
+    callIndex++;
     const contextTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
 
     if (
-      sawFirstCall &&
+      callIndex > 0 &&
       entry.cacheCreationTokens >= REBUILD_MIN_TOKENS &&
       previousContextTokens > 0 &&
-      entry.cacheCreationTokens / previousContextTokens >= REBUILD_RATIO_THRESHOLD
+      entry.cacheCreationTokens / previousContextTokens >=
+        REBUILD_RATIO_THRESHOLD
     ) {
       events.push({
+        callIndex,
         atMs: entry.atMs,
         cacheCreationTokens: entry.cacheCreationTokens,
         previousContextTokens,
@@ -82,14 +91,16 @@ export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent
       });
     }
 
-    sawFirstCall = true;
     previousContextTokens = contextTokens;
   }
 
   return events;
 }
 
-function nearestPrecedingPrompt(entries: TranscriptEntry[], atMs: number): string | null {
+function nearestPrecedingPrompt(
+  entries: TranscriptEntry[],
+  atMs: number,
+): string | null {
   let best: string | null = null;
   for (const entry of entries) {
     if (entry.atMs > atMs) break;

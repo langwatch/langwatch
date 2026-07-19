@@ -209,6 +209,14 @@ describe("SessionView", () => {
     });
   });
 
+  describe("given the drawer header already names agent and models", () => {
+    it("repeats none of them as chips", () => {
+      renderSession();
+      expect(screen.queryByText("claude_code")).toBeNull();
+      expect(screen.queryByText("v2.0.0")).toBeNull();
+    });
+  });
+
   describe("given no transcript entries", () => {
     it("omits the token timeline rather than showing an empty chart", () => {
       renderSession();
@@ -219,7 +227,12 @@ describe("SessionView", () => {
   describe("given transcript entries with a cache rebuild", () => {
     it("shows the timeline and names the prompt that triggered the rebuild", () => {
       const entries: TranscriptEntry[] = [
-        { kind: "user_prompt", atMs: 500, text: "start over on this", chars: 19 },
+        {
+          kind: "user_prompt",
+          atMs: 500,
+          text: "start over on this",
+          chars: 19,
+        },
         {
           kind: "model_call",
           atMs: 1_000,
@@ -251,6 +264,11 @@ describe("SessionView", () => {
       renderSession({}, entries);
 
       expect(screen.getByText("Where the tokens went")).toBeTruthy();
+      // The annotation names the call so it can be found in the chart, whose
+      // bars are numbered in call order.
+      expect(
+        screen.getByText(/Call 2 rebuilt 90k tokens instead of reusing 100k/),
+      ).toBeTruthy();
       expect(screen.getByText(/after "start over on this"/)).toBeTruthy();
     });
   });
@@ -296,7 +314,9 @@ describe("SessionView", () => {
       });
 
       expect(screen.getByText("Context noise")).toBeTruthy();
-      expect(screen.getByText("Compacted 2× — 180k → 40k tokens.")).toBeTruthy();
+      expect(
+        screen.getByText("Compacted 2× — 180k → 40k tokens."),
+      ).toBeTruthy();
     });
   });
 

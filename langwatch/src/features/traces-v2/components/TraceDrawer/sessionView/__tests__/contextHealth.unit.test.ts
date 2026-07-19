@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  contextHealthBand,
-  contextWindowCeiling,
-} from "../contextHealth";
+import { contextHealthBand, contextWindowCeiling } from "../contextHealth";
 
 describe("contextWindowCeiling", () => {
   describe("given a session that only used standard-window models", () => {

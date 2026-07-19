@@ -149,7 +149,9 @@ describe("deriveSessionSignals", () => {
 
   describe("given a human sat waiting to approve tools", () => {
     it("reports the idle time — nothing else in the session surfaces it", () => {
-      const signals = deriveSessionSignals(session({ blockedOnUserMs: 372_000 }));
+      const signals = deriveSessionSignals(
+        session({ blockedOnUserMs: 372_000 }),
+      );
 
       const blocked = signals.find((s) => s.id === "blocked-on-user");
       expect(blocked).toBeDefined();

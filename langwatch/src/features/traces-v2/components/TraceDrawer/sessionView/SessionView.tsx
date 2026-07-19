@@ -6,9 +6,9 @@ import type { CodingAgentSession } from "~/server/app-layer/traces/coding-agent-
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { formatCost } from "../../../utils/formatters";
 import {
+  type ContextHealthTone,
   contextHealthBand,
   contextWindowCeiling,
-  type ContextHealthTone,
 } from "./contextHealth";
 import {
   deriveSessionSignals,
@@ -80,7 +80,10 @@ export function SessionView({ session, entries }: SessionViewProps) {
 
         {tokenTimeline.length > 0 && (
           <Section title="Where the tokens went">
-            <TokenTimelineChart points={tokenTimeline} rebuilds={cacheRebuilds} />
+            <TokenTimelineChart
+              points={tokenTimeline}
+              rebuilds={cacheRebuilds}
+            />
           </Section>
         )}
 
@@ -108,24 +111,21 @@ export function SessionView({ session, entries }: SessionViewProps) {
 }
 
 function Headline({ session }: { session: CodingAgentSession }) {
+  // No agent / version / model chips here: the drawer header directly above
+  // already carries Service and Models, and the agent version opens the
+  // Terminal tab's banner. Only the multi-trace note earns a spot — most
+  // sessions are one trace (Claude Code's own tracer groups a whole run
+  // under one traceId), and when one isn't (a context compaction, a
+  // `/clear`, or the session outliving its own limit and continuing) the
+  // reader must know they are looking at a merged view rather than silently
+  // seeing only the trace that happened to be open.
   return (
     <VStack align="stretch" gap={3}>
-      <HStack gap={2} flexWrap="wrap">
-        {session.agent && <MetaChip>{session.agent}</MetaChip>}
-        {session.agentVersion && <MetaChip>v{session.agentVersion}</MetaChip>}
-        {session.models.map((model) => (
-          <MetaChip key={model}>{model}</MetaChip>
-        ))}
-        {session.entrypoint && <MetaChip>{session.entrypoint}</MetaChip>}
-        {/* Most sessions are one trace — Claude Code's own tracer groups a
-            whole run under one traceId. When it isn't (a context compaction,
-            a `/clear`, or the session simply outliving its own limit and
-            continuing), say so rather than silently showing only the trace
-            that happened to be open. */}
-        {session.traceIds.length > 1 && (
+      {session.traceIds.length > 1 && (
+        <HStack gap={2} flexWrap="wrap">
           <MetaChip>{`spans ${session.traceIds.length} traces`}</MetaChip>
-        )}
-      </HStack>
+        </HStack>
+      )}
 
       <Grid
         templateColumns="repeat(auto-fit, minmax(120px, 1fr))"
@@ -138,7 +138,10 @@ function Headline({ session }: { session: CodingAgentSession }) {
         {session.subAgents > 0 && (
           <Stat label="Sub-agents" value={String(session.subAgents)} />
         )}
-        <Stat label="Files touched" value={String(session.filesTouched.length)} />
+        <Stat
+          label="Files touched"
+          value={String(session.filesTouched.length)}
+        />
       </Grid>
     </VStack>
   );
@@ -416,8 +419,9 @@ function CacheHealth({ session }: { session: CodingAgentSession }) {
         </Grid>
         {session.largestCacheRebuildTokens > 0 && (
           <Text textStyle="xs" color="fg.muted">
-            Biggest single rebuild: {formatCompact(session.largestCacheRebuildTokens)}{" "}
-            tokens re-sent instead of being reused from cache.
+            Biggest single rebuild:{" "}
+            {formatCompact(session.largestCacheRebuildTokens)} tokens re-sent
+            instead of being reused from cache.
           </Text>
         )}
       </VStack>
@@ -545,13 +549,7 @@ function Outcome({ session }: { session: CodingAgentSession }) {
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <VStack align="stretch" gap={2.5}>
       <HStack gap={3} align="center">
