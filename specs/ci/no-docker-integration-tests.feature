@@ -4,7 +4,7 @@ Feature: Integration tests against native local services
   So that I can run integration tests without Docker Desktop eating my machine
 
   # Activated by LANGWATCH_TEST_CLICKHOUSE_URL + LANGWATCH_TEST_REDIS_URL
-  # (optionally LANGWATCH_TEST_DATABASE_URL for Postgres) in langwatch/.env.
+  # (optionally LANGWATCH_TEST_DATABASE_URL for Postgres) in platform/app/.env.
   # The mode is never active in CI, and testcontainers remains the default
   # when the variables are absent. These scenarios exercise the test harness
   # itself, so they are validated by running the suite, not by bound tests.

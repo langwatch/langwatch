@@ -169,15 +169,15 @@ structured logs + posthog. We don't query the queue for history anyway.
 - Related ADRs: ADR-022 (data retention, umbrella), ADR-019
   (repository-service layering)
 - Code:
-  - `langwatch/src/server/data-retention/orphan-sweep/retentionOrphanSweep.reactor.ts`
-  - `langwatch/src/server/data-retention/orphan-sweep/orphanSweep.service.ts`
-  - `langwatch/src/server/data-retention/orphan-sweep/orphanSweepCursor.store.ts`
-  - `langwatch/src/server/background/queues/orphanSweepChainQueue.ts`
-  - `langwatch/src/server/background/workers/orphanSweepChainWorker.ts`
-- Pipeline wiring: `langwatch/src/server/event-sourcing/pipelines/trace-processing/pipeline.ts`
-- Composition: `langwatch/src/server/app-layer/presets.ts`
+  - `platform/app/src/server/data-retention/orphan-sweep/retentionOrphanSweep.reactor.ts`
+  - `platform/app/src/server/data-retention/orphan-sweep/orphanSweep.service.ts`
+  - `platform/app/src/server/data-retention/orphan-sweep/orphanSweepCursor.store.ts`
+  - `platform/app/src/server/background/queues/orphanSweepChainQueue.ts`
+  - `platform/app/src/server/background/workers/orphanSweepChainWorker.ts`
+- Pipeline wiring: `platform/app/src/server/event-sourcing/pipelines/trace-processing/pipeline.ts`
+- Composition: `platform/app/src/server/app-layer/presets.ts`
 - Specs: `specs/data-retention/orphan-sweep.feature`,
   `specs/data-retention/trace-pinning.feature`
-- Tests: `langwatch/src/server/background/workers/__tests__/orphanSweepChainWorker.unit.test.ts`,
-  `langwatch/src/server/data-retention/__tests__/orphanSweep.unit.test.ts`
+- Tests: `platform/app/src/server/background/workers/__tests__/orphanSweepChainWorker.unit.test.ts`,
+  `platform/app/src/server/data-retention/__tests__/orphanSweep.unit.test.ts`
 - PR: #4147

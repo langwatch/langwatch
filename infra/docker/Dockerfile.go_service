@@ -1,0 +1,57 @@
+# syntax=docker/dockerfile:1.7
+
+# ─── Build stage ──────────────────────────────────────────────────────────────
+# Pin the build stage to the host arch (BUILDPLATFORM) and let Go cross-compile
+# to TARGETARCH natively. This avoids QEMU emulation when buildx is producing
+# images for an arch different from the host, which is the difference between
+# a 30-second compile and a 30-minute one.
+FROM --platform=$BUILDPLATFORM golang:1.26.4-alpine AS build
+WORKDIR /src
+RUN apk add --no-cache git ca-certificates tzdata
+
+ARG TARGETOS
+ARG TARGETARCH
+
+# Dependency layer (cached until go.mod/go.sum change). The module cache is
+# arch-independent, but keying both caches by TARGETARCH keeps buildx from
+# churning a shared dir when producing multiple platforms in the same job.
+#
+# Monorepo: sdks/go is in-tree and resolved via `replace ... => ./sdks/go`
+# in the root go.mod, so its go.mod must land in the build context
+# before `go mod download` runs. Same pattern python-sdk + langwatch_nlp
+# use — sdks/go changes flow with nlpgo changes in the same commit, no
+# publish-then-bump ping-pong. Full sdks/go source is copied below
+# alongside the other build inputs.
+COPY go.mod go.sum ./
+COPY sdks/go/go.mod sdks/go/go.sum ./sdks/go/
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
+    go mod download && go mod verify
+
+# Copy only Go source directories needed for the build.
+COPY cmd/ cmd/
+COPY pkg/ pkg/
+COPY services/ services/
+# sdks/go full source — the in-tree dependency resolved via `replace`
+# in the root go.mod (see comment on the COPY of sdks/go/go.mod above).
+COPY sdks/go/ sdks/go/
+ARG VERSION=dev
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
+    --mount=type=cache,target=/root/.cache/go-build,id=go-build-${TARGETARCH} \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+      -ldflags="-s -w -X main.Version=${VERSION}" \
+      -trimpath \
+      -o /out/service ./cmd/service
+
+# ─── Runtime stage ────────────────────────────────────────────────────────────
+FROM gcr.io/distroless/static-debian12:nonroot AS runtime
+COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=build /out/service /service
+
+USER nonroot:nonroot
+
+# SERVICE selects which sub-service to run (e.g. aigateway).
+ENV SERVICE=aigateway
+EXPOSE 5563
+ENTRYPOINT ["/service"]
+CMD ["aigateway"]

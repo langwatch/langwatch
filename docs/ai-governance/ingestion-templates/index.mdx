@@ -335,7 +335,7 @@ discipline**: (a) a fixture-track verification, canned OTLP payloads emitted via
 base and tier-2 protected lists, and (b) a real-user track, admin publishes via
 `/settings/governance/tool-catalog`, a real user installs via `/me`, the real upstream
 tool emits a real trace, and the result is verified end-to-end with cross-user isolation.
-Per-template rituals live at `langwatch/ee/governance/ingestion-templates/<slug>/dogfood.md`.
+Per-template rituals live at `platform/app/ee/governance/ingestion-templates/<slug>/dogfood.md`.
 
 ### What is audited
 
@@ -396,13 +396,13 @@ and we'll evaluate.
 ## Verifying the contract
 
 The full admin OTTL authoring flow has a Playwright real-user dogfood at
-`langwatch/e2e/admin-ottl-dogfood.ts` (~30s loop), 8 steps end-to-end:
+`platform/app/e2e/admin-ottl-dogfood.ts` (~30s loop), 8 steps end-to-end:
 navigate → list 3 platform rows → View OTTL drawer → Clone-to-customise →
 Save OTTL → list 4 rows → Edit OTTL → Archive. Pairs with the
 service-level integration test at
-`langwatch/ee/governance/services/__tests__/ingestionTemplate.authoring.integration.test.ts`
+`platform/app/ee/governance/services/__tests__/ingestionTemplate.authoring.integration.test.ts`
 and the wire-level REST integration test at
-`langwatch/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`.
+`platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`.
 
 If you're touching the IngestionTemplatesEditor surface, the OttlEditor
 component, or the IngestionTemplateService, run the dogfood + both

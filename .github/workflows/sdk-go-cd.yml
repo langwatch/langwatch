@@ -21,16 +21,20 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: "1.25"
-          cache-dependency-path: sdk-go/go.sum
+          cache-dependency-path: sdks/go/go.sum
 
       - name: Run tests
-        working-directory: sdk-go
+        working-directory: sdks/go
+        # The repo-root go.work targets a newer Go than the SDK's floor; the SDK
+        # must build standalone at its declared go directive, so ignore the workspace.
+        env:
+          GOWORK: off
         run: go test -v ./...
 
       - name: Trigger pkg.go.dev to index the new version
         run: |
           # Request pkg.go.dev to fetch the new version
-          curl -s "https://proxy.golang.org/github.com/langwatch/langwatch/sdk-go/@v/$(echo ${{ github.event.release.tag_name }} | sed 's/sdk-go@//').info" || true
+          curl -s "https://proxy.golang.org/github.com/langwatch/langwatch/sdks/go/@v/$(echo ${{ github.event.release.tag_name }} | sed 's/sdk-go@//').info" || true
 
       - name: Get version from tag or manifest
         id: get_version
@@ -38,7 +42,7 @@ jobs:
           if [ "${{ github.event_name }}" = "release" ]; then
             VERSION=${GITHUB_REF#refs/tags/sdk-go@v}
           else
-            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."sdk-go"')
+            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."sdks/go"')
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
@@ -47,6 +51,6 @@ jobs:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
         run: |
           bash .github/scripts/notify-slack-release.sh \
-            sdk-go/CHANGELOG.md \
+            sdks/go/CHANGELOG.md \
             "Go SDK" \
             "${{ steps.get_version.outputs.version }}"

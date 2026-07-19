@@ -34,8 +34,8 @@ jobs:
         with:
           filters: |
             relevant:
-              - 'python-sdk/**'
-              - '!python-sdk/src/langwatch/__version__.py'
+              - 'sdks/python/**'
+              - '!sdks/python/src/langwatch/__version__.py'
               - '.github/workflows/sdk-python-ci.yml'
               - '.github/.release-please-manifest.json'
 
@@ -56,14 +56,14 @@ jobs:
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
-          cache-dependency-glob: "python-sdk/uv.lock"
+          cache-dependency-glob: "sdks/python/uv.lock"
 
       - name: Setup Python UV
-        working-directory: python-sdk
+        working-directory: sdks/python
         run: uv sync --all-groups --all-extras
 
       - name: Run unit tests
-        working-directory: python-sdk
+        working-directory: sdks/python
         env:
           LANGWATCH_DEBUG: "true"
         run: make test-unit
@@ -77,7 +77,7 @@ jobs:
            || github.event.pull_request.head.repo.full_name == github.repository)
           && (github.actor != 'dependabot[bot]'
            || github.event_name == 'pull_request_target')
-        working-directory: python-sdk
+        working-directory: sdks/python
         env:
           LANGWATCH_DEBUG: "true"
           LANGWATCH_API_KEY: ${{ secrets.PYTHON_SDK_LANGWATCH_API_KEY }}
@@ -112,14 +112,14 @@ jobs:
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
-          cache-dependency-glob: "python-sdk/uv.lock"
+          cache-dependency-glob: "sdks/python/uv.lock"
 
       - name: Setup Python UV
-        working-directory: python-sdk
+        working-directory: sdks/python
         run: uv sync --all-groups --all-extras && uv pip install build
 
       - name: Build package
-        working-directory: python-sdk
+        working-directory: sdks/python
         run: uv run python -m build
 
   # One required check for the whole workflow. Reports success if every

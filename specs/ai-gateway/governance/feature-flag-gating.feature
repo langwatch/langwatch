@@ -10,7 +10,7 @@ Feature: Governance preview hides behind a single feature flag
 
   Spec scope: the gating contract itself — what's hidden, when, and how
   to enable it for development. Implementation lives in
-  `langwatch/src/server/featureFlag/frontendFeatureFlags.ts`.
+  `platform/app/src/server/featureFlag/frontendFeatureFlags.ts`.
 
   Background:
     Given the canonical name is locked:

@@ -87,4 +87,4 @@ A submit handler that detects an invalid cross-field state **must `return` befor
 
 - #3785 — bug that triggered this ADR: provider-default silent no-op
 - `dev/docs/design/guidelines.md` §6 — implementation summary
-- `langwatch/src/hooks/useProviderFormSubmit.ts` — canonical implementation of cross-field submit-time validation
+- `platform/app/src/hooks/useProviderFormSubmit.ts` — canonical implementation of cross-field submit-time validation

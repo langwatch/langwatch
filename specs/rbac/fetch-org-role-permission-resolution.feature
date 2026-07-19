@@ -6,7 +6,7 @@ Feature: Organization role awareness across the platform
 
   # The role-recognition + permission-grant scenarios below are
   # bound to the corresponding cases in
-  # `langwatch/src/server/api/__tests__/rbac.test.ts` (Org Role
+  # `platform/app/src/server/api/__tests__/rbac.test.ts` (Org Role
   # Permissions, Team Role Permissions, Custom Role Scenarios).
   #
   # The "non-member denied", "demo project access", "frontend knows

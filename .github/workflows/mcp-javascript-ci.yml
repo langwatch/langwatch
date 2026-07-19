@@ -29,7 +29,7 @@ jobs:
         with:
           filters: |
             relevant:
-              - 'mcp-server/**'
+              - 'mcp/typescript/**'
               - '.github/workflows/mcp-javascript-ci.yml'
               - '.github/actions/setup-pnpm-node/**'
               - '.github/.release-please-manifest.json'
@@ -49,11 +49,11 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "mcp-server/pnpm-lock.yaml"
-          install-dir: mcp-server
+          cache-dependency-path: "pnpm-lock.yaml"
+          install-dir: mcp/typescript
 
       - name: Run typecheck
-        working-directory: mcp-server
+        working-directory: mcp/typescript
         run: ./node_modules/.bin/tsgo --noEmit --project ./tsconfig.json
 
   build_and_test:
@@ -71,11 +71,11 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "mcp-server/pnpm-lock.yaml"
-          install-dir: mcp-server
+          cache-dependency-path: "pnpm-lock.yaml"
+          install-dir: mcp/typescript
 
       - name: Build
-        working-directory: mcp-server
+        working-directory: mcp/typescript
         run: pnpm run build
 
       - name: Run tests
@@ -87,7 +87,7 @@ jobs:
            || github.event.pull_request.head.repo.full_name == github.repository)
           && (github.actor != 'dependabot[bot]'
            || github.event_name == 'pull_request_target')
-        working-directory: mcp-server
+        working-directory: mcp/typescript
         env:
           LANGWATCH_API_KEY: ${{ secrets.MCP_SERVER_LANGWATCH_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.MCP_SERVER_ANTHROPIC_API_KEY }}

@@ -136,5 +136,5 @@ JSON is consumable by all our tools: the skills compiler, platform frontend, doc
 - Internal maintenance skill: `.claude/skills/feature-map/SKILL.md`
 - Skills: `skills/{tracing,evaluations,scenarios,prompts,analytics,level-up}/SKILL.md`
 - Evaluations terminology: `dev/docs/terminology/001-evaluations.md`
-- Platform sidebar: `langwatch/src/components/MainMenu.tsx`
-- Platform routes: `langwatch/src/utils/routes.ts`
+- Platform sidebar: `platform/app/src/components/MainMenu.tsx`
+- Platform routes: `platform/app/src/utils/routes.ts`

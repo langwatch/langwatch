@@ -1,7 +1,7 @@
 # Lens System — Gherkin Spec
 # Covers: lens tabs UI, built-in lenses, creating lenses, draft state, editing custom lenses, persistence, data gating, keyboard shortcuts
 #
-# Audited against `langwatch/src/features/traces-v2/{stores/viewStore.ts,components/Toolbar/*}`
+# Audited against `platform/app/src/features/traces-v2/{stores/viewStore.ts,components/Toolbar/*}`
 # on 2026-05-01. Scenarios that describe behavior the current code doesn't implement
 # are tagged `@planned`.
 #

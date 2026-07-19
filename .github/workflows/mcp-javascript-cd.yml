@@ -27,15 +27,15 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          cache-dependency-path: "mcp-server/pnpm-lock.yaml"
+          cache-dependency-path: "pnpm-lock.yaml"
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        working-directory: mcp-server
+        working-directory: mcp/typescript
         run: pnpm install --frozen-lockfile
 
       - name: Build and publish
-        working-directory: mcp-server
+        working-directory: mcp/typescript
         run: pnpm publish --provenance --access public --no-git-checks
 
       - name: Get version from tag or manifest
@@ -44,7 +44,7 @@ jobs:
           if [ "${{ github.event_name }}" = "release" ]; then
             VERSION=${GITHUB_REF#refs/tags/mcp-server@v}
           else
-            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."mcp-server"')
+            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."mcp/typescript"')
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
@@ -53,6 +53,6 @@ jobs:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
         run: |
           bash .github/scripts/notify-slack-release.sh \
-            mcp-server/CHANGELOG.md \
+            mcp/typescript/CHANGELOG.md \
             "MCP Server" \
             "${{ steps.get_version.outputs.version }}"

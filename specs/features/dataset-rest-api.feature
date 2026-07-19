@@ -4,7 +4,7 @@ Feature: Dataset REST API
   So that I can programmatically manage datasets without the UI
 
   # All 38 scenarios are now bound to integration tests in
-  # langwatch/src/app/api/dataset/__tests__/dataset-rest-api.integration.test.ts.
+  # platform/app/src/app/api/dataset/__tests__/dataset-rest-api.integration.test.ts.
 
   Background:
     Given a project with a valid API key in the X-Auth-Token header

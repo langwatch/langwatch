@@ -13,7 +13,7 @@ that unlocked the Enterprise feature surface without a signed license file.
 That was removed because:
 
 1. **It bakes the bypass into the codebase.** Any reader of `/dev/docs/`,
-   `langwatch/.env.example`, or `git log` learns how to skip licensing in one
+   `platform/app/.env.example`, or `git log` learns how to skip licensing in one
    line. The friction protecting the Enterprise tier should be **getting a
    license**, not finding the env var.
 2. **It papers over real plan-resolution bugs.** When the bypass is on,
@@ -29,9 +29,9 @@ Used by every dogfood / QA / seed flow that needs Enterprise surfaces unlocked.
 
 ## Pre-requisites
 
-- `LANGWATCH_LICENSE_PRIVATE_KEY` set in `langwatch/.env` (RSA private key, paired with
+- `LANGWATCH_LICENSE_PRIVATE_KEY` set in `platform/app/.env` (RSA private key, paired with
   the public key compiled into the verifier at
-  `langwatch/ee/licensing/signing.ts`). Ask the maintainer for the dev key —
+  `platform/app/ee/licensing/signing.ts`). Ask the maintainer for the dev key —
   it is **not** checked into the repo.
 - Postgres reachable via `DATABASE_URL`.
 - The target organization already exists (the script writes a `License` row
@@ -59,7 +59,7 @@ Arguments:
 | Flag | Required | Default | Description |
 |---|---|---|---|
 | `--org-id` | yes | — | Target `Organization.id` to attach the license to. Org must already exist. |
-| `--plan` | no | `ENTERPRISE` | One of `ENTERPRISE` / `GROWTH` / `PRO`. Plan templates live at `langwatch/ee/licensing/planTemplates.ts`. |
+| `--plan` | no | `ENTERPRISE` | One of `ENTERPRISE` / `GROWTH` / `PRO`. Plan templates live at `platform/app/ee/licensing/planTemplates.ts`. |
 | `--max-members` | no | `50` | Seat cap. Must be ≥ 1. |
 | `--email` | no | `<orgSlug>@local.test` | Issued-to email for the license metadata + audit-trail field. |
 
@@ -90,7 +90,7 @@ await applyLicenseToOrg({
 });
 ```
 
-The dogfood seed at `langwatch/scripts/seed-gateway-dogfood.ts` ships an
+The dogfood seed at `platform/app/scripts/seed-gateway-dogfood.ts` ships an
 idempotent `ensureOrgHasLicense(orgId)` helper that wraps `applyLicenseToOrg`
 — skips if the org already has a valid license, warns if the env var is
 unset, and is safe to call on every seed run.
@@ -99,7 +99,7 @@ unset, and is safe to call on every seed run.
 
 - **Self-hosted dogfood** — generate an Enterprise license for the dogfood
   org so multi-user / governance / ingestion-source surfaces unlock.
-- **QA scripts** — `langwatch/scripts/_qa-*.mjs` create test orgs; each one
+- **QA scripts** — `platform/app/scripts/_qa-*.mjs` create test orgs; each one
   needs a license matching the test's plan-tier expectations. Wire the
   generator into the QA bootstrap.
 - **Local-dev seed** — when running `pnpm dev:seed` against a fresh DB,
@@ -144,7 +144,7 @@ row exists for the org (or all rows are expired).
   is gone with it; non-SaaS installs now go through the same
   `getLicenseHandler().getActivePlan(organizationId)` path as SaaS.
 - The generator script itself shipped in `6c8020462`
-  (`langwatch/scripts/generate-license.ts` + `applyLicenseToOrg`
+  (`platform/app/scripts/generate-license.ts` + `applyLicenseToOrg`
   programmatic export + `ensureOrgHasLicense` idempotent helper wired
   into `seed-gateway-dogfood.ts`).
 

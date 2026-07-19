@@ -81,7 +81,7 @@ Click **Create GitHub App**. On the resulting page:
 
 Add to the control-plane env (`.env`, `values.yaml`, secret manager — whatever
 your deploy uses). All are optional in the schema
-(`langwatch/src/env-create.mjs`); when the **private key** is unset the feature
+(`platform/app/src/env-create.mjs`); when the **private key** is unset the feature
 is silently off — the connect card says the integration is unavailable and no
 token can be minted.
 

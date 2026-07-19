@@ -2,11 +2,11 @@
 
 Bundle: tail-b. Tracking: #3458.
 
-Survey result: every scenario in this domain describes behaviour that already lives in `typescript-sdk/`, with vitest coverage in the matching `__tests__` directories. They are tagged unimplemented because no `@scenario <name>` JSDoc tag binds them to a test yet — Phase 3 will add the JSDoc binding (no new test code). One scenario covers behaviour that no longer matches the implementation and is marked UPDATE.
+Survey result: every scenario in this domain describes behaviour that already lives in `sdks/typescript/`, with vitest coverage in the matching `__tests__` directories. They are tagged unimplemented because no `@scenario <name>` JSDoc tag binds them to a test yet — Phase 3 will add the JSDoc binding (no new test code). One scenario covers behaviour that no longer matches the implementation and is marked UPDATE.
 
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|
-| specs/typescript-sdk/cli-docs.feature | "docs with no argument fetches the LangWatch llms.txt index" | KEEP | `langwatch docs` exists at typescript-sdk/src/cli/commands/docs.ts; covered by docs.unit.test.ts "fetches the langwatch index when called with no url" — Phase 3 adds @scenario JSDoc |
+| specs/typescript-sdk/cli-docs.feature | "docs with no argument fetches the LangWatch llms.txt index" | KEEP | `langwatch docs` exists at sdks/typescript/src/cli/commands/docs.ts; covered by docs.unit.test.ts "fetches the langwatch index when called with no url" — Phase 3 adds @scenario JSDoc |
 | specs/typescript-sdk/cli-docs.feature | "docs with a relative path appends .md and resolves under /docs" | KEEP | Implemented in normalizeDocsUrl(); covered by docs.unit.test.ts "appends .md to a relative path without extension" |
 | specs/typescript-sdk/cli-docs.feature | "docs is forgiving about leading slashes" | KEEP | normalizeDocsUrl() strips leading slash; covered by docs.unit.test.ts "strips a leading slash and prefixes the docs base" |
 | specs/typescript-sdk/cli-docs.feature | "docs is forgiving about a redundant docs/ prefix" | KEEP | normalizeDocsUrl() de-duplicates prefix; covered by docs.unit.test.ts "does not duplicate the docs/ prefix when included" |
@@ -49,7 +49,7 @@ Survey result: every scenario in this domain describes behaviour that already li
 | specs/typescript-sdk/cli-prompt-tags.feature | "Prompt list JSON format includes tags array with latest plus customs" | KEEP | list.ts `--format json` dumps full `allPrompts`; tags array passes through from API. Phase 3 binding asserts shape. |
 | specs/typescript-sdk/cli-prompt-tags.feature | "Prompt versions renders a Tags column per version" | KEEP | prompt/versions.ts:51 has Tags column. Phase 3 adds a small unit test. |
 | specs/typescript-sdk/cli-prompt-tags.feature | "Prompt versions JSON format includes tags array on each version" | KEEP | prompt/versions.ts JSON path passes through API tags. Phase 3 asserts shape. |
-| specs/typescript-sdk/cli-prompt-tags.feature | "API get returns latest plus custom tags on the latest version" | DUPLICATE | Server-side concern. Already covered by langwatch/src/app/api/prompts/__tests__/prompt-tags.integration.test.ts and by specs/prompts/prompt-tags.feature. Belongs in the prompts domain spec, not typescript-sdk. |
+| specs/typescript-sdk/cli-prompt-tags.feature | "API get returns latest plus custom tags on the latest version" | DUPLICATE | Server-side concern. Already covered by platform/app/src/app/api/prompts/__tests__/prompt-tags.integration.test.ts and by specs/prompts/prompt-tags.feature. Belongs in the prompts domain spec, not typescript-sdk. |
 | specs/typescript-sdk/cli-prompt-tags.feature | "API get with ?tag=staging omits the latest tag for a non-latest version" | DUPLICATE | Server-side; covered in prompts domain spec + integration test (see prompt-tags.integration.test.ts). |
 | specs/typescript-sdk/cli-prompt-tags.feature | "API versions marks the latest row with the latest tag" | DUPLICATE | Server-side; covered in prompts domain spec + langwatch integration tests. |
 | specs/typescript-sdk/cli-prompt-tags.feature | "API list returns latest plus any custom tags on the latest version" | DUPLICATE | Server-side; covered in prompts domain spec + langwatch integration tests. |

@@ -23,7 +23,7 @@
         "values.yaml"
       ]
     },
-    "sdk-go": {
+    "sdks/go": {
       "release-type": "go",
       "package-name": "langwatch-go",
       "prerelease": true,
@@ -59,7 +59,7 @@
         "version.go"
       ]
     },
-    "typescript-sdk": {
+    "sdks/typescript": {
       "release-type": "node",
       "package-name": "langwatch",
       "prerelease": true,
@@ -99,7 +99,7 @@
         }
       ]
     },
-    "python-sdk": {
+    "sdks/python": {
       "release-type": "python",
       "package-name": "langwatch",
       "prerelease": true,
@@ -135,7 +135,7 @@
         "src/langwatch/__version__.py"
       ]
     },
-    "mcp-server": {
+    "mcp/typescript": {
       "release-type": "node",
       "package-name": "@langwatch/mcp-server",
       "prerelease": true,
@@ -175,7 +175,7 @@
         }
       ]
     },
-    "langevals": {
+    "services/langevals": {
       "release-type": "python",
       "package-name": "langevals",
       "prerelease": true,
@@ -258,12 +258,12 @@
       "include-component-in-tag": true,
       "tag-separator": "@",
       "exclude-paths": [
-        "typescript-sdk",
-        "sdk-go",
-        "mcp-server",
-        "langevals",
+        "sdks/typescript",
+        "sdks/go",
+        "mcp/typescript",
+        "services/langevals",
         "charts/clickhouse-serverless",
-        "python-sdk",
+        "sdks/python",
         "skills",
         ".github",
         ".cursor",
@@ -323,7 +323,7 @@
         },
         {
           "type": "json",
-          "path": "langwatch/package.json",
+          "path": "platform/app/package.json",
           "jsonpath": "$.version"
         },
         {

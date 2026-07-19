@@ -4,7 +4,9 @@
 
 set -e
 
-COMPILER="npx tsx skills/_compiler/compile.ts"
+# tsx comes from the skills workspace member (single root pnpm workspace).
+TSX="skills/node_modules/.bin/tsx"
+COMPILER="$TSX skills/_compiler/compile.ts"
 OUT_DIR="skills/_compiled"
 
 SKILLS="tracing evaluations scenarios prompts analytics level-up datasets"
@@ -28,4 +30,4 @@ echo "Done. Generated $(ls -1 $OUT_DIR/*.txt 2>/dev/null | wc -l) files in $OUT_
 # the langyagent image so the in-product assistant loads exactly what the
 # public skill directory publishes (see skills/_compiler/native.ts).
 echo "Generating native (opencode) skills..."
-npx tsx skills/_compiler/native.ts
+"$TSX" skills/_compiler/native.ts

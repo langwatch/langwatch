@@ -1057,7 +1057,7 @@ Run the Playwright-driven scripts against staging. These cover most
 of Parts A/B programmatically:
 
 ```bash
-cd langwatch
+cd platform/app
 # Start dev server on port 5571 in email mode first, then:
 NEXTAUTH_URL=http://localhost:5571 NEXTAUTH_PROVIDER=email \
   pnpm exec tsx e2e/auth-regression/iter43-browser-qa.ts         # 17 checks
@@ -1206,5 +1206,5 @@ The `e2e/auth-regression/*.ts` scripts **ARE** committed because
 they're the automated part of the manual test plan and will stay
 useful for future audits or for verifying a rollback. They live
 under `e2e/` (not `scripts/`) but are explicitly **not** part of
-`pnpm test:e2e` — see `langwatch/e2e/auth-regression/README.md`
+`pnpm test:e2e` — see `platform/app/e2e/auth-regression/README.md`
 for why and how to run them.

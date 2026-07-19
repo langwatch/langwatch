@@ -65,7 +65,7 @@ No limit means a misbehaving container can starve the whole system. Too tight me
 ## Rationale
 
 **Why profiles over multiple compose files?**
-Profiles keep everything in one file, easier to maintain. `--profile scenarios` is clearer than `-f compose.yml -f compose.scenarios.yml`.
+Profiles keep everything in one file, easier to maintain. `--profile scenarios` is clearer than `-f infra/compose.yml -f infra/compose.scenarios.yml`.
 
 **Why init container over host install?**
 macOS binaries don't work in Linux containers. We tried `.npmrc` supportedArchitectures but it was unreliable. Init container guarantees correct platform binaries.
@@ -88,7 +88,7 @@ make down             # Stop all
 ```
 
 **Key files:**
-- `compose.dev.yml` - Docker Compose configuration
+- `infra/compose.dev.yml` - Docker Compose configuration
 - `scripts/dev.sh` - Interactive profile chooser
 - `Makefile` - Convenience targets
 
@@ -133,7 +133,7 @@ The 2026-03 worktree-isolation amendment treated **every** volume as per-worktre
 
 ### Decision
 
-**The contributor's `langwatch/.env` is the source of truth.** A new `langwatch/.env.dev-up` overlay is loaded as `env_file` AFTER `.env` and contains only the URLs whose services are starting locally for the chosen mode. `x-common-env` no longer sets infrastructure URLs.
+**The contributor's `platform/app/.env` is the source of truth.** A new `platform/app/.env.dev-up` overlay is loaded as `env_file` AFTER `.env` and contains only the URLs whose services are starting locally for the chosen mode. `x-common-env` no longer sets infrastructure URLs.
 
 **`make quickstart` is the single entry point** with five intent-based modes:
 
@@ -145,7 +145,7 @@ The 2026-03 worktree-isolation amendment treated **every** volume as per-worktre
 | `nlp` | + langwatch_nlp + langevals | + `LANGWATCH_NLP_SERVICE`, `LANGEVALS_ENDPOINT` |
 | `full-local` | `--profile full` (workers, scenarios, bullboard, ai-server) | all five infrastructure URLs |
 
-Migration mode uses `compose.dev.migration.yml` to expose host ports so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
+Migration mode uses `infra/compose.dev.migration.yml` to expose host ports so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
 
 `make quickstart` accepts a positional mode arg (`make quickstart frontend-only`) for non-interactive runs. `make quickstart-help` (or `./scripts/dev.sh help`) prints the mode reference.
 
@@ -159,7 +159,7 @@ Trade-off: only one worktree can have the same stateful container `up` at a time
 
 **Deprecated targets** (`make dev`, `dev-nlp`, `dev-scenarios`, `dev-test`, `dev-full`, and `dev-up` / `dev-down` / `dev-logs`) print a deprecation warning and forward to the corresponding `quickstart` mode for one release before being removed.
 
-**Fail-fast SSRF guard.** `scripts/dev.sh` errors if `langwatch/.env` has `IS_SAAS=true` with `BLOCK_LOCAL_HTTP_CALLS=false`. (Compose's runtime always sets `BLOCK_LOCAL_HTTP_CALLS=true` via `x-common-env`, but workers running outside compose / lambdas would inherit the broken combo.)
+**Fail-fast SSRF guard.** `scripts/dev.sh` errors if `platform/app/.env` has `IS_SAAS=true` with `BLOCK_LOCAL_HTTP_CALLS=false`. (Compose's runtime always sets `BLOCK_LOCAL_HTTP_CALLS=true` via `x-common-env`, but workers running outside compose / lambdas would inherit the broken combo.)
 
 ### Migration
 
@@ -170,7 +170,7 @@ docker volume ls | grep -E '^local +lw-[0-9a-f]{8}-(db|redis|clickhouse)-data'
 docker volume rm <volume-name>   # one per worktree, after confirming you don't need the data
 ```
 
-If you previously relied on `x-common-env`'s implicit `DATABASE_URL` / `REDIS_URL` / `CLICKHOUSE_URL` overrides, those moved to `langwatch/.env.dev-up` written by `quickstart`. Running `make dev` (deprecated alias for `quickstart backend-shared`) keeps the same effective behavior.
+If you previously relied on `x-common-env`'s implicit `DATABASE_URL` / `REDIS_URL` / `CLICKHOUSE_URL` overrides, those moved to `platform/app/.env.dev-up` written by `quickstart`. Running `make dev` (deprecated alias for `quickstart backend-shared`) keeps the same effective behavior.
 
 ## Amendment: In-process workers for local dev (2026-07)
 

@@ -34,12 +34,12 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
     - specs/ai-gateway/governance/birds-eye-dashboard-v2.feature       (Top-N + click-through)
 
   Implementation lives at:
-    - langwatch/src/pages/governance/index.tsx                         (bird's-eye home)
-    - langwatch/src/components/governance/AdminImpersonationBanner.tsx (persistent banner)
-    - langwatch/ee/governance/services/governanceImpersonation.service.ts
+    - platform/app/src/pages/governance/index.tsx                         (bird's-eye home)
+    - platform/app/src/components/governance/AdminImpersonationBanner.tsx (persistent banner)
+    - platform/app/ee/governance/services/governanceImpersonation.service.ts
                                                                        (server-side context)
-    - langwatch/src/server/governance/audit/                            (OCSF emission)
-    - langwatch/src/pages/me/settings.tsx                              (user-visible disclosure)
+    - platform/app/src/server/governance/audit/                            (OCSF emission)
+    - platform/app/src/pages/me/settings.tsx                              (user-visible disclosure)
 
   Background:
     Given an admin "carol@acme.com" with `governance:view` permission
@@ -104,7 +104,7 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
   # Persistent server-side-gated banner
   # ---------------------------------------------------------------------------
 
-  # AdminViewingAsBanner exists in DashboardLayout (langwatch/src/components)
+  # AdminViewingAsBanner exists in DashboardLayout (platform/app/src/components)
   # but no UI integration test currently asserts the cross-page persistence
   # contract. Pinning @unimplemented; backfill needs Playwright + adminViewingAs
   # session shim before a real test can drive nav across trace list / detail /

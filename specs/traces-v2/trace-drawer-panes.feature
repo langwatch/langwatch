@@ -1,9 +1,9 @@
 # Trace Drawer Panes — DevTools-style layout
 #
 # Implementation:
-#   langwatch/src/features/traces-v2/components/TraceDrawer/TraceDrawerShell.tsx
-#   langwatch/src/features/traces-v2/components/TraceDrawer/panes/*
-#   langwatch/src/features/traces-v2/stores/drawerStore.ts (widthPx, paneState, layoutMode)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/TraceDrawerShell.tsx
+#   platform/app/src/features/traces-v2/components/TraceDrawer/panes/*
+#   platform/app/src/features/traces-v2/stores/drawerStore.ts (widthPx, paneState, layoutMode)
 #
 # Motivation: the drawer was previously a single scroll container with a
 # fixed 45% / "maximized" toggle. Operators on laptops reported having to

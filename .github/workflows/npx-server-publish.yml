@@ -10,7 +10,7 @@
 #   bumps. The dispatched run reads the version from package.json — it does
 #   NOT require a release tag.
 #
-# Version lock: root package.json and langwatch/package.json must match.
+# Version lock: root package.json and platform/app/package.json must match.
 # Both are auto-bumped in lockstep by release-please-config.json (the `.`
 # package's extra-files list). The pre-publish step verifies it.
 #
@@ -66,10 +66,10 @@ jobs:
         run: |
           set -e
           pkg_version="$(node -p "require('./package.json').version")"
-          app_version="$(node -p "require('./langwatch/package.json').version")"
+          app_version="$(node -p "require('./platform/app/package.json').version")"
           tag="${GITHUB_REF_NAME:-}"
           echo "package.json version:           $pkg_version"
-          echo "langwatch/package.json version: $app_version"
+          echo "platform/app/package.json version: $app_version"
           echo "release tag (if any):           $tag"
 
           if [ "$pkg_version" != "$app_version" ]; then
@@ -168,17 +168,16 @@ jobs:
       # this, end users see vite chunder past at startup on first run —
       # exactly the bureaucracy we're trying to eliminate.
       #
-      # langwatch/ is its own pnpm workspace (not in the root pnpm-workspace
-      # `packages/*` glob), so we install + build it explicitly here.
-      # node_modules/ is excluded from the tarball by langwatch/.npmignore,
-      # so end users still run `pnpm install` once on first start (which
-      # generates the platform-specific Prisma client via prisma's
-      # postinstall hook).
+      # The repo is a single pnpm workspace, so the root install above already
+      # covers platform/app + its packages + mcp/typescript. node_modules/ is
+      # excluded from the tarball, so end users still run `pnpm install` once
+      # on first start (which generates the platform-specific Prisma client
+      # via prisma's postinstall hook).
       - name: Install langwatch app deps
-        run: pnpm -C langwatch install --frozen-lockfile --prod=false
+        run: pnpm install --frozen-lockfile --prod=false
 
       - name: Build langwatch app (vite + scenario + mcp + generated types)
-        run: pnpm -C langwatch run build
+        run: pnpm -C platform/app run build
         env:
           NODE_ENV: production
 
@@ -200,23 +199,27 @@ jobs:
           tarball="${{ steps.pack.outputs.tarball }}"
           required=(
             "package/packages/server/dist/cli.cjs"
-            "package/langwatch/package.json"
-            "package/langwatch/dist/client/index.html"
-            "package/langwatch/dist/scenario-child-process.js"
-            "package/langevals/pyproject.toml"
+            "package/platform/app/package.json"
+            "package/platform/app/dist/client/index.html"
+            "package/platform/app/dist/scenario-child-process.js"
+            "package/services/langevals/pyproject.toml"
             # langevals resolves the python SDK as a local path dependency,
-            # so the tarball must ship python-sdk/pyproject.toml + src/.
-            "package/python-sdk/pyproject.toml"
-            "package/python-sdk/src"
+            # so the tarball must ship sdks/python/pyproject.toml + src/.
+            "package/sdks/python/pyproject.toml"
+            "package/sdks/python/src"
             # langwatch's pnpm-workspace.yaml lists "../mcp-server" as a
             # workspace package; without the prebuilt dist the langwatch app
             # crashes loading "@langwatch/mcp-server/create-mcp-server".
-            "package/mcp-server/package.json"
-            "package/mcp-server/dist/create-mcp-server.js"
+            "package/mcp/typescript/package.json"
+            "package/mcp/typescript/dist/create-mcp-server.js"
+            # single-workspace root manifests: first-boot `pnpm install` at
+            # ~/.langwatch/app runs against these.
+            "package/pnpm-workspace.yaml"
+            "package/pnpm-lock.yaml"
           )
           forbidden=(
-            "package/langwatch/node_modules"
-            "package/langwatch/.next/cache"
+            "package/platform/app/node_modules"
+            "package/platform/app/.next/cache"
             "package/.env"
           )
           listing="$(mktemp)"

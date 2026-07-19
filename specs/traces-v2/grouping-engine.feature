@@ -2,7 +2,7 @@
 # Covers: grouping selector, accordion rendering, column aggregates, session grouping,
 #         expand/collapse, sorting, filtering, pagination, performance, data gating, keyboard
 #
-# Audited against `langwatch/src/features/traces-v2/{stores/viewStore.ts,
+# Audited against `platform/app/src/features/traces-v2/{stores/viewStore.ts,
 # components/Toolbar/GroupingSelector.tsx, components/TraceTable/{GroupLensBody.tsx,
 # conversationGroups.ts, registry/cells/group/types.ts}}` on 2026-05-01.
 # Scenarios that describe behavior not implemented today are tagged `@planned`.

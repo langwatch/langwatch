@@ -112,7 +112,7 @@ spec:
           {{- end }}
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
-          workingDir: /app/langwatch
+          workingDir: /app/platform/app
           command: ['pnpm']
           args: ['run', 'task', 'backfillDatasetContentToS3']
           env:

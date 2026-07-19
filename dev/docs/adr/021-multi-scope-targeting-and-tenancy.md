@@ -95,7 +95,7 @@ We reject two alternatives the team weighed explicitly:
 
 ### 2. A shared scope contract, with per-table storage enums
 
-We add one value-type module, `langwatch/src/server/scopes/scope.types.ts`:
+We add one value-type module, `platform/app/src/server/scopes/scope.types.ts`:
 
 - `SCOPE_TIERS = ["ORGANIZATION", "TEAM", "PROJECT"]` and `ScopeTier`.
 - `scopeAssignmentSchema` (Zod) and `ScopeAssignment` (`{ scopeType, scopeId }`).
@@ -113,7 +113,7 @@ three universal tiers); the storage enum is the table's own invariant. This is
 the existing per-table-enum decision in `scoped-resources.md`, kept deliberately.
 
 The cascade walk is captured once in
-`langwatch/src/server/scopes/resolveScopeChain.ts`: it returns the
+`platform/app/src/server/scopes/resolveScopeChain.ts`: it returns the
 `PROJECT → TEAM → ORGANIZATION` chain for a project context,
 most-specific-first. Junction readers apply it as
 `scopes: { some: { OR: resolveScopeChain(ctx) } }`; inline readers apply it as
@@ -276,5 +276,5 @@ change gated on a backfill, so it lands last.
 - `specs/security/org-level-tenancy-enforcement.feature`
 - `specs/model-providers/model-cost-scoping.feature`
 - `specs/ai-gateway/gateway-budget-targeting.feature`
-- `langwatch/src/server/scopes/scope.types.ts`,
-  `langwatch/src/server/scopes/resolveScopeChain.ts`: the shared contract
+- `platform/app/src/server/scopes/scope.types.ts`,
+  `platform/app/src/server/scopes/resolveScopeChain.ts`: the shared contract

@@ -85,7 +85,7 @@ A compiler transforms skills into self-contained copy-paste prompts. Two modes:
 Skills tell the agent to install and use the `langwatch` CLI — it covers docs (`langwatch docs ...`, `langwatch scenario-docs ...`) and every platform operation. There is no MCP install step in any skill. If the CLI itself cannot be run (e.g., the agent is inside ChatGPT or another web assistant with no shell), the skill links to `_shared/llms-txt-fallback.md` for direct llms.txt-based doc fetching.
 
 ### 5. Every improvement has a test
-Each skill has scenario tests using Claude Code against fixture codebases. The testing pattern mirrors what's already in `mcp-server/tests/scenario-openai.test.ts`.
+Each skill has scenario tests using Claude Code against fixture codebases. The testing pattern mirrors what's already in `mcp/typescript/tests/scenario-openai.test.ts`.
 
 ### 6. Dev skills write code, platform skills use the CLI
 Dev skills (`tracing`, `evaluations`, `scenarios`, `prompts`) explicitly tell the agent to write code files. Platform skills tell the agent to use the `langwatch` CLI for platform operations (e.g. `langwatch scenario create`, `langwatch evaluator create`, `langwatch prompt push`). Cross-cutting skills (`analytics`) use the CLI in both contexts. No skill instructs the agent to use MCP tools.
@@ -95,7 +95,7 @@ Skills that create datasets, experiments, or tests generate content based on the
 
 ## Relationship to Existing Systems
 
-### MCP Server (`mcp-server/`)
+### MCP Server (`mcp/typescript/`)
 The MCP server still exists and is useful for environments where users specifically prefer MCP tools (notably ChatGPT, where MCP is the only programmatic surface). However, **skills do not reference the MCP at all** — they only point at the `langwatch` CLI, which exposes the same docs (`langwatch docs`, `langwatch scenario-docs`) and platform operations directly. Keeping skills CLI-only avoids the agent juggling two surfaces.
 
 ### Better Agents CLI
@@ -113,7 +113,7 @@ Docs pages link to skills/prompts. The four onboarding paths should be reflected
 ## Testing Strategy
 
 ### Test Infrastructure
-- **Agent adapter**: Reusable Claude Code adapter (same pattern as `mcp-server/tests/`)
+- **Agent adapter**: Reusable Claude Code adapter (same pattern as `mcp/typescript/tests/`)
 - **Fixtures**: Minimal agent codebases per language/framework combination
 - **Assertions**: File content checks (deterministic) + JudgeAgent criteria (semantic)
 - **Environment**: Tests run against production LangWatch for speed

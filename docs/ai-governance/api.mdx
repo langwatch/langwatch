@@ -6,7 +6,7 @@ sidebarTitle: REST API
 
 <Info>**Pairs with:** [Governance CLI](/ai-governance/cli) (the CLI is a thin shell over this API) and [Governance MCP server](/ai-governance/mcp) (the MCP tools are a thin shell over this API). All three surfaces dispatch through the same service-layer functions; the dashboard tRPC procedures call into the same services. There is exactly one place each governance verb is implemented.</Info>
 
-<Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`IngestionTemplateService.updateOttlRules`, `IngestionKeyService.install`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant, no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly. Sergey's Lane B-5 commit at `8fffad4ad` locked the invariant for the governance resources shipped in v1: see `langwatch/ee/governance/repositories/ingestionTemplate.repository.ts` and `governanceAudit.repository.ts` (the latter wraps every `AuditLog` write so audit emission also goes through the repository boundary). Repo methods accept `Prisma.TransactionClient | PrismaClient` so they work inside service `$transaction` blocks and against the top-level client transparently.</Note>
+<Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`IngestionTemplateService.updateOttlRules`, `IngestionKeyService.install`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant, no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly. Sergey's Lane B-5 commit at `8fffad4ad` locked the invariant for the governance resources shipped in v1: see `platform/app/ee/governance/repositories/ingestionTemplate.repository.ts` and `governanceAudit.repository.ts` (the latter wraps every `AuditLog` write so audit emission also goes through the repository boundary). Repo methods accept `Prisma.TransactionClient | PrismaClient` so they work inside service `$transaction` blocks and against the top-level client transparently.</Note>
 
 ## Why a separate REST API alongside tRPC
 
@@ -129,9 +129,9 @@ The mutating verbs across the two shipped resources (`createOrgTemplate`, `updat
 
 The wire shape, request bodies, response envelopes, status-code mapping, and surface attribution, is locked by two integration tests that run against real Postgres + the real Hono pipeline (no service mocks):
 
-**Ingestion-templates wire shape**: `langwatch/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`. 14 scenarios (Lane B-4 at `1839d9f54`) covering the full ingestion-templates verb set, 401, 400, 403, 404 envelopes, and a wire-level audit-uniform assertion that `metadata.surface === "hono"` for state-changing calls.
+**Ingestion-templates wire shape**: `platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`. 14 scenarios (Lane B-4 at `1839d9f54`) covering the full ingestion-templates verb set, 401, 400, 403, 404 envelopes, and a wire-level audit-uniform assertion that `metadata.surface === "hono"` for state-changing calls.
 
-**Ingestion-key wire shape**: `langwatch/src/app/api/governance/__tests__/governance-ingestion-keys.integration.test.ts`. 9 scenarios (Lane B-6 at `60f769498`) covering the ingestion-key flows. Specifically locks:
+**Ingestion-key wire shape**: `platform/app/src/app/api/governance/__tests__/governance-ingestion-keys.integration.test.ts`. 9 scenarios (Lane B-6 at `60f769498`) covering the ingestion-key flows. Specifically locks:
 
 - the mint route returns a one-time `sk-lw-…` token and thereafter exposes only the prefix
 - `install` and `rotate` audit rows both stamp `metadata.surface === "hono"` end-to-end (cross-validates the B-3 surface threading at `fc6d54100`)
@@ -139,18 +139,18 @@ The wire shape, request bodies, response envelopes, status-code mapping, and sur
 
 The setup pattern in this file (project + ingest-only RoleBinding + `aiTools:manage` caller) is the canonical reference for any downstream lane (CLI, MCP) that needs an ingestion-key test path.
 
-**No-bypass invariant (CI-enforced)**: `langwatch/ee/governance/repositories/__tests__/no-bypass.unit.test.ts`. 3 tests (Lane B-7 at `94c219035`) statically reject any future PR that adds a direct `prisma.ingestionTemplate.*` call outside the allowlist. Locks the umbrella spec's `@no-bypass` invariant in CI so the repository-pattern boundary won't silently drift.
+**No-bypass invariant (CI-enforced)**: `platform/app/ee/governance/repositories/__tests__/no-bypass.unit.test.ts`. 3 tests (Lane B-7 at `94c219035`) statically reject any future PR that adds a direct `prisma.ingestionTemplate.*` call outside the allowlist. Locks the umbrella spec's `@no-bypass` invariant in CI so the repository-pattern boundary won't silently drift.
 
-**MCP audit-uniform regression**: `langwatch/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts`. 3 cases (Lane B-MCP audit at `66fd35162`) prove the Path B contract end-to-end: `governance_ingestion_templates_create` and `governance_ingestion_keys_mint` both stamp `metadata.surface === "mcp"` against real Postgres, and the `AUTH_REQUIRED:` negative case stays closed (write tool with no `callerUserId` fails before any audit row is written).
+**MCP audit-uniform regression**: `platform/app/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts`. 3 cases (Lane B-MCP audit at `66fd35162`) prove the Path B contract end-to-end: `governance_ingestion_templates_create` and `governance_ingestion_keys_mint` both stamp `metadata.surface === "mcp"` against real Postgres, and the `AUTH_REQUIRED:` negative case stays closed (write tool with no `callerUserId` fails before any audit row is written).
 
-**Cross-surface audit-uniformity regression**: `langwatch/ee/governance/services/__tests__/auditSurface.crossSurface.integration.test.ts`. Invokes `createOrgTemplate` via all four surfaces, tRPC service-direct, Hono REST, CLI REST (with `X-LangWatch-Surface: cli`), and MCP service-direct, in one test (Lane B-8 at `d96cd4300`, extended to 4 surfaces at `cb4c8224c`); asserts the four audit rows have **identical** payload shape, same `action`, same `targetKind`, same `organizationId`, same metadata-key-set, with only `metadata.surface` varying (`"trpc"`, `"hono"`, `"cli"`, `"mcp"`). Slug regex format identical, no default-fallback leakage.
+**Cross-surface audit-uniformity regression**: `platform/app/ee/governance/services/__tests__/auditSurface.crossSurface.integration.test.ts`. Invokes `createOrgTemplate` via all four surfaces, tRPC service-direct, Hono REST, CLI REST (with `X-LangWatch-Surface: cli`), and MCP service-direct, in one test (Lane B-8 at `d96cd4300`, extended to 4 surfaces at `cb4c8224c`); asserts the four audit rows have **identical** payload shape, same `action`, same `targetKind`, same `organizationId`, same metadata-key-set, with only `metadata.surface` varying (`"trpc"`, `"hono"`, `"cli"`, `"mcp"`). Slug regex format identical, no default-fallback leakage.
 
 **Surface-spoof rejection regression**: same file as above (Lane B-8 extension at `cb4c8224c`). Fires three Hono POSTs with `X-LangWatch-Surface` set to `trpc`, `mcp`, and `evil`; asserts all three audit rows fall back to `metadata.surface === "hono"`. Locks Alexis's `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` as the defense against external HTTP callers forging in-process surface tags, the only legal value the Hono surface accepts on inbound is `cli`; everything else falls through to the route's default `"hono"`. Together with the cross-surface uniformity test this exhaustively pins the umbrella spec's `@audit-uniform` invariant for v1.
 
 To run locally:
 
 ```bash
-cd langwatch
+cd platform/app
 pnpm test:integration governance-rest-api.integration.test.ts
 pnpm test:integration governance-ingestion-keys.integration.test.ts
 pnpm test:integration governance-tools.audit-uniform.integration.test.ts
@@ -169,4 +169,4 @@ Use these files as the authoritative reference when implementing a CLI command o
 - [Compliance architecture](/ai-governance/compliance-architecture): how the OCSF v1.1 export consumes the same audit stream
 - Spec, `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`
 - v1 scope-fence audit, `specs/ai-gateway/governance/agentic-first-parity-v1-status.md` (12-resource × 4-surface matrix on shipped SHAs; scoring 2/12 full parity, 8/12 tRPC-only deferred to follow-on)
-- Wire-shape lock, `langwatch/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`
+- Wire-shape lock, `platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`

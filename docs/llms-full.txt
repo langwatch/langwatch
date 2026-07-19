@@ -324,7 +324,7 @@ LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that m
 
 The two URLs are split for **auth + routing convenience**, not for architectural reasons. Internally they share everything that matters:
 
-- **Same hardened OTLP parser**: `langwatch/src/server/otel/parseOtlpBody.ts` (`readOtlpBody` + `parseOtlpTraces`, `parseOtlpLogs`) handles gzip, deflate, brotli decompression, JSON + protobuf decode, and the JSON-then-protobuf-encode fallback path. Both URLs call into it. There is no parser-quality gap.
+- **Same hardened OTLP parser**: `platform/app/src/server/otel/parseOtlpBody.ts` (`readOtlpBody` + `parseOtlpTraces`, `parseOtlpLogs`) handles gzip, deflate, brotli decompression, JSON + protobuf decode, and the JSON-then-protobuf-encode fallback path. Both URLs call into it. There is no parser-quality gap.
 - **Same trace pipeline**: both URLs hand off to the existing `traces.collection.handleOtlpTraceRequest` (or `traces.logCollection.handleOtlpLogRequest` for log-shaped sources) that powers `/api/otel/v1/traces`. No parallel write path. No parallel storage.
 - **Same `recorded_spans` and `log_records` tables**, governance-ingested events land in the same ClickHouse storage that powers the rest of the platform. They're distinguished by reserved attribute namespaces stamped at the receiver edge:
   - `langwatch.origin.kind = "ingestion_source"`, discriminator
@@ -644,42 +644,42 @@ Below are some examples for integrating LangWatch into your project.
   ### Python
 
     <CardGroup cols={3}>
-      <Card title="Azure OpenAI Streaming Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/azure_openai_stream_bot.py" />
-      <Card title="Custom Evaluation Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/custom_evaluation_bot.py" />
-      <Card title="DSPy Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/dspy_bot.py" />
-      <Card title="DSPy Visualization" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/dspy_visualization.ipynb" />
-      <Card title="Evaluation Manual Call" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/evaluation_manual_call.py" />
-      <Card title="FastAPI App" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/fastapi_app.py" />
-      <Card title="Generic Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot.py" />
-      <Card title="Generic Bot Exception" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot_exception.py" />
-      <Card title="Generic Bot RAG" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot_rag.py" />
-      <Card title="Generic Bot RAG Expected Output" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot_rag_expected_output.py" />
-      <Card title="Generic Bot Span Context Manager" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot_span_context_manager.py" />
-      <Card title="Generic Bot Span Low Level" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot_span_low_level.py" />
-      <Card title="Generic Bot Sync Function" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot_sync_function.py" />
-      <Card title="Generic Bot Update Metadata Later" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/generic_bot_update_metadata_later.py" />
-      <Card title="Guardrails" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/guardrails.py" />
-      <Card title="Guardrails Parallel" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/guardrails_parallel.py" />
-      <Card title="Guardrails Without Tracing" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/guardrails_without_tracing.py" />
-      <Card title="LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/langchain_bot.py" />
-      <Card title="LangChain RAG Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/langchain_rag_bot.py" />
-      <Card title="LangChain RAG Bot Vertex AI" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/langchain_rag_bot_vertex_ai.py" />
-      <Card title="LiteLLM Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/litellm_bot.py" />
-      <Card title="OpenAI Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/openai_bot.py" />
-      <Card title="OpenAI Bot Function Call" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/openai_bot_function_call.py" />
-      <Card title="OpenAI Bot RAG" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/openai_bot_rag.py" />
-      <Card title="Weaviate DSPy Visualization" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/weaviate_dspy_visualization.ipynb" />
-      <Card title="Streamlit OpenAI Assistants API Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/streamlit_openai_assistants_api_bot.py" />
+      <Card title="Azure OpenAI Streaming Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/azure_openai_stream_bot.py" />
+      <Card title="Custom Evaluation Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/custom_evaluation_bot.py" />
+      <Card title="DSPy Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/dspy_bot.py" />
+      <Card title="DSPy Visualization" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/dspy_visualization.ipynb" />
+      <Card title="Evaluation Manual Call" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/evaluation_manual_call.py" />
+      <Card title="FastAPI App" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/fastapi_app.py" />
+      <Card title="Generic Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot.py" />
+      <Card title="Generic Bot Exception" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot_exception.py" />
+      <Card title="Generic Bot RAG" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot_rag.py" />
+      <Card title="Generic Bot RAG Expected Output" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot_rag_expected_output.py" />
+      <Card title="Generic Bot Span Context Manager" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot_span_context_manager.py" />
+      <Card title="Generic Bot Span Low Level" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot_span_low_level.py" />
+      <Card title="Generic Bot Sync Function" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot_sync_function.py" />
+      <Card title="Generic Bot Update Metadata Later" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/generic_bot_update_metadata_later.py" />
+      <Card title="Guardrails" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/guardrails.py" />
+      <Card title="Guardrails Parallel" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/guardrails_parallel.py" />
+      <Card title="Guardrails Without Tracing" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/guardrails_without_tracing.py" />
+      <Card title="LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/langchain_bot.py" />
+      <Card title="LangChain RAG Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/langchain_rag_bot.py" />
+      <Card title="LangChain RAG Bot Vertex AI" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/langchain_rag_bot_vertex_ai.py" />
+      <Card title="LiteLLM Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/litellm_bot.py" />
+      <Card title="OpenAI Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/openai_bot.py" />
+      <Card title="OpenAI Bot Function Call" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/openai_bot_function_call.py" />
+      <Card title="OpenAI Bot RAG" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/openai_bot_rag.py" />
+      <Card title="Weaviate DSPy Visualization" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/weaviate_dspy_visualization.ipynb" />
+      <Card title="Streamlit OpenAI Assistants API Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/streamlit_openai_assistants_api_bot.py" />
     </CardGroup>
 
   ### TypeScript
 
     <CardGroup cols={3}>
-      <Card title="LangGraph Chatbot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/typescript-sdk/examples/langgraph" />
-      <Card title="LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/typescript-sdk/examples/langchain" />
-      <Card title="Mastra Weather Agent" icon="link" href="https://github.com/langwatch/langwatch/blob/main/typescript-sdk/examples/mastra" />
-      <Card title="Prompt CLI" icon="link" href="https://github.com/langwatch/langwatch/blob/main/typescript-sdk/examples/prompt-cli" />
-      <Card title="Vercel AI SDK Chatbot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/typescript-sdk/examples/vercel-ai" />
+      <Card title="LangGraph Chatbot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/typescript/examples/langgraph" />
+      <Card title="LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/typescript/examples/langchain" />
+      <Card title="Mastra Weather Agent" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/typescript/examples/mastra" />
+      <Card title="Prompt CLI" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/typescript/examples/prompt-cli" />
+      <Card title="Vercel AI SDK Chatbot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/typescript/examples/vercel-ai" />
     </CardGroup>
 
   ### Go
@@ -691,14 +691,14 @@ Below are some examples for integrating LangWatch into your project.
   ### OpenTelemetry
 
     <CardGroup cols={3}>
-      <Card title="OpenInference DSPy Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/openinference_dspy_bot.py" />
-      <Card title="OpenInference Haystack" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/openinference_haystack.py" />
-      <Card title="OpenInference LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/openinference_langchain_bot.py" />
-      <Card title="OpenInference OpenAI Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/openinference_openai_bot.py" />
-      <Card title="OpenTelemetry Anthropic Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/openllmetry_anthropic_bot.py" />
-      <Card title="OpenTelemetry LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/openllmetry_langchain_bot.py" />
-      <Card title="OpenTelemetry OpenAI Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/openllmetry_openai_bot.py" />
-      <Card title="Traditional Instrumentation FastAPI App" icon="link" href="https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/opentelemetry/traditional_instrumentation_fastapi_app.py" />
+      <Card title="OpenInference DSPy Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/openinference_dspy_bot.py" />
+      <Card title="OpenInference Haystack" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/openinference_haystack.py" />
+      <Card title="OpenInference LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/openinference_langchain_bot.py" />
+      <Card title="OpenInference OpenAI Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/openinference_openai_bot.py" />
+      <Card title="OpenTelemetry Anthropic Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/openllmetry_anthropic_bot.py" />
+      <Card title="OpenTelemetry LangChain Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/openllmetry_langchain_bot.py" />
+      <Card title="OpenTelemetry OpenAI Bot" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/openllmetry_openai_bot.py" />
+      <Card title="Traditional Instrumentation FastAPI App" icon="link" href="https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/opentelemetry/traditional_instrumentation_fastapi_app.py" />
     </CardGroup>
 
 
@@ -10896,7 +10896,7 @@ Replace the placeholders with your actual data. The `@-` tells `curl` to read th
 
 All `timestamps` are unix epoch **milliseconds**. The optional `first_token_at` records when the first streamed token reached the user and powers the Time to First Token (TTFT) metric, see [Tracking Time to First Token](/integration/python/tutorials/tracking-time-to-first-token). Token counts and cost are derived from `metrics` and the model pricing registry, see [Tracking LLM Costs and Tokens](/integration/python/tutorials/tracking-llm-costs).
 
-For the type reference of how a `span` should look like, check out our [types definitions](https://github.com/langwatch/langwatch/blob/main/python-sdk/src/langwatch/types.py).
+For the type reference of how a `span` should look like, check out our [types definitions](https://github.com/langwatch/langwatch/blob/main/sdks/python/src/langwatch/types.py).
 
 It's optional but highly recommended to pass the `user_id` on the metadata if you want to leverage user-specific analytics and the `thread_id` to group related traces together. To connect it to an event later on. Read more about those and other concepts [here](../concepts).
 
@@ -16479,7 +16479,7 @@ sidebarTitle: Quickstart
 description: Quickly visualize DSPy notebooks and optimization experiments in LangWatch to support debugging and agent evaluation.
 ---
 
-[<img align="center" src="https://colab.research.google.com/assets/colab-badge.svg" />](https://colab.research.google.com/github/langwatch/langwatch/blob/main/python-sdk/examples/dspy_visualization.ipynb)
+[<img align="center" src="https://colab.research.google.com/assets/colab-badge.svg" />](https://colab.research.google.com/github/langwatch/langwatch/blob/main/sdks/python/examples/dspy_visualization.ipynb)
 
 LangWatch DSPy Visualization allows you to start tracking your DSPy experiments in real-time and easily follow the progress, track costs and debug each step.
 
@@ -26626,10 +26626,10 @@ Docker Compose is the quickest way to try LangWatch locally. It runs the full st
 ```bash
 # Clone the repository
 git clone https://github.com/langwatch/langwatch.git
-cd langwatch
+cd platform/app
 
 # Copy the example environment file
-cp langwatch/.env.example langwatch/.env
+cp platform/app/.env.example platform/app/.env
 
 # Start all services
 docker compose up
@@ -26649,7 +26649,7 @@ Docker Compose starts the following services:
 |---------|-------|------|-------------|
 | `app` | `langwatch/langwatch:latest` | 5560 | Main application |
 | `workers` | `langwatch/langwatch:latest` |, | Background job processing |
-| `langwatch_nlp` | `langwatch/langwatch_nlp:latest` | 5561 | NLP processing, workflows |
+| `langwatch_nlp` | `platform/app/langwatch_nlp:latest` | 5561 | NLP processing, workflows |
 | `langevals` | `langwatch/langevals:latest` | 5562 | Evaluators, guardrails |
 | `postgres` | `postgres:16` | 5432 | Control plane database |
 | `redis` | `redis:alpine` |, | Job queue, caching |
@@ -26657,7 +26657,7 @@ Docker Compose starts the following services:
 
 ## Configuration
 
-Edit `langwatch/.env` to customize your deployment. Key variables:
+Edit `platform/app/.env` to customize your deployment. Key variables:
 
 ```bash
 # Required: generate a secret for each
@@ -26710,7 +26710,7 @@ docker compose up
 
 ### Disable optional services
 
-If you don't need NLP or evaluators, comment them out in `compose.yml`:
+If you don't need NLP or evaluators, comment them out in `infra/compose.yml`:
 
 ```yaml
 services:
@@ -26801,7 +26801,7 @@ The main application image. Used for both LangWatch App and LangWatch Workers. H
 - Manages the control plane via PostgreSQL (Prisma ORM)
 - Broadcasts real-time updates via Server-Sent Events (SSE)
 
-### langwatch/langwatch_nlp
+### platform/app/langwatch_nlp
 
 Python service for natural language processing tasks.
 
@@ -26881,17 +26881,17 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # Pull from Docker Hub
 docker pull langwatch/langwatch:3.0.0
-docker pull langwatch/langwatch_nlp:3.0.0
+docker pull platform/app/langwatch_nlp:3.0.0
 docker pull langwatch/langevals:3.0.0
 
 # Tag for your registry
 docker tag langwatch/langwatch:3.0.0 registry.example.com/langwatch/langwatch:3.0.0
-docker tag langwatch/langwatch_nlp:3.0.0 registry.example.com/langwatch/langwatch_nlp:3.0.0
+docker tag platform/app/langwatch_nlp:3.0.0 registry.example.com/platform/app/langwatch_nlp:3.0.0
 docker tag langwatch/langevals:3.0.0 registry.example.com/langwatch/langevals:3.0.0
 
 # Push
 docker push registry.example.com/langwatch/langwatch:3.0.0
-docker push registry.example.com/langwatch/langwatch_nlp:3.0.0
+docker push registry.example.com/platform/app/langwatch_nlp:3.0.0
 docker push registry.example.com/langwatch/langevals:3.0.0
 ```
 
@@ -26903,7 +26903,7 @@ images:
     repository: registry.example.com/langwatch/langwatch
     tag: "3.0.0"
   langwatch_nlp:
-    repository: registry.example.com/langwatch/langwatch_nlp
+    repository: registry.example.com/platform/app/langwatch_nlp
     tag: "3.0.0"
   langevals:
     repository: registry.example.com/langwatch/langevals
@@ -27448,7 +27448,7 @@ make images-local
 
 This builds four images:
 - `langwatch/langwatch:local`, App
-- `langwatch/langwatch_nlp:local`, NLP service
+- `platform/app/langwatch_nlp:local`, NLP service
 - `langwatch/langevals:local`, Evaluators
 - `langwatch/clickhouse-serverless:next`, ClickHouse
 
@@ -27827,7 +27827,7 @@ LangEvals and NLP make outbound calls to external LLM providers (OpenAI, Azure, 
 | Image | Port | Purpose |
 |-------|------|---------|
 | `langwatch/langwatch` | 5560 | App + Workers (same image, different entrypoint) |
-| `langwatch/langwatch_nlp` | 5561 | NLP, workflows, topic clustering |
+| `platform/app/langwatch_nlp` | 5561 | NLP, workflows, topic clustering |
 | `langwatch/langevals` | 5562 | Evaluators, guardrails |
 
 ## OpenTelemetry Integration
@@ -28818,7 +28818,7 @@ LangWatch container images and CLI packages are published with verifiable supply
 
 ### Container images (Docker Hub)
 
-Every release of `langwatch/langwatch`, `langwatch/langwatch_nlp`, `langwatch/langevals`, and `langwatch/ai-gateway` is signed with [Sigstore](https://www.sigstore.dev/) cosign using keyless OIDC. Both the multi-arch index manifest and each per-platform manifest (linux/amd64, linux/arm64) are signed by digest. A CycloneDX SBOM is generated per platform and attached as a cosign attestation against the matching platform manifest digest, so the SBOM you verify always corresponds to the architecture you actually pulled.
+Every release of `langwatch/langwatch`, `platform/app/langwatch_nlp`, `langwatch/langevals`, and `langwatch/ai-gateway` is signed with [Sigstore](https://www.sigstore.dev/) cosign using keyless OIDC. Both the multi-arch index manifest and each per-platform manifest (linux/amd64, linux/arm64) are signed by digest. A CycloneDX SBOM is generated per platform and attached as a cosign attestation against the matching platform manifest digest, so the SBOM you verify always corresponds to the architecture you actually pulled.
 
 Verify a signature with [cosign](https://github.com/sigstore/cosign):
 
@@ -28896,7 +28896,7 @@ Another process is using port 5560. Find and stop it:
 
 ```bash
 lsof -i :5560
-# Then either stop that process or change the port in compose.yml
+# Then either stop that process or change the port in infra/compose.yml
 ```
 
 ### Containers keep restarting
@@ -29408,7 +29408,7 @@ Add ClickHouse to your existing infrastructure. Your Elasticsearch instance stay
 
 ### Docker Compose
 
-Add the ClickHouse service to your `compose.yml`:
+Add the ClickHouse service to your `infra/compose.yml`:
 
 ```yaml
 services:
@@ -29444,7 +29444,7 @@ The v3 Helm chart includes the `clickhouse-serverless` subchart automatically. N
 
 Update your environment variables and pull the v3 images:
 
-Add `CLICKHOUSE_URL` to your app and workers environment in `compose.yml`:
+Add `CLICKHOUSE_URL` to your app and workers environment in `infra/compose.yml`:
 
 ```yaml
 services:
@@ -29501,7 +29501,7 @@ The `es-migration` tool reads documents from Elasticsearch and writes them to Cl
 git clone https://github.com/langwatch/langwatch.git
 
 # Navigate to the langwatch workspace
-cd langwatch
+cd platform/app
 
 # Install dependencies from the langwatch pnpm workspace
 pnpm install
@@ -29699,14 +29699,14 @@ Once you've verified the migration:
    - `ELASTICSEARCH_NODE_URL`
    - `ELASTICSEARCH_API_KEY`
 
-2. **Remove the Elasticsearch service** from your `compose.yml` or Helm values
+2. **Remove the Elasticsearch service** from your `infra/compose.yml` or Helm values
 
 3. **Restart LangWatch** to apply the changes
 
 ### Docker Compose
 
 ```bash
-# After removing the elasticsearch service from compose.yml
+# After removing the elasticsearch service from infra/compose.yml
 docker compose up -d
 ```
 

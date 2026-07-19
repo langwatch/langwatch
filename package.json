@@ -33,13 +33,15 @@
   "files": [
     "packages/server/dist/",
     "packages/server/templates/",
-    "langwatch/",
-    "langevals/",
-    "python-sdk/",
-    "mcp-server/",
+    "platform/app/",
+    "services/langevals/",
+    "sdks/python/",
+    "mcp/typescript/",
     "scripts/",
     "README.md",
-    "LICENSE.md"
+    "LICENSE.md",
+    "pnpm-workspace.yaml",
+    "pnpm-lock.yaml"
   ],
   "scripts": {
     "build:cli": "pnpm --filter @langwatch/server-cli build",

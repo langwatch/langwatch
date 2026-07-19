@@ -8,10 +8,10 @@ import type { LangwatchPaths } from "../shared/paths.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 
 /**
- * Ensure langwatch/node_modules exists + start:prepare:files has run, both of
+ * Ensure platform/app/node_modules exists + start:prepare:files has run, both of
  * which are prerequisites for `pnpm run prisma:migrate` and `pnpm run start:app`.
  *
- * Runs INSIDE the relocated app tree (LANGWATCH_HOME/app/langwatch/) — see
+ * Runs INSIDE the relocated app tree (LANGWATCH_HOME/app/platform/app/) — see
  * services/app-dir.ts for why we relocate out of node_modules.
  */
 export async function ensureLangwatchDeps(ctx: { paths: LangwatchPaths }, bus: EventBus): Promise<void> {
@@ -21,7 +21,9 @@ export async function ensureLangwatchDeps(ctx: { paths: LangwatchPaths }, bus: E
   const nodeModulesPath = join(langwatchDir, "node_modules");
   const distPath = join(langwatchDir, "dist");
   const prismaClientPath = join(nodeModulesPath, ".prisma", "client", "index.js");
-  const lockfilePath = join(langwatchDir, "pnpm-lock.yaml");
+  // The repo is a single pnpm workspace — the lockfile lives at the shipped
+  // tree's root (appRoot()), not inside platform/app.
+  const lockfilePath = join(appRoot(), "pnpm-lock.yaml");
   const hashFile = join(nodeModulesPath, ".install-hash");
 
   const distAlreadyBuilt = existsSync(join(distPath, "client"));
@@ -76,11 +78,14 @@ export async function ensureLangwatchDeps(ctx: { paths: LangwatchPaths }, bus: E
     // overlap unpredictably with langwatch's devDependencies, and
     // chasing each is a losing game. Disk hit is acceptable; reliability
     // wins.
+    // Install at the workspace root: the unified lockfile covers the app, its
+    // internal packages and mcp/typescript in one pass. Members listed in
+    // pnpm-workspace.yaml but absent from the shipped tree are skipped.
     await execAndPipe(
       bus,
       "prepare:langwatch",
       pnpm.command,
-      [...pnpm.args, "-C", langwatchDir, "install", "--prod=false", "--frozen-lockfile"],
+      [...pnpm.args, "-C", appRoot(), "install", "--prod=false", "--frozen-lockfile"],
     );
     writeFileSync(hashFile, installKey);
   }
@@ -175,6 +180,6 @@ export async function resolvePnpm(paths?: LangwatchPaths): Promise<{ command: st
 export function locateLangwatchDir(): string | null {
   // appRoot() returns the relocated tree (LANGWATCH_HOME/app) once
   // ensureAppDir has run, or the dev workspace fallback otherwise.
-  const dir = join(appRoot(), "langwatch");
+  const dir = join(appRoot(), "platform", "app");
   return existsSync(join(dir, "package.json")) ? dir : null;
 }

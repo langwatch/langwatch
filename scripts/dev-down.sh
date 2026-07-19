@@ -7,7 +7,7 @@
 #   ./scripts/dev-down.sh --clean  # stop and remove volumes
 set -e
 
-COMPOSE="docker compose -f compose.dev.yml"
+COMPOSE="docker compose -f infra/compose.dev.yml --project-directory ."
 
 # ---------------------------------------------------------------------------
 # Restore isolation env vars from .dev-port

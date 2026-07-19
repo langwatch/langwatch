@@ -17,7 +17,7 @@ inspect.
 | Postgres | `wise-mixing-zebra-postgres-1` |
 | ClickHouse | `wise-mixing-zebra-clickhouse-1` |
 | App URL | `http://localhost:5560` |
-| Playwright auth state | `langwatch/e2e/auth.json` (rogerio@langwatch.ai session) |
+| Playwright auth state | `platform/app/e2e/auth.json` (rogerio@langwatch.ai session) |
 | Demo org (Ariana Zone Co) | `organization_0000HrVrdhNtZNrM5ysajP4tyK9Cq` |
 | Personal project | `project_0007LMBuNNJ3P88cRMPkIJnKhJbTF` |
 | Virtual key | `vk_AHkS1MesrtEMTr2HqFDQeA` |
@@ -42,7 +42,7 @@ docker exec wise-mixing-zebra-app-1 pnpm tsx scripts/dogfood/governance/<script>
 
 ### 1. /me portal walkthrough
 
-**Walker:** `langwatch/e2e/full-uiqa-walkthrough.ts` (19 surfaces).
+**Walker:** `platform/app/e2e/full-uiqa-walkthrough.ts` (19 surfaces).
 **Out dir:** `/tmp/uiqa-walkthrough/`.
 
 Gates:
@@ -54,7 +54,7 @@ Gates:
 
 ### 2. Per-template install ritual
 
-**Walker:** `langwatch/e2e/dogfood-claude-code-install.ts` (claude_code).
+**Walker:** `platform/app/e2e/dogfood-claude-code-install.ts` (claude_code).
 **Out dir:** `/tmp/dogfood-claude-code/`.
 
 For cursor + claude_cowork: copy + adjust `data-tile-slug` selector. Sibling
@@ -181,7 +181,7 @@ they're docs assets under `docs/images/ai-governance/`.
 | Symptom | Cause | Fix |
 |---|---|---|
 | Walker times out on "By tool" selector | Dev stack 502 or auth expired | Restart `wise-mixing-zebra-app-1`, re-seed auth.json |
-| `Cannot find module '.prisma/client'` | Generated types missing in worktree | `cd langwatch && pnpm start:prepare:files` |
+| `Cannot find module '.prisma/client'` | Generated types missing in worktree | `cd platform/app && pnpm start:prepare:files` |
 | Install drawer returns 409 CONFLICT | Tile already has binding | Drawer should auto-route to Rotate path; if not, check `hasExistingBinding` prop wiring |
 | TotalCost = NULL on trace | Legacy model alias not in llmModels.json | Bump payload to current-gen alias |
 | `pnpm tsx scripts/...` silently no-ops | Host `.env` DATABASE_URL points at AWS RDS | Run inside `docker exec wise-mixing-zebra-app-1` |

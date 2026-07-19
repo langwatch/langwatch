@@ -3,7 +3,7 @@
 # connect.sh — wire local dev into the local observability stack.
 #
 # Idempotent. Run after `make observability` is up. It:
-#   1. points langwatch/.env at the local collector (traces + logs + metrics),
+#   1. points platform/app/.env at the local collector (traces + logs + metrics),
 #      backing up the current .env first;
 #   2. mints a Grafana service-account token for read access;
 #   3. configures the `gcx` CLI (Grafana's official CLI) with that token so an
@@ -14,7 +14,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ENV_FILE="${REPO_ROOT}/langwatch/.env"
+ENV_FILE="${REPO_ROOT}/platform/app/.env"
 GRAFANA_PORT="${LW_OBS_GRAFANA_PORT:-3000}"
 GRAFANA_URL="http://localhost:${GRAFANA_PORT}"
 OTLP_ENDPOINT="http://localhost:${LW_OBS_OTLP_HTTP_PORT:-4318}"
@@ -23,7 +23,7 @@ say() { printf '\033[1;36m▶ %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m! %s\033[0m\n' "$*"; }
 
 # ---------------------------------------------------------------------------
-# 1. Point langwatch/.env at the local collector
+# 1. Point platform/app/.env at the local collector
 # ---------------------------------------------------------------------------
 set_env_var() { # key value file — replace existing (even commented) line, else append
   local key="$1" val="$2" file="$3"
@@ -56,10 +56,10 @@ if [ -f "$ENV_FILE" ]; then
   # (envDetector) and the Go SDK (resource.Default) read OTEL_RESOURCE_ATTRIBUTES.
   worktree_name="$(basename "$(git -C "$REPO_ROOT" rev-parse --show-toplevel 2>/dev/null || echo "$REPO_ROOT")")"
   set_env_var OTEL_RESOURCE_ATTRIBUTES "langwatch.worktree=${worktree_name}" "$ENV_FILE"
-  say "Pointed langwatch/.env at ${OTLP_ENDPOINT} (TS traces+logs+metrics, Go dual-export)."
+  say "Pointed platform/app/.env at ${OTLP_ENDPOINT} (TS traces+logs+metrics, Go dual-export)."
   say "Tagged telemetry with langwatch.worktree=${worktree_name}."
 else
-  warn "langwatch/.env not found — skipping .env wiring. Set these yourself:"
+  warn "platform/app/.env not found — skipping .env wiring. Set these yourself:"
   cat <<EOF
   OTEL_EXPORTER_OTLP_ENDPOINT=${OTLP_ENDPOINT}
   PINO_OTEL_ENABLED=true

@@ -9,8 +9,8 @@ Feature: Activity Monitor — cross-platform AI activity ingestion + oversight
   cross-source spend, per-user breakdown, and anomaly alerts.
 
   This spec captures the user-facing contract. Implementation lives
-  under `langwatch/src/server/governance/activity-monitor/` and
-  `langwatch/src/server/routes/ingest/`. UI is gated behind
+  under `platform/app/src/server/governance/activity-monitor/` and
+  `platform/app/src/server/routes/ingest/`. UI is gated behind
   `release_ui_ai_governance_enabled`.
 
   Spec scope: the cross-platform monitoring pillar from gateway.md

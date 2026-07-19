@@ -67,8 +67,8 @@ function resolveVenvSpecs(_ctx: RuntimeContext): VenvSpec[] {
   const specs: VenvSpec[] = [
     {
       name: "langevals",
-      projectDir: join(root, "langevals"),
-      lockFile: join(root, "langevals", "uv.lock"),
+      projectDir: join(root, "services", "langevals"),
+      lockFile: join(root, "services", "langevals", "uv.lock"),
       // langevals's evaluator routes (ROUGE Score, exact match, llm-as-judge,
       // etc.) live in subpackages declared as optional dependencies in
       // langevals/pyproject.toml: langevals-ragas, langevals-openai,

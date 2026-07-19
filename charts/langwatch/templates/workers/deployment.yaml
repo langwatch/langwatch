@@ -115,7 +115,7 @@ spec:
             {{- toYaml (coalesce .Values.workers.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
-          workingDir: /app/langwatch
+          workingDir: /app/platform/app
           command: ['pnpm']
           args: ['run', 'start:workers']
           env:

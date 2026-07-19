@@ -30,7 +30,7 @@ jobs:
         with:
           filters: |
             relevant:
-              - 'langevals/**'
+              - 'services/langevals/**'
               - '.github/workflows/langevals-ci.yml'
 
   lint:
@@ -51,14 +51,14 @@ jobs:
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
-          cache-dependency-glob: "langevals/uv.lock"
+          cache-dependency-glob: "services/langevals/uv.lock"
 
       - name: Install dependencies
-        working-directory: langevals
+        working-directory: services/langevals
         run: uv sync --all-extras --all-groups
 
       - name: Run type checking
-        working-directory: langevals
+        working-directory: services/langevals
         run: uv run python -m py_compile langevals/server.py
 
   test:
@@ -79,10 +79,10 @@ jobs:
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
-          cache-dependency-glob: "langevals/uv.lock"
+          cache-dependency-glob: "services/langevals/uv.lock"
 
       - name: Install dependencies
-        working-directory: langevals
+        working-directory: services/langevals
         run: uv sync --all-extras --all-groups
 
       - name: Run tests
@@ -94,7 +94,7 @@ jobs:
            || github.event.pull_request.head.repo.full_name == github.repository)
           && (github.actor != 'dependabot[bot]'
            || github.event_name == 'pull_request_target')
-        working-directory: langevals
+        working-directory: services/langevals
         env:
           OPENAI_API_KEY: ${{ secrets.LANGEVALS_OPENAI_API_KEY }}
           AZURE_API_KEY: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_API_KEY }}
@@ -134,7 +134,7 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          file: Dockerfile.langevals
+          file: infra/docker/Dockerfile.langevals
           push: false
           tags: langwatch/langevals:test
           cache-from: type=gha

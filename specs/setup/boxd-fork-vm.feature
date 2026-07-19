@@ -3,7 +3,7 @@ Feature: boxd Makefile orchestrates per-PR / per-branch / per-issue VM forks
   I want a single command surface for spinning up testable VMs from PRs, branches, or issues
   So that secrets transit, ports map, and Claude is wired in without manual steps
 
-  # Behavior is in `boxd.mk` and `scripts/boxd-fork.sh`. Tests are bats files
+  # Behavior is in `dev/boxd.mk` and `scripts/boxd-fork.sh`. Tests are bats files
   # at `scripts/__tests__/boxd-fork.unit.bats` (slug, naming, env discovery,
   # hostname rewrite) and `scripts/__tests__/boxd-fork.integration.bats`
   # (mocked boxd / gh / git, asserts the fork → cp → proxy → tmux call

@@ -1,0 +1,73 @@
+# syntax=docker/dockerfile:1.7
+#
+# Self-hosted langwatch_nlp image. nlpgo is the sole NLP engine: a single
+# static Go binary. The only Python is a minimal stdlib interpreter plus a
+# small curated set of libraries used to sandbox user code blocks (see
+# services/nlpgo/app/engine/blocks/codeblock/). No uvicorn, no langwatch_nlp
+# Python package, no litellm, no dspy.
+
+# ─── Go build ─────────────────────────────────────────────────────────────────
+# Pin the build stage to the host arch (BUILDPLATFORM) and cross-compile to
+# TARGETARCH natively, avoiding QEMU. Mirrors Dockerfile.go_service.
+FROM --platform=$BUILDPLATFORM golang:1.26.4-alpine AS go-build
+WORKDIR /src
+RUN apk add --no-cache git ca-certificates
+ARG TARGETOS
+ARG TARGETARCH
+# Monorepo: sdks/go is in-tree, resolved via `replace ... => ./sdks/go` in the
+# root go.mod, so its go.mod must be present before `go mod download`.
+COPY go.mod go.sum ./
+COPY sdks/go/go.mod sdks/go/go.sum ./sdks/go/
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
+    go mod download
+COPY cmd/ cmd/
+COPY pkg/ pkg/
+COPY services/ services/
+COPY sdks/go/ sdks/go/
+ARG VERSION=dev
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
+    --mount=type=cache,target=/root/.cache/go-build,id=go-build-${TARGETARCH} \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+      -ldflags="-s -w -X main.Version=${VERSION}" -trimpath \
+      -o /out/service ./cmd/service
+
+# ─── Code-block sandbox libraries ──────────────────────────────────────────────
+# The curated set of packages available inside a Studio code block (see
+# sandbox-requirements.txt). The Python version (3.11) MUST match the
+# distroless/python3-debian12 runtime ABI so the compiled wheels (pydantic_core)
+# load. After install we prune the safe-to-drop bulk: bytecode caches, test
+# suites, and babel's full CLDR locale data (python-liquid pulls babel, but the
+# sandbox only needs en + root). We KEEP each *.dist-info: opentelemetry (a
+# langwatch dep) resolves its runtime context via importlib.metadata entry
+# points there, so pruning dist-info breaks `import langwatch` (StopIteration).
+#
+# This prune block is shared verbatim with the production Lambda image so both
+# artifacts install byte-identically from the one requirements file.
+FROM python:3.11-slim-bookworm AS sandbox-build
+COPY services/nlpgo/app/engine/blocks/codeblock/sandbox-requirements.txt /tmp/sandbox-requirements.txt
+RUN pip install --no-cache-dir --target=/pylibs -r /tmp/sandbox-requirements.txt
+RUN set -eux; \
+    find /pylibs -name "__pycache__" -type d -prune -exec rm -rf {} +; \
+    find /pylibs -type d -name "tests" -prune -exec rm -rf {} +; \
+    find /pylibs/babel/locale-data -type f ! -name 'en*.dat' ! -name 'root.dat' -delete 2>/dev/null || true; \
+    du -sh /pylibs
+
+# ─── Runtime ───────────────────────────────────────────────────────────────────
+# distroless/python3 (Python 3.11) provides a stdlib python3 for the code-block
+# sandbox with no shell and no package manager. The static Go binary is the only
+# long-lived process; python3 is spawned per code-block node and exits.
+FROM gcr.io/distroless/python3-debian12:nonroot AS runtime
+COPY --from=go-build /out/service /usr/local/bin/service
+COPY --from=sandbox-build /pylibs /opt/sandbox-libs
+
+# nlpgo binds this port; compose + the helm chart dial http://langwatch_nlp:5561.
+ENV SERVER_ADDR=:5561
+# Code-block sandbox: the interpreter and its curated libraries. PYTHONPATH is
+# only consulted when the executor spawns python3 for a code-block node.
+ENV SANDBOX_PYTHON=/usr/bin/python3.11
+ENV PYTHONPATH=/opt/sandbox-libs
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV RUNNING_IN_DOCKER=true
+
+EXPOSE 5561
+ENTRYPOINT ["/usr/local/bin/service", "nlpgo"]

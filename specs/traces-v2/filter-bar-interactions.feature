@@ -1,13 +1,13 @@
 # Filter bar interactions — caret placement + clear-all
 #
 # Implementation:
-#   langwatch/src/features/traces-v2/components/SearchBar/TokenValuePicker.tsx
-#   langwatch/src/features/traces-v2/components/SearchBar/SearchBar.tsx
-#   langwatch/src/features/traces-v2/components/SearchBar/SearchBarIndicators.tsx
-#   langwatch/src/features/traces-v2/components/FilterSidebar/FilterSidebar.tsx
-#   langwatch/src/features/traces-v2/components/FilterSidebar/FacetSection.tsx (row-order freeze)
-#   langwatch/src/features/traces-v2/stores/filterStore.ts   (clearAll)
-#   langwatch/src/features/traces-v2/stores/viewStore.ts     (revertLens, isDraft — reset to lens)
+#   platform/app/src/features/traces-v2/components/SearchBar/TokenValuePicker.tsx
+#   platform/app/src/features/traces-v2/components/SearchBar/SearchBar.tsx
+#   platform/app/src/features/traces-v2/components/SearchBar/SearchBarIndicators.tsx
+#   platform/app/src/features/traces-v2/components/FilterSidebar/FilterSidebar.tsx
+#   platform/app/src/features/traces-v2/components/FilterSidebar/FacetSection.tsx (row-order freeze)
+#   platform/app/src/features/traces-v2/stores/filterStore.ts   (clearAll)
+#   platform/app/src/features/traces-v2/stores/viewStore.ts     (revertLens, isDraft — reset to lens)
 #
 # Related specs:
 #   specs/traces-v2/data-layer.feature   — owns the clearAll mechanism (AST + dependent state reset)

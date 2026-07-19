@@ -10,8 +10,8 @@ Feature: SDK Prompt Tag Support
   #     a tags list — the OpenAPI-generated client sends them
   #     through, but the assertion lives behind the existing client
   #     factory tests; cheap follow-up adds a focused assertion.
-  #   * E2E flows under `typescript-sdk/e2e/prompts/prompt-tags.
-  #     e2e.test.ts` — that test file IS in `typescript-sdk/src` /
+  #   * E2E flows under `sdks/typescript/e2e/prompts/prompt-tags.
+  #     e2e.test.ts` — that test file IS in `sdks/typescript/src` /
   #     test scan reach via DEFAULT_TEST_ROOTS, but the suite is
   #     `it.skipIf(!process.env.LANGWATCH_TEST_API_KEY)` and not
   #     classified by the audit manifest as bindable. Cheap follow-

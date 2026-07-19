@@ -35,7 +35,7 @@ Feature: CI smoke + publish for `@langwatch/server`
       | schedule                  | "0 4 * * *" (nightly, UTC)                                             |
       | push paths                | package.json, pnpm-workspace.yaml, packages/server/**                   |
       | push paths                | langwatch_nlp/pyproject.toml, langevals/**/pyproject.toml               |
-      | push paths                | services/aigateway/**, langwatch/package.json, langwatch/scripts/**     |
+      | push paths                | services/aigateway/**, platform/app/package.json, platform/app/scripts/**     |
 
   # =========================================================================
   # Publish job
@@ -48,7 +48,7 @@ Feature: CI smoke + publish for `@langwatch/server`
     And it publishes "@langwatch/server@3.1.1" to npm
 
   Scenario: Version-lock guard refuses mismatched tag and package version
-    Given "langwatch/package.json" version is "3.1.1"
+    Given "platform/app/package.json" version is "3.1.1"
     But the release tag is "v3.2.0"
     When the publish job runs
     Then the job fails fast with "version mismatch: tag=v3.2.0 package.json=3.1.1"
@@ -62,8 +62,8 @@ Feature: CI smoke + publish for `@langwatch/server`
     Given a clean checkout
     When the publish job runs
     Then "pnpm --filter langwatch build" runs before npm pack
-    And the resulting tarball contains "langwatch/.next/standalone/server.js"
-    And the tarball does NOT contain "langwatch/.next/cache" or "node_modules/.cache"
+    And the resulting tarball contains "platform/app/.next/standalone/server.js"
+    And the tarball does NOT contain "platform/app/.next/cache" or "node_modules/.cache"
 
   Scenario: Tarball contains expected directories only
     When the publish job builds the tarball
@@ -71,18 +71,18 @@ Feature: CI smoke + publish for `@langwatch/server`
       | path                                  |
       | bin/langwatch-server.mjs              |
       | dist/                                 |
-      | langwatch/.next/standalone/           |
-      | langwatch/public/                     |
-      | langwatch/prisma/                     |
+      | platform/app/.next/standalone/           |
+      | platform/app/public/                     |
+      | platform/app/prisma/                     |
       | langwatch_nlp/                        |
       | langevals/                            |
       | scripts/clickhouse-migrations/        |
     And the tarball does NOT contain:
       | path                       |
-      | langwatch/node_modules     |
+      | platform/app/node_modules     |
       | langwatch_nlp/.venv        |
       | langevals/**/.venv         |
-      | langwatch/.next/cache      |
+      | platform/app/.next/cache      |
       | **/.env                    |
       | **/__pycache__             |
 

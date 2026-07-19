@@ -67,7 +67,7 @@ regardless. Override the image or ports with `HAVEN_OBS_IMAGE`,
 | Logs    | Loki       | `PINO_OTEL_ENABLED=true`                | zap teed to OTLP via `OTEL_DEBUG_COLLECTOR_ENDPOINT` |
 | Metrics | Prometheus | `OTEL_METRICS_ENABLED=true` (host/runtime) | Go runtime metrics via `OTEL_DEBUG_COLLECTOR_ENDPOINT` |
 
-`make observability-connect` sets all of these in `langwatch/.env` for you
+`make observability-connect` sets all of these in `platform/app/.env` for you
 (backing it up first). The Go services **dual-export**: their product/customer
 traces still go to the LangWatch app (dogfooding); their *own* operational
 telemetry additionally goes to the collector. Setting
@@ -108,7 +108,7 @@ fallbacks).
 
 ## The stack
 
-The `otel-lgtm` service lives in `compose.dev.yml` under the optional
+The `otel-lgtm` service lives in `infra/compose.dev.yml` under the optional
 `observability` profile — one `grafana/otel-lgtm` container that bundles the
 OpenTelemetry Collector (OTLP on `:4317` gRPC / `:4318` HTTP, fanning traces →
 Tempo, logs → Loki, metrics → Prometheus) and a pre-provisioned Grafana on
@@ -130,7 +130,7 @@ LW_OBS_GRAFANA_PORT=3100 LW_OBS_OTLP_HTTP_PORT=4319 make observability
 
 ## Reading the data as an agent
 
-**When the stack is up, query this instead of grepping `langwatch/server.log`.**
+**When the stack is up, query this instead of grepping `platform/app/server.log`.**
 Indexed attribute search (by service, level, trace id, worktree) finds the
 failure far faster than scanning a multi-megabyte log file — and with the stack
 up the console is muted to `warn+` (haven sets `LOG_CONSOLE_LEVEL`), so the
@@ -181,5 +181,5 @@ Two ways, both wired by `make observability-connect`:
 make observability-down       # stop the stack (discards telemetry)
 ```
 
-Restore your previous `langwatch/.env` from the `.env.bak.<timestamp>` that
+Restore your previous `platform/app/.env` from the `.env.bak.<timestamp>` that
 `observability-connect` wrote, or just clear the OTLP vars.

@@ -28,7 +28,7 @@
 | Component | Repo | Path |
 |---|---|---|
 | Go NLP service (sole engine) | `langwatch` | `services/nlpgo/` (a subcommand of `cmd/service/main.go`) |
-| Self-hosted NLP image | `langwatch` | `Dockerfile.langwatch_nlp` (Go binary + slim stdlib `python3`) |
+| Self-hosted NLP image | `langwatch` | `infra/docker/Dockerfile.langwatch_nlp` (Go binary + slim stdlib `python3`) |
 | Helm | `langwatch` | `charts/langwatch/templates/langwatch_nlp/` (single Go container) |
 | BDD specs | `langwatch` | `specs/nlp-go/` |
 | Production Lambda artifact | `langwatch-saas` | `infrastructure/langwatch_nlp_lambda.tf` + saas runtime packaging |
@@ -309,7 +309,7 @@ On the LLM gateway-call span specifically:
 
 - Unit tests for translators, parsers, DAG resolver — `tests/unit/`.
 - Integration tests for engine + each block — `tests/integration/`. **Real HTTP server**, real fixtures from `langwatch_nlp/tests/`. No mocks for cross-component flow.
-- Provider matrix tests (Ash) — `tests/matrix/` with `//go:build live_<provider>` tags, real keys from `langwatch/.env`.
+- Provider matrix tests (Ash) — `tests/matrix/` with `//go:build live_<provider>` tags, real keys from `platform/app/.env`.
 - Each spec scenario in `specs/nlp-go/*.feature` MUST have at least one corresponding test. We do not ship without specs and tests aligned.
 
 ---

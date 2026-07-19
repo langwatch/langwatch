@@ -63,12 +63,12 @@ Here's how to propose a change:
 If your changes affect the UI, please ensure e2e tests pass:
 
 ```bash
-cd agentic-e2e-tests
+cd tests/agentic-e2e
 docker compose up -d --wait
 pnpm install && pnpm test
 ```
 
-See `agentic-e2e-tests/README.md` for details on writing new tests.
+See `tests/agentic-e2e/README.md` for details on writing new tests.
 
 ## Commit Messages and PR Titles
 

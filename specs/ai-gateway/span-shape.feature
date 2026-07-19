@@ -21,7 +21,7 @@ Feature: Gateway span shape — mandatory attributes per completed request
   # ─────────────────────────────────────────────────────────────────────────
   # Per rchaves iter 107: "EVERYTHING should follow the gen_ai specs."
   # The LangWatch trace pipeline already canonicalises these attributes
-  # from SDK-instrumented clients (see langwatch/src/server/tracer/
+  # from SDK-instrumented clients (see platform/app/src/server/tracer/
   # otel.traces.ts). Gateway spans MUST carry the same set so UI,
   # evaluators, and analytics treat gateway traffic identically to
   # SDK-instrumented traffic.
