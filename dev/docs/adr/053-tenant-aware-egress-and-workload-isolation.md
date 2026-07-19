@@ -28,49 +28,43 @@ cross address classes, and a future call site can omit the validator. More
 importantly, a shared process or pod can hold credentials and state for several
 tenants, so a single escape or SSRF bypass inherits the whole pod's authority.
 
-### Production observation on 2026-07-19
+### Structural gaps in the current architecture
 
-Read-only inspection of the production EKS cluster found material drift from
-the infrastructure repository:
+Independent of any particular deployment, the present architecture concentrates
+risk in ways that URL validation alone cannot address:
 
-- The AI gateway runs as three ordinary runc pods on the primary node group.
-  BLOCK_LOCAL_HTTP_CALLS and REQUIRE_HTTPS_CUSTOM_ENDPOINTS are absent from the
-  live deployment, so the service's permissive defaults apply.
-- No NetworkPolicy selects the live gateway, worker, or NLP pods. The VPC CNI
-  network-policy agent is enabled, but only the Langy policy is present in the
-  default namespace.
-- The live gateway receives the shared Redis credential and mounts the default
-  service-account token even though neither authority is needed for provider
-  dispatch.
-- The main infrastructure branch contains gateway environment hardening and a
-  NetworkPolicy, but that configuration is not deployed. It must not be applied
-  blindly: its Bedrock rule targets the protected subnets while the endpoints
-  are in the PrivateLink subnets, and its Redis rule preserves an unnecessary
-  gateway-to-core dependency.
-- The NLP pod is an ordinary shared container with unrestricted egress. It
-  executes tenant Python code as same-UID subprocesses and passes decrypted
-  project secrets in the request. Processes share the container PID, mount,
-  temporary-file, and network namespaces.
-- Langy runs one manager and up to twenty untrusted workers in a single gVisor
-  pod on a dedicated, tainted node. Per-worker Unix users and passwords improve
-  separation inside that pod, but all workers share one gVisor sandbox and one
-  network namespace. The production egress policy allows globally routable
-  TCP/443, and LANGY_EGRESS_ENFORCE_FLOOR is false.
+- Several egress paths (gateway provider calls, NLP HTTP, code-block execution)
+  rest on application-layer validation with no enforced network boundary behind
+  them, so a validation regression or a new call site that forgets the validator
+  has no second line of defence.
+- Broad platform authority and tenant-controlled work can occupy the same
+  workload and network domain, so a single SSRF or sandbox escape inherits far
+  more credentials and reachability than the task itself requires.
+- NLP executes tenant Python as in-container subprocesses sharing the pod's
+  process, mount, and network namespaces, rather than a per-invocation sandbox.
+- Langy runs multiple untrusted workers inside one gVisor sandbox and one
+  network namespace. Per-worker Unix accounts are useful defence in depth, but
+  they are a sibling-process boundary, not a tenant boundary.
 
-### Application observations
+These are properties of the design to engineer away. Deployment-specific
+configuration review and remediation tracking live in the private
+infrastructure repository, not here.
+
+### Application-layer motivation
 
 The automation webhook sender already forces private-address blocking, refuses
 redirects, pins the validated DNS answer for the connection, caps response
 size, applies timeouts, sanitizes headers, and rate-limits per project. Its
-principal remaining risk is execution inside the general worker pod, which
-also holds database, Redis, object-store, provider, and platform credentials.
+principal remaining risk is that it runs inside a general worker carrying broad
+platform authority, so the fence is application-layer only.
 
-The Go customer-endpoint validator rejects non-public DNS answers when its
-policy is enabled, but validation returns only an error. The provider client
-subsequently resolves the hostname again. A DNS-rebinding attacker can
-therefore present a public address during validation and a private address
-during connection. The same provider adapter is embedded by the NLP service,
-so protecting only the public gateway deployment does not close this path.
+Before this change the Go customer-endpoint validator rejected non-public DNS
+answers but returned only an error, and the provider client then resolved the
+hostname a second time at dial. That validate-then-dial gap let a DNS-rebinding
+answer present a public address during validation and a private one during
+connection. The same provider adapter is embedded by the NLP service, so
+hardening one caller in isolation would not have closed the path. Pinning the
+dial to the validated address across both callers removes it.
 
 Managed private provider endpoints are represented partly as tenant-supplied
 URLs. A hostname suffix establishes neither tenant ownership nor authorization
@@ -103,7 +97,7 @@ The plan has an immediate containment phase followed by four migration tracks.
 
 ## Target topology
 
-### Current production shape
+### Current shape
 
 The important problem is not only that several services can open sockets. It is
 that tenant-controlled work and broad platform authority occupy the same
@@ -119,7 +113,7 @@ workloads and network domain.
     |       | DB, Redis, S3, provider/platform secrets              |
     |                                                               |
     |  [AI gateway] ------- direct provider ---> Internet / VPC     |
-    |       | shared Redis credential, default service-account token |
+    |       | broader platform authority than provider dispatch needs |
     |                                                               |
     |  [NLP pod] ---------- direct provider ---> Internet / VPC     |
     |       +-- tenant Python subprocess A                          |
@@ -130,9 +124,9 @@ workloads and network domain.
     +---------------------------------------------------------------+
 
 The application webhook sender has a strong URL-level fence. The gateway and
-NLP paths do not currently have an equivalent enforced network boundary in
-production. The Langy worker identity is better than a shared Unix account, but
-it is still a sibling process boundary inside one sandbox.
+NLP paths rely on application-layer validation without an equivalent enforced
+network boundary. The Langy worker identity is better than a shared Unix
+account, but it is still a sibling process boundary inside one sandbox.
 
 ### Target SaaS shape
 
@@ -197,7 +191,7 @@ group during the transition. The final socket-owning egress service is placed
 in the separate egress VPC or equivalent network domain with no route or
 peering to the core VPC. A subnet name alone is not a security boundary.
 
-### Phase 0: contain the live SSRF path
+### Phase 0: containment
 
 This is an emergency production change, delivered and verified independently
 of the larger migration:
@@ -382,8 +376,8 @@ service-account automounting, and RuntimeClass is a release gate.
 
 ### Workstream 0: emergency containment and evidence preservation
 
-**Goal:** close the currently live gateway SSRF path without waiting for the
-new egress service.
+**Goal:** close the validate-then-dial gap on the gateway path and put a network
+boundary behind it, without waiting for the new egress service.
 
 **Infrastructure changes**
 
