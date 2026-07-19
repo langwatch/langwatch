@@ -73,6 +73,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import { classify as classifyEgressAddress } from "@langwatch/ssrf";
 import dns from "dns/promises";
 import { isIP } from "net";
 import {
@@ -210,54 +211,19 @@ export function isBlockedCloudDomain(hostname: string): boolean {
 // IP Address Validation
 // ============================================================================
 
-function isPrivateIPv4(ip: string): boolean {
-  if (ip.startsWith("127.")) return true;
-  if (ip === "0.0.0.0") return true;
-  if (ip.startsWith("10.")) return true;
-  if (ip.startsWith("192.168.")) return true;
-
-  const match172 = ip.match(/^172\.(\d+)\./);
-  if (match172?.[1]) {
-    const second = parseInt(match172[1], 10);
-    if (second >= 16 && second <= 31) return true;
-  }
-
-  if (ip.startsWith("169.254.")) return true;
-
-  return false;
-}
-
+/**
+ * Whether an IP literal is non-globally-routable ("private or localhost" in the
+ * caller's sense). Delegates to the shared @langwatch/ssrf classifier so this
+ * app, the Go AI gateway, the Go Langy egress proxy and the NLP service all
+ * agree on exactly which addresses are unsafe to reach — the same rule set,
+ * expressed once, tested by one shared corpus. This now also covers the CGNAT,
+ * benchmarking, documentation, NAT64, 6to4 and reserved ranges the previous
+ * hand-rolled string checks silently missed. A cloud-metadata address is
+ * likewise non-global, so it is reported here too (it is additionally refused
+ * unconditionally by the metadata-host check, regardless of BLOCK_LOCAL).
+ */
 export function isPrivateOrLocalhostIP(ip: string): boolean {
-  const normalized = ip.toLowerCase();
-
-  if (normalized === "::1") return true;
-  if (normalized === "::") return true;
-  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
-  const firstHextet = normalized.match(/^([0-9a-f]{1,4}):/)?.[1];
-  if (firstHextet) {
-    const first = parseInt(firstHextet, 16);
-    // fe80::/10 spans first hextets fe80 through febf, not only fe80::/16.
-    if ((first & 0xffc0) === 0xfe80) return true;
-  }
-
-  const ipv4MappedMatch = normalized.match(/^::ffff:(.+)$/);
-  if (ipv4MappedMatch?.[1]) {
-    const mapped = ipv4MappedMatch[1];
-
-    if (mapped.includes(".")) {
-      return isPrivateIPv4(mapped);
-    }
-
-    const hexMatch = mapped.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
-    if (hexMatch?.[1] && hexMatch[2]) {
-      const high = parseInt(hexMatch[1], 16);
-      const low = parseInt(hexMatch[2], 16);
-      const reconstructed = `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`;
-      return isPrivateIPv4(reconstructed);
-    }
-  }
-
-  return isPrivateIPv4(ip);
+  return classifyEgressAddress(ip) !== "global";
 }
 
 // ============================================================================

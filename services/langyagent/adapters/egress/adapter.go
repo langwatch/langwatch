@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/pkg/ssrf"
 )
 
 // egressAdapter is the per-worker outbound forward proxy (ADR-043). It is the
@@ -257,26 +259,16 @@ func (a *egressAdapter) checkedDialAddress(ctx context.Context, host, port strin
 	}
 	for _, ip := range addresses {
 		addr, ok := netip.AddrFromSlice(ip)
-		if ok && isPublicEgressAddress(addr.Unmap()) {
+		// pkg/ssrf.IsPublicAddress is the canonical, cross-service rule set
+		// (Unmap()s IPv4-mapped IPv6 and rejects metadata, private, CGNAT,
+		// benchmarking, documentation, NAT64, 6to4 and reserved ranges). Pinning
+		// the dial to the first resolved public address closes the DNS-rebinding
+		// window between policy decision and connect.
+		if ok && ssrf.IsPublicAddress(addr) {
 			return net.JoinHostPort(addr.Unmap().String(), port), nil
 		}
 	}
 	return "", fmt.Errorf("host has no public address")
-}
-
-func isPublicEgressAddress(addr netip.Addr) bool {
-	if !addr.IsValid() || addr.IsUnspecified() || addr.IsLoopback() || addr.IsPrivate() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() || addr.IsMulticast() {
-		return false
-	}
-	if addr == netip.MustParseAddr("168.63.129.16") || addr == netip.MustParseAddr("169.254.169.254") || addr == netip.MustParseAddr("fd00:ec2::254") {
-		return false
-	}
-	for _, prefix := range []netip.Prefix{netip.MustParsePrefix("0.0.0.0/8"), netip.MustParsePrefix("100.64.0.0/10"), netip.MustParsePrefix("192.0.0.0/24"), netip.MustParsePrefix("192.0.2.0/24"), netip.MustParsePrefix("198.18.0.0/15"), netip.MustParsePrefix("198.51.100.0/24"), netip.MustParsePrefix("203.0.113.0/24"), netip.MustParsePrefix("240.0.0.0/4"), netip.MustParsePrefix("100::/64"), netip.MustParsePrefix("2001:db8::/32")} {
-		if prefix.Contains(addr) {
-			return false
-		}
-	}
-	return true
 }
 
 // tunnel splices client<->upstream opaquely. The client→upstream direction

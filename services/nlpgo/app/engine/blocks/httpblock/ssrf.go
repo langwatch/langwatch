@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/pkg/ssrf"
 )
 
 // SSRFOptions tunes the destination policy for the HTTP block.
@@ -154,8 +157,21 @@ func hostPolicy(host string, opts SSRFOptions) (allow, deny bool) {
 	return false, false
 }
 
-// ipBlocked is the unified IP-level deny check.
-func ipBlocked(ip net.IP) bool { return isPrivate(ip) || metadataIP(ip) }
+// ipBlocked is the unified IP-level deny check. It defers to the shared
+// pkg/ssrf rule set so the HTTP block, the Langy egress proxy, the AI gateway
+// and the TypeScript app all refuse exactly the same addresses: cloud metadata
+// (including Azure WireServer 168.63.129.16, which the old check missed),
+// private, loopback, link-local, CGNAT, benchmarking, documentation, NAT64,
+// 6to4 and reserved ranges. Anything not globally routable is refused; a
+// self-hosted operator reaches internal hosts through the AllowedHosts escape
+// hatch, which bypasses this check entirely (see hostPolicy).
+func ipBlocked(ip net.IP) bool {
+	addr, ok := netip.AddrFromSlice(ip)
+	if !ok {
+		return true // fail closed on an address we cannot classify
+	}
+	return !ssrf.IsPublicAddress(addr)
+}
 
 func resolveHost(host string, opts SSRFOptions) ([]net.IP, error) {
 	r := opts.Resolver
@@ -163,18 +179,4 @@ func resolveHost(host string, opts SSRFOptions) ([]net.IP, error) {
 		r = net.LookupIP
 	}
 	return r(host)
-}
-
-// isPrivate covers loopback, link-local, private, and unspecified IPs.
-func isPrivate(ip net.IP) bool {
-	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
-		ip.IsPrivate() || ip.IsUnspecified() {
-		return true
-	}
-	return false
-}
-
-// metadataIP catches IPv4 169.254.169.254 even after DNS resolution.
-func metadataIP(ip net.IP) bool {
-	return ip.String() == "169.254.169.254"
 }
