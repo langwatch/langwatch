@@ -133,14 +133,19 @@ export class ProcessRuntime {
             }
             const evolution = config.onWake(previousState, {
               at: input.scheduledFor,
+              now: input.now,
               key: ref.processKey,
               projectId: ref.projectId,
               intents: factories,
             });
             return {
               state: evolution.state,
+              // Rearm from the present, not from the slot we missed. A wake
+              // that fires days late must schedule the NEXT slot from now, or
+              // every skipped interval is replayed back-to-back on recovery.
               nextWakeAt: config.schedule
-                ? input.scheduledFor + config.schedule.everyMs
+                ? Math.max(input.scheduledFor, input.now) +
+                  config.schedule.everyMs
                 : (evolution.nextWakeAt ?? null),
               intents: evolution.intents ?? [],
             };

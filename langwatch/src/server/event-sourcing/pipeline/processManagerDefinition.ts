@@ -82,12 +82,25 @@ export type EventHandler<
   context: ProcessHandlerContext<Intents>,
 ) => ProcessEvolution<State>;
 
+/**
+ * Wake handlers additionally see wall-clock, because `at` is the slot the
+ * wake was *scheduled* for, which may be far in the past when the fleet has
+ * been down. A handler that reschedules from `at` alone replays every missed
+ * slot one commit at a time on recovery; clamping with `Math.max(at, now)`
+ * collapses the whole gap into a single catch-up.
+ */
+export interface ProcessWakeContext<
+  Intents extends Record<string, IntentSpec<any>>,
+> extends ProcessHandlerContext<Intents> {
+  now: number;
+}
+
 export type WakeHandler<
   State,
   Intents extends Record<string, IntentSpec<any>>,
 > = (
   state: State,
-  context: ProcessHandlerContext<Intents>,
+  context: ProcessWakeContext<Intents>,
 ) => ProcessEvolution<State>;
 
 export interface ProcessManagerConfig<
