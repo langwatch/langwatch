@@ -32,7 +32,7 @@ interface Vectors {
 // `langwatch/`, so the repo-root `specs/` dir is one level up.
 const VECTORS: Vectors = JSON.parse(
   readFileSync(
-    resolve(process.cwd(), "..", "specs", "langy", "langy-frame-auth.vectors.json"),
+    resolve(process.cwd(), "..", "..", "specs", "langy", "langy-frame-auth.vectors.json"),
     "utf8",
   ),
 ) as Vectors;

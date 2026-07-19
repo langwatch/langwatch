@@ -23,7 +23,7 @@ import {
 
 const CLI_PROGRAM_PATH = fileURLToPath(
   new URL(
-    "../../../../../typescript-sdk/src/cli/program.ts",
+    "../../../../../../sdks/typescript/src/cli/program.ts",
     import.meta.url,
   ),
 );

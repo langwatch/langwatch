@@ -8,7 +8,7 @@ import {
 import GENERATED from "../langySkills.generated.json";
 import { LANGY_SKILLS, findSkill } from "../langySkills";
 
-const REPO_ROOT = path.resolve(__dirname, "../../../../..");
+const REPO_ROOT = path.resolve(__dirname, "../../../../../..");
 
 /**
  * The catalogue must match the IMAGE, not our memory of it.
@@ -32,7 +32,7 @@ describe("given the Langy skill catalogue", () => {
 
     it("reads its source directories out of the Dockerfile, not a hardcoded list", () => {
       const dockerfile = fs.readFileSync(
-        path.join(REPO_ROOT, "Dockerfile.langyagent"),
+        path.join(REPO_ROOT, "infra/docker/Dockerfile.langyagent"),
         "utf8",
       );
 

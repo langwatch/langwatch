@@ -19,7 +19,7 @@ CLUSTER_NAME="${CLUSTER_NAME:-ch-test}"
 RELEASE="ch"
 NAMESPACE="ch-test"
 CHART_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-DOCKER_DIR="$(cd "$(dirname "$0")/../../../clickhouse-serverless" && pwd)"
+DOCKER_DIR="$(cd "$(dirname "$0")/../../../infra/clickhouse-serverless" && pwd)"
 TIMEOUT="${TIMEOUT:-480}"
 IMAGE="${IMAGE:-langwatch/clickhouse-serverless:next}"
 
