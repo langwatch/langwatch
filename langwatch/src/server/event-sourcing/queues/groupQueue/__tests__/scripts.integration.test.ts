@@ -3123,7 +3123,7 @@ describe("GroupStagingScripts", () => {
     });
 
     describe("when the same stagedJobId is staged twice (at-least-once redelivery)", () => {
-      /** @scenario Counter equals sum of all :jobs ZSET cardinalities */
+      /** @scenario Counter is conserved when the same staged-job id is re-sent */
       it("counts the job once in total-pending", async () => {
         await scripts.stage(
           makeJob({ stagedJobId: "j-dup", groupId: "g-dup", dispatchAfterMs: 100 }),
