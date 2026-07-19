@@ -108,11 +108,17 @@ func run(args []string) (code int) {
 		return 1
 	}
 
+	// clog.New stamps service/version/environment from the context's ServiceInfo,
+	// so the canonical name has to be on the context *before* the logger is built.
+	// The bootstrap logger above carries only the pre-dispatch failures (bad usage,
+	// unknown service), where there is no service name to stamp yet.
 	ctx = contexts.SetServiceInfo(ctx, contexts.ServiceInfo{
 		Service:     serviceTelemetryName(cmd),
 		Version:     Version,
 		Environment: os.Getenv("ENVIRONMENT"),
 	})
+	logger = clog.New(ctx, clog.Config{Level: "info"})
+	ctx = clog.Set(ctx, logger)
 
 	if err := fn(ctx, args); err != nil {
 		logger.Error("service exited with error", zap.String("service", cmd), zap.Error(err))
