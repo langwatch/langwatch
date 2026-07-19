@@ -17,7 +17,7 @@ import {
 } from "../../../__tests__/integration/testContainers";
 import { BlobLeases } from "../blobLeases";
 import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle";
-import { readEnvelopeLease } from "../jobEnvelope";
+import { readEnvelopeLease, splitEnvelope } from "../jobEnvelope";
 import { InMemoryObjectStore, incompressible } from "./blobTestDoubles";
 
 const hasTestcontainers = !!(
@@ -146,6 +146,42 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
 
         await expect(
           lifecycle.decode({ value, groupId: "proj2/agg" }),
+        ).rejects.toThrow(/tenant mismatch/i);
+      });
+    });
+
+    // The guard used to key off the LEASE, which additionally requires
+    // `header.h`. Stripping `h` therefore produced an envelope that still
+    // carried a fetchable cross-tenant `ref` but yielded no lease — so the
+    // check was skipped entirely and decodeJobEnvelope, which has no tenant
+    // check of its own, read the other tenant's blob.
+    describe("when it carries no lease holder id", () => {
+      /** @scenario "A tampered ref cannot read another tenant's blob" */
+      it("still refuses the cross-tenant read", async () => {
+        const value = await lifecycle.encode({
+          jobData: REDIS_TIER_PAYLOAD,
+          groupId: TENANT_GROUP,
+        });
+        const { header, body } = splitEnvelope(value);
+        delete (header as { h?: string }).h;
+        const headerJson = JSON.stringify(header);
+        const leaseless = `GQ2|${Buffer.byteLength(headerJson)}|${headerJson}${body}`;
+
+        await expect(
+          lifecycle.decode({ value: leaseless, groupId: "proj2/agg" }),
+        ).rejects.toThrow(/tenant mismatch/i);
+      });
+
+      it("refuses a tiered ref under a group with no tenant prefix", async () => {
+        const value = await lifecycle.encode({
+          jobData: REDIS_TIER_PAYLOAD,
+          groupId: TENANT_GROUP,
+        });
+
+        // Nothing to compare the ref against, so this cannot be waved through
+        // on an undefined === undefined match.
+        await expect(
+          lifecycle.decode({ value, groupId: "untenanted-agg" }),
         ).rejects.toThrow(/tenant mismatch/i);
       });
     });

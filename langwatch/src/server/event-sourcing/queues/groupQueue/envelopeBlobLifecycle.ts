@@ -10,6 +10,7 @@ import {
   isEnvelope,
   readEnvelopeLease,
   readEnvelopeLeaseFromHeader,
+  readEnvelopeTieredRefFromHeader,
   readEnvelopeRetirement,
   splitEnvelope,
 } from "./jobEnvelope";
@@ -131,17 +132,26 @@ export class EnvelopeBlobLifecycle {
     // second Buffer.from + JSON.parse (2026-06-24 review).
     const parsed = isEnvelope(value) ? splitEnvelope(value) : undefined;
     const lease = parsed ? readEnvelopeLeaseFromHeader(parsed.header) : null;
-    if (lease) {
+    // Guard the REF, not the lease. A lease additionally requires `header.h`,
+    // so keying the tenant check off it let an envelope carrying a valid
+    // cross-tenant ref and no holder id skip the guard entirely and still be
+    // fetched by decodeJobEnvelope, which has no tenant check of its own.
+    const tieredRef = parsed
+      ? readEnvelopeTieredRefFromHeader(parsed.header)
+      : null;
+    if (tieredRef) {
       // Defense-in-depth: the blob ref's tenant must match the group's tenant.
       // A forged or mis-routed ref must never read another tenant's blob, so
       // refuse before fetching and let the missing-blob fail-safe run (ADR-030 §5).
+      // An untenanted group cannot validate a tiered ref at all, so it is
+      // refused rather than waved through on an undefined === undefined match.
       const expected = this.projectIdFor(groupId);
-      if (lease.ref.projectId !== expected) {
+      if (!expected || tieredRef.projectId !== expected) {
         logger.warn(
           {
             projectId: "[redacted]",
             refProjectId: "[redacted]",
-            blobHash: lease.ref.hash,
+            blobHash: tieredRef.hash,
             groupId: "[redacted]",
           },
           "Blob ref tenant mismatch; refusing cross-tenant read",

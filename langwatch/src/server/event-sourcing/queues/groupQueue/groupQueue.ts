@@ -22,10 +22,7 @@ import {
   tenantIdFromGroupId,
 } from "../../../observability/tenantRateTracker";
 import { connection } from "../../../redis";
-import {
-  type ProjectStorageDestination,
-  redactStorageUrisInText,
-} from "../../../stored-objects/project-storage-destination";
+import { redactStorageUrisInText } from "../../../stored-objects/project-storage-destination";
 import { isDispatchError } from "../../outbox/dispatchError";
 import type {
   DeduplicationConfig,
@@ -43,6 +40,7 @@ import {
 import { getBackoffMs, JOB_RETRY_CONFIG } from "../shared";
 import { GroupQueueDispatcher } from "./dispatcher";
 import { EnvelopeBlobLifecycle } from "./envelopeBlobLifecycle";
+import type { GroupQueueStorageDestination } from "./groupQueueStorage";
 import {
   DecodeFailureError,
   type DecodeFailureReason,
@@ -234,9 +232,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     options?: {
       consumerEnabled?: boolean;
       objectStoreFor?: (projectId: string) => ObjectStore;
+      // The queue owns its destination (its own bucket/prefix, never tenant
+      // BYOC by default) — see resolveGroupQueueStorageDestination. Typed as the
+      // queue's own shape so a resolver that cannot name a lifecycle-managed
+      // prefix is a compile error rather than an unswept payload.
       resolveStorageDestination?: (
         projectId: string,
-      ) => Promise<ProjectStorageDestination>;
+      ) => Promise<GroupQueueStorageDestination>;
     },
   ) {
     const {
@@ -303,7 +305,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     );
 
     // The GQ2 content-addressed blob lifecycle — tiered store and the
-    // encode/decode/renew/release seams. Staging Lua acquires holder leases.
+    // encode/decode/renew/release seams. Staging Lua acquires the leases.
     this.blobLifecycle = new EnvelopeBlobLifecycle({
       redis: this.redisConnection,
       queueName: this.queueName,
@@ -1099,7 +1101,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   return;
                 }
 
-                await this.scripts.retryRestage({
+                const restaged = await this.scripts.retryRestage({
                   groupId,
                   stagedJobId,
                   newStagedJobId,
@@ -1107,15 +1109,29 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   jobDataJson: retryJobData,
                   backoffMs,
                 });
-                // Atomically transfer the lease from the dispatched value to the
-                // re-staged one. For GQ2 the retry re-encodes to the SAME content
-                // hash, so one deadline replaces another in the lease set (the
-                // blob stays); mixed/GQ1 falls back to ordered take+release.
-                await this.blobLifecycle.transferLease({
-                  newValue: retryJobData,
-                  oldValue: jobDataJson,
-                  groupId,
-                });
+                // Only transfer once the replacement is actually staged.
+                // retryRestage returns false when the active key is stale —
+                // another worker owns this slot now — and nothing was written.
+                // Transferring anyway would take a lease for a value no staged
+                // job references (a phantom holding its blob for the full lease
+                // window) AND release the old one, dropping the live owner's
+                // protection. The publication and the transfer are still two
+                // round trips, so a crash between them leaves the replacement
+                // leaseless; that is survivable because the retry re-encodes to
+                // the SAME content hash, so the not-yet-released old lease keeps
+                // the blob alive until decode renews. Folding the transfer into
+                // the staging Lua is the real fix — tracked separately, it needs
+                // the blocked-restage path too.
+                if (restaged) {
+                  // For GQ2 the retry re-encodes to the SAME content hash, so one
+                  // deadline replaces another in the lease set (the blob stays);
+                  // mixed/GQ1 falls back to ordered take+release.
+                  await this.blobLifecycle.transferLease({
+                    newValue: retryJobData,
+                    oldValue: jobDataJson,
+                    groupId,
+                  });
+                }
 
                 // Audit hook: willRetry=true. Fires for the dispatched
                 // payload + every drained sibling (they all get re-staged).
