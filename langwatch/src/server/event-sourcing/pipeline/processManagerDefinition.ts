@@ -1,7 +1,10 @@
 import type { z, ZodTypeAny } from "zod";
 
 import type { Event } from "../domain/types";
-import type { ProcessIntent } from "../process-manager/processManager.types";
+import type {
+  ProcessEventEnvelope,
+  ProcessIntent,
+} from "../process-manager/processManager.types";
 import type { DeduplicationStrategy } from "../queues/queue.types";
 
 /** Shared delivery descriptor for lightweight subscribers. */
@@ -111,6 +114,17 @@ export interface ProcessManagerConfig<
   handlers: Record<string, EventHandler<State, unknown, Intents>>;
   eventTypes: readonly string[];
   onWake?: WakeHandler<State, Intents>;
+  /**
+   * Narrows a committed event to the payload the process is allowed to see.
+   * Defaults to the raw `event.data`.
+   *
+   * Any domain whose events carry customer content MUST supply this. The
+   * payload is persisted verbatim into process state and outbox rows, so the
+   * default is only safe for events that are already identities-and-flags.
+   * Building the narrowed view here is the boundary — the process never sees
+   * prompts, parts, tool output, titles, or tokens at all.
+   */
+  toPayload?: (event: E) => ProcessEventEnvelope["payload"];
   intents: Intents;
   outbox?: {
     maxAttempts?: number;

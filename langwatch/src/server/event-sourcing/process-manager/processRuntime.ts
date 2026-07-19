@@ -80,7 +80,11 @@ export class ProcessRuntime {
             tenantId: context.tenantId,
             projectId: context.tenantId,
             processKey: context.aggregateId,
-            payload: event.data as ProcessEventEnvelope["payload"],
+            // `toPayload` is the content boundary. Without one the raw event
+            // data is persisted into process state and outbox rows verbatim.
+            payload: definition.config.toPayload
+              ? definition.config.toPayload(event)
+              : (event.data as ProcessEventEnvelope["payload"]),
           };
           const result = await registered.manager.handleEvent({
             envelope,
