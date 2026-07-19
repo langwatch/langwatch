@@ -1,6 +1,6 @@
+import { HandledError } from "@langwatch/handled-error";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
-import { HandledError } from "@langwatch/handled-error";
 import { sseErrorFrame } from "../sse";
 
 class TestHandledError extends HandledError {
@@ -20,9 +20,9 @@ describe("sseErrorFrame", () => {
   it("carries the full serialized domain error for a bare HandledError", () => {
     const frame = sseErrorFrame(new TestHandledError());
 
-    expect(frame["type"]).toBe("error");
-    expect(frame["message"]).toBe("a fixable failure");
-    expect(frame["domainError"]).toMatchObject({
+    expect(frame.type).toBe("error");
+    expect(frame.message).toBe("a fixable failure");
+    expect(frame.domainError).toMatchObject({
       code: "test_handled",
       httpStatus: 422,
       tips: ["Do the thing"],
@@ -40,8 +40,8 @@ describe("sseErrorFrame", () => {
       }),
     );
 
-    expect(frame["message"]).toBe("a fixable failure");
-    expect(frame["domainError"]).toMatchObject({ code: "test_handled" });
+    expect(frame.message).toBe("a fixable failure");
+    expect(frame.domainError).toMatchObject({ code: "test_handled" });
   });
 
   it("keeps the message of a client-safe TRPCError without a domain payload", () => {
@@ -65,10 +65,13 @@ describe("sseErrorFrame", () => {
 
   it("masks internal TRPCErrors without a handled cause", () => {
     const frame = sseErrorFrame(
-      new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "raw internals" }),
+      new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "raw internals",
+      }),
     );
 
-    expect(frame["message"]).toBe("An unknown error occurred");
-    expect(frame["domainError"]).toBeUndefined();
+    expect(frame.message).toBe("An unknown error occurred");
+    expect(frame.domainError).toBeUndefined();
   });
 });

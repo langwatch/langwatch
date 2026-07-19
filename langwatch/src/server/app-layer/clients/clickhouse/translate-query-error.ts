@@ -1,9 +1,9 @@
-import { toError } from "~/utils/posthogErrorCapture";
 import {
   ClickHouseUnavailableError,
   QueryMemoryExceededError,
   QueryTimeoutError,
 } from "~/server/app-layer/traces/errors";
+import { toError } from "~/utils/posthogErrorCapture";
 
 /** Errno codes for connection-level failures (shared with the retry loop). */
 export const TRANSIENT_NETWORK_CODES = new Set([
@@ -64,11 +64,7 @@ export function translateClickHouseQueryError(
   const status =
     (error as { statusCode?: number }).statusCode ??
     (error as { status?: number }).status;
-  if (
-    TRANSIENT_NETWORK_CODES.has(code) ||
-    status === 502 ||
-    status === 503
-  ) {
+  if (TRANSIENT_NETWORK_CODES.has(code) || status === 502 || status === 503) {
     return new ClickHouseUnavailableError({ reasons: [toError(error)] });
   }
 

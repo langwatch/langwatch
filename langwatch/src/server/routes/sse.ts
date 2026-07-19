@@ -58,10 +58,20 @@ export function sseErrorFrame(err: unknown): Record<string, unknown> {
 
 /** The HandledError behind a stream failure, if there is one. */
 function handledCauseOf(err: unknown): HandledError | undefined {
-  if (err instanceof TRPCError && err.cause instanceof HandledError) {
-    return err.cause;
+  const candidate = err instanceof TRPCError ? err.cause : err;
+  if (candidate instanceof HandledError) return candidate;
+  // A bundler can load a second copy of the package — duck-type like the
+  // Hono error handler does (see error-handler.ts).
+  if (
+    candidate &&
+    typeof candidate === "object" &&
+    "code" in candidate &&
+    "httpStatus" in candidate &&
+    typeof (candidate as { serialize?: unknown }).serialize === "function"
+  ) {
+    return candidate as HandledError;
   }
-  return err instanceof HandledError ? err : undefined;
+  return undefined;
 }
 
 /**

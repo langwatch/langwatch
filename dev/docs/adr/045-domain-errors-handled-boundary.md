@@ -19,10 +19,11 @@ the whole point:
    The caller cannot act on the raw detail, and presenting it as if they could is
    both a poor experience and a leak surface.
 
-The platform already has the machinery for (1): the app-layer `HandledError`
-(`src/server/app-layer/handled-error.ts`) — an abstract `Error` subclass carrying
-a serialisable `code`, `meta`, `traceId`/`spanId` (captured from the active OTel
-span), `httpStatus`, and a `reasons` cause chain, with a `serialize()` producing
+The platform already has the machinery for (1): the `HandledError`
+(`packages/handled-error`, consumed by the app and the other TS surfaces) — an
+abstract `Error` subclass carrying a serialisable `code`, `meta`,
+`traceId`/`spanId` (captured from the active OTel span), `httpStatus`, and a
+`reasons` cause chain, with a `serialize()` producing
 `SerializedHandledError`. It is wired into both transports:
 
 - **tRPC** (`src/server/api/trpc.ts`): a `handledErrorMiddleware` converts a
@@ -201,22 +202,33 @@ ignore unknown keys; the REST envelope shape is unchanged):
    since the default is `customer`.
 
 Supporting changes: the TS `HandledError` core moved into the shared source-only
-package `@langwatch/handled-error` (`packages/handled-error`), consumed by the
-app (via the `src/server/app-layer/handled-error.ts` shim, which wires the
-Grafana trace-link builder), the MCP server (bundled via tsup `noExternal`),
-and available to the CLI and SDKs. The MCP server now JSON-parses API error
-bodies and surfaces `code`/`tips`/`docsUrl` in tool error text. SSE error
-frames (`server/routes/sse.ts`) carry the serialized `domainError` alongside
+package `@langwatch/handled-error` (`packages/handled-error`), which the app,
+MCP server, CLI and SDKs all import directly (the app wires its Grafana
+trace-link builder via `src/server/handled-error-wiring.ts`, loaded by
+`server.mts` and `workers.ts`); the MCP server bundles the package via tsup
+`noExternal` and JSON-parses API error bodies to surface `code`/`tips`/`docsUrl`
+in tool error text. All remediation copy lives in one registry
+(`src/server/app-layer/error-remediation.ts`), with a CI test asserting every
+docs link resolves to a real page. SSE error frames
+(`server/routes/sse.ts`) carry the serialized `domainError` alongside
 the message; non-handled stream failures now degrade to the generic unknown
 message instead of leaking raw error text onto an already-200 stream.
+Log levels follow the fault axis on every boundary: tRPC, Hono REST
+(`logHttpRequest`), SSE, and the Go telemetry middleware. One asymmetry by
+design: TS defaults `fault` to `"customer"`, while Go `herr` leaves it unset
+(only explicitly annotated codes get one) — an unset Go fault logs at info,
+matching the pre-existing Go behavior for expected control-flow errors.
 
 ## References
 
-- Code (TS): `src/server/app-layer/handled-error.ts` (`HandledError`,
-  `SerializedHandledError`, `NotFoundError`, `ValidationError`),
-  `src/server/api/trpc.ts` (`handledErrorMiddleware`, `errorFormatter`),
-  `src/app/api/middleware/error-handler.ts` (`handleError`),
-  `src/features/automations/logic/errorExplainer.ts`
+- Code (TS): `packages/handled-error` (`HandledError`,
+  `SerializedHandledError`, `NotFoundError`, `ValidationError` — shared
+  package, imported directly by the app, MCP server, CLI and SDKs),
+  `langwatch/src/server/handled-error-wiring.ts` (Grafana trace-link wiring),
+  `langwatch/src/server/app-layer/error-remediation.ts` (tips/docs registry),
+  `langwatch/src/server/api/trpc.ts` (`handledErrorMiddleware`, `errorFormatter`),
+  `langwatch/src/app/api/middleware/error-handler.ts` (`handleError`),
+  `langwatch/src/features/automations/logic/errorExplainer.ts`
   (`readHandledError`/`explainHandledError`).
 - Code (Go): `pkg/herr/herr.go` (`E`, `New`), `pkg/herr/http.go`
   (`WriteHTTP`, code→status registry).

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { HandledError } from "@langwatch/handled-error";
 import {
   ClickHouseUnavailableError,
   QueryMemoryExceededError,
@@ -52,21 +51,20 @@ describe("translateClickHouseQueryError", () => {
   });
 
   describe("given a connection-level failure", () => {
-    it.each(["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT"])(
-      "translates %s to ClickHouseUnavailableError",
-      (errno) => {
-        const raw = Object.assign(new Error(`connect ${errno}`), {
-          code: errno,
-        });
+    it.each([
+      "ECONNREFUSED",
+      "ECONNRESET",
+      "ETIMEDOUT",
+    ])("translates %s to ClickHouseUnavailableError", (errno) => {
+      const raw = Object.assign(new Error(`connect ${errno}`), {
+        code: errno,
+      });
 
-        const translated = translateClickHouseQueryError(raw, 50);
+      const translated = translateClickHouseQueryError(raw, 50);
 
-        expect(translated).toBeInstanceOf(ClickHouseUnavailableError);
-        expect((translated as ClickHouseUnavailableError).fault).toBe(
-          "platform",
-        );
-      },
-    );
+      expect(translated).toBeInstanceOf(ClickHouseUnavailableError);
+      expect((translated as ClickHouseUnavailableError).fault).toBe("platform");
+    });
 
     it("translates a 503 response to ClickHouseUnavailableError", () => {
       const raw = Object.assign(new Error("service unavailable"), {
@@ -98,7 +96,7 @@ describe("translateClickHouseQueryError", () => {
       // Not reachable via the driver today, but guards against wrapper
       // stacking: handled errors pass through as themselves.
       const translated = translateClickHouseQueryError(handled, 10);
-      expect(translated).toBeInstanceOf(HandledError);
+      expect(translated).toBe(handled);
     });
   });
 });

@@ -19,4 +19,15 @@ describe("error remediation registry", () => {
   it("has no duplicate codes", () => {
     expect(new Set(REMEDIATION_CODES).size).toBe(REMEDIATION_CODES.length);
   });
+
+  it("every entry carries at least one remediation channel", async () => {
+    const { remediation } = await import("../error-remediation");
+    for (const code of REMEDIATION_CODES) {
+      const r = remediation(code);
+      expect(
+        (r.tips?.length ?? 0) > 0 || r.docsUrl !== undefined,
+        `${code} must define tips or a docs link`,
+      ).toBe(true);
+    }
+  });
 });

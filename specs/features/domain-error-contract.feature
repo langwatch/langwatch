@@ -18,9 +18,11 @@ Feature: Handled errors — the handled-error boundary
   error. The presence of a serialised domain payload IS the signal of "handled".
 
   This contract is the same in both languages and applies everywhere. See
-  ADR-045. The machinery already exists (`src/server/app-layer/handled-error.ts`,
-  wired into tRPC's `errorFormatter` and Hono's `onError`); these scenarios pin
-  its intended behaviour and its reach.
+  ADR-045. The machinery lives in the shared `packages/handled-error` package
+  (consumed directly by the app, MCP server, CLI and SDKs; the app wires its
+  Grafana trace links via `src/server/handled-error-wiring.ts`), wired into
+  tRPC's `errorFormatter` and Hono's `onError`; these scenarios pin its
+  intended behaviour and its reach.
 
   Background:
     Given the HandledError base and its serialisation are available in the app layer
@@ -89,14 +91,14 @@ Feature: Handled errors — the handled-error boundary
   # Cross-language: handled-ness survives the Go ↔ TS boundary
   # ==========================================================================
 
-  @bdd @domain-errors @unimplemented
+  @bdd @domain-errors
   Scenario: A Go herr proxied by the control plane arrives as a handled error
     Given a Go service returns an herr.E with Code "github_unreachable" and a trace id
     When the control plane proxies that failure to the client
     Then it is adapted into a HandledError (Code → code, meta→meta, trace_id/span_id→traceId/spanId)
     And the client receives code "github_unreachable" with its meta and trace link
 
-  @bdd @domain-errors @unimplemented
+  @bdd @domain-errors
   Scenario: A plain Go error proxied by the control plane becomes unknown
     Given a Go service returns a plain error (not an herr.E)
     When the control plane proxies that failure to the client
@@ -107,7 +109,7 @@ Feature: Handled errors — the handled-error boundary
   # Non-tRPC transports carry the same shape
   # ==========================================================================
 
-  @bdd @domain-errors @unimplemented
+  @bdd @domain-errors
   Scenario: A streamed response carries the serialised handled error on its error event
     Given a streamed endpoint (e.g. the Langy chat stream) hits a known failure mid-stream
     Then its error event carries the SerializedHandledError, not a plain string

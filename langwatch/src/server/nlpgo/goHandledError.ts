@@ -1,6 +1,9 @@
+import {
+  type HandledError,
+  handledErrorFromHerr,
+} from "@langwatch/handled-error";
 import { APICallError, RetryError } from "ai";
 import { z } from "zod";
-import { HandledError, handledErrorFromHerr } from "@langwatch/handled-error";
 
 /**
  * nlpgo's handled-error envelope (services/nlpgo herr package). Every
@@ -17,6 +20,8 @@ const goErrorEnvelopeSchema = z.object({
     type: z.string(),
     message: z.string().optional(),
     meta: z.record(z.string(), z.unknown()).optional(),
+    trace_id: z.string().optional(),
+    span_id: z.string().optional(),
     fault: z.enum(["customer", "platform", "provider"]).optional(),
     tips: z.array(z.string()).optional(),
     docs_url: z.string().optional(),
@@ -83,6 +88,8 @@ export function nlpgoHandledErrorFrom(error: unknown): HandledError | null {
       type: code,
       message: envelope.message ?? envelope.type,
       meta: envelope.meta,
+      trace_id: envelope.trace_id,
+      span_id: envelope.span_id,
       fault: envelope.fault,
       tips: envelope.tips,
       docs_url: envelope.docs_url,

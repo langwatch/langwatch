@@ -156,11 +156,14 @@ function parseErrorBody(responseBody: string): ParsedErrorBody {
       return {};
     }
     const body = parsed as Record<string, unknown>;
+    // Prefer `code` (the domain discriminant) over `error` — the
+    // packages/api unversioned envelope uses `error` for the HTTP status
+    // text ("Not Found") while `code` holds the real code.
     const code =
-      typeof body.error === "string"
-        ? body.error
-        : typeof body.code === "string"
-          ? body.code
+      typeof body.code === "string"
+        ? body.code
+        : typeof body.error === "string"
+          ? body.error
           : undefined;
     const message = typeof body.message === "string" ? body.message : undefined;
     if (code === undefined && message === undefined) {

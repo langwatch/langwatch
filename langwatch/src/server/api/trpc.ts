@@ -30,6 +30,7 @@ interface CreateNextContextOptions {
   res: any;
 }
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import type { OrganizationUserRole } from "@prisma/client";
@@ -37,7 +38,6 @@ import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
 import superjson from "superjson";
 import { ZodError } from "zod";
-import { HandledError } from "@langwatch/handled-error";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -604,10 +604,17 @@ export function handleTrpcCallLogging({
         : 500;
     logData.statusCode = resolvedStatus;
 
+    const cause =
+      result.error instanceof TRPCError ? result.error.cause : undefined;
+    // Duck-typed alongside instanceof: a bundler can load a second copy of
+    // the package (see error-handler.ts).
     const handledCause =
-      result.error instanceof TRPCError &&
-      result.error.cause instanceof HandledError
-        ? result.error.cause
+      cause instanceof HandledError ||
+      (cause &&
+        typeof cause === "object" &&
+        "code" in cause &&
+        "httpStatus" in cause)
+        ? (cause as HandledError)
         : undefined;
 
     // Include handled error code + fault in log data for structured
@@ -665,8 +672,9 @@ function isSilencedCall(path: string, type: string): boolean {
 export const loggerMiddleware = t.middleware(
   async ({ path, type, input, ctx, next }) => {
     // Import context utilities dynamically to avoid circular deps
-    const { createContextFromTRPC, runWithContext } =
-      await import("../context/asyncContext");
+    const { createContextFromTRPC, runWithContext } = await import(
+      "../context/asyncContext"
+    );
 
     // Create context from tRPC context and input
     const requestContext = createContextFromTRPC(ctx, input as any);

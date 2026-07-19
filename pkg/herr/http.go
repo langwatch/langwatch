@@ -135,8 +135,8 @@ func FromBody(body ErrorBody) E {
 	if sid, err := trace.SpanIDFromHex(body.SpanID); err == nil {
 		e.SpanID = sid
 	}
-	for _, reason := range body.Reasons {
-		e.Reasons = append(e.Reasons, FromBody(reason))
+	for i := range body.Reasons {
+		e.Reasons = append(e.Reasons, FromBody(body.Reasons[i]))
 	}
 	return e
 }

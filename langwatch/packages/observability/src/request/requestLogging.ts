@@ -60,10 +60,10 @@ export function handledFaultOf(
 ): "customer" | "platform" | "provider" | undefined {
   if (!error || typeof error !== "object") return undefined;
   const e = error as Record<string, unknown>;
-  if (typeof e["code"] !== "string" || typeof e["httpStatus"] !== "number") {
+  if (typeof e.code !== "string" || typeof e.httpStatus !== "number") {
     return undefined;
   }
-  const fault = e["fault"];
+  const fault = e.fault;
   return fault === "customer" || fault === "platform" || fault === "provider"
     ? fault
     : undefined;
