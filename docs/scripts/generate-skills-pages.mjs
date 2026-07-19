@@ -68,7 +68,7 @@ function cmdBox({ copyValue, code, track, trackProps }) {
     .map(([k, v]) => `data-track-${k}=${attr(v)}`)
     .join(" ");
   return [
-    `    <div className="lw-accordion-cmd-box" data-copy=${attr(copyValue)} data-track="${track}" ${trackAttrs}>`,
+    `    <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy=${attr(copyValue)} data-track="${track}" ${trackAttrs}>`,
     `      ${code}`,
     `      <span className="lw-inline-copy-btn lw-copy-line-icon">${ICONS.copySmall}</span>`,
     `      <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}>${ICONS.checkSmall}</span>`,
@@ -134,7 +134,7 @@ function renderAccordion(entry) {
   const fence = "`".repeat(longestBacktickRun + 1);
   lines.push(`    <div className="lw-accordion-actions${!skill ? " lw-accordion-actions-single" : ""}">`);
   lines.push(
-    `      <div className="lw-accordion-action" data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title=${attr(title)} data-track-skill=${attr(skill || "platform")}>`
+    `      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title=${attr(title)} data-track-skill=${attr(skill || "platform")}>`
   );
   lines.push(`        <span className="lw-accordion-action-icon lw-copy-line-icon">${ICONS.copyLarge}</span>`);
   lines.push(
@@ -157,7 +157,7 @@ function renderAccordion(entry) {
   if (skill) {
     const downloadUrl = `https://raw.githubusercontent.com/langwatch/skills/main/${skillPath}/SKILL.md`;
     lines.push(
-      `      <div className="lw-accordion-action" data-download-url="${downloadUrl}" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title=${attr(title)} data-track-skill=${attr(skill)}>`
+      `      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="${downloadUrl}" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title=${attr(title)} data-track-skill=${attr(skill)}>`
     );
     lines.push(`        <span className="lw-accordion-action-icon">${ICONS.download}</span>`);
     lines.push(`        <span className="lw-accordion-action-text">`);

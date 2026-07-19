@@ -103,13 +103,14 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// Keyboard support for the div-based accordion headers (role="button")
+// Keyboard support for the div-based accordion controls (role="button"):
+// headers toggle, command boxes copy, actions copy or download.
 document.addEventListener('keydown', function(e) {
   if (e.key !== 'Enter' && e.key !== ' ') return;
   if (!e.target || !e.target.closest) return;
-  var accHeader = e.target.closest('.lw-accordion-header');
-  if (accHeader) {
+  var control = e.target.closest('.lw-accordion-header, .lw-accordion-action, .lw-accordion-cmd-box');
+  if (control) {
     e.preventDefault();
-    accHeader.click();
+    control.click();
   }
 });

@@ -182,6 +182,19 @@ describe("docs skills directory pages", () => {
       expect(js).toContain("data-download-url");
       expect(js).toContain("data-copy-source");
       expect(js).toContain(".lw-prompt-source code");
+      expect(js, "keyboard activation must cover all interactive controls").toContain(
+        ".lw-accordion-header, .lw-accordion-action, .lw-accordion-cmd-box"
+      );
+    });
+
+    it("marks every interactive control as a focusable button", () => {
+      for (const { name, content } of pageFiles) {
+        for (const cls of ["lw-accordion-header", "lw-accordion-action", "lw-accordion-cmd-box"]) {
+          const total = content.match(new RegExp(`className="${cls}[" ]`, "g"))?.length ?? 0;
+          const buttons = content.match(new RegExp(`className="${cls}[" ][^>]*role="button" tabIndex=\\{0\\}`, "g"))?.length ?? 0;
+          expect(buttons, `${name}: ${cls} keyboard semantics`).toBe(total);
+        }
+      }
     });
 
     it("hides and shows the accordion body via the data-open attribute", () => {
