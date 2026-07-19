@@ -28,3 +28,13 @@ Feature: Resource caps — shared services can't take the machine
     Then the ClickHouse line includes its current memory use against its cap
     And the Redis line includes its current memory use against its ceiling
     And the running stacks line includes their combined memory footprint
+
+  # Bound by domain/clickhouse_test.go (`// @scenario` on
+  # TestRenderClickHouseConfig). Disk is the cap here, not memory: stock
+  # ClickHouse keeps unbounded system log tables AND a verbose server log.
+  Scenario: The managed ClickHouse keeps its own telemetry lightweight
+    When haven provisions the ClickHouse it manages
+    Then the high-volume system log tables are disabled
+    And the kept system log tables expire after a bounded number of days
+    And the server log records only warnings and rotates within a small disk budget
+    But full stock logging can be restored via the environment

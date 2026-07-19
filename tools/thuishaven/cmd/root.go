@@ -325,6 +325,10 @@ func clickHouseLimits() domain.ClickHouseLimits {
 		l.ContainerMemoryMB = mb
 		l.MaxServerMemory = int64(mb) * 9 / 10 * (1 << 20)
 	}
+	if envOr("HAVEN_CLICKHOUSE_FULL_LOGS", "") != "" {
+		l.LightweightLogs = false
+	}
+	l.SystemLogTTLDays = envInt("HAVEN_CLICKHOUSE_LOG_TTL_DAYS", l.SystemLogTTLDays)
 	return l
 }
 
