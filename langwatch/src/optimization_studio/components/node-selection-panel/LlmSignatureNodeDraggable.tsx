@@ -1,9 +1,11 @@
 import { merge } from "lodash-es";
 
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Component } from "~/optimization_studio/types/dsl";
-import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import { MODULES } from "~/optimization_studio/registry";
 import type { NodeWithOptionalPosition } from "~/types";
+import { api } from "~/utils/api";
+import { DEFAULT_MODEL } from "~/utils/constants";
 
 import { NodeDraggable } from "./NodeDraggable";
 
@@ -14,11 +16,16 @@ type LlmSignatureNodeDraggableProps = {
 export function LlmSignatureNodeDraggable({
   onDragEnd,
 }: LlmSignatureNodeDraggableProps) {
-  const { getWorkflow } = useWorkflowStore((state) => ({
-    getWorkflow: state.getWorkflow,
-  }));
+  const { project } = useOrganizationTeamProject();
 
-  const defaultLLMConfig = getWorkflow().default_llm;
+  // Nodes own their LLM config: seed freshly dragged nodes with the
+  // project's cascade-resolved default, or the registry flagship when
+  // nothing is configured (query still loading falls back the same way —
+  // the value is materialized again server-side on save).
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "workflows.create_default" },
+    { enabled: !!project?.id },
+  );
 
   return (
     <NodeDraggable
@@ -27,7 +34,7 @@ export function LlmSignatureNodeDraggable({
           {
             identifier: "llm",
             type: "llm",
-            value: defaultLLMConfig,
+            value: { model: resolvedDefault.data?.model ?? DEFAULT_MODEL },
           },
         ],
       })}

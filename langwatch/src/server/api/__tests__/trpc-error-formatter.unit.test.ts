@@ -2,7 +2,7 @@
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
-import { NotFoundError } from "~/server/app-layer/handled-error";
+import { NotFoundError } from "@langwatch/handled-error";
 import { errorFormatterForTesting } from "../trpc";
 
 function format(error: TRPCError) {

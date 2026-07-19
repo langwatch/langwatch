@@ -1,4 +1,10 @@
-import { HandledError, NotFoundError } from "../handled-error";
+import {
+  HandledError,
+  type HandledErrorOptions,
+  NotFoundError,
+} from "@langwatch/handled-error";
+
+import { remediation } from "../error-remediation";
 
 export class EvaluationNotFoundError extends NotFoundError {
   declare readonly code: "evaluation_not_found";
@@ -9,6 +15,7 @@ export class EvaluationNotFoundError extends NotFoundError {
   ) {
     super("evaluation_not_found", "Evaluation", evaluationId, {
       meta: { evaluationId },
+      ...remediation("evaluation_not_found"),
       ...options,
     });
     this.name = "EvaluationNotFoundError";
@@ -25,6 +32,7 @@ export class TraceNotEvaluatableError extends HandledError {
     super("trace_not_evaluatable", `Trace ${traceId} is not evaluatable`, {
       meta: { traceId },
       httpStatus: 422,
+      ...remediation("trace_not_evaluatable"),
       ...options,
     });
     this.name = "TraceNotEvaluatableError";
@@ -40,6 +48,7 @@ export class EvaluatorConfigError extends HandledError {
   ) {
     super("evaluator_config_error", message, {
       httpStatus: 422,
+      ...remediation("evaluator_config_error"),
       ...options,
     });
     this.name = "EvaluatorConfigError";
@@ -49,12 +58,13 @@ export class EvaluatorConfigError extends HandledError {
 export class EvaluatorExecutionError extends HandledError {
   declare readonly code: "evaluator_execution_error";
 
-  constructor(
-    message: string,
-    options: { meta?: Record<string, unknown>; reasons?: readonly Error[] } = {},
-  ) {
+  constructor(message: string, options: HandledErrorOptions = {}) {
     super("evaluator_execution_error", message, {
       httpStatus: 502,
+      // The evaluator backend failed to run — an execution failure on our
+      // side, not caller error.
+      fault: "platform",
+      ...remediation("evaluator_execution_error"),
       ...options,
     });
     this.name = "EvaluatorExecutionError";
@@ -85,6 +95,7 @@ export class EvaluatorMissingFieldError extends HandledError {
         // client Bad Request, not a semantic 422) — existing API consumers
         // of this legacy endpoint keep seeing the same status code.
         httpStatus: 400,
+        ...remediation("evaluator_missing_field"),
         ...options,
       },
     );
@@ -101,6 +112,7 @@ export class EvaluatorNotFoundError extends NotFoundError {
   ) {
     super("evaluator_not_found", "Evaluator", evaluatorType, {
       meta: { evaluatorType },
+      ...remediation("evaluator_not_found"),
       ...options,
     });
     this.name = "EvaluatorNotFoundError";

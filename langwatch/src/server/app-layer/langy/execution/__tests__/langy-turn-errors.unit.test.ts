@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { handledErrorFromHerr } from "~/server/app-layer/handled-error";
+import { handledErrorFromHerr } from "@langwatch/handled-error";
 import { LangyModelNotConfiguredError } from "~/server/app-layer/langy/errors";
 
 import {
@@ -111,9 +111,10 @@ describe("langyAgentErrorFromFrame", () => {
             code: "no_provider_configured",
             // Deprecated back-compat alias of `code`.
             kind: "no_provider_configured",
+            fault: "customer",
+            traceId: "0af7651916cd43dd8448eb211c80319c",
             meta: {
               http_status: 400,
-              traceId: "0af7651916cd43dd8448eb211c80319c",
             },
           },
         ]);
@@ -138,7 +139,7 @@ describe("langyAgentErrorFromFrame", () => {
           serializeLangyTurnError(error),
         ) as Record<string, unknown>;
         expect(serialized.reasons).toEqual([
-          { code: "rate_limited", kind: "rate_limited" },
+          { code: "rate_limited", kind: "rate_limited", fault: "customer" },
         ]);
       });
 

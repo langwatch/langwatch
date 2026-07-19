@@ -51,12 +51,12 @@
  */
 export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_ai_gateway_menu_enabled",
-  // Governance preview — gates the personal-keys / admin oversight /
-  // RoutingPolicy / IngestionSource UI surfaces on this long-lived
-  // branch. Default off until rchaves flips it for an org. Distinct
-  // from `release_ui_ai_gateway_menu_enabled` because the existing
-  // gateway product ships unblocked while governance keeps cooking.
-  // Force-enable in dev: `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_governance_enabled`.
+  // Governance: gates the personal-keys / admin oversight /
+  // RoutingPolicy / IngestionSource UI surfaces. On by default
+  // (ADR-038 Decision 7); SaaS rollout and per-org kill switches live
+  // in PostHog. Distinct from `release_ui_ai_gateway_menu_enabled`
+  // because the gateway product ships on its own flag.
+  // Force off in dev: `RELEASE_UI_AI_GOVERNANCE_ENABLED=0`.
   "release_ui_ai_governance_enabled",
   "release_langy_enabled",
   "release_langy_promo_enabled",

@@ -1,3 +1,4 @@
+import type { HandledErrorFault } from "@langwatch/handled-error";
 import { getConfig, requireApiKey } from "./config.js";
 
 // --- Response types ---
@@ -106,13 +107,79 @@ export interface PromptMutationResponse {
 // --- HTTP client ---
 
 export class LangWatchApiError extends Error {
+  readonly code?: string;
+  readonly tips?: string[];
+  readonly docsUrl?: string;
+  readonly fault?: HandledErrorFault;
+
   constructor(
     message: string,
     public readonly status: number,
     public readonly responseBody: string,
+    options: {
+      code?: string;
+      tips?: string[];
+      docsUrl?: string;
+      fault?: HandledErrorFault;
+    } = {},
   ) {
     super(message);
     this.name = "LangWatchApiError";
+    this.code = options.code;
+    this.tips = options.tips;
+    this.docsUrl = options.docsUrl;
+    this.fault = options.fault;
+  }
+}
+
+/** Structured fields extracted from a handled-error JSON response body. */
+interface ParsedErrorBody {
+  code?: string;
+  message?: string;
+  tips?: string[];
+  docsUrl?: string;
+  fault?: HandledErrorFault;
+}
+
+const VALID_FAULTS: readonly HandledErrorFault[] = ["customer", "platform", "provider"];
+
+/**
+ * Parses an error response body as a handled-error envelope. Accepts both the
+ * REST shape (`{ error: "<code>", message, tips?, docsUrl?, fault? }`) and the
+ * serialized tRPC shape (`{ code, message?, tips?, docsUrl?, fault?, ... }`).
+ * Returns an empty object when the body is not a recognizable error envelope.
+ */
+function parseErrorBody(responseBody: string): ParsedErrorBody {
+  try {
+    const parsed: unknown = JSON.parse(responseBody);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return {};
+    }
+    const body = parsed as Record<string, unknown>;
+    // Prefer `code` (the domain discriminant) over `error` — the
+    // packages/api unversioned envelope uses `error` for the HTTP status
+    // text ("Not Found") while `code` holds the real code.
+    const code =
+      typeof body.code === "string"
+        ? body.code
+        : typeof body.error === "string"
+          ? body.error
+          : undefined;
+    const message = typeof body.message === "string" ? body.message : undefined;
+    if (code === undefined && message === undefined) {
+      return {};
+    }
+    const tips =
+      Array.isArray(body.tips) && body.tips.every((t) => typeof t === "string")
+        ? (body.tips as string[])
+        : undefined;
+    const docsUrl = typeof body.docsUrl === "string" ? body.docsUrl : undefined;
+    const fault = VALID_FAULTS.includes(body.fault as HandledErrorFault)
+      ? (body.fault as HandledErrorFault)
+      : undefined;
+    return { code, message, tips, docsUrl, fault };
+  } catch {
+    return {};
   }
 }
 
@@ -151,10 +218,26 @@ export async function makeRequest(
 
   if (!response.ok) {
     const responseBody = await response.text();
+    const parsed = parseErrorBody(responseBody);
+    const lines = [
+      `LangWatch API error ${response.status}: ${parsed.message ?? responseBody}`,
+    ];
+    if (parsed.tips && parsed.tips.length > 0) {
+      lines.push("Tips:", ...parsed.tips.map((tip) => `- ${tip}`));
+    }
+    if (parsed.docsUrl) {
+      lines.push(`Docs: ${parsed.docsUrl}`);
+    }
     throw new LangWatchApiError(
-      `LangWatch API error ${response.status}: ${responseBody}`,
+      lines.join("\n"),
       response.status,
       responseBody,
+      {
+        code: parsed.code,
+        tips: parsed.tips,
+        docsUrl: parsed.docsUrl,
+        fault: parsed.fault,
+      },
     );
   }
 

@@ -141,6 +141,56 @@ describe("requestLogging", () => {
         );
       });
     });
+
+    describe("when the error is a handled error", () => {
+      const handled = (fault: string, httpStatus: number) =>
+        Object.assign(new Error("handled"), {
+          code: "some_code",
+          httpStatus,
+          fault,
+        });
+
+      it("logs customer-fault at warn even for 5xx, with code and fault in the data", () => {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+
+        logHttpRequest(logger, {
+          method: "POST",
+          url: "/query",
+          statusCode: 504,
+          duration: 100,
+          userAgent: null,
+          error: handled("customer", 504),
+        });
+
+        expect(logger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            statusCode: 504,
+            handledErrorCode: "some_code",
+            handledErrorFault: "customer",
+          }),
+          "error handling request",
+        );
+        expect(logger.error).not.toHaveBeenCalled();
+      });
+
+      it("logs platform-fault at error", () => {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+
+        logHttpRequest(logger, {
+          method: "GET",
+          url: "/traces",
+          statusCode: 503,
+          duration: 100,
+          userAgent: null,
+          error: handled("platform", 503),
+        });
+
+        expect(logger.error).toHaveBeenCalledWith(
+          expect.objectContaining({ handledErrorFault: "platform" }),
+          "error handling request",
+        );
+      });
+    });
   });
 
   describe("hasAuthorizationToken", () => {

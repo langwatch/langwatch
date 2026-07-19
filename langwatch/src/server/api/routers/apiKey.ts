@@ -2,7 +2,7 @@ import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { auditLog } from "~/server/auditLog";
 import { skipPermissionCheck } from "../rbac";

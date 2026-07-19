@@ -4,7 +4,7 @@ import type {
   LocalPromptConfig,
   TargetConfig,
 } from "~/experiments-v3/types";
-import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
+import { LATEST_SPEC_VERSION, type LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { ExecutionCell, WorkflowBuilderInput } from "../types";
@@ -124,7 +124,7 @@ describe("WorkflowBuilder", () => {
       const input = createBasicInput();
       const result = buildCellWorkflow(input, {});
 
-      expect(result.workflow.spec_version).toBe("1.4");
+      expect(result.workflow.spec_version).toBe(LATEST_SPEC_VERSION);
       expect(result.workflow.name).toContain("Evaluation V3");
       expect(result.workflow.enable_tracing).toBe(true);
     });

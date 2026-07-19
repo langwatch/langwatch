@@ -26,6 +26,9 @@ interface HandledErrorLike {
     spanId?: string;
     traceUrl?: string;
     httpStatus: number;
+    fault?: string;
+    tips?: readonly string[];
+    docsUrl?: string;
     reasons: Array<{
       code: string;
       meta?: Record<string, unknown>;
@@ -101,6 +104,9 @@ interface ErrorResponseBody {
   traceId?: string;
   spanId?: string;
   traceUrl?: string;
+  fault?: string;
+  tips?: readonly string[];
+  docsUrl?: string;
 }
 
 function finalizeErrorResponse({
@@ -149,6 +155,9 @@ function formatError({
         traceId: serialized.traceId,
         spanId: serialized.spanId,
         ...(serialized.traceUrl ? { traceUrl: serialized.traceUrl } : {}),
+        ...(serialized.fault ? { fault: serialized.fault } : {}),
+        ...(serialized.tips?.length ? { tips: serialized.tips } : {}),
+        ...(serialized.docsUrl ? { docsUrl: serialized.docsUrl } : {}),
       },
     });
   }

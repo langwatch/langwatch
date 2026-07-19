@@ -27,6 +27,7 @@ import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
+import { materializeNodeLlmConfigs } from "../../workflows/materializeNodeLlmConfigs";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -1318,6 +1319,11 @@ export const saveOrCommitWorkflowVersion = async ({
     nodes: mergeLocalConfigsIntoDsl(input.dsl.nodes as any) as any,
     state: {},
   };
+  await materializeNodeLlmConfigs({
+    prisma: ctx.prisma,
+    projectId: input.projectId,
+    dsl: dslWithMergedConfigs,
+  });
   const dslWithoutStates = JSON.parse(JSON.stringify(dslWithMergedConfigs));
   const data = {
     commitMessage,

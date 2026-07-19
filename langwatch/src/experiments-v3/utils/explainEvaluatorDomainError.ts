@@ -1,4 +1,4 @@
-import type { SerializedHandledError } from "~/server/app-layer/handled-error";
+import type { SerializedHandledError } from "@langwatch/handled-error";
 
 export type EvaluatorDomainErrorExplanation = {
   headline: string;

@@ -34,6 +34,12 @@ func Budget(precheck BudgetPrecheckFunc, logger *zap.Logger) Interceptor {
 		case domain.BudgetBlock:
 			return herr.New(ctx, domain.ErrBudgetExceeded, herr.M{
 				"message": budgetExceededMessage,
+				"tips": []string{
+					"Contact your LangWatch admin to raise the organization's spending limit",
+					"Switch to a cheaper model or reduce request volume to stay within the limit",
+				},
+				"docs_url": "https://docs.langwatch.ai/ai-gateway/budgets",
+				"fault":    "customer",
 			})
 		case domain.BudgetWarn:
 			call.Meta.BudgetWarnings = append(call.Meta.BudgetWarnings, "near_limit")

@@ -19,7 +19,7 @@ import {
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
 import { getApp } from "../../app-layer/app";
-import { HandledError } from "../../app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
 import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
@@ -53,7 +53,7 @@ type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
 /** Maps experiment handled errors to TRPCError using the code discriminant. */
 const mapExperimentError = (error: unknown): never => {
-  if (error instanceof HandledError && error.code === "experiment_not_found") {
+  if (HandledError.isHandled(error) && error.code === "experiment_not_found") {
     throw new TRPCError({ code: "NOT_FOUND", message: error.message });
   }
   throw error;
