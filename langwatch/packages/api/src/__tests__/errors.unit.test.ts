@@ -1,5 +1,5 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { ZodError, z } from "zod";
 
 import { createErrorHandler, formatError } from "../errors.js";
@@ -39,15 +39,6 @@ function fakeContext(overrides: { isVersioned?: boolean } = {}) {
     set: (key: string, value: unknown) => store.set(key, value),
     json: (body: unknown, status: number) => ({ body, status }),
     _store: store,
-  };
-}
-
-function fakeLogger() {
-  return {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
   };
 }
 
@@ -250,27 +241,26 @@ describe("formatError", () => {
 });
 
 // ---------------------------------------------------------------------------
-// createErrorHandler -- logging + resolved status
+// createErrorHandler -- resolved error handoff
 // ---------------------------------------------------------------------------
 
 describe("createErrorHandler", () => {
   describe("when the error is unhandled", () => {
-    it("logs it at error with its cause", () => {
-      const logger = fakeLogger();
-      const handler = createErrorHandler({ logger: logger as never });
+    it("publishes it with the 500 it sent", () => {
+      const handler = createErrorHandler();
       const err = new Error("secret internal details");
+      const c = fakeContext();
 
-      handler(err, fakeContext() as never);
+      handler(err, c as never);
 
-      expect(logger.error).toHaveBeenCalledTimes(1);
-      const [payload, message] = logger.error.mock.calls[0]!;
-      expect(payload).toMatchObject({ statusCode: 500, error: err });
-      expect(message).toBe("unhandled error on request");
+      expect(c._store.get("resolvedError")).toMatchObject({
+        status: 500,
+        error: err,
+      });
     });
 
     it("does not leak the cause into the response", () => {
-      const logger = fakeLogger();
-      const handler = createErrorHandler({ logger: logger as never });
+      const handler = createErrorHandler();
 
       const res = handler(
         new Error("secret internal details"),
@@ -282,77 +272,57 @@ describe("createErrorHandler", () => {
   });
 
   describe("when the error is handled", () => {
-    it("logs a customer fault at warn", () => {
-      const logger = fakeLogger();
-      const handler = createErrorHandler({ logger: logger as never });
+    it("publishes the error and the status it sent", () => {
+      const handler = createErrorHandler();
+      const err = new NotFoundError("not_found", "Resource", "abc");
+      const c = fakeContext();
 
-      handler(
-        new NotFoundError("not_found", "Resource", "abc") as Error,
-        fakeContext() as never,
-      );
+      handler(err as Error, c as never);
 
-      expect(logger.error).not.toHaveBeenCalled();
-      expect(logger.warn).toHaveBeenCalledTimes(1);
-      expect(logger.warn.mock.calls[0]![0]).toMatchObject({
-        statusCode: 404,
-        handledErrorCode: "not_found",
-        handledErrorFault: "customer",
+      expect(c._store.get("resolvedError")).toMatchObject({
+        status: 404,
+        error: err,
       });
     });
 
-    it.each(["platform", "provider"] as const)(
-      "logs a %s fault at error",
-      (fault) => {
-        const logger = fakeLogger();
-        const handler = createErrorHandler({ logger: logger as never });
+    it("carries the traceId through for the request logger", () => {
+      const handler = createErrorHandler();
+      const err = new TestError("upstream_down", "Upstream is down", {
+        httpStatus: 502,
+        fault: "provider",
+      });
+      (err as { traceId?: string }).traceId = "trace-abc";
+      const c = fakeContext();
 
-        handler(
-          new TestError("upstream_down", "Upstream is down", {
-            httpStatus: 502,
-            fault,
-          }) as Error,
-          fakeContext() as never,
-        );
+      handler(err as Error, c as never);
 
-        expect(logger.warn).not.toHaveBeenCalled();
-        expect(logger.error).toHaveBeenCalledTimes(1);
-        expect(logger.error.mock.calls[0]![0]).toMatchObject({
-          handledErrorFault: fault,
-        });
-      },
-    );
+      expect(c._store.get("resolvedError")).toMatchObject({
+        status: 502,
+        traceId: "trace-abc",
+      });
+    });
   });
 
   describe("when the error is a ZodError", () => {
-    it("logs at warn with the status the caller actually received", () => {
+    it("publishes the promoted ValidationError and the 422 the caller received", () => {
       // Regression: a bare ZodError has no `httpStatus`, so the request logger
       // derived 500 and logged at error while the response went out 422.
-      const logger = fakeLogger();
-      const handler = createErrorHandler({ logger: logger as never });
+      const handler = createErrorHandler();
       const zodError = zodErrorFrom(() =>
         z.object({ name: z.string() }).parse({}),
       );
-
-      handler(zodError as unknown as Error, fakeContext() as never);
-
-      expect(logger.error).not.toHaveBeenCalled();
-      expect(logger.warn).toHaveBeenCalledTimes(1);
-      expect(logger.warn.mock.calls[0]![0]).toMatchObject({
-        statusCode: 422,
-        handledErrorCode: "validation_error",
-      });
-    });
-  });
-
-  describe("resolved status", () => {
-    it("records the status it sent on the context", () => {
-      const logger = fakeLogger();
-      const handler = createErrorHandler({ logger: logger as never });
       const c = fakeContext();
 
-      handler(new NotFoundError("not_found", "Resource", "abc") as Error, c as never);
+      handler(zodError as unknown as Error, c as never);
 
-      expect(c._store.get("resolvedErrorStatus")).toBe(404);
+      const resolved = c._store.get("resolvedError") as {
+        status: number;
+        error: HandledError;
+      };
+      expect(resolved.status).toBe(422);
+      expect(HandledError.isHandled(resolved.error)).toBe(true);
+      expect(resolved.error.code).toBe("validation_error");
+      expect(resolved.error.fault).toBe("customer");
     });
   });
 });

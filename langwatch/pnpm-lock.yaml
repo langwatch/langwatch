@@ -423,7 +423,7 @@ importers:
         version: 17.5.0
       openai:
         specifier: ^6.45.0
-        version: 6.45.0(@aws-sdk/credential-provider-node@3.972.64)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
+        version: 6.45.0(@aws-sdk/credential-provider-node@3.972.64)(@smithy/signature-v4@5.6.2)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
       papaparse:
         specifier: ^5.5.4
         version: 5.5.4

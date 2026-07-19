@@ -1,4 +1,3 @@
-import { createLogger, type Logger } from "@langwatch/observability";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -171,62 +170,33 @@ function formatError({
 }
 
 // ---------------------------------------------------------------------------
-// Logging
+// Resolved-error handoff to the request logger
 // ---------------------------------------------------------------------------
 
 /**
- * The Hono context key holding the status the error handler actually sent.
+ * The Hono context key holding what the error handler actually resolved: the
+ * status it sent, and the error it sent it for.
  *
- * The request logger would otherwise re-derive the status from the error, and
- * disagree with the response whenever the two encodings differ. Writing it
- * down once removes the guesswork.
+ * The request logger owns the single error record for a failed request, but on
+ * its own it can only see the raw thrown value and has to re-derive a status
+ * from it. Both guesses are wrong whenever the handler promoted the error: a
+ * `ZodError` has no `httpStatus`, so the logger would report a 500 the caller
+ * never received, against an error the response no longer describes. Writing
+ * the resolved pair down once removes the guesswork — and keeps the handler
+ * from logging a second, competing copy.
  */
-export const RESOLVED_ERROR_STATUS = "resolvedErrorStatus";
+export const RESOLVED_ERROR = "resolvedError";
 
 /**
- * Logs a failed request from inside the error handler.
+ * What {@link createErrorHandler} publishes for the request logger to consume.
  *
- * Handled errors are the domain speaking on purpose, so they log by fault
- * attribution — a customer's bad input is a `warn`, our own or a provider's
- * breakage is an `error`. Anything unhandled is a bug and always logs at
- * `error` with its cause, because the response deliberately flattens it to
- * "An unknown error occurred" and that is the only place the stack survives.
- *
- * Request bodies are never logged: automation `actionParams` carry encrypted
- * webhook headers and Slack tokens.
+ * Request bodies are deliberately absent: automation `actionParams` carry
+ * encrypted webhook headers and Slack tokens.
  */
-function logError({
-  logger,
-  err,
-  status,
-  c,
-}: {
-  logger: Logger;
-  err: unknown;
+export interface ResolvedError {
   status: ContentfulStatusCode;
-  c: Context;
-}): void {
-  const base = {
-    method: c.req.method,
-    url: c.req.path,
-    statusCode: status,
-  };
-
-  if (HandledError.isHandled(err)) {
-    const level = err.fault === "customer" ? "warn" : "error";
-    logger[level](
-      {
-        ...base,
-        handledErrorCode: err.code,
-        handledErrorFault: err.fault,
-        ...(err.traceId ? { traceId: err.traceId } : {}),
-      },
-      "handled error on request",
-    );
-    return;
-  }
-
-  logger.error({ ...base, error: err }, "unhandled error on request");
+  error: unknown;
+  traceId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -236,28 +206,34 @@ function logError({
 /**
  * Creates the `app.onError(...)` handler for the service framework.
  *
- * Reads `c.get("isVersionedRequest")` to decide the response format, logs the
- * failure, and records the status it sent on the context so the request logger
- * reports what the caller actually received.
+ * Reads `c.get("isVersionedRequest")` to decide the response format, and
+ * records the error it sent plus the status it sent it as on the context, so
+ * the request logger reports what the caller actually received.
+ *
+ * This handler does not log. `loggerMiddleware` writes exactly one error
+ * record per failed request, from the resolved pair published here — a second
+ * record from this side would double every error-log-derived alert and count.
  */
-export function createErrorHandler(options?: {
-  logger?: Logger;
-  name?: string;
-}): (err: Error, c: Context) => Response | Promise<Response> {
-  const logger =
-    options?.logger ??
-    createLogger(`langwatch:api:${options?.name ?? "hono"}:errors`);
-
+export function createErrorHandler(): (
+  err: Error,
+  c: Context,
+) => Response | Promise<Response> {
   return (err: Error, c: Context) => {
     const isVersioned = c.get("isVersionedRequest") === true;
-    // Promote first so the response and the log agree on one error. Logging
-    // the raw ZodError would report it as unhandled, at `error`, against the
-    // 500 it no longer is.
+    // Promote first so the response and the log agree on one error. Reporting
+    // the raw ZodError would log it as unhandled, at `error`, against the 500
+    // it no longer is.
     const effective = err instanceof ZodError ? validationErrorFromZod(err) : err;
     const { status, body } = formatError({ err: effective, isVersioned });
 
-    logError({ logger, err: effective, status, c });
-    c.set(RESOLVED_ERROR_STATUS, status);
+    const resolved: ResolvedError = {
+      status,
+      error: effective,
+      ...(HandledError.isHandled(effective) && effective.traceId
+        ? { traceId: effective.traceId }
+        : {}),
+    };
+    c.set(RESOLVED_ERROR, resolved);
 
     return c.json(body, status);
   };
