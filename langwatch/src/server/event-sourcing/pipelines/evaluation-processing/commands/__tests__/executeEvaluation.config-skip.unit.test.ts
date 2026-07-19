@@ -5,11 +5,8 @@
  * skip, not a failure. All deps injected via the constructor; the logger is
  * mocked because the log *level* is the behaviour under test.
  *
- * Covers scenarios from specs/evaluators/evaluator-config-skips.feature:
- * - "Monitor using a provider the project has disabled is skipped"
- * - "Monitor using a provider the project never configured is skipped"
- * - "Misconfiguration is logged at info with a stable kind for alerting"
- * - "Genuine evaluator faults are still reported as errors"
+ * Scenarios from specs/evaluators/evaluator-config-skips.feature are bound
+ * individually via the `@scenario` annotations below.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -113,6 +110,7 @@ describe("Feature: Evaluator misconfiguration is a skip, not a failure", () => {
 
   describe("given the project has the provider configured but not enabled", () => {
     describe("when the command handles the evaluation", () => {
+      /** @scenario Monitor using a provider the project has disabled is skipped */
       it("emits a skipped event carrying the configure message", async () => {
         const { command } = buildCommandWithMocks({
           thrown: new EvaluatorConfigError("Provider openai is not enabled"),
@@ -137,6 +135,7 @@ describe("Feature: Evaluator misconfiguration is a skip, not a failure", () => {
         expect(loggerSpies.error).not.toHaveBeenCalled();
       });
 
+      /** @scenario Misconfiguration is logged at info with a stable code for alerting */
       it("logs at info with the stable code and identifiers", async () => {
         const { command } = buildCommandWithMocks({
           thrown: new EvaluatorConfigError("Provider openai is not enabled"),
@@ -159,6 +158,7 @@ describe("Feature: Evaluator misconfiguration is a skip, not a failure", () => {
 
   describe("given the project never configured the provider", () => {
     describe("when the command handles the evaluation", () => {
+      /** @scenario Monitor using a provider the project never configured is skipped */
       it("emits a skipped event carrying the configure message", async () => {
         const { command } = buildCommandWithMocks({
           thrown: new EvaluatorConfigError(
@@ -183,6 +183,7 @@ describe("Feature: Evaluator misconfiguration is a skip, not a failure", () => {
   // file and fails only these.
   describe("given langevals is unreachable", () => {
     describe("when the command handles the evaluation", () => {
+      /** @scenario An evaluator service outage is reported as an error, not a skip */
       it("emits an error event, not a skip", async () => {
         const { command } = buildCommandWithMocks({
           thrown: new EvaluatorExecutionError("Evaluator cannot be reached"),
@@ -208,6 +209,7 @@ describe("Feature: Evaluator misconfiguration is a skip, not a failure", () => {
 
   describe("given the evaluator throws an unexpected error", () => {
     describe("when the command handles the evaluation", () => {
+      /** @scenario Genuine evaluator faults are still reported as errors */
       it("emits an error event", async () => {
         const { command } = buildCommandWithMocks({
           thrown: new Error("connection reset by peer"),

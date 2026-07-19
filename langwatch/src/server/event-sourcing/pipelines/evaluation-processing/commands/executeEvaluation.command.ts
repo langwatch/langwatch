@@ -5,7 +5,7 @@ import {
   isAzureEvaluatorType,
 } from "../../../../app-layer/evaluations/azure-safety-env";
 import { getAzureSafetyEnvFromProject } from "../../../../app-layer/evaluations/azure-safety-env.server";
-import { HandledError } from "../../../../app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
@@ -42,26 +42,22 @@ const logger = createLogger(
 );
 
 /**
- * Handled-error codes that represent a customer-fixable misconfiguration
- * rather than a platform fault. These are reported as "skipped" with a
- * self-serve message instead of "error", and logged at info.
+ * A failure the customer can resolve themselves (provider disabled, missing
+ * credentials, an unmapped evaluator field) rather than one we have to fix.
  *
- * Deliberately an allowlist keyed on `code` (the serialisable discriminant,
- * safe across process boundaries) rather than a `HandledError` instanceof
- * check: `HandledError` also covers genuine faults — notably
- * `EvaluatorExecutionError`, raised when langevals times out, is unreachable,
- * or returns 5xx — which must keep surfacing as errors. Add a code here only
- * when the customer can actually resolve it themselves.
+ * Keyed on `HandledError.fault` — the repo's own classification, mirrored in
+ * `services/aigateway/adapters/httpapi/faults.go` — so this stays correct as
+ * new error types are added instead of drifting behind a hand-kept list.
+ *
+ * Note it is deliberately NOT `HandledError.isHandled(error)`: that is the
+ * whole base class, which also covers `EvaluatorExecutionError`
+ * (`fault: "platform"`, raised when langevals times out, is unreachable, or
+ * returns 5xx). Downgrading those would hide an outage behind a benign skip.
+ * `fault: "provider"` likewise stays an error — a third-party outage is not
+ * something the customer can act on.
  */
-const CUSTOMER_FIXABLE_ERROR_CODES: ReadonlySet<string> = new Set([
-  "evaluator_config_error",
-]);
-
-function isCustomerFixableConfigError(error: unknown): error is HandledError {
-  return (
-    HandledError.isHandled(error) &&
-    CUSTOMER_FIXABLE_ERROR_CODES.has(error.code)
-  );
+function isCustomerFixable(error: unknown): error is HandledError {
+  return HandledError.isHandled(error) && error.fault === "customer";
 }
 
 export interface ExecuteEvaluationCommandDeps {
@@ -370,7 +366,7 @@ export class ExecuteEvaluationCommand implements CommandHandler<
       // silently swallow real outages. `EvaluatorExecutionError` in particular
       // is a HandledError raised when langevals times out, is unreachable, or
       // returns 5xx — exactly the faults that must keep paging us.
-      if (isCustomerFixableConfigError(error)) {
+      if (isCustomerFixable(error)) {
         logger.info(
           {
             // `meta` first so the fixed identifiers below always win: `meta`
