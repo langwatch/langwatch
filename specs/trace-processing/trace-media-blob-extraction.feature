@@ -65,7 +65,8 @@ Feature: Trace media blob extraction at the ingestion edge
   Scenario: Raw realtime audio is wrapped into a playable container at store time
     Given an inline recording in a raw header-less format (pcm16 or G.711)
     When the recording is externalized (on the scenario path or the trace path)
-    Then the stored bytes carry a WAV container around the exact original samples
+    Then the stored bytes are a linear-PCM WAV (G.711 is decoded first — browser
+      WAV playback is PCM-only)
     And the stored object's media type is "audio/wav" so the reference plays natively
     And both paths wrap identically, so the same recording still dedups to one object
 

@@ -213,23 +213,36 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
     }
     let cancelled = false;
     let objectUrl: string | null = null;
+    const controller = new AbortController();
     void (async () => {
       try {
-        const response = await fetch(src, { credentials: "same-origin" });
+        const response = await fetch(src, {
+          credentials: "same-origin",
+          signal: controller.signal,
+        });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const bytes = new Uint8Array(await response.arrayBuffer());
         const wav = wrapRawPcmToWav(bytes, rawUrlFormat);
         if (!wav) throw new Error("empty audio payload");
-        objectUrl = URL.createObjectURL(
+        const url = URL.createObjectURL(
           new Blob([wav as BlobPart], { type: "audio/wav" }),
         );
-        if (!cancelled) setWrappedSrc(objectUrl);
+        // The cleanup may already have run while the bytes were in flight;
+        // a URL minted after that point would leak forever, so revoke it
+        // here instead of publishing it.
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        objectUrl = url;
+        setWrappedSrc(url);
       } catch {
         if (!cancelled) handleError();
       }
     })();
     return () => {
       cancelled = true;
+      controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
     // handleError is a stable-in-practice component function; src/format are

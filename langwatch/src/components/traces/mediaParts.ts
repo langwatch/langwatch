@@ -15,7 +15,10 @@ import type { MediaPartData } from "~/components/simulations/MediaPart";
 import type { TraceMediaRef } from "~/server/app-layer/traces/media-refs";
 import { containsMediaMarkers } from "~/server/stored-objects/media-markers";
 import { visitContentPart } from "~/server/stored-objects/visit-content-part";
-import { pcm16ToWavBase64, resolveRawPcmFormat } from "~/shared/audio/pcmToWav";
+import {
+  rawPcmBase64ToWavBase64,
+  resolveRawPcmFormat,
+} from "~/shared/audio/pcmToWav";
 
 const AUDIO_FORMAT_MIME: Record<string, string> = {
   wav: "audio/wav",
@@ -94,22 +97,19 @@ export function mediaPartToMediaData(part: unknown): MediaPartData | null {
     }),
     inputAudio: (p) => {
       // Raw, header-less realtime formats aren't playable as a bare data: URI.
-      // pcm16 (the primary OpenAI Realtime format) is wrapped into a WAV
-      // container so it actually plays; g711 is companded and can't be wrapped
-      // inline yet, so we return null rather than emit a silently-broken
-      // <audio> — it falls back to the raw view. Only inline `data` needs
-      // wrapping here: externalized `url` references are WAV-wrapped at store
-      // time by the content extractor and served as playable audio/wav.
+      // Wrap them into a playable WAV: pcm16 gets a header as-is, the
+      // companded G.711 formats are decoded to linear PCM first (browser WAV
+      // decoders are PCM-only). Only inline `data` needs wrapping here:
+      // externalized `url` references are WAV-wrapped at store time by the
+      // content extractor and served as playable audio/wav.
       const rawFormat = resolveRawPcmFormat(p.format, p.mimeType);
       if (p.data && rawFormat) {
-        if (rawFormat === "pcm16") {
-          const wav = pcm16ToWavBase64(p.data);
-          if (wav)
-            return {
-              type: "audio",
-              source: { type: "data", value: wav, mimeType: "audio/wav" },
-            };
-        }
+        const wav = rawPcmBase64ToWavBase64(p.data, rawFormat);
+        if (wav)
+          return {
+            type: "audio",
+            source: { type: "data", value: wav, mimeType: "audio/wav" },
+          };
         return null;
       }
       const mimeType = p.mimeType ?? audioFormatToMimeType(p.format);

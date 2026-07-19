@@ -306,9 +306,12 @@ describe("extractInlineMediaFromValue", () => {
   });
 
   describe("given a companded G.711 realtime recording", () => {
-    it("stores it WAV-wrapped under the µ-law fmt code without re-encoding", async () => {
+    it("stores it decoded to linear PCM16 WAV so browsers can play it", async () => {
       const { service, calls } = makeFakeService();
-      const samples = Buffer.from([1, 2, 3, 4, 5, 6, 7, 8]);
+      // µ-law byte 0x00 decodes to the maximum-magnitude negative sample
+      // (-32124) in the standard CCITT expansion — a strong signal the
+      // decode really ran instead of the bytes being copied through.
+      const samples = Buffer.from([0x00, 0xff, 1, 2, 3, 4, 5, 8]);
       const value = [
         {
           role: "user",
@@ -334,9 +337,14 @@ describe("extractInlineMediaFromValue", () => {
       expect(calls[0]!.mediaType).toBe("audio/wav");
       const wav = calls[0]!.bytes;
       expect(wav.subarray(0, 4).toString("ascii")).toBe("RIFF");
-      expect(wav.readUInt16LE(20)).toBe(7); // fmt 7 = µ-law
+      // Browser WAV decoders are PCM-only: the companded bytes must be
+      // expanded, never stored under fmt codes 6/7.
+      expect(wav.readUInt16LE(20)).toBe(1); // linear PCM
       expect(wav.readUInt32LE(24)).toBe(8000); // telephony sample rate
-      expect(wav.subarray(44).equals(samples)).toBe(true);
+      expect(wav.readUInt16LE(34)).toBe(16); // 16-bit after expansion
+      expect(wav.length).toBe(44 + samples.length * 2);
+      expect(wav.readInt16LE(44)).toBe(-32124); // µ-law 0x00
+      expect(wav.readInt16LE(46)).toBe(0); // µ-law 0xff
     });
   });
 

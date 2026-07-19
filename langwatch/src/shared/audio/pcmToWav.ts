@@ -14,10 +14,12 @@
  * externalized references are served as playable `audio/wav` from day one.
  *
  * Formats: `pcm16` (24 kHz mono 16-bit little-endian, the OpenAI Realtime
- * capture default) is wrapped as linear PCM. The companded G.711 formats
- * (`g711_ulaw` / `g711_alaw`, 8 kHz telephony) are wrapped WITHOUT decoding —
- * WAV carries them natively via fmt codes 7 (µ-law) and 6 (A-law), which
- * browsers decode.
+ * capture default) is wrapped as linear PCM as-is. The companded G.711
+ * formats (`g711_ulaw` / `g711_alaw`, 8 kHz telephony) are DECODED to linear
+ * PCM16 first: browser <audio> WAV decoders are PCM-only, so a WAV carrying
+ * fmt codes 6/7 would be a silently-dead player. The G.711 expansion is the
+ * standard table-free CCITT decode — lossless with respect to what the codec
+ * carries.
  */
 
 export type RawPcmFormat = "pcm16" | "g711_ulaw" | "g711_alaw";
@@ -57,9 +59,21 @@ export function resolveRawPcmFormat(
  * Returns null when the payload is empty or cannot be decoded.
  */
 export function pcm16ToWavBase64(dataBase64: string): string | null {
+  return rawPcmBase64ToWavBase64(dataBase64, "pcm16");
+}
+
+/**
+ * Wrap (and for G.711, decode) raw realtime audio base64 into WAV base64,
+ * ready for a `data:audio/wav;base64,…` URI. Returns null when the payload
+ * is empty or cannot be decoded.
+ */
+export function rawPcmBase64ToWavBase64(
+  dataBase64: string,
+  format: RawPcmFormat,
+): string | null {
   try {
-    const pcm = base64ToBytes(dataBase64);
-    const wrapped = wrapRawPcmToWav(pcm, "pcm16");
+    const samples = base64ToBytes(dataBase64);
+    const wrapped = wrapRawPcmToWav(samples, format);
     return wrapped ? bytesToBase64(wrapped) : null;
   } catch {
     return null;
@@ -67,47 +81,82 @@ export function pcm16ToWavBase64(dataBase64: string): string | null {
 }
 
 /**
+ * Decode one G.711 µ-law byte to a linear 16-bit sample (SUN g711.c decode).
+ */
+function ulawToLinear(byte: number): number {
+  const u = ~byte & 0xff;
+  let t = ((u & 0x0f) << 3) + 0x84;
+  t <<= (u & 0x70) >> 4;
+  return u & 0x80 ? 0x84 - t : t - 0x84;
+}
+
+/**
+ * Decode one G.711 A-law byte to a linear 16-bit sample (SUN g711.c decode).
+ */
+function alawToLinear(byte: number): number {
+  const a = byte ^ 0x55;
+  let t = (a & 0x0f) << 4;
+  const seg = (a & 0x70) >> 4;
+  if (seg === 0) t += 8;
+  else if (seg === 1) t += 0x108;
+  else {
+    t += 0x108;
+    t <<= seg - 1;
+  }
+  return a & 0x80 ? t : -t;
+}
+
+/** Expand companded G.711 bytes to linear PCM16 little-endian. */
+function g711ToPcm16(
+  samples: Uint8Array,
+  format: "g711_ulaw" | "g711_alaw",
+): Uint8Array {
+  const decode = format === "g711_ulaw" ? ulawToLinear : alawToLinear;
+  const out = new Uint8Array(samples.length * 2);
+  const view = new DataView(out.buffer);
+  for (let i = 0; i < samples.length; i++) {
+    view.setInt16(i * 2, decode(samples[i]!), true);
+  }
+  return out;
+}
+
+/**
  * Wrap raw realtime audio bytes in a WAV container for the given format.
- * Returns null for an empty payload. The samples are never re-encoded —
- * pcm16 gets a linear-PCM header (fmt 1); G.711 keeps its companded bytes
- * under fmt 7 (µ-law) / fmt 6 (A-law).
+ * Returns null for an empty payload. pcm16 keeps its samples untouched under
+ * a linear-PCM header; G.711 is expanded to linear PCM16 first (browser WAV
+ * decoders are PCM-only — fmt codes 6/7 would produce a dead player).
  */
 export function wrapRawPcmToWav(
   samples: Uint8Array,
   format: RawPcmFormat,
 ): Uint8Array | null {
   if (samples.length === 0) return null;
-  const spec =
-    format === "pcm16"
-      ? { fmtCode: 1, bitsPerSample: 16, sampleRate: PCM16_SAMPLE_RATE }
-      : {
-          fmtCode: format === "g711_ulaw" ? 7 : 6,
-          bitsPerSample: 8,
-          sampleRate: G711_SAMPLE_RATE,
-        };
+  const pcm = format === "pcm16" ? samples : g711ToPcm16(samples, format);
+  const sampleRate = format === "pcm16" ? PCM16_SAMPLE_RATE : G711_SAMPLE_RATE;
   const channels = 1;
-  const blockAlign = (channels * spec.bitsPerSample) / 8;
-  const byteRate = spec.sampleRate * blockAlign;
+  const bitsPerSample = 16;
+  const blockAlign = (channels * bitsPerSample) / 8;
+  const byteRate = sampleRate * blockAlign;
 
-  const out = new Uint8Array(44 + samples.length);
+  const out = new Uint8Array(44 + pcm.length);
   const view = new DataView(out.buffer);
   // RIFF chunk descriptor
   writeAscii(view, 0, "RIFF");
-  view.setUint32(4, 36 + samples.length, true);
+  view.setUint32(4, 36 + pcm.length, true);
   writeAscii(view, 8, "WAVE");
   // "fmt " sub-chunk
   writeAscii(view, 12, "fmt ");
   view.setUint32(16, 16, true); // fmt chunk size
-  view.setUint16(20, spec.fmtCode, true);
+  view.setUint16(20, 1, true); // linear PCM
   view.setUint16(22, channels, true);
-  view.setUint32(24, spec.sampleRate, true);
+  view.setUint32(24, sampleRate, true);
   view.setUint32(28, byteRate, true);
   view.setUint16(32, blockAlign, true);
-  view.setUint16(34, spec.bitsPerSample, true);
+  view.setUint16(34, bitsPerSample, true);
   // "data" sub-chunk
   writeAscii(view, 36, "data");
-  view.setUint32(40, samples.length, true);
-  out.set(samples, 44);
+  view.setUint32(40, pcm.length, true);
+  out.set(pcm, 44);
   return out;
 }
 

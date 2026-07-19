@@ -12,12 +12,6 @@ import "@testing-library/jest-dom/vitest";
 import type { Trace } from "../../../server/tracer/types";
 import { TraceMessages } from "../TraceMessages";
 
-vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "proj-1", slug: "test", name: "Test Project" },
-  }),
-}));
-
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "test", name: "Test Project" },

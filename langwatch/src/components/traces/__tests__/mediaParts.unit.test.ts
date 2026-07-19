@@ -96,15 +96,25 @@ describe("audioPartToMediaData", () => {
     });
 
     describe("when it carries companded g711 data", () => {
-      it("returns null rather than a silently-broken player", () => {
-        // Raw g711 can't be wrapped inline yet; emitting an <audio> would be a
-        // dead player, so it must fall back (null) to the raw view instead.
-        expect(
-          audioPartToMediaData({
-            type: "input_audio",
-            input_audio: { data: "AAAA", format: "g711_ulaw" },
-          }),
-        ).toBeNull();
+      it("decodes it to a playable linear-PCM WAV data source", () => {
+        // Browser WAV playback is PCM-only, so the companded bytes are
+        // expanded during the wrap instead of shipped under fmt codes 6/7.
+        const result = audioPartToMediaData({
+          type: "input_audio",
+          input_audio: { data: "AAAA", format: "g711_ulaw" },
+        });
+
+        expect(result).not.toBeNull();
+        const source = (
+          result as { source: { value: string; mimeType?: string } }
+        ).source;
+        expect(source.mimeType).toBe("audio/wav");
+        const wav = Buffer.from(source.value, "base64");
+        expect(wav.toString("ascii", 0, 4)).toBe("RIFF");
+        expect(wav.readUInt16LE(20)).toBe(1); // linear PCM after decode
+        expect(wav.readUInt32LE(24)).toBe(8000);
+        // 3 companded bytes ("AAAA" decodes to 3 bytes) → 3 PCM16 samples
+        expect(wav.length).toBe(44 + 3 * 2);
       });
     });
   });
