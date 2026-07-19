@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { ConversationExpandContext } from "~/features/traces-v2/components/TraceDrawer/conversationView/expandContext";
@@ -31,7 +31,7 @@ import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
 import { TraceDetails } from "../traces/TraceDetails";
-import { hasNoResults } from "./scenario-run-status.utils";
+import { hasNoResults, shouldShowNoResponse } from "./scenario-run-status.utils";
 import { getRunStatePollInterval } from "./run-state-polling";
 import { Drawer } from "../ui/drawer";
 import { CopyIdChip } from "./CopyIdChip";
@@ -222,6 +222,15 @@ export function ScenarioRunDetailDrawer({
     (streamingMessages ?? []).length > 0;
   const conversationCount =
     (scenarioState?.messages ?? []).length + (streamingMessages ?? []).length;
+
+  // A finished run that produced no messages (and didn't fail at the infra
+  // level) means the agent under test returned nothing — show an explicit
+  // "No response" state instead of silently omitting the conversation.
+  const showNoResponse = shouldShowNoResponse({
+    status: scenarioState?.status,
+    hasConversation,
+    hasError: Boolean(scenarioState?.results?.error),
+  });
 
   const [openSections, setOpenSections] = useState<string[]>([
     "conversation",
@@ -430,11 +439,39 @@ export function ScenarioRunDetailDrawer({
                   </RunDetailSection>
                 )}
 
+                {/* No-response — explicit empty state when a finished run
+                    produced no messages (agent under test returned nothing). */}
+                {showNoResponse && (
+                  <RunDetailSection
+                    value="conversation"
+                    title="Conversation"
+                    isFirst
+                  >
+                    <VStack
+                      align="center"
+                      justify="center"
+                      gap={2}
+                      paddingY={8}
+                      color="fg.muted"
+                      data-testid="scenario-no-response"
+                    >
+                      <Inbox size={24} />
+                      <Text fontSize="sm" fontWeight="medium" color="fg">
+                        No response
+                      </Text>
+                      <Text fontSize="xs" textAlign="center" maxWidth="320px">
+                        The agent under test didn&apos;t return any messages for
+                        this run.
+                      </Text>
+                    </VStack>
+                  </RunDetailSection>
+                )}
+
                 <RunDetailSection
                   value="results"
                   title="Results"
                   count={criteria?.total}
-                  isFirst={!hasConversation}
+                  isFirst={!hasConversation && !showNoResponse}
                 >
                   <Box
                     borderRadius="xl"
