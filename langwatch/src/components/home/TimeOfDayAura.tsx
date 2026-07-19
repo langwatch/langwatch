@@ -1,5 +1,6 @@
 import { chakra } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
+import { useColorMode } from "~/components/ui/color-mode";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { TimeOfDay } from "./WelcomeHeader";
 
@@ -43,12 +44,14 @@ const PALETTES: Record<TimeOfDay, AuraBlob[]> = {
 
 export function TimeOfDayAura({ timeOfDay }: { timeOfDay: TimeOfDay }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const { colorMode } = useColorMode();
   const reduceMotion = useReducedMotion();
   const timeOfDayRef = useRef(timeOfDay);
   timeOfDayRef.current = timeOfDay;
   const drawRef = useRef<((t: number) => void) | null>(null);
 
   useEffect(() => {
+    if (colorMode !== "dark") return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -137,7 +140,7 @@ export function TimeOfDayAura({ timeOfDay }: { timeOfDay: TimeOfDay }) {
       observer.disconnect();
       drawRef.current = null;
     };
-  }, [reduceMotion]);
+  }, [colorMode, reduceMotion]);
 
   // A time-of-day flip (midnight owl, dev switcher) repaints the still frame.
   useEffect(() => {
@@ -148,13 +151,15 @@ export function TimeOfDayAura({ timeOfDay }: { timeOfDay: TimeOfDay }) {
     <chakra.canvas
       ref={canvasRef}
       aria-hidden
+      data-testid="time-of-day-aura"
+      display={{ base: "none", _dark: "block" }}
       position="absolute"
       inset={0}
       width="100%"
       height="100%"
       pointerEvents="none"
       zIndex={0}
-      opacity={{ base: 0.5, _dark: 0.65 }}
+      opacity={0.65}
     />
   );
 }

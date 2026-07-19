@@ -3,10 +3,12 @@
  * trace drawer.
  *
  * Unlike the page tour (SpotlightOverlay), there's no linear walkthrough:
- * each DRAWER_SPOTLIGHTS entry fires exactly once per browser, the first
- * time a drawer opens where the feature is actually present. The anchored
- * components only emit their `data-spotlight` attribute when the feature
- * has content, so anchor-in-DOM IS the display condition.
+ * each DRAWER_SPOTLIGHTS entry fires exactly once in the current browser,
+ * the first time a drawer opens where the feature is actually present.
+ * The server-backed preference suppresses the entire automatic queue for
+ * a user after any tour dismissal, including on other projects or devices.
+ * Anchored components only emit their `data-spotlight` attribute when the
+ * feature has content, so anchor presence is the display condition.
  *
  * Show-once semantics: a spotlight is marked seen the moment it is
  * DISPLAYED (not when acknowledged), so it never repeats — even if the
@@ -18,6 +20,7 @@ import { Portal } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTraceExplorerTourPreference } from "../hooks/useTraceExplorerTourPreference";
 import { useOnboardingStore } from "../store/onboardingStore";
 import {
   type AnchorRect,
@@ -41,6 +44,8 @@ export function DrawerSpotlights({
   const markDrawerSpotlightSeen = useOnboardingStore(
     (s) => s.markDrawerSpotlightSeen,
   );
+  const { dismiss: persistDismissal, isDismissed } =
+    useTraceExplorerTourPreference();
 
   // The queue is computed once per trace (after a rAF so the drawer's
   // content has painted). Freeze the seen-map behind a ref so marking
@@ -63,7 +68,7 @@ export function DrawerSpotlights({
     setPos(0);
     setClosed(false);
     setAnchorRect(null);
-    if (pageTourActive) return;
+    if (pageTourActive || isDismissed) return;
     const raf = requestAnimationFrame(() => {
       const next = DRAWER_SPOTLIGHTS.filter(
         (s) => !seenRef.current[s.id] && measureAnchor(s.anchor) !== null,
@@ -71,10 +76,10 @@ export function DrawerSpotlights({
       setQueue(next);
     });
     return () => cancelAnimationFrame(raf);
-  }, [traceId, pageTourActive]);
+  }, [traceId, pageTourActive, isDismissed]);
 
   const current: Spotlight | null =
-    !closed && !pageTourActive ? (queue[pos] ?? null) : null;
+    !closed && !pageTourActive && !isDismissed ? (queue[pos] ?? null) : null;
 
   // Mark the spotlight seen the moment it is displayed — show-once even
   // when the queue is dismissed straight after.
@@ -145,8 +150,9 @@ export function DrawerSpotlights({
   }, [current, remeasure]);
 
   const handleDismiss = useCallback(() => {
+    persistDismissal();
     setClosed(true);
-  }, []);
+  }, [persistDismissal]);
 
   const handleNext = useCallback(() => {
     setPos((p) => {
