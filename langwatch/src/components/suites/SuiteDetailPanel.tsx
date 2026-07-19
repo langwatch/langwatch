@@ -255,7 +255,7 @@ export function SuiteEmptyState({ onNewSuite }: { onNewSuite: () => void }) {
           <EmptyState.Description>
             Select a run plan from the sidebar or create a new one
           </EmptyState.Description>
-          <Button colorPalette="orange" onClick={onNewSuite}>
+          <Button colorPalette="blue" onClick={onNewSuite}>
             <Plus size={16} /> New Run Plan
           </Button>
         </EmptyState.Content>

@@ -7,11 +7,11 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 /**
  * Small announcement card pinned to the bottom of the simulations sidebar,
- * just above the collapse-toggle footer. A subtle, on-brand info card
- * (orange `colorPalette` surface tokens + arrow CTA + snooze-on-dismiss) at a
- * sidebar-friendly size — styled with design-system semantic tokens so it
- * matches the rest of the product and adapts to light/dark, rather than a
- * hardcoded gradient.
+ * just above the collapse-toggle footer. A clean, subtle info card in the
+ * simulations blue accent (`colorPalette="blue"` surface tokens + arrow CTA +
+ * snooze-on-dismiss) at a sidebar-friendly size — styled with design-system
+ * semantic tokens so it matches the rest of the product and adapts to
+ * light/dark, rather than the previous clashing hardcoded blue→teal gradient.
  *
  * The CTA opens the public Voice docs (Scenario `voice/getting-started`)
  * in a new tab, so we render a plain `<a>` rather than the in-app `<Link>`
@@ -96,7 +96,7 @@ export function VoiceAgentsCallout() {
         style={{ textDecoration: "none", display: "block" }}
       >
         <Box
-          colorPalette="orange"
+          colorPalette="blue"
           position="relative"
           borderRadius="lg"
           padding={3}

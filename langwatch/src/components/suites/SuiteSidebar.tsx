@@ -207,7 +207,7 @@ export function SuiteSidebar({
                 agent.
               </EmptyState.Description>
               {onNewSuite && (
-                <Button size="xs" colorPalette="orange" onClick={onNewSuite}>
+                <Button size="xs" colorPalette="blue" onClick={onNewSuite}>
                   <Plus size={14} /> New Run Plan
                 </Button>
               )}
