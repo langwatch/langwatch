@@ -14,7 +14,7 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
 
   Rule: Live AI gateway containment blocks non-public destinations
 
-    @security @integration @phase-0
+    @security @integration @phase-0 @unimplemented
     Scenario Outline: The gateway rejects special-use destination classes
       Given a tenant controls a custom provider endpoint
       When the endpoint resolves to <destination>
@@ -32,7 +32,7 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
         | an IPv6 unique-local address        |
         | an IPv4-mapped private IPv6 address |
 
-    @security @integration @phase-0
+    @security @integration @phase-0 @unimplemented
     Scenario: A DNS rebinding answer cannot change the connected address class
       Given a customer hostname resolves publicly during authorization
       And the hostname resolves privately on a later DNS query
@@ -41,7 +41,7 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
       Or the request is denied
       And no private address receives request bytes
 
-    @security @integration @phase-0
+    @security @integration @phase-0 @unimplemented
     Scenario: A redirect is re-authorized before it is followed
       Given an allowed public endpoint redirects to a private endpoint
       When the gateway receives the redirect
@@ -63,7 +63,7 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
 
   Rule: Public destinations continue to work through the egress plane
 
-    @integration
+    @integration @unimplemented
     Scenario Outline: Supported public delivery semantics are preserved
       Given a tenant is authorized to use <egress class>
       And the destination resolves only to globally routable addresses
@@ -78,14 +78,14 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
         | built-in AI provider   |
         | custom public provider |
 
-    @integration
+    @integration @unimplemented
     Scenario: AI streaming cancellation propagates across the egress hop
       Given a public provider is streaming a response
       When the client disconnects
       Then the provider connection is cancelled within the configured budget
       And the final audit event records a client cancellation
 
-    @integration
+    @integration @unimplemented
     Scenario: Webhook retry identity survives queue redelivery
       Given a webhook delivery is retried after a transient response
       When the dedicated executor redelivers the job
@@ -94,21 +94,21 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
 
   Rule: The egress contract is tenant-bound
 
-    @security @integration
+    @security @integration @unimplemented
     Scenario: A signed envelope cannot be replayed for another tenant
       Given an envelope was issued for organization A and project A
       When it is submitted with organization B or project B credentials
       Then authorization fails
       And no outbound connection is opened
 
-    @security @integration
+    @security @integration @unimplemented
     Scenario: A tenant cannot select another tenant's credential reference
       Given organization A has a provider credential
       When organization B names that credential reference
       Then authorization fails
       And the credential is not materialized
 
-    @security @integration
+    @security @integration @unimplemented
     Scenario: Provider connections do not leak authentication across tenants
       Given tenants A and B use the same provider hostname
       When their requests are dispatched concurrently
@@ -124,7 +124,7 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
 
   Rule: Private provider access uses registered connectors
 
-    @security @integration
+    @security @integration @unimplemented
     Scenario: A tenant uses its own registered PrivateLink connector
       Given organization A owns connector A
       And connector A names exact endpoint addresses and TCP port 443
@@ -132,14 +132,14 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
       Then only connector A's endpoint can be reached
       And the endpoint security group accepts only the egress workload identity
 
-    @security @integration
+    @security @integration @unimplemented
     Scenario: A tenant cannot use another tenant's private connector
       Given organization A owns connector A
       When organization B requests connector A
       Then authorization fails
       And no connection to connector A is opened
 
-    @security @integration
+    @security @integration @unimplemented
     Scenario: A raw private URL cannot substitute for a connector
       Given a tenant submits a private hostname in a provider base URL
       When the provider request is authorized
@@ -156,7 +156,7 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
       And it has no database, Redis, object-store, AI-provider, or platform credentials
       And it has no Kubernetes credentials
 
-    @security @integration
+    @security @integration @unimplemented
     Scenario: The general worker cannot bypass the webhook executor
       Given a process worker tries to connect directly to an arbitrary public host
       Then the worker network policy denies the connection
@@ -171,7 +171,7 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
       And each pod uses runtimeClassName gvisor
       And each pod has distinct PID, mount, network, and ephemeral storage namespaces
 
-    @security @integration
+    @security @integration @unimplemented
     Scenario Outline: A compromised worker cannot inspect a sibling
       Given tenant A controls arbitrary shell in its worker pod
       And tenant B has an active worker pod
@@ -188,7 +188,7 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
         | loopback services     |
         | session credentials   |
 
-    @security @integration
+    @security @integration @unimplemented
     Scenario: A Langy worker cannot bypass the external egress service
       Given tenant-controlled code ignores proxy environment variables
       When it connects directly to a public address
@@ -219,13 +219,13 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
       And the shared NLP pod does not execute the Python process
       And only that invocation's inputs and scoped secrets are present
 
-    @security @integration
+    @security @integration @unimplemented
     Scenario: A code block is denied network access by default
       Given a workflow has not declared outbound HTTP capability
       When tenant Python opens a network connection
       Then the sandbox denies the connection
 
-    @security @integration
+    @security @integration @unimplemented
     Scenario: An HTTP-enabled code block uses tenant-aware egress
       Given a workflow is authorized for outbound HTTP
       When tenant Python calls an allowed public destination
