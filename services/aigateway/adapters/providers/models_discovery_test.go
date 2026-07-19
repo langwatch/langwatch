@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"time"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -109,5 +110,61 @@ func TestListModels_NoAuthHeaderWhenKeyEmptyAndDedupes(t *testing.T) {
 	}
 	if len(models) != 1 {
 		t.Fatalf("models = %v, want the shared model deduped to one entry", models)
+	}
+}
+
+// REPRO bug 1: discovery is serial — dead/slow endpoints stack their
+// latency. Three 400ms endpoints must be queried concurrently (~400ms
+// total), not serially (~1.2s).
+func TestListModels_QueriesEndpointsConcurrently(t *testing.T) {
+	slow := func() *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(400 * time.Millisecond)
+			_, _ = w.Write([]byte(`{"data":[{"id":"m"}]}`))
+		}))
+	}
+	s1, s2, s3 := slow(), slow(), slow()
+	defer s1.Close()
+	defer s2.Close()
+	defer s3.Close()
+
+	router := &BifrostRouter{}
+	start := time.Now()
+	_, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-1", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": s1.URL}},
+		{ID: "mp-2", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": s2.URL}},
+		{ID: "mp-3", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": s3.URL}},
+	})
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if elapsed > 900*time.Millisecond {
+		t.Fatalf("discovery took %v — endpoints are queried serially, not concurrently", elapsed)
+	}
+}
+
+// REPRO bug 3: only Authorization: Bearer is sent. An Anthropic-style
+// server that requires x-api-key rejects the probe and its models
+// silently vanish from the list.
+func TestListModels_SendsXAPIKeyForAnthropicStyleServers(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("x-api-key") == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[{"id":"qwen3-14b"}]}`))
+	}))
+	defer srv.Close()
+
+	router := &BifrostRouter{}
+	models, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-1", ProviderID: domain.ProviderAnthropic, APIKey: "sk-local", Extra: map[string]string{"base_url": srv.URL}},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if len(models) != 1 {
+		t.Fatalf("models = %v — x-api-key header not sent, server rejected the probe", models)
 	}
 }

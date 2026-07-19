@@ -122,3 +122,30 @@ func TestListModels_DedupesAndSorts(t *testing.T) {
 
 	assert.Equal(t, []string{"a-model", "b-model"}, modelIDs(models))
 }
+
+// REPRO bug 2: allow rules targeting models are ignored by the listing —
+// dispatch rejects models outside the allow pattern ("is not in
+// allowlist", adapters/policy/matcher.go), so listing them promises a
+// model the VK cannot actually call.
+func TestListModels_FiltersModelsOutsideAllowRules(t *testing.T) {
+	application := New(
+		WithLogger(zap.NewNop()),
+		WithProviders(&mockProvider{
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, error) {
+				return []domain.Model{{ID: "qwen3-14b"}, {ID: "gpt-4o"}}, nil
+			},
+		}),
+	)
+
+	models, err := application.ListModels(context.Background(), &domain.Bundle{
+		Config: domain.BundleConfig{
+			PolicyRules: []domain.PolicyRule{
+				{Pattern: "^qwen.*$", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	assert.ElementsMatch(t, []string{"qwen3-14b"}, modelIDs(models),
+		"gpt-4o is outside the model allow pattern; dispatch would 403 it")
+}

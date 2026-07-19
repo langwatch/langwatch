@@ -132,39 +132,54 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 		}
 	}
 
-	models = filterDeniedModels(models, cfg.PolicyRules)
+	models = filterModelsByPolicy(models, cfg.PolicyRules)
 	sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
 	return models, nil
 }
 
-// filterDeniedModels drops models matching a deny rule targeting models.
-// Invalid patterns are skipped: the list is discovery, not enforcement —
-// dispatch-time policy evaluation remains the authority.
-func filterDeniedModels(models []domain.Model, rules []domain.PolicyRule) []domain.Model {
-	var deny []*regexp.Regexp
+// filterModelsByPolicy mirrors dispatch-time model policy: models matching
+// a deny rule are dropped, and when any allow rule targets models, only
+// models matching one survive (the policy matcher rejects the rest with
+// "is not in allowlist"). Invalid patterns are skipped: the list is
+// discovery, not enforcement — dispatch-time evaluation remains the
+// authority.
+func filterModelsByPolicy(models []domain.Model, rules []domain.PolicyRule) []domain.Model {
+	var deny, allow []*regexp.Regexp
 	for _, r := range rules {
-		if r.Target != domain.PolicyTargetModel || r.Type != domain.PolicyDeny {
+		if r.Target != domain.PolicyTargetModel {
 			continue
 		}
-		if re, err := regexp.Compile(r.Pattern); err == nil {
+		re, err := regexp.Compile(r.Pattern)
+		if err != nil {
+			continue
+		}
+		switch r.Type {
+		case domain.PolicyDeny:
 			deny = append(deny, re)
+		case domain.PolicyAllow:
+			allow = append(allow, re)
 		}
 	}
-	if len(deny) == 0 {
+	if len(deny) == 0 && len(allow) == 0 {
 		return models
+	}
+	matchesAny := func(id string, patterns []*regexp.Regexp) bool {
+		for _, re := range patterns {
+			if re.MatchString(id) {
+				return true
+			}
+		}
+		return false
 	}
 	kept := models[:0]
 	for _, m := range models {
-		denied := false
-		for _, re := range deny {
-			if re.MatchString(m.ID) {
-				denied = true
-				break
-			}
+		if matchesAny(m.ID, deny) {
+			continue
 		}
-		if !denied {
-			kept = append(kept, m)
+		if len(allow) > 0 && !matchesAny(m.ID, allow) {
+			continue
 		}
+		kept = append(kept, m)
 	}
 	return kept
 }

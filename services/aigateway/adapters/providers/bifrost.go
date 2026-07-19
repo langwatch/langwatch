@@ -730,27 +730,41 @@ var modelsDiscoveryClient = &http.Client{Timeout: 5 * time.Second}
 // have no catalog to query and are skipped. A failing endpoint is skipped
 // too: one dead server must not blank out the whole list.
 func (r *BifrostRouter) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, error) {
-	var out []domain.Model
-	seen := make(map[string]bool)
-	for _, cred := range creds {
+	// Query endpoints concurrently: latency is max(endpoint), not
+	// sum(endpoint) — one slow or dead server must not stack its timeout
+	// onto the others. Results keep credential order for determinism.
+	perCred := make([][]string, len(creds))
+	var wg sync.WaitGroup
+	for i, cred := range creds {
 		base := normalizeOpenAICompatBaseURL(credBaseURL(cred))
 		if base == "" {
 			continue
 		}
-		ids, err := fetchUpstreamModels(ctx, base, cred.APIKey)
-		if err != nil {
-			if r.logger != nil {
-				r.logger.Warn("model discovery failed for endpoint, skipping",
-					zap.String("credential_id", cred.ID), zap.Error(err))
+		wg.Add(1)
+		go func(i int, cred domain.Credential, base string) {
+			defer wg.Done()
+			ids, err := fetchUpstreamModels(ctx, base, cred.APIKey)
+			if err != nil {
+				if r.logger != nil {
+					r.logger.Warn("model discovery failed for endpoint, skipping",
+						zap.String("credential_id", cred.ID), zap.Error(err))
+				}
+				return
 			}
-			continue
-		}
+			perCred[i] = ids
+		}(i, cred, base)
+	}
+	wg.Wait()
+
+	var out []domain.Model
+	seen := make(map[string]bool)
+	for i, ids := range perCred {
 		for _, id := range ids {
 			if id == "" || seen[id] {
 				continue
 			}
 			seen[id] = true
-			out = append(out, domain.Model{ID: id, Name: id, ProviderID: cred.ProviderID})
+			out = append(out, domain.Model{ID: id, Name: id, ProviderID: creds[i].ProviderID})
 		}
 	}
 	return out, nil
@@ -763,7 +777,11 @@ func fetchUpstreamModels(ctx context.Context, baseURL, apiKey string) ([]string,
 		return nil, err
 	}
 	if apiKey != "" {
+		// Both header conventions: OpenAI-compatible servers (vLLM,
+		// LiteLLM) read the bearer token, Anthropic-style servers read
+		// x-api-key. Sending both means neither kind rejects the probe.
 		req.Header.Set("Authorization", "Bearer "+apiKey)
+		req.Header.Set("x-api-key", apiKey)
 	}
 	resp, err := modelsDiscoveryClient.Do(req)
 	if err != nil {
