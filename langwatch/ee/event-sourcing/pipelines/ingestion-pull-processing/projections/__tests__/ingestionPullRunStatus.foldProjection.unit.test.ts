@@ -229,4 +229,70 @@ describe("IngestionPullRunStatusFoldProjection", () => {
       });
     });
   });
+
+  describe("given a source that is reconfigured while a pull is in flight", () => {
+    describe("when the configure event carries a stale cursor snapshot", () => {
+      it("keeps the live cursor instead of dragging it backwards", () => {
+        // syncIngestionPullSource snapshots pollerCursor at edit time, so a
+        // rename or schedule change replays whatever the cursor was THEN.
+        const configured = projection.apply(
+          projection.init(),
+          event("lw.obs.ingestion_pull.configured", {
+            sourceId: "source-1",
+            cron: "*/15 * * * *",
+            configVersion: "v1",
+            cursor: "cursor-A",
+          }),
+        );
+        const advanced = projection.apply(
+          configured,
+          event(
+            "lw.obs.ingestion_pull.run_completed",
+            {
+              sourceId: "source-1",
+              runId: "2000",
+              scheduledFor: 2_000,
+              nextCursor: "cursor-B",
+              eventCount: 4,
+            },
+            2_100,
+          ),
+        );
+
+        const reconfigured = projection.apply(
+          advanced,
+          event(
+            "lw.obs.ingestion_pull.configured",
+            {
+              sourceId: "source-1",
+              cron: "*/30 * * * *",
+              configVersion: "v2",
+              cursor: "cursor-A",
+            },
+            2_200,
+          ),
+        );
+
+        expect(reconfigured.Cursor).toBe("cursor-B");
+        expect(reconfigured.Cron).toBe("*/30 * * * *");
+        expect(reconfigured.Enabled).toBe(true);
+      });
+    });
+
+    describe("when it is the first configure", () => {
+      it("seeds the cursor from the event", () => {
+        const configured = projection.apply(
+          projection.init(),
+          event("lw.obs.ingestion_pull.configured", {
+            sourceId: "source-1",
+            cron: "*/15 * * * *",
+            configVersion: "v1",
+            cursor: "cursor-seed",
+          }),
+        );
+
+        expect(configured.Cursor).toBe("cursor-seed");
+      });
+    });
+  });
 });

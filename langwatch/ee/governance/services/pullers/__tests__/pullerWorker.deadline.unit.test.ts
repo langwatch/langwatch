@@ -16,11 +16,13 @@ import type { PullResult, PullRunOptions } from "../pullerAdapter";
 
 const sourceFindUnique = vi.fn();
 const sourceUpdate = vi.fn();
+const ocsfInsert = vi.fn();
 const ensureGovProject = vi.fn();
 
 beforeEach(() => {
   sourceFindUnique.mockReset();
   sourceUpdate.mockReset();
+  ocsfInsert.mockReset();
   ensureGovProject.mockReset();
   ensureGovProject.mockResolvedValue({ id: "gov-proj-1" });
 
@@ -34,8 +36,8 @@ beforeEach(() => {
   }));
   vi.doMock("../../governanceOcsfEvents.clickhouse.repository", () => ({
     GovernanceOcsfEventsClickHouseRepository: class {
-      async insertEvent() {
-        return undefined;
+      async insertEvent(row: unknown) {
+        return ocsfInsert(row);
       }
     },
     OCSF_ACTIVITY: { CREATE: 1, READ: 2, UPDATE: 3, DELETE: 4, INVOKE: 6 },
@@ -152,7 +154,11 @@ describe("given an adapter whose pull never settles", () => {
       expect(seen.signal!.aborted).toBe(true);
     });
 
-    it("leaves the durable cursor untouched so the window is retried", async () => {
+    it("ingests nothing, so no completion can record an advanced cursor", async () => {
+      // The cursor advances only when a completed run reports its nextCursor.
+      // A run cut off at the deadline must produce no events and no outcome --
+      // asserting on prisma writes here would be vacuous, because the worker
+      // no longer writes the cursor itself.
       vi.useFakeTimers();
       const { adapter, hasStarted } = hangingAdapter();
       sourceFindUnique.mockResolvedValueOnce({
@@ -166,15 +172,22 @@ describe("given an adapter whose pull never settles", () => {
 
       const { runIngestionPull } = await loadWorkerWith(adapter);
 
+      let resolvedNormally = false;
       const run = runIngestionPull({
         sourceId: "src-hang-3",
         cursor: "cursor-A",
-      }).catch(() => undefined);
+      })
+        .then(() => {
+          resolvedNormally = true;
+        })
+        .catch(() => undefined);
 
       await hasStarted;
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
       await run;
 
+      expect(resolvedNormally).toBe(false);
+      expect(ocsfInsert).not.toHaveBeenCalled();
       expect(sourceUpdate).not.toHaveBeenCalled();
     });
   });

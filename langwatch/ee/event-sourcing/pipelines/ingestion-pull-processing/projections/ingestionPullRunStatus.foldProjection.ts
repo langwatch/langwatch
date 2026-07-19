@@ -120,7 +120,15 @@ export class IngestionPullRunStatusFoldProjection
       SourceId: event.data.sourceId,
       Enabled: true,
       Cron: event.data.cron,
-      Cursor: event.data.cursor,
+      // Only the FIRST configure seeds the cursor. A reconfigure carries a
+      // cursor snapshotted from IngestionSource.pollerCursor when the edit was
+      // made, so adopting it would drag a live cursor backwards whenever
+      // someone renames a source or edits its schedule while a pull is in
+      // flight -- re-ingesting that window. The process manager fences this
+      // exact case (`previousState.sourceId ? previousState.cursor :
+      // view.cursor`); the read model has to agree, because its Cursor is
+      // mirrored back into pollerCursor.
+      Cursor: state.SourceId ? state.Cursor : event.data.cursor,
     };
   }
 
