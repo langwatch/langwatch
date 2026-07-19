@@ -20,10 +20,23 @@ const __dirname = path.dirname(__filename);
  */
 export const SKILL_TESTS_SET_ID = "skill-tests";
 
+const skillTestWorkRoot = path.resolve(
+	__dirname,
+	"../../../.claude/tmp/skill-tests",
+);
+
 export function createSkillTestWorkDir(prefix: string): string {
-	const root = path.resolve(__dirname, "../../../.claude/tmp/skill-tests");
-	fs.mkdirSync(root, { recursive: true });
-	return fs.mkdtempSync(path.join(root, prefix));
+	fs.mkdirSync(skillTestWorkRoot, { recursive: true });
+	return fs.mkdtempSync(path.join(skillTestWorkRoot, prefix));
+}
+
+export function removeSkillTestWorkDir(workingDirectory: string): void {
+	const resolvedDirectory = path.resolve(workingDirectory);
+	if (!resolvedDirectory.startsWith(`${skillTestWorkRoot}${path.sep}`)) {
+		throw new Error(`Test workspace must stay inside ${skillTestWorkRoot}`);
+	}
+
+	fs.rmSync(resolvedDirectory, { recursive: true, force: true });
 }
 
 export function copyFixtureToWorkDir({
@@ -103,6 +116,41 @@ exec node "${cliDistPath}" "$@"
 	fs.writeFileSync(wrapperPath, wrapperScript, { mode: 0o755 });
 }
 
+export function ensureClaudeSkillInstructions(workingDirectory: string): void {
+	const skillsDir = path.join(workingDirectory, ".skills");
+	if (!fs.existsSync(skillsDir)) return;
+
+	const skillPaths = fs
+		.readdirSync(skillsDir, { withFileTypes: true })
+		.filter(
+			(entry) =>
+				entry.isDirectory() &&
+				fs.existsSync(path.join(skillsDir, entry.name, "SKILL.md")),
+		)
+		.map((entry) => `.skills/${entry.name}/SKILL.md`);
+	if (skillPaths.length === 0) return;
+
+	const claudeMdPath = path.join(workingDirectory, "CLAUDE.md");
+	const existingInstructions = fs.existsSync(claudeMdPath)
+		? fs.readFileSync(claudeMdPath, "utf8")
+		: "";
+	const missingSkillPaths = skillPaths.filter(
+		(skillPath) => !existingInstructions.includes(skillPath),
+	);
+	if (missingSkillPaths.length === 0) return;
+
+	const separator =
+		existingInstructions.length > 0 && !existingInstructions.endsWith("\n")
+			? "\n"
+			: "";
+	fs.appendFileSync(
+		claudeMdPath,
+		`${separator}Read and follow the instructions in ${missingSkillPaths.join(
+			" and ",
+		)} before doing anything else.\n`,
+	);
+}
+
 /**
  * Creates a Claude Code agent adapter for use with @langwatch/scenario.
  *
@@ -138,28 +186,9 @@ export function createClaudeCodeAgent({
 		fs.copyFileSync(skillPath, path.join(skillDir, "SKILL.md"));
 	}
 
-	// Claude Code doesn't auto-discover .skills/ in arbitrary directories.
-	// If .skills/ exists but no CLAUDE.md points to it, create one.
-	const skillsDir = path.join(workingDirectory, ".skills");
-	const claudeMdPath = path.join(workingDirectory, "CLAUDE.md");
-	if (fs.existsSync(skillsDir) && !fs.existsSync(claudeMdPath)) {
-		const skillDirs = fs
-			.readdirSync(skillsDir, { withFileTypes: true })
-			.filter(
-				(d) =>
-					d.isDirectory() &&
-					fs.existsSync(path.join(skillsDir, d.name, "SKILL.md")),
-			);
-		if (skillDirs.length > 0) {
-			const instructions = skillDirs
-				.map((d) => `.skills/${d.name}/SKILL.md`)
-				.join(" and ");
-			fs.writeFileSync(
-				claudeMdPath,
-				`Read and follow the instructions in ${instructions} before doing anything else.\n`,
-			);
-		}
-	}
+	// Claude Code does not auto-discover .skills/ in arbitrary directories.
+	// Preserve any existing CLAUDE.md and append only missing skill references.
+	ensureClaudeSkillInstructions(workingDirectory);
 
 	return {
 		role: AgentRole.AGENT,

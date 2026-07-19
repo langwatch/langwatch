@@ -2,11 +2,13 @@ import { createLogger } from "@langwatch/observability";
 import type { Prisma } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { nanoid } from "nanoid";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { slugify } from "~/utils/slugify";
 import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
@@ -229,8 +231,6 @@ secured.access(requires("evaluations:manage")).post(
       }
     }
 
-    const { slugify } = await import("~/utils/slugify");
-    const { nanoid } = await import("nanoid");
     const slug = `${slugify(body.name)}-${nanoid(5)}`;
 
     const monitor = await prisma.monitor.create({

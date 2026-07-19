@@ -123,57 +123,56 @@ export const SURFACE_LABEL: Record<CapabilitySurface, string> = {
   platform: "LangWatch",
 };
 
+type SurfaceRouteConfig = {
+  path: string;
+  deepLink?: false;
+  resourceHref?: (base: string, resourceId: string) => string;
+};
+
+const nestedResourceHref = (base: string, resourceId: string) =>
+  `${base}/${encodeURIComponent(resourceId)}`;
+
+const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
+  traces: { path: "messages", resourceHref: nestedResourceHref },
+  analytics: { path: "analytics" },
+  experiments: { path: "experiments", resourceHref: nestedResourceHref },
+  evaluations: {
+    path: "online-evaluations",
+    resourceHref: (base, resourceId) =>
+      `${base}?drawer.open=onlineEvaluation&drawer.monitorId=${encodeURIComponent(
+        resourceId,
+      )}`,
+  },
+  evaluators: {
+    path: "evaluators",
+    resourceHref: (base, resourceId) =>
+      `${base}?drawer.open=evaluatorViewer&drawer.evaluatorId=${encodeURIComponent(
+        resourceId,
+      )}`,
+  },
+  datasets: { path: "datasets", resourceHref: nestedResourceHref },
+  prompts: { path: "prompts" },
+  dashboards: { path: "analytics/custom" },
+  simulations: { path: "simulations" },
+  agents: { path: "agents" },
+  automations: { path: "automations" },
+  workflows: { path: "workflows" },
+  annotations: { path: "annotations" },
+  secrets: { path: "settings", deepLink: false },
+  projects: { path: "settings/projects", deepLink: false },
+  apiKeys: { path: "settings/authentication", deepLink: false },
+  modelProviders: { path: "settings/model-providers", deepLink: false },
+  gateway: { path: "settings", deepLink: false },
+  platform: { path: "settings", deepLink: false },
+};
+
 /** Project-relative base path for each surface's index page. */
-export const SURFACE_PATH: Record<CapabilitySurface, string> = {
-  traces: "messages",
-  analytics: "analytics",
-  experiments: "experiments",
-  evaluations: "online-evaluations",
-  evaluators: "evaluators",
-  datasets: "datasets",
-  prompts: "prompts",
-  dashboards: "analytics/custom",
-  simulations: "simulations",
-  agents: "agents",
-  automations: "automations",
-  workflows: "workflows",
-  annotations: "annotations",
-  // Settings/org surfaces — never deep-linked (see SURFACE_NO_DEEPLINK); paths
-  // are placeholders only to satisfy the exhaustive Record.
-  secrets: "settings",
-  projects: "settings/projects",
-  apiKeys: "settings/authentication",
-  modelProviders: "settings/model-providers",
-  // The gateway pages live under org-level /settings/gateway, outside any
-  // project path — never deep-linked, placeholder only.
-  gateway: "settings",
-  // The fallback surface for a resource the catalog has never heard of: there
-  // is nowhere sane to link, so the card shows no link at all.
-  platform: "settings",
-};
-
-// Surfaces whose index route accepts a trailing resource id as a deep segment
-// (`/messages/<traceId>`, `/experiments/<slug>`, `/datasets/<id>`,
-// Others deep-link to their index page only.
-const SURFACE_ACCEPTS_ID: Partial<Record<CapabilitySurface, boolean>> = {
-  traces: true,
-  experiments: true,
-  datasets: true,
-  evaluations: true,
-  evaluators: true,
-};
-
-// Settings / org-level surfaces whose reads render a card but have no clean
-// project-scoped page to deep-link to. The card shows the result without an
-// "Open in <surface>" chip rather than linking somewhere wrong.
-const SURFACE_NO_DEEPLINK: Partial<Record<CapabilitySurface, boolean>> = {
-  secrets: true,
-  projects: true,
-  apiKeys: true,
-  modelProviders: true,
-  gateway: true,
-  platform: true,
-};
+export const SURFACE_PATH = Object.fromEntries(
+  Object.entries(SURFACE_ROUTE_CONFIG).map(([surface, config]) => [
+    surface,
+    config.path,
+  ]),
+) as Record<CapabilitySurface, string>;
 
 /**
  * Build a project-scoped deep link to a surface, optionally targeting one
@@ -190,20 +189,11 @@ export function buildSurfaceHref({
   resourceId?: string | null;
 }): string | null {
   if (!projectSlug) return null;
-  if (SURFACE_NO_DEEPLINK[surface]) return null;
-  const base = `/${projectSlug}/${SURFACE_PATH[surface]}`;
-  if (resourceId && SURFACE_ACCEPTS_ID[surface]) {
-    if (surface === "evaluations") {
-      return `${base}?drawer.open=onlineEvaluation&drawer.monitorId=${encodeURIComponent(
-        resourceId,
-      )}`;
-    }
-    if (surface === "evaluators") {
-      return `${base}?drawer.open=evaluatorViewer&drawer.evaluatorId=${encodeURIComponent(
-        resourceId,
-      )}`;
-    }
-    return `${base}/${encodeURIComponent(resourceId)}`;
+  const config = SURFACE_ROUTE_CONFIG[surface];
+  if (config.deepLink === false) return null;
+  const base = `/${projectSlug}/${config.path}`;
+  if (resourceId && config.resourceHref) {
+    return config.resourceHref(base, resourceId);
   }
   return base;
 }
@@ -223,7 +213,7 @@ export function buildResourceHref({
   projectSlug?: string | null;
   resourceId?: string | null;
 }): string | null {
-  if (!resourceId || !SURFACE_ACCEPTS_ID[surface]) return null;
+  if (!resourceId || !SURFACE_ROUTE_CONFIG[surface].resourceHref) return null;
   return buildSurfaceHref({ surface, projectSlug, resourceId });
 }
 

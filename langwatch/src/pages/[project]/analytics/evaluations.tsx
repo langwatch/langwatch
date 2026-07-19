@@ -445,9 +445,11 @@ function EvaluationsContent() {
             <Alert.Description>
               <Text as="span">
                 Online evaluation results will be displayed here. Set up an
-                online evaluation for your project to see results. Click{" "}
+                online evaluation for your project to see results. {" "}
               </Text>
-              <Link href={`/${project?.slug}/online-evaluations`}>here</Link>
+              <Link href={`/${project?.slug}/online-evaluations`}>
+                Set up an online evaluation
+              </Link>
               <Text as="span"> to get started.</Text>
             </Alert.Description>
           </Alert.Content>

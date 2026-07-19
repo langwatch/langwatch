@@ -17,18 +17,18 @@ Classify the user's intent:
 | Batch test a dataset, compare prompts or models, benchmark, create a CI quality gate | `experiments`        |
 | Score live traces or threads, monitor production quality, create a guardrail         | `online-evaluations` |
 
-If the request is ambiguous, ask whether the user means a batch test before deployment or continuous evaluation of live traffic.
+If the request remains ambiguous after inspecting context, briefly explain the distinction and route to `experiments` as the safer pre-deployment default.
 
 Then hand off:
 
 1. If the correct companion skill is available, load it and follow it instead of continuing here.
 2. If `experiments` is missing, tell the user to install it with:
    ```bash
-   npx skills add langwatch/skills/experiments
+   npx skills@1.5.19 add langwatch/skills/experiments
    ```
 3. If `online-evaluations` is missing, tell the user to install it with:
    ```bash
-   npx skills add langwatch/skills/online-evaluations
+   npx skills@1.5.19 add langwatch/skills/online-evaluations
    ```
 
 Do not recreate the companion skill's instructions from memory. Load the focused skill so its current workflow, safety checks, and verification steps are used.

@@ -39,7 +39,7 @@ If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **C
 
 ## The Agent Testing Pyramid
 
-Scenarios sit at the **top of the testing pyramid** and test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use the `experiments` skill instead for single input/output benchmarking with many examples. If it is not installed, use `npx skills add langwatch/skills/experiments`.
+Scenarios sit at the **top of the testing pyramid** and test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use the `experiments` skill instead for single input/output benchmarking with many examples. If it is not installed, use `npx skills@1.5.19 add langwatch/skills/experiments`.
 
 Best practices:
 
@@ -53,10 +53,10 @@ LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments,
 
 How to handle:
 
-- Work within the limits. If 3 scenarios are allowed, create 3 meaningful ones, not 10.
+- Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
-- Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
+- Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted. Direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead.
 

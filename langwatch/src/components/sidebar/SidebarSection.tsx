@@ -1,12 +1,10 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
 
-import { trackEvent } from "~/utils/tracking";
+import { useSidebarSectionState } from "./useSidebarSectionState";
 
-export const getSidebarSectionStorageKey = (id: string) =>
-  `langwatch:main-sidebar-section:${id}:expanded:v1`;
+export { getSidebarSectionStorageKey } from "./useSidebarSectionState";
 
 type SidebarSectionProps = {
   id: string;
@@ -25,72 +23,21 @@ export const SidebarSection = ({
   defaultExpanded = true,
   projectId,
 }: SidebarSectionProps) => {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-
-  useEffect(() => {
-    const savedPreference = window.localStorage.getItem(
-      getSidebarSectionStorageKey(id),
-    );
-
-    if (savedPreference === "true" || savedPreference === "false") {
-      setIsExpanded(savedPreference === "true");
-    } else {
-      setIsExpanded(defaultExpanded);
-    }
-  }, [defaultExpanded, id]);
-
-  const toggleSection = () => {
-    const nextExpanded = !isExpanded;
-    setIsExpanded(nextExpanded);
-    window.localStorage.setItem(
-      getSidebarSectionStorageKey(id),
-      String(nextExpanded),
-    );
-    trackEvent("side_menu_section_toggle", {
-      project_id: projectId,
-      menu_item: label,
-      expanded: nextExpanded,
-    });
-  };
+  const { isExpanded, toggleSection } = useSidebarSectionState({
+    id,
+    label,
+    defaultExpanded,
+    projectId,
+  });
 
   return (
     <VStack width="full" gap={0.5} align="start">
-      <Box asChild width="full" cursor="pointer">
-        <button
-          type="button"
-          aria-label={`${isExpanded ? "Collapse" : "Expand"} ${label}`}
-          aria-expanded={isExpanded}
-          onClick={toggleSection}
-        >
-          <HStack
-            width="full"
-            minHeight="28px"
-            paddingX={showExpanded ? 2 : 3}
-            paddingTop={2.5}
-            paddingBottom={0.5}
-            justifyContent={showExpanded ? "space-between" : "center"}
-            borderRadius="md"
-            color="gray.500"
-            _hover={{ color: "nav.fg" }}
-          >
-            {showExpanded && (
-              <Text
-                fontSize="11px"
-                fontWeight="medium"
-                textTransform="uppercase"
-                whiteSpace="nowrap"
-              >
-                {label}
-              </Text>
-            )}
-            {isExpanded ? (
-              <ChevronDown size={13} aria-hidden="true" />
-            ) : (
-              <ChevronRight size={13} aria-hidden="true" />
-            )}
-          </HStack>
-        </button>
-      </Box>
+      <SidebarSectionToggle
+        isExpanded={isExpanded}
+        label={label}
+        showExpanded={showExpanded}
+        onToggle={toggleSection}
+      />
 
       {isExpanded && (
         <VStack width="full" gap={0.5} align="start">
@@ -100,3 +47,52 @@ export const SidebarSection = ({
     </VStack>
   );
 };
+
+const SidebarSectionToggle = ({
+  isExpanded,
+  label,
+  showExpanded,
+  onToggle,
+}: {
+  isExpanded: boolean;
+  label: string;
+  showExpanded: boolean;
+  onToggle: () => void;
+}) => (
+  <Box asChild width="full" cursor="pointer">
+    <button
+      type="button"
+      aria-label={`${isExpanded ? "Collapse" : "Expand"} ${label}`}
+      aria-expanded={isExpanded}
+      onClick={onToggle}
+    >
+      <HStack
+        width="full"
+        minHeight="28px"
+        paddingX={showExpanded ? 2 : 3}
+        paddingTop={2.5}
+        paddingBottom={0.5}
+        justifyContent={showExpanded ? "space-between" : "center"}
+        borderRadius="md"
+        color="gray.500"
+        _hover={{ color: "nav.fg" }}
+      >
+        {showExpanded && (
+          <Text
+            fontSize="11px"
+            fontWeight="medium"
+            textTransform="uppercase"
+            whiteSpace="nowrap"
+          >
+            {label}
+          </Text>
+        )}
+        {isExpanded ? (
+          <ChevronDown size={13} aria-hidden="true" />
+        ) : (
+          <ChevronRight size={13} aria-hidden="true" />
+        )}
+      </HStack>
+    </button>
+  </Box>
+);

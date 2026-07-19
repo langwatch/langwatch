@@ -24,7 +24,6 @@ Feature: Separate experiments from online evaluations
     Then every primary section has a visible caret and an accessible expand or collapse control
     When I collapse a section
     Then its destinations are hidden
-    And my preference is stored locally for that section
     And the preference is restored after I reload the application
 
   Scenario: Use sensible section defaults without a saved preference

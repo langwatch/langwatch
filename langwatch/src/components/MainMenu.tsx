@@ -20,6 +20,10 @@ import { projectRoutes } from "../utils/routes";
 import { useTableView } from "./messages/HeaderButtons";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
 import { GovernSection } from "./sidebar/GovernSection";
+import {
+  isExperimentsActivePath,
+  isOnlineEvaluationsActivePath,
+} from "./sidebar/navigationActiveState";
 import { SidebarSection } from "./sidebar/SidebarSection";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
@@ -148,12 +152,7 @@ export const MainMenu = React.memo(function MainMenu({
                 icon={featureIcons.online_evaluations.icon}
                 label={projectRoutes.online_evaluations.title}
                 project={project}
-                isActive={
-                  router.pathname.includes("/online-evaluations") ||
-                  (router.pathname.includes("/evaluations/") &&
-                    !router.pathname.includes("/analytics") &&
-                    !router.pathname.includes("/evaluations/wizard"))
-                }
+                isActive={isOnlineEvaluationsActivePath(router.pathname)}
                 showLabel={showExpanded}
               />
               {hasPermission("triggers:view") && (
@@ -214,10 +213,7 @@ export const MainMenu = React.memo(function MainMenu({
                 icon={featureIcons.experiments.icon}
                 label={projectRoutes.experiments.title}
                 project={project}
-                isActive={
-                  router.pathname.includes("/experiments") ||
-                  router.pathname === "/[project]/evaluations"
-                }
+                isActive={isExperimentsActivePath(router.pathname)}
                 showLabel={showExpanded}
               />
 

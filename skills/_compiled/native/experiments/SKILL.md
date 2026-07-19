@@ -17,7 +17,7 @@ If the user wants to score live traces or threads, monitor production quality, o
 1. If the `online-evaluations` skill is available, load it and follow it now.
 2. Otherwise, tell the user to install it with:
    ```bash
-   npx skills add langwatch/skills/online-evaluations
+   npx skills@1.5.19 add langwatch/skills/online-evaluations
    ```
 
 Do not configure a monitor or guardrail from this skill.
@@ -45,10 +45,10 @@ LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments,
 
 How to handle:
 
-- Work within the limits. If 3 scenarios are allowed, create 3 meaningful ones, not 10.
+- Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
-- Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
+- Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted. Direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead.
 

@@ -19,6 +19,7 @@ import { useRouter } from "~/utils/compat/next-router";
 
 import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { GovernSection } from "./sidebar/GovernSection";
+import { isOnlineEvaluationsActivePath } from "./sidebar/navigationActiveState";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
 import { ThemeToggle } from "./sidebar/ThemeToggle";
@@ -79,8 +80,8 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
   // `/[project]/<section>` routes, so highlight them off the current path
   // the same way MainMenu does for project nav.
   const isTracesActive = router.pathname.includes("/traces");
-  const isOnlineEvaluationsActive = router.pathname.includes(
-    "/online-evaluations",
+  const isOnlineEvaluationsActive = isOnlineEvaluationsActivePath(
+    router.pathname,
   );
   const isDatasetsActive = router.pathname.includes("/datasets");
   const isAnnotationsActive = router.pathname.includes("/annotations");

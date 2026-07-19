@@ -231,13 +231,13 @@ export function ExperimentsPage() {
                         </Table.Row>
                       ))
                     : experiments.data
-                      ? experiments.data.experiments.map((experiment, i) => (
+                      ? experiments.data.experiments.map((experiment) => (
                           // Point Langy at an experiment. Same chip id the
                           // `/experiments/<slug>` route derives, so pointing
                           // at a row and then opening it yields one chip, not
                           // two. Closed, this is the plain clickable row.
                           <LangyContextTarget
-                            key={i}
+                            key={experiment.id}
                             target={{
                               id: `experiment:${experiment.slug}`,
                               kind: "experiment",

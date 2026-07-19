@@ -20374,7 +20374,7 @@ You can now iterate on the prompt to address the failing questions. After making
 
 The version marker allows you to compare performance across different iterations and identify the best-performing version.
 
-This completes your first experiment. You can now integrate this versioned prompt into your application using LangWatch APIs. Maintain this evaluation in LangWatch to validate that future versions of prompts, datasets, or LLM models meet or exceed current performance standards before deploying to production.
+This completes your first experiment. You can now integrate this versioned prompt into your application using LangWatch APIs. Maintain this experiment in LangWatch to validate that future versions of prompts, datasets, or LLM models meet or exceed current performance standards before deploying to production.
 
 ---
 

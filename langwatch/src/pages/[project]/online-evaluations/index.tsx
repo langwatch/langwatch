@@ -107,7 +107,9 @@ function OnlineEvaluationsPage() {
   const deleteMonitor = api.monitors.delete.useMutation({
     onSuccess: () => {
       void monitors.refetch();
-      void performance.refetch();
+      if (canViewAnalytics) {
+        void performance.refetch();
+      }
       toaster.create({
         title: "Online evaluation deleted",
         type: "success",

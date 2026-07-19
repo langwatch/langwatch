@@ -1,4 +1,4 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { openai } from "@ai-sdk/openai";
 import scenario, { type ScenarioExecutionStateLike } from "@langwatch/scenario";
 import dotenv from "dotenv";
 import path from "path";
@@ -9,6 +9,7 @@ import {
 	createClaudeCodeAgent,
 	createSkillTestWorkDir,
 	installSkillToWorkDir,
+	removeSkillTestWorkDir,
 	SKILL_TESTS_SET_ID,
 	toolCallFix,
 } from "./helpers/claude-code-adapter";
@@ -19,8 +20,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
-const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY });
-const judgeModel = google("gemini-2.5-flash-lite");
+const judgeModel = openai("gpt-5-mini");
 
 interface Monitor {
 	id: string;
@@ -111,6 +111,7 @@ function executedCommandTranscript(state: ScenarioExecutionStateLike): string {
 }
 
 describe("Online Evaluations Skill", () => {
+	/** @scenario Prove both skills independently with real services */
 	it.skipIf(isCI)(
 		"creates and verifies a real asynchronous online evaluation",
 		async () => {
@@ -133,7 +134,7 @@ describe("Online Evaluations Skill", () => {
 					agents: [
 						createClaudeCodeAgent({
 							workingDirectory: tempFolder,
-							omitEnvKeys: ["ANTHROPIC_API_KEY", "GEMINI_API_KEY"],
+							omitEnvKeys: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"],
 						}),
 						scenario.userSimulatorAgent({ model: judgeModel }),
 						scenario.judgeAgent({
@@ -188,10 +189,11 @@ describe("Online Evaluations Skill", () => {
 				const leftovers = (await listMonitors()).filter(
 					(monitor) => monitor.name === monitorName,
 				);
-				await Promise.all(
-					leftovers.map((monitor) => deleteMonitor(monitor.id)),
-				);
-			}
+					await Promise.all(
+						leftovers.map((monitor) => deleteMonitor(monitor.id)),
+					);
+					removeSkillTestWorkDir(tempFolder);
+				}
 		},
 		900_000,
 	);
@@ -207,7 +209,8 @@ describe("Online Evaluations Skill", () => {
 				skillSubpath: "online-evaluations",
 			});
 
-			const result = await scenario.run({
+			try {
+				const result = await scenario.run({
 				setId: SKILL_TESTS_SET_ID,
 				name: "Online evaluation skill routes a batch request",
 				description:
@@ -215,14 +218,14 @@ describe("Online Evaluations Skill", () => {
 				agents: [
 					createClaudeCodeAgent({
 						workingDirectory: tempFolder,
-						omitEnvKeys: ["ANTHROPIC_API_KEY", "GEMINI_API_KEY"],
+						omitEnvKeys: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"],
 					}),
 					scenario.userSimulatorAgent({ model: judgeModel }),
 					scenario.judgeAgent({
 						model: judgeModel,
 						criteria: [
 							"Agent clearly says this batch benchmark belongs to the experiments workflow",
-							"Agent gives the exact install command `npx skills add langwatch/skills/experiments` because that companion skill is unavailable",
+								"Agent gives the exact install command `npx skills@1.5.19 add langwatch/skills/experiments` because that companion skill is unavailable",
 							"Agent does not create an online monitor or guardrail",
 						],
 					}),
@@ -242,9 +245,12 @@ describe("Online Evaluations Skill", () => {
 					},
 					scenario.judge(),
 				],
-			});
+				});
 
-			expect(result.success).toBe(true);
+				expect(result.success).toBe(true);
+			} finally {
+				removeSkillTestWorkDir(tempFolder);
+			}
 		},
 		900_000,
 	);

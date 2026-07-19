@@ -20,7 +20,7 @@ describe("evaluation skill boundaries", () => {
 
 		expect(source).toContain("langwatch.experiments.init");
 		expect(source).toContain(
-			"npx skills add langwatch/skills/online-evaluations",
+			"npx skills@1.5.19 add langwatch/skills/online-evaluations",
 		);
 		expect(source).not.toContain("langwatch monitor create <name>");
 		expect(source).not.toContain("as_guardrail=True");
@@ -32,7 +32,9 @@ describe("evaluation skill boundaries", () => {
 
 		expect(source).toContain("langwatch monitor create --help");
 		expect(source).toContain("as_guardrail=True");
-		expect(source).toContain("npx skills add langwatch/skills/experiments");
+		expect(source).toContain(
+			"npx skills@1.5.19 add langwatch/skills/experiments",
+		);
 		expect(source).not.toContain("langwatch.experiments.init");
 	});
 
@@ -43,20 +45,20 @@ describe("evaluation skill boundaries", () => {
 		expect(source.length).toBeLessThan(2_500);
 		expect(source).toContain("langwatch/skills/experiments");
 		expect(source).toContain("langwatch/skills/online-evaluations");
-		expect(source).not.toContain("langwatch.experiment.init");
+		expect(source).toContain("safer pre-deployment default");
+		expect(source).not.toContain("langwatch.experiments.init");
 		expect(source).not.toContain("langwatch monitor create");
 	});
 
-	/** @scenario Prove both skills independently with real services */
-	it("has independent scenario suites", () => {
+	it("organizes the dogfood scenarios into focused files", () => {
+		const scenarioFiles = fs
+			.readdirSync(__dirname)
+			.filter((file) => file.endsWith(".scenario.test.ts"));
+
 		expect(
-			fs.existsSync(path.join(__dirname, "experiments.scenario.test.ts")),
-		).toBe(true);
-		expect(
-			fs.existsSync(
-				path.join(__dirname, "online-evaluations.scenario.test.ts"),
-			),
-		).toBe(true);
+			scenarioFiles.filter((file) => file.startsWith("experiments-")),
+		).toHaveLength(5);
+		expect(scenarioFiles).toContain("online-evaluations.scenario.test.ts");
 	});
 
 	it("keeps both focused evaluation workflows in the full level-up skill", () => {
