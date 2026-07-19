@@ -98,7 +98,6 @@ import {
   MetricSeriesCatalogAppendStore,
   MetricTimeRollupAppendStore,
 } from "./pipelines/metric-processing/projections/stores";
-import type { TriggerActionDispatchDeps } from "./pipelines/shared/triggerActionDispatch";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
