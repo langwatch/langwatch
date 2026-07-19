@@ -92,4 +92,70 @@ describe("runStubQuery", () => {
       expect(nonsense).toEqual(noFilter);
     });
   });
+
+  describe("given a has_error:true/false filter", () => {
+    // PR #5737 review's own finding: "Failed traces" (count, no groupBy, filter
+    // has_error:true) rendered byte-identical to "Traces" elsewhere, because the
+    // filter was fully inert. has_error is the one exception to the invariance
+    // above -- the stub already models hasError faithfully via groupBy, so this
+    // recognizes the literal string templates.ts authors instead of ignoring it.
+    const countSpec: WidgetSpec = { ...baseSpec, aggregations: [{ op: "count" }] };
+
+    it("differs from the unfiltered count, unlike every other filter string", () => {
+      const unfiltered = runStubQuery(countSpec, window);
+      const failedOnly = runStubQuery({ ...countSpec, filter: "has_error:true" }, window);
+
+      expect(failedOnly).not.toEqual(unfiltered);
+      expect(failedOnly.groups[0]?.values).not.toEqual(unfiltered.groups[0]?.values);
+    });
+
+    it("true and false buckets differ from each other", () => {
+      const errorOnly = runStubQuery({ ...countSpec, filter: "has_error:true" }, window);
+      const okOnly = runStubQuery({ ...countSpec, filter: "has_error:false" }, window);
+
+      expect(errorOnly.groups[0]?.values).not.toEqual(okOnly.groups[0]?.values);
+    });
+
+    it("does not leak hasError into groups when grouped by a different dimension", () => {
+      // "Errors by model" shape: filtered to errors, but displayed per-model —
+      // the synthetic hasError level must not appear as its own dimension.
+      const byModel = runStubQuery(
+        { ...countSpec, groupBy: ["model"], filter: "has_error:true" },
+        window,
+      );
+
+      expect(byModel.columns.map((c) => c.key)).toEqual(["model", expect.any(String)]);
+      for (const group of byModel.groups) {
+        expect(group.dims).not.toHaveProperty("hasError");
+        expect(Object.keys(group.dims)).toEqual(["model"]);
+      }
+    });
+
+    it("differs per-model from the unfiltered model breakdown", () => {
+      const byModel = runStubQuery({ ...countSpec, groupBy: ["model"] }, window);
+      const byModelErrorsOnly = runStubQuery(
+        { ...countSpec, groupBy: ["model"], filter: "has_error:true" },
+        window,
+      );
+
+      expect(byModelErrorsOnly.groups.map((g) => g.values)).not.toEqual(
+        byModel.groups.map((g) => g.values),
+      );
+    });
+
+    it("is a no-op when hasError is already the explicit groupBy", () => {
+      // Already grouping by hasError is the non-synthetic path: filtering just
+      // narrows the displayed groups to the matching bucket, dims stay intact.
+      const byError = runStubQuery({ ...countSpec, groupBy: ["hasError"] }, window);
+      const byErrorFiltered = runStubQuery(
+        { ...countSpec, groupBy: ["hasError"], filter: "has_error:true" },
+        window,
+      );
+
+      expect(byErrorFiltered.groups).toHaveLength(1);
+      expect(byErrorFiltered.groups[0]?.dims).toEqual({ hasError: "Error" });
+      const matchingUnfiltered = byError.groups.find((g) => g.dims.hasError === "Error");
+      expect(byErrorFiltered.groups[0]?.values).toEqual(matchingUnfiltered?.values);
+    });
+  });
 });

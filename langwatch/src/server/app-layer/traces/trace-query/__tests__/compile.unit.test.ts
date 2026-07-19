@@ -2,12 +2,13 @@
  * Security-core unit tests for the read-only trace query compiler (SPIKE #5670).
  *
  * These are Layer 1 (SQL-structure assertions, no DB) — fast regression guards.
- * The load-bearing evidence lives in compile.integration.test.ts, which executes
- * the emitted SQL against a real two-tenant ClickHouse and proves zero foreign
- * rows. Per CODING_STANDARDS, string assertions here are SUPPLEMENTARY to that
- * executed proof.
- *
- * @see specs/trace-query/read-only-query-surface.feature
+ * On the source branch (spike/5670-clickhouse-query-access) the load-bearing
+ * evidence is compile.integration.test.ts, which executes the emitted SQL
+ * against a real two-tenant ClickHouse and proves zero foreign rows, plus
+ * specs/trace-query/read-only-query-surface.feature. Neither file was carried
+ * over to this branch (no live 2-tenant ClickHouse available here) — on THIS
+ * branch, these unit tests are the only test evidence for the compiler; treat
+ * them as supplementary, not load-bearing, until the integration test lands.
  */
 
 import { describe, expect, it } from "vitest";

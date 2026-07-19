@@ -229,11 +229,20 @@ const bucketLabel = (t: number, fmt: "hour" | "day" | "week"): string => {
 
 // ── The engine ──────────────────────────────────────────────────────────────
 export const runStubQuery = (spec: WidgetSpec, win: StubWindow): StubResult => {
-  // `spec.filter` is deliberately excluded here — the stub never parses Liqe
-  // syntax, so folding the raw string into the seed or volume would make an
-  // inert control look functional (distinct strings would yield distinct but
-  // fake results). Output stays identical regardless of filter text until a
-  // real engine replaces this module.
+  // `spec.filter` is deliberately excluded from the seed/volume in general — the
+  // stub never parses Liqe syntax, so folding arbitrary text in would make an
+  // inert control look functional (distinct strings yielding distinct-but-fake
+  // results). One narrow exception: `has_error:true` / `has_error:false` is the
+  // exact literal every curated template authors (see templates.ts) to mean
+  // "the hasError dimension", which the stub already models faithfully via
+  // groupBy. Recognizing only this one hardcoded pattern lets those widgets
+  // show a real error-vs-ok split instead of silently matching their unfiltered
+  // counterpart; any other filter text still changes nothing.
+  const errorFilterMatch = /^has_error:(true|false)$/.exec(spec.filter.trim());
+  const errorFilterValue = errorFilterMatch?.[1] as "true" | "false" | undefined;
+  const appliesSyntheticErrorGroup =
+    errorFilterValue !== undefined && !spec.groupBy.includes("hasError");
+
   const queryKey = JSON.stringify({
     a: spec.aggregations,
     g: spec.groupBy,
@@ -245,7 +254,13 @@ export const runStubQuery = (spec: WidgetSpec, win: StubWindow): StubResult => {
   const windowScale = Math.max(0.15, Math.min(6, win.days / 7));
 
   // Build the set of groups (cross-product of the chosen dimensions, bounded).
-  const dimLists = spec.groupBy.map((dim, i) =>
+  // When a has_error filter applies and hasError isn't already a displayed
+  // group, append it as an extra level so error/ok volumes are computed
+  // independently, then strip it back out of the displayed shape below.
+  const combosGroupBy = appliesSyntheticErrorGroup
+    ? [...spec.groupBy, "hasError" as const]
+    : spec.groupBy;
+  const dimLists = combosGroupBy.map((dim, i) =>
     DIMENSION_VALUES[dim].slice(0, DIM_TAKE[i] ?? 2).map((dv) => ({ dim, ...dv })),
   );
 
@@ -258,6 +273,18 @@ export const runStubQuery = (spec: WidgetSpec, win: StubWindow): StubResult => {
     }
     combos = next;
   }
+
+  if (errorFilterValue !== undefined) {
+    combos = combos.filter((combo) =>
+      combo.some((c) => c.dim === "hasError" && c.value === errorFilterValue),
+    );
+  }
+  // Seed keys stay derived from the full (unstripped) combo so a filtered
+  // widget gets a different volume than its unfiltered counterpart; only the
+  // displayed label/dims/color drop the synthetic hasError level.
+  const displayedCombos = combos.map((combo) =>
+    appliesSyntheticErrorGroup ? combo.filter((c) => c.dim !== "hasError") : combo,
+  );
 
   const columns: StubColumn[] = [
     ...spec.groupBy.map((dim) => ({
@@ -273,11 +300,13 @@ export const runStubQuery = (spec: WidgetSpec, win: StubWindow): StubResult => {
     })),
   ];
 
-  const groups: StubGroup[] = combos.map((combo) => {
-    const key = combo.map((c) => `${c.dim}:${c.value}`).join("|") || "__all__";
-    const label = combo.map((c) => c.label).join(" · ") || "All traces";
-    const colorSeed = combo.length ? combo[combo.length - 1]!.label : label;
-    const rng = mulberry32(hashString(queryKey + "||" + key));
+  const groups: StubGroup[] = combos.map((combo, idx) => {
+    const displayed = displayedCombos[idx]!;
+    const seedKey = combo.map((c) => `${c.dim}:${c.value}`).join("|") || "__all__";
+    const key = displayed.map((c) => `${c.dim}:${c.value}`).join("|") || "__all__";
+    const label = displayed.map((c) => c.label).join(" · ") || "All traces";
+    const colorSeed = displayed.length ? displayed[displayed.length - 1]!.label : label;
+    const rng = mulberry32(hashString(queryKey + "||" + seedKey));
 
     // Per-group popularity → volume; per-group mean factor per metric.
     const popularity = 0.35 + rng() * 1.3;
@@ -310,7 +339,7 @@ export const runStubQuery = (spec: WidgetSpec, win: StubWindow): StubResult => {
       key,
       label,
       color: getHexColorForString(colorSeed),
-      dims: Object.fromEntries(combo.map((c) => [c.dim, c.label])),
+      dims: Object.fromEntries(displayed.map((c) => [c.dim, c.label])),
       values,
     };
   });
