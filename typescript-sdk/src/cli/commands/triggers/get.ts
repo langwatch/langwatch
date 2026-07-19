@@ -24,7 +24,7 @@ export const getTriggerCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch trigger "${id}": ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: `fetch trigger "${id}"` });
       process.exit(1);
     }
 

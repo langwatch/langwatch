@@ -22,7 +22,7 @@ export const listTriggersCommand = async (options?: { format?: string }): Promis
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch triggers: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "fetch triggers" });
       process.exit(1);
     }
 

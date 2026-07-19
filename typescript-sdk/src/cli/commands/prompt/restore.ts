@@ -35,7 +35,11 @@ export const promptRestoreCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to restore "${handle}" to ${versionId}: ${message}`);
+      failSpinner({
+        spinner,
+        error: new Error(message),
+        action: `restore "${handle}" to ${versionId}`,
+      });
       process.exit(1);
     }
 

@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -18,11 +19,11 @@ export const updateGraphCommand = async (
   checkApiKey();
 
   if (!options.name && !options.graph && !options.filters) {
-    console.error(
-      chalk.red(
-        "Error: At least one of --name, --graph, or --filters is required"
-      )
-    );
+    reportCommandError({
+      error: commandValidationError(
+        "At least one of --name, --graph, or --filters is required",
+      ),
+    });
     process.exit(1);
   }
 
@@ -53,7 +54,7 @@ export const updateGraphCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to update graph: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "update graph" });
       process.exit(1);
     }
 
@@ -73,11 +74,16 @@ export const updateGraphCommand = async (
     console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(graph.name)}`);
     console.log();
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      spinner.fail(chalk.red("--graph and --filters must be valid JSON"));
-    } else {
-      failSpinner({ spinner, error, action: "update graph" });
-    }
+    // Route BOTH failure kinds through failSpinner: a direct spinner.fail()
+    // prints nothing in --json/--jq/agent mode (spinners are silent there).
+    failSpinner({
+      spinner,
+      error:
+        error instanceof SyntaxError
+          ? commandValidationError("--graph and --filters must be valid JSON")
+          : error,
+      action: "update graph",
+    });
     process.exit(1);
   }
 };

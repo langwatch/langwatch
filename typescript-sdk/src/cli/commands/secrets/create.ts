@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -13,11 +14,11 @@ export const createSecretCommand = async (
   checkApiKey();
 
   if (!/^[A-Z][A-Z0-9_]*$/.test(name)) {
-    console.error(
-      chalk.red(
-        "Error: Secret name must contain only uppercase letters, digits, and underscores, and must start with a letter (e.g. MY_API_KEY)"
-      )
-    );
+    reportCommandError({
+      error: commandValidationError(
+        "Secret name must contain only uppercase letters, digits, and underscores, and must start with a letter (e.g. MY_API_KEY)",
+      ),
+    });
     process.exit(1);
   }
 
@@ -39,7 +40,7 @@ export const createSecretCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to create secret: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "create secret" });
       process.exit(1);
     }
 

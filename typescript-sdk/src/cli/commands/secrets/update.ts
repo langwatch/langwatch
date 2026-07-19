@@ -30,7 +30,7 @@ export const updateSecretCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to update secret: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "update secret" });
       process.exit(1);
     }
 

@@ -54,9 +54,12 @@ const loadYaml = (): Promise<typeof yaml> =>
   (yamlModulePromise ??= import("js-yaml"));
 
 /** The formats the output contract knows. */
-export type OutputFormat = "table" | "json" | "agents" | "yaml";
+const OUTPUT_FORMATS = ["table", "json", "agents", "yaml"] as const;
 
-const OUTPUT_FORMATS: readonly string[] = ["table", "json", "agents", "yaml"];
+export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
+
+const isOutputFormat = (value: string): value is OutputFormat =>
+  (OUTPUT_FORMATS as readonly string[]).includes(value);
 
 /**
  * Environment variables that mark the caller as an AI coding agent. The
@@ -136,8 +139,8 @@ export const resolveOutputOptions = (
       : undefined;
 
   let format: OutputFormat;
-  if (raw.output !== undefined && OUTPUT_FORMATS.includes(raw.output)) {
-    format = raw.output as OutputFormat;
+  if (raw.output !== undefined && isOutputFormat(raw.output)) {
+    format = raw.output;
   } else if (raw.json !== undefined || raw.jq !== undefined) {
     format = "json";
   } else if (raw.format === "json") {
@@ -326,7 +329,15 @@ export const printResult = async (
  * format or colour (see utils/errorOutput.ts).
  */
 export const applyOutputContext = (resolved: ResolvedOutput): void => {
-  setOutputFormat(resolved.format === "table" ? undefined : "json");
+  // Machine formats fail as structured documents; agent mode's document is the
+  // compact single-line form (see renderErrorAsJson), everything else pretty.
+  setOutputFormat(
+    resolved.format === "table"
+      ? undefined
+      : resolved.format === "agents"
+        ? "agents"
+        : "json",
+  );
   if (resolved.agent) disableOutputColor();
 };
 

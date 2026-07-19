@@ -235,7 +235,7 @@ describe("isDaemonDisabledByConfig", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it("is true when the persisted config says daemon off", () => {
+  it("disables the daemon when the persisted config says daemon off", () => {
     fs.writeFileSync(configFile, JSON.stringify({ daemon: "off" }));
 
     expect(
@@ -243,7 +243,7 @@ describe("isDaemonDisabledByConfig", () => {
     ).toBe(true);
   });
 
-  it("is false when it says on, or the field is absent", () => {
+  it("keeps the daemon enabled when the config says on, or the field is absent", () => {
     fs.writeFileSync(configFile, JSON.stringify({ daemon: "on" }));
     expect(
       isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile }),
@@ -255,7 +255,7 @@ describe("isDaemonDisabledByConfig", () => {
     ).toBe(false);
   });
 
-  it("is false when the config file does not exist", () => {
+  it("keeps the daemon enabled when the config file does not exist", () => {
     expect(
       isDaemonDisabledByConfig({
         LANGWATCH_CLI_CONFIG: path.join(dir, "missing.json"),
@@ -263,7 +263,7 @@ describe("isDaemonDisabledByConfig", () => {
     ).toBe(false);
   });
 
-  it("is false when the config file is corrupt — never breaks a command", () => {
+  it("keeps the daemon enabled when the config file is corrupt — never breaks a command", () => {
     fs.writeFileSync(configFile, "not json {");
 
     expect(

@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { commandValidationError } from "../../utils/errorOutput";
 
 export const updateAgentCommand = async (
   id: string,
@@ -31,11 +32,16 @@ export const updateAgentCommand = async (
       console.log(JSON.stringify(agent, null, 2));
     }
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      spinner.fail(chalk.red("--config must be valid JSON"));
-    } else {
-      failSpinner({ spinner, error, action: "update agent" });
-    }
+    // Route BOTH failure kinds through failSpinner: a direct spinner.fail()
+    // prints nothing in --json/--jq/agent mode (spinners are silent there).
+    failSpinner({
+      spinner,
+      error:
+        error instanceof SyntaxError
+          ? commandValidationError("--config must be valid JSON")
+          : error,
+      action: "update agent",
+    });
     process.exit(1);
   }
 };

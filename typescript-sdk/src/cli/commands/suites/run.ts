@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { SuitesApiService } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { resolveOutputFormat } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -72,12 +73,20 @@ export const runSuiteCommand = async (
 
     while (!completed) {
       if (Date.now() - startTime > TIMEOUT_MS) {
-        pollSpinner.fail("Suite run timed out after 10 minutes");
-        console.log(
-          chalk.yellow(
-            `Check results in the dashboard. Batch ID: ${result.batchRunId}`,
-          ),
-        );
+        failSpinner({
+          spinner: pollSpinner,
+          error: new Error("Suite run timed out after 10 minutes"),
+          action: "run suite",
+        });
+        // Follow-up prose is human-only — in a machine format the structured
+        // document above must keep stdout to itself.
+        if (resolveOutputFormat() === "text") {
+          console.log(
+            chalk.yellow(
+              `Check results in the dashboard. Batch ID: ${result.batchRunId}`,
+            ),
+          );
+        }
         process.exit(1);
       }
 

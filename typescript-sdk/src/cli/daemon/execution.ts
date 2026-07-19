@@ -7,6 +7,7 @@
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
+import { StringDecoder } from "node:string_decoder";
 
 import chalk from "chalk";
 
@@ -71,6 +72,15 @@ export class ExecutionContext {
     stdout: null,
     stderr: null,
   };
+  /**
+   * Per-stream UTF-8 decoders for the colour-stripping path: a multibyte
+   * character split across two writes must survive the split, which
+   * `chunk.toString("utf8")` per write would not (each half decodes to U+FFFD).
+   */
+  private readonly decoders: Record<OutputStream, StringDecoder> = {
+    stdout: new StringDecoder("utf8"),
+    stderr: new StringDecoder("utf8"),
+  };
 
   constructor(
     readonly id: string,
@@ -98,8 +108,13 @@ export class ExecutionContext {
    * finalize is never a complete sequence, so nothing visible is lost.
    */
   private stripSgr(stream: OutputStream, chunk: Buffer): Buffer {
+    // SGR sequences are pure ASCII, so the held-back partial decodes safely on
+    // its own; the chunk goes through the stream's StringDecoder so a
+    // multibyte character split across writes is reassembled, not corrupted.
     const held = this.pendingEscape[stream];
-    let text = (held === null ? "" : held.toString("utf8")) + chunk.toString("utf8");
+    let text =
+      (held === null ? "" : held.toString("utf8")) +
+      this.decoders[stream].write(chunk);
     this.pendingEscape[stream] = null;
 
     const partial = PARTIAL_SGR_AT_END.exec(text);
@@ -113,6 +128,14 @@ export class ExecutionContext {
   /** Record the exit status and silence further output. Idempotent. */
   finalize(code: number): void {
     if (this.finished) return;
+    // Flush any bytes the decoders are still holding (a multibyte character
+    // truncated by the stream's end surfaces as U+FFFD, exactly as a terminal
+    // would render it). A dangling partial SGR is NOT flushed — it is never a
+    // complete sequence, so nothing visible is lost.
+    for (const stream of ["stdout", "stderr"] as const) {
+      const rest = this.decoders[stream].end();
+      if (rest) this.sink(stream, Buffer.from(rest, "utf8"));
+    }
     this.finished = true;
     this.code = code;
   }

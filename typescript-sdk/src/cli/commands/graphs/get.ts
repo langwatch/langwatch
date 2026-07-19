@@ -25,7 +25,7 @@ export const getGraphCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch graph: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "fetch graph" });
       process.exit(1);
     }
 

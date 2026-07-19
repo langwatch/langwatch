@@ -25,7 +25,7 @@ export const deleteSecretCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to delete secret: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "delete secret" });
       process.exit(1);
     }
 

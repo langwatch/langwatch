@@ -400,6 +400,58 @@ describe("statusCommand", () => {
       expect(out).toContain("Resource Counts:");
     });
 
+    it("marks the running-experiments scan incomplete when a candidate check fails", async () => {
+      mockGET.mockImplementation(async (path: string) => {
+        if (path.startsWith("/api/experiments/runs")) {
+          throw new Error("runs endpoint down");
+        }
+        if (path.startsWith("/api/experiments")) {
+          return {
+            data: {
+              experiments: [
+                {
+                  id: "exp_1",
+                  slug: "eval-x",
+                  name: "Eval X",
+                  type: "EVALUATIONS_V3",
+                  workflowId: null,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  runsCount: 1,
+                  lastRunAt: new Date().toISOString(),
+                },
+              ],
+              pagination: { page: 1, pageSize: 50, totalHits: 1, hasMore: false },
+            },
+            error: undefined,
+            response: { status: 200 },
+          };
+        }
+        return { data: [{ id: "1" }], error: undefined };
+      });
+      mockPOST.mockResolvedValue({
+        data: { traces: [], pagination: { totalHits: 0 } },
+        error: undefined,
+        response: { status: 200 },
+      });
+      global.fetch = vi.fn().mockImplementation(async (input: unknown) => {
+        const url = String(input);
+        if (url.includes("/api/gateway/v1/budgets")) {
+          return { ok: true, status: 200, json: async () => ({ data: [] }) };
+        }
+        return { ok: true, status: 200, json: async () => [{ id: "1" }] };
+      }) as unknown as typeof fetch;
+
+      await statusCommand();
+
+      const out = consoleLogSpy.mock.calls.flat().join("\n");
+      // A candidate whose run-list call failed must NOT read as a green
+      // all-clear: a running experiment may be hiding behind the failure.
+      expect(out).not.toContain("nothing needs your attention");
+      expect(out).toContain("nothing flagged, but some checks did not run");
+      expect(out).toContain("could not check running experiments");
+    });
+
     it("machine output carries the attention document + per-section errors map", async () => {
       mockAllSuccess();
       mockPOST.mockResolvedValue({

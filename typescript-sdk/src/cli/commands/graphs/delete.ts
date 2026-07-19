@@ -24,7 +24,7 @@ export const deleteGraphCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to delete graph "${id}": ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: `delete graph "${id}"` });
       process.exit(1);
     }
 

@@ -10,7 +10,11 @@
  * error instead, because a blocked prompt reads to a script as a hang.
  */
 import * as readline from "node:readline";
-import { printResult, type RawOutputFlags } from "../../utils/output";
+import {
+  printResult,
+  resolveOutputOptions,
+  type RawOutputFlags,
+} from "../../utils/output";
 import {
   applyUninstall,
   planUninstall,
@@ -55,8 +59,17 @@ export const skillsUninstallCommand = async (
   const results = targets.map((skill) => planUninstall(skill, root, { yes }));
   const removals = results.filter((result) => result.action === "removed");
 
+  // Interactive confirmation is for humans at a terminal ONLY. A TTY stdin
+  // does not make prompting safe: with `-o json`/`--jq`/`--agent` (or agent
+  // env vars) the caller is a machine — a prompt blocks it like a hang, and
+  // the pre-confirmation preview would corrupt the structured document it is
+  // about to read. Machine callers get the -y error instead, always.
+  const resolved = resolveOutputOptions({ ...options });
+  const interactive = process.stdin.isTTY === true && resolved.format === "table" && !resolved.agent;
+
+  let confirmed = false;
   if (removals.length > 0 && !yes && !dryRun) {
-    if (!process.stdin.isTTY) {
+    if (!interactive) {
       return throwValidationError(
         `uninstall would remove ${removals.length} file${removals.length === 1 ? "" : "s"} and needs confirmation. Re-run with -y (non-interactive callers are never prompted).`,
         { removals: removals.map((result) => result.path) },
@@ -68,6 +81,7 @@ export const skillsUninstallCommand = async (
       console.log("Aborted. Nothing was removed.");
       return;
     }
+    confirmed = true;
   }
 
   applyUninstall(results, { dryRun });
@@ -76,7 +90,11 @@ export const skillsUninstallCommand = async (
     { dir: root, bundleVersion: SKILLS_BUNDLE_VERSION, dryRun, results },
     {
       ...options,
-      table: () => renderSkillFileResults(results, { dryRun }),
+      table: () => {
+        // The confirmed path already printed the list as the prompt preview —
+        // rendering it again would say the same thing twice.
+        if (!confirmed) renderSkillFileResults(results, { dryRun });
+      },
     },
   );
 };

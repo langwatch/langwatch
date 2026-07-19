@@ -54,8 +54,10 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
 function resolveRequestTimeoutMs(): number {
   const fromEnv = process.env.LANGWATCH_DAEMON_REQUEST_TIMEOUT_MS;
   if (fromEnv) {
-    const parsed = Number.parseInt(fromEnv, 10);
-    if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+    // A complete positive integer only: parseInt would accept "5000ms" and
+    // truncate "1.5", and the documented contract is a millisecond count.
+    const parsed = Number(fromEnv);
+    if (Number.isSafeInteger(parsed) && parsed > 0) return parsed;
   }
   return DEFAULT_REQUEST_TIMEOUT_MS;
 }

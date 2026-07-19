@@ -19,6 +19,20 @@ export const getMonitorCommand = async (
 
   const spinner = createSpinner(`Fetching monitor "${id}"...`).start();
 
+  let monitor: {
+    id: string;
+    name: string;
+    slug: string;
+    checkType: string;
+    enabled: boolean;
+    executionMode: string;
+    sample: number;
+    level: string;
+    evaluatorId: string | null;
+    preconditions: unknown;
+    createdAt: string;
+    platformUrl?: string;
+  };
   try {
     const response = await fetch(`${endpoint}/api/monitors/${id}`, {
       headers: buildAuthHeaders({ apiKey }),
@@ -26,11 +40,11 @@ export const getMonitorCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch monitor: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "fetch monitor" });
       process.exit(1);
     }
 
-    const monitor = (await response.json()) as {
+    monitor = (await response.json()) as {
       id: string;
       name: string;
       slug: string;
@@ -46,8 +60,16 @@ export const getMonitorCommand = async (
     };
 
     spinner.succeed(`Monitor "${monitor.name}"`);
+  } catch (error) {
+    // No explicit `format`: see traces/search.ts — the preAction hook covers
+    // every spelling; the `-f` commander default must not override it.
+    failSpinner({ spinner, error, action: "fetch monitor" });
+    process.exit(1);
+  }
 
-    await printResult(monitor, {
+  // Rendering stays OUTSIDE the fetch try: a printResult rejection (invalid
+  // --jq) is a rendering failure, not a fetch failure.
+  await printResult(monitor, {
       ...options,
       table: () => {
         console.log();
@@ -75,10 +97,4 @@ export const getMonitorCommand = async (
         console.log();
       },
     });
-  } catch (error) {
-    // No explicit `format`: see traces/search.ts — the preAction hook covers
-    // every spelling; the `-f` commander default must not override it.
-    failSpinner({ spinner, error, action: "fetch monitor" });
-    process.exit(1);
-  }
 };

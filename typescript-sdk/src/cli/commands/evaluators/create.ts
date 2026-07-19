@@ -14,8 +14,9 @@ export const createEvaluatorCommand = async (
   const service = new EvaluatorsApiService();
   const spinner = createSpinner(`Creating evaluator "${name}"...`).start();
 
+  let evaluator: Awaited<ReturnType<EvaluatorsApiService["create"]>>;
   try {
-    const evaluator = await service.create({
+    evaluator = await service.create({
       name,
       config: {
         evaluatorType: options.type,
@@ -25,19 +26,21 @@ export const createEvaluatorCommand = async (
     spinner.succeed(
       `Created evaluator "${chalk.cyan(evaluator.name)}" ${chalk.gray(`(slug: ${evaluator.slug ?? "—"})`)}`,
     );
-
-    await printResult(evaluator, {
-      ...options,
-      table: () => {
-        if (evaluator.platformUrl) {
-          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
-        }
-      },
-    });
   } catch (error) {
     // No explicit `format`: see traces/search.ts — the preAction hook covers
     // every spelling; the `-f` commander default must not override it.
     failSpinner({ spinner, error, action: "create evaluator" });
     process.exit(1);
   }
+
+  // Rendering stays OUTSIDE the create try: a printResult rejection (invalid
+  // --jq) must not report an already-created evaluator as a create failure.
+  await printResult(evaluator, {
+    ...options,
+    table: () => {
+      if (evaluator.platformUrl) {
+        console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
+      }
+    },
+  });
 };

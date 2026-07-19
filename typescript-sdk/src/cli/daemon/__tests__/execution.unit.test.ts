@@ -208,6 +208,29 @@ describe("process interceptors", () => {
         chalk.level = savedLevel;
       }
     });
+
+    it("reassembles a multibyte character split across two writes", async () => {
+      const savedLevel = chalk.level;
+      try {
+        chalk.level = 1;
+        const agent = collectingSink();
+        const context = new ExecutionContext("agent", agent.sink);
+
+        await withExecutionContext(context, async () => {
+          disableOutputColor();
+          // "—" is three UTF-8 bytes; split after the first, per-chunk
+          // toString("utf8") decoding would emit U+FFFD for both halves.
+          const bytes = Buffer.from("a — b", "utf8");
+          const splitAt = bytes.indexOf(0xe2) + 1;
+          context.write("stderr", bytes.subarray(0, splitAt));
+          context.write("stderr", bytes.subarray(splitAt));
+        });
+
+        expect(agent.stderr()).toBe("a — b");
+      } finally {
+        chalk.level = savedLevel;
+      }
+    });
   });
 
   describe("when a command calls process.exit", () => {

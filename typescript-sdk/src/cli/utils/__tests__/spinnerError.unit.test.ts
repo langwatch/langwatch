@@ -81,8 +81,8 @@ describe("failSpinner", () => {
 
       const rendered = stripAnsi(String(calls[0]));
       expect(rendered.split("\n")[0]).toBe("Failed to fetch trace: Record missing");
-      expect(rendered).toContain("code");
-      expect(rendered).toContain("NotFoundError");
+      // The Details block renders key/value pairs without a colon ("code  X").
+      expect(rendered).toMatch(/code\s+NotFoundError/);
     });
   });
 

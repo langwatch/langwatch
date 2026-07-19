@@ -24,7 +24,7 @@ export const deleteTriggerCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to delete trigger "${id}": ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: `delete trigger "${id}"` });
       process.exit(1);
     }
 

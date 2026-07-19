@@ -38,16 +38,6 @@ export const deleteEvaluatorCommand = async (
     deleteSpinner.succeed(
       `Archived evaluator "${chalk.cyan(evaluatorName)}"`,
     );
-
-    await printResult(
-      { id: evaluatorId, name: evaluatorName, archived: true },
-      {
-        ...options,
-        table: () => {
-          // The spinner's success line is the human output.
-        },
-      },
-    );
   } catch (error) {
     failSpinner({
       spinner: deleteSpinner,
@@ -56,4 +46,16 @@ export const deleteEvaluatorCommand = async (
     });
     process.exit(1);
   }
+
+  // Rendering stays OUTSIDE the deletion try: a printResult rejection (invalid
+  // --jq) must not report an already-archived evaluator as an archive failure.
+  await printResult(
+    { id: evaluatorId, name: evaluatorName, archived: true },
+    {
+      ...options,
+      table: () => {
+        // The spinner's success line is the human output.
+      },
+    },
+  );
 };

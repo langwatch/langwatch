@@ -46,7 +46,7 @@ describe("spawnDaemon", () => {
     delete process.env[MARKER];
   });
 
-  describe("given a spawner whose shell is full of unrelated variables", () => {
+  describe("when the spawner's shell is full of unrelated variables", () => {
     it("does not hand them to the daemon", () => {
       spawnDaemon({ cliPath: "/cli.js", env: {}, identity });
 
@@ -54,7 +54,33 @@ describe("spawnDaemon", () => {
     });
   });
 
-  describe("given the process essentials", () => {
+  describe("when the daemon boots on a private-CA host", () => {
+    it("keeps the TLS trust-store variables so daemon HTTPS works", () => {
+      const saved = {
+        NODE_EXTRA_CA_CERTS: process.env.NODE_EXTRA_CA_CERTS,
+        SSL_CERT_FILE: process.env.SSL_CERT_FILE,
+        SSL_CERT_DIR: process.env.SSL_CERT_DIR,
+      };
+      process.env.NODE_EXTRA_CA_CERTS = "/etc/pki/corp.pem";
+      process.env.SSL_CERT_FILE = "/etc/pki/tls/cert.pem";
+      process.env.SSL_CERT_DIR = "/etc/pki/tls/certs";
+      try {
+        spawnDaemon({ cliPath: "/cli.js", env: {}, identity });
+
+        const env = spawnedEnv();
+        expect(env.NODE_EXTRA_CA_CERTS).toBe("/etc/pki/corp.pem");
+        expect(env.SSL_CERT_FILE).toBe("/etc/pki/tls/cert.pem");
+        expect(env.SSL_CERT_DIR).toBe("/etc/pki/tls/certs");
+      } finally {
+        for (const [key, value] of Object.entries(saved)) {
+          if (value === undefined) delete process.env[key];
+          else process.env[key] = value;
+        }
+      }
+    });
+  });
+
+  describe("when given the process essentials", () => {
     it("keeps PATH and HOME so the daemon can function", () => {
       spawnDaemon({ cliPath: "/cli.js", env: {}, identity });
 
@@ -64,7 +90,7 @@ describe("spawnDaemon", () => {
     });
   });
 
-  describe("given the identity the daemon must serve", () => {
+  describe("when given the identity the daemon must serve", () => {
     it("pins the identity triple and the no-recursion guard", () => {
       spawnDaemon({
         cliPath: "/cli.js",

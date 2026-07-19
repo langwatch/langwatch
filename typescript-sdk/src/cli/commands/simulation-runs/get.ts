@@ -75,7 +75,7 @@ export const getSimulationRunCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch simulation run: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "fetch simulation run" });
       process.exit(1);
     }
 

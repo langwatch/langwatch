@@ -17,6 +17,14 @@ export const listMonitorsCommand = async (options?: RawOutputFlags): Promise<voi
 
   const spinner = createSpinner("Fetching monitors...").start();
 
+  let monitors: Array<{
+    id: string;
+    name: string;
+    checkType: string;
+    enabled: boolean;
+    executionMode: string;
+    sample: number;
+  }>;
   try {
     const response = await fetch(`${endpoint}/api/monitors`, {
       headers: buildAuthHeaders({ apiKey }),
@@ -24,11 +32,11 @@ export const listMonitorsCommand = async (options?: RawOutputFlags): Promise<voi
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch monitors: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "fetch monitors" });
       process.exit(1);
     }
 
-    const monitors = (await response.json()) as Array<{
+    monitors = (await response.json()) as Array<{
       id: string;
       name: string;
       checkType: string;
@@ -40,8 +48,16 @@ export const listMonitorsCommand = async (options?: RawOutputFlags): Promise<voi
     spinner.succeed(
       `Found ${monitors.length} monitor${monitors.length !== 1 ? "s" : ""}`
     );
+  } catch (error) {
+    // No explicit `format`: see traces/search.ts — the preAction hook covers
+    // every spelling; the `-f` commander default must not override it.
+    failSpinner({ spinner, error, action: "fetch monitors" });
+    process.exit(1);
+  }
 
-    await printResult(monitors, {
+  // Rendering stays OUTSIDE the fetch try: a printResult rejection (invalid
+  // --jq) is a rendering failure, not a fetch failure.
+  await printResult(monitors, {
       ...options,
       table: () => {
         if (monitors.length === 0) {
@@ -79,10 +95,4 @@ export const listMonitorsCommand = async (options?: RawOutputFlags): Promise<voi
         console.log();
       },
     });
-  } catch (error) {
-    // No explicit `format`: see traces/search.ts — the preAction hook covers
-    // every spelling; the `-f` commander default must not override it.
-    failSpinner({ spinner, error, action: "fetch monitors" });
-    process.exit(1);
-  }
 };
