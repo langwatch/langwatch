@@ -27,11 +27,37 @@ export interface LogRequestCollectionDeps {
   piiRedactionService?: LogRedactionService;
 }
 
-export interface LogRequestCollectionResult {
-  acceptedLogRecords: number;
-  rejectedLogRecords: number;
-  errorMessage?: string;
-}
+/**
+ * The outcome of an OTLP log request.
+ *
+ * The two cases are deliberately separate shapes rather than a counter pair.
+ * An OTLP `partialSuccess` body means the server rejected those records
+ * *permanently* and the client must not re-send them, so folding a failure
+ * that is ours — a queue outage, say — into `rejectedLogRecords` tells every
+ * collector in the fleet to drop data it would otherwise have retried. As a
+ * counter pair the two are one indistinguishable `+= n`; as a discriminated
+ * union, conflating them is a type error at the call site.
+ */
+export type LogRequestCollectionResult =
+  | {
+      outcome: "collected";
+      acceptedLogRecords: number;
+      /** Rejected for good — the caller must NOT retry these. */
+      rejectedLogRecords: number;
+      errorMessage?: string;
+    }
+  | {
+      /**
+       * Nothing was durably accepted. `recordLogRecords` enqueues the batch in
+       * one call, so this is all-or-nothing: the caller must retry the whole
+       * request, and the route must answer with a retryable status.
+       */
+      outcome: "unavailable";
+      errorMessage: string;
+    };
+
+/** Returned in place of a persistence exception, which may name internals. */
+const PERSISTENCE_ERROR_MESSAGE = "failed to record log record";
 
 export class LogRequestCollectionService {
   private readonly tracer = getLangWatchTracer(
@@ -87,11 +113,10 @@ export class LogRequestCollectionService {
               preparation.accepted.map(({ record }) => record),
             );
           } catch (error) {
-            acceptedLogRecords = 0;
-            rejectedLogRecords += preparation.accepted.length;
-            const message =
-              error instanceof Error ? error.message : String(error);
-            errors.push(`canonical log batch: ${message}`);
+            // Preparation errors describe the caller's own payload and are
+            // safe to return. A persistence failure is ours: its message can
+            // name internal hosts, tables and queries, so the sender gets a
+            // stable string and the detail goes to the log only.
             this.logger.error(
               {
                 error,
@@ -103,6 +128,14 @@ export class LogRequestCollectionService {
               },
               "Failed to enqueue canonical log record batch",
             );
+            span.setAttribute(
+              "logs.ingestion.unavailable",
+              preparation.accepted.length,
+            );
+            return {
+              outcome: "unavailable",
+              errorMessage: PERSISTENCE_ERROR_MESSAGE,
+            };
           }
         }
 
@@ -142,11 +175,12 @@ export class LogRequestCollectionService {
           try {
             await this.deps.recordLogContributions(contributions);
           } catch (error) {
-            acceptedLogRecords -= contributions.length;
-            rejectedLogRecords += contributions.length;
-            const message =
-              error instanceof Error ? error.message : String(error);
-            errors.push(`log trace contribution batch: ${message}`);
+            // Correlation is deliberately best-effort and separate from log
+            // acceptance, matching the metric pipeline: the canonical record
+            // is already durably enqueued above, and it — not the trace
+            // contribution — is the source of truth. Counting these as
+            // rejections would tell the sender to discard logs we have in
+            // fact accepted.
             this.logger.error(
               {
                 error,
@@ -167,6 +201,7 @@ export class LogRequestCollectionService {
           ? errors.join("; ").slice(0, 1024)
           : undefined;
         return {
+          outcome: "collected",
           acceptedLogRecords,
           rejectedLogRecords,
           ...(errorMessage ? { errorMessage } : {}),
