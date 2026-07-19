@@ -19,7 +19,7 @@ import { getProjectEmbeddingsModel } from "../../embeddings";
 import { stagedLangevalsFetch } from "../../langevals/stagedFetch";
 import { getPayloadSizeHistogram } from "../../metrics";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
-import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "./process-manager/topicClusteringEffects";
+import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "./process-manager/topicClusteringIntentHandlers";
 import type {
   BatchClusteringParams,
   IncrementalClusteringParams,

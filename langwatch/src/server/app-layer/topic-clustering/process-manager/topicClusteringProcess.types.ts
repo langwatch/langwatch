@@ -5,8 +5,12 @@ import { topicClusteringSearchAfterSchema } from "~/server/event-sourcing/pipeli
 export const TOPIC_CLUSTERING_PROCESS_NAME = "topicClustering" as const;
 
 export const TOPIC_CLUSTERING_PROCESS_INTENT_TYPES = {
-  /** Run one clustering page for the project. */
-  RUN: "topic_clustering.run",
+  /**
+   * Run one clustering page for the project. Property-style like the other
+   * builder-mounted domains (`ctx.intents.run(...)`); outbox rows scope
+   * intentType by processName, so the short name stays unambiguous.
+   */
+  RUN: "run",
 } as const;
 
 /**

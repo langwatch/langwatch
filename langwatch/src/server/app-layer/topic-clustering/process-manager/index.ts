@@ -1,9 +1,14 @@
 export {
+  buildProcessEventView,
+  handleClusteringRequested,
+  handleClusteringRunCompleted,
+  handleClusteringRunFailed,
+  INITIAL_TOPIC_CLUSTERING_STATE,
   nextDailySlot,
-  toTopicClusteringProcessEnvelope,
-  topicClusteringProcessDefinition,
   TOPIC_CLUSTERING_STALE_RUN_MS,
-} from "./topicClusteringProcess.definition";
+  topicClusteringWake,
+  type TopicClusteringIntents,
+} from "./topicClustering.process";
 export {
   TOPIC_CLUSTERING_PROCESS_INTENT_TYPES,
   TOPIC_CLUSTERING_PROCESS_NAME,
@@ -12,14 +17,11 @@ export {
   type TopicClusteringRunIntent,
 } from "./topicClusteringProcess.types";
 export {
-  createTopicClusteringProcessSubscriber,
-  type TopicClusteringProcessManagerPort,
-} from "./topicClusteringProcessSubscriber";
-export {
-  createTopicClusteringIntentHandlers,
+  createTopicClusteringRunHandler,
   TOPIC_CLUSTERING_MAX_ATTEMPTS,
   TOPIC_CLUSTERING_OUTBOX_BATCH_SIZE,
   TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
+  type TopicClusteringDispatchDeps,
   type TopicClusteringOutcomeCommands,
   type TopicClusteringRunPort,
-} from "./topicClusteringEffects";
+} from "./topicClusteringIntentHandlers";

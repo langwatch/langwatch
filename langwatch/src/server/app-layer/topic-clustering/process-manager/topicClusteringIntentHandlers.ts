@@ -1,13 +1,13 @@
 import { createLogger } from "@langwatch/observability";
 
-import type { IntentHandler } from "~/server/event-sourcing/process-manager";
+import type {
+  IntentContext,
+  IntentExecutor,
+} from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { ClusteringPageOutcome } from "~/server/app-layer/topic-clustering/clustering";
 import { classifyClusteringError } from "../clustering-error";
 
-import {
-  TOPIC_CLUSTERING_PROCESS_INTENT_TYPES,
-  topicClusteringRunIntentSchema,
-} from "./topicClusteringProcess.types";
+import type { TopicClusteringRunIntent } from "./topicClusteringProcess.types";
 
 const logger = createLogger("langwatch:topic-clustering:process-effects");
 
@@ -27,10 +27,11 @@ export const TOPIC_CLUSTERING_MAX_ATTEMPTS = 3;
 export const TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS = 20 * 60 * 1000;
 
 /**
- * One drain leases at most this many clustering intents, and the dispatcher
- * is configured (pipelineRegistry) to run the whole batch concurrently — so
- * this constant IS the effective clustering concurrency ADR-051 §4 promises,
- * matching the old worker's cap of 3.
+ * Leased per drain AND dispatched concurrently (the pipeline declares both):
+ * this constant is the effective clustering concurrency ADR-051 §4 promises,
+ * matching the old worker's cap of 3. Bounding the lease batch to the same
+ * number keeps leased-but-waiting messages from sitting invisible behind a
+ * slow page for the whole lease.
  */
 export const TOPIC_CLUSTERING_OUTBOX_BATCH_SIZE = 3;
 
@@ -73,24 +74,19 @@ export interface TopicClusteringOutcomeCommands {
   }): Promise<void>;
 }
 
-/**
- * Intent handlers for the topic clustering process outbox (ADR-051 §4).
- *
- * At-least-once + idempotent: re-running a page re-derives its work from
- * live data (unassigned traces), and the outcome commands carry
- * deterministic idempotency keys, so a redelivered intent cannot
- * double-record.
- *
- * Failure contract, split by which half failed:
- * - the CLUSTERING call — attempts below the cap rethrow so the outbox
- *   retries with backoff; the final attempt records a durable run_failed
- *   instead and retires the message dispatched, so the failure is a visible
- *   outcome rather than a dead row an operator has to find.
- * - the OUTCOME write — never retried through the outbox, on EITHER branch,
- *   because that would redeliver the intent and re-run a page that has already
- *   either succeeded or exhausted its attempts. Both call sites swallow and
- *   log; see the comments there.
- */
+export interface TopicClusteringDispatchDeps {
+  runPort: TopicClusteringRunPort;
+  /**
+   * Late-bound on purpose: the executor is declared while the pipeline is
+   * being built, and these are the SAME pipeline's commands — they only
+   * exist after `.build()`. The registry supplies a getter it resolves
+   * post-build; dispatch happens long after that.
+   */
+  commands: () => TopicClusteringOutcomeCommands;
+  maxAttempts?: number;
+  clock?: () => number;
+}
+
 /** Everything a page's bookkeeping needs to identify itself in logs/events. */
 interface PageContext {
   projectId: string;
@@ -240,40 +236,53 @@ async function recordClusteringSuccess(params: {
   }
 }
 
-export function createTopicClusteringIntentHandlers(params: {
-  runPort: TopicClusteringRunPort;
-  commands: TopicClusteringOutcomeCommands;
-  maxAttempts?: number;
-  clock?: () => number;
-}): Record<string, IntentHandler> {
-  const maxAttempts = params.maxAttempts ?? TOPIC_CLUSTERING_MAX_ATTEMPTS;
-  const clock = params.clock ?? (() => Date.now());
+/**
+ * The `run` intent executor (ADR-051 §4): one clustering page per dispatch.
+ *
+ * At-least-once + idempotent: re-running a page re-derives its work from
+ * live data (unassigned traces), and the outcome commands carry
+ * deterministic idempotency keys, so a redelivered intent cannot
+ * double-record.
+ *
+ * Failure contract, split by which half failed:
+ * - the CLUSTERING call — attempts below the cap rethrow so the outbox
+ *   retries with backoff; the final attempt records a durable run_failed
+ *   instead and retires the message dispatched, so the failure is a visible
+ *   outcome rather than a dead row an operator has to find.
+ * - the OUTCOME write — never retried through the outbox, on either branch,
+ *   because that would redeliver the intent and re-run a page that has
+ *   already either succeeded or exhausted its attempts.
+ */
+export function createTopicClusteringRunHandler(
+  deps: TopicClusteringDispatchDeps,
+): IntentExecutor<TopicClusteringRunIntent> {
+  const maxAttempts = deps.maxAttempts ?? TOPIC_CLUSTERING_MAX_ATTEMPTS;
+  const clock = deps.clock ?? (() => Date.now());
 
-  const runHandler: IntentHandler = async ({ message }) => {
-    const intent = topicClusteringRunIntentSchema.parse(message.payload);
+  return async (
+    payload: TopicClusteringRunIntent,
+    intentContext: IntentContext,
+  ) => {
+    const commands = deps.commands();
     const context: PageContext = {
-      projectId: message.projectId,
-      runId: intent.runId,
-      page: intent.page,
-      attempt: message.attempt,
+      projectId: intentContext.projectId,
+      runId: payload.runId,
+      page: payload.page,
+      attempt: intentContext.attempt,
     };
 
-    await announceRunStarted({
-      commands: params.commands,
-      context,
-      occurredAt: clock(),
-    });
+    await announceRunStarted({ commands, context, occurredAt: clock() });
 
     let outcome: ClusteringPageOutcome;
     try {
-      outcome = await params.runPort.runClusteringPage({
+      outcome = await deps.runPort.runClusteringPage({
         projectId: context.projectId,
-        searchAfter: intent.searchAfter,
+        searchAfter: payload.searchAfter,
       });
     } catch (error) {
       // Attempts below the cap rethrow so the outbox retries with backoff;
       // only the final attempt records the durable, visible failure.
-      if (message.attempt < maxAttempts) {
+      if (intentContext.attempt < maxAttempts) {
         logger.warn(
           { ...context, error: errorText(error) },
           "Clustering page failed; outbox will retry",
@@ -281,7 +290,7 @@ export function createTopicClusteringIntentHandlers(params: {
         throw error;
       }
       await recordClusteringFailure({
-        commands: params.commands,
+        commands,
         context,
         occurredAt: clock(),
         error,
@@ -290,14 +299,10 @@ export function createTopicClusteringIntentHandlers(params: {
     }
 
     await recordClusteringSuccess({
-      commands: params.commands,
+      commands,
       context,
       occurredAt: clock(),
       outcome,
     });
-  };
-
-  return {
-    [TOPIC_CLUSTERING_PROCESS_INTENT_TYPES.RUN]: runHandler,
   };
 }

@@ -1,24 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { DispatchableMessage } from "~/server/event-sourcing/process-manager";
+import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import {
   CLUSTERING_ERROR_CODES,
   ClusteringError,
 } from "../../clustering-error";
-import { createTopicClusteringIntentHandlers } from "../topicClusteringEffects";
+import type { TopicClusteringRunIntent } from "../topicClusteringProcess.types";
+import { createTopicClusteringRunHandler } from "../topicClusteringIntentHandlers";
 
-function makeMessage(overrides: Partial<DispatchableMessage> = {}): DispatchableMessage {
+function makePayload(
+  overrides: Partial<TopicClusteringRunIntent> = {},
+): TopicClusteringRunIntent {
+  return { runId: "20260717", page: 1, searchAfter: null, ...overrides };
+}
+
+function makeContext(overrides: Partial<IntentContext> = {}): IntentContext {
   return {
     processName: "topicClustering",
     projectId: "project-1",
     processKey: "project-1",
     tenantId: "project-1",
-    messageKey: "run:20260717:page-1",
-    intentType: "topic_clustering.run",
-    payload: { runId: "20260717", page: 1, searchAfter: null },
-    sourceEventId: null,
+    messageKey: "process:project-1:run:20260717:page-1",
     attempt: 1,
     ...overrides,
   };
@@ -32,7 +36,7 @@ function makeCommands() {
   };
 }
 
-describe("createTopicClusteringIntentHandlers", () => {
+describe("createTopicClusteringRunHandler", () => {
   describe("when a page begins", () => {
     it("announces the run before doing the work", async () => {
       const commands = makeCommands();
@@ -40,7 +44,7 @@ describe("createTopicClusteringIntentHandlers", () => {
       commands.recordClusteringRunStarted.mockImplementation(async () => {
         order.push("started");
       });
-      const handlers = createTopicClusteringIntentHandlers({
+      const run = createTopicClusteringRunHandler({
         runPort: {
           runClusteringPage: vi.fn().mockImplementation(async () => {
             order.push("clustered");
@@ -52,11 +56,11 @@ describe("createTopicClusteringIntentHandlers", () => {
             };
           }),
         },
-        commands,
+        commands: () => commands,
         clock: () => 999,
       });
 
-      await handlers["topic_clustering.run"]!({ message: makeMessage() });
+      await run(makePayload(), makeContext());
 
       expect(commands.recordClusteringRunStarted).toHaveBeenCalledWith({
         tenantId: "project-1",
@@ -80,13 +84,13 @@ describe("createTopicClusteringIntentHandlers", () => {
         topicsCount: 1,
         subtopicsCount: 1,
       });
-      const handlers = createTopicClusteringIntentHandlers({
+      const run = createTopicClusteringRunHandler({
         runPort: { runClusteringPage },
-        commands,
+        commands: () => commands,
         clock: () => 999,
       });
 
-      await handlers["topic_clustering.run"]!({ message: makeMessage() });
+      await run(makePayload(), makeContext());
 
       // A status announcement must never cost the run it announces.
       expect(runClusteringPage).toHaveBeenCalledTimes(1);
@@ -97,7 +101,7 @@ describe("createTopicClusteringIntentHandlers", () => {
   describe("when a clustering page succeeds", () => {
     it("records the completed outcome with the page facts", async () => {
       const commands = makeCommands();
-      const handlers = createTopicClusteringIntentHandlers({
+      const run = createTopicClusteringRunHandler({
         runPort: {
           runClusteringPage: vi.fn().mockResolvedValue({
             mode: "incremental",
@@ -107,11 +111,11 @@ describe("createTopicClusteringIntentHandlers", () => {
             nextSearchAfter: [123, "trace-a"],
           }),
         },
-        commands,
+        commands: () => commands,
         clock: () => 999,
       });
 
-      await handlers["topic_clustering.run"]!({ message: makeMessage() });
+      await run(makePayload(), makeContext());
 
       expect(commands.recordClusteringRunCompleted).toHaveBeenCalledWith({
         tenantId: "project-1",
@@ -131,7 +135,7 @@ describe("createTopicClusteringIntentHandlers", () => {
   describe("when a page is skipped by a gate", () => {
     it("forwards the skip reason on the completed outcome", async () => {
       const commands = makeCommands();
-      const handlers = createTopicClusteringIntentHandlers({
+      const run = createTopicClusteringRunHandler({
         runPort: {
           runClusteringPage: vi.fn().mockResolvedValue({
             mode: "batch",
@@ -141,11 +145,11 @@ describe("createTopicClusteringIntentHandlers", () => {
             skippedReason: "recently_clustered",
           }),
         },
-        commands,
+        commands: () => commands,
         clock: () => 999,
       });
 
-      await handlers["topic_clustering.run"]!({ message: makeMessage() });
+      await run(makePayload(), makeContext());
 
       expect(commands.recordClusteringRunCompleted).toHaveBeenCalledWith(
         expect.objectContaining({ skippedReason: "recently_clustered" }),
@@ -166,14 +170,14 @@ describe("createTopicClusteringIntentHandlers", () => {
         subtopicsCount: 20,
         nextSearchAfter: [123, "trace-a"],
       });
-      const handlers = createTopicClusteringIntentHandlers({
+      const run = createTopicClusteringRunHandler({
         runPort: { runClusteringPage },
-        commands,
+        commands: () => commands,
         clock: () => 999,
       });
 
       await expect(
-        handlers["topic_clustering.run"]!({ message: makeMessage() }),
+        run(makePayload(), makeContext()),
       ).resolves.toBeUndefined();
 
       expect(runClusteringPage).toHaveBeenCalledTimes(1);
@@ -185,19 +189,17 @@ describe("createTopicClusteringIntentHandlers", () => {
   describe("when clustering fails below the attempt cap", () => {
     it("rethrows so the outbox retries and records nothing", async () => {
       const commands = makeCommands();
-      const handlers = createTopicClusteringIntentHandlers({
+      const run = createTopicClusteringRunHandler({
         runPort: {
           runClusteringPage: vi
             .fn()
             .mockRejectedValue(new Error("langevals unavailable")),
         },
-        commands,
+        commands: () => commands,
       });
 
       await expect(
-        handlers["topic_clustering.run"]!({
-          message: makeMessage({ attempt: 2 }),
-        }),
+        run(makePayload(), makeContext({ attempt: 2 })),
       ).rejects.toThrow("langevals unavailable");
 
       expect(commands.recordClusteringRunFailed).not.toHaveBeenCalled();
@@ -208,7 +210,7 @@ describe("createTopicClusteringIntentHandlers", () => {
   describe("when clustering fails on the final attempt", () => {
     it("records a durable run_failed instead of dying silently", async () => {
       const commands = makeCommands();
-      const handlers = createTopicClusteringIntentHandlers({
+      const run = createTopicClusteringRunHandler({
         runPort: {
           runClusteringPage: vi
             .fn()
@@ -219,13 +221,11 @@ describe("createTopicClusteringIntentHandlers", () => {
               ),
             ),
         },
-        commands,
+        commands: () => commands,
         clock: () => 999,
       });
 
-      await handlers["topic_clustering.run"]!({
-        message: makeMessage({ attempt: 3 }),
-      });
+      await run(makePayload(), makeContext({ attempt: 3 }));
 
       expect(commands.recordClusteringRunFailed).toHaveBeenCalledWith({
         tenantId: "project-1",
@@ -240,7 +240,7 @@ describe("createTopicClusteringIntentHandlers", () => {
 
     it("marks a missing model configuration as the customer's to fix", async () => {
       const commands = makeCommands();
-      const handlers = createTopicClusteringIntentHandlers({
+      const run = createTopicClusteringRunHandler({
         runPort: {
           runClusteringPage: vi
             .fn()
@@ -253,13 +253,11 @@ describe("createTopicClusteringIntentHandlers", () => {
               ),
             ),
         },
-        commands,
+        commands: () => commands,
         clock: () => 999,
       });
 
-      await handlers["topic_clustering.run"]!({
-        message: makeMessage({ attempt: 3 }),
-      });
+      await run(makePayload(), makeContext({ attempt: 3 }));
 
       expect(commands.recordClusteringRunFailed).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -276,7 +274,7 @@ describe("createTopicClusteringIntentHandlers", () => {
      */
     it("never blames the customer for an error it cannot attribute", async () => {
       const commands = makeCommands();
-      const handlers = createTopicClusteringIntentHandlers({
+      const run = createTopicClusteringRunHandler({
         runPort: {
           runClusteringPage: vi
             .fn()
@@ -284,13 +282,11 @@ describe("createTopicClusteringIntentHandlers", () => {
               new Error("Code: 499. DB::Exception: 403 Forbidden (S3Error)"),
             ),
         },
-        commands,
+        commands: () => commands,
         clock: () => 999,
       });
 
-      await handlers["topic_clustering.run"]!({
-        message: makeMessage({ attempt: 3 }),
-      });
+      await run(makePayload(), makeContext({ attempt: 3 }));
 
       expect(commands.recordClusteringRunFailed).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -320,16 +316,14 @@ describe("createTopicClusteringIntentHandlers", () => {
               "langevals unavailable",
             ),
           );
-        const handlers = createTopicClusteringIntentHandlers({
+        const run = createTopicClusteringRunHandler({
           runPort: { runClusteringPage },
-          commands,
+          commands: () => commands,
           clock: () => 999,
         });
 
         await expect(
-          handlers["topic_clustering.run"]!({
-            message: makeMessage({ attempt: 3 }),
-          }),
+          run(makePayload(), makeContext({ attempt: 3 })),
         ).resolves.toBeUndefined();
       });
 
@@ -341,15 +335,13 @@ describe("createTopicClusteringIntentHandlers", () => {
         const runClusteringPage = vi
           .fn()
           .mockRejectedValue(new Error("langevals unavailable"));
-        const handlers = createTopicClusteringIntentHandlers({
+        const run = createTopicClusteringRunHandler({
           runPort: { runClusteringPage },
-          commands,
+          commands: () => commands,
           clock: () => 999,
         });
 
-        await handlers["topic_clustering.run"]!({
-          message: makeMessage({ attempt: 3 }),
-        });
+        await run(makePayload(), makeContext({ attempt: 3 }));
 
         expect(runClusteringPage).toHaveBeenCalledTimes(1);
         expect(commands.recordClusteringRunCompleted).not.toHaveBeenCalled();

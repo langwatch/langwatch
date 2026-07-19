@@ -5,13 +5,13 @@ import {
   OutboxDispatcherService,
   ProcessManagerService,
 } from "~/server/event-sourcing/process-manager";
+import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
+import { buildIntentHandlers, buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
+import { topicClusteringPM } from "~/server/event-sourcing/pipelines/topic-clustering-processing/pipeline";
 import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
 
-import { createTopicClusteringIntentHandlers } from "../topicClusteringEffects";
-import {
-  toTopicClusteringProcessEnvelope,
-  topicClusteringProcessDefinition,
-} from "../topicClusteringProcess.definition";
+import { buildProcessEventView } from "../topicClustering.process";
+import type { TopicClusteringOutcomeCommands } from "../topicClusteringIntentHandlers";
 import { TOPIC_CLUSTERING_PROCESS_NAME } from "../topicClusteringProcess.types";
 
 const PROJECT_ID = "project-1";
@@ -39,13 +39,51 @@ function makeEvent(overrides: {
   } as TopicClusteringProcessingEvent;
 }
 
-function harness() {
+function toEnvelope(event: TopicClusteringProcessingEvent) {
+  return {
+    eventId: event.id,
+    eventType: event.type,
+    occurredAt: event.occurredAt,
+    tenantId: String(event.tenantId),
+    projectId: String(event.tenantId),
+    processKey: String(event.aggregateId),
+    payload: buildProcessEventView(event),
+  };
+}
+
+/** Builder-authored intent keys are qualified per process instance. */
+function runKey(runId: string, page: number): string {
+  return `process:${encodeURIComponent(PROJECT_ID)}:run:${runId}:page-${page}`;
+}
+
+function harness(options?: {
+  runPort?: Parameters<typeof topicClusteringPM>[0]["runPort"];
+  commands?: TopicClusteringOutcomeCommands;
+}) {
   const store = new InMemoryProcessStore();
+  // The EXACT topology the pipeline mounts, composed on the runtime's own
+  // definition builder — clamping, intent-key prefixing and the payload
+  // boundary all included.
+  const definition = buildProcessManager<TopicClusteringProcessingEvent>({
+    name: TOPIC_CLUSTERING_PROCESS_NAME,
+    applier: topicClusteringPM({
+      runPort:
+        options?.runPort ??
+        ({
+          runClusteringPage: () => Promise.reject(new Error("unused")),
+        } as Parameters<typeof topicClusteringPM>[0]["runPort"]),
+      commands: () => {
+        if (!options?.commands) throw new Error("commands unused in this test");
+        return options.commands;
+      },
+      clock: () => 999_999,
+    }),
+  });
   const manager = new ProcessManagerService({
-    definition: topicClusteringProcessDefinition,
+    definition: buildProcessDefinition(definition.config),
     store,
   });
-  return { store, manager };
+  return { store, manager, definition };
 }
 
 async function bootstrap(
@@ -53,7 +91,7 @@ async function bootstrap(
   occurredAt = 10_000,
 ) {
   return manager.handleEvent({
-    envelope: toTopicClusteringProcessEnvelope(
+    envelope: toEnvelope(
       makeEvent({
         type: "lw.obs.topic_clustering.requested",
         occurredAt,
@@ -104,7 +142,7 @@ describe("topic clustering process flow (store + manager + dispatcher)", () => {
 
       // A manual request advances the revision before the wake is handled.
       await manager.handleEvent({
-        envelope: toTopicClusteringProcessEnvelope(
+        envelope: toEnvelope(
           makeEvent({
             type: "lw.obs.topic_clustering.requested",
             occurredAt: 20_000,
@@ -135,11 +173,11 @@ describe("topic clustering process flow (store + manager + dispatcher)", () => {
         data: { trigger: "manual" },
       });
       const first = await manager.handleEvent({
-        envelope: toTopicClusteringProcessEnvelope(event),
+        envelope: toEnvelope(event),
         now: 20_000,
       });
       const second = await manager.handleEvent({
-        envelope: toTopicClusteringProcessEnvelope(event),
+        envelope: toEnvelope(event),
         now: 20_001,
       });
 
@@ -152,7 +190,33 @@ describe("topic clustering process flow (store + manager + dispatcher)", () => {
 
   describe("when the dispatcher runs a leased clustering intent", () => {
     it("executes the page and the completion event drives the continuation intent", async () => {
-      const { store, manager } = harness();
+      const recordedStarts: unknown[] = [];
+      const recordedCompletions: unknown[] = [];
+      const { store, manager, definition } = harness({
+        runPort: {
+          runClusteringPage: vi.fn().mockResolvedValue({
+            mode: "batch",
+            tracesProcessed: 2_000,
+            topicsCount: 5,
+            subtopicsCount: 12,
+            nextSearchAfter: [9_999, "trace-x"],
+          }),
+        },
+        commands: {
+          // This object must satisfy the FULL TopicClusteringOutcomeCommands
+          // contract. It once omitted recordClusteringRunStarted; the
+          // handler's best-effort try/catch swallowed the resulting
+          // TypeError, so the test passed green while exercising the
+          // "announcement failed" path on every dispatch.
+          recordClusteringRunStarted: async (args) => {
+            recordedStarts.push(args);
+          },
+          recordClusteringRunCompleted: async (args) => {
+            recordedCompletions.push(args);
+          },
+          recordClusteringRunFailed: async () => undefined,
+        },
+      });
       await bootstrap(manager);
       const [wake] = await store.findDueWakes({
         now: Number.MAX_SAFE_INTEGER,
@@ -160,36 +224,9 @@ describe("topic clustering process flow (store + manager + dispatcher)", () => {
       });
       await manager.handleWake({ wake: wake!, now: wake!.wakeAt });
 
-      const recordedStarts: unknown[] = [];
-      const recordedCompletions: unknown[] = [];
       const dispatcher = new OutboxDispatcherService({
         store,
-        handlers: createTopicClusteringIntentHandlers({
-          runPort: {
-            runClusteringPage: vi.fn().mockResolvedValue({
-              mode: "batch",
-              tracesProcessed: 2_000,
-              topicsCount: 5,
-              subtopicsCount: 12,
-              nextSearchAfter: [wake!.wakeAt - 1, "trace-x"],
-            }),
-          },
-          commands: {
-            // This object must satisfy the FULL TopicClusteringOutcomeCommands
-            // contract. It once omitted recordClusteringRunStarted; the
-            // handler's best-effort try/catch swallowed the resulting
-            // TypeError, so the test passed green while exercising the
-            // "announcement failed" path on every dispatch.
-            recordClusteringRunStarted: async (args) => {
-              recordedStarts.push(args);
-            },
-            recordClusteringRunCompleted: async (args) => {
-              recordedCompletions.push(args);
-            },
-            recordClusteringRunFailed: async () => undefined,
-          },
-          clock: () => wake!.wakeAt + 60_000,
-        }),
+        handlers: buildIntentHandlers(definition.config),
         processNames: [TOPIC_CLUSTERING_PROCESS_NAME],
       });
 
@@ -209,7 +246,7 @@ describe("topic clustering process flow (store + manager + dispatcher)", () => {
         nextSearchAfter: [number, string];
       };
       await manager.handleEvent({
-        envelope: toTopicClusteringProcessEnvelope(
+        envelope: toEnvelope(
           makeEvent({
             type: "lw.obs.topic_clustering.run_completed",
             occurredAt: wake!.wakeAt + 60_000,
@@ -230,7 +267,7 @@ describe("topic clustering process flow (store + manager + dispatcher)", () => {
       const messages = await store.findMessagesByRef({ ref: REF });
       const pending = messages.filter((m) => m.status === "pending");
       expect(pending).toHaveLength(1);
-      expect(pending[0]!.messageKey).toBe(`run:${completion.runId}:page-2`);
+      expect(pending[0]!.messageKey).toBe(runKey(completion.runId, 2));
       expect(pending[0]!.payload).toMatchObject({
         page: 2,
         searchAfter: completion.nextSearchAfter,

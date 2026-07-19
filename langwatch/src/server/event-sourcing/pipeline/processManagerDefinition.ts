@@ -132,6 +132,12 @@ export interface ProcessManagerConfig<
     retryDelayMs?: (params: { attempt: number }) => number;
     /** In-flight dispatches per loop. Default 1 (sequential). */
     concurrency?: number;
+    /**
+     * Messages leased per drain. Bound it to roughly `concurrency` when
+     * dispatches are slow (minutes, not seconds), or leased-but-waiting
+     * messages sit invisible behind the in-flight ones for the whole lease.
+     */
+    batchSize?: number;
   };
   schedule?: { everyMs: number };
   readonly _eventType?: E;

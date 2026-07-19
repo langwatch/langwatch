@@ -1,17 +1,47 @@
 import { describe, expect, it } from "vitest";
 
+import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
+import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
 import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
+import { topicClusteringPM } from "~/server/event-sourcing/pipelines/topic-clustering-processing/pipeline";
 
 import {
+  buildProcessEventView,
   nextDailySlot,
-  toTopicClusteringProcessEnvelope,
-  topicClusteringProcessDefinition,
   TOPIC_CLUSTERING_STALE_RUN_MS,
-} from "../topicClusteringProcess.definition";
+} from "../topicClustering.process";
+import { TOPIC_CLUSTERING_PROCESS_NAME } from "../topicClusteringProcess.types";
 import type { TopicClusteringProcessState } from "../topicClusteringProcess.types";
 
 const PROJECT_ID = "project-1";
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The EXACT definition the runtime mounts — built through the pipeline's own
+ * `topicClusteringPM` applier and the runtime's `buildProcessDefinition`, so
+ * these tests cover the generated evolve (clamping, intent-key prefixing,
+ * undeclared-event guard) rather than a re-implementation. The executor is
+ * a stub: evolve never dispatches.
+ */
+const definition = buildProcessDefinition(
+  buildProcessManager<TopicClusteringProcessingEvent>({
+    name: TOPIC_CLUSTERING_PROCESS_NAME,
+    applier: topicClusteringPM({
+      runPort: { runClusteringPage: () => Promise.reject(new Error("unused")) },
+      commands: () => {
+        throw new Error("unused in evolve tests");
+      },
+    }),
+  }).config,
+);
+
+const initialState = definition.initialState as TopicClusteringProcessState;
+
+const REF = {
+  processName: TOPIC_CLUSTERING_PROCESS_NAME,
+  projectId: PROJECT_ID,
+  processKey: PROJECT_ID,
+};
 
 function makeEvent(overrides: {
   type: TopicClusteringProcessingEvent["type"];
@@ -36,10 +66,22 @@ function evolveEvent(
   /** Handling instant; defaults to prompt delivery. Pass it to model lag. */
   now?: number,
 ) {
-  const envelope = toTopicClusteringProcessEnvelope(event);
-  return topicClusteringProcessDefinition.evolve({
+  return definition.evolve({
     previousState,
-    input: { kind: "event", event: envelope, now: now ?? envelope.occurredAt },
+    input: {
+      kind: "event",
+      event: {
+        eventId: event.id,
+        eventType: event.type,
+        occurredAt: event.occurredAt,
+        tenantId: String(event.tenantId),
+        projectId: String(event.tenantId),
+        processKey: String(event.aggregateId),
+        payload: buildProcessEventView(event),
+      },
+      now: now ?? event.occurredAt,
+    },
+    ref: REF,
   });
 }
 
@@ -48,14 +90,20 @@ function evolveWake(
   scheduledFor: number,
   now: number = scheduledFor,
 ) {
-  return topicClusteringProcessDefinition.evolve({
+  return definition.evolve({
     previousState,
     input: { kind: "wake", scheduledFor, now },
+    ref: REF,
   });
 }
 
 function bootstrappedState(): TopicClusteringProcessState {
   return { projectId: PROJECT_ID, enabled: true, currentRun: null };
+}
+
+/** Builder-authored intent keys are qualified per process instance. */
+function runKey(runId: string, page: number): string {
+  return `process:${encodeURIComponent(PROJECT_ID)}:run:${runId}:page-${page}`;
 }
 
 describe("nextDailySlot", () => {
@@ -90,11 +138,11 @@ describe("nextDailySlot", () => {
   });
 });
 
-describe("topicClusteringProcessDefinition", () => {
+describe("topicClustering process (runtime-built definition)", () => {
   describe("when a bootstrap request arrives", () => {
     it("enables the process and schedules the first wake without an intent", () => {
       const evolution = evolveEvent(
-        topicClusteringProcessDefinition.initialState,
+        initialState,
         makeEvent({
           type: "lw.obs.topic_clustering.requested",
           occurredAt: 10_000,
@@ -110,7 +158,7 @@ describe("topicClusteringProcessDefinition", () => {
 
     it("is idempotent when re-sent by the backfill task", () => {
       const first = evolveEvent(
-        topicClusteringProcessDefinition.initialState,
+        initialState,
         makeEvent({
           type: "lw.obs.topic_clustering.requested",
           occurredAt: 10_000,
@@ -138,8 +186,8 @@ describe("topicClusteringProcessDefinition", () => {
 
       expect(evolution.intents).toHaveLength(1);
       expect(evolution.intents[0]).toEqual({
-        messageKey: "run:20260717T093000:page-1",
-        intentType: "topic_clustering.run",
+        messageKey: runKey("20260717T093000", 1),
+        intentType: "run",
         payload: { runId: "20260717T093000", page: 1, searchAfter: null },
       });
       expect(evolution.state.currentRun).toEqual({
@@ -215,7 +263,7 @@ describe("topicClusteringProcessDefinition", () => {
       }
 
       expect(intents).toHaveLength(1);
-      expect(intents[0]!.messageKey).toBe("run:20260717T093000:page-1");
+      expect(intents[0]!.messageKey).toBe(runKey("20260717T093000", 1));
       expect(nextWakeAt).toBeGreaterThan(now);
     });
   });
@@ -265,7 +313,7 @@ describe("topicClusteringProcessDefinition", () => {
   describe("when a wake fires for a never-bootstrapped process", () => {
     it("decides nothing and clears its own wake", () => {
       const evolution = evolveWake(
-        topicClusteringProcessDefinition.initialState,
+        initialState,
         5_000,
       );
 
@@ -288,8 +336,8 @@ describe("topicClusteringProcessDefinition", () => {
 
       expect(evolution.intents).toEqual([
         {
-          messageKey: `run:manual-${occurredAt}:page-1`,
-          intentType: "topic_clustering.run",
+          messageKey: runKey(`manual-${occurredAt}`, 1),
+          intentType: "run",
           payload: { runId: `manual-${occurredAt}`, page: 1, searchAfter: null },
         },
       ]);
@@ -344,8 +392,8 @@ describe("topicClusteringProcessDefinition", () => {
 
       expect(evolution.intents).toEqual([
         {
-          messageKey: "run:20260717:page-2",
-          intentType: "topic_clustering.run",
+          messageKey: runKey("20260717", 2),
+          intentType: "run",
           payload: {
             runId: "20260717",
             page: 2,

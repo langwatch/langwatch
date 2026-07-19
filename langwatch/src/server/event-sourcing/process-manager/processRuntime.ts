@@ -11,7 +11,10 @@ import {
   type IntentHandler,
 } from "./outbox/outboxDispatcherService";
 import { ProcessOutboxWorker } from "./outbox/processOutboxWorker";
-import type { ProcessEventEnvelope } from "./processManager.types";
+import type {
+  ProcessDefinition,
+  ProcessEventEnvelope,
+} from "./processManager.types";
 import { ProcessManagerService } from "./processManagerService";
 import type { ProcessStore } from "./stores/processStore.types";
 import {
@@ -32,6 +35,102 @@ interface RegisteredProcessManager {
 
 export interface GeneratedProcessArtifacts<E extends Event> {
   subscribers: EventSubscriberDefinition<E>[];
+}
+
+/**
+ * The runtime-facing ProcessDefinition a builder config generates. Exported
+ * so tests (and future domains' harnesses) can drive the EXACT evolve the
+ * runtime runs — clamping, schedule arming, undeclared-event guard and all —
+ * instead of re-implementing it around the raw handlers.
+ */
+/**
+ * The outbox intent handlers a builder config generates: schema-validate the
+ * leased payload, then hand it to the declared executor with the dispatch
+ * context. Exported for the same reason as {@link buildProcessDefinition}.
+ */
+export function buildIntentHandlers(
+  config: ProcessManagerDefinition["config"],
+): Record<string, IntentHandler> {
+  const handlers: Record<string, IntentHandler> = {};
+  for (const [intentType, spec] of Object.entries(config.intents)) {
+    handlers[intentType] = async ({ message }) => {
+      await spec.run(spec.schema.parse(message.payload), {
+        processName: message.processName,
+        projectId: message.projectId,
+        processKey: message.processKey,
+        tenantId: message.tenantId,
+        messageKey: message.messageKey,
+        attempt: message.attempt,
+      });
+    };
+  }
+  return handlers;
+}
+
+export function buildProcessDefinition(
+  config: ProcessManagerDefinition["config"],
+): ProcessDefinition<unknown> {
+  return {
+    name: config.name,
+    initialState: config.state,
+    evolve: ({ previousState, input, ref }) => {
+      const factories = buildIntentFactories(config.intents, {
+        processKey: ref.processKey,
+      });
+      if (input.kind === "wake") {
+        if (!config.onWake) {
+          return { state: previousState, nextWakeAt: null, intents: [] };
+        }
+        const evolution = config.onWake(previousState, {
+          at: input.scheduledFor,
+          now: input.now,
+          key: ref.processKey,
+          projectId: ref.projectId,
+          intents: factories,
+        });
+        return {
+          state: evolution.state,
+          // Rearm from the present, not from the slot we missed. A wake
+          // that fires days late must schedule the NEXT slot from now, or
+          // every skipped interval is replayed back-to-back on recovery.
+          nextWakeAt: config.schedule
+            ? Math.max(input.scheduledFor, input.now) + config.schedule.everyMs
+            : (evolution.nextWakeAt ?? null),
+          intents: evolution.intents ?? [],
+        };
+      }
+
+      const envelope = input.event;
+      if (envelope.eventType === SCHEDULE_ARM_EVENT_TYPE) {
+        return {
+          state: previousState,
+          nextWakeAt:
+            Math.max(envelope.occurredAt, input.now) +
+            (config.schedule?.everyMs ?? 0),
+          intents: [],
+        };
+      }
+
+      const handler = config.handlers[envelope.eventType];
+      if (!handler) {
+        throw new Error(
+          `Process manager "${config.name}" received undeclared event "${envelope.eventType}"`,
+        );
+      }
+      const evolution = handler(previousState, envelope.payload, {
+        at: envelope.occurredAt,
+        now: input.now,
+        key: envelope.processKey,
+        projectId: envelope.projectId,
+        intents: factories,
+      });
+      return {
+        state: evolution.state,
+        nextWakeAt: evolution.nextWakeAt ?? null,
+        intents: evolution.intents ?? [],
+      };
+    },
+  };
 }
 
 /**
@@ -124,87 +223,13 @@ export class ProcessRuntime {
     }
 
     const manager = new ProcessManagerService<unknown>({
-      definition: {
-        name: config.name,
-        initialState: config.state,
-        evolve: ({ previousState, input, ref }) => {
-          const factories = buildIntentFactories(config.intents, {
-            processKey: ref.processKey,
-          });
-          if (input.kind === "wake") {
-            if (!config.onWake) {
-              return { state: previousState, nextWakeAt: null, intents: [] };
-            }
-            const evolution = config.onWake(previousState, {
-              at: input.scheduledFor,
-              now: input.now,
-              key: ref.processKey,
-              projectId: ref.projectId,
-              intents: factories,
-            });
-            return {
-              state: evolution.state,
-              // Rearm from the present, not from the slot we missed. A wake
-              // that fires days late must schedule the NEXT slot from now, or
-              // every skipped interval is replayed back-to-back on recovery.
-              nextWakeAt: config.schedule
-                ? Math.max(input.scheduledFor, input.now) +
-                  config.schedule.everyMs
-                : (evolution.nextWakeAt ?? null),
-              intents: evolution.intents ?? [],
-            };
-          }
-
-          const envelope = input.event;
-          if (envelope.eventType === SCHEDULE_ARM_EVENT_TYPE) {
-            return {
-              state: previousState,
-              nextWakeAt:
-                Math.max(envelope.occurredAt, input.now) +
-                (config.schedule?.everyMs ?? 0),
-              intents: [],
-            };
-          }
-
-          const handler = config.handlers[envelope.eventType];
-          if (!handler) {
-            throw new Error(
-              `Process manager "${config.name}" received undeclared event "${envelope.eventType}"`,
-            );
-          }
-          const evolution = handler(previousState, envelope.payload, {
-            at: envelope.occurredAt,
-            now: input.now,
-            key: envelope.processKey,
-            projectId: envelope.projectId,
-            intents: factories,
-          });
-          return {
-            state: evolution.state,
-            nextWakeAt: evolution.nextWakeAt ?? null,
-            intents: evolution.intents ?? [],
-          };
-        },
-      },
+      definition: buildProcessDefinition(config),
       store: this.store,
     });
 
-    const handlers: Record<string, IntentHandler> = {};
-    for (const [intentType, spec] of Object.entries(config.intents)) {
-      handlers[intentType] = async ({ message }) => {
-        await spec.run(spec.schema.parse(message.payload), {
-          processName: message.processName,
-          projectId: message.projectId,
-          processKey: message.processKey,
-          tenantId: message.tenantId,
-          messageKey: message.messageKey,
-          attempt: message.attempt,
-        });
-      };
-    }
     const dispatcher = new OutboxDispatcherService({
       store: this.store,
-      handlers,
+      handlers: buildIntentHandlers(config),
       maxAttempts: config.outbox?.maxAttempts,
       leaseDurationMs: config.outbox?.leaseDurationMs,
       retryDelayMs: config.outbox?.retryDelayMs,
@@ -214,6 +239,7 @@ export class ProcessRuntime {
     const outboxWorker = new ProcessOutboxWorker({
       dispatcher,
       logger: this.logger,
+      batchSize: config.outbox?.batchSize,
     });
     const registered = { definition, manager, outboxWorker };
     this.managers.set(config.name, registered);

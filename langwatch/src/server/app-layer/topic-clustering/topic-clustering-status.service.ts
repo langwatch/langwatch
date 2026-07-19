@@ -1,4 +1,4 @@
-import { TOPIC_CLUSTERING_STALE_RUN_MS } from "./process-manager/topicClusteringProcess.definition";
+import { TOPIC_CLUSTERING_STALE_RUN_MS } from "./process-manager/topicClustering.process";
 import type { TopicClusteringStatusRepository } from "./repositories/topic-clustering-status.repository";
 
 export interface TopicClusteringStatus {
