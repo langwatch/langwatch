@@ -10,7 +10,12 @@ import { TerminalView } from "../TerminalView";
 afterEach(cleanup);
 
 const entries: TranscriptEntry[] = [
-  { kind: "user_prompt", atMs: 1000, text: "check git status and bump the version", chars: 39 },
+  {
+    kind: "user_prompt",
+    atMs: 1000,
+    text: "check git status and bump the version",
+    chars: 39,
+  },
   {
     kind: "model_call",
     atMs: 1500,
@@ -24,7 +29,12 @@ const entries: TranscriptEntry[] = [
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
   },
-  { kind: "assistant_message", atMs: 2000, text: "Checking the working tree.", model: "claude-opus-4" },
+  {
+    kind: "assistant_message",
+    atMs: 2000,
+    text: "Checking the working tree.",
+    model: "claude-opus-4",
+  },
   {
     kind: "tool",
     atMs: 2500,
@@ -55,7 +65,9 @@ const entries: TranscriptEntry[] = [
   },
 ];
 
-function renderView(props: Partial<React.ComponentProps<typeof TerminalView>> = {}) {
+function renderView(
+  props: Partial<React.ComponentProps<typeof TerminalView>> = {},
+) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <TerminalView entries={entries} {...props} />
@@ -110,14 +122,22 @@ describe("TerminalView", () => {
       const noTrailingText: TranscriptEntry[] = [
         entries[0]!,
         entries[1]!,
-        { ...(entries[2] as Extract<TranscriptEntry, { kind: "assistant_message" }>), text: null },
+        {
+          ...(entries[2] as Extract<
+            TranscriptEntry,
+            { kind: "assistant_message" }
+          >),
+          text: null,
+        },
         entries[3]!,
         entries[4]!,
       ];
       renderView({ entries: noTrailingText });
       expect(screen.getByText("Bash")).toBeInTheDocument();
       expect(screen.getByText("Edit")).toBeInTheDocument();
-      expect(screen.getByText("check git status and bump the version")).toBeInTheDocument();
+      expect(
+        screen.getByText("check git status and bump the version"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -125,20 +145,52 @@ describe("TerminalView", () => {
     it("shows it as denied rather than silently missing", () => {
       const withDenial: TranscriptEntry[] = [
         entries[0]!,
-        { kind: "tool_rejected", atMs: 1200, name: "Bash", reason: "user_reject" },
+        {
+          kind: "tool_rejected",
+          atMs: 1200,
+          name: "Bash",
+          reason: "user_reject",
+        },
       ];
       renderView({ entries: withDenial });
-      expect(screen.getByText(/denied by the user, never ran/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/denied by the user, never ran/),
+      ).toBeInTheDocument();
     });
   });
 
   describe("given the session banner", () => {
     it("shows the Claude Code version, model, and repo above the transcript", () => {
       renderView({
-        banner: { version: "2.1.207", model: "claude-opus-4-8", repo: "langwatch/langwatch" },
+        banner: {
+          agent: "claude_code",
+          version: "2.1.207",
+          model: "claude-opus-4-8",
+          repo: "langwatch/langwatch",
+        },
       });
       expect(screen.getByText("Claude Code v2.1.207")).toBeInTheDocument();
       expect(screen.getByText("langwatch/langwatch")).toBeInTheDocument();
+    });
+
+    it("names another agent by its own identity, not Claude's", () => {
+      renderView({
+        banner: {
+          agent: "gemini_cli",
+          version: "0.51.0",
+          model: "gemini-3.5-flash",
+          repo: null,
+        },
+      });
+      expect(screen.getByText("Gemini CLI v0.51.0")).toBeInTheDocument();
+      expect(screen.queryByText(/Claude Code/)).toBeNull();
+    });
+
+    it("falls back to a generic identity when the agent is unknown", () => {
+      renderView({
+        banner: { agent: "unknown", version: "1.0.0", model: null, repo: null },
+      });
+      expect(screen.getByText("Coding agent v1.0.0")).toBeInTheDocument();
     });
   });
 
@@ -188,10 +240,17 @@ describe("TerminalView", () => {
           cacheReadTokens: 20_000,
           cacheCreationTokens: 30_000,
         },
-        { kind: "assistant_message", atMs: 1500, text: "On it.", model: "claude-opus-4" },
+        {
+          kind: "assistant_message",
+          atMs: 1500,
+          text: "On it.",
+          model: "claude-opus-4",
+        },
       ];
       renderView({ entries: growingEntries });
-      expect(screen.getByText("Context growing: 50.0K tok")).toBeInTheDocument();
+      expect(
+        screen.getByText("Context growing: 50.0K tok"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -211,7 +270,12 @@ describe("TerminalView", () => {
           cacheReadTokens: 0,
           cacheCreationTokens: 10_000,
         },
-        { kind: "assistant_message", atMs: 1200, text: "Reading the repo.", model: "claude-opus-4" },
+        {
+          kind: "assistant_message",
+          atMs: 1200,
+          text: "Reading the repo.",
+          model: "claude-opus-4",
+        },
         {
           kind: "model_call",
           atMs: 2000,
@@ -226,7 +290,12 @@ describe("TerminalView", () => {
           // >=1000 tokens AND >=50% of the 10k the previous call had cached.
           cacheCreationTokens: 6_000,
         },
-        { kind: "assistant_message", atMs: 2200, text: "Continuing.", model: "claude-opus-4" },
+        {
+          kind: "assistant_message",
+          atMs: 2200,
+          text: "Continuing.",
+          model: "claude-opus-4",
+        },
       ];
       renderView({ entries: rebuildEntries });
       expect(

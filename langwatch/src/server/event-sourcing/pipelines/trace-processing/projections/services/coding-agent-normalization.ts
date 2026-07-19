@@ -29,6 +29,7 @@ export type CodingAgentEvent =
   | "user_prompt"
   | "assistant_response"
   | "api_request"
+  | "api_response"
   | "api_error"
   | "api_refusal"
   | "retries_exhausted"
@@ -153,6 +154,10 @@ const EVENT_ALIASES: Readonly<Record<string, CodingAgentEvent>> = {
   user_prompt: "user_prompt",
   assistant_response: "assistant_response",
   api_request: "api_request",
+  // Gemini's completion event; carries the reply text (`response_text`) when
+  // prompt logging is on. Claude splits the same fact into api_request (cost
+  // anchor) + api_response_body (raw payload), neither of which lands here.
+  api_response: "api_response",
   api_error: "api_error",
   api_refusal: "api_refusal",
   refusal: "api_refusal",

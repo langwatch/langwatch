@@ -330,6 +330,12 @@ export const TerminalView = memo(function TerminalView({
       >
         <VStack align="stretch" gap={2.5}>
           <TerminalBanner banner={banner} />
+          {visibleIndices.length === 0 && entries.length > 0 && (
+            <Text {...CELL} color={TERMINAL_TOKENS.faint}>
+              This agent reported tokens and timing only: its telemetry carries
+              no conversation content to replay. The totals below are real.
+            </Text>
+          )}
           {visibleIndices.map((fullIndex) => (
             <Fragment key={fullIndex}>
               {contextMarkers.get(fullIndex)?.map((marker, i) => (
@@ -406,16 +412,58 @@ function JumpToBottomPill({ onClick }: { onClick: () => void }) {
   );
 }
 
+/**
+ * The name each agent prints for itself, and the mark drawn next to it. The
+ * mark is block art in the agent's own visual language: claude's mark keeps
+ * its shaded gradient; every other agent gets a flat tint; an agent we can't
+ * identify gets a monochrome, armless cousin of the claude creature rather
+ * than wearing another agent's badge.
+ */
+const AGENT_BANNERS: Record<
+  SessionBanner["agent"],
+  { name: string; rows: readonly string[]; color: string | null }
+> = {
+  claude_code: { name: "Claude Code", rows: MARK_ROWS, color: null },
+  opencode: {
+    name: "opencode",
+    rows: ["▛▀▀▀▀▜", "▌ ▐█ ▐", "▙▄▄▄▄▟"],
+    color: TERMINAL_TOKENS.green,
+  },
+  codex: {
+    name: "Codex",
+    rows: [" ▗▛▀▜▖", " ▐▙▄▟▌", "  ▝▀▘ "],
+    color: TERMINAL_TOKENS.screenFg,
+  },
+  gemini_cli: {
+    name: "Gemini CLI",
+    rows: ["  ▟▙  ", " ▟██▙ ", "  ▜▛  "],
+    color: TERMINAL_TOKENS.blue,
+  },
+  copilot: {
+    name: "GitHub Copilot",
+    rows: ["▗▛▀▀▀▜▖", "▐ ▐▌▐▌▌", "▝▙▄▄▄▟▘"],
+    color: TERMINAL_TOKENS.blue,
+  },
+  unknown: {
+    name: "Coding agent",
+    rows: [" ▐▛███▜▌", " ▜█████▛ ", "  ▘▘ ▝▝ "],
+    color: TERMINAL_TOKENS.faint,
+  },
+};
+
 function TerminalBanner({ banner }: { banner?: SessionBanner }) {
   if (!banner || (!banner.version && !banner.model && !banner.repo)) {
     return null;
   }
+  const identity = AGENT_BANNERS[banner.agent];
   return (
     <HStack align="center" gap={3} paddingBottom={2}>
-      <ClaudeMark />
+      <AgentMark rows={identity.rows} color={identity.color} />
       <VStack align="stretch" gap={0} minWidth={0}>
         <Text {...CELL} color={TERMINAL_TOKENS.screenFg} fontWeight="semibold">
-          {banner.version ? `Claude Code v${banner.version}` : "Claude Code"}
+          {banner.version
+            ? `${identity.name} v${banner.version}`
+            : identity.name}
         </Text>
         {banner.model && (
           <Text {...CELL} color={TERMINAL_TOKENS.faint} truncate>
@@ -432,8 +480,17 @@ function TerminalBanner({ banner }: { banner?: SessionBanner }) {
   );
 }
 
-/** The startup mark, shaded left-to-right rather than drawn in one flat colour. */
-function ClaudeMark() {
+/**
+ * The startup mark. A `color` draws it flat in that tint; without one it is
+ * shaded left-to-right with the claude gradient.
+ */
+function AgentMark({
+  rows,
+  color,
+}: {
+  rows: readonly string[];
+  color: string | null;
+}) {
   return (
     <VStack
       align="flex-start"
@@ -442,11 +499,14 @@ function ClaudeMark() {
       aria-hidden
       userSelect="none"
     >
-      {MARK_ROWS.map((row, rowIndex) => (
+      {rows.map((row, rowIndex) => (
         <Text key={rowIndex} {...CELL} lineHeight="1.15" whiteSpace="pre">
           {[...row].map((char, charIndex) => (
             <Fragment key={charIndex}>
-              <Text as="span" color={gradientColorAt(charIndex, row.length)}>
+              <Text
+                as="span"
+                color={color ?? gradientColorAt(charIndex, row.length)}
+              >
                 {char}
               </Text>
             </Fragment>

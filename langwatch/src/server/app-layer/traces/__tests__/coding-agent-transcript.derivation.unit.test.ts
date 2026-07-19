@@ -38,7 +38,13 @@ function toolSpan({
   } as unknown as SpanDetail;
 }
 
-function modelSpan({ atMs, cost = 0.5 }: { atMs: number; cost?: number }): SpanDetail {
+function modelSpan({
+  atMs,
+  cost = 0.5,
+}: {
+  atMs: number;
+  cost?: number;
+}): SpanDetail {
   return {
     spanId: `llm-${atMs}`,
     name: "claude_code.llm_request",
@@ -63,7 +69,10 @@ describe("buildCodingAgentTranscript", () => {
       // Spans and logs arrive on separate exporters and separate batches, so the
       // order they are handed to us says nothing about what happened first.
       const transcript = buildCodingAgentTranscript({
-        spans: [toolSpan({ name: "Bash", atMs: 3_000 }), modelSpan({ atMs: 2_000 })],
+        spans: [
+          toolSpan({ name: "Bash", atMs: 3_000 }),
+          modelSpan({ atMs: 2_000 }),
+        ],
         logs: [
           log({ "event.name": "assistant_response", response: "Done." }, 4_000),
           log({ "event.name": "user_prompt", prompt: "fix the build" }, 1_000),
@@ -120,7 +129,10 @@ describe("buildCodingAgentTranscript", () => {
         },
       } as unknown as SpanDetail;
 
-      const transcript = buildCodingAgentTranscript({ spans: [span], logs: [] });
+      const transcript = buildCodingAgentTranscript({
+        spans: [span],
+        logs: [],
+      });
 
       expect(transcript.entries[0]).toMatchObject({
         cacheReadTokens: 14_000_000,
@@ -169,7 +181,11 @@ describe("buildCodingAgentTranscript", () => {
         spans: [],
         logs: [
           log(
-            { "event.name": "tool_decision", decision: "accept", tool_name: "Read" },
+            {
+              "event.name": "tool_decision",
+              decision: "accept",
+              tool_name: "Read",
+            },
             1_000,
           ),
         ],
@@ -193,7 +209,9 @@ describe("buildCodingAgentTranscript", () => {
       });
 
       expect(transcript.entries).toHaveLength(3);
-      expect(transcript.subAgents).toEqual([{ agentId: "agent-7", toolCalls: 2 }]);
+      expect(transcript.subAgents).toEqual([
+        { agentId: "agent-7", toolCalls: 2 },
+      ]);
       expect(transcript.totals.toolCalls).toBe(3);
     });
   });
@@ -252,10 +270,16 @@ describe("buildCodingAgentTranscript", () => {
         params: {},
       } as unknown as SpanDetail;
 
-      const transcript = buildCodingAgentTranscript({ spans: [span], logs: [] });
+      const transcript = buildCodingAgentTranscript({
+        spans: [span],
+        logs: [],
+      });
 
       expect(transcript.agent).toBe("opencode");
-      expect(transcript.entries[0]).toMatchObject({ kind: "tool", name: "bash" });
+      expect(transcript.entries[0]).toMatchObject({
+        kind: "tool",
+        name: "bash",
+      });
     });
   });
 
@@ -307,12 +331,212 @@ describe("buildCodingAgentTranscript", () => {
   describe("given a trace that is not a coding agent", () => {
     it("returns an empty transcript rather than guessing at one", () => {
       const transcript = buildCodingAgentTranscript({
-        spans: [{ spanId: "s", name: "openai.chat", startTimeMs: 1 } as unknown as SpanDetail],
+        spans: [
+          {
+            spanId: "s",
+            name: "openai.chat",
+            startTimeMs: 1,
+          } as unknown as SpanDetail,
+        ],
         logs: [],
       });
 
       expect(transcript.agent).toBe("unknown");
       expect(transcript.entries).toEqual([]);
+    });
+  });
+});
+
+describe("buildCodingAgentTranscript for non-claude agents", () => {
+  describe("given a gemini session (llm_call spans + gemini_cli.* events)", () => {
+    const geminiResponse = JSON.stringify([
+      {
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: "**Thinking it over**", thought: true },
+                { text: "pong" },
+                { text: "", thoughtSignature: "abc" },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+
+    const spans = [
+      {
+        spanId: "llm-1",
+        name: "llm_call",
+        startTimeMs: 1_000,
+        endTimeMs: 1_400,
+        status: "ok",
+        metrics: { promptTokens: 2_458, completionTokens: 44 },
+        params: { "gen_ai.request.model": "gemini-3.5-flash" },
+        output: JSON.stringify({
+          type: "chat_messages",
+          value: [{ role: "assistant", content: "pong" }],
+        }),
+      } as unknown as SpanDetail,
+    ];
+    const logs = [
+      log(
+        {
+          "event.name": "gemini_cli.user_prompt",
+          "session.id": "sess-g",
+          prompt: "reply with the single word pong",
+        },
+        900,
+      ),
+      log(
+        {
+          "event.name": "gemini_cli.api_response",
+          role: "utility_router",
+          model: "gemini-3.1-flash-lite",
+          response_text: JSON.stringify({
+            candidates: [
+              { content: { parts: [{ text: '{"complexity":"trivial"}' }] } },
+            ],
+          }),
+        },
+        950,
+      ),
+      log(
+        {
+          "event.name": "gemini_cli.api_response",
+          role: "main",
+          model: "gemini-3.5-flash",
+          response_text: geminiResponse,
+        },
+        1_500,
+      ),
+      log(
+        {
+          "event.name": "gemini_cli.tool_call",
+          function_name: "read_file",
+          success: "true",
+          duration_ms: "42",
+        },
+        1_200,
+      ),
+    ];
+
+    it("keeps the reply, skips the thinking, and ignores the router call", () => {
+      const transcript = buildCodingAgentTranscript({ spans, logs });
+
+      const replies = transcript.entries.filter(
+        (entry) => entry.kind === "assistant_message",
+      );
+      expect(replies).toHaveLength(1);
+      expect(replies[0]).toMatchObject({
+        text: "pong",
+        model: "gemini-3.5-flash",
+      });
+      expect(JSON.stringify(transcript.entries)).not.toContain(
+        "Thinking it over",
+      );
+      expect(JSON.stringify(transcript.entries)).not.toContain("complexity");
+    });
+
+    it("derives the user prompt, the tool call, and the model call", () => {
+      const transcript = buildCodingAgentTranscript({ spans, logs });
+
+      expect(
+        transcript.entries.find((entry) => entry.kind === "user_prompt"),
+      ).toMatchObject({ text: "reply with the single word pong" });
+      expect(
+        transcript.entries.find((entry) => entry.kind === "tool"),
+      ).toMatchObject({ name: "read_file", durationMs: 42, failed: false });
+      expect(transcript.totals.modelCalls).toBe(1);
+      expect(transcript.agent).toBe("gemini_cli");
+    });
+  });
+
+  describe("given a codex session (contentless turn spans)", () => {
+    it("derives a model call with the turn's token usage", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          {
+            spanId: "turn-1",
+            name: "session_task.turn",
+            startTimeMs: 1_000,
+            endTimeMs: 2_554,
+            status: "ok",
+            params: {
+              "codex.turn.token_usage.total_tokens": "12902",
+              "codex.turn.token_usage.non_cached_input_tokens": "2913",
+              "gen_ai.usage.cache_read.input_tokens": "9984",
+            },
+          } as unknown as SpanDetail,
+        ],
+        logs: [],
+      });
+
+      expect(transcript.totals.modelCalls).toBe(1);
+      const call = transcript.entries.find(
+        (entry) => entry.kind === "model_call",
+      );
+      expect(call).toMatchObject({
+        tokens: 12_902,
+        inputTokens: 2_913,
+        cacheReadTokens: 9_984,
+      });
+    });
+  });
+
+  describe("given an opencode session (Vercel AI SDK spans, no log events)", () => {
+    it("counts ai.streamText once and takes the reply from the span output", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          {
+            spanId: "st-1",
+            name: "ai.streamText",
+            startTimeMs: 1_000,
+            endTimeMs: 3_000,
+            status: "ok",
+            metrics: { promptTokens: 2_300, completionTokens: 12 },
+            params: { "gen_ai.request.model": "xiaomi/mimo-v2.5" },
+            output: JSON.stringify({ type: "text", value: "pong" }),
+          } as unknown as SpanDetail,
+          {
+            spanId: "st-1-inner",
+            name: "ai.streamText.doStream",
+            startTimeMs: 1_010,
+            endTimeMs: 2_990,
+            status: "ok",
+            metrics: { promptTokens: 2_300, completionTokens: 12 },
+            params: {},
+          } as unknown as SpanDetail,
+        ],
+        logs: [],
+      });
+
+      expect(transcript.totals.modelCalls).toBe(1);
+      expect(
+        transcript.entries.find((entry) => entry.kind === "assistant_message"),
+      ).toMatchObject({ text: "pong" });
+    });
+  });
+
+  describe("given a copilot session (chat <model> spans)", () => {
+    it("recognizes the model-named chat span as a model call", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          {
+            spanId: "chat-1",
+            name: "chat gpt-5-mini",
+            startTimeMs: 1_000,
+            endTimeMs: 2_000,
+            status: "ok",
+            metrics: { promptTokens: 900, completionTokens: 5 },
+            params: { "gen_ai.request.model": "gpt-5-mini" },
+          } as unknown as SpanDetail,
+        ],
+        logs: [],
+      });
+
+      expect(transcript.totals.modelCalls).toBe(1);
     });
   });
 });

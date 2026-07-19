@@ -11,6 +11,12 @@ const BASE_URL = process.env.BASE_URL ?? "http://localhost:5570";
 const PROJECT = "local-dev-project-jcq4ii";
 const OUTER_TRACE = "6088c5691a9e1177ee738e7897228d38";
 const CHILD_TRACE = "a9b9c64f8b53f3c3c8397a1feb994218";
+const AGENT_TRACES: Array<[string, string]> = [
+  ["05-gemini-terminal", "1413e253e00eada61d4d37d260a6193b"],
+  ["06-opencode-terminal", "0fd529d4e60f7ba9a0bd5799e514d50d"],
+  ["07-codex-terminal", "c642eae1677da5ddc9b91103066a5336"],
+  ["08-copilot-terminal", "3c4db830224ede997f954ea8d99c9561"],
+];
 const OUT_DIR = "/tmp/cam-shots";
 
 async function shoot(page: Page, name: string) {
@@ -21,16 +27,28 @@ async function shoot(page: Page, name: string) {
 void (async () => {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ viewport: { width: 1600, height: 950 } });
+  const page = await browser.newPage({
+    viewport: { width: 1600, height: 950 },
+  });
 
   // Fresh credentials login.
   await page.goto(`${BASE_URL}/auth/signin`);
-  await page.waitForSelector('input[name="email"], input[type="email"]', { timeout: 30_000 });
-  await page.fill('input[name="email"], input[type="email"]', "admin@local.langwatch.dev");
-  await page.fill('input[name="password"], input[type="password"]', "LocalAdmin!2026");
+  await page.waitForSelector('input[name="email"], input[type="email"]', {
+    timeout: 30_000,
+  });
+  await page.fill(
+    'input[name="email"], input[type="email"]',
+    "admin@local.langwatch.dev",
+  );
+  await page.fill(
+    'input[name="password"], input[type="password"]',
+    "LocalAdmin!2026",
+  );
   await page.click('button[type="submit"]');
   try {
-    await page.waitForURL((u) => !u.pathname.includes("/auth/"), { timeout: 20_000 });
+    await page.waitForURL((u) => !u.pathname.includes("/auth/"), {
+      timeout: 20_000,
+    });
   } catch {
     await shoot(page, "00-login-debug");
     console.log("login stuck at", page.url());
@@ -65,6 +83,19 @@ void (async () => {
   );
   await page.waitForTimeout(6000);
   await shoot(page, "04-child-session");
+
+  for (const [name, traceId] of AGENT_TRACES) {
+    await page.goto(
+      `${BASE_URL}/${PROJECT}/traces/${traceId}?drawer.mode=terminal`,
+    );
+    // Data-aware wait: the step counter renders only once the transcript
+    // arrived; a fixed sleep screenshots the loading skeleton on cold caches.
+    await page
+      .waitForSelector("text=/step \\d/", { timeout: 30_000 })
+      .catch(() => undefined);
+    await page.waitForTimeout(1500);
+    await shoot(page, name);
+  }
 
   await browser.close();
 })();

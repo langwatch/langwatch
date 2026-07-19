@@ -1,7 +1,7 @@
 import type { TraceLogRecordDto } from "~/server/api/routers/tracesV2";
 import {
-  normalizeEventName,
   type CodingAgentEvent,
+  normalizeEventName,
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/coding-agent-normalization";
 
 /**
@@ -24,7 +24,10 @@ export function summarizeLogEvent(log: TraceLogRecordDto): string | null {
   return describe(event, log.attributes);
 }
 
-function describe(event: CodingAgentEvent, attrs: Record<string, string>): string {
+function describe(
+  event: CodingAgentEvent,
+  attrs: Record<string, string>,
+): string {
   switch (event) {
     case "user_prompt":
       return `User sent a prompt (${attrs.prompt_length ?? attrs.prompt?.length ?? "?"} chars)`;
@@ -32,6 +35,8 @@ function describe(event: CodingAgentEvent, attrs: Record<string, string>): strin
       return `Assistant replied${attrs.model ? ` (${attrs.model})` : ""}`;
     case "api_request":
       return "Model call started";
+    case "api_response":
+      return "Model call completed";
     case "api_error": {
       const status = attrs.status_code;
       return status === "429"
@@ -65,13 +70,17 @@ function describe(event: CodingAgentEvent, attrs: Record<string, string>): strin
     case "at_mention":
       return `@-mentioned${attrs.target ? ` ${attrs.target}` : " a file"}`;
     case "internal_error":
-      return attrs.error ? `Internal error: ${attrs.error}` : "The session hit an internal error";
+      return attrs.error
+        ? `Internal error: ${attrs.error}`
+        : "The session hit an internal error";
     case "session_created":
       return "Session started";
     case "session_idle":
       return "Session went idle";
     case "session_error":
-      return attrs.error ? `Session error: ${attrs.error}` : "The session hit an error";
+      return attrs.error
+        ? `Session error: ${attrs.error}`
+        : "The session hit an error";
     case "subtask_invoked":
       return `Sub-agent invoked${attrs.subagent_type ? `: ${attrs.subagent_type}` : ""}`;
     case "commit":

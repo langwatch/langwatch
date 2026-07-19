@@ -34,6 +34,7 @@ ENV_DIR="${TMPDIR:-/tmp}/coding-agent-matrix-env"
 # a .claude/settings.local.json in the cwd pins the wiring without touching
 # the operator's global config.
 WORK_DIR="${TMPDIR:-/tmp}/coding-agent-matrix-work"
+CODEX_HOME_DIR="${TMPDIR:-/tmp}/coding-agent-matrix-codex-home"
 mkdir -p "$ENV_DIR" "$WORK_DIR"
 
 require_key() {
@@ -70,11 +71,30 @@ export OTEL_LOGS_EXPORT_INTERVAL=3000
 CLAUDE_ENV
         ;;
       codex)
-        cat <<'CODEX_ENV'
-export OTEL_TRACES_EXPORTER=otlp
+        # Codex ignores OTEL_* env entirely; its exporter reads [otel] from
+        # $CODEX_HOME/config.toml (see write_codex_home). This env file stays
+        # a no-op placeholder so the generic session plumbing works.
+        echo "# codex is configured via CODEX_HOME/config.toml, not env"
+        ;;
+      copilot)
+        cat <<'COPILOT_ENV'
+export COPILOT_OTEL_ENABLED=true
+export COPILOT_OTEL_EXPORTER_TYPE=otlp-http
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
-export OTEL_RESOURCE_ATTRIBUTES=service.name=codex
-CODEX_ENV
+export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true
+export OTEL_RESOURCE_ATTRIBUTES=service.name=copilot-cli
+COPILOT_ENV
+        # BYOK: with a provider key set, LLM traffic goes to that provider
+        # directly and no Copilot seat is needed for the dogfood.
+        if [ -n "${COPILOT_BYOK_OPENAI_KEY:-}" ]; then
+          {
+            echo "export COPILOT_ENABLE_ALT_PROVIDERS=1"
+            echo "export COPILOT_PROVIDER_TYPE=openai"
+            echo "export COPILOT_PROVIDER_BASE_URL=https://api.openai.com/v1"
+            echo "export COPILOT_MODEL=gpt-5-mini"
+            echo "export COPILOT_PROVIDER_API_KEY='$COPILOT_BYOK_OPENAI_KEY'"
+          }
+        fi
         ;;
       opencode)
         cat <<'OPENCODE_ENV'
@@ -111,11 +131,64 @@ GEMINI_ENV
 agent_command() {
   case "$1" in
     claude) echo "claude --dangerously-skip-permissions" ;;
-    codex) echo "codex --dangerously-bypass-approvals-and-sandbox" ;;
+    codex) echo "CODEX_HOME='$CODEX_HOME_DIR' codex --dangerously-bypass-approvals-and-sandbox" ;;
     opencode) echo "opencode" ;;
     gemini) echo "gemini --yolo" ;;
+    copilot) echo "copilot --allow-all-tools" ;;
     *) echo "unknown agent: $1" >&2; exit 1 ;;
   esac
+}
+
+# Codex reads its exporter from $CODEX_HOME/config.toml and IGNORES OTEL_*
+# env vars, and the operator's real ~/.codex/config.toml may carry a
+# langwatch-managed otel block pointing at some other instance (prod), which
+# would silently swallow the dogfood telemetry. So codex gets a scratch home:
+# auth + config copied from ~/.codex, with the otel block rewritten (or
+# appended) to point at this run's endpoint.
+write_codex_home() {
+  mkdir -p "$CODEX_HOME_DIR"
+  cp ~/.codex/auth.json "$CODEX_HOME_DIR/" 2>/dev/null || true
+  cp ~/.codex/langwatch-gateway.config.toml "$CODEX_HOME_DIR/" 2>/dev/null || true
+  if [ -f ~/.codex/config.toml ]; then
+    cp ~/.codex/config.toml "$CODEX_HOME_DIR/config.toml"
+  else
+    : >"$CODEX_HOME_DIR/config.toml"
+  fi
+  python3 - "$CODEX_HOME_DIR/config.toml" "$ENDPOINT" "$LW_API_KEY" <<'PYCODEX'
+import re, sys
+path, endpoint, key = sys.argv[1], sys.argv[2], sys.argv[3]
+src = open(path, encoding="utf-8").read()
+block = (
+    "
+[otel]
+log_user_prompt = true
+environment = "coding-agent-matrix"
+
+"
+    "[otel.trace_exporter.otlp-http]
+"
+    f"endpoint = "{endpoint}/v1/traces"
+"
+    "protocol = "json"
+"
+    f"headers = {{ "Authorization" = "Bearer {key}" }}
+"
+)
+if "[otel]" in src:
+    src = re.sub(r"\[otel\][\s\S]*?(?=
+\[(?!otel)|\Z)", block.lstrip("
+"), src, count=1)
+    src = re.sub(r"\[otel\.trace_exporter[\s\S]*?(?=
+\[(?!otel)|\Z)", "", src)
+    if "[otel.trace_exporter.otlp-http]" not in src:
+        src = src.replace("[otel]
+", "[otel]
+", 1)
+        src += block
+else:
+    src += block
+open(path, "w", encoding="utf-8").write(src)
+PYCODEX
 }
 
 # Pin the claude telemetry wiring at project-settings level (see WORK_DIR
@@ -157,6 +230,9 @@ cmd_up() {
   if [ "$agent" = "claude" ]; then
     write_claude_workdir
     start_dir="$WORK_DIR"
+  fi
+  if [ "$agent" = "codex" ]; then
+    write_codex_home
   fi
   tmux kill-session -t "$session" 2>/dev/null || true
   tmux new-session -d -s "$session" -c "$start_dir" \

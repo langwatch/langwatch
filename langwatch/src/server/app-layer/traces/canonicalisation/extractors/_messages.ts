@@ -66,6 +66,11 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
     if (part && typeof part === "object") {
       const p = part as Record<string, unknown>;
       if (typeof p.text === "string") {
+        // Gemini marks its thinking with `thought: true` and pads the final
+        // message with empty thoughtSignature parts. Neither is answer text,
+        // and taking them verbatim makes the reasoning monologue win over the
+        // actual reply as the extracted output.
+        if (p.thought === true || p.text.length === 0) continue;
         texts.push(p.text);
       } else if (typeof p.content === "string") {
         texts.push(p.content);
