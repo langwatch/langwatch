@@ -1340,9 +1340,37 @@ export class ClickHouseTraceService {
             return null;
           }
 
+          // #5753: resolve offloaded eventref IO (>64 KB) for the target
+          // LLM span before extraction. Only this span's attributes are
+          // read by extractPromptStudioDataFromClickHouse; the ancestor
+          // walk below reads only small langwatch.prompt.* metadata that
+          // is never offloaded, so resolving just the target is enough.
+          let resolvedRow = row;
+          if (this.resolveTraceSpans) {
+            const targetSpan = {
+              spanId: row.SpanId,
+              traceId: row.TraceId,
+              spanAttributes: row.SpanAttributes,
+            } as unknown as NormalizedSpan;
+            const { resolvedSpans } = await this.resolveTraceSpans(
+              projectId,
+              [targetSpan],
+            );
+            const resolved = resolvedSpans[0];
+            if (resolved) {
+              resolvedRow = {
+                ...row,
+                SpanAttributes: resolved.spanAttributes as Record<
+                  string,
+                  unknown
+                >,
+              };
+            }
+          }
+
           // Extract span data from attributes
           const result = this.extractPromptStudioDataFromClickHouse(
-            row,
+            resolvedRow,
             protections,
           );
 

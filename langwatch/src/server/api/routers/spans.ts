@@ -83,7 +83,13 @@ export const spansRouter = createTRPCRouter({
         projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      // #5753: wire blob-resolution deps so getSpanForPromptStudio can
+      // resolve offloaded eventref IO (>64 KB) before extraction —
+      // matches the getAllForTrace pattern above.
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       const result = await traceService.getSpanForPromptStudio(
         projectId,
         spanId,
