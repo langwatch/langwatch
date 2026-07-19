@@ -112,9 +112,11 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
     },
     onError: (error) => {
       if (isHandledByGlobalHandler(error)) return;
+      // The server's message is a fixed sentence (the failure detail is
+      // internal and logged server-side), so don't echo it as the description.
       toaster.create({
         title: "Failed to trigger topic clustering",
-        description: error.message,
+        description: "Please try again in a moment.",
         type: "error",
       });
     },

@@ -495,11 +495,16 @@ export const projectRouter = createTRPCRouter({
         });
         return { started: true as const };
       } catch (error) {
+        captureException(toError(error), {
+          extra: { projectId: input.projectId },
+        });
+        // The UI toasts this message verbatim, and the failures behind it are
+        // event-store/projection internals (Prisma detail, hostnames) — the
+        // same class of text the status read deliberately never exposes.
+        // Detail goes to the log above; the customer gets a fixed sentence.
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `Failed to trigger topic clustering: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
+          message: "Failed to trigger topic clustering",
         });
       }
     }),
