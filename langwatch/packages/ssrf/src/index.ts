@@ -300,20 +300,20 @@ export function isPublicAddress(ip: string): boolean {
 /**
  * Whether ip must be refused given whether local/private egress is permitted.
  * Metadata is always refused; other special ranges are refused only when
- * shouldBlockLocal is set. Mirrors Go's ssrf.Blocked.
+ * blockLocal is set. Mirrors Go's ssrf.Blocked.
  */
 export function blocked({
   ip,
-  shouldBlockLocal,
+  blockLocal,
 }: {
   ip: string;
-  shouldBlockLocal: boolean;
+  blockLocal: boolean;
 }): boolean {
   switch (classify(ip)) {
     case "metadata":
       return true;
     case "special":
-      return shouldBlockLocal;
+      return blockLocal;
     default:
       return false;
   }

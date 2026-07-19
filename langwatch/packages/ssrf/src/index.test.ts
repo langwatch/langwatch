@@ -45,16 +45,16 @@ describe("@langwatch/ssrf shared conformance corpus", () => {
           expect(isPublicAddress(v.addr)).toBe(v.category === "global");
         });
 
-        it("honours shouldBlockLocal the same way Go's Blocked does", () => {
+        it("honours blockLocal the same way Go's Blocked does", () => {
           if (v.category === "metadata") {
-            expect(blocked({ ip: v.addr, shouldBlockLocal: false })).toBe(true);
-            expect(blocked({ ip: v.addr, shouldBlockLocal: true })).toBe(true);
+            expect(blocked({ ip: v.addr, blockLocal: false })).toBe(true);
+            expect(blocked({ ip: v.addr, blockLocal: true })).toBe(true);
           } else if (v.category === "special") {
-            expect(blocked({ ip: v.addr, shouldBlockLocal: false })).toBe(false);
-            expect(blocked({ ip: v.addr, shouldBlockLocal: true })).toBe(true);
+            expect(blocked({ ip: v.addr, blockLocal: false })).toBe(false);
+            expect(blocked({ ip: v.addr, blockLocal: true })).toBe(true);
           } else {
-            expect(blocked({ ip: v.addr, shouldBlockLocal: false })).toBe(false);
-            expect(blocked({ ip: v.addr, shouldBlockLocal: true })).toBe(false);
+            expect(blocked({ ip: v.addr, blockLocal: false })).toBe(false);
+            expect(blocked({ ip: v.addr, blockLocal: true })).toBe(false);
           }
         });
       });
