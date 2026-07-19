@@ -82,16 +82,17 @@ describe("listAnnotationsCommand()", () => {
     });
   });
 
-  describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
+  describe("when a machine format is requested", () => {
+    it("returns the raw annotation list as the payload instead of printing", async () => {
       const annotations = [makeAnnotation()];
       mockGetAll.mockResolvedValue(annotations);
 
-      await listAnnotationsCommand({ format: "json" });
+      const result = await listAnnotationsCommand({});
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(annotations, null, 2),
-      );
+      // The command no longer decides the format — it hands the payload to
+      // the output port, which renders json/yaml/agents/--jq from this value.
+      expect(result?.data).toEqual(annotations);
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 

@@ -7,7 +7,13 @@ import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-export const listTriggersCommand = async (options?: { format?: string }): Promise<void> => {
+import type { CommandResult } from "../../utils/output";
+
+/**
+ * Returns the listing rather than printing it: the output port renders it in
+ * whatever format the caller asked for (utils/output.ts).
+ */
+export const listTriggersCommand = async (): Promise<CommandResult | void> => {
   checkApiKey();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
@@ -36,39 +42,39 @@ export const listTriggersCommand = async (options?: { format?: string }): Promis
 
     spinner.succeed(`Found ${triggers.length} trigger${triggers.length !== 1 ? "s" : ""}`);
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(triggers, null, 2));
-      return;
-    }
+    return {
+      data: triggers,
+      table: () => {
+        if (triggers.length === 0) {
+          console.log();
+          console.log(chalk.gray("No triggers found."));
+          console.log(chalk.gray("Create one with:"));
+          console.log(chalk.cyan('  langwatch trigger create "My Alert" --action SEND_EMAIL'));
+          return;
+        }
 
-    if (triggers.length === 0) {
-      console.log();
-      console.log(chalk.gray("No triggers found."));
-      console.log(chalk.gray("Create one with:"));
-      console.log(chalk.cyan('  langwatch trigger create "My Alert" --action SEND_EMAIL'));
-      return;
-    }
+        console.log();
 
-    console.log();
+        const tableData = triggers.map((t) => ({
+          Name: t.name,
+          ID: t.id,
+          Action: t.action,
+          Status: t.active ? chalk.green("active") : chalk.gray("inactive"),
+          Alert: t.alertType ?? chalk.gray("—"),
+        }));
 
-    const tableData = triggers.map((t) => ({
-      Name: t.name,
-      ID: t.id,
-      Action: t.action,
-      Status: t.active ? chalk.green("active") : chalk.gray("inactive"),
-      Alert: t.alertType ?? chalk.gray("—"),
-    }));
+        formatTable({
+          data: tableData,
+          headers: ["Name", "ID", "Action", "Status", "Alert"],
+          colorMap: {
+            Name: chalk.cyan,
+            ID: chalk.green,
+          },
+        });
 
-    formatTable({
-      data: tableData,
-      headers: ["Name", "ID", "Action", "Status", "Alert"],
-      colorMap: {
-        Name: chalk.cyan,
-        ID: chalk.green,
+        console.log();
       },
-    });
-
-    console.log();
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "fetch triggers" });
     process.exit(1);

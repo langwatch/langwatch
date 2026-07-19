@@ -4,10 +4,14 @@ import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
-import { printResult, type RawOutputFlags } from "../../utils/output";
+import type { CommandResult } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+/**
+ * Returns the created monitor rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts).
+ */
 export const createMonitorCommand = async (
   name: string,
   options: {
@@ -17,8 +21,8 @@ export const createMonitorCommand = async (
     evaluatorId?: string;
     level?: string;
     parameters?: string;
-  } & RawOutputFlags
-): Promise<void> => {
+  }
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const validModes = ["ON_MESSAGE", "AS_GUARDRAIL", "MANUALLY"];
@@ -100,10 +104,8 @@ export const createMonitorCommand = async (
     process.exit(1);
   }
 
-  // Rendering stays OUTSIDE the create try: a printResult rejection (invalid
-  // --jq) must not report an already-created monitor as a create failure.
-  await printResult(monitor, {
-    ...options,
+  return {
+    data: monitor,
     table: () => {
       console.log();
       console.log(`  ${chalk.gray("ID:")}   ${chalk.green(monitor.id)}`);
@@ -114,5 +116,5 @@ export const createMonitorCommand = async (
       }
       console.log();
     },
-  });
+  };
 };

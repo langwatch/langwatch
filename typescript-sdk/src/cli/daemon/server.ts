@@ -26,6 +26,20 @@ import { noopTelemetry, type DaemonTelemetry } from "./telemetry";
 /** 10 minutes: long enough to span an agent's think-time, short enough to never feel like a leak. */
 export const DEFAULT_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 
+/**
+ * How long `stop()` waits for in-flight requests before tearing the execution
+ * window down underneath them.
+ *
+ * Shutdown restores the daemon's own cwd and environment (ExecutionWindow.reset),
+ * so a request still running when that happens would finish against the WRONG
+ * globals — and version-skew eviction makes shutdown-while-serving a routine
+ * dev-loop event, not an exotic one. 5s covers any command close enough to
+ * finishing to be worth waiting for; past that the connections are destroyed so
+ * the client sees a transport failure and re-runs in-process, which is the one
+ * outcome that is always correct.
+ */
+export const DEFAULT_SHUTDOWN_GRACE_MS = 5_000;
+
 export interface DaemonServerOptions {
   socketPath: string;
   socketDir: string;
@@ -35,6 +49,8 @@ export interface DaemonServerOptions {
   /** Identity of the code this daemon actually loaded. See resolveBuildId. */
   build: string;
   idleTimeoutMs?: number;
+  /** How long `stop()` lets in-flight requests finish. Injectable for tests. */
+  shutdownGraceMs?: number;
   telemetry?: DaemonTelemetry;
   /** Injectable for tests; defaults to really running commander. */
   executor?: CommandExecutor;
@@ -100,6 +116,7 @@ export async function cleanStaleSocket(socketPath: string): Promise<boolean> {
 export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
   const telemetry = options.telemetry ?? noopTelemetry;
   const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
+  const shutdownGraceMs = options.shutdownGraceMs ?? DEFAULT_SHUTDOWN_GRACE_MS;
   const startedAt = Date.now();
 
   const window = new ExecutionWindow();
@@ -111,6 +128,10 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
   let stopping = false;
   let idleTimer: NodeJS.Timeout | undefined;
   let uninstallInterceptors: (() => void) | undefined;
+  /** Live client connections, so shutdown can cut them if a drain times out. */
+  const connections = new Set<net.Socket>();
+  /** Woken when `inflight` reaches zero. Only `stop()` ever waits on this. */
+  let drainWaiters: (() => void)[] = [];
 
   const server = net.createServer();
   let resolveClosed: () => void;
@@ -126,6 +147,27 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     }, idleTimeoutMs);
     // Never let the idle timer alone hold the process open.
     idleTimer.unref();
+  };
+
+  /** Called on every request completion; wakes a shutdown waiting to drain. */
+  const noteRequestSettled = (): void => {
+    if (inflight > 0) return;
+    const waiters = drainWaiters;
+    drainWaiters = [];
+    for (const wake of waiters) wake();
+  };
+
+  /** Resolves true if everything finished in time, false if the grace ran out. */
+  const drainInflight = async (graceMs: number): Promise<boolean> => {
+    if (inflight === 0) return true;
+    return new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => resolve(false), graceMs);
+      timer.unref();
+      drainWaiters.push(() => {
+        clearTimeout(timer);
+        resolve(true);
+      });
+    });
   };
 
   const stop = async (
@@ -152,6 +194,19 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
       // Already gone — someone cleaned up a stale file, or we never bound.
     }
 
+    // `window.reset()` below restores the daemon's OWN cwd and environment. A
+    // request still executing when that lands would resolve its paths and read
+    // its credentials against the daemon's globals instead of its caller's, and
+    // would then report an exit code the client trusts. So: let them finish.
+    if (!(await drainInflight(shutdownGraceMs))) {
+      // They did not. Cut the connections instead of letting the clients
+      // believe a result computed under a rewritten environment: a transport
+      // failure before the `exit` frame is a clean in-process re-run (nothing
+      // has been committed to their stdout), which is always correct.
+      for (const connection of connections) connection.destroy();
+      connections.clear();
+    }
+
     // The one place a telemetry flush is both necessary and possible.
     await telemetry.shutdown();
     uninstallInterceptors?.();
@@ -167,6 +222,17 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     let handshaken = false;
     let execution: { cancel: (code: number) => void } | undefined;
     let counted = false;
+
+    connections.add(socket);
+
+    /** This connection's request is done: uncount it and wake any drain. */
+    const endRequest = (): void => {
+      if (!counted) return;
+      counted = false;
+      inflight--;
+      armIdleTimer();
+      noteRequestSettled();
+    };
 
     const send = (frame: ServerFrame): void => {
       if (socket.destroyed) return;
@@ -184,6 +250,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     });
 
     socket.on("close", () => {
+      connections.delete(socket);
       execution?.cancel(130);
     });
 
@@ -309,9 +376,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
             (code) => {
               send({ t: "exit", code });
               finish();
-              inflight--;
-              counted = false;
-              armIdleTimer();
+              endRequest();
             },
             (error: unknown) => {
               // The window could not be applied — almost always because the
@@ -323,9 +388,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
                   error instanceof Error ? error.message : "execution-failed",
               });
               finish();
-              inflight--;
-              counted = false;
-              armIdleTimer();
+              endRequest();
             },
           );
           return;
@@ -345,11 +408,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
         try {
           handleFrame(frame);
         } catch {
-          if (counted) {
-            inflight--;
-            counted = false;
-            armIdleTimer();
-          }
+          endRequest();
           send({ t: "fallback", reason: "daemon-error" });
           finish();
         }

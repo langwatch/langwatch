@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { buildProgram } from "../program";
-import { renderAgentHelpTopic } from "../commands/help";
+import {
+  HELP_TOPIC_NAMES,
+  renderAgentHelpTopic,
+} from "../commands/help";
 import { AGENT_MODE_ENV_VARS } from "../utils/output";
 
 // buildProgram() reads the tsup-injected __CLI_VERSION__ build constant —
@@ -73,14 +76,81 @@ describe("`langwatch help` command", () => {
       .map((chunk: unknown) => String(chunk))
       .join("");
 
-  it("`help agent` prints the agent topic page", async () => {
-    await buildProgram().parseAsync(["node", "langwatch", "help", "agent"]);
+  it("`help agent-mode` prints the agent topic page", async () => {
+    await buildProgram().parseAsync([
+      "node",
+      "langwatch",
+      "help",
+      "agent-mode",
+    ]);
 
     const out = consoleLogSpy.mock.calls.flat().join("\n");
     expect(out).toContain("AGENT MODE");
     expect(out).toContain("OUTPUT CONTRACT");
     expect(out).toContain("PIPING RULES");
     expect(process.exitCode).toBe(0);
+  });
+
+  describe("when a word names both a real command and could name a topic", () => {
+    it("resolves a real command before a help topic", async () => {
+      // `agent` is a REAL top-level group (agent definitions). It used to be
+      // swallowed by the agent-mode topic, leaving the group's help
+      // unreachable through `help` entirely.
+      await buildProgram().parseAsync(["node", "langwatch", "help", "agent"]);
+
+      expect(stdoutText()).toContain("Usage: langwatch agent");
+      expect(consoleLogSpy.mock.calls.flat().join("\n")).not.toContain(
+        "AGENT MODE",
+      );
+      expect(process.exitCode).toBe(0);
+    });
+
+    it("walks into the real command's subcommands rather than discarding them", async () => {
+      // `help agent list` previously printed the topic page and silently
+      // dropped `list`.
+      await buildProgram().parseAsync([
+        "node",
+        "langwatch",
+        "help",
+        "agent",
+        "list",
+      ]);
+
+      expect(stdoutText()).toContain("Usage: langwatch agent list");
+      expect(process.exitCode).toBe(0);
+    });
+
+    it("keeps every help topic clear of the registered command tree", () => {
+      const program = buildProgram();
+      const registered = new Set(
+        program.commands.flatMap((cmd) => [cmd.name(), ...cmd.aliases()]),
+      );
+
+      const collisions = HELP_TOPIC_NAMES.filter((name) =>
+        registered.has(name),
+      );
+
+      expect(
+        collisions,
+        `Help topic(s) ${collisions.join(", ")} share a name with a registered command. ` +
+          "Commands win the lookup, so these topics are unreachable — rename the topic.",
+      ).toEqual([]);
+    });
+  });
+
+  it("rejects a topic given extra words instead of silently discarding them", async () => {
+    await buildProgram().parseAsync([
+      "node",
+      "langwatch",
+      "help",
+      "agent-mode",
+      "list",
+    ]);
+
+    expect(consoleErrorSpy.mock.calls.flat().join("\n")).toContain(
+      "unknown command or help topic 'agent-mode list'",
+    );
+    expect(process.exitCode).toBe(1);
   });
 
   it("`help <command>` still prints that command's help", async () => {

@@ -104,6 +104,34 @@ Feature: CLI daemon mode
       When a daemon starts
       Then its socket is created with 0600 permissions inside a 0700 directory
 
+    Scenario: A socket owned by another user is not used
+      Given a socket exists at the path my identity resolves to
+      But it is owned by another user
+      When I run a command
+      Then nothing is sent to it — not my arguments, my working directory
+      or my forwarded credentials
+      And the command runs in-process
+      And "langwatch daemon status" reports no daemon running
+
+    Scenario Outline: A socket that is not demonstrably private is not used
+      Given a socket exists at the path my identity resolves to
+      But <looseness>
+      When I run a command
+      Then the socket is not connected to
+      And the command runs in-process
+
+      Examples:
+        | looseness                                        |
+        | its directory is writable by other users         |
+        | the socket itself is connectable by other users  |
+        | it is a symlink rather than a socket             |
+
+    Scenario: The socket directory cannot be made private
+      Given the directory my socket would live in is owned by another user
+      When I run a command
+      Then no daemon is spawned, because its socket could never be private
+      And the command runs in-process
+
     Scenario: A daemon rejects a request from a different identity
       Given a daemon is warm for identity A
       When a client presents a fingerprint for identity B
@@ -154,8 +182,39 @@ Feature: CLI daemon mode
     Scenario: A command that hangs
       Given the daemon is running my command
       When the command exceeds the per-request timeout
-      Then the request is abandoned with exit code 124
-      And its execution window is released for other callers
+      Then the request is abandoned with exit code 124 without waiting for it
+      And no further output from it reaches me
+      But its execution window is still held, because the work is still running
+      And the next caller waits rather than having the working directory
+      changed underneath the abandoned command
+
+    Scenario: Abandoned work finishes on its own
+      Given a command was abandoned at the per-request timeout
+      And another caller is waiting for a different working directory
+      When the abandoned command finally finishes
+      Then it resolved its files against its OWN working directory throughout
+      And only then is the waiting caller admitted
+
+    Scenario: Abandoned work never finishes at all
+      Given a command was abandoned at the per-request timeout
+      When it has still not finished after the abandon grace period
+      Then the daemon exits rather than hand its execution window to anyone
+      And every command runs in-process, exactly as with no daemon installed
+
+  Rule: The daemon never hands a result computed under the wrong environment
+
+    Scenario: The daemon is stopped while it is still serving
+      Given a daemon is serving my command
+      When the daemon is asked to stop
+      Then it waits for my command to finish before restoring its own
+      working directory and environment
+
+    Scenario: An in-flight command outlasts the shutdown grace period
+      Given a daemon is serving a command that will not finish
+      When the daemon is asked to stop
+      And the shutdown grace period elapses
+      Then the connection is dropped before any exit code is sent
+      And the command is retried in-process
 
   Rule: The daemon is managed explicitly
 

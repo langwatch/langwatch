@@ -1,9 +1,13 @@
 /**
- * Hung and cancelled commands must not pin their execution window: a request
- * that never finishes would otherwise hold its (cwd, env, colour) tuple
- * forever — blocking every caller whose tuple differs, and suppressing the
- * daemon's idle exit (server.ts never arms the idle timer while a request is
- * in flight).
+ * What happens to the execution window when a command is abandoned.
+ *
+ * The caller of a hung or cancelled command is settled AT ONCE (124/130) — a
+ * timeout or a Ctrl-C must never make anybody wait. The window, though, stays
+ * held until the abandoned work actually settles: node cannot unwind its
+ * promise chain, so it is still running, and the next request's `applyWindow`
+ * would chdir and rewrite `process.env` underneath it. A command that never
+ * settles at all is bounded by the abandon grace, after which the daemon stops
+ * being a daemon rather than corrupt anybody.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
@@ -30,6 +34,36 @@ const hungProgram = (): never =>
 /** A program whose command succeeds immediately. */
 const okProgram = (): never =>
   ({ parseAsync: vi.fn(() => Promise.resolve()) }) as never;
+
+/**
+ * A program that hangs until the test resumes it, recording what the process
+ * globals looked like at the moment it continued — which is what an abandoned
+ * command would actually resolve its relative paths against.
+ */
+const resumableProgram = (): {
+  program: never;
+  resume: () => void;
+  cwdOnResume: () => string | undefined;
+} => {
+  let release: (() => void) | undefined;
+  let cwdOnResume: string | undefined;
+  const program = {
+    parseAsync: vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          release = () => {
+            cwdOnResume = process.cwd();
+            resolve();
+          };
+        }),
+    ),
+  } as never;
+  return {
+    program,
+    resume: () => release?.(),
+    cwdOnResume: () => cwdOnResume,
+  };
+};
 
 const collect = (): {
   sink: (stream: "stdout" | "stderr", chunk: Buffer) => void;
@@ -104,12 +138,14 @@ describe("createCommandExecutor", () => {
   });
 
   describe("when a command never finishes", () => {
-    it("times out with 124 and releases its window for other callers", async () => {
+    it("settles its caller at 124 without waiting for the work", async () => {
       mockedBuildProgram.mockReturnValue(hungProgram());
       const executor = createCommandExecutor({
         window,
         telemetry: noopTelemetry,
         requestTimeoutMs: 30,
+        abandonGraceMs: 60_000,
+        onWedged: vi.fn(),
       });
       const out = collect();
 
@@ -118,23 +154,73 @@ describe("createCommandExecutor", () => {
 
       expect(code).toBe(124);
       expect(out.stderr()).toContain("timed out");
-      expect(window.inflightCount).toBe(0);
-
-      // A caller with a DIFFERENT window tuple is admitted immediately: the
-      // hung request is no longer holding the process globals.
-      mockedBuildProgram.mockReturnValue(okProgram());
-      const second = executor(request("r2", dirB, collect().sink));
-      await expect(second.completed).resolves.toBe(0);
     });
-  });
 
-  describe("when the client cancels a hung command", () => {
-    it("settles immediately and releases the window", async () => {
+    it("keeps holding its window, because the abandoned work is still running", async () => {
       mockedBuildProgram.mockReturnValue(hungProgram());
       const executor = createCommandExecutor({
         window,
         telemetry: noopTelemetry,
+        requestTimeoutMs: 30,
+        abandonGraceMs: 60_000,
+        onWedged: vi.fn(),
+      });
+
+      await expect(
+        executor(request("r1", dirA, collect().sink)).completed,
+      ).resolves.toBe(124);
+
+      // Releasing here would admit the next caller and chdir underneath work
+      // that has not stopped running.
+      expect(window.inflightCount).toBe(1);
+    });
+  });
+
+  describe("when timed-out work resumes after another caller has arrived", () => {
+    it("still sees its OWN working directory, not the next caller's", async () => {
+      // The bug this guards: releasing the window on timeout let the next
+      // request's applyWindow chdir + rewrite process.env, so an abandoned
+      // `workflows run --output results.json` wrote into ANOTHER caller's
+      // directory, under another caller's credentials.
+      const hung = resumableProgram();
+      mockedBuildProgram.mockReturnValue(hung.program);
+      const executor = createCommandExecutor({
+        window,
+        telemetry: noopTelemetry,
+        requestTimeoutMs: 30,
+        abandonGraceMs: 60_000,
+        onWedged: vi.fn(),
+      });
+
+      const first = executor(request("r1", dirA, collect().sink));
+      await expect(first.completed).resolves.toBe(124);
+
+      // A different-tuple caller arrives while the abandoned work runs on.
+      mockedBuildProgram.mockReturnValue(okProgram());
+      const second = executor(request("r2", dirB, collect().sink));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      // It waits its turn rather than moving the ground under r1.
+      expect(window.queuedCount).toBe(1);
+
+      hung.resume();
+      await expect(second.completed).resolves.toBe(0);
+
+      expect(hung.cwdOnResume()).toBe(fs.realpathSync(dirA));
+      expect(hung.cwdOnResume()).not.toBe(fs.realpathSync(dirB));
+    });
+  });
+
+  describe("when the client cancels a hung command", () => {
+    it("settles the caller at 130 at once, and hands the window back only when the work settles", async () => {
+      const hung = resumableProgram();
+      mockedBuildProgram.mockReturnValue(hung.program);
+      const executor = createCommandExecutor({
+        window,
+        telemetry: noopTelemetry,
         requestTimeoutMs: 60_000,
+        abandonGraceMs: 60_000,
+        onWedged: vi.fn(),
       });
 
       const running = executor(request("r1", dirA, collect().sink));
@@ -145,21 +231,54 @@ describe("createCommandExecutor", () => {
       running.cancel(130);
 
       await expect(running.completed).resolves.toBe(130);
-      expect(window.inflightCount).toBe(0);
+      expect(window.inflightCount).toBe(1);
 
-      // A different-tuple caller no longer queues behind the corpse.
+      hung.resume();
+      await vi.waitFor(() => expect(window.inflightCount).toBe(0));
+
+      // ...and only now can a different-tuple caller take the window.
       const releaseB = await window.acquire({ cwd: dirB, env: {}, colorLevel: 0 });
       releaseB();
     });
   });
 
-  describe("when a QUEUED request is cancelled", () => {
-    it("leaves the queue rather than being admitted after its caller is gone", async () => {
+  describe("when abandoned work never settles at all", () => {
+    it("stops being a daemon rather than release a window it cannot make safe", async () => {
+      const wedged = vi.fn();
       mockedBuildProgram.mockReturnValue(hungProgram());
       const executor = createCommandExecutor({
         window,
         telemetry: noopTelemetry,
+        requestTimeoutMs: 20,
+        abandonGraceMs: 40,
+        onWedged: wedged,
+      });
+
+      await expect(
+        executor(request("r1", dirA, collect().sink)).completed,
+      ).resolves.toBe(124);
+
+      await vi.waitFor(() =>
+        expect(wedged).toHaveBeenCalledWith({
+          requestId: "r1",
+          graceMs: 40,
+        }),
+      );
+      // Never quietly released: the whole point is that this window is unsafe.
+      expect(window.inflightCount).toBe(1);
+    });
+  });
+
+  describe("when a QUEUED request is cancelled", () => {
+    it("leaves the queue rather than being admitted after its caller is gone", async () => {
+      const hung = resumableProgram();
+      mockedBuildProgram.mockReturnValue(hung.program);
+      const executor = createCommandExecutor({
+        window,
+        telemetry: noopTelemetry,
         requestTimeoutMs: 60_000,
+        abandonGraceMs: 60_000,
+        onWedged: vi.fn(),
       });
 
       const first = executor(request("r1", dirA, collect().sink));
@@ -179,7 +298,13 @@ describe("createCommandExecutor", () => {
       first.cancel(130);
       await expect(first.completed).resolves.toBe(130);
 
-      // The queue drained cleanly: window B can be taken now.
+      // r1's abandoned work still holds window A — that is fix #2's contract —
+      // so the queue draining is what this test is about, and it drained.
+      expect(window.queuedCount).toBe(0);
+
+      // Once r1's work finally settles, window B is takeable again.
+      hung.resume();
+      await vi.waitFor(() => expect(window.inflightCount).toBe(0));
       const releaseB = await window.acquire({ cwd: dirB, env: {}, colorLevel: 0 });
       releaseB();
     });

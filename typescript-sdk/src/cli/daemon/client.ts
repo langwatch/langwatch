@@ -2,11 +2,13 @@
  * The thin client: talk to the daemon if it is there, and never, ever break if
  * it is not.
  *
- * Loaded on every CLI invocation, so it imports node builtins and nothing else.
+ * Loaded on every CLI invocation, so it imports node builtins and its own
+ * sibling modules and nothing else.
  */
 
 import * as net from "node:net";
 
+import { inspectSocketTrust } from "./identity";
 import {
   encodeFrame,
   FrameDecoder,
@@ -73,6 +75,14 @@ export async function execViaDaemon(
   const stdout = options.stdout ?? process.stdout;
   const stderr = options.stderr ?? process.stderr;
   const maxBufferBytes = options.maxBufferBytes ?? DEFAULT_MAX_BUFFER_BYTES;
+
+  // BEFORE connect, and above all before the pipelined `exec` hands over args,
+  // cwd and the forwarded LANGWATCH_* env: the socket must be ours. See
+  // identity.ts inspectSocketTrust. Not being able to trust the socket is
+  // exactly "no daemon available" — the command runs in-process, as it would
+  // if nothing were listening at all.
+  const untrusted = inspectSocketTrust(options.socketPath);
+  if (untrusted) return { served: false, reason: untrusted };
 
   return new Promise<DaemonExecOutcome>((resolve) => {
     const socket = net.connect(options.socketPath);
@@ -258,6 +268,9 @@ export interface DaemonStatus {
 export async function requestStatus(
   socketPath: string,
 ): Promise<DaemonStatus | null> {
+  // A socket we do not own is not our daemon, so there is nothing to report.
+  if (inspectSocketTrust(socketPath)) return null;
+
   return new Promise<DaemonStatus | null>((resolve) => {
     const socket = net.connect(socketPath);
     const decoder = new FrameDecoder<ServerFrame>();
@@ -302,6 +315,11 @@ export async function requestStatus(
  * evicts an OLDER daemon, which by definition cannot agree on the version.
  */
 export async function requestStop(socketPath: string): Promise<boolean> {
+  // Deliberately does not require a handshake — but it still requires a socket
+  // that is ours. `stop` is an unauthenticated command; sending it to a
+  // stranger's listener tells them we are here and nothing else useful.
+  if (inspectSocketTrust(socketPath)) return false;
+
   return new Promise<boolean>((resolve) => {
     const socket = net.connect(socketPath);
     let connected = false;

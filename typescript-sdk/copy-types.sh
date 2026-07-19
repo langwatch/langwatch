@@ -1,6 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
+# `pipefail` and `-u` alongside `-e`: this script generates files that are
+# compiled into the published tarball and into all five release binaries, so a
+# silently-swallowed failure here ships broken generated code.
+set -euo pipefail
 
 # Tracer types are Zod-first in the platform: the schemas in types.ts are the
 # source of truth and the TypeScript types are inferred with z.infer. Copy the

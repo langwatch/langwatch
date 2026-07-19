@@ -135,6 +135,35 @@ const asReasons = (value: unknown): CliDomainErrorReason[] | undefined => {
   return reasons.length > 0 ? reasons : undefined;
 };
 
+/**
+ * A libuv/Node system error, not a platform error body.
+ *
+ * `fetch` reports a transport failure by throwing a `TypeError("fetch failed")`
+ * whose `cause` is the system error, and `domainErrorFromThrown` unwraps to that
+ * cause. Its own enumerable keys are `{ errno, code, syscall, address, port }` —
+ * so its `code` is `ECONNREFUSED`/`ENOTFOUND`/`ETIMEDOUT`/a TLS cert code, NOT a
+ * discriminant the platform ever chose. Reading one as a domain error is the
+ * worst kind of wrong: it blames the user for the network being down, and it
+ * lifts the local `address`/`port` into `meta` as though they were domain
+ * context. `errno`/`syscall` are the tell, and no platform envelope carries
+ * them, so their presence disqualifies the record outright — a transport
+ * failure is infrastructure, always.
+ */
+const isSystemError = (record: Record<string, unknown>): boolean =>
+  "errno" in record || "syscall" in record;
+
+/**
+ * Does this record look like the platform's envelope at all?
+ *
+ * Only asked of a BARE top-level `code` — the one field a system error shares
+ * with dialect 3. The platform never sends a lone `code`: its envelope always
+ * carries the sentence, the meta bag, or the deprecated `kind` alongside it. So
+ * a `code` with none of them is not the platform speaking, and is not trusted to
+ * name a domain failure.
+ */
+const looksLikeErrorEnvelope = (record: Record<string, unknown>): boolean =>
+  "message" in record || "meta" in record || "kind" in record;
+
 /** Next steps, defensively: only real strings survive. */
 const asSuggestions = (value: unknown): string[] | undefined => {
   if (!Array.isArray(value)) return undefined;
@@ -172,7 +201,7 @@ interface ErrorBody {
  *      `{ error: <sentence>, domainError: { code, kind, meta, traceId, reasons } }`.
  *
  *   3. THE FRAMEWORK ONE, from the new API framework
- *      (`packages/api/src/errors.ts`): the envelope top-level —
+ *      (`langwatch/packages/api/src/errors.ts`): the envelope top-level —
  *      `{ code, kind, message, meta, reasons, traceId, spanId, traceUrl }`,
  *      with `error` carrying the HTTP status text on unversioned routes.
  *
@@ -183,6 +212,12 @@ interface ErrorBody {
 const asErrorBody = (value: unknown): ErrorBody | null => {
   const record = asRecord(value);
   if (!record) return null;
+
+  // A libuv system error is a transport failure wearing a `code`. It is never
+  // any of the three dialects, whatever else it carries, so it never gets to
+  // name a domain failure — it falls through to the status-derived reading,
+  // which calls it `network_error` and means it.
+  if (isSystemError(record)) return null;
 
   // Dialect 2: the serialised HandledError, carried whole under `domainError`.
   const serialized = asRecord(record.domainError);
@@ -228,7 +263,9 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
   // if `code` were read first. Dialect 3 always emits `kind` alongside `code`,
   // so a `kind` present means `code` is the envelope's own and wins; with no
   // `kind`, `error` is the dialect-1 discriminant and a bare `code` is only
-  // trusted when nothing else named the failure.
+  // trusted when nothing else named the failure — and only then if the record
+  // looks like the platform's envelope at all, so a stray `code` on some other
+  // object cannot pass itself off as a discriminant the platform chose.
   const named =
     typeof record.kind === "string"
       ? typeof record.code === "string"
@@ -236,7 +273,7 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
         : record.kind
       : typeof record.error === "string"
         ? record.error
-        : typeof record.code === "string"
+        : typeof record.code === "string" && looksLikeErrorEnvelope(record)
           ? record.code
           : null;
   if (named === null) return null;

@@ -4,10 +4,17 @@
  * Commander's built-in help command is intercepted internally (it never runs
  * an action of ours), so program.ts registers this as a REAL `help` command:
  * a registered `help` suppresses the implicit one, and `help <word>` then
- * reaches this action. The only topic so far is `agent` — the page an AI
- * agent (or the person driving one) reads to learn how to drive this CLI
- * without human docs. Anything else delegates to the named command's own
- * help, which is what the built-in command did.
+ * reaches this action.
+ *
+ * Resolution order is COMMANDS FIRST, topics second — the same rule `gh`
+ * follows. A help topic must never be able to shadow a real command: the CLI
+ * registers a top-level `agent` group (agent definitions), so a topic also
+ * named `agent` made `langwatch help agent` unreachable for the group and
+ * silently swallowed `langwatch help agent list`. The topic is therefore
+ * `agent-mode`, and the lookup order makes the same mistake impossible for
+ * any topic added later. `HELP_TOPIC_NAMES` is asserted against the
+ * registered command tree in the unit test, so a future collision fails CI
+ * rather than shipping.
  */
 import type { Command } from "commander";
 import { AGENT_MODE_ENV_VARS } from "../utils/output";
@@ -71,17 +78,30 @@ PIPING RULES
 };
 
 /**
- * The `help` command action: the `agent` topic, or the named command's help.
+ * The help topics, keyed by the word the user types after `help`.
+ *
+ * Every name here MUST NOT match a registered command name or alias — a topic
+ * that collides is unreachable-by-design for the command it shadows. The unit
+ * test walks `buildProgram()` and fails on any overlap.
+ */
+export const HELP_TOPICS: Record<string, () => string> = {
+  "agent-mode": renderAgentHelpTopic,
+};
+
+export const HELP_TOPIC_NAMES = Object.keys(HELP_TOPICS);
+
+/**
+ * The `help` command action: the named command's help, else a help topic.
  * Extra words walk into nested commands, so `help trace search` shows the
  * search command's help (stock commander showed only the top level; `gh help
  * issue list` shows the nested one — we follow gh).
+ *
+ * Commands are resolved BEFORE topics so a real command can never be shadowed
+ * by a topic page. Topics are single-word only: `help agent-mode list` is an
+ * error, not a page with `list` quietly discarded.
  */
 export const helpCommand = (program: Command, topics: string[]): void => {
   const [topic, ...rest] = topics;
-  if (topic === "agent") {
-    console.log(renderAgentHelpTopic());
-    return;
-  }
   if (topic === undefined) {
     program.outputHelp();
     return;
@@ -93,6 +113,13 @@ export const helpCommand = (program: Command, topics: string[]): void => {
     target = target?.commands.find(
       (cmd) => cmd.name() === word || cmd.aliases().includes(word),
     );
+  }
+  if (!target && rest.length === 0) {
+    const renderTopic = HELP_TOPICS[topic];
+    if (renderTopic) {
+      console.log(renderTopic());
+      return;
+    }
   }
   if (!target) {
     // Mirror commander's own unknown-command error so scripts that probe

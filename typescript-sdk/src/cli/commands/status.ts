@@ -20,6 +20,50 @@ const BUDGET_ATTENTION_THRESHOLD_PCT = 80;
 /** Running state is per-RUN and runs list per experiment, so the "is anything
  * still running" check only re-queries the most recently active experiments. */
 const RUNNING_EXPERIMENT_CANDIDATES = 5;
+/** How many experiments the first page can carry. Anything past this is unseen
+ * by the running-experiments scan and must be declared as a gap. */
+const EXPERIMENT_PAGE_SIZE = 50;
+/** Per-call ceiling. `status` is the most-run command in the CLI and often the
+ * first thing an agent does in a session, so no single backend call may hold it
+ * open indefinitely — see `withTimeout`. */
+const CALL_TIMEOUT_MS = 5_000;
+
+class CallTimeoutError extends Error {
+  constructor(ms: number) {
+    super(`timed out after ${Math.round(ms / 1000)}s`);
+    this.name = "CallTimeoutError";
+  }
+}
+
+/**
+ * Puts a hard floor under every network call status makes.
+ *
+ * `Promise.allSettled` never rejects, so without this there is no upper bound
+ * on how long status blocks: the trace-search POST runs a ClickHouse COUNT over
+ * a 24h partition and can hang indefinitely, and a hung call would simply never
+ * settle. A timeout is reported the same way any other section failure is —
+ * as an `errors` entry — so it withholds the all-clear rather than hiding.
+ */
+async function withTimeout<T>(operation: () => Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation(),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new CallTimeoutError(CALL_TIMEOUT_MS)), CALL_TIMEOUT_MS);
+        // Never hold the process open just to fire a timeout that no longer matters.
+        (timer as { unref?: () => void }).unref?.();
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** A timeout is a first-class, self-explanatory reason — don't run it through
+ * the API-body formatter, which has nothing to add to it. */
+const describeFailure = (error: unknown): string =>
+  error instanceof CallTimeoutError ? error.message : formatApiErrorMessage({ error });
 
 export interface RunningExperiment {
   slug: string;
@@ -116,16 +160,17 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
 
   async function fetchRunningExperiments(): Promise<RunningExperiment[]> {
     const service = new ExperimentsApiService();
-    const list = await service.listExperiments({ pageSize: 50 });
+    const list = await service.listExperiments({ pageSize: EXPERIMENT_PAGE_SIZE });
     // "Running" is a property of a run, and runs are only listed per
     // experiment — so check the latest run of just the most recently active
     // experiments rather than fanning out over all of them.
+    //
+    // Deliberately NOT windowed to the last 24h. `running` has no bounded
+    // duration: an experiment wedged in `running` for three days has a 72h-old
+    // `lastRunAt`, and those are precisely the ones worth surfacing. Recency is
+    // used to RANK candidates, never to filter them out.
     const recent = list.experiments
-      .filter(
-        (experiment) =>
-          experiment.lastRunAt !== null &&
-          Date.now() - new Date(experiment.lastRunAt).getTime() < DAY_MS,
-      )
+      .filter((experiment) => experiment.lastRunAt !== null)
       .sort(
         (a, b) =>
           new Date(b.lastRunAt ?? 0).getTime() - new Date(a.lastRunAt ?? 0).getTime(),
@@ -159,6 +204,15 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     // "nothing needs your attention".
     const failedChecks = checks.filter((check) => check.status === "rejected").length;
     const gaps: string[] = [];
+    // `GET /api/experiments` is ordered by `updatedAt desc`, NOT by `lastRunAt`
+    // — so a running experiment whose row has a stale `updatedAt` can sit past
+    // the page boundary and never be seen at all. An unread page is the single
+    // biggest hole in this scan; it goes on the record first.
+    if (list.pagination.hasMore) {
+      gaps.push(
+        `only the first ${list.experiments.length} of ${list.pagination.totalHits} experiments were listed`,
+      );
+    }
     if (recent.length > candidates.length) {
       gaps.push(
         `only the ${RUNNING_EXPERIMENT_CANDIDATES} most recently active of ${recent.length} candidate experiments were checked`,
@@ -178,32 +232,106 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     );
   }
 
+  /**
+   * `GET /api/gateway/v1/budgets` returns org-, team- and project-scoped
+   * budgets only — it documents that VK- and principal-scoped budgets come from
+   * "their detail pages", and no REST endpoint serves those: the org-wide
+   * listing that does include every scope is a session-authenticated tRPC
+   * procedure, the virtual-key DTO carries no budget fields, and there is no
+   * `GET /budgets/:id`. So a virtual-key budget at 100% with `on_breach: BLOCK`
+   * — actively rejecting production traffic — is structurally invisible here.
+   *
+   * That blind spot only has anything behind it if this project routes through
+   * the gateway at all: with no virtual keys there is no VK or principal
+   * traffic to block, and the scopes we CAN see are the whole picture. So probe
+   * for keys, and whenever there are any — or we cannot tell — put the
+   * uncovered scope on the record instead of claiming an all-clear over it.
+   */
+  async function uncoveredBudgetScopeGap(): Promise<string | null> {
+    const unchecked = "virtual-key and principal budgets were not checked";
+    let payload: unknown;
+    try {
+      const { data, error, status } = await fetchCount("/api/gateway/v1/virtual-keys");
+      if (error) {
+        return `${unchecked} (could not list virtual keys: ${formatApiErrorMessage({ error, options: { status } })})`;
+      }
+      payload = data;
+    } catch (err) {
+      return `${unchecked} (could not list virtual keys: ${describeFailure(err)})`;
+    }
+    const keys = Array.isArray(payload)
+      ? payload
+      : (payload as { data?: unknown } | null)?.data;
+    const count = Array.isArray(keys) ? keys.length : 0;
+    if (count === 0) return null;
+    return `${unchecked} — this API cannot list them, and ${count} virtual key${count === 1 ? "" : "s"} in this project could carry them`;
+  }
+
   async function fetchBudgetsAtRisk(): Promise<BudgetAtRisk[]> {
-    const budgets = await new GatewayBudgetsApiService({ endpoint, apiKey }).list();
-    return budgets
+    const [budgets, scopeGap] = await Promise.all([
+      new GatewayBudgetsApiService({ endpoint, apiKey }).list(),
+      uncoveredBudgetScopeGap(),
+    ]);
+
+    const unreadable: string[] = [];
+    const scored = budgets
       .filter((budget) => budget.archived_at === null)
-      .map((budget) => {
+      .flatMap((budget): BudgetAtRisk[] => {
         const limit = Number(budget.limit_usd);
         const spent = Number(budget.spent_usd);
-        return {
-          name: budget.name,
-          scope: budget.scope_type,
-          window: budget.window,
-          utilizationPct:
-            Number.isFinite(limit) && limit > 0 && Number.isFinite(spent)
-              ? Math.round((spent / limit) * 100)
-              : 0,
-          spentUsd: budget.spent_usd,
-          limitUsd: budget.limit_usd,
-          onBreach: budget.on_breach,
-        };
-      })
+        // Neither "at risk" nor "fine" — we cannot say which, so say that.
+        if (!Number.isFinite(limit) || !Number.isFinite(spent)) {
+          unreadable.push(budget.name);
+          return [];
+        }
+        return [
+          {
+            name: budget.name,
+            scope: budget.scope_type,
+            window: budget.window,
+            // A limit of zero admits no spend at all: it is the maximally
+            // breached state, not a 0%-utilized one. Scoring it 0 and dropping
+            // it below the threshold is how a BLOCK budget that rejects every
+            // single request turns into a green tick.
+            utilizationPct: limit <= 0 ? 100 : Math.round((spent / limit) * 100),
+            spentUsd: budget.spent_usd,
+            limitUsd: budget.limit_usd,
+            onBreach: budget.on_breach,
+          },
+        ];
+      });
+
+    const gaps: string[] = [];
+    if (scopeGap) gaps.push(scopeGap);
+    if (unreadable.length > 0) {
+      gaps.push(
+        `the limit or spend of ${unreadable.length} budget${unreadable.length === 1 ? "" : "s"} could not be read (${unreadable.join(", ")})`,
+      );
+    }
+    if (gaps.length > 0) {
+      attention.errors.budgetsAtRisk = `incomplete scan: ${gaps.join("; ")}`;
+    }
+
+    return scored
       .filter((budget) => budget.utilizationPct >= BUDGET_ATTENTION_THRESHOLD_PCT)
       .sort((a, b) => b.utilizationPct - a.utilizationPct);
   }
 
-  // Fetch counts for all major resources in parallel
-  const fetchers = [
+  // Fetch counts for all major resources in parallel.
+  //
+  // Annotated rather than inferred: the array mixes `apiClient.GET` (whose
+  // FetchResponse is a DIFFERENT structural type per path) with `fetchCount`,
+  // so an inferred `fn` is a union of thunks that `withTimeout<T>` cannot
+  // unify. This is the shape the counting below actually reads.
+  const fetchers: {
+    key: keyof typeof results;
+    fn: () => Promise<{
+      data?: unknown;
+      error?: unknown;
+      status?: number;
+      response?: { status?: number };
+    }>;
+  }[] = [
     { key: "evaluators", fn: () => apiClient.GET("/api/evaluators") },
     { key: "scenarios", fn: () => apiClient.GET("/api/scenarios") },
     { key: "suites", fn: () => fetchCount("/api/suites") },
@@ -216,16 +344,20 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     { key: "secrets", fn: () => fetchCount("/api/secrets") },
   ];
 
-  const sectionFetchers = [
+  // Same reason as `fetchers` above: the three return number |
+  // RunningExperiment[] | BudgetAtRisk[], so an inferred `fn` is a union of
+  // thunks. The result is assigned through a keyed cast below, which is where
+  // the per-key types are reconciled.
+  const sectionFetchers: { key: string; fn: () => Promise<unknown> }[] = [
     { key: "erroredTraces24h", fn: fetchErroredTraces24h },
     { key: "runningExperiments", fn: fetchRunningExperiments },
     { key: "budgetsAtRisk", fn: fetchBudgetsAtRisk },
-  ] as const;
+  ];
 
   await Promise.allSettled([
     ...fetchers.map(async ({ key, fn }) => {
       try {
-        const result = await fn();
+        const result = await withTimeout(fn);
         const { data, error } = result;
         const status = (result as { status?: number; response?: { status?: number } }).status
           ?? (result as { response?: { status?: number } }).response?.status;
@@ -249,18 +381,20 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
           results[key] = { count: 0 };
         }
       } catch (err) {
-        results[key] = { count: 0, error: formatApiErrorMessage({ error: err }) };
+        results[key] = { count: 0, error: describeFailure(err) };
       }
     }),
     ...sectionFetchers.map(async ({ key, fn }) => {
       try {
         // The three section fetchers return number | RunningExperiment[] |
         // BudgetAtRisk[]; the AttentionReport field types line up by key.
-        (attention as unknown as Record<string, unknown>)[key] = await fn();
+        (attention as unknown as Record<string, unknown>)[key] = await withTimeout(fn);
       } catch (err) {
         // Soft-fail: the section reads null and the reason lives in `errors`
-        // (rendered dimly in human mode, verbatim in machine output).
-        attention.errors[key] = formatApiErrorMessage({ error: err });
+        // (rendered dimly in human mode, verbatim in machine output). A timeout
+        // lands here too, so a hung backend withholds the all-clear like any
+        // other unfinished check.
+        attention.errors[key] = describeFailure(err);
       }
     }),
   ]);
@@ -341,9 +475,11 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         );
       }
       if (flagged === 0) {
-        // All-clear only means something when every section actually loaded —
-        // don't print a green ✓ next to a list of sections we couldn't check.
-        if (Object.keys(attention.errors).length === 0) {
+        // All-clear only means something when the whole scan actually ran —
+        // don't print a green ✓ next to a list of sections we couldn't check,
+        // and don't print one directly above a grid of red 403s either. A
+        // resource we could not read is a resource we cannot vouch for.
+        if (Object.keys(attention.errors).length === 0 && errorCount === 0) {
           console.log(chalk.green("    ✓ nothing needs your attention"));
         } else {
           console.log(

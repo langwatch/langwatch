@@ -205,6 +205,17 @@ const descend = (value: unknown, key: string): unknown => {
 };
 
 /**
+ * Syntax this subset does NOT implement. It must be REJECTED rather than
+ * walked as a literal key: `descend` answers `null` for any key it cannot
+ * resolve, so `.traces[0]` would otherwise look up a property literally named
+ * `traces[0]`, miss, and print `null` at exit 0 — a fabricated answer an agent
+ * then builds on. Array indexing in particular is the first thing anyone tries
+ * after reading this flag's own `.traces[].traceId` example, so it has to fail
+ * loudly. A trailing `[]` is stripped before this test (that IS supported).
+ */
+const UNSUPPORTED_SEGMENT_RE = /[[\]"'?*]/;
+
+/**
  * The tiny built-in jq subset: `.`, `.a.b`, `.items[]`, `.items[].name`, and a
  * terminal `| length` (arrays, strings, objects). Iteration collects into an
  * array, the way `jq '[ .items[].name ]'` reads. Anything else throws — a
@@ -252,6 +263,12 @@ export const applyJq = (expression: string, data: unknown): unknown => {
     if (key === "" && !iterate) {
       throw new Error(`Invalid --jq expression "${expression}": empty segment at "${path}"`);
     }
+    if (UNSUPPORTED_SEGMENT_RE.test(key)) {
+      throw new Error(
+        `Invalid --jq expression "${expression}": unsupported syntax at "${path}.${head}" ` +
+          `(supported: dot paths, .items[], .items[].field, | length — no indexing, quoting or optionals)`,
+      );
+    }
 
     const descended = key === "" ? value : descend(value, key);
     const at = `${path}.${head}`;
@@ -266,20 +283,40 @@ export const applyJq = (expression: string, data: unknown): unknown => {
         `Invalid --jq expression "${expression}": "${at}" iterates over a non-array value`,
       );
     }
-    return descended.map((item) => apply(item, tail, at));
+    const mapped = descended.map((item) => apply(item, tail, at));
+    // Chained iteration COLLECTS, it does not nest: `.traces[].spans[].id` is
+    // `["s1","s2","s3"]`, matching `jq '[ .traces[].spans[].id ]'`, not
+    // `[["s1","s2"],["s3"]]`. Each nested level has already flattened itself,
+    // so exactly one flatten per iterating segment is correct.
+    return tail.some((segment) => segment.endsWith("[]")) ? mapped.flat() : mapped;
   };
 
   return apply(data, segments, "");
 };
 
-/** `--json <fields>`: pick top-level fields, per item when data is an array. */
+/**
+ * `--json <fields>`: pick fields, per item when data is an array.
+ *
+ * Fields may be dotted paths (`config.evaluatorType`). A flat property lookup
+ * would treat that as a literal key, miss, and null-fill — reporting "this
+ * record has no such field" for a field it does have, which is a lie a machine
+ * caller cannot detect. The resulting key keeps the dotted spelling the caller
+ * asked for, so the projection round-trips.
+ */
 const selectFields = (data: unknown, fields: string[]): unknown => {
+  const valueAt = (item: unknown, field: string): unknown => {
+    let cursor = item;
+    for (const segment of field.split(".")) {
+      cursor = descend(cursor, segment);
+      if (cursor === null) return null;
+    }
+    return cursor;
+  };
   const pick = (item: unknown): unknown => {
     if (item === null || typeof item !== "object" || Array.isArray(item)) {
       return item;
     }
-    const record = item as Record<string, unknown>;
-    return Object.fromEntries(fields.map((field) => [field, record[field] ?? null]));
+    return Object.fromEntries(fields.map((field) => [field, valueAt(item, field)]));
   };
   return Array.isArray(data) ? data.map(pick) : pick(data);
 };
@@ -327,6 +364,156 @@ export const printResult = async (
   if (resolved.jq) out = applyJq(resolved.jq, out);
 
   console.log(await serialize(out, resolved.format));
+};
+
+/**
+ * What a command SAYS, as opposed to what it PRINTS.
+ *
+ * A command action returns this instead of writing to stdout itself: `data` is
+ * the raw payload — the single source of truth every machine format projects
+ * from — and `table` renders the human form. The command never learns which
+ * format was asked for; the port below decides. That is the whole point: when
+ * format resolution lives in 150 command files, 129 of them get it wrong and
+ * nothing detects it, because a chalk table on stdout at exit 0 looks exactly
+ * like success.
+ */
+export interface CommandResult {
+  /** The payload. `-o json|yaml|agents`, `--json <fields>` and `--jq` all project from this. */
+  data: unknown;
+  /** Renders the human form. Only invoked when the resolved format is `table`. */
+  table: () => void;
+}
+
+/**
+ * Commands whose action speaks the output contract.
+ *
+ * Marked at registration by `emitsResult` rather than sniffed off the handler:
+ * commander's `.action(fn)` stores its OWN listener wrapping `fn`, so anything
+ * we tag `fn` with is sealed inside that closure and unreachable. A WeakSet
+ * keyed on the command is both simpler and free of commander private API.
+ */
+const OUTPUT_AWARE_COMMANDS = new WeakSet<Command>();
+
+/**
+ * The output PORT: register a command's action so whatever it RETURNS is
+ * rendered in the caller's format, once, here.
+ *
+ *     emitsResult(
+ *       program.command("list").description("…"),
+ *       async (options) => ({ data: agents, table: () => { … } }),
+ *     );
+ *
+ * Resolution reads `optsWithGlobals()` off the running command, so a
+ * root-position flag (`lw --output json monitor list` — the spelling the help
+ * text teaches, since the root's copies are what render under "Global
+ * Options:") resolves the same as a trailing one. Commander only puts
+ * root-position globals on the ROOT command, so anything reading the leaf's
+ * `opts()` silently drops them.
+ *
+ * A handler returning nothing is fine — commands that legitimately own their
+ * own output (interactive login, the gateway wrappers) just return void.
+ */
+export const emitsResult = <Args extends unknown[]>(
+  command: Command,
+  handler: (...args: Args) => Promise<CommandResult | void> | CommandResult | void,
+): Command => {
+  OUTPUT_AWARE_COMMANDS.add(command);
+  return command.action(async (...args: unknown[]): Promise<void> => {
+    const actionCommand = args[args.length - 1] as Command;
+    const result = await handler(...(args as unknown as Args));
+    if (!result) return;
+
+    const resolved = resolveActionOutputOptions(actionCommand);
+    if (resolved.format === "table") {
+      result.table();
+      return;
+    }
+    let out = result.data;
+    if (resolved.fields) out = selectFields(out, resolved.fields);
+    if (resolved.jq) out = applyJq(resolved.jq, out);
+    console.log(await serialize(out, resolved.format));
+  });
+};
+
+/** Whether this command's action speaks the output contract. */
+export const isOutputAware = (command: Command): boolean =>
+  OUTPUT_AWARE_COMMANDS.has(command);
+
+/**
+ * Refuse to answer a machine format we cannot actually produce.
+ *
+ * `registerOutputOptions` puts `-o/--output` on EVERY command, and `choices()`
+ * makes a typo fail loudly at parse time. Until a command is migrated to
+ * `withOutput`, a VALID value is the more dangerous case: the flag validates,
+ * the command prints its chalk table anyway, and the caller gets human text at
+ * exit 0 having explicitly asked for JSON. `--jq` is worse still — the
+ * expression is never parsed, so a malformed one also exits 0.
+ *
+ * So: an EXPLICIT machine format on an unmigrated command is an error, not a
+ * table. Agent mode merely detected from the environment is not explicit — the
+ * caller asked for nothing, and erroring there would break every unmigrated
+ * command the moment it runs under Claude Code — so that case keeps the table
+ * and warns on stderr that the output is not machine-readable.
+ *
+ * Returns the format the request should actually run as.
+ */
+export const assertFormatIsSupported = async (
+  actionCommand: Command,
+  resolved: ResolvedOutput,
+): Promise<ResolvedOutput> => {
+  if (resolved.format === "table" || isOutputAware(actionCommand)) return resolved;
+
+  // A command that defines its OWN non-hidden `--json` (daemon status, the
+  // ingest and governance groups) already emits machine output through that
+  // flag — it just predates the port. Refusing it would break a working
+  // spelling, so it passes through. The contract's own copy is `hideHelp()`'d
+  // wherever it is injected, which is what makes a non-hidden one distinctive.
+  const ownsJsonFlag = actionCommand.options.some(
+    (option) => option.long === "--json" && !option.hidden,
+  );
+  if (ownsJsonFlag) return resolved;
+
+  const raw: RawOutputFlags = actionCommand.optsWithGlobals();
+  const name = actionCommand.name();
+
+  // Only the NEW contract flags are refusable. Legacy `-f/--format json` is
+  // NOT: unmigrated commands implement it themselves (`if (options.format ===
+  // "json")`), so refusing it would break a spelling that has always worked —
+  // which is why `hasExplicitFormatRequest` (which counts it) is the wrong
+  // predicate here. `-o` and `--jq` never existed before this contract, so a
+  // command that cannot honour them has nothing to break.
+  const requestedNewContractFlag =
+    raw.output !== undefined || raw.jq !== undefined || raw.json !== undefined;
+
+  if (requestedNewContractFlag) {
+    const { commandValidationError, reportCommandError } = await import(
+      "./errorOutput.js"
+    );
+    // Reported here rather than thrown: `preAction` runs OUTSIDE each
+    // registration's try/catch, so a throw escapes to the dependency-free net
+    // in index.ts and renders as `Error: [object Object]` — prose at a parser,
+    // the exact failure this contract exists to end.
+    reportCommandError({
+      error: commandValidationError(
+        `\`${name}\` does not emit structured output yet, so --output/--json/--jq cannot be honoured. ` +
+          `Re-run without them for the human table, or use \`lw commands\` to find a command that does.`,
+        { command: name, requestedFormat: resolved.format },
+      ),
+    });
+    process.exit(1);
+  }
+
+  // Legacy `-f/--format json`: the command renders this itself, so pass it
+  // through untouched. Falling into the downgrade below would rewrite it to
+  // `table` and break output that has always worked.
+  if (raw.format === "json") return resolved;
+
+  // Auto-detected agent mode: keep the human table, but never let a caller
+  // believe it is parsing structured output.
+  process.stderr.write(
+    `note: \`${name}\` does not emit structured output yet — the table below is not machine-readable.\n`,
+  );
+  return { ...resolved, format: "table" };
 };
 
 /**

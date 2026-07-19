@@ -6,6 +6,7 @@ import {
 } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
 export interface UpdateGatewayBudgetOptions {
   name?: string;
@@ -15,13 +16,16 @@ export interface UpdateGatewayBudgetOptions {
   onBreach?: "block" | "warn";
   timezone?: string;
   clearTimezone?: boolean;
-  format?: string;
 }
 
+/**
+ * Returns the updated budget rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts).
+ */
 export const updateGatewayBudgetCommand = async (
   id: string,
   options: UpdateGatewayBudgetOptions,
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const onBreach: BudgetOnBreach | undefined = options.onBreach
@@ -60,19 +64,19 @@ export const updateGatewayBudgetCommand = async (
 
     spinner.succeed(`Updated budget "${chalk.cyan(budget.name)}"`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(budget, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`${chalk.bold("ID:")}       ${budget.id}`);
-    console.log(`${chalk.bold("Scope:")}    ${budget.scope_type.toLowerCase()}:${budget.scope_id}`);
-    console.log(`${chalk.bold("Window:")}   ${budget.window.toLowerCase()}`);
-    console.log(`${chalk.bold("Limit:")}    $${budget.limit_usd}`);
-    console.log(`${chalk.bold("Breach:")}   ${budget.on_breach.toLowerCase()}`);
-    console.log(`${chalk.bold("Timezone:")} ${budget.timezone ?? chalk.gray("—")}`);
-    console.log();
+    return {
+      data: budget,
+      table: () => {
+        console.log();
+        console.log(`${chalk.bold("ID:")}       ${budget.id}`);
+        console.log(`${chalk.bold("Scope:")}    ${budget.scope_type.toLowerCase()}:${budget.scope_id}`);
+        console.log(`${chalk.bold("Window:")}   ${budget.window.toLowerCase()}`);
+        console.log(`${chalk.bold("Limit:")}    $${budget.limit_usd}`);
+        console.log(`${chalk.bold("Breach:")}   ${budget.on_breach.toLowerCase()}`);
+        console.log(`${chalk.bold("Timezone:")} ${budget.timezone ?? chalk.gray("—")}`);
+        console.log();
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "update gateway budget" });
     process.exit(1);

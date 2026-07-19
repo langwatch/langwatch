@@ -3,12 +3,15 @@ import { createSpinner } from "../../utils/spinner";
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
-import { printResult, type RawOutputFlags } from "../../utils/output";
+import type { CommandResult } from "../../utils/output";
 
+/**
+ * Returns the archival outcome rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts).
+ */
 export const deleteEvaluatorCommand = async (
   idOrSlug: string,
-  options?: RawOutputFlags,
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new EvaluatorsApiService();
@@ -47,15 +50,10 @@ export const deleteEvaluatorCommand = async (
     process.exit(1);
   }
 
-  // Rendering stays OUTSIDE the deletion try: a printResult rejection (invalid
-  // --jq) must not report an already-archived evaluator as an archive failure.
-  await printResult(
-    { id: evaluatorId, name: evaluatorName, archived: true },
-    {
-      ...options,
-      table: () => {
-        // The spinner's success line is the human output.
-      },
+  return {
+    data: { id: evaluatorId, name: evaluatorName, archived: true },
+    table: () => {
+      // The spinner's success line is the human output.
     },
-  );
+  };
 };

@@ -4,7 +4,7 @@ import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import type { EvaluatorResponse } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
-import { printResult, type RawOutputFlags } from "../../utils/output";
+import type { CommandResult } from "../../utils/output";
 
 const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
   const config = evaluator.config as
@@ -64,7 +64,11 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
   console.log();
 };
 
-export const getEvaluatorCommand = async (idOrSlug: string, options?: RawOutputFlags): Promise<void> => {
+/**
+ * Returns the evaluator rather than printing it: the output port renders it in
+ * whatever format the caller asked for (utils/output.ts).
+ */
+export const getEvaluatorCommand = async (idOrSlug: string): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new EvaluatorsApiService();
@@ -81,10 +85,8 @@ export const getEvaluatorCommand = async (idOrSlug: string, options?: RawOutputF
     process.exit(1);
   }
 
-  // Rendering stays OUTSIDE the fetch try: a printResult rejection (invalid
-  // --jq) is a rendering failure, not a fetch failure.
-  await printResult(evaluator, {
-    ...options,
+  return {
+    data: evaluator,
     table: () => formatEvaluatorDetails(evaluator),
-  });
+  };
 };

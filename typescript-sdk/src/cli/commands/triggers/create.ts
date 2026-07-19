@@ -7,6 +7,12 @@ import { commandValidationError, reportCommandError } from "../../utils/errorOut
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import type { CommandResult } from "../../utils/output";
+
+/**
+ * Returns the created trigger rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts).
+ */
 export const createTriggerCommand = async (
   name: string,
   options: {
@@ -15,9 +21,8 @@ export const createTriggerCommand = async (
     message?: string;
     alertType?: string;
     slackWebhook?: string;
-    format?: string;
   },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const validActions = ["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE"];
@@ -69,18 +74,18 @@ export const createTriggerCommand = async (
     const trigger = await response.json() as { id: string; name: string; action: string; platformUrl?: string };
     spinner.succeed(`Trigger "${trigger.name}" created (${trigger.id})`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(trigger, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`  ${chalk.gray("ID:")}     ${chalk.green(trigger.id)}`);
-    console.log(`  ${chalk.gray("Action:")} ${trigger.action}`);
-    if (trigger.platformUrl) {
-      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(trigger.platformUrl)}`);
-    }
-    console.log();
+    return {
+      data: trigger,
+      table: () => {
+        console.log();
+        console.log(`  ${chalk.gray("ID:")}     ${chalk.green(trigger.id)}`);
+        console.log(`  ${chalk.gray("Action:")} ${trigger.action}`);
+        if (trigger.platformUrl) {
+          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(trigger.platformUrl)}`);
+        }
+        console.log();
+      },
+    };
   } catch (error) {
     // Route BOTH failure kinds through failSpinner: a direct spinner.fail()
     // prints nothing in --json/--jq/agent mode (spinners are silent there).

@@ -13,7 +13,7 @@ import {
   type RawOutputFlags,
 } from "../../utils/output";
 import { findSkill, SKILLS_BUNDLE } from "./installer";
-import { throwValidationError } from "./shared";
+import { throwValidationError } from "./validation";
 
 export const skillsGetCommand = async (
   name: string,

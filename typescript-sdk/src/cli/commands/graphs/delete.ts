@@ -3,12 +3,16 @@ import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+/**
+ * Returns the deletion outcome rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts).
+ */
 export const deleteGraphCommand = async (
   id: string,
-  options?: { format?: string },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
@@ -31,9 +35,12 @@ export const deleteGraphCommand = async (
     const result = await response.json() as { id: string; deleted: boolean };
     spinner.succeed(`Graph "${id}" deleted`);
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(result, null, 2));
-    }
+    return {
+      data: result,
+      table: () => {
+        // The spinner's success line is the human output.
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "delete graph" });
     process.exit(1);

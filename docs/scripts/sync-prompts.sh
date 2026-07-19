@@ -1,15 +1,27 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Regenerate docs/snippets/prompts-data.jsx from compiled skill prompts.
 # Run from the repo root: bash docs/scripts/sync-prompts.sh
-
-set -e
+#
+# `env bash`, not /bin/bash: this script uses `declare -A` (associative
+# arrays), which needs bash >= 4. macOS still ships bash 3.2 at /bin/bash, so
+# a hard-coded interpreter silently picks the one version that cannot run it.
+#
+# `pipefail` matters as much as `-e` here: the generation below is built from
+# pipelines, and without it a failure in any stage but the last is swallowed
+# and an EMPTY prompt body gets written into the committed .jsx.
+set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 # Step 1: Compile the skill sources into .txt files
-echo "Running skills/_compiled/generate.sh..."
-bash skills/_compiled/generate.sh
+GENERATE="skills/_compiled/generate.sh"
+if [ ! -f "$GENERATE" ]; then
+  echo "ERROR: missing $GENERATE — run from a full checkout" >&2
+  exit 1
+fi
+echo "Running $GENERATE..."
+bash "$GENERATE"
 
 # Step 2: Convert compiled .txt files into prompts-data.jsx
 OUT="docs/snippets/prompts-data.jsx"
@@ -55,12 +67,17 @@ DOCS_ORDER="tracing evaluations scenarios prompts analytics datasets level-up re
 
 for stem in $DOCS_ORDER; do
   file="$COMPILED_DIR/${stem}.docs.txt"
-  key="${DOCS_KEY_MAP[$stem]}"
-  if [ -f "$file" ] && [ -n "$key" ]; then
+  # `:-` because `set -u` makes a missing associative-array key a hard bash
+  # error, which would pre-empt the explicit message below.
+  key="${DOCS_KEY_MAP[$stem]:-}"
+  # -s, not -f: an existing-but-empty compiled file is the exact failure this
+  # script must not commit — it would write an empty prompt body that looks
+  # like a legitimate diff.
+  if [ -s "$file" ] && [ -n "$key" ]; then
     content=$(escape_for_template_literal < "$file")
     printf '  %s: `%s`,\n\n' "$key" "$content" >> "$OUT"
   else
-    echo "ERROR: Missing file or key for $stem" >&2; exit 1
+    echo "ERROR: Missing, empty, or unkeyed compiled file for $stem ($file)" >&2; exit 1
   fi
 done
 
@@ -81,12 +98,12 @@ PLATFORM_ORDER="analytics scenarios evaluations"
 
 for stem in $PLATFORM_ORDER; do
   file="$COMPILED_DIR/${stem}.platform.txt"
-  key="${PLATFORM_KEY_MAP[$stem]}"
-  if [ -f "$file" ] && [ -n "$key" ]; then
+  key="${PLATFORM_KEY_MAP[$stem]:-}"
+  if [ -s "$file" ] && [ -n "$key" ]; then
     content=$(escape_for_template_literal < "$file")
     printf '  %s: `%s`,\n\n' "$key" "$content" >> "$OUT"
   else
-    echo "ERROR: Missing platform file or key for $stem" >&2; exit 1
+    echo "ERROR: Missing, empty, or unkeyed platform file for $stem ($file)" >&2; exit 1
   fi
 done
 

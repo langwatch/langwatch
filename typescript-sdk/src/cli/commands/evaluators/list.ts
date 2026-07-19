@@ -4,9 +4,14 @@ import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
-import { printResult, type RawOutputFlags } from "../../utils/output";
+import type { CommandResult } from "../../utils/output";
 
-export const listEvaluatorsCommand = async (options?: RawOutputFlags): Promise<void> => {
+/**
+ * Returns the listing rather than printing it: the output port renders it in
+ * whatever format the caller asked for (utils/output.ts). The `table` closure
+ * is the human form, byte-identical to what this command printed before.
+ */
+export const listEvaluatorsCommand = async (): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new EvaluatorsApiService();
@@ -26,10 +31,8 @@ export const listEvaluatorsCommand = async (options?: RawOutputFlags): Promise<v
     process.exit(1);
   }
 
-  // Rendering stays OUTSIDE the fetch try: a printResult rejection (invalid
-  // --jq) is a rendering failure, not a fetch failure.
-  await printResult(evaluators, {
-    ...options,
+  return {
+    data: evaluators,
     table: () => {
       if (evaluators.length === 0) {
         console.log();
@@ -75,5 +78,5 @@ export const listEvaluatorsCommand = async (options?: RawOutputFlags): Promise<v
         ),
       );
     },
-  });
+  };
 };

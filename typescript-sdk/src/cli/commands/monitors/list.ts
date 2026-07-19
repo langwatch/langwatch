@@ -4,11 +4,16 @@ import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
-import { printResult, type RawOutputFlags } from "../../utils/output";
+import type { CommandResult } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-export const listMonitorsCommand = async (options?: RawOutputFlags): Promise<void> => {
+/**
+ * Returns the listing rather than printing it: the output port renders it in
+ * whatever format the caller asked for (utils/output.ts). The `table` closure
+ * is the human form, byte-identical to what this command printed before.
+ */
+export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
   checkApiKey();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
@@ -55,44 +60,42 @@ export const listMonitorsCommand = async (options?: RawOutputFlags): Promise<voi
     process.exit(1);
   }
 
-  // Rendering stays OUTSIDE the fetch try: a printResult rejection (invalid
-  // --jq) is a rendering failure, not a fetch failure.
-  await printResult(monitors, {
-      ...options,
-      table: () => {
-        if (monitors.length === 0) {
-          console.log();
-          console.log(chalk.gray("No monitors found."));
-          console.log(chalk.gray("Create one with:"));
-          console.log(
-            chalk.cyan(
-              '  langwatch monitor create "Toxicity Check" --check-type ragas/toxicity'
-            )
-          );
-          return;
-        }
-
+  return {
+    data: monitors,
+    table: () => {
+      if (monitors.length === 0) {
         console.log();
+        console.log(chalk.gray("No monitors found."));
+        console.log(chalk.gray("Create one with:"));
+        console.log(
+          chalk.cyan(
+            '  langwatch monitor create "Toxicity Check" --check-type ragas/toxicity'
+          )
+        );
+        return;
+      }
 
-        const tableData = monitors.map((m) => ({
-          Name: m.name,
-          ID: m.id,
-          Type: m.checkType,
-          Mode: m.executionMode,
-          Status: m.enabled ? chalk.green("enabled") : chalk.gray("disabled"),
-          Sample: `${Math.round(m.sample * 100)}%`,
-        }));
+      console.log();
 
-        formatTable({
-          data: tableData,
-          headers: ["Name", "ID", "Type", "Mode", "Status", "Sample"],
-          colorMap: {
-            Name: chalk.cyan,
-            ID: chalk.green,
-          },
-        });
+      const tableData = monitors.map((m) => ({
+        Name: m.name,
+        ID: m.id,
+        Type: m.checkType,
+        Mode: m.executionMode,
+        Status: m.enabled ? chalk.green("enabled") : chalk.gray("disabled"),
+        Sample: `${Math.round(m.sample * 100)}%`,
+      }));
 
-        console.log();
-      },
-    });
+      formatTable({
+        data: tableData,
+        headers: ["Name", "ID", "Type", "Mode", "Status", "Sample"],
+        colorMap: {
+          Name: chalk.cyan,
+          ID: chalk.green,
+        },
+      });
+
+      console.log();
+    },
+  };
 };

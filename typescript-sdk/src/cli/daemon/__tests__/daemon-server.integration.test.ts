@@ -21,6 +21,7 @@ import * as path from "node:path";
 import { Writable } from "node:stream";
 
 import { execViaDaemon, requestStatus, requestStop } from "../client";
+import { secureSocketFile } from "../identity";
 import {
   cleanStaleSocket,
   createDaemonServer,
@@ -135,6 +136,7 @@ describe("daemon over a unix socket", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await server?.stop("stop-requested");
     server = undefined;
     fs.rmSync(dir, { recursive: true, force: true });
@@ -613,6 +615,127 @@ describe("daemon over a unix socket", () => {
     });
   });
 
+  /**
+   * The daemon's whole trust model is filesystem permissions. The server half
+   * (0600 socket in a 0700 directory) is worthless if the CLIENT will talk to
+   * any socket at that path — it pipelines `exec` before the handshake is
+   * answered, so a squatter is handed the caller's args, cwd and forwarded
+   * LANGWATCH_* env, API key included.
+   */
+  describe("given a socket the caller cannot trust", () => {
+    describe("when its directory is writable by other users", () => {
+      it("refuses to connect and reports not-served, so the CLI runs in-process", async () => {
+        const executor = vi.fn(scriptedExecutor(() => ({ stdout: "leaked\n" })));
+        await startDaemon({ executor });
+
+        // Anyone who can write the directory can unlink our socket and bind
+        // their own in its place.
+        fs.chmodSync(dir, 0o777);
+
+        const { outcome, stdout } = await exec(["trace", "search"]);
+
+        expect(outcome).toEqual({
+          served: false,
+          reason: "socket-dir-loose-mode",
+        });
+        expect(stdout).toBe("");
+        expect(executor).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the socket itself is world-connectable", () => {
+      it("refuses it rather than drive a daemon anyone else can drive too", async () => {
+        const executor = vi.fn(scriptedExecutor(() => ({ stdout: "leaked\n" })));
+        await startDaemon({ executor });
+
+        fs.chmodSync(socketPath, 0o666);
+
+        const { outcome } = await exec(["trace", "search"]);
+
+        expect(outcome).toEqual({ served: false, reason: "socket-loose-mode" });
+        expect(executor).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when it is owned by another user", () => {
+      it("refuses it, and reports no daemon for status and stop as well", async () => {
+        const executor = vi.fn(scriptedExecutor(() => ({ stdout: "leaked\n" })));
+        await startDaemon({ executor });
+
+        // chown needs root; moving OUR uid makes the same comparison fail.
+        vi.spyOn(process, "getuid").mockReturnValue(
+          (process.getuid?.() ?? 0) + 1,
+        );
+
+        const { outcome, stdout } = await exec(["trace", "search"]);
+
+        expect(outcome).toEqual({
+          served: false,
+          reason: "socket-dir-foreign-owner",
+        });
+        expect(stdout).toBe("");
+        expect(executor).not.toHaveBeenCalled();
+        // A stranger's listener is not our daemon: nothing to report, and
+        // nothing to send an unauthenticated `stop` to.
+        expect(await requestStatus(socketPath)).toBeNull();
+        expect(await requestStop(socketPath)).toBe(false);
+
+        vi.restoreAllMocks();
+      });
+    });
+  });
+
+  describe("given a daemon asked to stop while it is still serving", () => {
+    describe("when a request is in flight", () => {
+      it("waits for it before tearing the execution window down", async () => {
+        const running = await startDaemon({
+          shutdownGraceMs: 5_000,
+          executor: scriptedExecutor(() => ({
+            stdout: "finished\n",
+            delayMs: 60,
+          })),
+        });
+
+        const inFlight = exec(["slow"]);
+        // Let the exec frame land so the request is genuinely counted.
+        await vi.waitFor(() => expect(running.stats().inflight).toBe(1));
+
+        await running.stop("stop-requested");
+
+        // Version-skew eviction makes this a routine dev-loop event; the
+        // request must not finish against the daemon's restored globals.
+        expect(running.stats().inflight).toBe(0);
+
+        const { outcome, stdout } = await inFlight;
+        expect(outcome).toEqual({ served: true, exitCode: 0 });
+        expect(stdout).toBe("finished\n");
+      });
+    });
+
+    describe("when the in-flight request will not finish in time", () => {
+      it("cuts the connection so the client falls back instead of trusting the result", async () => {
+        const running = await startDaemon({
+          shutdownGraceMs: 30,
+          executor: (): CommandExecution => ({
+            completed: new Promise<number>(() => undefined),
+            cancel: () => undefined,
+          }),
+        });
+
+        const inFlight = exec(["forever"]);
+        await vi.waitFor(() => expect(running.stats().inflight).toBe(1));
+
+        await running.stop("stop-requested");
+
+        // No `exit` frame ever reached the client, and nothing was committed to
+        // its stdout, so re-running in-process is safe and correct.
+        const { outcome, stdout } = await inFlight;
+        expect(outcome).toMatchObject({ served: false });
+        expect(stdout).toBe("");
+      });
+    });
+  });
+
   describe("given a daemon that declines the request", () => {
     describe("when the caller's working directory no longer exists", () => {
       it("tells the client to run it in-process, having emitted no output", async () => {
@@ -684,6 +807,11 @@ describe("given a daemon that dies mid-command", () => {
       });
     });
     await new Promise<void>((resolve) => rogue.listen(socketPath, resolve));
+    // A real daemon tightens its socket to 0600 the moment it binds; the client
+    // will not talk to one that has not (see inspectSocketTrust), so the rogue
+    // has to look like a genuine daemon for these tests to exercise the
+    // mid-command death they are actually about.
+    secureSocketFile(socketPath);
   };
 
   describe("when it dies before any output reaches the caller", () => {
