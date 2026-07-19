@@ -231,10 +231,41 @@ const MONITORED_TABLES = [
   "stored_objects",
 ];
 
+/** Values of CLICKHOUSE_BACKUP_METRICS_ENABLED that turn backup collection off. */
+const BACKUP_METRICS_OFF_VALUES = new Set(["false", "0", "no", "off"]);
+
+/**
+ * Whether this deployment should collect backup-status gauges from
+ * system.backup_log.
+ *
+ * Collection is ON unless explicitly disabled. The gauges predate this flag and
+ * production alerts (clickhouse_backup_last_success_timestamp_seconds,
+ * clickhouse_backup_status_total, and the "Backup Reporting Absent" rule built on
+ * them) already depend on them, while the deployments that emit them do not set
+ * the variable. Defaulting to off would silently disarm live backup monitoring on
+ * the next deploy, so an unset — or unparseable — value keeps the existing
+ * behaviour and only a deliberate opt-OUT stops collection.
+ *
+ * Opting out is for environments where backups genuinely do not exist (local dev
+ * under haven, CI, self-hosted installs without backups), where the table is
+ * missing and the query would fail on every 15s tick for nothing.
+ *
+ * See specs/ops/clickhouse-backup-metrics.feature.
+ */
+export function shouldCollectBackupMetrics(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const raw = env.CLICKHOUSE_BACKUP_METRICS_ENABLED;
+  if (typeof raw !== "string") return true;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "") return true;
+  return !BACKUP_METRICS_OFF_VALUES.has(normalized);
+}
+
 /**
  * Collects ClickHouse backup status from system.backup_log into the backup gauges.
- * Extracted so collectStorageStats can gate it behind the explicit opt-in (see the
- * call site).
+ * Extracted so collectStorageStats can gate it behind the opt-out (see the call
+ * site).
  *
  * We deliberately query system.backup_log instead of system.backups: system.backups
  * is an in-memory table that gets wiped on CH restart, which happens on every app
@@ -351,12 +382,13 @@ export async function collectStorageStats(
     // Backup status only exists where backups are configured (the production
     // cluster, via clickhouse-serverless's backup cronjobs) — everywhere else this
     // query just fails on every 15s tick for nothing, and NODE_ENV can't tell
-    // "has backups" from "staging/self-hosted production build". So the deployment
-    // that has backups opts in explicitly (set on the worker alongside the backup
-    // cronjobs). Gating here (not at one call site) covers both the app under
+    // "has backups" from "staging/self-hosted production build". So the
+    // deployments WITHOUT backups opt out explicitly; unset stays on, because
+    // production already emits these gauges and alerts on them without setting
+    // anything. Gating here (not at one call site) covers both the app under
     // haven's in-process workers and the standalone worker.
     // See specs/ops/clickhouse-backup-metrics.feature.
-    if (process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED === "true") {
+    if (shouldCollectBackupMetrics()) {
       await collectBackupStats(client);
     }
 

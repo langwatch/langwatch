@@ -487,11 +487,37 @@ describe("ClickHouse metrics", () => {
       });
     });
 
-    describe("when backup metrics are not enabled (the default)", () => {
-      // system.backup_log only exists where backups are configured, so anywhere
-      // that hasn't opted in the collector must skip it entirely, leaving only
-      // parts + disks.
+    describe("when CLICKHOUSE_BACKUP_METRICS_ENABLED is unset (the default)", () => {
+      // Production workers never set this variable and live Grafana alerts read
+      // the gauges it feeds, so the default MUST keep collecting — a default-off
+      // flag would silently disarm backup monitoring on the next deploy.
+      beforeEach(() => {
+        delete process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED;
+      });
+
+      it("still queries system.backup_log", async () => {
+        const client = buildMockClient(() => false);
+
+        await metrics.collectStorageStats(client);
+
+        expect(client.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.stringContaining("system.backup_log"),
+          }),
+        );
+      });
+    });
+
+    describe("when backup metrics are explicitly disabled", () => {
+      // system.backup_log only exists where backups are configured, so the
+      // environments without them (local dev, CI, self-hosted) opt out and the
+      // collector skips it entirely, leaving only parts + disks.
+      afterEach(() => {
+        delete process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED;
+      });
+
       it("skips the system.backup_log query entirely", async () => {
+        process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED = "false";
         const client = buildMockClient(() => false);
 
         await metrics.collectStorageStats(client);
@@ -502,6 +528,42 @@ describe("ClickHouse metrics", () => {
           }),
         );
       });
+    });
+  });
+
+  describe("shouldCollectBackupMetrics", () => {
+    // The whole point of the inversion: absence of configuration means the
+    // existing (collecting) behaviour, never a silent opt-out.
+    const collectingCases: [string, NodeJS.ProcessEnv][] = [
+      ["unset", {}],
+      ["empty", { CLICKHOUSE_BACKUP_METRICS_ENABLED: "" }],
+      ["whitespace", { CLICKHOUSE_BACKUP_METRICS_ENABLED: "   " }],
+      ["true", { CLICKHOUSE_BACKUP_METRICS_ENABLED: "true" }],
+      ["TRUE", { CLICKHOUSE_BACKUP_METRICS_ENABLED: "TRUE" }],
+      ["padded true", { CLICKHOUSE_BACKUP_METRICS_ENABLED: " true " }],
+      ["1", { CLICKHOUSE_BACKUP_METRICS_ENABLED: "1" }],
+      ["unparseable", { CLICKHOUSE_BACKUP_METRICS_ENABLED: "banana" }],
+    ];
+
+    it.each(collectingCases)("collects when %s", (_label, env) => {
+      expect(metrics.shouldCollectBackupMetrics(env)).toBe(true);
+    });
+
+    const optedOutValues: string[] = [
+      "false",
+      "FALSE",
+      "  false  ",
+      "0",
+      "no",
+      "off",
+    ];
+
+    it.each(optedOutValues)("skips when explicitly %s", (value) => {
+      expect(
+        metrics.shouldCollectBackupMetrics({
+          CLICKHOUSE_BACKUP_METRICS_ENABLED: value,
+        }),
+      ).toBe(false);
     });
   });
 });

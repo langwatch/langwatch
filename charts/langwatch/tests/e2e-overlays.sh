@@ -219,11 +219,16 @@ test_backup_metrics_gate() {
 
   local backup_flags="--set autogen.enabled=true --set clickhouse.objectStorage.bucket=b --set clickhouse.objectStorage.region=us-east-1"
 
-  # Off by default: no backups configured -> no backup-log querying.
+  # No backups configured -> the chart opts OUT explicitly. The app defaults to
+  # collecting (an unset var must never disarm production monitoring), so the
+  # chart has to say "false" to stop the workers querying a table that this
+  # deployment does not have.
   local off
-  off=$(tmpl_only "templates/workers/deployment.yaml" --set autogen.enabled=true)
-  assert_not_contains "default: workers do not set backup metrics" \
-    "$off" "CLICKHOUSE_BACKUP_METRICS_ENABLED"
+  off=$(tmpl_only "templates/workers/deployment.yaml" --set autogen.enabled=true \
+    | grep -A1 "name: CLICKHOUSE_BACKUP_METRICS_ENABLED")
+  assert_contains "default: workers opt out of backup metrics" \
+    "$off" "name: CLICKHOUSE_BACKUP_METRICS_ENABLED"
+  assert_contains "default: backup metrics value false" "$off" '"false"'
 
   # Chart-managed backups on -> metrics auto-enabled on the workers (which emit
   # the gauges), so the alert never fires spuriously against a live backup setup.
@@ -243,6 +248,7 @@ test_backup_metrics_gate() {
     | grep -A1 "name: CLICKHOUSE_BACKUP_METRICS_ENABLED")
   assert_contains "metricsEnabled override: workers set backup metrics" \
     "$forced" "name: CLICKHOUSE_BACKUP_METRICS_ENABLED"
+  assert_contains "metricsEnabled override: backup metrics value true" "$forced" '"true"'
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
