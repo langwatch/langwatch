@@ -376,7 +376,12 @@ describe("createProjectMetadataReactor()", () => {
         expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
       });
 
-      it("bootstraps only after the metadata write has committed", async () => {
+      it("bootstraps independently of the metadata write", async () => {
+        // The bootstrap is no longer sequenced behind the metadata write: it
+        // has to run for projects whose metadata needs no update at all. Its
+        // own try/catch, not its position, is what keeps a bootstrap failure
+        // from being reported as a metadata failure.
+        mockProjects.updateMetadata.mockRejectedValue(new Error("pg down"));
         const reactor = createProjectMetadataReactor(deps);
 
         await reactor.handle(
@@ -384,11 +389,31 @@ describe("createProjectMetadataReactor()", () => {
           createContext(tenantId, createFoldState()),
         );
 
-        expect(
-          bootstrapTopicClustering.mock.invocationCallOrder[0]!,
-        ).toBeGreaterThan(
-          mockProjects.updateMetadata.mock.invocationCallOrder[0]!,
+        expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
+      });
+    });
+
+    describe("when the project is already marked as integrated", () => {
+      it("still re-asserts the clustering schedule", async () => {
+        // The regression that made a deploy-time backfill necessary: an
+        // established project returned early, so a project that lost its
+        // schedule never got it back from ingest. Bootstrap is level-triggered
+        // now, so every real trace re-asserts it.
+        mockProjects.getById.mockResolvedValue({
+          id: tenantId,
+          firstMessage: true,
+          integrated: true,
+        });
+        const reactor = createProjectMetadataReactor(deps);
+
+        await reactor.handle(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState()),
         );
+
+        expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
+        // Still no redundant metadata write for an already-marked project.
+        expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
       });
     });
 
@@ -448,8 +473,8 @@ describe("createProjectMetadataReactor()", () => {
     let bootstrapTopicClustering: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
-      // Not yet integrated, so the reactor still writes metadata — the
-      // bootstrap must stay behind the first-message transition alone.
+      // Not yet integrated, so the reactor still writes metadata. The
+      // bootstrap is no longer gated on the first-message transition.
       mockProjects.getById.mockResolvedValue({
         id: tenantId,
         firstMessage: true,
@@ -464,7 +489,11 @@ describe("createProjectMetadataReactor()", () => {
     });
 
     describe("when another trace arrives", () => {
-      it("updates the metadata without bootstrapping clustering again", async () => {
+      it("updates the metadata and re-asserts the clustering schedule", async () => {
+        // Re-asserting is the point: it is idempotent at the process (a
+        // bootstrap-trigger request cannot move the wake or start a run) and
+        // rate-limited at the injected implementation, so the reconciliation
+        // costs at most one commit per project per claim window.
         const reactor = createProjectMetadataReactor(deps);
 
         await reactor.handle(
@@ -473,7 +502,7 @@ describe("createProjectMetadataReactor()", () => {
         );
 
         expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
-        expect(bootstrapTopicClustering).not.toHaveBeenCalled();
+        expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
       });
     });
   });

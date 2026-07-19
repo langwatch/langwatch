@@ -96,7 +96,7 @@ describe("TopicClusteringStatusService", () => {
      */
     it("reports the run as in flight", async () => {
       const status = await serviceReading({
-        projection: projectionRow({ LastRequestedAt: NOW - 5_000 }),
+        projection: projectionRow({ LastRequestedAt: NOW - 5_000, LastRequestTrigger: "manual" }),
       }).getByProjectId({ projectId: PROJECT_ID });
 
       expect(status.isRunInFlight).toBe(true);
@@ -107,16 +107,35 @@ describe("TopicClusteringStatusService", () => {
       const status = await serviceReading({
         projection: projectionRow({
           LastRequestedAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS + 1,
+          LastRequestTrigger: "manual",
         }),
       }).getByProjectId({ projectId: PROJECT_ID });
 
       expect(status.isRunInFlight).toBe(true);
     });
 
+    it("does not report a bootstrap request as a run in flight", async () => {
+      // A bootstrap request deliberately starts no run — it only ensures the
+      // process exists and its wake is scheduled. Counting it would show
+      // "Running" for a project where nothing runs, and make "Run now"
+      // refuse. It also latches: bootstrap is re-asserted on ingest, so this
+      // would never clear for an active project.
+      const status = await serviceReading({
+        projection: projectionRow({
+          LastRequestedAt: NOW - 5_000,
+          LastRequestTrigger: "bootstrap",
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.isRunInFlight).toBe(false);
+      expect(status.isInProgress).toBe(false);
+    });
+
     it("stops reporting it in flight once the scheduler would abandon it", async () => {
       const status = await serviceReading({
         projection: projectionRow({
           LastRequestedAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS,
+          LastRequestTrigger: "manual",
         }),
       }).getByProjectId({ projectId: PROJECT_ID });
 
@@ -129,6 +148,7 @@ describe("TopicClusteringStatusService", () => {
       const status = await serviceReading({
         projection: projectionRow({
           LastRequestedAt: NOW - 10_000,
+          LastRequestTrigger: "manual",
           LastRunAt: NOW - 1_000,
           LastRunOutcome: "completed",
         }),
@@ -141,6 +161,7 @@ describe("TopicClusteringStatusService", () => {
       const status = await serviceReading({
         projection: projectionRow({
           LastRequestedAt: NOW - 1_000,
+          LastRequestTrigger: "manual",
           LastRunAt: NOW - 1_000,
         }),
       }).getByProjectId({ projectId: PROJECT_ID });
@@ -154,6 +175,7 @@ describe("TopicClusteringStatusService", () => {
       const status = await serviceReading({
         projection: projectionRow({
           LastRequestedAt: NOW - 10_000,
+          LastRequestTrigger: "manual",
           LastRunAt: NOW - 5_000,
           InProgressRunId: "20260717T093000",
           InProgressStartedAt: NOW - 10_000,
@@ -281,7 +303,7 @@ describe("TopicClusteringStatusService", () => {
   describe("when the manual trigger asks whether a run is already underway", () => {
     it("answers yes while a request is outstanding", async () => {
       const service = serviceReading({
-        projection: projectionRow({ LastRequestedAt: NOW - 5_000 }),
+        projection: projectionRow({ LastRequestedAt: NOW - 5_000, LastRequestTrigger: "manual" }),
       });
 
       await expect(
@@ -293,6 +315,7 @@ describe("TopicClusteringStatusService", () => {
       const service = serviceReading({
         projection: projectionRow({
           LastRequestedAt: NOW - 5_000,
+          LastRequestTrigger: "manual",
           LastRunAt: NOW - 1_000,
           LastRunOutcome: "completed",
         }),

@@ -95,7 +95,12 @@ export class TopicClusteringStatusService {
       lastRunSubtopicsCount: projection?.LastRunSubtopicsCount ?? 0,
       isInProgress,
       isRunInFlight:
-        isInProgress || this.hasUnansweredRequest({ lastRequestedAt, lastRunAt }),
+        isInProgress ||
+        this.hasUnansweredRequest({
+          lastRequestedAt,
+          lastRunAt,
+          lastRequestTrigger: projection?.LastRequestTrigger ?? null,
+        }),
       nextRunAt: nextWakeAt?.getTime() ?? null,
     };
   }
@@ -113,9 +118,18 @@ export class TopicClusteringStatusService {
   private hasUnansweredRequest(params: {
     lastRequestedAt: number | null;
     lastRunAt: number | null;
+    lastRequestTrigger: string | null;
   }): boolean {
-    const { lastRequestedAt, lastRunAt } = params;
+    const { lastRequestedAt, lastRunAt, lastRequestTrigger } = params;
     if (lastRequestedAt === null) return false;
+    // Only a MANUAL ask can go unanswered. A bootstrap request deliberately
+    // starts no run -- it just ensures the process exists and its wake is
+    // scheduled -- so treating one as in-flight reports "Running" for a
+    // project where nothing is running, and makes "Run now" refuse. Bootstrap
+    // requests are also re-asserted on ingest, so this would latch on
+    // permanently for every active project rather than clearing after the
+    // stale window.
+    if (lastRequestTrigger !== "manual") return false;
     if (lastRunAt !== null && lastRunAt >= lastRequestedAt) return false;
     return this.now() - lastRequestedAt < TOPIC_CLUSTERING_STALE_RUN_MS;
   }
