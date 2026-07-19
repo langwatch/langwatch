@@ -873,37 +873,12 @@ export const fetchTopicsBatchClustering = async (
     "uploading traces data for project",
   );
 
-  const response = await postToTopicClustering({
+  return await postToTopicClustering({
     projectId,
     url: `${baseUrl}/topics/batch_clustering`,
     body: params,
     kind: "topic_clustering_batch",
   });
-
-  if (!response.ok) {
-    let body = await response.text();
-    try {
-      body = JSON.stringify(JSON.parse(body), null, 2)
-        .split("\n")
-        .slice(0, 10)
-        .join("\n");
-    } catch {
-      /* this is just a safe json parse fallback */
-    }
-    // Ours by default. The body often quotes an upstream provider error, but
-    // quoting is not evidence — attributing a 5xx to the customer's credentials
-    // on the strength of the text inside it is how this used to tell people to
-    // rotate working keys during our own outages. The message keeps the detail
-    // for operators; the customer is told the code only.
-    throw new ClusteringError(
-      CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
-      `Failed to fetch topics batch clustering (langevals): ${response.statusText}\n\n${body}`,
-    );
-  }
-
-  const result = (await response.json()) as TopicClusteringResponse;
-
-  return result;
 };
 
 export const fetchTopicsIncrementalClustering = async (
@@ -927,34 +902,12 @@ export const fetchTopicsIncrementalClustering = async (
     "uploading traces data for project",
   );
 
-  const response = await postToTopicClustering({
+  return await postToTopicClustering({
     projectId,
     url: `${baseUrl}/topics/incremental_clustering`,
     body: params,
     kind: "topic_clustering_incremental",
   });
-
-  if (!response.ok) {
-    let body = await response.text();
-    try {
-      body = JSON.stringify(JSON.parse(body), null, 2)
-        .split("\n")
-        .slice(0, 10)
-        .join("\n");
-    } catch {
-      /* this is just a safe json parse fallback */
-    }
-
-    // Ours by default — see the batch path above.
-    throw new ClusteringError(
-      CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
-      `Failed to fetch topics incremental clustering (langevals): ${response.statusText}\n\n${body}`,
-    );
-  }
-
-  const result = (await response.json()) as TopicClusteringResponse;
-
-  return result;
 };
 
 /**
@@ -967,7 +920,7 @@ const postToTopicClustering = async (opts: {
   url: string;
   body: BatchClusteringParams | IncrementalClusteringParams;
   kind: "topic_clustering_batch" | "topic_clustering_incremental";
-}) => {
+}): Promise<TopicClusteringResponse> => {
   // Every clustering call carries a deadline — see
   // TOPIC_CLUSTERING_REQUEST_DEADLINE_MS for why an unbounded one is a
   // data-loss race and not just a slow request.
@@ -981,21 +934,55 @@ const postToTopicClustering = async (opts: {
   }, TOPIC_CLUSTERING_REQUEST_DEADLINE_MS);
   deadline.unref?.();
 
+  const label =
+    opts.kind === "topic_clustering_batch" ? "batch" : "incremental";
+
+  // The WHOLE exchange lives inside the deadline: staging upload, request,
+  // and the body read. Clearing the timer as soon as fetch resolved left
+  // response.json() unbounded — a streaming upstream that returns 200
+  // headers then trickles a large body could outlive the 20-minute lease,
+  // reopening exactly the double-lease race the deadline exists to prevent.
   try {
-    return await stagedLangevalsFetch({
+    const response = await stagedLangevalsFetch({
       url: opts.url,
       body: opts.body,
       projectId: opts.projectId,
       kind: opts.kind,
       signal: controller.signal,
     });
+
+    if (!response.ok) {
+      let body = await response.text();
+      try {
+        body = JSON.stringify(JSON.parse(body), null, 2)
+          .split("\n")
+          .slice(0, 10)
+          .join("\n");
+      } catch {
+        /* this is just a safe json parse fallback */
+      }
+      // Ours by default. The body often quotes an upstream provider error,
+      // but quoting is not evidence — attributing a 5xx to the customer's
+      // credentials on the strength of the text inside it is how this used to
+      // tell people to rotate working keys during our own outages. The
+      // message keeps the detail for operators; the customer is told the code
+      // only.
+      throw new ClusteringError(
+        CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
+        `Failed to fetch topics ${label} clustering (langevals): ${response.statusText}\n\n${body}`,
+      );
+    }
+
+    return (await response.json()) as TopicClusteringResponse;
   } catch (error) {
     // Our own deadline firing is a fact we know at the throw site, so it is
     // classified here rather than guessed at from the message later (see
     // clustering-error.ts). It is the clustering service failing to answer in
     // time — ours, not the customer's, and worth retrying: the outbox
     // redelivers the intent and the next attempt gets a fresh deadline.
-    if (controller.signal.aborted) {
+    // A ClusteringError from the !ok branch keeps its own (identically
+    // retryable) identity even if the timer happens to fire while it unwinds.
+    if (controller.signal.aborted && !(error instanceof ClusteringError)) {
       logger.warn(
         {
           projectId: opts.projectId,

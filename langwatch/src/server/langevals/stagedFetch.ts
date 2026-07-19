@@ -123,6 +123,11 @@ export async function stagedLangevalsFetch(
     keyPrefix: `${STAGING_PREFIX}/${projectId}/${kind}`,
     serialized,
     ttlSeconds,
+    // The upload is part of the deadline-bounded exchange: it runs BEFORE
+    // the fetch, so leaving it unsignalled would let a stalled put spend the
+    // caller's whole deadline (and, for topic clustering, its lease) before
+    // the abort could bite.
+    ...(signal ? { signal } : {}),
   });
 
   logger.info(

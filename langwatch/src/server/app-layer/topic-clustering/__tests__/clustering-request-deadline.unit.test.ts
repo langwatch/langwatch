@@ -175,6 +175,45 @@ describe("topic clustering langevals requests", () => {
     });
   });
 
+  describe("given a response whose body never finishes streaming", () => {
+    describe("when the deadline elapses", () => {
+      it("aborts the body read instead of letting it outlive the lease", async () => {
+        // 200 headers arrive promptly; the JSON body trickles forever. The
+        // deadline used to be cleared the moment fetch resolved, so this
+        // exact shape ran unbounded — past the lease, into the double-lease
+        // batch-delete race the deadline exists to prevent.
+        stagedLangevalsFetchMock.mockImplementation(
+          ({ signal }: { signal?: AbortSignal }) =>
+            Promise.resolve({
+              ok: true,
+              json: () =>
+                new Promise((_resolve, reject) => {
+                  signal?.addEventListener("abort", () => {
+                    reject(
+                      Object.assign(new Error("The operation was aborted"), {
+                        name: "AbortError",
+                      }),
+                    );
+                  });
+                }),
+            }),
+        );
+
+        const settled = fetchTopicsBatchClustering("proj-1", batchParams).catch(
+          (error) => error,
+        );
+
+        await vi.advanceTimersByTimeAsync(TOPIC_CLUSTERING_REQUEST_DEADLINE_MS);
+        const error = await settled;
+
+        expect(classifyClusteringError(error)).toEqual({
+          code: CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
+          userActionable: false,
+        });
+      });
+    });
+  });
+
   describe("given a clustering call that answers before the deadline", () => {
     describe("when the response arrives", () => {
       it("returns the clustering result untouched", async () => {
