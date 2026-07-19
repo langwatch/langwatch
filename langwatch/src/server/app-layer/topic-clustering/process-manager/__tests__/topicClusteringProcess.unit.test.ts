@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
+import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
 import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
 import { topicClusteringPM } from "~/server/event-sourcing/pipelines/topic-clustering-processing/pipeline";
 
@@ -23,6 +24,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * undeclared-event guard) rather than a re-implementation. The executor is
  * a stub: evolve never dispatches.
  */
+// buildProcessDefinition is untyped over State (the runtime treats every
+// process as unknown); the cast narrows the whole harness once so each
+// evolution's state reads as the domain type.
 const definition = buildProcessDefinition(
   buildProcessManager<TopicClusteringProcessingEvent>({
     name: TOPIC_CLUSTERING_PROCESS_NAME,
@@ -33,9 +37,9 @@ const definition = buildProcessDefinition(
       },
     }),
   }).config,
-);
+) as ProcessDefinition<TopicClusteringProcessState>;
 
-const initialState = definition.initialState as TopicClusteringProcessState;
+const initialState = definition.initialState;
 
 const REF = {
   processName: TOPIC_CLUSTERING_PROCESS_NAME,

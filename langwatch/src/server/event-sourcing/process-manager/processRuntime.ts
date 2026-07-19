@@ -38,12 +38,6 @@ export interface GeneratedProcessArtifacts<E extends Event> {
 }
 
 /**
- * The runtime-facing ProcessDefinition a builder config generates. Exported
- * so tests (and future domains' harnesses) can drive the EXACT evolve the
- * runtime runs — clamping, schedule arming, undeclared-event guard and all —
- * instead of re-implementing it around the raw handlers.
- */
-/**
  * The outbox intent handlers a builder config generates: schema-validate the
  * leased payload, then hand it to the declared executor with the dispatch
  * context. Exported for the same reason as {@link buildProcessDefinition}.
@@ -67,6 +61,12 @@ export function buildIntentHandlers(
   return handlers;
 }
 
+/**
+ * The runtime-facing ProcessDefinition a builder config generates. Exported
+ * so tests (and future domains' harnesses) can drive the EXACT evolve the
+ * runtime runs — clamping, schedule arming, undeclared-event guard and all —
+ * instead of re-implementing it around the raw handlers.
+ */
 export function buildProcessDefinition(
   config: ProcessManagerDefinition["config"],
 ): ProcessDefinition<unknown> {

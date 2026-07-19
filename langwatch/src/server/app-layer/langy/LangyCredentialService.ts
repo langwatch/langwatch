@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Session } from "~/server/auth";
 import { getApp } from "~/server/app-layer";
 import { LANGY_GITHUB_ENABLED } from "./langyGithub.enabled";
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { captureException, toError } from "~/utils/posthogErrorCapture";

@@ -16,7 +16,7 @@ import {
   redactActionParamsFor,
 } from "~/server/app-layer/automations/providers/registry";
 import { getApp } from "~/server/app-layer/app";
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
 import {
@@ -202,7 +202,7 @@ function toTemplateTRPCError(err: unknown): TRPCError {
   // as a DispatchError with an already-actionable message — lift it onto the
   // typed HandledError channel so the UI shows a clean 4xx, not a generic 500.
   const domainError =
-    err instanceof HandledError
+    HandledError.isHandled(err)
       ? err
       : isDispatchError(err)
         ? new NotificationDeliveryError(err.message)

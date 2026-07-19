@@ -233,6 +233,7 @@ describe("parseEvaluationResult", () => {
           code: "evaluator_execution_error",
           kind: "evaluator_execution_error",
           httpStatus: 401,
+          fault: "customer",
           meta: { httpStatus: 401 },
           traceId: "trace-1",
           spanId: "span-1",
@@ -251,6 +252,7 @@ describe("parseEvaluationResult", () => {
           code: "evaluator_execution_error",
           kind: "evaluator_execution_error",
           httpStatus: 401,
+          fault: "customer",
           meta: {},
           traceId: undefined,
           spanId: undefined,
@@ -266,6 +268,29 @@ describe("parseEvaluationResult", () => {
         });
 
         expect(result.domainError?.kind).toBe("evaluator_execution_error");
+      });
+
+      it("preserves fault, tips and docsUrl through the parse", () => {
+        const result = parseEvaluationResult({
+          status: "error",
+          domainError: {
+            code: "evaluator_execution_error",
+            httpStatus: 502,
+            fault: "provider",
+            tips: ["Check the evaluator logs"],
+            docsUrl: "https://docs.langwatch.ai/evaluations",
+            reasons: [
+              { code: "rate_limited", kind: "rate_limited", tips: ["Back off"] },
+            ],
+          },
+        });
+
+        expect(result.domainError).toMatchObject({
+          fault: "provider",
+          tips: ["Check the evaluator logs"],
+          docsUrl: "https://docs.langwatch.ai/evaluations",
+          reasons: [{ code: "rate_limited", tips: ["Back off"] }],
+        });
       });
 
       it("drops the domainError when httpStatus is missing", () => {

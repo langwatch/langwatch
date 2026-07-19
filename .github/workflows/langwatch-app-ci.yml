@@ -421,15 +421,6 @@ jobs:
             ${{ runner.os }}-vite-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-
             ${{ runner.os }}-vite-
 
-      # Cache Turbo build outputs
-      - name: Cache Turbo
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: langwatch/.turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
-
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
       # its postinstall always falls back to `node-gyp rebuild`. With
       # pnpm/action-setup v6's npm-bootstrap path, node-gyp isn't on PATH

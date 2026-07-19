@@ -1109,3 +1109,46 @@ describe("ClickHouseTraceService", () => {
     });
   });
 });
+
+describe("isClickHouseMemoryLimitError", () => {
+  it("recognizes the resilient client's translated query_memory_exceeded", async () => {
+    const { isClickHouseMemoryLimitError } = await import(
+      "../clickhouse-trace.service"
+    );
+    const { QueryMemoryExceededError } = await import(
+      "~/server/app-layer/traces/errors"
+    );
+
+    const translated = new QueryMemoryExceededError({
+      reasons: [new Error("some driver detail without the fragment")],
+    });
+    expect(isClickHouseMemoryLimitError(translated)).toBe(true);
+  });
+
+  it("recognizes a handled error wrapping a raw MEMORY_LIMIT_EXCEEDED in reasons", async () => {
+    const { isClickHouseMemoryLimitError } = await import(
+      "../clickhouse-trace.service"
+    );
+    const { ClickHouseUnavailableError } = await import(
+      "~/server/app-layer/traces/errors"
+    );
+
+    const wrapped = new ClickHouseUnavailableError({
+      reasons: [new Error("Code: 241. DB::Exception: ... (MEMORY_LIMIT_EXCEEDED)")],
+    });
+    expect(isClickHouseMemoryLimitError(wrapped)).toBe(true);
+  });
+
+  it("does not match an unrelated handled error", async () => {
+    const { isClickHouseMemoryLimitError } = await import(
+      "../clickhouse-trace.service"
+    );
+    const { ClickHouseUnavailableError } = await import(
+      "~/server/app-layer/traces/errors"
+    );
+
+    expect(isClickHouseMemoryLimitError(new ClickHouseUnavailableError())).toBe(
+      false,
+    );
+  });
+});

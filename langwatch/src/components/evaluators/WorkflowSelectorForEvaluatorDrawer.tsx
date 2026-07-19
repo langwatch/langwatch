@@ -22,7 +22,6 @@ import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { DEFAULT_MODEL } from "~/utils/constants";
 import { trackEvent } from "~/utils/tracking";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import type { Workflow } from "~/optimization_studio/types/dsl";
@@ -127,22 +126,15 @@ export function WorkflowSelectorForEvaluatorDrawer(
       if (!project) return;
 
       try {
-        // Create workflow from custom_evaluator template
+        // Create workflow from custom_evaluator template. LLM nodes without
+        // a model are materialized server-side from the project's resolved
+        // default.
         const template = customEvaluatorTemplate;
         const newWorkflow: Workflow = {
           ...template,
           name: data.name,
           description: data.description,
           icon: data.icon ?? defaultIcon,
-          default_llm: {
-            ...template.default_llm,
-            // Project-level default-model column is gone; the workflow
-            // engine resolves the actual model via the cascade at run
-            // time. We seed the new workflow's default with the global
-            // DEFAULT_MODEL placeholder so the editor renders something
-            // sensible before the user picks.
-            model: DEFAULT_MODEL,
-          },
         };
 
         const createdWorkflow = await createWorkflowMutation.mutateAsync({

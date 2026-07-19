@@ -37,6 +37,12 @@ Feature: The process substrate tells operators when it is in trouble
     And an alert fires for final failures
     And a skipped run counts as skipped, never as a failure
 
+  Scenario: A swallowed outcome write is counted, not just logged
+    Given a clustering page finished but recording its outcome failed
+    Then the loss increments a metric naming which write was lost
+    And a lost terminal write raises an alert, because the run wedges until the next daily wake
+    And a lost run-started announcement is counted but never pages anyone
+
   Scenario: Every alert ships with the deployment that ships the metrics
     Given a vanilla helm install with metrics enabled
     Then the alert rules are loaded by the bundled Prometheus

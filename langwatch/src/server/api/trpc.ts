@@ -30,6 +30,7 @@ interface CreateNextContextOptions {
   res: any;
 }
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import type { OrganizationUserRole } from "@prisma/client";
@@ -37,7 +38,6 @@ import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
 import superjson from "superjson";
 import { ZodError } from "zod";
-import { HandledError } from "~/server/app-layer/handled-error";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -146,7 +146,7 @@ export function errorFormatterForTesting({
     : null;
 
   const domainError =
-    error.cause instanceof HandledError ? error.cause.serialize() : null;
+    HandledError.isHandled(error.cause) ? error.cause.serialize() : null;
 
   // Surface ModelNotConfiguredError on the wire so the frontend
   // interceptor in `utils/trpcError.ts::extractMissingModelInfo` can
@@ -198,11 +198,11 @@ export function errorFormatterForTesting({
     error.code === "INTERNAL_SERVER_ERROR" ||
     shape?.data?.code === "INTERNAL_SERVER_ERROR";
   const message =
-    isInternalServerError && !(error.cause instanceof HandledError)
+    isInternalServerError && !HandledError.isHandled(error.cause)
       ? HandledError.toUserMessage(error.cause)
       : shape.message;
   const shapeData = { ...shape.data };
-  if (isInternalServerError && !(error.cause instanceof HandledError)) {
+  if (isInternalServerError && !HandledError.isHandled(error.cause)) {
     // tRPC includes stacks in development error shapes. Local callers should
     // exercise the same safe wire contract as production callers.
     delete shapeData.stack;
@@ -518,7 +518,7 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
  */
 const handledErrorMiddleware = t.middleware(async ({ next }) => {
   const result = await next();
-  if (!result.ok && result.error.cause instanceof HandledError) {
+  if (!result.ok && HandledError.isHandled(result.error.cause)) {
     const domainError = result.error.cause;
     throw new TRPCError({
       code: handledErrorToTRPCCode(domainError),
@@ -604,20 +604,34 @@ export function handleTrpcCallLogging({
         : 500;
     logData.statusCode = resolvedStatus;
 
-    // Include handled error code in log data for structured filtering
-    if (
-      result.error instanceof TRPCError &&
-      result.error.cause instanceof HandledError
-    ) {
-      logData.handledErrorCode = result.error.cause.code;
+    const cause =
+      result.error instanceof TRPCError ? result.error.cause : undefined;
+    // isHandled also matches an instance from a second copy of the package,
+    // which bare `instanceof` misses — see its brand check.
+    const handledCause = HandledError.isHandled(cause) ? cause : undefined;
+
+    // Include handled error code + fault in log data for structured
+    // filtering (and spike alerting on handledErrorCode).
+    if (handledCause) {
+      logData.handledErrorCode = handledCause.code;
+      logData.handledErrorFault = handledCause.fault;
     }
 
-    // Only capture 5xx errors (actual bugs)
-    if (resolvedStatus >= 500) {
+    // Only unhandled 5xx errors are captured as exceptions: handled errors
+    // are expected failure modes with typed causes, not bugs.
+    if (resolvedStatus >= 500 && !handledCause) {
       capture(toError(result.error));
     }
 
-    const logLevel = getLogLevelFromStatusCode(resolvedStatus);
+    // Handled errors log by fault attribution, not status: customer-fault
+    // errors are expected (warn — watched for spikes), while platform and
+    // provider failures are incidents worth an error line. Unhandled errors
+    // stay status-based.
+    const logLevel = handledCause
+      ? handledCause.fault === "customer"
+        ? "warn"
+        : "error"
+      : getLogLevelFromStatusCode(resolvedStatus);
     log[logLevel](logData, "trpc call");
   } else {
     log.info(logData, "trpc call");
@@ -651,8 +665,9 @@ function isSilencedCall(path: string, type: string): boolean {
 export const loggerMiddleware = t.middleware(
   async ({ path, type, input, ctx, next }) => {
     // Import context utilities dynamically to avoid circular deps
-    const { createContextFromTRPC, runWithContext } =
-      await import("../context/asyncContext");
+    const { createContextFromTRPC, runWithContext } = await import(
+      "../context/asyncContext"
+    );
 
     // Create context from tRPC context and input
     const requestContext = createContextFromTRPC(ctx, input as any);

@@ -20,7 +20,7 @@ import { cliToolResultSchema } from "@langwatch/cli-cards";
 import {
   handledErrorFromHerr,
   type HerrEnvelope,
-} from "~/server/app-layer/handled-error";
+} from "@langwatch/handled-error";
 
 /**
  * The signed envelope — mirrors frameauth's construction. `payload` is the exact
@@ -53,11 +53,14 @@ const herrEnvelopeWireSchema: z.ZodType<HerrEnvelope> = z.lazy(() =>
     meta: z.record(z.string(), z.unknown()).optional(),
     trace_id: z.string().optional(),
     span_id: z.string().optional(),
+    fault: z.enum(["customer", "platform", "provider"]).optional(),
+    tips: z.array(z.string()).optional(),
+    docs_url: z.string().optional(),
     reasons: z.array(herrEnvelopeWireSchema).optional(),
   }),
 );
-const receivedDomainErrorSchema = herrEnvelopeWireSchema.transform(
-  handledErrorFromHerr,
+const receivedDomainErrorSchema = herrEnvelopeWireSchema.transform((body) =>
+  handledErrorFromHerr(body),
 );
 
 /** A tool call the agent ran, in the compact shape the durable final carries. */

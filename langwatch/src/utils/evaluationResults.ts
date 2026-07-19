@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { SerializedHandledError } from "~/server/app-layer/handled-error";
+import type { SerializedHandledError } from "@langwatch/handled-error";
 
 /**
  * Parsed evaluation result with status information.
@@ -36,13 +36,23 @@ export type ParsedEvaluationResult = {
 const serializedReasonSchema: z.ZodType<{
   code: string;
   kind: string;
+  fault?: "customer" | "platform" | "provider";
+  traceId?: string;
+  spanId?: string;
   meta?: Record<string, unknown>;
+  tips?: readonly string[];
+  docsUrl?: string;
   reasons?: unknown[];
 }> = z.lazy(() =>
   z.object({
     code: z.string(),
     kind: z.string(),
+    fault: z.enum(["customer", "platform", "provider"]).optional(),
+    traceId: z.string().optional(),
+    spanId: z.string().optional(),
     meta: z.record(z.unknown()).optional(),
+    tips: z.array(z.string()).optional(),
+    docsUrl: z.string().optional(),
     reasons: z.array(serializedReasonSchema).optional(),
   }),
 );
@@ -56,6 +66,9 @@ const serializedHandledErrorSchema = z
     spanId: z.string().optional(),
     traceUrl: z.string().optional(),
     httpStatus: z.number(),
+    fault: z.enum(["customer", "platform", "provider"]).optional(),
+    tips: z.array(z.string()).optional(),
+    docsUrl: z.string().optional(),
     reasons: z.array(serializedReasonSchema).optional(),
   })
   .refine((value) => value.code !== undefined || value.kind !== undefined)
@@ -69,6 +82,9 @@ const serializedHandledErrorSchema = z
       traceId: value.traceId,
       spanId: value.spanId,
       traceUrl: value.traceUrl,
+      fault: value.fault ?? "customer",
+      ...(value.tips?.length ? { tips: value.tips } : {}),
+      ...(value.docsUrl ? { docsUrl: value.docsUrl } : {}),
       reasons: (value.reasons ?? []) as SerializedHandledError["reasons"],
     };
   });

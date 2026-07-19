@@ -7,6 +7,13 @@
 
 This manifest classifies every unimplemented-tagged scenario in `specs/evaluations-v3/` as KEEP / UPDATE / DELETE / DUPLICATE for downstream cull and binding waves. (The literal tag string is omitted from this prose so the brief's `grep -rh` convergence check counts only `.feature` files, not this manifest.)
 
+> **Stale citations (2026-07-19)**: four KEEP rows below cite
+> `experiments-v3/hooks/useEvaluatorMappings.ts`, which has since been deleted as
+> unreferenced (no importers). No replacement hook exists, so those verdicts rest
+> on an implementation that is no longer there and need re-deriving before they
+> are acted on. Note that `specs/evaluations-v3/` — the directory this manifest
+> classifies — does not exist in the tree either; that predates the deletion.
+
 ## Summary
 
 | Class | Count | % | Phase 1 action |

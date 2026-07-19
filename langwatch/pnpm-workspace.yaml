@@ -6,16 +6,19 @@ packages:
   # and zod-peer-dep'd, so it compiles against the app's own zod (3.25) via the
   # `zod/v4` subpath both majors ship.
   - "../packages/cli-cards"
+  # The handled-error contract (HandledError ⇔ Go herr), shared by the app,
+  # mcp-server, CLI and SDKs. Source-only, OTel peer-dep'd like cli-cards.
+  - "../packages/handled-error"
 
 minimumReleaseAge: 10080
-
+# Adding workspace packages forces a re-resolve; these shipped fresh releases
+# inside the age gate with no older version satisfying the requested ranges.
+# Version-pinned so only the pinned release bypasses the gate; drop each entry
+# once that version ages past it.
 minimumReleaseAgeExclude:
-  # Adding the @langwatch/automations workspace package forces a full
-  # re-resolve; these shipped fresh releases inside the age gate with no
-  # older version satisfying the requested ranges. Remove once they age.
-  - ws
-  - "@browserbasehq/sdk"
-  - "postcss"
+  - ws@8.21.1
+  - "@browserbasehq/sdk@2.16.0"
+  - postcss@8.5.19
 
 overrides:
   pino: ^10.3.0

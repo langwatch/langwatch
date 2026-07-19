@@ -186,7 +186,7 @@ v.sse(
 
 ## Error handling
 
-Throw `HandledError` subclasses (from `~/server/app-layer/handled-error`). The framework:
+Throw `HandledError` subclasses (from `@langwatch/handled-error`). The framework:
 
 1. Catches and serializes them with `code`, `meta`, `reasons`, `traceId`/`spanId`
 2. Catches `ZodError` and maps each issue to a `schema_failure` reason (cher-style)
