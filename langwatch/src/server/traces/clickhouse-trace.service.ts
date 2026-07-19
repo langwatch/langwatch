@@ -3315,7 +3315,7 @@ export function isClickHouseMemoryLimitError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   // The resilient client translates the raw driver error into a handled
   // `query_memory_exceeded`, wrapping the original in `reasons`.
-  if (error instanceof HandledError) {
+  if (HandledError.isHandled(error)) {
     return (
       error.code === "query_memory_exceeded" ||
       (error.reasons ?? []).some(isClickHouseMemoryLimitError)

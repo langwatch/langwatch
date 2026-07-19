@@ -6,6 +6,7 @@ import {
   handledErrorFromHerr,
   setTraceUrlProvider,
 } from "./index";
+import type { HandledErrorFault } from "./index";
 
 class TestError extends HandledError {
   declare readonly code: "test_error";
@@ -130,5 +131,127 @@ describe("NotFoundError", () => {
     expect(err.httpStatus).toBe(404);
     expect(err.meta).toMatchObject({ id: "abc" });
     expect(err.serialize().tips).toEqual(["Check the trace id"]);
+  });
+});
+
+/**
+ * Stand-in for a HandledError raised from a second copy of this package: same
+ * brand, same fields, same `serialize` — but not an instance of *this* copy's
+ * HandledError, exactly as a duplicated bundle produces. Next.js/turbopack does
+ * this across route and server boundaries, and bare `instanceof` misses it,
+ * which silently downgrades a handled 4xx to an unhandled 500.
+ */
+class DuplicatedHandledError extends Error {
+  readonly isHandled = true as const;
+  readonly meta: Record<string, unknown> = {};
+  readonly traceId: string | undefined = undefined;
+  readonly spanId: string | undefined = undefined;
+  readonly reasons: readonly Error[] = [];
+  readonly tips: readonly string[] = [];
+  readonly docsUrl: string | undefined = undefined;
+  readonly fault: HandledErrorFault = "customer";
+
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly httpStatus = 404,
+  ) {
+    super(message);
+    this.name = code;
+  }
+}
+
+describe("HandledError.isHandled", () => {
+  it("matches a real HandledError instance", () => {
+    expect(HandledError.isHandled(new TestError())).toBe(true);
+  });
+
+  it("matches an instance whose class identity the bundler duplicated", () => {
+    const duplicate = new DuplicatedHandledError("span_not_found", "gone");
+
+    // The premise: bare instanceof does not see it.
+    expect(duplicate instanceof HandledError).toBe(false);
+    expect(HandledError.isHandled(duplicate)).toBe(true);
+  });
+
+  it.each([
+    ["a plain Error", new Error("boom")],
+    ["a serialised payload with no brand", { code: "x", httpStatus: 500 }],
+    ["a non-true brand", { isHandled: "yes" }],
+    ["null", null],
+    ["undefined", undefined],
+    ["a string", "span_not_found"],
+  ])("rejects %s", (_label, value) => {
+    expect(HandledError.isHandled(value)).toBe(false);
+  });
+});
+
+describe("HandledError.isUnhandled", () => {
+  it("does not treat a duplicated HandledError as infrastructure failure", () => {
+    const duplicate = new DuplicatedHandledError("span_not_found", "gone");
+    expect(HandledError.isUnhandled(duplicate)).toBe(false);
+  });
+
+  it("still treats a plain Error as unhandled", () => {
+    expect(HandledError.isUnhandled(new Error("db exploded"))).toBe(true);
+  });
+});
+
+describe("HandledError.is", () => {
+  it("narrows to the concrete subclass within one module graph", () => {
+    expect(TestError.is(new TestError())).toBe(true);
+    expect(NotFoundError.is(new TestError())).toBe(false);
+  });
+
+  it("stays instanceof-only, so a duplicated identity does not match", () => {
+    // Subclass narrowing cannot be brand-based — the brand says "handled", not
+    // "which subclass". Cross-boundary callers compare `code` instead.
+    const duplicate = new DuplicatedHandledError("test_error", "gone");
+    expect(TestError.is(duplicate)).toBe(false);
+    expect(duplicate.code).toBe("test_error");
+  });
+});
+
+describe("HandledError.toUserMessage", () => {
+  it("forwards the message of a duplicated HandledError", () => {
+    const duplicate = new DuplicatedHandledError(
+      "span_not_found",
+      "That span no longer exists",
+    );
+    expect(HandledError.toUserMessage(duplicate)).toBe(
+      "That span no longer exists",
+    );
+  });
+
+  it("masks an unhandled error and reports it to the log callback", () => {
+    const unhandled = new Error("connection reset by peer");
+    const logged: unknown[] = [];
+
+    expect(HandledError.toUserMessage(unhandled, (e) => logged.push(e))).toBe(
+      "An unknown error occurred",
+    );
+    expect(logged).toEqual([unhandled]);
+  });
+});
+
+describe("serialising a reason chain", () => {
+  it("keeps the code of a duplicated nested reason instead of masking it", () => {
+    const error = new TestError("could not build preview", {
+      reasons: [new DuplicatedHandledError("span_not_found", "no span")],
+    });
+
+    expect(error.serialize().reasons).toEqual([
+      { code: "span_not_found", kind: "span_not_found", fault: "customer" },
+    ]);
+  });
+
+  it("still masks a genuinely unknown reason", () => {
+    const error = new TestError("could not build preview", {
+      reasons: [new Error("connection reset by peer")],
+    });
+
+    expect(error.serialize().reasons).toEqual([
+      { code: "unknown", kind: "unknown" },
+    ]);
   });
 });

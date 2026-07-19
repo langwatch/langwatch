@@ -120,6 +120,11 @@ export function setTraceUrlProvider(provider: TraceUrlProvider): void {
  * if (err instanceof EvaluationNotFoundError) { ...}  // same-process only
  * ```
  *
+ * For the broader "is this handled at all?" question, call
+ * {@link HandledError.isHandled} rather than `instanceof HandledError`: it also
+ * matches instances whose class identity a bundler duplicated, which bare
+ * `instanceof` misses (see {@link hasHandledErrorBrand}).
+ *
  * `meta` carries domain-specific context (e.g. `{ spanId }`) included in the
  * serialised shape. `httpStatus` is the suggested HTTP response code (defaults
  * to 500; subclasses set appropriate defaults). `traceId` / `spanId` are
@@ -211,12 +216,14 @@ export abstract class HandledError extends Error {
   }
 
   /**
-   * Type-safe guard: narrows `error` to the concrete subclass.
+   * Narrows `error` to the concrete subclass this is called on:
    *
-   * Usage:
    *   EvaluationNotFoundError.is(err)   // error is EvaluationNotFoundError
    *   NotFoundError.is(err)             // error is NotFoundError
-   *   HandledError.is(err)              // error is HandledError
+   *
+   * This is a plain `instanceof`, so it only holds within one module graph.
+   * At a boundary, ask {@link HandledError.isHandled} instead ("is this
+   * handled at all?"), or compare `err.code` to pick out one subclass.
    */
   static is<T extends HandledError>(
     this: abstract new (...args: never) => T,
@@ -225,14 +232,19 @@ export abstract class HandledError extends Error {
     return error instanceof this;
   }
 
-  /** Returns true when `error` is a known, handled HandledError. */
+  /**
+   * True when `error` is a handled error, including one whose class identity a
+   * bundler duplicated — see {@link hasHandledErrorBrand}. Prefer this over
+   * `instanceof HandledError` anywhere an error may have crossed a module
+   * boundary (route handlers, tRPC middleware, error formatters).
+   */
   static isHandled(error: unknown): error is HandledError {
-    return error instanceof HandledError;
+    return error instanceof HandledError || hasHandledErrorBrand(error);
   }
 
-  /** Returns true when `error` is an unhandled infrastructure Error. */
+  /** True when `error` is an unhandled infrastructure Error. */
   static isUnhandled(error: unknown): boolean {
-    return error instanceof Error && !(error instanceof HandledError);
+    return error instanceof Error && !HandledError.isHandled(error);
   }
 
   /**
@@ -252,10 +264,33 @@ export abstract class HandledError extends Error {
     error: unknown,
     log?: (error: unknown) => void,
   ): string {
-    if (error instanceof HandledError) return error.message;
+    if (HandledError.isHandled(error)) return error.message;
     log?.(error);
     return "An unknown error occurred";
   }
+}
+
+/**
+ * Structural test for the `isHandled` brand.
+ *
+ * `instanceof` compares class identity, which breaks when a bundler includes
+ * this module twice — Next.js/turbopack does this across route and server
+ * boundaries, so an error can be a genuine HandledError raised from a *second*
+ * copy of this class and still fail `instanceof`. Every instance carries the
+ * `isHandled` brand as an own property, so matching on that recognises those
+ * duplicates while still rejecting unrelated objects.
+ *
+ * Deliberately does not match a deserialised wire payload: that is a plain
+ * object with no prototype, so the methods this guard promises (`serialize`)
+ * would not exist. Wire payloads go through the boundary schema instead —
+ * `handledErrorFromHerr` here, or `isHandledErrorLike` in `packages/api`.
+ */
+function hasHandledErrorBrand(error: unknown): error is HandledError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { isHandled?: unknown }).isHandled === true
+  );
 }
 
 /**
@@ -288,7 +323,7 @@ export function handledErrorFromHerr(
 }
 
 function serializeReason(error: Error): SerializedReason {
-  if (error instanceof HandledError) {
+  if (HandledError.isHandled(error)) {
     return {
       code: error.code,
       // Deprecated back-compat alias — see SerializedReason.kind.

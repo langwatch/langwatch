@@ -53,7 +53,7 @@ type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
 /** Maps experiment handled errors to TRPCError using the code discriminant. */
 const mapExperimentError = (error: unknown): never => {
-  if (error instanceof HandledError && error.code === "experiment_not_found") {
+  if (HandledError.isHandled(error) && error.code === "experiment_not_found") {
     throw new TRPCError({ code: "NOT_FOUND", message: error.message });
   }
   throw error;

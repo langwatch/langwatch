@@ -202,7 +202,7 @@ function toTemplateTRPCError(err: unknown): TRPCError {
   // as a DispatchError with an already-actionable message — lift it onto the
   // typed HandledError channel so the UI shows a clean 4xx, not a generic 500.
   const domainError =
-    err instanceof HandledError
+    HandledError.isHandled(err)
       ? err
       : isDispatchError(err)
         ? new NotificationDeliveryError(err.message)
