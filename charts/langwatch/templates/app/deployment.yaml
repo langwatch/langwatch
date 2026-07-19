@@ -112,7 +112,7 @@ spec:
           command: ['sh', '-c']
           args:
             - |
-              cp -r /app/langwatch/.next/* /next-tmp/ 2>/dev/null || true
+              cp -r /app/platform/app/.next/* /next-tmp/ 2>/dev/null || true
               echo "Copied .next contents to writable volume"
           volumeMounts:
             - name: next-dir
@@ -325,7 +325,7 @@ spec:
             - name: tmp-dir
               mountPath: /tmp
             - name: next-dir
-              mountPath: /app/langwatch/.next
+              mountPath: /app/platform/app/.next
             {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
             # Stored-objects local-FS mount — renders ONLY when local-FS is
             # the active backend (dataplane disabled). Single-replica only

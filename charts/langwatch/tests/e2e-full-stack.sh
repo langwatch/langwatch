@@ -267,7 +267,7 @@ test_api() {
   local api_key="e2e-full-stack-test-key"
   info "Seeding database..."
   kc exec "$app_pod" -- \
-    sh -c "cd /app/langwatch && HOME=/tmp LANGWATCH_API_KEY=$api_key pnpm prisma:seed"
+    sh -c "cd /app/platform/app && HOME=/tmp LANGWATCH_API_KEY=$api_key pnpm prisma:seed"
   pass "Database seeded (org + project)"
 
   # Send a trace to the collector API
