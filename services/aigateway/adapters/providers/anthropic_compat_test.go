@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -156,8 +157,7 @@ func TestDispatch_MessagesReachesAnthropicCompatEndpoint(t *testing.T) {
 		hit    bool
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body := make([]byte, r.ContentLength)
-		_, _ = r.Body.Read(body)
+		body, _ := io.ReadAll(r.Body)
 		captured.hit = true
 		captured.path = r.URL.Path
 		captured.apiKey = r.Header.Get("x-api-key")
@@ -205,6 +205,75 @@ func TestDispatch_MessagesReachesAnthropicCompatEndpoint(t *testing.T) {
 	}
 	if string(resp.Body) != upstreamResponse {
 		t.Fatalf("response body was not the server's native bytes:\n got: %s\nwant: %s", resp.Body, upstreamResponse)
+	}
+}
+
+// Streaming sibling of the dispatch test above, keyless: DispatchStream
+// must reach the configured endpoint's /v1/messages, send no x-api-key
+// (unauthenticated self-hosted server), and forward the server's native
+// Anthropic SSE frames byte-for-byte — Anthropic SDK clients Zod-validate
+// every event and reject any reshaped chunk.
+//
+// Spec: specs/ai-gateway/custom-provider-base-url.feature
+func TestDispatchStream_MessagesStreamsFromKeylessAnthropicCompatEndpoint(t *testing.T) {
+	const sseBody = "event: message_start\n" +
+		`data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","content":[],"model":"qwen3-14b","usage":{"input_tokens":3,"output_tokens":0}}}` + "\n\n" +
+		"event: content_block_delta\n" +
+		`data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hi"},"index":0}` + "\n\n" +
+		"event: message_stop\n" +
+		`data: {"type":"message_stop"}` + "\n\n"
+
+	var captured struct {
+		path      string
+		apiKey    string
+		hasAPIKey bool
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured.path = r.URL.Path
+		captured.apiKey = r.Header.Get("x-api-key")
+		_, captured.hasAPIKey = r.Header["X-Api-Key"]
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(sseBody))
+	}))
+	defer srv.Close()
+
+	router, err := NewBifrostRouter(context.Background(), BifrostOptions{Logger: zap.NewNop(), InitialPoolSize: 10})
+	if err != nil {
+		t.Fatalf("NewBifrostRouter: %v", err)
+	}
+	defer router.Close()
+
+	iter, err := router.DispatchStream(context.Background(), &domain.Request{
+		Type:  domain.RequestTypeMessages,
+		Model: "claude-sonnet-5",
+		Body:  []byte(`{"model":"claude-sonnet-5","max_tokens":16,"stream":true,"messages":[{"role":"user","content":"hi"}]}`),
+	}, domain.Credential{
+		ID:         "mp-ant-keyless",
+		ProviderID: domain.ProviderAnthropic,
+		// No APIKey: unauthenticated self-hosted server.
+		Extra: map[string]string{"base_url": srv.URL},
+	})
+	if err != nil {
+		t.Fatalf("DispatchStream returned error: %v", err)
+	}
+	defer func() { _ = iter.Close() }()
+
+	var received []byte
+	for iter.Next(context.Background()) {
+		received = append(received, iter.Chunk()...)
+	}
+	if iterErr := iter.Err(); iterErr != nil {
+		t.Fatalf("stream iterator error: %v", iterErr)
+	}
+
+	if captured.path != "/v1/messages" {
+		t.Fatalf("upstream path = %q, want /v1/messages", captured.path)
+	}
+	if captured.hasAPIKey || captured.apiKey != "" {
+		t.Fatalf("x-api-key = %q sent for a keyless credential, want no header", captured.apiKey)
+	}
+	if string(received) != sseBody {
+		t.Fatalf("SSE frames were not forwarded byte-for-byte:\n got: %q\nwant: %q", received, sseBody)
 	}
 }
 
