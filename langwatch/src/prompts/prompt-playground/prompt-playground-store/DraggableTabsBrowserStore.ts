@@ -523,9 +523,11 @@ function createDraggableTabsBrowserStore(projectId: string) {
               tabs: [
                 {
                   id: newTabId,
-                  // sourceTab is an immer draft; unwrap it before cloning —
-                  // cloneDeep walks Ctor.prototype, which violates the draft
-                  // Proxy's invariants and throws.
+                  // sourceTab is an immer draft. current() takes a plain
+                  // snapshot so no draft proxy can escape into state, and
+                  // cloneDeep detaches that snapshot: current() structurally
+                  // shares untouched subtrees with the base state, so the
+                  // clone is what makes the split tab own its data outright.
                   data: cloneDeep(current(sourceTab).data),
                 },
               ],
