@@ -280,10 +280,10 @@ describe("listEvaluatorsCommand() failure shape under machine formats", () => {
     );
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     // Undo the preAction simulation: reset the recorded format and colour.
     chalk.level = savedChalkLevel;
-    applyOutputContext(resolveOutputOptions({}, {}));
+    await applyOutputContext(resolveOutputOptions({}, {}));
   });
 
   const printedStdout = (): string =>
@@ -292,7 +292,7 @@ describe("listEvaluatorsCommand() failure shape under machine formats", () => {
   it("emits the structured JSON error document under -o json, despite the -f commander default", async () => {
     // What preAction resolves for `-o json`: the -f default "table" sits on
     // the same options object and must not win.
-    applyOutputContext(resolveOutputOptions({ output: "json", format: "table" }, {}));
+    await applyOutputContext(resolveOutputOptions({ output: "json", format: "table" }, {}));
 
     await expect(
       listEvaluatorsCommand({ output: "json", format: "table" }),
@@ -304,7 +304,7 @@ describe("listEvaluatorsCommand() failure shape under machine formats", () => {
   });
 
   it("emits the structured JSON error document under --agent, despite the -f commander default", async () => {
-    applyOutputContext(resolveOutputOptions({ agent: true, format: "table" }, {}));
+    await applyOutputContext(resolveOutputOptions({ agent: true, format: "table" }, {}));
 
     await expect(
       listEvaluatorsCommand({ agent: true, format: "table" }),
@@ -315,7 +315,7 @@ describe("listEvaluatorsCommand() failure shape under machine formats", () => {
   });
 
   it("still emits JSON errors when a human passes -f json explicitly", async () => {
-    applyOutputContext(resolveOutputOptions({ format: "json" }, {}));
+    await applyOutputContext(resolveOutputOptions({ format: "json" }, {}));
 
     await expect(
       listEvaluatorsCommand({ format: "json" }),
@@ -326,7 +326,7 @@ describe("listEvaluatorsCommand() failure shape under machine formats", () => {
   });
 
   it("keeps the human error block when no machine format was asked for", async () => {
-    applyOutputContext(resolveOutputOptions({ format: "table" }, {}));
+    await applyOutputContext(resolveOutputOptions({ format: "table" }, {}));
 
     await expect(
       listEvaluatorsCommand({ format: "table" }),

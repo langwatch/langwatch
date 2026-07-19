@@ -12,6 +12,9 @@ const config = tseslint.config(
             // Plain-node build scripts run by copy-types.sh — outside the
             // eslint tsconfig project, like the shell script that calls them.
             "scripts/**/*.mjs",
+            // Startup profiling preload hook — plain CJS, likewise outside
+            // the tsconfig project.
+            "scripts/**/*.cjs",
         ],
     },
     eslint.configs.recommended,
