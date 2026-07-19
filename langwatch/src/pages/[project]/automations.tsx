@@ -23,7 +23,7 @@ import {
   TrendingUp,
   Zap,
 } from "react-feather";
-import { CLIENT_PROVIDERS } from "~/automations/providers/client";
+import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { HoverableBigText } from "~/components/HoverableBigText";
 import { AutomationsHistory } from "~/features/automations/components/page/AutomationsHistory";

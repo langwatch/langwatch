@@ -194,12 +194,12 @@ func (a changePollerAdapter) PollChanges(ctx context.Context, organizationID, si
 	out := make([]authresolver.CacheChange, len(cs))
 	for i, c := range cs {
 		out[i] = authresolver.CacheChange{
-			Kind:                 c.Kind,
-			VirtualKeyID:         c.VirtualKeyID,
-			BudgetID:             c.BudgetID,
-			ProviderCredentialID: c.ProviderCredentialID,
-			ProjectID:            c.ProjectID,
-			Revision:             c.Revision,
+			Kind:            c.Kind,
+			VirtualKeyID:    c.VirtualKeyID,
+			BudgetID:        c.BudgetID,
+			ModelProviderID: c.ModelProviderID,
+			ProjectID:       c.ProjectID,
+			Revision:        c.Revision,
 		}
 	}
 	return out, next, nil

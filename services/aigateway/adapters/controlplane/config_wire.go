@@ -4,6 +4,11 @@ import "github.com/langwatch/langwatch/services/aigateway/domain"
 
 // configWire matches the JSON shape returned by GET /api/internal/gateway/config/:vk_id.
 type configWire struct {
+	// ProjectID is the trace-export project, emitted by the control-plane
+	// materialiser as the sibling of project_otlp_token and resolved from the
+	// same object (config.materialiser.ts). The pair must travel together —
+	// see domain.BundleConfig.TraceProjectID.
+	ProjectID        string             `json:"project_id"`
 	ProjectOTLPToken string             `json:"project_otlp_token"`
 	DisplayPrefix    string             `json:"display_prefix"`
 	Providers        []providerSlotWire `json:"providers"`
@@ -126,6 +131,7 @@ func (w *configWire) toDomain() domain.BundleConfig {
 
 	cfg := domain.BundleConfig{
 		Credentials:      creds,
+		TraceProjectID:   w.ProjectID,
 		ProjectOTLPToken: w.ProjectOTLPToken,
 		VKDisplayPrefix:  w.DisplayPrefix,
 		AllowedModels:    w.ModelsAllowed,

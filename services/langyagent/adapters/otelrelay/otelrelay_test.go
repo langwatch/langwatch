@@ -17,7 +17,7 @@ import (
 // startRelay boots a relay on loopback and tears it down with the test.
 func startRelay(t *testing.T) *Relay {
 	t.Helper()
-	r, err := New(context.Background())
+	r, err := New(context.Background(), Options{})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

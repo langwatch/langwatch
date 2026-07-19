@@ -511,10 +511,6 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `cronjobs.jobs.topicClustering.enabled`  | Enable topic clustering job.                       | `true`                                |
 | `cronjobs.jobs.topicClustering.schedule` | Cron schedule.                                     | `0 0 * * *`                           |
 | `cronjobs.jobs.topicClustering.endpoint` | Endpoint path.                                     | `/api/cron/schedule_topic_clustering` |
-| `cronjobs.jobs.alertTriggers`            | Alert triggers job.                                |                                       |
-| `cronjobs.jobs.alertTriggers.enabled`    | Enable alert triggers job.                         | `true`                                |
-| `cronjobs.jobs.alertTriggers.schedule`   | Cron schedule.                                     | `*/3 * * * *`                         |
-| `cronjobs.jobs.alertTriggers.endpoint`   | Endpoint path.                                     | `/api/cron/triggers`                  |
 | `cronjobs.podSecurityContext`            | Pod security context overrides.                    | `{}`                                  |
 | `cronjobs.containerSecurityContext`      | Container security context overrides.              | `{}`                                  |
 | `cronjobs.nodeSelector`                  | Node selector overrides.                           | `{}`                                  |

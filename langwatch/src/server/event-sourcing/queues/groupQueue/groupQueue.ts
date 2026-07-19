@@ -26,7 +26,7 @@ import {
   type ProjectStorageDestination,
   redactStorageUrisInText,
 } from "../../../stored-objects/project-storage-destination";
-import { isDispatchError } from "../../outbox/dispatchError";
+import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
@@ -114,6 +114,18 @@ const DEFAULT_DEDUPLICATION_TTL_MS = 200;
 export function isRetryableJobError(err: unknown): boolean {
   if (isDispatchError(err) && !err.retryable) return false;
   return categorizeError(err) !== ErrorCategory.CRITICAL;
+}
+
+/** Resolve retry delay with a receiver Retry-After as a floor, never a cap. */
+export function retryBackoffMsFor({
+  attempt,
+  error,
+}: {
+  attempt: number;
+  error: unknown;
+}): number {
+  const retryAfterMs = isDispatchError(error) ? error.retryAfterMs : undefined;
+  return Math.max(getBackoffMs(attempt), retryAfterMs ?? 0);
 }
 
 /**
@@ -497,11 +509,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           groupKey: groupId,
           dedupKey: dedupId || undefined,
           scheduledAt: new Date(dispatchAfterMs),
-          // Mirror the queue's actual retry budget into the audit
-          // projection so `ReactorOutbox.maxAttempts` matches when the
-          // queue will stop retrying (otherwise the column defaults to
-          // 8 and an operator sees `attempts > maxAttempts` once the
-          // queue retries 9+ times).
+          // Mirror the queue's actual retry budget into any attached audit
+          // projection so its terminal status agrees with queue behavior.
           maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
         }),
       );
@@ -1082,7 +1091,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 // Re-stage with backoff — frees the worker slot immediately
                 gqJobsRetriedTotal.inc(routingLabels);
 
-                const backoffMs = getBackoffMs(attempt);
+                // Honor a receiver's Retry-After (ADR-040 §5) as a FLOOR over
+                // the exponential backoff: a DispatchError may carry a
+                // retryAfterMs hint, which can lengthen but never shorten the
+                // wait (so it can't cause a retry storm).
+                const backoffMs = retryBackoffMsFor({ attempt, error: err });
                 gqRetryAttempt.observe(routingLabels, attempt);
                 gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
                 const newStagedJobId = `${stagedJobId}/r/${attempt}`;

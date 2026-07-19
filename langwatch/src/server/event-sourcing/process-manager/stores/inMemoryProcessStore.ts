@@ -14,6 +14,8 @@ import type {
 interface StoredMessage extends OutboxMessageRecord {
   /** Epoch ms until which the message is exclusively leased; 0 = unleased. */
   leasedUntil: number;
+  /** Epoch ms of the successful dispatch; null while pending/dead. */
+  dispatchedAt: number | null;
 }
 
 function refKey(ref: ProcessRef): string {
@@ -106,6 +108,7 @@ export class InMemoryProcessStore implements ProcessStore {
         leaseToken: null,
         createdAt: commit.now,
         leasedUntil: 0,
+        dispatchedAt: null,
       });
       insertedMessageKeys.push(message.messageKey);
     }
@@ -137,11 +140,14 @@ export class InMemoryProcessStore implements ProcessStore {
     now: number;
     limit: number;
     leaseDurationMs: number;
+    processNames?: readonly string[];
   }): Promise<LeasedOutboxMessageRecord[]> {
     const leased: LeasedOutboxMessageRecord[] = [];
     for (const message of this.messages.values()) {
       if (leased.length >= params.limit) break;
       if (message.status !== "pending") continue;
+      if (params.processNames && !params.processNames.includes(message.processName))
+        continue;
       if (message.nextAttemptAt > params.now) continue;
       if (message.leasedUntil > params.now) continue;
       message.leasedUntil = params.now + params.leaseDurationMs;
@@ -162,6 +168,7 @@ export class InMemoryProcessStore implements ProcessStore {
     message.attempts += 1;
     message.leasedUntil = 0;
     message.leaseToken = null;
+    message.dispatchedAt = params.now;
   }
 
   async markFailed(params: {
@@ -183,10 +190,16 @@ export class InMemoryProcessStore implements ProcessStore {
   async findDueWakes(params: {
     now: number;
     limit: number;
+    processNames?: readonly string[];
   }): Promise<DueWake[]> {
+    if (params.processNames && params.processNames.length === 0) return [];
+    const allowed = params.processNames
+      ? new Set(params.processNames)
+      : undefined;
     const due: DueWake[] = [];
     for (const instance of this.instances.values()) {
       if (due.length >= params.limit) break;
+      if (allowed && !allowed.has(instance.ref.processName)) continue;
       if (instance.nextWakeAt === null || instance.nextWakeAt > params.now) {
         continue;
       }
@@ -197,5 +210,21 @@ export class InMemoryProcessStore implements ProcessStore {
       });
     }
     return due;
+  }
+
+  async deleteDispatchedBefore(params: {
+    processName: string;
+    before: number;
+  }): Promise<number> {
+    let deleted = 0;
+    for (const [key, message] of this.messages) {
+      if (message.processName !== params.processName) continue;
+      if (message.status !== "dispatched") continue;
+      if (message.dispatchedAt === null || message.dispatchedAt >= params.before)
+        continue;
+      this.messages.delete(key);
+      deleted++;
+    }
+    return deleted;
   }
 }

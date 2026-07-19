@@ -237,15 +237,10 @@ describe("evaluation processing live FIFO", () => {
         append: vi.fn().mockResolvedValue(undefined),
       },
       executeEvaluationCommand: {} as never,
-      evaluationAlertTriggerReactor: {
-        name: "evaluationAlertTrigger",
-      } as never,
-      evaluationAlertTriggerNotifyOutboxReactor: {
-        name: "evaluationAlertTriggerNotifyOutbox",
-      } as never,
-      graphTriggerEvaluationOutboxReactor: {
-        name: "graphTriggerEvaluation",
-      } as never,
+      automations: {
+        triggerMatchHandler: vi.fn().mockResolvedValue(undefined),
+        graphActivityHandler: vi.fn().mockResolvedValue(undefined),
+      },
     });
 
     expect(

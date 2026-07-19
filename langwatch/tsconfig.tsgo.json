@@ -17,6 +17,7 @@
 		"isolatedModules": true,
 		"jsx": "preserve",
 		"incremental": true,
+		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsgo-app.tsbuildinfo",
 		"noUncheckedIndexedAccess": true,
 		"verbatimModuleSyntax": true,
 		"paths": {

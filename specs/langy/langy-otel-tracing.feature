@@ -79,6 +79,80 @@ Feature: Langy agent activity is traced into the user's project
     Then the manager rejects it and forwards nothing
 
   # ============================================================================
+  # LangWatch's own copy of worker telemetry
+  #
+  # The customer's project gets the worker's spans verbatim — their agent, their
+  # prompts. LangWatch also needs to see how its own workers behave, but must
+  # not receive the content, so a SECOND, content-stripped copy goes to
+  # LangWatch's collector. Worker logs and metrics are already dropped outright
+  # for the same reason; spans are filtered per attribute instead, because their
+  # shape and cost data is the operational signal.
+  # ============================================================================
+
+  Scenario: Worker telemetry remains complete for the customer
+    Given the manager is running a worker for a customer conversation
+    When the worker reports its activity
+    Then the customer's trace contains the worker's complete activity
+    And the worker's prompts, completions and tool output remain visible there
+
+  Scenario: Operators retain useful worker health signals without customer content
+    Given the worker reports model usage and an upstream failure
+    When LangWatch records operational worker telemetry
+    Then operators can see the model, token usage and failure outcome
+    And LangWatch cannot see the customer's prompts, completions or tool output
+
+  Scenario: Newly introduced worker metadata cannot expose customer content
+    Given the worker reports an unrecognised metadata value
+    When LangWatch records operational worker telemetry
+    Then the unrecognised value is absent from LangWatch's operational view
+
+  Scenario: Worker diagnostics do not expose raw error text
+    Given a worker reports an exception and a provider error description
+    When LangWatch records operational worker telemetry
+    Then operators can see that the worker failed
+    And raw exception and provider error text is absent
+
+  Scenario: Worker identity is not presented as customer identity
+    When LangWatch records operational worker telemetry
+    Then it identifies the LangWatch worker and conversation
+    And customer-controlled worker resource metadata is absent
+
+  Scenario: Customer telemetry is unaffected when operational recording is unavailable
+    Given LangWatch cannot record operational worker telemetry
+    When the worker reports its activity
+    Then the customer's trace still contains the worker's complete activity
+
+  # ============================================================================
+  # Provenance cannot be forged by the worker
+  #
+  # The worker is model-driven and prompt-injectable, so anything it says about
+  # who it is must be treated as a claim, not a fact. LangWatch marks its own
+  # telemetry as platform-internal; a worker that brands its spans the same way
+  # would launder customer content into LangWatch's own view, so the claim is
+  # removed on the way to the customer's project no matter how it is dressed up.
+  # ============================================================================
+
+  Scenario: A worker cannot claim its telemetry is LangWatch's own
+    Given the worker claims its telemetry is LangWatch's own
+    When the manager forwards that activity to the customer's project
+    Then the provenance claim is absent from the forwarded trace
+
+  Scenario: Repeating the provenance claim does not smuggle it through
+    Given the worker repeats its provenance claim several times in one batch
+    When the manager forwards that activity to the customer's project
+    Then no copy of the provenance claim survives in the forwarded trace
+
+  Scenario: Moving the provenance claim onto individual spans does not smuggle it through
+    Given the worker attaches its provenance claim to individual spans
+    When the manager forwards that activity to the customer's project
+    Then the provenance claim is absent from every forwarded span
+
+  Scenario: Repeating a reserved grouping key does not override the manager's value
+    Given the worker repeats a reserved grouping key several times in one batch
+    When the manager forwards that activity to the customer's project
+    Then the forwarded trace carries only the manager's value for that key
+
+  # ============================================================================
   # Manager-mediated LLM calls (phase 2)
   # ============================================================================
 

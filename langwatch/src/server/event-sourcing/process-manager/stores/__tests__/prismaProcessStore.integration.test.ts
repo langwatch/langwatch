@@ -3,10 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import type { JsonValue } from "../../json";
 import type { ProcessRef } from "../../processManager.types";
-import type {
-  NewOutboxMessage,
-  ProcessCommit,
-} from "../processStore.types";
+import type { NewOutboxMessage, ProcessCommit } from "../processStore.types";
 import { PrismaProcessStore } from "../prismaProcessStore";
 
 const store = new PrismaProcessStore(prisma);
@@ -75,7 +72,7 @@ function commit({
 
 async function clean(): Promise<void> {
   const where = {
-    processName,
+    processName: { in: [processName, `${processName}-other`] },
     projectId: { in: ["project-1", "project-2"] },
   };
   await prisma.processManagerOutbox.deleteMany({ where });
@@ -153,9 +150,11 @@ describe("PrismaProcessStore", () => {
     expect(await store.findByRef({ ref: ref() })).toEqual(
       expect.objectContaining({ state: { step: 1 }, revision: 1 }),
     );
-    expect((await store.findMessagesByRef({ ref: ref() })).map((row) => row.messageKey)).toEqual([
-      "message-1",
-    ]);
+    expect(
+      (await store.findMessagesByRef({ ref: ref() })).map(
+        (row) => row.messageKey,
+      ),
+    ).toEqual(["message-1"]);
   });
 
   it("allows exactly one concurrent revision CAS and rolls back the loser", async () => {
@@ -356,9 +355,7 @@ describe("PrismaProcessStore", () => {
       limit: 10,
       leaseDurationMs: 30_000,
     });
-    const retryLease = initialLeases.find(
-      (row) => row.messageKey === "retry",
-    )!;
+    const retryLease = initialLeases.find((row) => row.messageKey === "retry")!;
     const successLease = initialLeases.find(
       (row) => row.messageKey === "success",
     )!;
@@ -414,15 +411,17 @@ describe("PrismaProcessStore", () => {
       where: { processName, projectId: "project-1" },
       orderBy: { messageKey: "asc" },
     });
-    expect(rows.map((row) => ({
-      key: row.messageKey,
-      status: row.status,
-      attempts: row.attempts,
-      nextAttemptAt: row.nextAttemptAt.getTime(),
-      dispatchedAt: row.dispatchedAt?.getTime() ?? null,
-      leaseToken: row.leaseToken,
-      updatedAt: row.updatedAt.getTime(),
-    }))).toEqual([
+    expect(
+      rows.map((row) => ({
+        key: row.messageKey,
+        status: row.status,
+        attempts: row.attempts,
+        nextAttemptAt: row.nextAttemptAt.getTime(),
+        dispatchedAt: row.dispatchedAt?.getTime() ?? null,
+        leaseToken: row.leaseToken,
+        updatedAt: row.updatedAt.getTime(),
+      })),
+    ).toEqual([
       {
         key: "retry",
         status: "dead",
@@ -470,6 +469,44 @@ describe("PrismaProcessStore", () => {
     ]);
   });
 
+  it("filters raw-SQL outbox leases and wake scans by process name", async () => {
+    const selected = ref("selected");
+    const other = {
+      ...ref("other"),
+      processName: `${processName}-other`,
+    };
+    await store.commit(
+      commit({
+        target: selected,
+        nextWakeAt: 1_500,
+        messages: [message("selected-message")],
+      }),
+    );
+    await store.commit(
+      commit({
+        target: other,
+        sourceEventId: "event-other",
+        nextWakeAt: 1_500,
+        messages: [message("other-message")],
+      }),
+    );
+
+    const leased = await store.leaseDueMessages({
+      now: 2_000,
+      limit: 10,
+      leaseDurationMs: 30_000,
+      processNames: [processName],
+    });
+    expect(leased.map((row) => row.messageKey)).toEqual(["selected-message"]);
+
+    const wakes = await store.findDueWakes({
+      now: 2_000,
+      limit: 10,
+      processNames: [processName],
+    });
+    expect(wakes).toEqual([{ ref: selected, revision: 1, wakeAt: 1_500 }]);
+  });
+
   it("isolates identical process and message keys by project", async () => {
     const projectOne = ref("same-conversation", "project-1");
     const projectTwo = ref("same-conversation", "project-2");
@@ -496,5 +533,132 @@ describe("PrismaProcessStore", () => {
     );
     expect(await store.findMessagesByRef({ ref: projectOne })).toHaveLength(1);
     expect(await store.findMessagesByRef({ ref: projectTwo })).toHaveLength(1);
+  });
+
+  it("prunes only dispatched rows past the cutoff, across projects and statuses", async () => {
+    const base = 1_700_000_000_000;
+    const cutoff = base + 10_000;
+
+    const oldDispatchedProjectOne = ref("old-dispatched-1", "project-1");
+    const oldDispatchedProjectTwo = ref("old-dispatched-2", "project-2");
+    const freshDispatched = ref("fresh-dispatched", "project-1");
+    const stillPending = ref("still-pending", "project-1");
+    const deadLetter = ref("dead-letter", "project-1");
+
+    await store.commit(
+      commit({
+        target: oldDispatchedProjectOne,
+        sourceEventId: "event-old-1",
+        messages: [message("old-dispatched-1-msg")],
+        now: base,
+      }),
+    );
+    await store.commit(
+      commit({
+        target: oldDispatchedProjectTwo,
+        sourceEventId: "event-old-2",
+        tenantId: "tenant-2",
+        messages: [message("old-dispatched-2-msg")],
+        now: base,
+      }),
+    );
+    await store.commit(
+      commit({
+        target: freshDispatched,
+        sourceEventId: "event-fresh",
+        messages: [message("fresh-dispatched-msg")],
+        now: base,
+      }),
+    );
+    await store.commit(
+      commit({
+        target: deadLetter,
+        sourceEventId: "event-dead",
+        messages: [message("dead-letter-msg")],
+        now: base,
+      }),
+    );
+    // Committed with a nextAttemptAt past the lease scan's `now` below, so it
+    // is never leased and stays genuinely pending (not just un-dispatched).
+    await store.commit(
+      commit({
+        target: stillPending,
+        sourceEventId: "event-pending",
+        messages: [message("still-pending-msg")],
+        now: cutoff + 5_000,
+      }),
+    );
+
+    const leased = await store.leaseDueMessages({
+      now: base,
+      limit: 10,
+      leaseDurationMs: 30_000,
+    });
+    const leaseFor = (messageKey: string) =>
+      leased.find((row) => row.messageKey === messageKey)!;
+
+    await store.markDispatched({
+      identity: {
+        processName,
+        projectId: "project-1",
+        messageKey: "old-dispatched-1-msg",
+      },
+      leaseToken: leaseFor("old-dispatched-1-msg").leaseToken,
+      now: base + 1_000,
+    });
+    await store.markDispatched({
+      identity: {
+        processName,
+        projectId: "project-2",
+        messageKey: "old-dispatched-2-msg",
+      },
+      leaseToken: leaseFor("old-dispatched-2-msg").leaseToken,
+      now: base + 1_000,
+    });
+    await store.markDispatched({
+      identity: {
+        processName,
+        projectId: "project-1",
+        messageKey: "fresh-dispatched-msg",
+      },
+      leaseToken: leaseFor("fresh-dispatched-msg").leaseToken,
+      now: cutoff + 1_000,
+    });
+    await store.markFailed({
+      identity: {
+        processName,
+        projectId: "project-1",
+        messageKey: "dead-letter-msg",
+      },
+      leaseToken: leaseFor("dead-letter-msg").leaseToken,
+      now: base + 1_000,
+      nextAttemptAt: base + 2_000,
+      dead: true,
+    });
+
+    const deletedCount = await store.deleteDispatchedBefore({
+      processName,
+      before: cutoff,
+    });
+
+    // The call must not throw (this doubles as the regression test for the
+    // cross-tenant multitenancy-guard bug) and must delete exactly the two
+    // dispatched rows older than the cutoff, regardless of project.
+    expect(deletedCount).toBe(2);
+
+    const remaining = await prisma.processManagerOutbox.findMany({
+      where: {
+        processName,
+        projectId: { in: ["project-1", "project-2"] },
+      },
+      orderBy: { messageKey: "asc" },
+    });
+    expect(
+      remaining.map((row) => ({ key: row.messageKey, status: row.status })),
+    ).toEqual([
+      { key: "dead-letter-msg", status: "dead" },
+      { key: "fresh-dispatched-msg", status: "dispatched" },
+      { key: "still-pending-msg", status: "pending" },
+    ]);
   });
 });

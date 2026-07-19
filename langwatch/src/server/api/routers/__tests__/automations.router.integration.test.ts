@@ -23,6 +23,8 @@ const {
   mockRemoveReportSchedule,
   mockTriggerSentGroupBy,
   mockTriggerSentFindMany,
+  mockFeatureFlagIsEnabled,
+  mockRateLimit,
 } = vi.hoisted(() => ({
   mockEnforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
   mockTriggerUpdate: vi.fn(),
@@ -38,6 +40,20 @@ const {
   mockRemoveReportSchedule: vi.fn().mockResolvedValue(undefined),
   mockTriggerSentGroupBy: vi.fn(),
   mockTriggerSentFindMany: vi.fn(),
+  mockFeatureFlagIsEnabled: vi.fn().mockResolvedValue(true),
+  mockRateLimit: vi.fn().mockResolvedValue({
+    allowed: true,
+    remaining: 9,
+    resetAt: Date.now() + 60_000,
+  }),
+}));
+
+vi.mock("~/server/featureFlag", () => ({
+  featureFlagService: { isEnabled: mockFeatureFlagIsEnabled },
+}));
+
+vi.mock("../../../rateLimit", () => ({
+  rateLimit: mockRateLimit,
 }));
 
 vi.mock("~/server/license-enforcement", async (importOriginal) => {
@@ -67,7 +83,34 @@ vi.mock("~/server/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
+import { PrismaTriggerRepository } from "../../../app-layer/automations/repositories/trigger.prisma.repository";
+import { TriggerService } from "../../../app-layer/automations/trigger.service";
 import { automationRouter } from "../automations";
+
+// One mock prisma client shared by the tRPC ctx (per-request service
+// factories) and the app-level TriggerService the router reaches via
+// getApp().triggers — so every query lands on the same mocks regardless of
+// which acquisition path the router uses.
+const mockPrismaClient = {
+  trigger: {
+    update: mockTriggerUpdate,
+    create: mockTriggerCreate,
+    findFirst: mockTriggerFindFirst,
+    findMany: mockTriggerFindMany,
+    findUnique: mockTriggerFindUnique,
+  },
+  monitor: {
+    findMany: mockMonitorFindMany,
+  },
+  customGraph: {
+    findUnique: mockCustomGraphFindUnique,
+    findMany: mockCustomGraphFindMany,
+  },
+  triggerSent: {
+    groupBy: mockTriggerSentGroupBy,
+    findMany: mockTriggerSentFindMany,
+  },
+} as any;
 
 function createTestCaller() {
   const ctx = {
@@ -77,26 +120,7 @@ function createTestCaller() {
     },
     req: undefined,
     res: undefined,
-    prisma: {
-      trigger: {
-        update: mockTriggerUpdate,
-        create: mockTriggerCreate,
-        findFirst: mockTriggerFindFirst,
-        findMany: mockTriggerFindMany,
-        findUnique: mockTriggerFindUnique,
-      },
-      monitor: {
-        findMany: mockMonitorFindMany,
-      },
-      customGraph: {
-        findUnique: mockCustomGraphFindUnique,
-        findMany: mockCustomGraphFindMany,
-      },
-      triggerSent: {
-        groupBy: mockTriggerSentGroupBy,
-        findMany: mockTriggerSentFindMany,
-      },
-    },
+    prisma: mockPrismaClient,
     permissionChecked: false,
     publiclyShared: false,
     organizationRole: undefined,
@@ -114,15 +138,24 @@ describe("automationRouter", () => {
     mockEnforceLicenseLimit.mockResolvedValue(undefined);
     mockTriggerUpdate.mockResolvedValue({
       id: "trigger_test_123",
+      action: TriggerAction.SEND_SLACK_MESSAGE,
       filters: JSON.stringify({ "spans.model": ["gpt-5-mini"] }),
     });
     previousApp = globalForApp.__langwatch_app;
+    // Real service + repository over the mocked prisma client, so the
+    // router's getApp().triggers CRUD hits the same trigger mocks the ctx
+    // does; the cache/schedule methods stay mocked (the schedule-side
+    // assertions target the service-method signatures).
+    const triggerService = new TriggerService(
+      new PrismaTriggerRepository(mockPrismaClient),
+    );
+    Object.assign(triggerService, {
+      invalidate: mockTriggersInvalidate,
+      syncReportSchedule: mockSyncReportSchedule,
+      removeReportSchedule: mockRemoveReportSchedule,
+    });
     globalForApp.__langwatch_app = createTestApp({
-      triggers: {
-        invalidate: mockTriggersInvalidate,
-        syncReportSchedule: mockSyncReportSchedule,
-        removeReportSchedule: mockRemoveReportSchedule,
-      } as any,
+      triggers: triggerService,
     });
     caller = createTestCaller();
   });
@@ -132,6 +165,19 @@ describe("automationRouter", () => {
   });
 
   describe("create", () => {
+    it("rejects SEND_WEBHOOK because only provider-aware upsert can persist it", async () => {
+      await expect(
+        caller.create({
+          projectId: "proj_123",
+          name: "Malformed webhook",
+          action: TriggerAction.SEND_WEBHOOK,
+          filters: {},
+          actionParams: {},
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(mockTriggerCreate).not.toHaveBeenCalled();
+    });
+
     describe("when the input contains an unknown filter field", () => {
       it("rejects the request before resolver logic runs", async () => {
         await expect(
@@ -165,6 +211,42 @@ describe("automationRouter", () => {
     });
   });
 
+  describe("testFireTemplate", () => {
+    it("does not carry kept header secrets to a changed webhook URL", async () => {
+      mockTriggerFindUnique.mockResolvedValueOnce({
+        actionParams: {
+          url: "https://saved.example/hook",
+          method: "POST",
+          headers: { Authorization: "Bearer saved-secret" },
+          bodyTemplate: null,
+        },
+      });
+
+      await expect(
+        caller.testFireTemplate({
+          projectId: "proj_123",
+          channel: "webhook",
+          trigger: { name: "Webhook", alertType: null },
+          draft: {},
+          webhook: null,
+          webhookDestination: {
+            url: "https://attacker.example/collect",
+            method: "POST",
+            headers: { Authorization: "__kept__" },
+            bodyTemplate: null,
+          },
+          botDestination: null,
+          automationId: "trigger_test_123",
+          graphAlert: null,
+          report: null,
+        }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: expect.stringMatching(/Re-enter webhook header values/),
+      });
+    });
+  });
+
   describe("upsert with graph-alert variant", () => {
     const baseGraphAlertInput = {
       projectId: "proj_123",
@@ -194,7 +276,10 @@ describe("automationRouter", () => {
       describe("on create (no triggerId)", () => {
         it("merges the threshold rule into actionParams and persists the graph-alert row", async () => {
           mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
-          mockTriggerCreate.mockResolvedValueOnce({ id: "trigger_new" });
+          mockTriggerCreate.mockResolvedValueOnce({
+            id: "trigger_new",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+          });
 
           await caller.upsert(baseGraphAlertInput as any);
 
@@ -254,7 +339,10 @@ describe("automationRouter", () => {
       describe("on create when a Slack secret rides along on an email action", () => {
         it("strips undeclared keys via the per-action schema before persisting", async () => {
           mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
-          mockTriggerCreate.mockResolvedValueOnce({ id: "trigger_new" });
+          mockTriggerCreate.mockResolvedValueOnce({
+            id: "trigger_new",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+          });
 
           await caller.upsert({
             ...baseGraphAlertInput,
@@ -292,6 +380,7 @@ describe("automationRouter", () => {
           });
           mockTriggerUpdate.mockResolvedValueOnce({
             id: "trigger_soft_deleted",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
           });
 
           await caller.upsert(baseGraphAlertInput as any);
@@ -362,7 +451,10 @@ describe("automationRouter", () => {
     describe("when editing an existing graph alert (triggerId set)", () => {
       it("routes the update through the SSOT builder shape", async () => {
         mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
-        mockTriggerUpdate.mockResolvedValueOnce({ id: "trigger-1" });
+        mockTriggerUpdate.mockResolvedValueOnce({
+            id: "trigger-1",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+          });
 
         await caller.upsert({
           ...baseGraphAlertInput,
@@ -402,7 +494,10 @@ describe("automationRouter", () => {
       describe("on create (no triggerId)", () => {
         it("pins the persisted cadence to immediate", async () => {
           mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
-          mockTriggerCreate.mockResolvedValueOnce({ id: "trigger_new" });
+          mockTriggerCreate.mockResolvedValueOnce({
+            id: "trigger_new",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+          });
 
           await caller.upsert(baseGraphAlertInput as any);
 
@@ -412,7 +507,10 @@ describe("automationRouter", () => {
 
         it("overrides a requested 5min_digest with immediate", async () => {
           mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
-          mockTriggerCreate.mockResolvedValueOnce({ id: "trigger_new" });
+          mockTriggerCreate.mockResolvedValueOnce({
+            id: "trigger_new",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+          });
 
           await caller.upsert({
             ...baseGraphAlertInput,
@@ -427,7 +525,10 @@ describe("automationRouter", () => {
       describe("on edit (triggerId set)", () => {
         it("pins the persisted cadence to immediate", async () => {
           mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
-          mockTriggerUpdate.mockResolvedValueOnce({ id: "trigger-1" });
+          mockTriggerUpdate.mockResolvedValueOnce({
+            id: "trigger-1",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+          });
 
           await caller.upsert({
             ...baseGraphAlertInput,
@@ -440,7 +541,10 @@ describe("automationRouter", () => {
 
         it("overrides a requested 5min_digest with immediate", async () => {
           mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
-          mockTriggerUpdate.mockResolvedValueOnce({ id: "trigger-1" });
+          mockTriggerUpdate.mockResolvedValueOnce({
+            id: "trigger-1",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+          });
 
           await caller.upsert({
             ...baseGraphAlertInput,
@@ -520,7 +624,10 @@ describe("automationRouter", () => {
 
     describe("on create", () => {
       it("persists a REPORT row and syncs the calendar schedule", async () => {
-        mockTriggerCreate.mockResolvedValueOnce({ id: "report_trig" });
+        mockTriggerCreate.mockResolvedValueOnce({
+            id: "report_trig",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+          });
 
         await caller.upsert(baseReportInput as any);
 
@@ -584,6 +691,7 @@ describe("automationRouter", () => {
         mockTriggerFindUnique.mockResolvedValueOnce(reportRow);
         mockTriggerUpdate.mockResolvedValueOnce({
           id: "report_trig",
+          action: TriggerAction.SEND_SLACK_MESSAGE,
           active: false,
         });
 
@@ -606,6 +714,7 @@ describe("automationRouter", () => {
         mockTriggerFindUnique.mockResolvedValueOnce(reportRow);
         mockTriggerUpdate.mockResolvedValueOnce({
           id: "report_trig",
+          action: TriggerAction.SEND_SLACK_MESSAGE,
           active: true,
         });
 
@@ -633,6 +742,7 @@ describe("automationRouter", () => {
         });
         mockTriggerUpdate.mockResolvedValueOnce({
           id: "trigger_test_123",
+          action: TriggerAction.SEND_SLACK_MESSAGE,
           active: false,
         });
 
@@ -670,11 +780,13 @@ describe("automationRouter", () => {
         mockTriggerFindMany.mockResolvedValueOnce([
           {
             id: "trigger_graph",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
             customGraphId: "graph-1",
             filters: "{}",
           },
           {
             id: "trigger_plain",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
             customGraphId: null,
             filters: "{}",
           },
@@ -706,6 +818,7 @@ describe("automationRouter", () => {
         mockTriggerFindMany.mockResolvedValueOnce([
           {
             id: "trigger_dangling",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
             customGraphId: "graph-gone",
             filters: "{}",
           },

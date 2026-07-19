@@ -114,6 +114,40 @@ func TestLoadConfig_CanonicalBeatsLegacy(t *testing.T) {
 	}
 }
 
+// The official OpenTelemetry name is the canonical way in; the LangWatch-only
+// OTEL_OTLP_ENDPOINT and the chart-era GATEWAY_OTEL_DEFAULT_ENDPOINT stay as
+// deprecated fallbacks behind it.
+func TestLoadConfig_OfficialOTelEndpointIsHonoured(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://official.otel.example.com")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	base, _ := cfg.OTel.PrimaryOTLP()
+	if base != "http://official.otel.example.com" {
+		t.Errorf("PrimaryOTLP base = %q, want the official env var's value", base)
+	}
+}
+
+// Both names live with different values is ambiguity — whichever silent
+// precedence pick is wrong ships telemetry to the wrong place with no error
+// anywhere, so boot refuses instead.
+func TestLoadConfig_RefusesConflictingOTelEndpointNames(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://official.otel.example.com")
+	t.Setenv("OTEL_OTLP_ENDPOINT", "http://legacy.otel.example.com")
+
+	if _, err := LoadConfig(context.Background()); err == nil {
+		t.Fatal("expected LoadConfig to reject two different endpoint values")
+	}
+}
+
 // clearGatewayEnv unsets every env var the alias layer or Hydrate inspects,
 // so each test starts from a clean slate. t.Setenv handles per-test scope on
 // what we explicitly set; this clears the bleed-through from the harness env.
@@ -134,6 +168,19 @@ func clearGatewayEnv(t *testing.T) {
 		"OTEL_OTLP_ENDPOINT",
 		"OTEL_OTLP_HEADERS",
 		"OTEL_SAMPLE_RATIO",
+		"OTEL_EXPORTER_OTLP_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_HEADERS",
+		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_TRACES_HEADERS",
+		"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_PROTOCOL",
+		"OTEL_TRACES_SAMPLER",
+		"OTEL_TRACES_SAMPLER_ARG",
+		"OTEL_TRACES_EXPORTER",
+		"OTEL_SDK_DISABLED",
+		"OTEL_DEBUG_COLLECTOR_ENDPOINT",
+		"OTEL_DEBUG_COLLECTOR_HEADERS",
 		"ENVIRONMENT",
 		"BLOCK_LOCAL_HTTP_CALLS",
 		"REQUIRE_HTTPS_CUSTOM_ENDPOINTS",

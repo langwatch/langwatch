@@ -1,7 +1,7 @@
 import { AlertType, TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { CLIENT_PROVIDERS } from "~/automations/providers/client";
-import type { EmailSlice } from "~/automations/providers/definitions/email/client";
+import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
+import type { EmailSlice } from "~/features/automations/providers/email/client";
 import {
   type AutomationDraft,
   buildTestFirePayload,

@@ -75,6 +75,11 @@ if (
     attributes: {
       "service.name": process.env.OTEL_SERVICE_NAME ?? "langwatch-app",
       "deployment.environment.name": process.env.ENVIRONMENT,
+      // Provenance marker shared with the Go services (pkg/otelsetup):
+      // everything the platform emits about ITSELF is identifiable as
+      // internal wherever it lands, so a misrouted payload can be
+      // recognised and refused. Customer traces never carry it.
+      "langwatch.origin": "platform_internal",
     },
     // envDetector merges OTEL_RESOURCE_ATTRIBUTES (e.g. langwatch.worktree=<name>,
     // set by `make observability-connect`) so telemetry from each worktree is

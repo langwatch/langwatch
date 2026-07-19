@@ -2,7 +2,11 @@
 
 **Date:** 2026-05-28 (revised 2026-06-01)
 
-**Status:** Accepted
+**Status:** Superseded by ADR-052
+
+The Redis settle/cadence and `ReactorOutbox` design below is retained as
+historical context. ADR-052 replaces its rolling settle TTL with deterministic,
+window-bucketed process-manager rounds while preserving later-window re-arm.
 
 ## Context
 
@@ -43,8 +47,8 @@ Replay safety comes from the queue's dedup config (`(reactorName, dedupKey)` col
 
 The trigger dispatch path answers two distinct questions:
 
-1. **"Has this trigger matched this subject, ever?"** — the *match claim*. Stops the trace-processing reactor and the evaluation-processing reactor from both dispatching the same trigger when their pipelines race. Subject is `traceId` for trace/evaluation triggers, `customGraphId` for custom-graph alerts; `TriggerSent` stores the unused column as `NULL`. Today this is `TriggerSent` with `@@unique([triggerId, traceId])` and `createMany skipDuplicates` returning `count: 1` to the winner — adequate for trace triggers; Postgres treats `NULL` as distinct in unique constraints, so custom-graph alerts rely on the alert's `resolvedAt` lifecycle (one open row at a time) rather than a hard uniqueness constraint.
-2. **"Has this match been dispatched? With what status, retry count, last error?"** — the *dispatch state*. Today this doesn't exist; dispatch is in-line and stateless. `ReactorOutbox` answers it.
+1. **"Has this trigger matched this subject, ever?"** — the _match claim_. Stops the trace-processing reactor and the evaluation-processing reactor from both dispatching the same trigger when their pipelines race. Subject is `traceId` for trace/evaluation triggers, `customGraphId` for custom-graph alerts; `TriggerSent` stores the unused column as `NULL`. Today this is `TriggerSent` with `@@unique([triggerId, traceId])` and `createMany skipDuplicates` returning `count: 1` to the winner — adequate for trace triggers; Postgres treats `NULL` as distinct in unique constraints, so custom-graph alerts rely on the alert's `resolvedAt` lifecycle (one open row at a time) rather than a hard uniqueness constraint.
+2. **"Has this match been dispatched? With what status, retry count, last error?"** — the _dispatch state_. Today this doesn't exist; dispatch is in-line and stateless. `ReactorOutbox` answers it.
 
 These stay as **two separate tables** with distinct roles:
 
@@ -84,18 +88,30 @@ Add `.withOutbox(projectionName, reactorName, definition)` to `StaticPipelineBui
 // Existing — extended with isReplay
 type ReactorContext<FoldState> = {
   // ...existing fields...
-  isReplay: boolean;   // true when the event was produced by a stream replay
+  isReplay: boolean; // true when the event was produced by a stream replay
 };
 
 type ReactorDefinition<Event, FoldState> = {
-  handle: (event: Event, context: ReactorContext<FoldState>, deps: Deps) => Promise<void>;
-  options?: { makeJobId, ttl, delay };
+  handle: (
+    event: Event,
+    context: ReactorContext<FoldState>,
+    deps: Deps,
+  ) => Promise<void>;
+  options?: { makeJobId; ttl; delay };
 };
 
 // New
 type OutboxReactorDefinition<Event, FoldState> = {
-  match: (event: Event, context: ReactorContext<FoldState>, deps: Deps) => Promise<OutboxEntry[] | null>;
-  dispatch: (payloads: unknown[], ctx: DispatchContext, deps: Deps) => Promise<void>;
+  match: (
+    event: Event,
+    context: ReactorContext<FoldState>,
+    deps: Deps,
+  ) => Promise<OutboxEntry[] | null>;
+  dispatch: (
+    payloads: unknown[],
+    ctx: DispatchContext,
+    deps: Deps,
+  ) => Promise<void>;
   groupKey: (entry: OutboxEntry) => string;
   cadenceWindowMs: (entry: OutboxEntry) => number;
   retryPolicy?: { maxAttempts: number; backoffMs: (attempt: number) => number };
@@ -143,11 +159,13 @@ The 2026-06-01 revision collapsed two outbox queues into one (settle + cadence o
 Outbox payloads are still stage-discriminated (`stage: "settle" | "cadence"`); the runtime composition just looks different. `buildOutboxRuntime(...)` returns `{ dispatcher, auditAdapter, enqueueSettle, attachQueue }` — no `queue` field. `EventSourcing`'s `createGlobalQueue()` reads the outbox runtime off its options, adds a "is this payload settle or cadence?" branch to each of the queue's callbacks (`groupKey`, `process`, `processBatch`, `coalesceMaxBatch`, `deduplication`), and wires the runtime's audit adapter onto the queue's `auditAdapter` slot. The adapter already gates internally on `isSettle || isCadence`, so non-outbox queue events no-op cheaply at the adapter level.
 
 Wins:
+
 - One Redis prefix, one set of Grafana panels, one crash-recovery story. The second queue's operational tooling (metrics, alarms, deploy gates) goes away.
 - No second queue to keep wired through the composition root — `EventSourcing` is the only thing that knows how to make a `GroupQueueProcessor`.
 - The audit adapter's existing payload gating did the conceptual work already; the change is structural, not semantic.
 
 Trade-off (captured here so the next person feels it):
+
 - Trigger dispatches and span projections now share the per-tenant fairness budget. A notification storm can nibble at the projection slot budget for the same tenant, and vice versa. Bounded by `TenantRateTracker` so neither side starves catastrophically, but it's a regression in isolation guarantees vs the two-queue split. If we ever want to scale them independently (different Redis instances, dedicated worker pools), we lose the ability to do that cheaply.
 
 ### Revision (2026-06-01) — what changed from the original draft
@@ -160,7 +178,7 @@ The revised design (above) keeps the same external behavior — durable retry, o
 
 - New reactors register via the queue-driven path with `auditAdapter` wired.
 - Existing Phase-0 code stays in place; `OutboxDrainer` becomes dead code once every reactor that used to register with it has migrated. Until the cleanup PR lands, the Phase-0 path **and its tests are intentionally retained as characterization tests** — the drainer/`leaseNext` suite is not dead weight, it locks the in-flight behaviour green until the path is removed.
-- A follow-up cleanup PR (out of scope here) drops the Phase-0 drainer + lease* methods + the `leasedUntil` / `nextAttemptAt` columns from `ReactorOutbox`.
+- A follow-up cleanup PR (out of scope here) drops the Phase-0 drainer + lease\* methods + the `leasedUntil` / `nextAttemptAt` columns from `ReactorOutbox`.
 
 ## Rationale
 
@@ -198,7 +216,7 @@ Adapter writes are still best-effort relative to dispatch: a PG outage logs and 
 ### Why row-per-match over row-per-window
 
 - **PG contention.** Row-per-window with JSONB append serializes 1000 concurrent matches on one row. Row-per-match has no contention — each match inserts a fresh row, and `@@unique([reactorName, dedupKey])` makes the insert idempotent for replays.
-- **Replay safety.** With row-per-match, a replay of the matching event re-attempts `createMany skipDuplicates` on the same `dedupKey` → no-op. With row-per-window, replay attempts an `INSERT ... ON CONFLICT DO UPDATE` that *appends* — possibly double-counting the trace.
+- **Replay safety.** With row-per-match, a replay of the matching event re-attempts `createMany skipDuplicates` on the same `dedupKey` → no-op. With row-per-window, replay attempts an `INSERT ... ON CONFLICT DO UPDATE` that _appends_ — possibly double-counting the trace.
 - **Mirrors `TriggerSent`.** Both tables have the same per-match grain. Operator queries can join them on `(triggerId, traceId)` or `(triggerId, customGraphId)`.
 - **Cost of more rows is negligible.** Outbox rows live ~minutes (until the worker drains the digest), then transition to `dispatched` and live ~30 days for audit, then prune.
 

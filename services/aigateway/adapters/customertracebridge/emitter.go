@@ -53,7 +53,10 @@ type dropFilterExporter struct {
 }
 
 func (d dropFilterExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
-	kept := spans[:0]
+	// Own slice, never spans[:0]: compacting in place writes into the batch
+	// processor's backing array, which the SpanExporter contract does not permit
+	// an exporter to mutate.
+	kept := make([]sdktrace.ReadOnlySpan, 0, len(spans))
 	for _, s := range spans {
 		drop := false
 		for _, a := range s.Attributes() {
@@ -89,7 +92,7 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 		opts.Registry = NewRegistry()
 	}
 
-	router := dropFilterExporter{inner: newRouterExporter(opts.Registry)}
+	router := dropFilterExporter{inner: newRouterExporter(ctx, opts.Registry)}
 
 	batchTimeout := opts.BatchTimeout
 	if batchTimeout == 0 {
