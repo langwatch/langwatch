@@ -28,7 +28,6 @@ function buildTraceDeps(
   const store = {} as any;
   return {
     spanAppendStore: store,
-    logRecordAppendStore: store,
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,
