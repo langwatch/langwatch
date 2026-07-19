@@ -124,6 +124,12 @@ func (s Stack) OverlayEnv() []string {
 	if s.ClickHouseHTTPPort != 0 && s.ClickHouseDatabase != "" {
 		env = append(env, fmt.Sprintf("CLICKHOUSE_URL=http://%s:%s@127.0.0.1:%d/%s",
 			ClickHouseUser, ClickHousePassword, s.ClickHouseHTTPPort, s.ClickHouseDatabase))
+		// Backup-status gauges query system.backup_log, which only exists once
+		// backups are configured — a production concern. The app collects them by
+		// default (unset must not disarm the production alerts that read them), so
+		// haven's container, which has no backups, opts out explicitly. Otherwise
+		// every 15s stats tick would fail on a missing table for nothing.
+		env = append(env, "CLICKHOUSE_BACKUP_METRICS_ENABLED=false")
 	}
 	// Same story for Postgres: one shared brew-managed server, a database per
 	// slug, connected straight to loopback.

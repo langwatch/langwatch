@@ -138,14 +138,34 @@ func buildConsoleCore(format string, level zapcore.Level) zapcore.Core {
 
 // prettyEncoderConfig aligns the Go pretty console with the TS app's
 // pino-pretty lane, so a terminal interleaving Go and JS services reads as one
-// format: a 24h HH:MM:SS.mmm timestamp (prettyconsole's default is 12h with no
-// seconds) and a full-word capital level (INFO, not INF) — matching
-// pino-pretty's "[12:19:00.616] INFO (name): msg".
+// format. pino-pretty's line is:
+//
+//	[12:19:00.616] INFO (langwatch:api): message key=value
+//
+// so this config matches it piece by piece: a bracketed 24h HH:MM:SS.mmm
+// timestamp (prettyconsole's default is an unbracketed 12h clock with no
+// seconds), a full-word capital level (INFO, not INF — the level is the first
+// thing anyone scans a log for, so it has to be legible in both lanes), and a
+// parenthesised logger name for services that call Named.
+//
+// One difference is left standing: prettyconsole hardcodes " > " between the
+// name and the message where pino-pretty writes ": ". That separator is not
+// configurable without forking the encoder, and the prefix that actually gets
+// scanned — time, level, name — now lines up.
 func prettyEncoderConfig() zapcore.EncoderConfig {
 	cfg := prettyconsole.NewEncoderConfig()
-	cfg.EncodeTime = prettyconsole.DefaultTimeEncoder("15:04:05.000")
+	// Go's time layouts only substitute reference values, so the brackets pass
+	// through literally.
+	cfg.EncodeTime = prettyconsole.DefaultTimeEncoder("[15:04:05.000]")
 	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	cfg.EncodeName = prettyNameEncoder
 	return cfg
+}
+
+// prettyNameEncoder renders a logger name the way pino-pretty does, "(name)".
+// Loggers that never call Named emit nothing, exactly as before.
+func prettyNameEncoder(name string, enc zapcore.PrimitiveArrayEncoder) {
+	enc.AppendString("(" + name + ")")
 }
 
 // leveledCore gates an inner core to a minimum level. Used to hold the otelzap

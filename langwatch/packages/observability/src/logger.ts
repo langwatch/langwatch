@@ -219,6 +219,39 @@ export function consoleIgnoreFields(isOtelExportEnabled: boolean): string {
     : BASE_CONSOLE_IGNORE;
 }
 
+/**
+ * The 24h wall-clock timestamp the pretty console prints: `[HH:MM:ss.mmm]`.
+ *
+ * Pinned rather than left to pino-pretty's default so it cannot drift, and
+ * because the Go services' clog encoder is configured to the same layout — a
+ * haven terminal interleaves both lanes, and two clock formats in one scrollback
+ * is unreadable. Change one side and you must change the other
+ * (pkg/clog/clog.go, prettyEncoderConfig).
+ */
+const PRETTY_TIME_FORMAT = "SYS:HH:MM:ss.l";
+
+/**
+ * Options for the pino-pretty console target, producing
+ * `[12:19:00.616] INFO (langwatch:api): message key=value`.
+ *
+ * The level is always shown and never in `ignore`: it is the first thing anyone
+ * scans a log for, and it is what tells a reader whether the line in front of
+ * them is the whole story or just the part loud enough to reach the console
+ * (under haven, info and below go to Grafana and only warn+ reaches here).
+ */
+export function prettyConsoleOptions(
+  isOtelExportEnabled: boolean,
+  level: string,
+): Record<string, unknown> {
+  return {
+    colorize: true,
+    singleLine: true,
+    translateTime: PRETTY_TIME_FORMAT,
+    ignore: consoleIgnoreFields(isOtelExportEnabled),
+    minimumLevel: level,
+  };
+}
+
 function buildConsoleTransport({
   usePretty,
   level,
@@ -231,12 +264,7 @@ function buildConsoleTransport({
   if (usePretty) {
     return {
       target: "pino-pretty",
-      options: {
-        colorize: true,
-        singleLine: true,
-        ignore: consoleIgnoreFields(isOtelExportEnabled),
-        minimumLevel: level,
-      },
+      options: prettyConsoleOptions(isOtelExportEnabled, level),
       level,
     };
   }

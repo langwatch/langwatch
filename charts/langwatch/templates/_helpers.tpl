@@ -528,16 +528,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS
   value: {{ $chCold.defaultTtlDays | default "49" | quote }}
 {{- end }}
-{{/* Backup-status gauges (system.backup_log) are opt-in — the app/worker only
-     queries the backup log when CLICKHOUSE_BACKUP_METRICS_ENABLED=true. Couple
-     that to the backup config so the "Backup Reporting Absent" signal can never
-     drift from whether backups actually run: on whenever chart-managed backups
-     are enabled, or when an operator forces it for out-of-band backups. */}}
+{{/* Backup-status gauges (system.backup_log) are opt-OUT in the app/worker: an
+     unset CLICKHOUSE_BACKUP_METRICS_ENABLED collects, so no deployment can lose
+     the "Backup Reporting Absent" signal just by not knowing about the flag.
+     The chart states it explicitly in both directions, coupled to the backup
+     config: "true" wherever chart-managed backups run (or an operator forces it
+     for out-of-band backups), "false" where this chart knows there are no
+     backups and system.backup_log would not exist. */}}
 {{- $chBackup := (.Values.clickhouse).backup }}
-{{- if or ($chBackup).enabled ($chBackup).metricsEnabled }}
 - name: CLICKHOUSE_BACKUP_METRICS_ENABLED
-  value: "true"
-{{- end }}
+  value: {{ if or ($chBackup).enabled ($chBackup).metricsEnabled }}"true"{{ else }}"false"{{ end }}
 
 # Credentials encryption key
 {{- if .Values.app.credentialsEncryptionKey.secretKeyRef.name }}

@@ -3,7 +3,11 @@ import superjson from "superjson";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { runWithContext } from "../context";
 import { getLogContext } from "../context/logging";
-import { consoleIgnoreFields, createLogger } from "../logger";
+import {
+  consoleIgnoreFields,
+  createLogger,
+  prettyConsoleOptions,
+} from "../logger";
 
 vi.mock("@opentelemetry/api", () => ({
   context: { active: vi.fn(() => ({})) },
@@ -195,6 +199,29 @@ describe("createLogger", () => {
 
     it("keeps business context when the console is the only output", () => {
       expect(consoleIgnoreFields(false)).toBe("pid,hostname");
+    });
+  });
+
+  describe("pretty console format", () => {
+    // A haven terminal interleaves this lane with the Go services' clog lane, so
+    // the two pretty formats have to agree. These pin the JS half; the Go half is
+    // prettyEncoderConfig in pkg/clog/clog.go.
+    it("prints a 24h wall-clock timestamp with milliseconds", () => {
+      expect(prettyConsoleOptions(false, "info").translateTime).toBe(
+        "SYS:HH:MM:ss.l",
+      );
+    });
+
+    it("never hides the log level", () => {
+      const ignored = String(prettyConsoleOptions(true, "warn").ignore).split(
+        ",",
+      );
+
+      expect(ignored).not.toContain("level");
+    });
+
+    it("honours the console level floor", () => {
+      expect(prettyConsoleOptions(false, "warn").minimumLevel).toBe("warn");
     });
   });
 });

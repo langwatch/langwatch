@@ -5,6 +5,12 @@ services:
       SKIP_ENV_VALIDATION: true
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
       CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+      # This compose stack runs a plain ClickHouse with no backups, so
+      # system.backup_log does not exist here. Backup-status collection is on by
+      # default (an unset flag must not disarm the alerts that read those gauges
+      # in deployments that do have backups), so opt out explicitly rather than
+      # failing the query on every stats tick.
+      CLICKHOUSE_BACKUP_METRICS_ENABLED: "false"
       REDIS_URL: redis://redis:6379
       LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
       LANGEVALS_ENDPOINT: http://langevals:5562
@@ -32,6 +38,12 @@ services:
       SKIP_ENV_VALIDATION: true
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
       CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+      # This compose stack runs a plain ClickHouse with no backups, so
+      # system.backup_log does not exist here. Backup-status collection is on by
+      # default (an unset flag must not disarm the alerts that read those gauges
+      # in deployments that do have backups), so opt out explicitly rather than
+      # failing the query on every stats tick.
+      CLICKHOUSE_BACKUP_METRICS_ENABLED: "false"
       REDIS_URL: redis://redis:6379
       LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
       LANGEVALS_ENDPOINT: http://langevals:5562

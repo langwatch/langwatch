@@ -148,6 +148,25 @@ func TestOverlayEmitsClickHouseURLOnlyWhenManaged(t *testing.T) {
 	}
 }
 
+// The app collects ClickHouse backup-status gauges by default (an unset flag must
+// not disarm the production alerts that read them), so haven's own container —
+// which has no backups and therefore no system.backup_log — has to opt out, or
+// every 15s stats tick fails on a missing table.
+func TestOverlayOptsOutOfBackupMetricsWhenManagingClickHouse(t *testing.T) {
+	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
+	}}
+	if hasKey(base.OverlayEnv(), "CLICKHOUSE_BACKUP_METRICS_ENABLED") {
+		t.Fatalf("unmanaged stack must leave backup metrics to the worktree's own .env")
+	}
+	managed := base
+	managed.ClickHouseHTTPPort = 18123
+	managed.ClickHouseDatabase = "lw_brave_otter"
+	if got := valueOf(managed.OverlayEnv(), "CLICKHOUSE_BACKUP_METRICS_ENABLED"); got != "false" {
+		t.Errorf("CLICKHOUSE_BACKUP_METRICS_ENABLED = %q, want %q", got, "false")
+	}
+}
+
 func TestOverlayEmitsPostgresURLOnlyWhenManaged(t *testing.T) {
 	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
 		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
