@@ -41,6 +41,29 @@ const logger = createLogger(
   "langwatch:evaluation-processing:execute-evaluation",
 );
 
+/**
+ * Handled-error codes that represent a customer-fixable misconfiguration
+ * rather than a platform fault. These are reported as "skipped" with a
+ * self-serve message instead of "error", and logged at info.
+ *
+ * Deliberately an allowlist keyed on `code` (the serialisable discriminant,
+ * safe across process boundaries) rather than a `HandledError` instanceof
+ * check: `HandledError` also covers genuine faults — notably
+ * `EvaluatorExecutionError`, raised when langevals times out, is unreachable,
+ * or returns 5xx — which must keep surfacing as errors. Add a code here only
+ * when the customer can actually resolve it themselves.
+ */
+const CUSTOMER_FIXABLE_ERROR_CODES: ReadonlySet<string> = new Set([
+  "evaluator_config_error",
+]);
+
+function isCustomerFixableConfigError(error: unknown): error is HandledError {
+  return (
+    HandledError.isHandled(error) &&
+    CUSTOMER_FIXABLE_ERROR_CODES.has(error.code)
+  );
+}
+
 export interface ExecuteEvaluationCommandDeps {
   monitors: MonitorService;
   spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string; occurredAtMs?: number }): Promise<Span[]> };
@@ -341,15 +364,23 @@ export class ExecuteEvaluationCommand implements CommandHandler<
       // and log at info so error telemetry only carries real faults. The
       // stable `code` is what customer-health rules key off, so nothing has
       // to pattern-match log message strings to find affected projects.
-      if (HandledError.isHandled(error)) {
+      //
+      // This is an explicit allowlist, NOT `HandledError.isHandled(error)`:
+      // `HandledError` is a broad base class, and downgrading all of it would
+      // silently swallow real outages. `EvaluatorExecutionError` in particular
+      // is a HandledError raised when langevals times out, is unreachable, or
+      // returns 5xx — exactly the faults that must keep paging us.
+      if (isCustomerFixableConfigError(error)) {
         logger.info(
           {
+            // `meta` first so the fixed identifiers below always win: `meta`
+            // is free-form per subclass and can itself carry a `traceId`.
+            ...error.meta,
             code: error.code,
             tenantId,
             evaluationId: data.evaluationId,
             evaluatorId: data.evaluatorId,
             traceId: data.traceId,
-            ...error.meta,
             error: error.message,
           },
           "Evaluator misconfigured — skipping evaluation",

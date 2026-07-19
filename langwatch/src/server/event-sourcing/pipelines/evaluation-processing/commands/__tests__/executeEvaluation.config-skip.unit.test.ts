@@ -15,7 +15,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Command } from "../../../../";
 import { createTenantId } from "../../../../";
-import { EvaluatorConfigError } from "../../../../../app-layer/evaluations/errors";
+import {
+  EvaluatorConfigError,
+  EvaluatorExecutionError,
+} from "../../../../../app-layer/evaluations/errors";
 import type { EvaluationCostRecorder } from "../../../../../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../../app-layer/monitors/monitor.service";
@@ -169,6 +172,36 @@ describe("Feature: Evaluator misconfiguration is a skip, not a failure", () => {
         expect(eventDataOf(events).details).toBe(
           "Provider anthropic is not configured",
         );
+      });
+    });
+  });
+
+  // Regression guard: EvaluatorExecutionError is ALSO a HandledError, but it
+  // means langevals timed out / was unreachable / returned 5xx. Downgrading it
+  // to a skip would silently hide an outage, so it must stay an error. A
+  // blanket `HandledError.isHandled` check passes every other test in this
+  // file and fails only these.
+  describe("given langevals is unreachable", () => {
+    describe("when the command handles the evaluation", () => {
+      it("emits an error event, not a skip", async () => {
+        const { command } = buildCommandWithMocks({
+          thrown: new EvaluatorExecutionError("Evaluator cannot be reached"),
+        });
+
+        const events = await command.handle(buildCommand());
+
+        expect(eventDataOf(events).status).toBe("error");
+      });
+
+      it("logs at error level so the outage still pages us", async () => {
+        const { command } = buildCommandWithMocks({
+          thrown: new EvaluatorExecutionError("Evaluator cannot be reached"),
+        });
+
+        await command.handle(buildCommand());
+
+        expect(loggerSpies.error).toHaveBeenCalledTimes(1);
+        expect(loggerSpies.info).not.toHaveBeenCalled();
       });
     });
   });

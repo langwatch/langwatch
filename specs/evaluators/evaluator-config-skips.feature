@@ -47,3 +47,14 @@ Feature: Evaluator misconfiguration is a skip, not a failure
     When a trace is processed that matches the monitor
     Then the evaluation is reported with status "error"
     And an error-level log is emitted
+
+  # Only misconfiguration is downgraded, and only by an explicit allowlist of
+  # error codes. An evaluator service outage is also a "handled" error, but it
+  # is a platform fault: downgrading it would hide an outage behind a benign
+  # skip and stop it paging us.
+  @integration
+  Scenario: An evaluator service outage is reported as an error, not a skip
+    Given the evaluator service is unreachable or times out
+    When a trace is processed that matches the monitor
+    Then the evaluation is reported with status "error"
+    And an error-level log is emitted
