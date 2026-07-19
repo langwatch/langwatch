@@ -4,7 +4,20 @@ import type {
   LogTraceContribution,
 } from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
 import { IO_PREVIEW_BYTES } from "../lean-for-projection";
-import { LogRequestCollectionService } from "../log-request-collection.service";
+import {
+  type LogRequestCollectionResult,
+  LogRequestCollectionService,
+} from "../log-request-collection.service";
+
+/** Narrows the result union so a test can assert on the collected counters. */
+function expectCollected(
+  result: LogRequestCollectionResult,
+): Extract<LogRequestCollectionResult, { outcome: "collected" }> {
+  if (result.outcome !== "collected") {
+    throw new Error(`expected a collected result, got "${result.outcome}"`);
+  }
+  return result;
+}
 
 function makeService(args?: {
   storageFails?: boolean;
@@ -122,9 +135,9 @@ describe("LogRequestCollectionService", () => {
     // truth; the contribution is best-effort correlation, as in the metric
     // pipeline. Rejecting here would tell the sender to discard a log we
     // have in fact accepted, and a retry would re-ingest it.
-    expect(result.outcome).toBe("collected");
-    expect(result.acceptedLogRecords).toBe(1);
-    expect(result.rejectedLogRecords).toBe(0);
+    const collected = expectCollected(result);
+    expect(collected.acceptedLogRecords).toBe(1);
+    expect(collected.rejectedLogRecords).toBe(0);
   });
 
   it("bounds duplicated trace I/O while retaining the full canonical log", async () => {
