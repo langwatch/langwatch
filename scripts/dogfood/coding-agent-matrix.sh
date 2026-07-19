@@ -155,39 +155,25 @@ write_codex_home() {
     : >"$CODEX_HOME_DIR/config.toml"
   fi
   python3 - "$CODEX_HOME_DIR/config.toml" "$ENDPOINT" "$LW_API_KEY" <<'PYCODEX'
-import re, sys
+import re
+import sys
+
 path, endpoint, key = sys.argv[1], sys.argv[2], sys.argv[3]
 src = open(path, encoding="utf-8").read()
-block = (
-    "
+block = f'''
 [otel]
 log_user_prompt = true
 environment = "coding-agent-matrix"
 
-"
-    "[otel.trace_exporter.otlp-http]
-"
-    f"endpoint = "{endpoint}/v1/traces"
-"
-    "protocol = "json"
-"
-    f"headers = {{ "Authorization" = "Bearer {key}" }}
-"
-)
-if "[otel]" in src:
-    src = re.sub(r"\[otel\][\s\S]*?(?=
-\[(?!otel)|\Z)", block.lstrip("
-"), src, count=1)
-    src = re.sub(r"\[otel\.trace_exporter[\s\S]*?(?=
-\[(?!otel)|\Z)", "", src)
-    if "[otel.trace_exporter.otlp-http]" not in src:
-        src = src.replace("[otel]
-", "[otel]
-", 1)
-        src += block
-else:
-    src += block
-open(path, "w", encoding="utf-8").write(src)
+[otel.trace_exporter.otlp-http]
+endpoint = "{endpoint}/v1/traces"
+protocol = "json"
+headers = {{ "Authorization" = "Bearer {key}" }}
+'''
+# Drop every existing [otel]/[otel.*] table (a previous langwatch-managed
+# install may point at prod), then append the local wiring once.
+src = re.sub(r"(?m)^\[otel(\.[^\]]*)?\][\s\S]*?(?=^\[(?!otel)|\Z)", "", src)
+open(path, "w", encoding="utf-8").write(src.rstrip("\n") + "\n" + block)
 PYCODEX
 }
 

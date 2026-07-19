@@ -8,6 +8,7 @@
  */
 
 import { isNonEmptyString, isRecord } from "./_guards";
+import { isReplyTextPart } from "./_parts";
 
 export const safeStringify = (value: unknown): string | null => {
   try {
@@ -71,10 +72,7 @@ export const convertGeminiContent = ({
     if (!isRecord(part)) continue;
 
     if (typeof part.text === "string") {
-      // Thinking parts (`thought: true`) and empty thoughtSignature padding
-      // are not conversation content; folding them in puts the model's
-      // reasoning monologue ahead of its actual reply.
-      if (part.thought === true || part.text.length === 0) continue;
+      if (!isReplyTextPart(part)) continue;
       texts.push(part.text);
       continue;
     }

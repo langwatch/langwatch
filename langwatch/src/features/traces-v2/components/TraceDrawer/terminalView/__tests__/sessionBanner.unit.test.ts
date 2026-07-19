@@ -73,6 +73,40 @@ describe("deriveSessionBanner", () => {
     });
   });
 
+  describe("given no service name and a copilot-named call span", () => {
+    it("falls back to copilot off the 'chat <model>' span name", () => {
+      const banner = deriveSessionBanner({
+        resourceAttributes: {},
+        spans: [
+          {
+            spanId: "s1",
+            name: "chat gpt-5-mini",
+            startTimeMs: 1,
+            params: {},
+          } as unknown as SpanDetail,
+        ],
+      });
+      expect(banner.agent).toBe("copilot");
+    });
+  });
+
+  describe("given real-shaped NESTED span params", () => {
+    it("still reads the model: the span mapper unflattens dotted keys", () => {
+      const banner = deriveSessionBanner({
+        resourceAttributes: { "service.name": "claude-code" },
+        spans: [
+          {
+            spanId: "s1",
+            name: "claude_code.llm_request",
+            startTimeMs: 1,
+            params: { gen_ai: { request: { model: "claude-sonnet-5" } } },
+          } as unknown as SpanDetail,
+        ],
+      });
+      expect(banner.model).toBe("claude-sonnet-5");
+    });
+  });
+
   describe("given the model rides another agent's call span", () => {
     it("reads gemini's llm_call and copilot's chat span all the same", () => {
       const banner = deriveSessionBanner({

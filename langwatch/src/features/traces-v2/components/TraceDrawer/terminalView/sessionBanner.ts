@@ -1,4 +1,8 @@
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
+import {
+  isModelCallSpan,
+  readString,
+} from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 
 /**
  * The handful of facts a coding agent itself prints above the prompt when a
@@ -23,19 +27,6 @@ export interface SessionBanner {
   version: string | null;
   model: string | null;
   repo: string | null;
-}
-
-const MODEL_CALL_SPAN_NAMES = new Set([
-  "claude_code.llm_request",
-  "opencode.llm",
-  "ai.streamText",
-  "llm_call",
-  "session_task.turn",
-  "chat",
-]);
-
-function isModelCallSpan(name: string): boolean {
-  return MODEL_CALL_SPAN_NAMES.has(name) || name.startsWith("chat ");
 }
 
 /**
@@ -63,6 +54,8 @@ function detectBannerAgent({
       return "opencode";
     if (span.name === "session_task.turn") return "codex";
     if (span.name === "llm_call") return "gemini_cli";
+    // Copilot's call span is "chat <model>" — the only agent naming this way.
+    if (span.name.startsWith("chat ")) return "copilot";
   }
   return "unknown";
 }
@@ -83,9 +76,15 @@ export function deriveSessionBanner({
   let model: string | null = null;
   for (const span of spans) {
     if (!isModelCallSpan(span.name)) continue;
+    // readString resolves dotted keys against BOTH attribute shapes — the
+    // span mapper unflattens params into nested objects, so a flat lookup
+    // of "gen_ai.request.model" reads nothing on real spans.
     const params = (span.params ?? {}) as Record<string, unknown>;
-    const value = params["gen_ai.request.model"] ?? params.model;
-    if (typeof value === "string" && value.length > 0) model = value;
+    const value =
+      readString(params, "gen_ai.request.model") ??
+      readString(params, "ai.model.id") ??
+      readString(params, "model");
+    if (value !== null) model = value;
   }
 
   return {

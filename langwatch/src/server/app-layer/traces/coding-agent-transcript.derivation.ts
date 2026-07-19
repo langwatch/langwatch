@@ -7,6 +7,7 @@ import {
   resolveConversationKey,
   resolveToolName,
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/coding-agent-normalization";
+import { isReplyTextPart } from "./canonicalisation/extractors/_parts";
 
 /**
  * What a coding agent DID, in the order it did it — derived on the server.
@@ -154,14 +155,23 @@ export function buildCodingAgentTranscript({
 
   const entries = [...fromSpans.entries, ...fromLogs.entries];
 
-  // Replies derived from span OUTPUT are held apart: when the same trace also
-  // carries reply-bearing LOG events (gemini emits both an llm_call span and
-  // an api_response event for one call), the log wins and the span-derived
-  // duplicates are dropped.
-  const hasLogReply = fromLogs.entries.some(
-    (entry) => entry.kind === "assistant_message",
-  );
-  if (!hasLogReply) entries.push(...fromSpans.spanReplies);
+  // Replies derived from span OUTPUT are held apart: when the same CALL also
+  // has a reply-bearing LOG event (gemini emits both an llm_call span and an
+  // api_response event for one call), the log wins and the span-derived
+  // duplicate is dropped. Scoped per call, not per trace: with partial log
+  // coverage (the log read is capped) a turn whose log reply was never
+  // captured must still keep its span-derived text.
+  const logReplyTimes = fromLogs.entries
+    .filter((entry) => entry.kind === "assistant_message")
+    .map((entry) => entry.atMs);
+  for (const reply of fromSpans.spanReplies) {
+    const duplicatedByLog = logReplyTimes.some(
+      (atMs) =>
+        atMs >= reply.windowStartMs &&
+        atMs <= reply.windowEndMs + LOG_REPLY_FLUSH_SLACK_MS,
+    );
+    if (!duplicatedByLog) entries.push(reply.entry);
+  }
 
   // Time is the only ordering every agent agrees on. Spans and logs arrive on
   // separate exporters and separate batches, so neither stream's arrival order
@@ -179,14 +189,28 @@ export function buildCodingAgentTranscript({
   };
 }
 
+/**
+ * How far after its span's end a call's log-borne reply may land and still be
+ * that call's (the event flushes with the response, so in practice within a
+ * couple of seconds). Kept tight: the NEXT turn's reply must never fall in.
+ */
+const LOG_REPLY_FLUSH_SLACK_MS = 2_000;
+
+/** A span-derived reply plus the call window a log duplicate would land in. */
+interface SpanReply {
+  entry: TranscriptEntry;
+  windowStartMs: number;
+  windowEndMs: number;
+}
+
 function collectSpanEntries(spans: SpanDetail[]): {
   entries: TranscriptEntry[];
-  spanReplies: TranscriptEntry[];
+  spanReplies: SpanReply[];
   totals: CodingAgentTranscript["totals"];
   subAgentToolCounts: Map<string, number>;
 } {
   const entries: TranscriptEntry[] = [];
-  const spanReplies: TranscriptEntry[] = [];
+  const spanReplies: SpanReply[] = [];
   const subAgentToolCounts = new Map<string, number>();
   const totals = { modelCalls: 0, toolCalls: 0, tokens: 0, costUsd: 0 };
 
@@ -206,10 +230,14 @@ function collectSpanEntries(spans: SpanDetail[]): {
         outputMessagesText(readString(span.params, "gen_ai.output.messages"));
       if (spanReplyText !== null) {
         spanReplies.push({
-          kind: "assistant_message",
-          atMs: span.endTimeMs ?? span.startTimeMs,
-          text: spanReplyText,
-          model: modelOf(span),
+          entry: {
+            kind: "assistant_message",
+            atMs: span.endTimeMs ?? span.startTimeMs,
+            text: spanReplyText,
+            model: modelOf(span),
+          },
+          windowStartMs: span.startTimeMs,
+          windowEndMs: span.endTimeMs ?? span.startTimeMs,
         });
       }
       continue;
@@ -571,7 +599,12 @@ function detectAgentFrom({
   return "unknown";
 }
 
-function isModelCallSpan(spanName: string): boolean {
+/**
+ * Exported for the drawer's session banner, which answers "which model did
+ * this session end on" over the same spans — one predicate, or the two
+ * drift (they already had, over the doStream exclude).
+ */
+export function isModelCallSpan(spanName: string): boolean {
   if (MODEL_CALL_SPAN_EXCLUDES.has(spanName)) return false;
   if (MODEL_CALL_SPAN_NAMES.has(spanName)) return true;
   // Copilot names its call span after the operation AND the model
@@ -632,7 +665,12 @@ function readValue(
   return cursor;
 }
 
-function readString(
+/**
+ * Exported alongside {@link isModelCallSpan} for the session banner: any
+ * reader of `SpanDetail.params` needs the dual-shape resolution or nested
+ * params silently read as absent.
+ */
+export function readString(
   attrs: Record<string, unknown> | null | undefined,
   key: string,
 ): string | null {
@@ -701,13 +739,7 @@ function messagesReplyText(messages: unknown[]): string | null {
       const texts: string[] = [];
       for (const part of message.parts) {
         const p = part as { text?: unknown; thought?: unknown };
-        if (
-          typeof p.text === "string" &&
-          p.text.length > 0 &&
-          p.thought !== true
-        ) {
-          texts.push(p.text);
-        }
+        if (isReplyTextPart(p)) texts.push(p.text);
       }
       if (texts.length > 0) return texts.join("\n");
     }
@@ -715,12 +747,12 @@ function messagesReplyText(messages: unknown[]): string | null {
       const texts: string[] = [];
       for (const part of message.content) {
         const p = part as { text?: unknown; type?: unknown };
+        const partType = p.type;
         if (
-          typeof p.text === "string" &&
-          p.text.length > 0 &&
-          (p.type === undefined ||
-            p.type === "text" ||
-            p.type === "output_text")
+          (partType === undefined ||
+            partType === "text" ||
+            partType === "output_text") &&
+          isReplyTextPart(p)
         ) {
           texts.push(p.text);
         }
@@ -752,13 +784,7 @@ function geminiResponseText(raw: string | null): string | null {
         if (!Array.isArray(parts)) continue;
         for (const part of parts) {
           const p = part as { text?: unknown; thought?: unknown };
-          if (
-            typeof p.text === "string" &&
-            p.text.length > 0 &&
-            p.thought !== true
-          ) {
-            texts.push(p.text);
-          }
+          if (isReplyTextPart(p)) texts.push(p.text);
         }
       }
     }

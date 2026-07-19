@@ -542,6 +542,38 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
       expect(transcript.totals.modelCalls).toBe(1);
       expect(transcript.agent).toBe("gemini_cli");
     });
+
+    it("keeps a later turn's span reply when only THAT turn's log was lost", () => {
+      // The log read is capped, so a long session can have log replies for
+      // some turns and not others. Suppression is per call: a turn whose
+      // api_response never arrived must keep its span-derived text.
+      const laterTurnSpan = {
+        spanId: "llm-2",
+        name: "llm_call",
+        startTimeMs: 60_000,
+        endTimeMs: 61_000,
+        status: "ok",
+        metrics: { promptTokens: 100, completionTokens: 5 },
+        params: { "gen_ai.request.model": "gemini-3.5-flash" },
+        output: JSON.stringify({
+          type: "chat_messages",
+          value: [{ role: "assistant", content: "second answer" }],
+        }),
+      } as unknown as SpanDetail;
+
+      const transcript = buildCodingAgentTranscript({
+        spans: [...spans, laterTurnSpan],
+        logs,
+      });
+
+      const replies = transcript.entries.filter(
+        (entry) => entry.kind === "assistant_message",
+      );
+      expect(replies.map((reply) => reply.text)).toEqual([
+        "pong",
+        "second answer",
+      ]);
+    });
   });
 
   describe("given a codex session (contentless turn spans)", () => {
