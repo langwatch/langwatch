@@ -207,6 +207,23 @@ export const RETENTION_MANAGED_TABLES = Object.keys(
  * Tables included in the customer-visible production storage meter. Canonical
  * metrics follow trace retention, but remain shadow-only for pricing: their
  * raw source bytes and derived rows must not affect billed storage totals.
+ *
+ * `log_records` is deliberately NOT shadowed, and that asymmetry is the point:
+ * logs were already billed here via `stored_log_records`, which canonical logs
+ * replace, so shadowing them would stop billing log storage entirely once the
+ * legacy table drains. Metrics are a new data type that was never billed, so
+ * they stay shadowed until priced.
+ *
+ * This does not make the cutover a price rise. Both tables meter the record's
+ * *content*, not its physical row: `stored_log_records._size_bytes` is
+ * `MATERIALIZED byteSize(Body, Attributes, ResourceAttributes, …)` (00032),
+ * while `log_records._size_bytes` is app-supplied `canonicalSizeBytes` — the
+ * byte length of the canonical payload alone. The canonical row denormalises
+ * that content into BodyJson/BodyText, Attributes{,Flat}Json and a ZSTD(6)
+ * CanonicalPayload, and none of that duplication is billed; the delta is JSON
+ * serialisation overhead, not a multiple. Supplying `_size_bytes` from the app
+ * is a deliberate exception to 00032's "never pass _size_bytes in INSERTs" —
+ * possible only because these columns are DEFAULT 0 rather than MATERIALIZED.
  */
 const SHADOW_METRIC_STORAGE_TABLES = new Set<RetentionManagedTable>([
   "metric_data_points",

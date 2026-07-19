@@ -41,10 +41,6 @@ export class RecordMetricDataPointCommand implements CommandHandler<
     return payload.pointId;
   }
 
-  static makeJobId(payload: RecordMetricDataPointCommandData): string {
-    return payload.pointId;
-  }
-
   static getSpanAttributes(
     payload: RecordMetricDataPointCommandData,
   ): Record<string, string | number | boolean> {

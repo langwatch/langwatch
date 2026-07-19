@@ -61,8 +61,4 @@ export class RecordLogContributionCommand
   static getAggregateId(payload: RecordLogContributionCommandData): string {
     return payload.traceId;
   }
-
-  static makeJobId(payload: RecordLogContributionCommandData): string {
-    return payload.recordId;
-  }
 }

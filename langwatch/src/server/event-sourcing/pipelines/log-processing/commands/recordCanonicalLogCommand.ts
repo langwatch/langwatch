@@ -47,10 +47,6 @@ export class RecordCanonicalLogCommand
     return payload.recordId;
   }
 
-  static makeJobId(payload: RecordCanonicalLogCommandData): string {
-    return payload.recordId;
-  }
-
   static getSpanAttributes(
     payload: RecordCanonicalLogCommandData,
   ): Record<string, string | number | boolean> {

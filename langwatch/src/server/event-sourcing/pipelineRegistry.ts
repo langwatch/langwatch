@@ -159,6 +159,7 @@ import {
   type TraceProcessingPipelineDeps,
 } from "./pipelines/trace-processing/pipeline";
 import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
+import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
@@ -890,6 +891,10 @@ export class PipelineRegistry {
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
         traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
           this.deps.repositories.traceAnalyticsRollup,
+        ),
+        // CUTOVER ONLY — see TraceProcessingPipelineDeps.logRecordAppendStore.
+        logRecordAppendStore: new LogRecordAppendStore(
+          this.deps.repositories.logRecordStorage,
         ),
         // Redis cache is the slim fold's ONLY warm read path — its store's
         // get() returns null by design (lossy row, no read-back), and on a

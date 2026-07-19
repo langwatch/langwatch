@@ -29,6 +29,7 @@ import {
   clampSpanShardCount,
   spanCommandGroupKey,
 } from "./commands/spanCommandGroupKey";
+import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
 import {
   type TraceAnalyticsData,
@@ -48,11 +49,23 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
 } from "./schemas/constants";
 import type { TraceProcessingEvent } from "./schemas/events";
+import type { NormalizedLogRecord } from "./schemas/logRecords";
 import type { NormalizedSpan } from "./schemas/spans";
 import { TraceRequestUtils } from "./utils/traceRequest.utils";
 
 export interface TraceProcessingPipelineDeps {
   spanAppendStore: AppendStore<NormalizedSpan>;
+  /**
+   * CUTOVER ONLY. Canonical logs replace this path, and nothing in this build
+   * sends `recordLog` — but during a rolling deploy an old instance still can,
+   * and the `recordLog` command stays registered to accept it. Without this
+   * projection those commands append a `log_record_received` event that no
+   * projection consumes, so the record reaches neither `stored_log_records`
+   * nor canonical `log_records`. Migration 00049 retains the legacy table on
+   * exactly this promise. Remove together with `recordLog`, the legacy table
+   * and this store once no pre-cutover instance can be running.
+   */
+  logRecordAppendStore: AppendStore<NormalizedLogRecord>;
   /** ADR-034 Phase 1: per-span rollup writer (app-side, replaces the MV). */
   traceAnalyticsRollupAppendStore: AppendStore<TraceAnalyticsRollupRow>;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
@@ -175,6 +188,14 @@ export function createTraceProcessingPipeline(
       "traceAnalyticsRollup",
       new TraceAnalyticsRollupMapProjection({
         store: deps.traceAnalyticsRollupAppendStore,
+      }),
+    )
+    // CUTOVER ONLY — drains `recordLog` commands still in flight from
+    // pre-canonical instances. See logRecordAppendStore on the deps above.
+    .withMapProjection(
+      "logRecordStorage",
+      new LogRecordStorageMapProjection({
+        store: deps.logRecordAppendStore,
       }),
     )
     .withReactor("traceSummary", "originGate", deps.originGateReactor)

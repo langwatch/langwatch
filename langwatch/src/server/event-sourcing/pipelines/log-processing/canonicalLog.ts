@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import {
   CLAUDE_CODE_KIND_ATTR,
@@ -8,6 +7,7 @@ import {
 import type { DeepPartial } from "~/utils/types";
 import {
   compareOrdinal,
+  sha256,
   stableStringify,
 } from "../metric-processing/canonical/serialization";
 import type { PIIRedactionLevel } from "../trace-processing/schemas/commands";
@@ -66,12 +66,15 @@ export interface CanonicalLogPreparationResult {
   errors: string[];
 }
 
+/**
+ * Deliberately NOT serialization.isRecord, which treats arrays as records
+ * (`typeof [] === "object"`). OTLP log bodies are an AnyValue union in which
+ * arrayValue and kvlistValue are distinct cases, so folding arrays into the
+ * record branch would canonicalise a body array as an object and change its
+ * RecordId. Keep the two apart; do not "share" them.
+ */
 const isRecord = (value: unknown): value is UnknownRecord =>
   value !== null && typeof value === "object" && !Array.isArray(value);
-
-function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
-}
 
 function longBitsToBigInt(value: UnknownRecord): bigint {
   const low = BigInt(Number(value.low ?? 0) >>> 0);

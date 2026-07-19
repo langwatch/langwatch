@@ -103,9 +103,12 @@ export class LogRequestCollectionService {
           redactionService: this.piiRedactionService,
           acceptedAt: Date.now(),
         });
-        let acceptedLogRecords = preparation.accepted.length;
-        let rejectedLogRecords = preparation.rejectedLogRecords;
-        const errors = [...preparation.errors];
+        // Only preparation can reject: it is the sole stage that judges the
+        // sender's payload. Everything after it either persists the record or
+        // fails on our side, and neither may be reported as a rejection.
+        const acceptedLogRecords = preparation.accepted.length;
+        const rejectedLogRecords = preparation.rejectedLogRecords;
+        const errors = preparation.errors;
 
         if (preparation.accepted.length > 0) {
           try {
@@ -153,11 +156,10 @@ export class LogRequestCollectionService {
             try {
               contributions.push(makeTraceContribution(prepared));
             } catch (error) {
-              acceptedLogRecords--;
-              rejectedLogRecords++;
-              const message =
-                error instanceof Error ? error.message : String(error);
-              errors.push(`${record.recordId}: ${message}`);
+              // Best-effort, for the same reason the enqueue failure below is:
+              // the canonical record is already durably enqueued, so failing to
+              // derive its trace contribution must not tell the sender to
+              // discard a log we hold. Log only — do not touch the counters.
               this.logger.error(
                 {
                   error,
