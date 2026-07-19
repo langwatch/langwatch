@@ -280,15 +280,18 @@ export abstract class HandledError extends Error {
  * `isHandled` brand as an own property, so matching on that recognises those
  * duplicates while still rejecting unrelated objects.
  *
- * Deliberately does not match a deserialised wire payload: that is a plain
- * object with no prototype, so the methods this guard promises (`serialize`)
- * would not exist. Wire payloads go through the boundary schema instead —
+ * The `instanceof Error` requirement is load-bearing, not belt-and-braces: the
+ * brand is an own *enumerable* field, so `JSON.parse(JSON.stringify(err))` — or
+ * a worker `postMessage` structured clone — produces a plain object that still
+ * carries `isHandled: true` but has no prototype, and therefore none of the
+ * methods this guard promises (`serialize`). Requiring a real `Error` rejects
+ * those while still admitting bundler duplicates, since `Error` is the realm's
+ * shared global. Wire payloads go through the boundary schema instead —
  * `handledErrorFromHerr` here, or `isHandledErrorLike` in `packages/api`.
  */
 function hasHandledErrorBrand(error: unknown): error is HandledError {
   return (
-    typeof error === "object" &&
-    error !== null &&
+    error instanceof Error &&
     (error as { isHandled?: unknown }).isHandled === true
   );
 }

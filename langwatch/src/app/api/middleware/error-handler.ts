@@ -80,7 +80,10 @@ function determineErrorResponse(
   // we only read fields off it below, never call its methods.
   if (
     HandledError.isHandled(error) ||
-    ("code" in error && "httpStatus" in error)
+    (typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      "httpStatus" in error)
   ) {
     const { code, message, httpStatus, meta } = error as HandledError;
     const { tips, docsUrl, fault } = error as HandledError;

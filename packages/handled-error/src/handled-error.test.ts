@@ -177,6 +177,9 @@ describe("HandledError.isHandled", () => {
   it.each([
     ["a plain Error", new Error("boom")],
     ["a serialised payload with no brand", { code: "x", httpStatus: 500 }],
+    // A structured clone / JSON round-trip keeps the brand but loses the
+    // prototype, so `.serialize()` would not exist — must not match.
+    ["a cloned payload carrying the brand", { isHandled: true, code: "x" }],
     ["a non-true brand", { isHandled: "yes" }],
     ["null", null],
     ["undefined", undefined],
