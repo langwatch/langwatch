@@ -269,7 +269,7 @@ export class LangyWorkerRestartingError extends HandledError {
  */
 /** Walk a HandledError chain (the error + its reasons, depth-first) for a kind. */
 function domainErrorChainHas(error: Error, code: string): boolean {
-  if (!(error instanceof HandledError)) return false;
+  if (!HandledError.isHandled(error)) return false;
   if (error.code === code) return true;
   return error.reasons.some((r) => domainErrorChainHas(r, code));
 }
@@ -420,7 +420,7 @@ function unhandledShape(): SerializedHandledError {
  * that — falls through to `unknown`.
  */
 export function classifyLangyTurnError(error: unknown): SerializedHandledError {
-  if (error instanceof HandledError) return error.serialize();
+  if (HandledError.isHandled(error)) return error.serialize();
   // fetch/AbortSignal failures arrive as DOMException/TypeError, never as ours.
   if (isTimeout(error)) {
     return new LangyTurnTimeoutError(AGENT_CHAT_TIMEOUT_MS).serialize();

@@ -146,7 +146,7 @@ export function errorFormatterForTesting({
     : null;
 
   const domainError =
-    error.cause instanceof HandledError ? error.cause.serialize() : null;
+    HandledError.isHandled(error.cause) ? error.cause.serialize() : null;
 
   // Surface ModelNotConfiguredError on the wire so the frontend
   // interceptor in `utils/trpcError.ts::extractMissingModelInfo` can
@@ -198,11 +198,11 @@ export function errorFormatterForTesting({
     error.code === "INTERNAL_SERVER_ERROR" ||
     shape?.data?.code === "INTERNAL_SERVER_ERROR";
   const message =
-    isInternalServerError && !(error.cause instanceof HandledError)
+    isInternalServerError && !HandledError.isHandled(error.cause)
       ? HandledError.toUserMessage(error.cause)
       : shape.message;
   const shapeData = { ...shape.data };
-  if (isInternalServerError && !(error.cause instanceof HandledError)) {
+  if (isInternalServerError && !HandledError.isHandled(error.cause)) {
     // tRPC includes stacks in development error shapes. Local callers should
     // exercise the same safe wire contract as production callers.
     delete shapeData.stack;
@@ -518,7 +518,7 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
  */
 const handledErrorMiddleware = t.middleware(async ({ next }) => {
   const result = await next();
-  if (!result.ok && result.error.cause instanceof HandledError) {
+  if (!result.ok && HandledError.isHandled(result.error.cause)) {
     const domainError = result.error.cause;
     throw new TRPCError({
       code: handledErrorToTRPCCode(domainError),
@@ -606,16 +606,9 @@ export function handleTrpcCallLogging({
 
     const cause =
       result.error instanceof TRPCError ? result.error.cause : undefined;
-    // Duck-typed alongside instanceof: a bundler can load a second copy of
-    // the package (see error-handler.ts).
-    const handledCause =
-      cause instanceof HandledError ||
-      (cause &&
-        typeof cause === "object" &&
-        "code" in cause &&
-        "httpStatus" in cause)
-        ? (cause as HandledError)
-        : undefined;
+    // isHandled also matches an instance from a second copy of the package,
+    // which bare `instanceof` misses — see its brand check.
+    const handledCause = HandledError.isHandled(cause) ? cause : undefined;
 
     // Include handled error code + fault in log data for structured
     // filtering (and spike alerting on handledErrorCode).

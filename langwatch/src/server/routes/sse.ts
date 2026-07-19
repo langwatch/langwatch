@@ -59,19 +59,9 @@ export function sseErrorFrame(err: unknown): Record<string, unknown> {
 /** The HandledError behind a stream failure, if there is one. */
 function handledCauseOf(err: unknown): HandledError | undefined {
   const candidate = err instanceof TRPCError ? err.cause : err;
-  if (candidate instanceof HandledError) return candidate;
-  // A bundler can load a second copy of the package — duck-type like the
-  // Hono error handler does (see error-handler.ts).
-  if (
-    candidate &&
-    typeof candidate === "object" &&
-    "code" in candidate &&
-    "httpStatus" in candidate &&
-    typeof (candidate as { serialize?: unknown }).serialize === "function"
-  ) {
-    return candidate as HandledError;
-  }
-  return undefined;
+  // isHandled also matches an instance from a second copy of the package,
+  // which bare `instanceof` misses — see its brand check.
+  return HandledError.isHandled(candidate) ? candidate : undefined;
 }
 
 /**
@@ -274,7 +264,9 @@ secured.access(
           writeData({ type: "complete" });
           end();
         } catch (error) {
-          logSseError(error, { error, path, input }, "SSE handler error");
+          // No `input` here: it is the raw request payload, which may carry
+          // PII — same contract as the observable error path above.
+          logSseError(error, { error, path }, "SSE handler error");
           writeData(sseErrorFrame(error));
           end();
         }

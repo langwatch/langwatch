@@ -74,11 +74,17 @@ function determineErrorResponse(
   },
 ): { statusCode: ContentfulStatusCode; response: object } {
   // HandledErrors are handled first — normalize to client-safe shape.
-  // Use code + httpStatus check instead of instanceof to handle
-  // module-boundary class identity mismatches (a bundler can load two
-  // copies of the same module).
-  // See handled-error.ts: "use code instead of instanceof in cross-process cases"
-  if (HandledError.is(error) || ("code" in error && "httpStatus" in error)) {
+  // isHandled covers real instances plus ones from a second copy of the
+  // module, which bare `instanceof` misses. The code + httpStatus tail
+  // additionally accepts an already-serialised payload reaching this handler;
+  // we only read fields off it below, never call its methods.
+  if (
+    HandledError.isHandled(error) ||
+    (typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      "httpStatus" in error)
+  ) {
     const { code, message, httpStatus, meta } = error as HandledError;
     const { tips, docsUrl, fault } = error as HandledError;
     return {
