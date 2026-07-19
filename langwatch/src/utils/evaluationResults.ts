@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { SerializedHandledError } from "~/server/app-layer/handled-error";
+import type { SerializedHandledError } from "@langwatch/handled-error";
 
 /**
  * Parsed evaluation result with status information.
@@ -36,6 +36,9 @@ export type ParsedEvaluationResult = {
 const serializedReasonSchema: z.ZodType<{
   code: string;
   kind: string;
+  fault?: "customer" | "platform" | "provider";
+  traceId?: string;
+  spanId?: string;
   meta?: Record<string, unknown>;
   tips?: readonly string[];
   docsUrl?: string;
@@ -44,6 +47,9 @@ const serializedReasonSchema: z.ZodType<{
   z.object({
     code: z.string(),
     kind: z.string(),
+    fault: z.enum(["customer", "platform", "provider"]).optional(),
+    traceId: z.string().optional(),
+    spanId: z.string().optional(),
     meta: z.record(z.unknown()).optional(),
     tips: z.array(z.string()).optional(),
     docsUrl: z.string().optional(),

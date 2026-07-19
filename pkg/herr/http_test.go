@@ -291,3 +291,20 @@ func TestBodyFromBody_RoundTripsTipsDocsURLFault(t *testing.T) {
 	again := Body(e)
 	assert.Equal(t, body, again)
 }
+
+func TestWriteHTTP_InvalidFaultDropped(t *testing.T) {
+	RegisterStatus("faulty", http.StatusBadRequest)
+
+	// A typo'd fault must not reach the wire — the TS side parses only the
+	// three contract values.
+	e := New(context.Background(), "faulty", M{"message": "boom", "fault": "custmer"})
+
+	rec := httptest.NewRecorder()
+	WriteHTTP(rec, e)
+
+	var resp ErrorResponse
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
+
+	assert.Empty(t, resp.Error.Fault)
+	assert.NotContains(t, rec.Body.String(), "custmer")
+}

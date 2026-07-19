@@ -1,6 +1,6 @@
-import { docsUrl } from "~/utils/docsUrl";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 
-import { HandledError, NotFoundError } from "../app-layer/handled-error";
+import { remediation } from "../app-layer/error-remediation";
 
 /**
  * Thrown when an API key cannot be located by id.
@@ -11,11 +11,7 @@ export class ApiKeyNotFoundError extends NotFoundError {
   constructor(apiKeyId: string, options: { reasons?: readonly Error[] } = {}) {
     super("api_key_not_found", "API Key", apiKeyId, {
       meta: { apiKeyId },
-      tips: [
-        "Check the API key id — the key may have been deleted or never created",
-        "List the keys on the organization to find the right id",
-      ],
-      docsUrl: docsUrl("/api-reference/api-keys/overview"),
+      ...remediation("api_key_not_found"),
       ...options,
     });
     this.name = "ApiKeyNotFoundError";
@@ -35,10 +31,7 @@ export class ApiKeyNotOwnedError extends HandledError {
     super("api_key_not_owned", "Not authorized to modify this API Key", {
       meta: { apiKeyId },
       httpStatus: 403,
-      tips: [
-        "Ask the key's owner or an organization admin to make this change",
-      ],
-      docsUrl: docsUrl("/api-reference/api-keys/overview"),
+      ...remediation("api_key_not_owned"),
       ...options,
     });
     this.name = "ApiKeyNotOwnedError";
@@ -58,10 +51,7 @@ export class ApiKeyAlreadyRevokedError extends HandledError {
     super("api_key_already_revoked", "API Key is already revoked", {
       meta: { apiKeyId },
       httpStatus: 409,
-      tips: [
-        "Revoked keys cannot be reactivated — create a new API key if you need one",
-      ],
-      docsUrl: docsUrl("/api-reference/api-keys/create-api-key"),
+      ...remediation("api_key_already_revoked"),
       ...options,
     });
     this.name = "ApiKeyAlreadyRevokedError";
@@ -90,10 +80,7 @@ export class ApiKeyPermissionDeniedError extends HandledError {
       {
         meta: { permission, ...options.meta },
         httpStatus: 403,
-        tips: [
-          "Re-create the API key with the required scope, or ask an admin to raise your role",
-        ],
-        docsUrl: docsUrl("/api-reference/api-keys/create-api-key"),
+        ...remediation("api_key_permission_denied"),
         reasons: options.reasons,
       },
     );
@@ -118,10 +105,7 @@ export class ApiKeyScopeViolationError extends HandledError {
   ) {
     super("api_key_scope_violation", message, {
       httpStatus: 403,
-      tips: [
-        "A key cannot be granted a scope you do not hold yourself — lower the requested scope or ask an admin to create the key",
-      ],
-      docsUrl: docsUrl("/api-reference/api-keys/create-api-key"),
+      ...remediation("api_key_scope_violation"),
       ...options,
     });
     this.name = "ApiKeyScopeViolationError";

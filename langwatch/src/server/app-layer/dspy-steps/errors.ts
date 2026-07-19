@@ -1,4 +1,4 @@
-import { NotFoundError } from "../handled-error";
+import { NotFoundError } from "@langwatch/handled-error";
 
 export class DspyStepNotFoundError extends NotFoundError {
   declare readonly code: "dspy_step_not_found";

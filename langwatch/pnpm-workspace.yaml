@@ -11,13 +11,13 @@ packages:
   - "../packages/handled-error"
 
 minimumReleaseAge: 10080
-# Transitive ranges resolving to versions still inside the 7-day maturity
-# window (ws@8.21.1, @browserbasehq/sdk, postcss as of 2026-07-18). Drop each
-# entry once that version ages past the gate.
+# Version-pinned exemptions for releases still inside the 7-day maturity
+# window (as of 2026-07-18). Version-qualified so only the pinned release
+# bypasses the gate; drop each entry once that version ages past it.
 minimumReleaseAgeExclude:
-  - ws
-  - "@browserbasehq/sdk"
-  - postcss
+  - ws@8.21.1
+  - "@browserbasehq/sdk@2.16.0"
+  - postcss@8.5.19
 
 overrides:
   pino: ^10.3.0

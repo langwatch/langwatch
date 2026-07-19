@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import type { HandledError } from "~/server/app-layer/handled-error";
+import type { HandledError } from "@langwatch/handled-error";
 import {
   langyAgentErrorFromErrorFrame,
   serializeLangyTurnError,

@@ -1,4 +1,4 @@
-import { HandledError } from "../handled-error";
+import { HandledError } from "@langwatch/handled-error";
 
 export class BroadcasterNotActiveError extends HandledError {
   declare readonly code: "broadcaster_not_active";

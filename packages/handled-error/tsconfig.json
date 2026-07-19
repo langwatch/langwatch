@@ -6,6 +6,8 @@
     "lib": ["es2020"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",

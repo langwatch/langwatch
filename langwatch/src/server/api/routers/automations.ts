@@ -12,7 +12,7 @@ import {
 import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
 import { actionParamsSchemaFor } from "~/automations/providers/server";
 import { getApp } from "~/server/app-layer/app";
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { listSlackChannels } from "~/server/triggers/slackWebApi";
 import {

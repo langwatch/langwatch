@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   HandledError,
@@ -61,13 +61,18 @@ describe("HandledError.serialize", () => {
   });
 
   it("uses the configured trace URL provider", () => {
-    setTraceUrlProvider((traceId) =>
+    const provider = vi.fn((traceId: string | undefined) =>
       traceId ? `https://grafana/${traceId}` : undefined,
     );
+    setTraceUrlProvider(provider);
     try {
-      const serialized = new TestError().serialize();
-      // No active span in tests → no traceId → no traceUrl.
-      expect(serialized.traceUrl).toBeUndefined();
+      new TestError().serialize();
+      // No active span in tests → no traceId → provider consulted with undefined.
+      expect(provider).toHaveBeenCalledWith(undefined);
+
+      const withIds = new TestError("with ids", { traceId: "abc123" });
+      expect(withIds.serialize().traceUrl).toBe("https://grafana/abc123");
+      expect(provider).toHaveBeenCalledWith("abc123");
     } finally {
       setTraceUrlProvider(() => undefined);
     }
@@ -80,6 +85,8 @@ describe("handledErrorFromHerr", () => {
       type: "budget_exceeded",
       message: "spending limit reached",
       meta: { limit: 100 },
+      trace_id: "0af7651916cd43dd8448eb211c80319c",
+      span_id: "b7ad6b7169203331",
       fault: "customer",
       tips: ["Contact your admin to raise the limit"],
       docs_url: "https://docs.langwatch.ai/gateway/budgets",
@@ -90,6 +97,10 @@ describe("handledErrorFromHerr", () => {
     expect(err.fault).toBe("customer");
     expect(err.tips).toEqual(["Contact your admin to raise the limit"]);
     expect(err.docsUrl).toBe("https://docs.langwatch.ai/gateway/budgets");
+    // Wire ids are preserved on the error itself, not buried in meta.
+    expect(err.traceId).toBe("0af7651916cd43dd8448eb211c80319c");
+    expect(err.spanId).toBe("b7ad6b7169203331");
+    expect(err.meta).not.toHaveProperty("traceId");
     expect(err.serialize().reasons[0]).toMatchObject({ code: "unknown" });
   });
 

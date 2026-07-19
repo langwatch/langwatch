@@ -19,7 +19,7 @@ import {
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
 import { getApp } from "../../app-layer/app";
-import { HandledError } from "../../app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
 import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";

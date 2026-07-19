@@ -65,6 +65,10 @@ const originalResolveFilename = (Module as any)._resolveFilename;
 // (OTEL_EXPORTER_OTLP_ENDPOINT); it is a no-op when observability is unconfigured.
 await import("./instrumentation.node");
 
+// Registers the Grafana trace-link builder with @langwatch/handled-error
+// (side-effect import; see the module for why order doesn't matter).
+await import("./server/handled-error-wiring");
+
 // Intentional inline dynamic import (exception to the "no inline import" rule):
 // - `./start` must not evaluate until after dotenv.config() above has run,
 //   because start.ts's transitive imports read process.env at module load.

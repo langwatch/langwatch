@@ -1,4 +1,6 @@
-import { HandledError, NotFoundError } from "~/server/app-layer/handled-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
+
+import { remediation } from "../error-remediation";
 
 /**
  * Langy conversation domain errors (ADR-046).
@@ -32,10 +34,7 @@ export class LangyConversationNotFoundError extends NotFoundError {
   ) {
     super("langy_conversation_not_found", "Langy conversation", conversationId, {
       meta: { conversationId },
-      tips: [
-        "Check the conversation id — it may be archived or belong to another project",
-        "Start a new conversation to keep going",
-      ],
+      ...remediation("langy_conversation_not_found"),
       ...options,
     });
     this.name = "LangyConversationNotFoundError";
@@ -57,9 +56,7 @@ export class LangyConversationNotOwnedError extends HandledError {
       {
         meta: { conversationId },
         httpStatus: 403,
-        tips: [
-          "Shared conversations can be viewed but only the owner can continue them — start a new conversation instead",
-        ],
+        ...remediation("langy_conversation_not_owned"),
       },
     );
     this.name = "LangyConversationNotOwnedError";
@@ -75,9 +72,7 @@ export class LangyModelNotConfiguredError extends HandledError {
       "No model configured for this project.",
       {
         httpStatus: 409,
-        tips: [
-          "Pick a model in the project's model settings, then retry",
-        ],
+        ...remediation("langy_model_not_configured"),
         reasons: options.reasons,
       },
     );
@@ -95,9 +90,7 @@ export class LangyModelNotAllowedError extends HandledError {
       {
         meta: { model },
         httpStatus: 400,
-        tips: [
-          "Choose one of the models configured for this project and retry",
-        ],
+        ...remediation("langy_model_not_allowed"),
       },
     );
     this.name = "LangyModelNotAllowedError";
@@ -113,9 +106,7 @@ export class LangyEgressMisconfiguredError extends HandledError {
       "Langy egress policy is misconfigured for this project.",
       {
         httpStatus: 409,
-        tips: [
-          "Ask a workspace admin to review the project's outbound network policy — Langy refuses to run rather than leak",
-        ],
+        ...remediation("langy_egress_misconfigured"),
       },
     );
     this.name = "LangyEgressMisconfiguredError";
@@ -128,9 +119,7 @@ export class LangyInsufficientScopeError extends HandledError {
   constructor(message: string) {
     super("langy_insufficient_scope", message, {
       httpStatus: 409,
-      tips: [
-        "Ask a workspace admin to grant Langy permissions in this project",
-      ],
+      ...remediation("langy_insufficient_scope"),
     });
     this.name = "LangyInsufficientScopeError";
   }
@@ -145,9 +134,7 @@ export class LangyTurnInProgressError extends HandledError {
       "A response is already in progress for this conversation.",
       {
         httpStatus: 409,
-        tips: [
-          "Wait for the current response to finish before sending another message",
-        ],
+        ...remediation("langy_turn_in_progress"),
       },
     );
     this.name = "LangyTurnInProgressError";
@@ -163,9 +150,7 @@ export class LangyAgentUnavailableError extends HandledError {
     super("langy_agent_unavailable", message, {
       httpStatus: 503,
       fault: "platform",
-      tips: [
-        "Retry in a few seconds — the agent is down, mid-deploy, or restarting",
-      ],
+      ...remediation("langy_agent_unavailable"),
     });
     this.name = "LangyAgentUnavailableError";
   }

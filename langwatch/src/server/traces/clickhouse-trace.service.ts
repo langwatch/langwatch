@@ -4,7 +4,7 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
@@ -3313,15 +3313,18 @@ interface PromptStudioCandidateRow {
 
 export function isClickHouseMemoryLimitError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
+  // The resilient client translates the raw driver error into a handled
+  // `query_memory_exceeded`, wrapping the original in `reasons`.
+  if (error instanceof HandledError) {
+    return (
+      error.code === "query_memory_exceeded" ||
+      (error.reasons ?? []).some(isClickHouseMemoryLimitError)
+    );
+  }
   return (
     error.message.includes("MEMORY_LIMIT_EXCEEDED") ||
     error.message.toLowerCase().includes("memory limit exceeded") ||
-    (error as { type?: string }).type === "MEMORY_LIMIT_EXCEEDED" ||
-    // The resilient client translates the raw driver error into a handled
-    // `query_memory_exceeded` (or wraps it in `reasons`) — recognize both.
-    (error instanceof HandledError &&
-      (error.code === "query_memory_exceeded" ||
-        error.reasons.some(isClickHouseMemoryLimitError)))
+    (error as { type?: string }).type === "MEMORY_LIMIT_EXCEEDED"
   );
 }
 

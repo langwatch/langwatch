@@ -3,8 +3,8 @@ export {
   HandledError,
   NotFoundError,
   ValidationError
-} from "./handled-error";
-export type { SerializedHandledError } from "./handled-error";
+} from "@langwatch/handled-error";
+export type { SerializedHandledError } from "@langwatch/handled-error";
 
 // Tracing
 export { traced } from "./tracing";

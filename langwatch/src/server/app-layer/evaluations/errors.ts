@@ -1,10 +1,10 @@
-import { docsUrl } from "~/utils/docsUrl";
-
 import {
   HandledError,
   type HandledErrorOptions,
   NotFoundError,
-} from "../handled-error";
+} from "@langwatch/handled-error";
+
+import { remediation } from "../error-remediation";
 
 export class EvaluationNotFoundError extends NotFoundError {
   declare readonly code: "evaluation_not_found";
@@ -15,11 +15,7 @@ export class EvaluationNotFoundError extends NotFoundError {
   ) {
     super("evaluation_not_found", "Evaluation", evaluationId, {
       meta: { evaluationId },
-      tips: [
-        "Check the evaluation id — it may belong to a different project",
-        "If the evaluation was just started, retry in a few seconds — evaluations run asynchronously",
-      ],
-      docsUrl: docsUrl("/evaluations/overview"),
+      ...remediation("evaluation_not_found"),
       ...options,
     });
     this.name = "EvaluationNotFoundError";
@@ -36,11 +32,7 @@ export class TraceNotEvaluatableError extends HandledError {
     super("trace_not_evaluatable", `Trace ${traceId} is not evaluatable`, {
       meta: { traceId },
       httpStatus: 422,
-      tips: [
-        "Check that the trace contains the inputs/outputs the evaluator expects",
-        "If the trace was just ingested, retry in a few seconds — ingestion is asynchronous",
-      ],
-      docsUrl: docsUrl("/evaluations/overview"),
+      ...remediation("trace_not_evaluatable"),
       ...options,
     });
     this.name = "TraceNotEvaluatableError";
@@ -56,10 +48,7 @@ export class EvaluatorConfigError extends HandledError {
   ) {
     super("evaluator_config_error", message, {
       httpStatus: 422,
-      tips: [
-        "Fix the evaluator config named in the message — check the evaluator's expected settings schema",
-      ],
-      docsUrl: docsUrl("/evaluations/evaluators/list"),
+      ...remediation("evaluator_config_error"),
       ...options,
     });
     this.name = "EvaluatorConfigError";
@@ -75,10 +64,7 @@ export class EvaluatorExecutionError extends HandledError {
       // The evaluator backend failed to run — an execution failure on our
       // side, not caller error.
       fault: "platform",
-      tips: [
-        "Retry in a few seconds — the evaluator backend failed to execute this run",
-        "If it persists, check the LangWatch status page or contact support",
-      ],
+      ...remediation("evaluator_execution_error"),
       ...options,
     });
     this.name = "EvaluatorExecutionError";
@@ -109,11 +95,7 @@ export class EvaluatorMissingFieldError extends HandledError {
         // client Bad Request, not a semantic 422) — existing API consumers
         // of this legacy endpoint keep seeing the same status code.
         httpStatus: 400,
-        tips: [
-          `Provide the missing field in the request (see meta.field)`,
-          "Check the evaluator's expected input schema for the fields it requires",
-        ],
-        docsUrl: docsUrl("/evaluations/evaluators/list"),
+        ...remediation("evaluator_missing_field"),
         ...options,
       },
     );
@@ -130,10 +112,7 @@ export class EvaluatorNotFoundError extends NotFoundError {
   ) {
     super("evaluator_not_found", "Evaluator", evaluatorType, {
       meta: { evaluatorType },
-      tips: [
-        "Check the evaluator type against the list of available evaluators",
-      ],
-      docsUrl: docsUrl("/evaluations/evaluators/list"),
+      ...remediation("evaluator_not_found"),
       ...options,
     });
     this.name = "EvaluatorNotFoundError";

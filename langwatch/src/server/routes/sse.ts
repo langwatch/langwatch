@@ -29,7 +29,7 @@ async function getAppRouter() {
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { createInnerTRPCContext } from "~/server/api/trpc";
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { getServerAuthSession } from "~/server/auth";
 
 const logger = createLogger("langwatch:sse");
@@ -42,13 +42,7 @@ const logger = createLogger("langwatch:sse");
  * message — the raw detail stays server-side in the log (ADR-045).
  */
 export function sseErrorFrame(err: unknown): Record<string, unknown> {
-  const cause = err instanceof TRPCError ? err.cause : undefined;
-  const handled =
-    cause instanceof HandledError
-      ? cause
-      : err instanceof HandledError
-        ? err
-        : undefined;
+  const handled = handledCauseOf(err);
   if (handled) {
     return {
       type: "error",
@@ -60,6 +54,33 @@ export function sseErrorFrame(err: unknown): Record<string, unknown> {
     return { type: "error", message: err.message };
   }
   return { type: "error", message: "An unknown error occurred" };
+}
+
+/** The HandledError behind a stream failure, if there is one. */
+function handledCauseOf(err: unknown): HandledError | undefined {
+  if (err instanceof TRPCError && err.cause instanceof HandledError) {
+    return err.cause;
+  }
+  return err instanceof HandledError ? err : undefined;
+}
+
+/**
+ * Stream-failure logging, same fault-axis rule as the tRPC and Hono request
+ * loggers: customer-fault handled errors warn (spike-watched), platform /
+ * provider and unhandled errors log at error.
+ */
+function logSseError(err: unknown, logData: Record<string, unknown>, msg: string) {
+  const handled = handledCauseOf(err);
+  const level = handled && handled.fault === "customer" ? "warn" : "error";
+  logger[level](
+    {
+      ...logData,
+      ...(handled
+        ? { handledErrorCode: handled.code, handledErrorFault: handled.fault }
+        : {}),
+    },
+    msg,
+  );
 }
 
 const secured = createServiceApp({ basePath: "/api" });
@@ -225,7 +246,7 @@ secured.access(
                 end();
               },
               error: (err: unknown) => {
-                logger.error({ err, path }, "SSE observable error");
+                logSseError(err, { err, path }, "SSE observable error");
                 writeData(sseErrorFrame(err));
                 end();
               },
@@ -243,7 +264,7 @@ secured.access(
           writeData({ type: "complete" });
           end();
         } catch (error) {
-          logger.error({ error, path, input }, "SSE handler error");
+          logSseError(error, { error, path, input }, "SSE handler error");
           writeData(sseErrorFrame(error));
           end();
         }

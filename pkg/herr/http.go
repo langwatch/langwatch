@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 
 	"go.opentelemetry.io/otel/trace"
 )
@@ -140,45 +141,61 @@ func FromBody(body ErrorBody) E {
 	return e
 }
 
+// validFaults is the shared three-value fault contract — the TS side
+// (HandledErrorFault, and the nlpgo envelope schema) accepts exactly these.
+// Anything else in Meta["fault"] is dropped rather than emitted, so a typo
+// can't fail parsing downstream.
+var validFaults = map[string]bool{"customer": true, "platform": true, "provider": true}
+
+// reservedMetaKeys are promoted to first-class ErrorBody fields and stripped
+// from the exposed Meta.
+var reservedMetaKeys = []string{"message", "tips", "docs_url", "fault"}
+
+func metaString(m M, key string) string {
+	s, _ := m[key].(string)
+	return s
+}
+
+func metaStrings(m M, key string) []string {
+	switch v := m[key].(type) {
+	case []string:
+		return v
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok && s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
+}
+
 func toErrorBody(e E) ErrorBody {
 	body := ErrorBody{
 		Type:    string(e.Code),
 		Message: string(e.Code),
 	}
 
-	if msg, ok := e.Meta["message"].(string); ok && msg != "" {
+	if msg := metaString(e.Meta, "message"); msg != "" {
 		body.Message = msg
 	}
-	if tips, ok := e.Meta["tips"]; ok {
-		switch t := tips.(type) {
-		case []string:
-			if len(t) > 0 {
-				body.Tips = t
-			}
-		case []any:
-			for _, tip := range t {
-				if s, ok := tip.(string); ok && s != "" {
-					body.Tips = append(body.Tips, s)
-				}
-			}
-		}
+	if tips := metaStrings(e.Meta, "tips"); len(tips) > 0 {
+		body.Tips = tips
 	}
-	if docsURL, ok := e.Meta["docs_url"].(string); ok && docsURL != "" {
-		body.DocsURL = docsURL
-	}
-	if fault, ok := e.Meta["fault"].(string); ok && fault != "" {
+	body.DocsURL = metaString(e.Meta, "docs_url")
+	if fault := metaString(e.Meta, "fault"); validFaults[fault] {
 		body.Fault = fault
 	}
 
-	// Expose Meta without "message"/"tips"/"docs_url"/"fault" (already promoted).
+	// Expose Meta without the reserved keys (already promoted).
 	if len(e.Meta) > 0 {
 		filtered := make(M, len(e.Meta))
 		for k, v := range e.Meta {
-			switch k {
-			case "message", "tips", "docs_url", "fault":
-				continue
+			if !slices.Contains(reservedMetaKeys, k) {
+				filtered[k] = v
 			}
-			filtered[k] = v
 		}
 		if len(filtered) > 0 {
 			body.Meta = filtered

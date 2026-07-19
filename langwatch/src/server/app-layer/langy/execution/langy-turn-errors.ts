@@ -22,7 +22,8 @@ import { trace } from "@opentelemetry/api";
 import {
   HandledError,
   type SerializedHandledError,
-} from "~/server/app-layer/handled-error";
+} from "@langwatch/handled-error";
+import { remediation } from "../../error-remediation";
 import { LangyModelNotConfiguredError } from "~/server/app-layer/langy/errors";
 
 /** How long we give the manager to answer one turn before we give up. */
@@ -40,9 +41,7 @@ export class LangyAgentUnavailableError extends HandledError {
     super("langy_agent_unavailable", message, {
       httpStatus: 503,
       fault: "platform",
-      tips: [
-        "Retry in a few seconds — the agent is down, mid-deploy, or restarting",
-      ],
+      ...remediation("langy_agent_unavailable"),
       meta: options.status !== undefined ? { status: options.status } : {},
     });
     this.name = "LangyAgentUnavailableError";
@@ -59,9 +58,7 @@ export class LangyAgentAtCapacityError extends HandledError {
   constructor() {
     super("langy_agent_at_capacity", "agent reported at-capacity", {
       httpStatus: 429,
-      tips: [
-        "Too many conversations are running at once — wait a few seconds and retry",
-      ],
+      ...remediation("langy_agent_at_capacity"),
     });
     this.name = "LangyAgentAtCapacityError";
   }
@@ -78,9 +75,7 @@ export class LangyAgentSessionLostError extends HandledError {
   constructor() {
     super("langy_agent_session_lost", "agent reported session-not-found", {
       httpStatus: 410,
-      tips: [
-        "The agent dropped this conversation before finishing — resend the message to pick it back up",
-      ],
+      ...remediation("langy_agent_session_lost"),
     });
     this.name = "LangyAgentSessionLostError";
   }
@@ -110,9 +105,7 @@ export class LangyGithubNotConnectedError extends HandledError {
       "agent required GitHub but the account is not connected",
       {
         httpStatus: 409,
-        tips: [
-          "Install the LangWatch GitHub App (Settings → Integrations) to let the agent open pull requests",
-        ],
+        ...remediation("langy_github_not_connected"),
       },
     );
     this.name = "LangyGithubNotConnectedError";
@@ -141,9 +134,7 @@ export class LangyGithubRepoNotAccessibleError extends HandledError {
       "the repository is not available to the LangWatch GitHub App",
       {
         httpStatus: 409,
-        tips: [
-          "Grant the LangWatch GitHub App access to that repository (Settings → Integrations → Configure), then retry",
-        ],
+        ...remediation("langy_github_repo_not_accessible"),
       },
     );
     this.name = "LangyGithubRepoNotAccessibleError";
@@ -170,9 +161,7 @@ export class LangyWorkerSpawnFailedError extends HandledError {
     super("langy_worker_spawn_failed", "agent reported worker-spawn failure", {
       httpStatus: 503,
       fault: "platform",
-      tips: [
-        "The agent failed to start for this turn — nothing was lost, retry in a moment",
-      ],
+      ...remediation("langy_worker_spawn_failed"),
     });
     this.name = "LangyWorkerSpawnFailedError";
   }
@@ -201,9 +190,7 @@ export class LangyWorkerStoppedError extends HandledError {
     super("langy_worker_stopped", "worker stopped before finishing the turn", {
       httpStatus: 503,
       fault: "platform",
-      tips: [
-        "The worker died mid-reply and the server already exhausted its recovery — the message is on record, retry manually",
-      ],
+      ...remediation("langy_worker_stopped"),
     });
     this.name = "LangyWorkerStoppedError";
   }
@@ -229,9 +216,7 @@ export class LangyAgentErroredError extends HandledError {
       // The agent answered deterministically — typically its LLM call was
       // rejected by the provider or gateway.
       fault: "provider",
-      tips: [
-        "The model call was rejected upstream — check meta/reasons for the provider's typed failure, then retry",
-      ],
+      ...remediation("langy_agent_errored"),
       reasons: options.reasons,
     });
     this.name = "LangyAgentErroredError";
@@ -246,9 +231,7 @@ export class LangyTurnTimeoutError extends HandledError {
     super("langy_turn_timeout", `agent turn timed out after ${timeoutMs}ms`, {
       httpStatus: 504,
       fault: "platform",
-      tips: [
-        "Retry — or ask for a narrower slice: a shorter time range or a single trace",
-      ],
+      ...remediation("langy_turn_timeout"),
       meta: { timeoutMs },
     });
     this.name = "LangyTurnTimeoutError";
@@ -269,7 +252,7 @@ export class LangyWorkerRestartingError extends HandledError {
       {
         httpStatus: 503,
         fault: "platform",
-        tips: ["An update interrupted this reply — resend the message"],
+        ...remediation("langy_worker_restarting"),
       },
     );
     this.name = "LangyWorkerRestartingError";

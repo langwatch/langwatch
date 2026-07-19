@@ -24,6 +24,9 @@ export interface SerializedReason {
    * removed once no consumer reads `kind`.
    */
   kind: string;
+  fault?: HandledErrorFault;
+  traceId?: string;
+  spanId?: string;
   meta?: Record<string, unknown>;
   tips?: readonly string[];
   docsUrl?: string;
@@ -165,12 +168,19 @@ export abstract class HandledError extends Error {
       tips?: readonly string[];
       docsUrl?: string;
       reasons?: readonly Error[];
+      /**
+       * Wire-provided trace/span ids (e.g. from a herr envelope). When set,
+       * they win over the active span — a deserialized error keeps the ids of
+       * the process that raised it, not whoever re-serializes it.
+       */
+      traceId?: string;
+      spanId?: string;
     } = {},
   ) {
     super(message);
     const ctx = trace.getActiveSpan()?.spanContext();
-    this.traceId = ctx?.traceId;
-    this.spanId = ctx?.spanId;
+    this.traceId = options.traceId ?? ctx?.traceId;
+    this.spanId = options.spanId ?? ctx?.spanId;
     this.meta = options.meta ?? {};
     this.httpStatus = options.httpStatus ?? 500;
     this.fault = options.fault ?? "customer";
@@ -256,18 +266,21 @@ export abstract class HandledError extends Error {
  * had been raised locally. Belongs in boundary middleware (wire schemas):
  * downstream code only ever receives the HandledError.
  */
-export function handledErrorFromHerr(body: HerrEnvelope): HandledError {
+export function handledErrorFromHerr(
+  body: HerrEnvelope,
+  options: { httpStatus?: number } = {},
+): HandledError {
   return new (class extends HandledError {
     constructor() {
       super(body.type, body.message, {
-        meta: {
-          ...body.meta,
-          ...(body.trace_id ? { traceId: body.trace_id } : {}),
-        },
+        meta: body.meta,
+        httpStatus: options.httpStatus,
         fault: body.fault,
         tips: body.tips,
         docsUrl: body.docs_url,
-        reasons: (body.reasons ?? []).map(handledErrorFromHerr),
+        traceId: body.trace_id,
+        spanId: body.span_id,
+        reasons: (body.reasons ?? []).map((r) => handledErrorFromHerr(r)),
       });
       this.name = body.type;
     }
@@ -280,6 +293,9 @@ function serializeReason(error: Error): SerializedReason {
       code: error.code,
       // Deprecated back-compat alias — see SerializedReason.kind.
       kind: error.code,
+      fault: error.fault,
+      ...(error.traceId ? { traceId: error.traceId } : {}),
+      ...(error.spanId ? { spanId: error.spanId } : {}),
       ...(Object.keys(error.meta).length > 0 && { meta: error.meta }),
       ...(error.tips.length > 0 && { tips: error.tips }),
       ...(error.docsUrl ? { docsUrl: error.docsUrl } : {}),

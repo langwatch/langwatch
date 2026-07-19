@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import {
   ClickHouseUnavailableError,
   QueryMemoryExceededError,
