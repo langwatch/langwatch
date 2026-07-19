@@ -71,9 +71,6 @@ importers:
       '@opentelemetry/semantic-conventions':
         specifier: ^1.36.0
         version: 1.41.1
-      '@types/prompts':
-        specifier: ^2.4.9
-        version: 2.4.9
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -144,6 +141,9 @@ importers:
       '@types/node':
         specifier: ^24.1.0
         version: 24.5.2
+      '@types/prompts':
+        specifier: ^2.4.9
+        version: 2.4.9
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260705.1
         version: 7.0.0-dev.20260705.1

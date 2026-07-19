@@ -482,11 +482,11 @@ record *payload*):
 
 ```bash
 langwatch trace search --jq '.traces[].traceId'
-langwatch experiment list --json slug,name,runsCount
+langwatch evaluator list --json id,name,slug
 langwatch monitor list -o yaml
 ```
 
-The legacy `-f/--format json` spelling keeps working and maps onto the same contract.
+The legacy `-f/--format json` spelling keeps working and maps onto the same contract. The contract is fully wired for traces, evaluators, monitors, status, skills, `commands`, and `help-tree`; on the remaining resource commands the flags parse but machine output is still rolling out — those commands keep their legacy `-f json` behavior until migrated.
 
 ### Structured errors
 
