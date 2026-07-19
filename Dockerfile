@@ -73,10 +73,19 @@ COPY --from=builder /app/langwatch ./langwatch
 COPY --from=builder /app/mcp-server ./mcp-server
 COPY --from=builder /app/packages/cli-cards/package.json ./packages/cli-cards/package.json
 COPY --from=builder /app/packages/cli-cards/src ./packages/cli-cards/src
-# cli-cards deliberately declares zod as a peer. Because the workspace package
-# lives outside /app/langwatch, expose the app's production zod at the nearest
-# shared node_modules boundary after dev dependencies have been pruned.
-RUN mkdir -p ./node_modules && ln -s ../langwatch/node_modules/zod ./node_modules/zod
+# handled-error is the shared HandledError contract. It is imported from
+# src/server/event-sourcing/services/errorHandling.ts, so every `pnpm task`
+# entrypoint loads it -- including the chart's post-install hook Jobs, which
+# failed with MODULE_NOT_FOUND until this was copied.
+COPY --from=builder /app/packages/handled-error/package.json ./packages/handled-error/package.json
+COPY --from=builder /app/packages/handled-error/src ./packages/handled-error/src
+# These workspace packages declare peers (cli-cards: zod, handled-error:
+# @opentelemetry/api) rather than depending on them. Because they live outside
+# /app/langwatch, expose the app's production copies at the nearest shared
+# node_modules boundary after dev dependencies have been pruned.
+RUN mkdir -p ./node_modules \
+  && ln -s ../langwatch/node_modules/zod ./node_modules/zod \
+  && ln -s ../langwatch/node_modules/@opentelemetry ./node_modules/@opentelemetry
 COPY --from=builder /app/langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
 COPY --from=builder /app/feature-map.json ./feature-map.json
 
