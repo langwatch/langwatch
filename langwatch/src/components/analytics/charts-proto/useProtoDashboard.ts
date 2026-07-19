@@ -29,6 +29,10 @@ export function useProtoDashboard(projectId: string) {
 
   const saveMutation = api.chartsProtoState.save.useMutation({
     onSuccess: () => void utils.chartsProtoState.get.invalidate({ projectId }),
+    // A failed save leaves the optimistic setData above wrong -- reconcile
+    // with the server's real state rather than leaving a ghost value that
+    // would only surface as a surprise on the next reload.
+    onError: () => void utils.chartsProtoState.get.invalidate({ projectId }),
   });
 
   const name = stateQuery.data?.name ?? "Untitled dashboard";
@@ -39,13 +43,23 @@ export function useProtoDashboard(projectId: string) {
   const persist = useCallback(
     (nextName: string, nextWidgets: WidgetSpec[]) => {
       if (!projectId) return;
+      // Update the cache synchronously before the round-trip resolves. Every
+      // mutator below reads `widgets`/`name` from this same cache, so two
+      // saves fired in quick succession (e.g. picking a width preset then a
+      // height preset from the same open menu) would otherwise both build
+      // their patch on the same pre-save snapshot -- the second `mutate`
+      // reaching the server last would silently discard the first's change.
+      utils.chartsProtoState.get.setData(
+        { projectId },
+        { name: nextName, widgets: nextWidgets as unknown as Record<string, unknown>[] },
+      );
       saveMutation.mutate({
         projectId,
         name: nextName,
         widgets: nextWidgets as unknown as Record<string, unknown>[],
       });
     },
-    [projectId, saveMutation],
+    [projectId, utils, saveMutation],
   );
 
   const setName = useCallback(
