@@ -4,7 +4,7 @@ description: Deploy the LangWatch AI Gateway alongside your self-hosted LangWatc
 sidebarTitle: Helm
 ---
 
-The AI Gateway ships as a sub-chart (`infra/charts/gateway/`) of the LangWatch umbrella chart (`infra/charts/langwatch/`). Installing the umbrella with `gateway.chartManaged: true` (the default) lifts the gateway pod alongside `langwatch-app` in the same release. The gateway runs as a separate Kubernetes Deployment (own pod, own container, own service) and reaches the LangWatch control plane for VK resolution, budget enforcement, and guardrail execution.
+The AI Gateway ships as a sub-chart (`charts/gateway/`) of the LangWatch umbrella chart (`charts/langwatch/`). Installing the umbrella with `gateway.chartManaged: true` (the default) lifts the gateway pod alongside `langwatch-app` in the same release. The gateway runs as a separate Kubernetes Deployment (own pod, own container, own service) and reaches the LangWatch control plane for VK resolution, budget enforcement, and guardrail execution.
 
 <Note>The gateway sub-chart's `version` and `appVersion` are bumped in **lockstep** with the umbrella `langwatch` chart by release-please (`.github/release-please-config.json` `.` package extra-files). `helm install langwatch/langwatch@3.x` always pulls a matching gateway sub-chart, operators should never need to pin them separately.</Note>
 
@@ -86,7 +86,7 @@ gateway:
     maxRequestBodyBytes: 10485760                 # 10 MiB
 ```
 
-The full set of overridable fields lives in `infra/charts/gateway/values.yaml` (canonical for everything not exposed at the umbrella surface). All defaults are production-safe; you should only need to override `controlPlane.baseUrl`, `secrets.existingSecretName`, `ingress.host`, and the OTLP endpoint.
+The full set of overridable fields lives in `charts/gateway/values.yaml` (canonical for everything not exposed at the umbrella surface). All defaults are production-safe; you should only need to override `controlPlane.baseUrl`, `secrets.existingSecretName`, `ingress.host`, and the OTLP endpoint.
 
 Apply:
 
@@ -98,7 +98,7 @@ helm upgrade --install langwatch langwatch/langwatch \
 
 ## Env vars wired by the chart
 
-Source of truth: `infra/charts/gateway/templates/configmap.yaml` (commit `d14576b1e`) and `infra/charts/gateway/templates/deployment.yaml`. The chart wires only the env vars the Go gateway actually reads, knobs in `values.yaml` that don't appear here are forward-compat surface for v1.1 (e.g. `cache.bootstrapAllKeys`, `admin.*`, `redis.url`) and are silently ignored by the running binary. The canonical names are derived by `services/aigateway/config.go` `pkg/config.Hydrate`, which walks the Config struct's `env:"…"` tags and joins parent/child with `_`.
+Source of truth: `charts/gateway/templates/configmap.yaml` (commit `d14576b1e`) and `charts/gateway/templates/deployment.yaml`. The chart wires only the env vars the Go gateway actually reads, knobs in `values.yaml` that don't appear here are forward-compat surface for v1.1 (e.g. `cache.bootstrapAllKeys`, `admin.*`, `redis.url`) and are silently ignored by the running binary. The canonical names are derived by `services/aigateway/config.go` `pkg/config.Hydrate`, which walks the Config struct's `env:"…"` tags and joins parent/child with `_`.
 
 | Env var | Source | Purpose |
 |---|---|---|
@@ -111,7 +111,7 @@ Source of truth: `infra/charts/gateway/templates/configmap.yaml` (commit `d14576
 | `LW_GATEWAY_JWT_SECRET` | Secret `secrets.existingSecretName` | HS256 for resolve-key JWT |
 | `LW_GATEWAY_JWT_SECRET_PREVIOUS` | Secret (only when `secrets.jwtSecretPreviousKey` is set) | Retired key during rotation overlap |
 
-The deployment template intentionally does not inject `GATEWAY_REDIS_URL`, `GATEWAY_ADMIN_AUTH_TOKEN`, or `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN`, the v1 gateway has no Redis client, admin/pprof listener, or OTLP auth-token field on its config struct, and silently dropping them at the env-var layer would mislead operators. OTLP authentication for self-hosters is delivered via `OTEL_OTLP_HEADERS` (e.g. `Authorization=Bearer …`) on the OTel config struct in `pkg/config/otel.go`. See `infra/charts/gateway/templates/deployment.yaml` for the rationale comment.
+The deployment template intentionally does not inject `GATEWAY_REDIS_URL`, `GATEWAY_ADMIN_AUTH_TOKEN`, or `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN`, the v1 gateway has no Redis client, admin/pprof listener, or OTLP auth-token field on its config struct, and silently dropping them at the env-var layer would mislead operators. OTLP authentication for self-hosters is delivered via `OTEL_OTLP_HEADERS` (e.g. `Authorization=Bearer …`) on the OTel config struct in `pkg/config/otel.go`. See `charts/gateway/templates/deployment.yaml` for the rationale comment.
 
 ## Secret rotation
 
@@ -151,7 +151,7 @@ See [Config → Secret rotation](/ai-gateway/self-hosting/config#secret-rotation
 Two control-plane components must be running for the gateway to function fully:
 
 - **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/changes`, and `/budget/check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `HARD_GRACE`) but new VKs cannot resolve and rate limits cannot tighten.
-- **`langwatch-workers`** running the trace-processing pipeline. **Budget enforcement depends on this.** The gateway emits OTLP spans with cost attrs but does NOT debit budgets directly, the workers' trace-fold reactor (`gatewayBudgetSync.reactor.ts`) reads finalised spans, computes cost, and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and `/budget/check` reads from that view. **If `workers.enabled: false`, gateway traces still flow but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `infra/charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
+- **`langwatch-workers`** running the trace-processing pipeline. **Budget enforcement depends on this.** The gateway emits OTLP spans with cost attrs but does NOT debit budgets directly, the workers' trace-fold reactor (`gatewayBudgetSync.reactor.ts`) reads finalised spans, computes cost, and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and `/budget/check` reads from that view. **If `workers.enabled: false`, gateway traces still flow but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
 
 ## Networking
 
@@ -210,7 +210,7 @@ The probe is disabled by default (empty list) so greenfield and air-gapped-via-f
 ## Admin listener
 
 <Note>
-**v1 status:** the chart's `gateway.admin.*` value keys are forward-compat surface, the v1 gateway binary does not expose an admin/pprof listener and the deployment template does not inject `GATEWAY_ADMIN_ADDR`, `GATEWAY_ADMIN_AUTH_TOKEN` (see the rationale comment in `infra/charts/gateway/templates/deployment.yaml`). The three postures below describe the planned v1.1 contract; setting the values today is a no-op. For live diagnostics in v1, fall back to `kubectl exec` + the production-runbook recipes.
+**v1 status:** the chart's `gateway.admin.*` value keys are forward-compat surface, the v1 gateway binary does not expose an admin/pprof listener and the deployment template does not inject `GATEWAY_ADMIN_ADDR`, `GATEWAY_ADMIN_AUTH_TOKEN` (see the rationale comment in `charts/gateway/templates/deployment.yaml`). The three postures below describe the planned v1.1 contract; setting the values today is a no-op. For live diagnostics in v1, fall back to `kubectl exec` + the production-runbook recipes.
 </Note>
 
 The gateway's `net/http/pprof` diagnostic surface (v1.1) will ship behind a dedicated listener. Three deployment postures, pick the one that matches your cluster:
@@ -456,7 +456,7 @@ All three timeouts apply to the public listener and the admin listener identical
 
 ## Chart and data-plane CI
 
-The upstream repo runs a dedicated `gateway-ci` workflow against every PR that touches `services/gateway/**` or `infra/charts/gateway/**` (paths-filter gated so unrelated PRs don't trigger it). What it guarantees on the chart you're installing:
+The upstream repo runs a dedicated `gateway-ci` workflow against every PR that touches `services/gateway/**` or `charts/gateway/**` (paths-filter gated so unrelated PRs don't trigger it). What it guarantees on the chart you're installing:
 
 - **Go data plane**: `go mod verify`, `go vet`, `go build`, `go test -count=1 -race ./...` across all 14 internal packages. Benchmarks compile under `-run=^$ -benchtime=1x` so Go API drift fails fast without adding benchmark noise to PR logs.
 - **Helm chart**: `helm lint` + two `helm template` renders, one with defaults (must render zero `NetworkPolicy` objects), one with `networkPolicy.enabled=true` + `redis.url=redis://…` (must render exactly one). Both invariants are asserted explicitly; violating either fails the job.
@@ -467,7 +467,7 @@ Consequence for operators: an upgrade path where `helm upgrade` would have silen
 
 ## Upgrade procedure
 
-Gateway and control plane are versioned in **lockstep**: release-please bumps both `infra/charts/gateway/Chart.yaml` and `infra/charts/langwatch/Chart.yaml` to the same version on every langwatch release. A single `helm upgrade langwatch langwatch/langwatch` rolls both pods together via the umbrella chart's RollingUpdate strategy.
+Gateway and control plane are versioned in **lockstep**: release-please bumps both `charts/gateway/Chart.yaml` and `charts/langwatch/Chart.yaml` to the same version on every langwatch release. A single `helm upgrade langwatch langwatch/langwatch` rolls both pods together via the umbrella chart's RollingUpdate strategy.
 
 1. `helm diff upgrade langwatch langwatch/langwatch -f values.yaml --version <new>` to preview the change set.
 2. `helm upgrade langwatch langwatch/langwatch -f values.yaml --version <new>`. The umbrella's `langwatch-app` and gateway Deployments roll concurrently, both use Kubernetes' standard `RollingUpdate` strategy and the chart does not enforce ordering. Safety during the overlap window is handled by the dual-key signature contract documented under [Secret rotation](#secret-rotation): the new control-plane image accepts both old and new signatures, so a brief window where gateway pods on the new image talk to control-plane pods still on the old image (or vice versa) does not break authentication. If you want to enforce ordering for an extra-cautious rollout, run `helm upgrade ... --set gateway.enabled=false` first to roll the app alone, then re-enable the gateway in a second `helm upgrade`, but for the standard upgrade path the dual-key contract is what makes the concurrent roll safe.

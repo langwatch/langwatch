@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: infra/charts/clickhouse-serverless
+        working-directory: charts/clickhouse-serverless
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
@@ -50,7 +50,7 @@ jobs:
       - name: Package chart
         run: |
           mkdir -p .cr-release-packages
-          helm package infra/charts/clickhouse-serverless -d .cr-release-packages
+          helm package charts/clickhouse-serverless -d .cr-release-packages
 
       - name: Upload chart
         run: |

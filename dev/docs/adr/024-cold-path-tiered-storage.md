@@ -141,7 +141,7 @@ A few non-obvious consequences:
 
 ### Layers
 
-**Chart** (`infra/charts/clickhouse-serverless/values.yaml`): one boolean
+**Chart** (`charts/clickhouse-serverless/values.yaml`): one boolean
 (`cold.enabled`) plus a shared `objectStorage` block (bucket / region /
 endpoint, IRSA-capable credentials). Helm `fail`s the install if
 `cold.enabled || backup.enabled` and `bucket` + (`region` or `endpoint`)
@@ -276,7 +276,7 @@ plays out over hours, but throttled — not as a thundering herd.
 
 - Related ADRs: ADR-022 (data retention, umbrella), ADR-023
   (orphan-sweep reactor + chain — superseded), ADR-025 (orphan sweep removed)
-- Chart: `infra/charts/clickhouse-serverless/{values.yaml,
+- Chart: `charts/clickhouse-serverless/{values.yaml,
   templates/statefulset.yaml, templates/_helpers.tpl}`
 - Image: `infra/clickhouse-serverless/internal/{config,storage,render}/`
 - Bootstrap: `platform/app/src/server/clickhouse/goose.ts`
@@ -285,7 +285,7 @@ plays out over hours, but throttled — not as a thundering herd.
   - `platform/app/src/server/clickhouse/__tests__/ttlReconciler.{unit,regression.unit}.test.ts`
   - `infra/clickhouse-serverless/internal/storage/storage_test.go`
   - `infra/clickhouse-serverless/tests/e2e-cold{,-move}-test.sh`
-  - `infra/charts/clickhouse-serverless/tests/e2e.sh` (`test_cold_storage`)
+  - `charts/clickhouse-serverless/tests/e2e.sh` (`test_cold_storage`)
 - CH docs: [Multiple volumes](https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree#table_engine-mergetree-multiple-volumes),
   [MOVE partitions](https://clickhouse.com/docs/en/sql-reference/statements/alter/partition#move-partition-part)
 - PR: #4147

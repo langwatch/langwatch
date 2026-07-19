@@ -37,7 +37,7 @@ jobs:
               - 'infra/docker/Dockerfile.go_service'
               - '.github/workflows/go-services.yaml'
             chart:
-              - 'infra/charts/gateway/**'
+              - 'charts/gateway/**'
               - '.github/workflows/go-services.yaml'
 
   docker:
@@ -102,15 +102,15 @@ jobs:
           version: v3.18.0
 
       - name: helm lint (gateway)
-        working-directory: infra/charts/gateway
+        working-directory: charts/gateway
         run: helm lint .
 
       - name: helm template (gateway defaults)
-        working-directory: infra/charts/gateway
+        working-directory: charts/gateway
         run: helm template gateway . --dry-run > /tmp/defaults.yaml
 
       - name: helm template (gateway network policy on)
-        working-directory: infra/charts/gateway
+        working-directory: charts/gateway
         run: helm template gateway . --set networkPolicy.enabled=true --set redis.url=redis://test:6379 --dry-run > /tmp/netpol.yaml
 
       - name: Assert NetworkPolicy renders when enabled
@@ -123,11 +123,11 @@ jobs:
           fi
 
       - name: helm dependency update (umbrella)
-        working-directory: infra/charts/langwatch
+        working-directory: charts/langwatch
         run: helm dependency update
 
       - name: helm template (umbrella includes gateway)
-        working-directory: infra/charts/langwatch
+        working-directory: charts/langwatch
         run: |
           helm template langwatch . --set autogen.enabled=true --dry-run > /tmp/umbrella.yaml
 
@@ -143,7 +143,7 @@ jobs:
           fi
 
       - name: helm template (umbrella gateway disabled)
-        working-directory: infra/charts/langwatch
+        working-directory: charts/langwatch
         run: |
           helm template langwatch . --set autogen.enabled=true --set gateway.chartManaged=false --dry-run > /tmp/umbrella-no-gw.yaml
 

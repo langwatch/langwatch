@@ -26599,9 +26599,9 @@ The recommended path is to flip `autogen.enabled` to `false`, pre-create the Sec
 
 ## Reference
 
-- Chart template comment: `infra/charts/langwatch/templates/app/secrets.yaml` documents the per-key lookup-or-rand shape inline.
-- Chart values: `infra/charts/langwatch/values.yaml` sections `secrets`, `gateway.secrets`, `autogen`, `preflight`.
-- Helper that enforces app+gateway Secret-name consistency: `infra/charts/langwatch/templates/_helpers.tpl` defines `langwatch.appSecretName` and `langwatch.validateSecrets`.
+- Chart template comment: `charts/langwatch/templates/app/secrets.yaml` documents the per-key lookup-or-rand shape inline.
+- Chart values: `charts/langwatch/values.yaml` sections `secrets`, `gateway.secrets`, `autogen`, `preflight`.
+- Helper that enforces app+gateway Secret-name consistency: `charts/langwatch/templates/_helpers.tpl` defines `langwatch.appSecretName` and `langwatch.validateSecrets`.
 - Postmortem driving the original chart change: [PR #4423](https://github.com/langwatch/langwatch/pull/4423).
 - Single-secret collapse (this page's current shape): [PR #4440](https://github.com/langwatch/langwatch/pull/4440).
 
@@ -26971,7 +26971,7 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 The default install requests ~6 CPU and ~18 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2 CPU and ~4 Gi RAM**:
 
 ```bash
-curl -sLO https://raw.githubusercontent.com/langwatch/langwatch/main/infra/charts/langwatch/examples/overlays/size-dev.yaml
+curl -sLO https://raw.githubusercontent.com/langwatch/langwatch/main/charts/langwatch/examples/overlays/size-dev.yaml
 
 helm install langwatch langwatch/langwatch \
   --namespace langwatch --create-namespace \
@@ -27408,7 +27408,7 @@ Run the full LangWatch stack locally on a [Kind](https://kind.sigs.k8s.io/) clus
 
 ```bash
 git clone https://github.com/langwatch/langwatch.git
-cd langwatch/infra/charts/langwatch
+cd langwatch/charts/langwatch
 make example-up
 ```
 
@@ -27428,7 +27428,7 @@ If you prefer to run each step manually:
 
 ```bash
 kind create cluster --name lw-local \
-  --config infra/charts/lib/kind-config.yaml \
+  --config charts/lib/kind-config.yaml \
   --wait 60s
 ```
 
@@ -27437,7 +27437,7 @@ The Kind config maps port 30560 on your host to a NodePort inside the cluster.
 ### 2. Build and Load Images
 
 ```bash
-cd infra/charts/langwatch
+cd charts/langwatch
 
 # Build all images
 make images
@@ -27524,7 +27524,7 @@ make clean
 Images haven't been loaded into Kind. Run `make images-local`.
 
 **Port 30560 not accessible:**
-Ensure the Kind cluster was created with the port mapping config (`infra/charts/lib/kind-config.yaml`). Recreate the cluster if needed: `make clean && make example-up`.
+Ensure the Kind cluster was created with the port mapping config (`charts/lib/kind-config.yaml`). Recreate the cluster if needed: `make clean && make example-up`.
 
 **Pods stuck in `Pending`:**
 Check if your Docker daemon has enough resources. Kind needs at least 4 CPU and 8 GB RAM allocated to Docker (16 GB if building images locally).
@@ -29175,7 +29175,7 @@ The migration **never deletes your data**. All dataset rows are kept in PostgreS
 - **Dataset storage**: dataset content is written to object storage (a persistent volume by default, or S3-compatible storage if configured)
 - **Migration Job**: a Helm post-install/post-upgrade Job migrates existing datasets automatically
 - **Local storage constraints**: with the default local storage, the app and workers now restart together during upgrades, and workers are limited to a single replica
-- **New chart values**: see the [chart README](https://github.com/langwatch/langwatch/blob/main/infra/charts/langwatch/README.md) for the full `app.dataplane`, `app.storedObjects`, and `datasetS3Migration` parameter reference
+- **New chart values**: see the [chart README](https://github.com/langwatch/langwatch/blob/main/charts/langwatch/README.md) for the full `app.dataplane`, `app.storedObjects`, and `datasetS3Migration` parameter reference
 
 ## Before You Upgrade
 
@@ -29360,7 +29360,7 @@ If the Job reports that it is waiting for schema migrations, it means the databa
 
 ## Getting Help
 
-- Full parameter reference: [chart README](https://github.com/langwatch/langwatch/blob/main/infra/charts/langwatch/README.md)
+- Full parameter reference: [chart README](https://github.com/langwatch/langwatch/blob/main/charts/langwatch/README.md)
 - Check the [Troubleshooting guide](/self-hosting/troubleshooting)
 - Open an issue at [github.com/langwatch/langwatch/issues](https://github.com/langwatch/langwatch/issues)
 
@@ -29968,7 +29968,7 @@ The data plane requires:
 
 ClickHouse can be deployed as:
 - A managed service (e.g., ClickHouse Cloud, Aiven, Altinity)
-- Self-hosted on your Kubernetes cluster using our [clickhouse-serverless helm chart](https://github.com/langwatch/langwatch/tree/main/infra/charts/clickhouse-serverless)
+- Self-hosted on your Kubernetes cluster using our [clickhouse-serverless helm chart](https://github.com/langwatch/langwatch/tree/main/charts/clickhouse-serverless)
 - Self-hosted on VMs
 
 ## Getting Started

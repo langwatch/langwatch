@@ -127,4 +127,4 @@ Canonical names always win when both are set. The aliases are scheduled for remo
 
 ## Forward-compat values.yaml knobs (v1.1)
 
-Several knobs are exposed in `infra/charts/gateway/values.yaml` but the v1 gateway code does not yet read them. Setting them today is a no-op, they are documented in `values.yaml` so operator runbooks built ahead of v1.1 don't need rewriting. See [Scaling, Future tunables](/ai-gateway/self-hosting/scaling#future-tunables-forward-compat-in-valuesyaml) for the full list (cache LRU sizing, Redis L2, Bifrost pool sizing, admin, pprof listener, guardrail timeouts, startup netcheck).
+Several knobs are exposed in `charts/gateway/values.yaml` but the v1 gateway code does not yet read them. Setting them today is a no-op, they are documented in `values.yaml` so operator runbooks built ahead of v1.1 don't need rewriting. See [Scaling, Future tunables](/ai-gateway/self-hosting/scaling#future-tunables-forward-compat-in-valuesyaml) for the full list (cache LRU sizing, Redis L2, Bifrost pool sizing, admin, pprof listener, guardrail timeouts, startup netcheck).

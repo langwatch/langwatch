@@ -8,7 +8,7 @@ The gateway is a stateless proxy, scale it horizontally. JWTs are self-contained
 
 ## Horizontal Pod Autoscaler
 
-The chart ships an HPA with CPU-based scaling plus an opt-in Prometheus custom metric (`infra/charts/gateway/values.yaml: autoscaling.*`):
+The chart ships an HPA with CPU-based scaling plus an opt-in Prometheus custom metric (`charts/gateway/values.yaml: autoscaling.*`):
 
 ```yaml
 autoscaling:
@@ -34,7 +34,7 @@ If you scale beyond ~30 replicas, watch your control plane: every gateway replic
 
 ## Pod Disruption Budget
 
-Chart default (`infra/charts/gateway/values.yaml: podDisruptionBudget`):
+Chart default (`charts/gateway/values.yaml: podDisruptionBudget`):
 
 ```yaml
 podDisruptionBudget:
@@ -62,7 +62,7 @@ Add this to the chart via the `affinity` value (you can lift it directly into `a
 
 ## Resource sizing
 
-Chart defaults (`infra/charts/gateway/values.yaml: resources`):
+Chart defaults (`charts/gateway/values.yaml: resources`):
 
 ```yaml
 resources:
@@ -165,7 +165,7 @@ If you're outside these ranges, check [Health Checks](/ai-gateway/self-hosting/h
 
 ## Future tunables (forward-compat in `values.yaml`)
 
-Several knobs are exposed in `infra/charts/gateway/values.yaml` that the v1 gateway code does not yet read, they exist as a forward-compat surface for v1.1. Setting them today has no effect; setting them once they're wired will be a no-op deploy (env vars already present in the chart configmap). They are documented here so operators can stage their own runbooks ahead of time.
+Several knobs are exposed in `charts/gateway/values.yaml` that the v1 gateway code does not yet read, they exist as a forward-compat surface for v1.1. Setting them today has no effect; setting them once they're wired will be a no-op deploy (env vars already present in the chart configmap). They are documented here so operators can stage their own runbooks ahead of time.
 
 - `cache.lruSize`, explicit auth-cache LRU bound (default 50,000)
 - `cache.refreshInterval`, `cache.jwtRefreshThreshold`, proactive auth-cache refresh cadence

@@ -309,8 +309,8 @@ platform/app/src/pages/cli/auth.tsx                     # Device-flow approval U
 sdks/typescript/src/cli/commands/                     # Unified langwatch CLI
 sdks/typescript/src/cli/utils/governance/             # Device-flow client, config, wrappers
 
-infra/charts/langwatch/                                    # Umbrella chart with NOTES.txt
-infra/charts/gateway/                                      # AI Gateway sub-chart
+charts/langwatch/                                    # Umbrella chart with NOTES.txt
+charts/gateway/                                      # AI Gateway sub-chart
 
 specs/ai-gateway/governance/                         # All BDD specs
 docs/ai-gateway/governance/                          # User-facing docs

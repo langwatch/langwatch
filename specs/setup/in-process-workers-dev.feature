@@ -10,7 +10,7 @@ Feature: In-process workers for local development
   # process — because a laptop juggling several worktrees can't afford a second
   # Node process per stack; opt back out with WORKERS_IN_PROCESS=0. Production is
   # untouched — it always runs web and worker as separate deployments
-  # (infra/charts/langwatch/templates/{app,workers}) and never honours the flag.
+  # (charts/langwatch/templates/{app,workers}) and never honours the flag.
   #
   # The topology is selected by the WORKERS_IN_PROCESS env flag, read in four
   # places (all gated on NODE_ENV=development):

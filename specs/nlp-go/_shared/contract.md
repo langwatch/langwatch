@@ -29,7 +29,7 @@
 |---|---|---|
 | Go NLP service (sole engine) | `langwatch` | `services/nlpgo/` (a subcommand of `cmd/service/main.go`) |
 | Self-hosted NLP image | `langwatch` | `infra/docker/Dockerfile.langwatch_nlp` (Go binary + slim stdlib `python3`) |
-| Helm | `langwatch` | `infra/charts/langwatch/templates/langwatch_nlp/` (single Go container) |
+| Helm | `langwatch` | `charts/langwatch/templates/langwatch_nlp/` (single Go container) |
 | BDD specs | `langwatch` | `specs/nlp-go/` |
 | Production Lambda artifact | `langwatch-saas` | `infrastructure/langwatch_nlp_lambda.tf` + saas runtime packaging |
 

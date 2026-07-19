@@ -43,7 +43,7 @@ an error. Tokens never touch disk.
 | GitHub OAuth *login* provider | `platform/app/src/server/better-auth/index.ts:63-72` (`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`) | Callback-route conventions only. **Do not reuse the login app** — identity login ≠ App user-to-server auth |
 | Worker skills | `services/langy-agent/skills/*.md`, seeded by `entrypoint.sh:19-21`, symlinked per-worker in `setupWorkerHome()` | New `skills/github.md` |
 | CLI install point | `infra/docker/Dockerfile.langy_agent` apt block (~line 23) | Add `gh` |
-| Egress policy | `infra/charts/langy-agent/templates/networkpolicy.yaml` + `values.networkPolicy.*` | `github.com`/`api.github.com`/`codeload.github.com` egress |
+| Egress policy | `charts/langy-agent/templates/networkpolicy.yaml` + `values.networkPolicy.*` | `github.com`/`api.github.com`/`codeload.github.com` egress |
 | Idle reaper | `server.js:393-400` (30s sweep, 10 min TTL, kills worker + home dir) | Clone dir lives inside worker home → cleaned for free |
 | Rate limiting | `checkLangyMessageRateLimit` (`rate-limit-langy.ts`, 30 msg/min, Redis sliding window) | PR creation already behind it; add per-user daily PR cap in skill/manager |
 | Audit log | `auditLog(...)` pattern (`routes/langy.ts:501-508`) | `langy.github.connect` / `.disconnect` / `.pr_created` actions |
@@ -179,7 +179,7 @@ exception.
   - Workflow: `gh repo clone owner/repo -- --depth 1` into `$HOME/work/` → branch → edit → commit → push → `gh pr create --title ... --body ...`
   - Hard rules: never `gh auth login`, never echo `$GH_TOKEN`, never write it to any file, clone only inside `$HOME`
 - [ ] `AGENTS.md.template` — one line announcing the github capability + skill pointer
-- [ ] `infra/charts/langy-agent/templates/networkpolicy.yaml` + `values.yaml` — `networkPolicy.allowGithub` toggle. **Reality check:** the chart already ships `allowExternalHttps: true` (0.0.0.0/0:443) so GitHub works today; the new toggle matters for hardened installs that turn that off. NetworkPolicy is L3/L4 — true FQDN-bounded egress needs the issue's follow-up, document as such.
+- [ ] `charts/langy-agent/templates/networkpolicy.yaml` + `values.yaml` — `networkPolicy.allowGithub` toggle. **Reality check:** the chart already ships `allowExternalHttps: true` (0.0.0.0/0:443) so GitHub works today; the new toggle matters for hardened installs that turn that off. NetworkPolicy is L3/L4 — true FQDN-bounded egress needs the issue's follow-up, document as such.
 
 ### PR 6 — Sidebar UX (chat cards + popup + acting-as chip)
 *Branch `langy/github-prs-6-ux`, depends on PR 2 (endpoints) + PR 4 (structured events)*

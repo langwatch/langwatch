@@ -174,8 +174,8 @@ The recommended path is to flip `autogen.enabled` to `false`, pre-create the Sec
 
 ## Reference
 
-- Chart template comment: `infra/charts/langwatch/templates/app/secrets.yaml` documents the per-key lookup-or-rand shape inline.
-- Chart values: `infra/charts/langwatch/values.yaml` sections `secrets`, `gateway.secrets`, `autogen`, `preflight`.
-- Helper that enforces app+gateway Secret-name consistency: `infra/charts/langwatch/templates/_helpers.tpl` defines `langwatch.appSecretName` and `langwatch.validateSecrets`.
+- Chart template comment: `charts/langwatch/templates/app/secrets.yaml` documents the per-key lookup-or-rand shape inline.
+- Chart values: `charts/langwatch/values.yaml` sections `secrets`, `gateway.secrets`, `autogen`, `preflight`.
+- Helper that enforces app+gateway Secret-name consistency: `charts/langwatch/templates/_helpers.tpl` defines `langwatch.appSecretName` and `langwatch.validateSecrets`.
 - Postmortem driving the original chart change: [PR #4423](https://github.com/langwatch/langwatch/pull/4423).
 - Single-secret collapse (this page's current shape): [PR #4440](https://github.com/langwatch/langwatch/pull/4440).

@@ -8,7 +8,7 @@ Feature: Self-hosted deployment surfaces personal-keys onboarding cleanly
 
   This spec captures the behaviour the umbrella `langwatch` chart
   must guarantee for that path. Implementation lives in
-  infra/charts/langwatch/templates and docs/self-hosting/.
+  charts/langwatch/templates and docs/self-hosting/.
 
   Background:
     Given an admin running Kubernetes 1.28+ with Helm 3

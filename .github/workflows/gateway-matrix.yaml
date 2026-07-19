@@ -51,7 +51,7 @@ on:
       - 'platform/app/src/server/gateway/**'
       - 'platform/app/src/server/event-sourcing/pipelines/trace-processing/reactors/gatewayBudgetSync.reactor.ts'
       - 'platform/app/src/server/routes/gateway-internal.ts'
-      - 'infra/charts/gateway/**'
+      - 'charts/gateway/**'
       - '.github/workflows/gateway-matrix.yaml'
   schedule:
     # 04:00 UTC daily — quiet provider tier, runs while EMEA is asleep

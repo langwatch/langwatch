@@ -52,7 +52,7 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 The default install requests ~6 CPU and ~18 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2 CPU and ~4 Gi RAM**:
 
 ```bash
-curl -sLO https://raw.githubusercontent.com/langwatch/langwatch/main/infra/charts/langwatch/examples/overlays/size-dev.yaml
+curl -sLO https://raw.githubusercontent.com/langwatch/langwatch/main/charts/langwatch/examples/overlays/size-dev.yaml
 
 helm install langwatch langwatch/langwatch \
   --namespace langwatch --create-namespace \

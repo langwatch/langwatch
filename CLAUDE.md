@@ -155,7 +155,7 @@ platform/app/        # Vite app (main product)
 langwatch_server/    # Python server
 services/nlpgo/      # Go NLP engine (:5561, built as platform/app/langwatch_nlp)
 services/aigateway/  # Go AI Gateway data plane (:5563)
-infra/charts/gateway/ # Helm sub-chart for the gateway
+charts/gateway/ # Helm sub-chart for the gateway
 sdks/python/         # Python SDK
 sdks/typescript/     # TypeScript SDK
 specs/               # BDD feature specs

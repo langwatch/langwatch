@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-// Repo root containing both `platform/app/` and `infra/charts/`. `process.cwd()`
+// Repo root containing both `platform/app/` and `charts/`. `process.cwd()`
 // is the platform/app/ package dir when vitest runs (per package.json), so
 // two levels up lands on the repo root reliably across worktrees and CI.
 const REPO_ROOT = path.resolve(process.cwd(), "..", "..");
@@ -26,7 +26,7 @@ describe("Helm chart deployment surface for stored-objects", () => {
   describe("when the env block emits dataplane storage variables", () => {
     /** @scenario "Helm chart emits S3_BUCKET_NAME (not legacy S3_BUCKET) so the app and stored-objects find the bucket" */
     it("emits S3_BUCKET_NAME and never emits a bare S3_BUCKET env line", () => {
-      const helpers = readRepoFile("infra/charts/langwatch/templates/_helpers.tpl");
+      const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
 
       // The new name must appear in the rendered env list
       expect(helpers).toContain("- name: S3_BUCKET_NAME");
@@ -40,7 +40,7 @@ describe("Helm chart deployment surface for stored-objects", () => {
   describe("when the chart describes the dataplane object-storage block", () => {
     /** @scenario "Helm chart exposes a single dataplane object-storage config block covering datasets and stored-objects together" */
     it("documents that the dataplane bucket is shared between datasets and stored-objects", () => {
-      const helpers = readRepoFile("infra/charts/langwatch/templates/_helpers.tpl");
+      const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
 
       // The shared-dataplane explainer must live near the env emission so
       // future readers find it at the moment they're configuring the bucket.
@@ -56,8 +56,8 @@ describe("Helm chart deployment surface for stored-objects", () => {
   describe("when localFilesystem.enabled is combined with multi-replica", () => {
     /** @scenario "Single-replica helm install can opt into a PVC-backed local-FS storage path" */
     it("renders a PVC bound to LANGWATCH_LOCAL_STORAGE_PATH and refuses multi-replica", () => {
-      const pvc = readRepoFile("infra/charts/langwatch/templates/app/stored-objects-pvc.yaml");
-      const helpers = readRepoFile("infra/charts/langwatch/templates/_helpers.tpl");
+      const pvc = readRepoFile("charts/langwatch/templates/app/stored-objects-pvc.yaml");
+      const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
 
       // PVC template is gated on the "local-FS is the active backend" helper
       // (renders only when localFilesystem.enabled AND NOT dataplane.enabled).
@@ -82,9 +82,9 @@ describe("Helm chart deployment surface for stored-objects", () => {
   describe("when dataplane is enabled alongside localFilesystem default-on", () => {
     /** @scenario "Multi-replica install with dataplane on does NOT create the local-FS PVC, even when localFilesystem.enabled defaults to true" */
     it("PVC and volume mount only render when dataplane is OFF", () => {
-      const pvc = readRepoFile("infra/charts/langwatch/templates/app/stored-objects-pvc.yaml");
+      const pvc = readRepoFile("charts/langwatch/templates/app/stored-objects-pvc.yaml");
       const deployment = readRepoFile(
-        "infra/charts/langwatch/templates/app/deployment.yaml",
+        "charts/langwatch/templates/app/deployment.yaml",
       );
 
       // Both the PVC and the volume mount must go through the
@@ -105,7 +105,7 @@ describe("Helm chart deployment surface for stored-objects", () => {
   describe("when neither dataplane S3 nor local-FS is configured", () => {
     /** @scenario "Vanilla helm install with no object storage configured surfaces the unconfigured-storage condition diagnostically and renders anyway" */
     it("the chart surfaces the unconfigured-storage condition diagnostically", () => {
-      const helpers = readRepoFile("infra/charts/langwatch/templates/_helpers.tpl");
+      const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
 
       // Earlier in the PR this was a hard-fail; it was relaxed to a soft
       // condition so existing single-pod installs keep working on upgrade,

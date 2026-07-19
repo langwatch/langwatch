@@ -336,7 +336,7 @@ services:
         limits:
           # langevals imports ragas/langchain at boot and OOM-kills at 256m
           # before it can serve a single request — even with preload disabled.
-          # Production (infra/charts/langwatch) requests 6Gi/limits 8Gi; 4g is enough
+          # Production (charts/langwatch) requests 6Gi/limits 8Gi; 4g is enough
           # for the dev import footprint plus LLM-judge evaluators.
           memory: 4g
           cpus: "0.5"

@@ -1,6 +1,6 @@
 {
   "packages": {
-    "infra/charts/clickhouse-serverless": {
+    "charts/clickhouse-serverless": {
       "release-type": "simple",
       "package-name": "clickhouse-serverless",
       "prerelease": false,
@@ -262,7 +262,7 @@
         "sdks/go",
         "mcp/typescript",
         "services/langevals",
-        "infra/charts/clickhouse-serverless",
+        "charts/clickhouse-serverless",
         "sdks/python",
         "skills",
         ".github",
@@ -302,23 +302,23 @@
         },
         {
           "type": "yaml",
-          "path": "infra/charts/langwatch/Chart.yaml",
+          "path": "charts/langwatch/Chart.yaml",
           "jsonpath": "$.version"
         },
         {
           "type": "yaml",
-          "path": "infra/charts/langwatch/Chart.yaml",
+          "path": "charts/langwatch/Chart.yaml",
           "jsonpath": "$.appVersion"
         },
-        "infra/charts/langwatch/values.yaml",
+        "charts/langwatch/values.yaml",
         {
           "type": "yaml",
-          "path": "infra/charts/gateway/Chart.yaml",
+          "path": "charts/gateway/Chart.yaml",
           "jsonpath": "$.version"
         },
         {
           "type": "yaml",
-          "path": "infra/charts/gateway/Chart.yaml",
+          "path": "charts/gateway/Chart.yaml",
           "jsonpath": "$.appVersion"
         },
         {

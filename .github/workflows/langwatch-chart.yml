@@ -3,18 +3,18 @@ name: langwatch-chart
 on:
   pull_request:
     paths:
-      - "infra/charts/langwatch/**"
-      - "infra/charts/clickhouse-serverless/**"
-      - "infra/charts/gateway/**"
-      - "infra/charts/lib/**"
+      - "charts/langwatch/**"
+      - "charts/clickhouse-serverless/**"
+      - "charts/gateway/**"
+      - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
   push:
     branches: [main]
     paths:
-      - "infra/charts/langwatch/**"
-      - "infra/charts/clickhouse-serverless/**"
-      - "infra/charts/gateway/**"
-      - "infra/charts/lib/**"
+      - "charts/langwatch/**"
+      - "charts/clickhouse-serverless/**"
+      - "charts/gateway/**"
+      - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: infra/charts/langwatch
+        working-directory: charts/langwatch
     strategy:
       fail-fast: false
       matrix:
@@ -79,7 +79,7 @@ jobs:
             build_app: false
     defaults:
       run:
-        working-directory: infra/charts/langwatch
+        working-directory: charts/langwatch
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5

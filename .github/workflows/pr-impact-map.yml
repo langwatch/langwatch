@@ -59,7 +59,7 @@ jobs:
                                    || /(^|\/)test_[^/]+\.py$/.test(p)
                                    || p.startsWith("tests/agentic-e2e/")],
               ["CI/CD",          p => p.startsWith(".github/")],
-              ["Deploy",         p => p.startsWith("infra/charts/")
+              ["Deploy",         p => p.startsWith("charts/")
                                    || /^infra\/docker\/Dockerfile/.test(p)
                                    || /^infra\/compose[.\w-]*\.ya?ml$/.test(p)],
               ["Docs",           p => p.startsWith("docs/")

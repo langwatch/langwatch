@@ -184,7 +184,7 @@ if it silently fails to boot you get an app that looks healthy but never drains
 queues. Some contributors would rather run a single process locally.
 
 Production is different and stays that way: it runs web and worker as separate
-Deployments (`infra/charts/langwatch/templates/{app,workers}`) so they scale
+Deployments (`charts/langwatch/templates/{app,workers}`) so they scale
 independently. Collapsing them is a *dev-only* convenience, never a prod change.
 
 ### Decision
