@@ -156,12 +156,52 @@ Key properties:
 - **Crash-bounded.** A crashed holder stops renewing and disappears after the lease window; no explicit release is required for convergence.
 - **Live siblings remain protected.** Every holder has its own deadline, so pruning a crashed sibling cannot remove a live job's renewed lease.
 - **Duplicate take/release is idempotent.** `ZADD` updates one member and `ZREM` of a missing member is harmless.
-- **No eager deletion.** Release and transfer mutate lease membership only. Redis TTL reclaims Redis-tier bytes. The dedicated GroupQueue bucket lifecycle reclaims durable bytes after seven days in SaaS.
+- **No eager deletion.** Release and transfer mutate lease membership only. Redis TTL reclaims Redis-tier bytes; the storage lifecycle reclaims durable bytes (see [Durable-tier retention](#durable-tier-retention)).
 - **Cluster-safe.** Blob, lease, migration-guard, and queue keys share the queue's Redis hash tag.
 
 A retry or dedup-squash uses `TRANSFER_LUA` to take/renew the new lease and remove the old member atomically. The blob is never deleted on either the same-content or changed-content path.
 
 During a rolling deploy, lease operations also write a TTL-bound sentinel into the previous release's holder set. Old release code therefore cannot observe an empty set and eagerly delete a blob written or renewed by new code. Existing ref-count-era blobs remain readable; the first new-code decode renews a lease, while finite Redis TTLs and the durable-store lifecycle policy eventually reclaim untouched legacy data.
+
+### Durable-tier retention
+
+Leases govern the Redis tier only. Nothing in the queue ever deletes a durable
+(s3/file) payload — reclaim is delegated entirely to the storage lifecycle. That
+delegation is only sound if every durable payload lands somewhere a lifecycle
+rule can name, so the queue prefix (`LANGWATCH_QUEUE_PAYLOAD_PREFIX`, default
+`temp-tier-3-offload/`) is applied on **every** destination:
+
+| Destination                                   | Key                                     |
+| --------------------------------------------- | --------------------------------------- |
+| Dedicated queue bucket (`LANGWATCH_QUEUE_PAYLOAD_BUCKET`) | `s3://<queue-bucket>/<prefix><tenantId>/<hash>` |
+| Shared deployment bucket (`S3_BUCKET_NAME`)   | `s3://<bucket>/<prefix><tenantId>/<hash>` |
+| Tenant BYOC bucket                            | `s3://<byoc-bucket>/<prefix><tenantId>/<hash>` |
+| Local filesystem                              | `file://<root>/<prefix><tenantId>/<hash>` |
+
+The prefix is a property of the payload, not of whether the dedicated bucket
+happens to be configured. Writing at the destination root would put ephemeral
+queue payloads beside `stored_objects` content — which has no `stored_objects`
+row for `deleteOwnedBy()` to find, is retained deliberately, and is exactly what
+a root-scoped expiry rule would have to spare. `mintGroupQueueStorageUri` throws
+rather than mint an unprefixed key.
+
+**Operator requirement.** Namespacing makes reclaim *possible*; it does not
+perform it. Each deployment must expire the prefix itself:
+
+- **S3 / S3-compatible** — a lifecycle rule expiring objects under
+  `temp-tier-3-offload/` past the backstop window (7 days in SaaS). A deployment
+  without one accumulates every completed payload indefinitely.
+- **BYOC** — the same rule on the tenant's bucket, or a dedicated queue bucket
+  (`LANGWATCH_QUEUE_PAYLOAD_BUCKET`) so queue bytes never reach tenant storage.
+  Preferred, because tenant-side lifecycle policy is not ours to guarantee.
+- **Local filesystem** — no lifecycle engine exists; self-host deployments that
+  offload to disk need a periodic sweep of the prefix by age.
+
+Payloads written before the prefix became unconditional sit at the destination
+root. Because a decode miss discards the job permanently (#5538) rather than
+retrying, the read path falls back to that legacy location on a miss —
+removable one release after this ships, by which point every legacy object is
+past the backstop window.
 
 ---
 

@@ -92,6 +92,7 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
       resolveStorageDestination: async () => ({
         kind: "s3",
         bucket: "test-bucket",
+        prefix: "temp-tier-3-offload/",
       }),
     });
     queues.push(queue);
@@ -186,6 +187,12 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
         });
         await queue.waitUntilReady();
 
+        // A shared `id` with a per-reactor `__jobName`: generateStagedJobId
+        // composes `<id>/<jobType>/<jobName>`, so these are three DISTINCT
+        // staged jobs, not three idempotent re-stages of one. That is the
+        // fan-out this exercises — identical bytes, one blob, three leases —
+        // and the zcard assertions below would read 1, not 3, if the ids
+        // collapsed.
         for (let i = 0; i < 3; i++) {
           await queue.send({
             id: "same-payload",

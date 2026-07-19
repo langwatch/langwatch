@@ -55,6 +55,7 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
       resolveStorageDestination: async () => ({
         kind: "s3",
         bucket: "test-bucket",
+        prefix: "temp-tier-3-offload/",
       }),
     });
     leases = new BlobLeases({ redis, queueName });
@@ -312,8 +313,18 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
           groupId: TENANT_GROUP,
         });
 
+        // No eager delete: a last-live-lease deletion would race a concurrent
+        // take on the same content. Retention is delegated to the storage
+        // lifecycle instead — which is only a real reclaim path because the
+        // object is written under the queue's own prefix, never at the bucket
+        // root beside stored_objects content a lifecycle rule must spare.
+        // Asserted below so "no delete" cannot silently become "retained
+        // forever" (ADR-030, Durable-tier retention).
         expect(objectStore.deleted).toHaveLength(0);
         expect(objectStore.store.size).toBe(1);
+        expect([...objectStore.store.keys()][0]).toContain(
+          "/temp-tier-3-offload/",
+        );
         expect(await redis.exists(leaseKey(hashOf(value)))).toBe(0);
       });
     });

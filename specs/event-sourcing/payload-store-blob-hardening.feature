@@ -204,6 +204,38 @@ Feature: GroupQueue blob-handling hardening
     Because lease transfer and rolling-deploy compatibility keys must share one cluster slot
 
   # ===========================================================================
+  # Track 7 — durable retention
+  #
+  # Leases reclaim Redis-tier bytes; durable-tier bytes reclaim through the
+  # storage lifecycle instead. That only works if every durable queue payload
+  # is written somewhere a lifecycle rule can name — so the queue prefix is a
+  # property of the payload, not of whether a dedicated bucket happens to be
+  # configured. A payload at the bucket root is indistinguishable from
+  # stored-objects content, which is retained deliberately and forever.
+  # ===========================================================================
+
+  @unit @track7
+  Scenario Outline: A durable queue payload is namespaced under the queue prefix
+    Given a deployment whose queue payloads resolve to <destination>
+    When a payload is offloaded to the durable tier
+    Then the object is written under the queue payload prefix
+    And it never lands beside tenant content at the destination root
+
+    Examples:
+      | destination                    |
+      | a dedicated queue bucket       |
+      | the shared deployment bucket   |
+      | a tenant's own BYOC bucket     |
+      | a local filesystem root        |
+
+  @unit @track7
+  Scenario: A payload written before the prefix existed is still readable
+    Given an offloaded job whose object was written at the destination root
+    When the payload is decoded after the prefix is introduced
+    Then the legacy location is read as a fallback
+    And the job is neither dropped nor retried
+
+  # ===========================================================================
   # --- AC Coverage Map (ADR-030) ---
   # Track 1 — bounded-memory offload
   #   AC1.1 buffered mid-MB           -> A mid-MB payload offloads through the buffered path
@@ -230,7 +262,10 @@ Feature: GroupQueue blob-handling hardening
   #   AC5.3 tenant-attributed logs    -> Blob log lines are tenant-attributed and never leak the bucket
   # Track 6 — cluster-slot guard
   #   AC6.1 reject hash-tag-less name -> A queue name without a Redis hash tag is rejected at construction
+  # Track 7 — durable retention
+  #   AC7.1 prefix on every destination -> A durable queue payload is namespaced under the queue prefix
+  #   AC7.2 legacy-location read        -> A payload written before the prefix existed is still readable
   #
-  # Count: 19 behavioral ACs -> 19 scenarios. Streaming (the original AC1.2) was
+  # Count: 21 behavioral ACs -> 21 scenarios. Streaming (the original AC1.2) was
   # dropped in implementation — the cap is the memory bound (ADR-030 §1).
   # ===========================================================================

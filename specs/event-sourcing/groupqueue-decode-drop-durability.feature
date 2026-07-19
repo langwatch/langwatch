@@ -72,14 +72,14 @@ Feature: GroupQueue decode-drop durability and attribution
   Scenario: a body-present decode failure does not destroy the body it could not read
     Given a staged job whose body is present but cannot be decoded
     When a worker claims the group and the decode fails
-    Then the staged value's blob holder is not released
+    Then the staged value's blob lease is not released
     And the body is still readable from the blob store afterwards
 
   @integration
-  Scenario: a missing-blob drop releases the absent blob's holder
+  Scenario: a missing-blob drop releases the absent blob's lease
     Given a staged job whose referenced blob is genuinely gone
     When a worker claims the group and the decode fails
-    Then the staged value's blob holder is released
+    Then the staged value's blob lease is released
     And the drop is recorded as an irreducible loss rather than a preserved body
 
   @integration
@@ -208,7 +208,7 @@ Feature: GroupQueue decode-drop durability and attribution
 #
 # AC2(a) "body-present failures do NOT call release() — recoverable bodies are not destroyed"
 #   -> Scenario: a body-present decode failure does not destroy the body it could not read
-#   -> Scenario: a missing-blob drop releases the absent blob's holder   (the stated exemption)
+#   -> Scenario: a missing-blob drop releases the absent blob's lease   (the stated exemption)
 # AC2(b) "every drop counted, labelled {queue_name, pipeline_name, job_type, job_name, reason}"
 #   -> Scenario: a drop names which pipeline and job lost the event
 # AC2(c) "liveness preserved — the group is not blocked"

@@ -54,7 +54,11 @@ type TestPayload = {
 const TENANT = "proj1";
 const PROJECT = createTenantId(TENANT);
 const STORAGE_DESTINATION = async () =>
-  ({ kind: "s3" as const, bucket: "test-bucket" });
+  ({
+    kind: "s3" as const,
+    bucket: "test-bucket",
+    prefix: "temp-tier-3-offload/",
+  });
 
 // > the 256 KiB s3 threshold once gzipped (see groupQueue.gq2.integration.test.ts).
 const OFFLOADABLE_S3_VALUE = () => incompressible(768 * 1024);
@@ -307,7 +311,7 @@ describe.skipIf(!hasTestcontainers)(
 
     describe("given a staged job whose referenced blob is genuinely gone", () => {
       describe("when a worker claims the group and the decode fails", () => {
-        /** @scenario "a missing-blob drop releases the absent blob's holder" */
+        /** @scenario "a missing-blob drop releases the absent blob's lease" */
         it("releases the blob's lease without eager object deletion", async () => {
           const name = freshName();
           const groupId = `${TENANT}/missing-blob-release`;

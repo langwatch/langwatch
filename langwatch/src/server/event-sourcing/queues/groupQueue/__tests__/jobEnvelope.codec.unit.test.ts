@@ -14,7 +14,11 @@ function makeTiered() {
   const tieredBlobs = new TieredBlobStore({
     redisBlobs,
     objectStoreFor: () => objectStore,
-    resolveDestination: async () => ({ kind: "s3", bucket: "test-bucket" }),
+    resolveDestination: async () => ({
+      kind: "s3",
+      bucket: "test-bucket",
+      prefix: "temp-tier-3-offload/",
+    }),
     s3ThresholdBytes: 256 * 1024,
   });
   return { tieredBlobs, redisBlobs, objectStore };

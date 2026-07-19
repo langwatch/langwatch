@@ -13,6 +13,7 @@ import { gqBlobDecodeCapExceededTotal } from "./metrics";
 import {
   type GroupQueueStorageDestination,
   mintGroupQueueStorageUri,
+  mintLegacyGroupQueueStorageUri,
 } from "./groupQueueStorage";
 
 /**
@@ -216,6 +217,22 @@ export class TieredBlobStore {
     return mintGroupQueueStorageUri({ destination, tenantId: projectId, hash });
   }
 
+  /** The pre-prefix location, read as a fallback. See {@link mintLegacyGroupQueueStorageUri}. */
+  private async mintLegacyUri({
+    projectId,
+    hash,
+  }: {
+    projectId: TenantId;
+    hash: string;
+  }): Promise<string> {
+    const destination = await this.resolveDestinationCached(projectId);
+    return mintLegacyGroupQueueStorageUri({
+      destination,
+      tenantId: projectId,
+      hash,
+    });
+  }
+
   async put({
     projectId,
     data,
@@ -343,6 +360,44 @@ export class TieredBlobStore {
         return null;
       }
       if (isObjectMissingError(err)) {
+        return await this.fetchLegacyLocation(ref);
+      }
+      throw new TransientBlobStoreError({
+        projectId: ref.projectId,
+        hash: ref.hash,
+        cause: err,
+      });
+    }
+  }
+
+  /**
+   * Second read at the pre-prefix location, tried only after the prefixed one
+   * reports missing. A miss here is a genuine missing blob (null → the decode
+   * fail-safe); a transient failure still throws, so a blip on the fallback
+   * read retries rather than permanently discarding the job. Deleted one
+   * release after the prefix ships — see {@link mintLegacyGroupQueueStorageUri}.
+   */
+  private async fetchLegacyLocation(ref: BlobRef): Promise<Buffer | null> {
+    let legacyUri: string;
+    try {
+      legacyUri = await this.mintLegacyUri({
+        projectId: ref.projectId,
+        hash: ref.hash,
+      });
+    } catch (err) {
+      throw new TransientBlobStoreError({
+        projectId: ref.projectId,
+        hash: ref.hash,
+        cause: err,
+      });
+    }
+    try {
+      return await streamToBuffer(
+        await this.objectStoreFor(ref.projectId).get(legacyUri),
+        MAX_BLOB_BYTES,
+      );
+    } catch (err) {
+      if (err instanceof BlobTooLargeError || isObjectMissingError(err)) {
         return null;
       }
       throw new TransientBlobStoreError({

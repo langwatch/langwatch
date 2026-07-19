@@ -19,7 +19,11 @@ function makeStore(s3ThresholdBytes = 256 * 1024) {
   const store = new TieredBlobStore({
     redisBlobs,
     objectStoreFor: () => objectStore,
-    resolveDestination: async () => ({ kind: "s3", bucket: "test-bucket" }),
+    resolveDestination: async () => ({
+      kind: "s3",
+      bucket: "test-bucket",
+      prefix: "temp-tier-3-offload/",
+    }),
     s3ThresholdBytes,
   });
   return { store, redisBlobs, objectStore };
@@ -81,13 +85,13 @@ describe("TieredBlobStore", () => {
 
   describe("given a payload over the S3 threshold", () => {
     describe("when it is put", () => {
-      it("stores it in the S3 tier under a projectId-namespaced s3 uri", async () => {
+      it("stores it in the S3 tier under a prefixed, projectId-namespaced s3 uri", async () => {
         const { store, objectStore } = makeStore(8);
         const data = Buffer.from("this comfortably exceeds the threshold");
 
         const ref = await store.put({ projectId: PROJECT, data });
 
-        const expectedUri = `s3://test-bucket/${PROJECT}/${contentHash(data)}`;
+        const expectedUri = `s3://test-bucket/temp-tier-3-offload/${PROJECT}/${contentHash(data)}`;
         expect(ref.tier).toBe("s3");
         expect(ref).toMatchObject({
           projectId: PROJECT,
@@ -96,7 +100,7 @@ describe("TieredBlobStore", () => {
         expect([...objectStore.store.keys()]).toEqual([expectedUri]);
       });
 
-      it("mints the lifecycle-managed GroupQueue prefix when configured", async () => {
+      it("mints the lifecycle-managed GroupQueue prefix when a dedicated bucket is configured", async () => {
         const objectStore = new InMemoryObjectStore();
         const store = new TieredBlobStore({
           redisBlobs: new InMemoryJobBlobStore(),
@@ -203,6 +207,43 @@ describe("TieredBlobStore", () => {
     });
   });
 
+  // Deployments without a dedicated queue bucket wrote durable payloads at the
+  // destination root until the prefix became unconditional. A decode miss is
+  // not a retry — it discards the job permanently (#5538) — so the read path
+  // must still find those objects across the deploy that introduces the prefix.
+  describe("given an s3-tier blob written at the pre-prefix location", () => {
+    describe("when it is fetched", () => {
+      /** @scenario "A payload written before the prefix existed is still readable" */
+      it("falls back to the legacy location instead of dropping the job", async () => {
+        const { store, objectStore } = makeStore(8);
+        const data = Buffer.from(
+          "over the threshold so it lands in the s3 tier",
+        );
+        const ref = await store.put({ projectId: PROJECT, data });
+
+        // Re-home the object exactly as an older deploy would have written it.
+        objectStore.store.clear();
+        objectStore.store.set(
+          `s3://test-bucket/${PROJECT}/${contentHash(data)}`,
+          data,
+        );
+
+        expect(await store.get(ref)).toEqual(data);
+      });
+
+      it("still reports missing when neither location holds the object", async () => {
+        const { store, objectStore } = makeStore(8);
+        const data = Buffer.from(
+          "over the threshold so it lands in the s3 tier",
+        );
+        const ref = await store.put({ projectId: PROJECT, data });
+        objectStore.store.clear();
+
+        expect(await store.get(ref)).toBeNull();
+      });
+    });
+  });
+
   describe("given the s3 store is failing transiently", () => {
     describe("when a blob is fetched", () => {
       it("throws TransientBlobStoreError so the job retries instead of dropping", async () => {
@@ -219,6 +260,7 @@ describe("TieredBlobStore", () => {
           resolveDestination: async () => ({
             kind: "s3",
             bucket: "test-bucket",
+            prefix: "temp-tier-3-offload/",
           }),
           s3ThresholdBytes: 8,
         });
