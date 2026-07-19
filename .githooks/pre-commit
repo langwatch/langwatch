@@ -10,11 +10,11 @@ set -euo pipefail
 
 staged_before=$(git diff --cached --name-only | sort)
 
-# Check if any staged files match skill sources
-if echo "$staged_before" | grep -qE '^skills/.*\.md$|^skills/_shared/'; then
-  echo "pre-commit: Regenerating prompts-data.jsx from skill sources..."
+# Check if any staged files match skill sources or the docs skills manifest
+if echo "$staged_before" | grep -qE '^skills/.*\.md$|^skills/_shared/|^docs/skills/skills-pages-manifest\.json$'; then
+  echo "pre-commit: Regenerating docs/skills pages from skill sources..."
   bash docs/scripts/sync-prompts.sh
-  git add docs/snippets/prompts-data.jsx
+  git add docs/skills/directory.mdx docs/skills/pms-and-domain-experts.mdx
 fi
 
 # Check if any staged files are under docs/ — always regenerate llms.txt (generation is fast)
@@ -28,7 +28,7 @@ if echo "$staged_before" | grep -qE '^docs/'; then
 fi
 
 # Detect peer-agent index races: anything in $staged_before must still be
-# staged. Hook-written paths (prompts-data.jsx, llms.txt, llms-full.txt) are
+# staged. Hook-written paths (docs/skills pages, llms.txt, llms-full.txt) are
 # additions on top, so we only fail if an originally-staged path disappeared.
 staged_after=$(git diff --cached --name-only | sort)
 dropped=$(comm -23 <(echo "$staged_before") <(echo "$staged_after") || true)
