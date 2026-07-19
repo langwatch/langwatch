@@ -27,7 +27,6 @@ import {
   createLicenseEnforcementService,
   LimitExceededError,
 } from "../../license-enforcement";
-import { getApp } from "../../app-layer/app";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,
@@ -474,16 +473,27 @@ export const projectRouter = createTRPCRouter({
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ ctx, input }) => {
       try {
-        await getApp().topicClustering.requestClustering({
+        const app = getApp();
+        // A request made while a run is already underway is declined by the
+        // scheduler, not queued behind it, so an unconditional success would
+        // tell the user a run started when nothing did. The read model is the
+        // only place that answer is visible before the scheduler makes it, so
+        // ask it first and report which of the two the click actually did.
+        // Best effort by nature: the scheduler, not this check, is what keeps
+        // two runs off one project.
+        if (await app.topicClustering.status.isRunInFlight(input)) {
+          return {
+            started: false as const,
+            reason: "already_running" as const,
+          };
+        }
+        await app.topicClustering.requestClustering({
           tenantId: input.projectId,
           occurredAt: Date.now(),
           trigger: "manual",
           requestedByUserId: ctx.session.user.id,
         });
-        return {
-          success: true,
-          message: "Topic clustering run requested successfully",
-        };
+        return { started: true as const };
       } catch (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",

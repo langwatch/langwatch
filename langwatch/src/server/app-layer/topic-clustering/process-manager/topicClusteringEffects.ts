@@ -125,15 +125,45 @@ export function createTopicClusteringIntentHandlers(params: {
         },
         "Clustering page failed on final attempt; recording run_failed",
       );
-      await params.commands.recordClusteringRunFailed({
-        tenantId: projectId,
-        occurredAt: clock(),
-        runId: intent.runId,
-        page: intent.page,
-        error: errorMessage,
-        errorCode: classified.code,
-        userActionable: classified.userActionable,
-      });
+      // Same swallow-and-log as the success path below, and for the same
+      // reason: the OUTCOME WRITE is never worth a redelivery. This branch
+      // used to let a failing write propagate, which was strictly worse than
+      // the failure it was reporting — the outbox marked the message dead, so
+      // no run_failed event was ever written, `currentRun` stayed pinned at
+      // this page, and the settings page showed a run stuck in progress with
+      // no error on it. The asymmetry bought nothing: the retry it triggered
+      // could only re-run the page that had ALREADY failed maxAttempts times.
+      //
+      // Swallowed, the process self-heals on the same schedule as the success
+      // path — the stale-run guard abandons the pinned run after
+      // TOPIC_CLUSTERING_STALE_RUN_MS and the next daily wake starts fresh.
+      try {
+        await params.commands.recordClusteringRunFailed({
+          tenantId: projectId,
+          occurredAt: clock(),
+          runId: intent.runId,
+          page: intent.page,
+          error: errorMessage,
+          errorCode: classified.code,
+          userActionable: classified.userActionable,
+        });
+      } catch (recordError) {
+        logger.error(
+          {
+            projectId,
+            runId: intent.runId,
+            page: intent.page,
+            attempt: message.attempt,
+            error: errorMessage,
+            errorCode: classified.code,
+            recordError:
+              recordError instanceof Error
+                ? recordError.message
+                : String(recordError),
+          },
+          "Clustering page failed on final attempt AND recording run_failed failed; the run stalls until the next daily wake abandons it and starts fresh",
+        );
+      }
       return;
     }
 

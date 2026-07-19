@@ -813,7 +813,12 @@ topicClusteringBackfill:
   enabled: true
   ## @param topicClusteringBackfill.backoffLimit [default: 3] Job backoffLimit — retries on transient failure. The task is idempotent, and retries also absorb the race against app-boot database migrations.
   backoffLimit: 3
-  ## @param topicClusteringBackfill.activeDeadlineSeconds [default: 3600] Hard runtime limit (s) — a backstop so a hung backfill can't run forever. The task is idempotent, so a re-run is safe; raise for installs with very many projects or set null to disable.
+  # activeDeadlineSeconds is the budget for the JOB AS A WHOLE, not per attempt,
+  # and it takes precedence over backoffLimit: once the deadline passes the Job
+  # is failed and no further retries happen, however many of the backoffLimit
+  # attempts are left. So this value is shared across every retry — size it as
+  # (worst-case single run x attempts), not as one run.
+  ## @param topicClusteringBackfill.activeDeadlineSeconds [default: 3600] Hard runtime limit (s) for the whole Job, shared across ALL backoffLimit retries — it overrides backoffLimit, so when it expires the Job fails outright with no further attempts. A backstop so a hung backfill can't run forever. The task is idempotent, so a re-run is safe; raise for installs with very many projects or set null to disable.
   activeDeadlineSeconds: 3600
   # ServiceAccount for the Job. Leave empty to use the namespace default
   # (matching the app/workers).
@@ -1153,11 +1158,11 @@ cronjobs:
   # Existing projects are seeded by the topicClusteringBackfill hook Job.
 
   # NOTE: the automation CronJobs are gone. The alertTriggers CronJob
-    # (`/api/cron/triggers`) was removed — custom-graph threshold alerts now
-    # fire from the event-sourced worker path (ADR-034) — and the webhook
-    # delivery-log prune runs as a daily scheduled process manager on the
-    # same worker path (ADR-040 §6), so neither needs a cron sweep. The
-    # workers Deployment (workers.enabled) is what runs them now.
+  # (`/api/cron/triggers`) was removed — custom-graph threshold alerts now
+  # fire from the event-sourced worker path (ADR-034) — and the webhook
+  # delivery-log prune runs as a daily scheduled process manager on the
+  # same worker path (ADR-040 §6), so neither needs a cron sweep. The
+  # workers Deployment (workers.enabled) is what runs them now.
 
   # =============================================================================
   # Kubernetes Pass-Through Configuration

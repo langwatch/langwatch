@@ -1,4 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const logger = vi.hoisted(() => ({
+  info: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+}));
+
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => logger,
+}));
+
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../../schemas/events";
@@ -104,6 +116,8 @@ describe("createProjectMetadataReactor()", () => {
   const tenantId = "project-123";
 
   beforeEach(() => {
+    logger.error.mockClear();
+    logger.warn.mockClear();
     mockProjects = createMockProjectService();
     deps = {
       projects: mockProjects as any,
@@ -330,6 +344,158 @@ describe("createProjectMetadataReactor()", () => {
     });
 
 
+  });
+
+  describe("given a project receiving its first real trace", () => {
+    let bootstrapTopicClustering: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      mockProjects.getById.mockResolvedValue({
+        id: tenantId,
+        firstMessage: false,
+        integrated: false,
+      });
+      mockProjects.updateMetadata.mockResolvedValue(undefined);
+      bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
+      deps = {
+        projects: mockProjects as any,
+        bootstrapTopicClustering: bootstrapTopicClustering as any,
+      };
+    });
+
+    describe("when a topic clustering bootstrap is wired", () => {
+      it("bootstraps the project's clustering schedule exactly once", async () => {
+        const reactor = createProjectMetadataReactor(deps);
+
+        await reactor.handle(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState()),
+        );
+
+        expect(bootstrapTopicClustering).toHaveBeenCalledTimes(1);
+        expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
+      });
+
+      it("bootstraps only after the metadata write has committed", async () => {
+        const reactor = createProjectMetadataReactor(deps);
+
+        await reactor.handle(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState()),
+        );
+
+        expect(
+          bootstrapTopicClustering.mock.invocationCallOrder[0]!,
+        ).toBeGreaterThan(
+          mockProjects.updateMetadata.mock.invocationCallOrder[0]!,
+        );
+      });
+    });
+
+    describe("when the bootstrap throws", () => {
+      beforeEach(() => {
+        bootstrapTopicClustering.mockRejectedValue(
+          new Error("process store unavailable"),
+        );
+      });
+
+      it("swallows the failure (non-fatal)", async () => {
+        const reactor = createProjectMetadataReactor(deps);
+
+        await expect(
+          reactor.handle(
+            createEvent(tenantId),
+            createContext(tenantId, createFoldState()),
+          ),
+        ).resolves.toBeUndefined();
+      });
+
+      it("does not report the committed metadata write as failed", async () => {
+        const reactor = createProjectMetadataReactor(deps);
+
+        await reactor.handle(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState()),
+        );
+
+        expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
+        expect(logger.error).toHaveBeenCalledTimes(1);
+        const [, message] = logger.error.mock.calls[0]!;
+        expect(message).toMatch(/bootstrap failed/i);
+        expect(message).not.toMatch(/Failed to update project metadata/i);
+      });
+    });
+
+    describe("when no bootstrap is wired", () => {
+      it("completes the metadata write without error", async () => {
+        const reactor = createProjectMetadataReactor({
+          projects: mockProjects as any,
+        });
+
+        await expect(
+          reactor.handle(
+            createEvent(tenantId),
+            createContext(tenantId, createFoldState()),
+          ),
+        ).resolves.toBeUndefined();
+
+        expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given a project that already received its first message", () => {
+    let bootstrapTopicClustering: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      // Not yet integrated, so the reactor still writes metadata — the
+      // bootstrap must stay behind the first-message transition alone.
+      mockProjects.getById.mockResolvedValue({
+        id: tenantId,
+        firstMessage: true,
+        integrated: false,
+      });
+      mockProjects.updateMetadata.mockResolvedValue(undefined);
+      bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
+      deps = {
+        projects: mockProjects as any,
+        bootstrapTopicClustering: bootstrapTopicClustering as any,
+      };
+    });
+
+    describe("when another trace arrives", () => {
+      it("updates the metadata without bootstrapping clustering again", async () => {
+        const reactor = createProjectMetadataReactor(deps);
+
+        await reactor.handle(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState()),
+        );
+
+        expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
+        expect(bootstrapTopicClustering).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the project no longer exists", () => {
+    describe("when a trace arrives", () => {
+      it("does not bootstrap clustering", async () => {
+        const bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
+        mockProjects.getById.mockResolvedValue(null);
+        const reactor = createProjectMetadataReactor({
+          projects: mockProjects as any,
+          bootstrapTopicClustering: bootstrapTopicClustering as any,
+        });
+
+        await reactor.handle(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState()),
+        );
+
+        expect(bootstrapTopicClustering).not.toHaveBeenCalled();
+      });
+    });
   });
 
   it("uses dedup makeJobId based on tenantId", () => {

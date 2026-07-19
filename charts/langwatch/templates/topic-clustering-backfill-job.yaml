@@ -7,18 +7,25 @@
   wakes. Those wakes are created when a project first ingests a trace (the
   projectMetadata reactor's bootstrap) — which does nothing for the projects
   that ALREADY ingested before the upgrade. Without this Job, a deploy of
-  ADR-051 leaves zero `ProcessManagerWake` rows for every existing project and
+  ADR-051 leaves every existing project without a `ProcessManagerInstance`
+  row — and therefore without the `nextWakeAt` the scheduler fires on — so
   topic clustering silently stops platform-wide until an operator remembers to
   run `pnpm run task backfillTopicClusteringSchedules` by hand. The whole point
   of a hook is that the deploy seeds itself.
 
   Properties that make it safe to fire on every upgrade:
 
-    - IDEMPOTENT: the task issues a bootstrap clustering request per eligible
-      project (firstMessage: true). The request is de-duplicated by the event
+    - IDEMPOTENT: the task pages through eligible projects (firstMessage: true)
+      and issues a bootstrap clustering request for each one that has no
+      scheduled `nextWakeAt` yet. Projects already scheduled are skipped
+      outright, and any request that does go out is de-duplicated by the event
       log and evolves already-bootstrapped processes to a pure no-op, so
       re-running on every `helm upgrade` neither double-schedules a project nor
       forces an unscheduled clustering run.
+    - PARTIAL FAILURE IS A FAILURE: one project's error is logged and skipped so
+      the rest of the fleet still gets scheduled, but the task then exits
+      non-zero. The Job retries (`backoffLimit`) rather than reporting a
+      truncated backfill as a successful deploy step.
     - OFF THE BOOT PATH: a hook Job, never the `set -e` app boot, so a failure
       here can never block pods from starting. Topic clustering degrades; the
       product still serves.

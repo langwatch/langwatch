@@ -9,8 +9,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useState } from "react";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { api } from "~/utils/api";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import SettingsLayout from "../../components/SettingsLayout";
 import { toaster } from "../../components/ui/toaster";
@@ -56,12 +58,11 @@ function TopicClusteringSettings() {
   return (
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
+        {/* Names the feature, matching the settings nav entry. */}
         <Heading as="h2">Topic Clustering</Heading>
         <Text fontSize="sm" color="fg.muted">
-          The model and embeddings used for topic clustering are
-          configured in <strong>Settings → Model Providers → Default
-          Models</strong> (the `analytics.topic_clustering_llm` and
-          `analytics.topic_clustering_embeddings` feature keys).
+          Choose the model and embeddings used for topic clustering in{" "}
+          <strong>Settings → Model Providers → Default Models</strong>.
         </Text>
 
         <TopicClusteringCard project={project} />
@@ -74,16 +75,37 @@ export default withPermissionGuard("project:manage", {
   layoutComponent: SettingsLayout,
 })(TopicClusteringSettings);
 
+/**
+ * How long a just-requested run keeps the status card polling. Nothing is
+ * recorded at the instant a run begins, so the card cannot see the run until
+ * the request itself reaches the read model; without this window the card
+ * would settle on the pre-click answer and sit there.
+ */
+const REQUEST_SETTLE_WINDOW_MS = 30_000;
+
+/** Poll cadence while a run is underway; the query stops itself once it settles. */
+const RUNNING_POLL_MS = 5_000;
+
 function TopicClusteringCard({ project }: { project: { id: string } }) {
   const utils = api.useContext();
+  const [lastTriggeredAt, setLastTriggeredAt] = useState<number | null>(null);
+
   const triggerClustering = api.project.triggerTopicClustering.useMutation({
-    onSuccess: () => {
-      toaster.create({
-        title: "Topic clustering started",
-        description:
-          "The topic clustering run has been requested and will start shortly.",
-        type: "success",
-      });
+    onSuccess: (result) => {
+      if (result.started) {
+        setLastTriggeredAt(Date.now());
+        toaster.create({
+          title: "Topic clustering started",
+          description: "This can take several minutes.",
+          type: "success",
+        });
+      } else {
+        toaster.create({
+          title: "A run is already in progress",
+          description: "Its results will appear here when it finishes.",
+          type: "info",
+        });
+      }
       void utils.topics.getClusteringStatus.invalidate({
         projectId: project.id,
       });
@@ -100,26 +122,27 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
 
   return (
     <VStack gap={6} width="full" align="start" paddingBottom={12}>
-      <ClusteringStatusCard projectId={project.id} />
+      <ClusteringStatusCard
+        projectId={project.id}
+        lastTriggeredAt={lastTriggeredAt}
+      />
       <Card.Root width="full">
         <Card.Header>
-          <Heading>Manual Topic Clustering</Heading>
+          <Heading>Manual topic clustering</Heading>
         </Card.Header>
         <Card.Body width="full">
           <VStack align="start" gap={4}>
             <Text>
-              Manually trigger topic clustering to organize your traces into
-              topics and subtopics. This will analyze your recent traces and
-              group them by similar patterns.
+              Group your recent traces into topics and subtopics without waiting
+              for the next scheduled run.
             </Text>
 
             <Alert.Root>
               <Alert.Indicator />
               <Alert.Content>
                 <Alert.Description>
-                  Topic clustering requires at least 10 traces to run
-                  effectively. The process may take several minutes depending on
-                  the number of traces.
+                  Topic clustering needs at least 10 traces to group anything,
+                  and can take several minutes.
                 </Alert.Description>
               </Alert.Content>
             </Alert.Root>
@@ -131,7 +154,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
               }
               loading={triggerClustering.isLoading}
             >
-              Run Topic Clustering
+              Run topic clustering
             </Button>
           </VStack>
         </Card.Body>
@@ -142,13 +165,19 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
 
 const SKIP_REASON_COPY: Record<string, string> = {
   recently_clustered:
-    "Skipped — topics were rebuilt recently, so this run wasn't needed yet",
-  not_enough_traces: "Skipped — not enough new traces to cluster yet",
-  not_configured: "Skipped — no topic clustering model is configured",
+    "Skipped, your topics were rebuilt recently so this run was not needed yet",
+  not_enough_traces: "Skipped, not enough new traces to group yet",
+  not_configured: "Skipped, no topic clustering model is set up",
 };
 
-function outcomeBadge(outcome: string | null, inProgress: boolean) {
-  if (inProgress) return <Badge colorPalette="blue">Running</Badge>;
+/** What each run mode did, in the customer's terms rather than the enum's. */
+const RUN_MODE_COPY: Record<string, string> = {
+  batch: "Rebuilt all topics",
+  incremental: "Sorted new traces into your existing topics",
+};
+
+function outcomeBadge(outcome: string | null, runInFlight: boolean) {
+  if (runInFlight) return <Badge colorPalette="blue">Running</Badge>;
   switch (outcome) {
     case "completed":
       return <Badge colorPalette="green">Completed</Badge>;
@@ -161,10 +190,27 @@ function outcomeBadge(outcome: string | null, inProgress: boolean) {
   }
 }
 
-function ClusteringStatusCard({ projectId }: { projectId: string }) {
+function ClusteringStatusCard({
+  projectId,
+  lastTriggeredAt,
+}: {
+  projectId: string;
+  lastTriggeredAt: number | null;
+}) {
   const status = api.topics.getClusteringStatus.useQuery(
     { projectId },
-    { refetchInterval: 30_000 },
+    {
+      refetchInterval: (data) => {
+        if (data?.runInFlight) return RUNNING_POLL_MS;
+        if (
+          lastTriggeredAt !== null &&
+          Date.now() - lastTriggeredAt < REQUEST_SETTLE_WINDOW_MS
+        ) {
+          return RUNNING_POLL_MS;
+        }
+        return false;
+      },
+    },
   );
 
   return (
@@ -182,15 +228,23 @@ function ClusteringStatusCard({ projectId }: { projectId: string }) {
           <VStack align="start" gap={3}>
             <HStack gap={3}>
               <Text fontWeight="medium">Last run</Text>
-              {outcomeBadge(status.data.lastRunOutcome, status.data.inProgress)}
+              {outcomeBadge(
+                status.data.lastRunOutcome,
+                status.data.runInFlight,
+              )}
               {status.data.lastRunAt && (
                 <Text color="fg.muted">
-                  {new Date(status.data.lastRunAt).toLocaleString()}
+                  {formatTimeAgo(status.data.lastRunAt)}
                 </Text>
               )}
             </HStack>
             {status.data.lastRunOutcome === "completed" && (
               <Text fontSize="sm" color="fg.muted">
+                {/* The mode is only trustworthy on a completed run: a failure
+                    leaves the previous run's mode in place. */}
+                {status.data.lastRunMode &&
+                  RUN_MODE_COPY[status.data.lastRunMode] &&
+                  `${RUN_MODE_COPY[status.data.lastRunMode]!}. `}
                 Organized {status.data.lastRunTracesProcessed} traces into{" "}
                 {status.data.lastRunTopicsCount} topics and{" "}
                 {status.data.lastRunSubtopicsCount} subtopics.
@@ -232,8 +286,8 @@ function ClusteringStatusCard({ projectId }: { projectId: string }) {
               <Text fontWeight="medium">Next scheduled run</Text>
               <Text color="fg.muted">
                 {status.data.nextRunAt
-                  ? new Date(status.data.nextRunAt).toLocaleString()
-                  : "Scheduled after your project receives its first traces"}
+                  ? formatTimeAgo(status.data.nextRunAt)
+                  : "Not scheduled yet"}
               </Text>
             </HStack>
           </VStack>

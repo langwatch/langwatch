@@ -19,6 +19,7 @@ import { getProjectEmbeddingsModel } from "../../embeddings";
 import { stagedLangevalsFetch } from "../../langevals/stagedFetch";
 import { getPayloadSizeHistogram } from "../../metrics";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
+import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "./process-manager/topicClusteringEffects";
 import type {
   BatchClusteringParams,
   IncrementalClusteringParams,
@@ -26,7 +27,6 @@ import type {
   TopicClusteringSubtopic,
   TopicClusteringTopic,
   TopicClusteringTrace,
-  TopicClusteringTraceTopicMap,
 } from "./clustering.types";
 
 const logger = createLogger("langwatch:topicClustering");
@@ -58,6 +58,30 @@ const CLUSTERING_MODE_WINDOW_DAYS = 365;
  * unaffected.
  */
 const CLUSTERING_FETCH_WINDOW_DAYS = 49;
+
+/**
+ * Hard deadline on a single langevals clustering call, DERIVED from the outbox
+ * lease so the two cannot drift apart.
+ *
+ * The outbox leases a clustering intent for
+ * {@link TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS}. A request with no client
+ * deadline can outlive that lease; the row then becomes visible again, a second
+ * replica leases it, and two runs cluster the same page concurrently. In batch
+ * mode that is destructive, not merely wasteful: the second run's
+ * delete-then-recreate in `storeResults` tears down the topic model the first
+ * run is still writing into, and the first run's `createMany` lands against a
+ * model the second one has already replaced.
+ *
+ * Sizing this comfortably below the lease makes that race structurally
+ * impossible rather than unlikely — the call is aborted (and classified as a
+ * retryable clustering-service failure) while the lease is still held, so the
+ * message is redelivered through the outbox's own retry path with only one run
+ * of this page ever in flight. 60% of the lease leaves ample room for response
+ * handling, the store, and the outcome write to finish inside the remainder.
+ */
+export const TOPIC_CLUSTERING_REQUEST_DEADLINE_MS = Math.floor(
+  TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS * 0.6,
+);
 
 /**
  * What one clustering page did (ADR-051). `nextSearchAfter` present means
