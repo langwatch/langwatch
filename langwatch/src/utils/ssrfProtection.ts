@@ -8,9 +8,16 @@
  * - Cloud provider internal domains (configured for AWS, see ssrfConstants.ts to extend)
  *
  * ## What's Blocked (only when BLOCK_LOCAL_HTTP_CALLS is true)
- * - IPv4 private: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16
- * - IPv6 private: ::1, ::, fc00::/7 (ULA), fe80::/10 (link-local)
- * - IPv4-mapped IPv6: ::ffff:x.x.x.x (extracted and checked as IPv4)
+ * Every non-globally-routable address, as classified by the shared
+ * `@langwatch/ssrf` rule set (one table, shared byte-for-byte with the Go
+ * services, held to one conformance corpus). That is the union of the IANA
+ * IPv4/IPv6 Special-Purpose registries, not just the classic private ranges:
+ * - IPv4 private/loopback/link-local: 10/8, 172.16/12, 192.168/16, 127/8, 169.254/16
+ * - IPv4 other special: 0.0.0.0/8, 100.64/10 (CGNAT), 192.0.2/24 · 198.51.100/24 ·
+ *   203.0.113/24 (TEST-NET), 198.18/15 (benchmarking), 224/4 (multicast), 240/4 (reserved)
+ * - IPv6: ::1, ::, fc00::/7 (ULA), fe80::/10 (link-local), NAT64, 6to4, Teredo,
+ *   2001:db8::/32 (documentation)
+ * - IPv4-mapped IPv6: ::ffff:x.x.x.x (unmapped and checked as IPv4)
  * - Hostnames resolving to any of the above
  *
  * ## DNS Rebinding Protection

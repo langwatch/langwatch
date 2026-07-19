@@ -55,20 +55,34 @@ func defaultEndpointResolver(ctx context.Context, host string) ([]net.IP, error)
 }
 
 // endpointAddressError maps a literal or resolved customer-endpoint address
-// onto the shared pkg/ssrf rule set. Cloud metadata is refused unconditionally;
-// any other non-public address is refused when the policy blocks local egress
-// and the host is not explicitly allowlisted. Sharing pkg/ssrf keeps this
-// validator, the Langy egress proxy and the TypeScript app in lockstep on which
-// addresses are non-public — the same rule set, tested by one shared corpus.
+// onto the shared pkg/ssrf rule set. Classification is shared; the always-block
+// policy below is this validator's own, deliberately stricter layer on top.
+//
+// Refused unconditionally (even for a self-hosted operator who has opted into
+// private egress):
+//   - cloud metadata (pkg/ssrf CategoryMetadata) — credential-theft SSRF;
+//   - unspecified 0.0.0.0/:: — collapses to localhost on many network stacks;
+//   - link-local 169.254.0.0/16 / fe80::/10 (and link-local multicast) — where
+//     undocumented instance-metadata surfaces live.
+//
+// None of those is ever a legitimate LLM endpoint. Every other non-public
+// address is refused only when the policy blocks local egress and the host is
+// not explicitly allowlisted. Sharing pkg/ssrf keeps the underlying "which range
+// is this address in" decision identical across this validator, the Langy egress
+// proxy and the TypeScript app — one rule set, tested by one corpus.
 func endpointAddressError(ip net.IP, blockLocal, allowlisted bool) error {
 	addr, ok := netip.AddrFromSlice(ip)
 	if !ok {
 		return fmt.Errorf("customer endpoint resolves to an unparseable address")
 	}
+	addr = addr.Unmap()
 	switch ssrf.Classify(addr) {
 	case ssrf.CategoryMetadata:
 		return fmt.Errorf("customer endpoint resolves to a reserved address")
 	case ssrf.CategorySpecial:
+		if addr.IsUnspecified() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() {
+			return fmt.Errorf("customer endpoint resolves to a reserved address")
+		}
 		if blockLocal && !allowlisted {
 			return fmt.Errorf("customer endpoint resolves to a non-public address")
 		}
