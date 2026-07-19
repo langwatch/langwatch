@@ -11,7 +11,7 @@ set -euo pipefail
 staged_before=$(git diff --cached --name-only | sort)
 
 # Check if any staged files match skill sources or the docs skills manifest
-if echo "$staged_before" | grep -qE '^skills/.*\.md$|^skills/_shared/|^docs/skills/skills-pages-manifest\.json$'; then
+if echo "$staged_before" | grep -qE '^skills/.*\.mdx?$|^skills/_shared/|^docs/skills/skills-pages-manifest\.json$'; then
   echo "pre-commit: Regenerating docs/skills pages from skill sources..."
   bash docs/scripts/sync-prompts.sh
   git add docs/skills/directory.mdx docs/skills/pms-and-domain-experts.mdx
