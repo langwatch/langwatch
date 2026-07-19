@@ -100,6 +100,13 @@ Feature: Event-sourced topic clustering scheduling
     Then each project gets a clustering process with a scheduled wake
     And re-running the backfill task changes nothing
 
+  Scenario: The backfill tolerates starting before the app's first boot
+    Given a fresh install whose database schema has not been created yet
+    When the backfill task starts before the app has applied migrations
+    Then it waits for the schema instead of failing the install
+    And once the schema appears the backfill proceeds normally
+    And if the schema never appears the task fails visibly rather than hanging forever
+
   Scenario: The settings page shows the schedule state
     When the user opens the topic clustering settings page
     Then they see the last run's time, mode, and outcome

@@ -10,6 +10,75 @@ const logger = createLogger("langwatch:tasks:backfillTopicClusteringSchedules");
 /** Projects fetched (and bootstrapped) per round-trip. */
 const DEFAULT_PAGE_SIZE = 500;
 
+/**
+ * How long the task waits for the database schema before giving up. The app's
+ * FIRST boot applies migrations, and on a fresh install that boot races this
+ * hook — image pulls and rollout in a new cluster take minutes, while the
+ * hook Job's three retries burn out in under a minute of crash-loops. Well
+ * under the chart's activeDeadlineSeconds (3600, shared across retries) so a
+ * timeout still leaves the Job budget to retry.
+ */
+const DEFAULT_SCHEMA_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
+const DEFAULT_SCHEMA_POLL_INTERVAL_MS = 5_000;
+
+export interface SchemaWaitDeps {
+  /** Resolves once every table the backfill touches exists; throws until then. */
+  probeSchema: () => Promise<void>;
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
+}
+
+/**
+ * Waits for the backfill's tables to exist instead of crash-looping.
+ *
+ * The Helm hook that runs this task fires on post-install as well as
+ * post-upgrade, and nothing orders it after the app's first successful boot —
+ * the boot that applies migrations. Probing before the walk turns "fresh
+ * install" from three `P2021: table does not exist` crashes (which fail the
+ * whole `helm install` with BackoffLimitExceeded) into a quiet wait followed
+ * by a no-op. The same wait covers upgrades that introduce the process
+ * manager tables themselves.
+ *
+ * Deliberately does not inspect error codes: a DB still starting up, a
+ * missing database, and a missing table all mean the same thing here — not
+ * ready yet — and the deadline bounds a genuine outage to a visible throw,
+ * which crash-loops with the real error in the pod log rather than hanging
+ * until the Job deadline kills it with no cause attached.
+ */
+export async function waitForBackfillSchema(
+  deps: SchemaWaitDeps,
+): Promise<void> {
+  const timeoutMs = deps.timeoutMs ?? DEFAULT_SCHEMA_WAIT_TIMEOUT_MS;
+  const pollIntervalMs = deps.pollIntervalMs ?? DEFAULT_SCHEMA_POLL_INTERVAL_MS;
+  const sleep =
+    deps.sleep ??
+    ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const now = deps.now ?? Date.now;
+
+  const deadline = now() + timeoutMs;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await deps.probeSchema();
+      return;
+    } catch (error) {
+      if (now() >= deadline) {
+        throw new Error(
+          `Database schema not ready after ${Math.round(timeoutMs / 1000)}s; ` +
+            "the app's first boot applies migrations — check that the app deployment is coming up",
+          { cause: error },
+        );
+      }
+      logger.warn(
+        { attempt, error },
+        "database schema not ready; waiting for the app's first boot to apply migrations",
+      );
+      await sleep(pollIntervalMs);
+    }
+  }
+}
+
 export interface BackfillSummary {
   /** Bootstrap request accepted for a project that had no scheduled wake. */
   succeeded: number;
@@ -105,6 +174,15 @@ export async function backfillTopicClusteringSchedules(
 }
 
 export default async function execute() {
+  await waitForBackfillSchema({
+    probeSchema: async () => {
+      // Every table the walk reads. Existence is the question, not content —
+      // an empty result is a healthy answer on a fresh install.
+      await prisma.$queryRaw`SELECT 1 FROM "Project" LIMIT 1`;
+      await prisma.$queryRaw`SELECT 1 FROM "ProcessManagerInstance" LIMIT 1`;
+    },
+  });
+
   await initializeDefaultApp();
   const app = getApp();
 

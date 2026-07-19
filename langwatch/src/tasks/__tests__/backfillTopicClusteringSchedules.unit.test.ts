@@ -13,6 +13,7 @@ vi.mock("~/server/app-layer/app", () => ({
 }));
 vi.mock("../../server/db", () => ({
   prisma: {
+    $queryRaw: vi.fn(),
     project: { findMany: vi.fn() },
     processManagerInstance: { findMany: vi.fn() },
   },
@@ -22,6 +23,7 @@ import { prisma as mockedPrisma } from "../../server/db";
 import execute, {
   type BackfillDeps,
   backfillTopicClusteringSchedules,
+  waitForBackfillSchema,
 } from "../backfillTopicClusteringSchedules";
 
 /**
@@ -272,14 +274,103 @@ describe("backfillTopicClusteringSchedules", () => {
   });
 });
 
+describe("waitForBackfillSchema", () => {
+  /** Deterministic clock: `sleep` advances `now` by the requested delay. */
+  const fakeClock = (startMs = 0) => {
+    let currentMs = startMs;
+    const sleeps: number[] = [];
+    return {
+      now: () => currentMs,
+      sleep: async (ms: number) => {
+        sleeps.push(ms);
+        currentMs += ms;
+      },
+      sleeps,
+    };
+  };
+
+  describe("given the schema already exists", () => {
+    describe("when the wait runs", () => {
+      it("returns after one probe without sleeping", async () => {
+        const clock = fakeClock();
+        const probeSchema = vi.fn().mockResolvedValue(undefined);
+
+        await waitForBackfillSchema({
+          probeSchema,
+          timeoutMs: 60_000,
+          pollIntervalMs: 5_000,
+          sleep: clock.sleep,
+          now: clock.now,
+        });
+
+        expect(probeSchema).toHaveBeenCalledTimes(1);
+        expect(clock.sleeps).toEqual([]);
+      });
+    });
+  });
+
+  describe("given the app's first boot applies migrations mid-wait", () => {
+    describe("when the wait runs", () => {
+      it("polls until the schema appears, then proceeds", async () => {
+        const clock = fakeClock();
+        const probeSchema = vi
+          .fn()
+          .mockRejectedValueOnce(new Error("Project does not exist"))
+          .mockRejectedValueOnce(new Error("Project does not exist"))
+          .mockResolvedValue(undefined);
+
+        await waitForBackfillSchema({
+          probeSchema,
+          timeoutMs: 60_000,
+          pollIntervalMs: 5_000,
+          sleep: clock.sleep,
+          now: clock.now,
+        });
+
+        expect(probeSchema).toHaveBeenCalledTimes(3);
+        expect(clock.sleeps).toEqual([5_000, 5_000]);
+      });
+    });
+  });
+
+  describe("given the schema never appears", () => {
+    describe("when the deadline passes", () => {
+      it("throws instead of hanging, keeping the failure visible", async () => {
+        // A silent hang would sit inside the hook Job until
+        // activeDeadlineSeconds kills the whole Job with no cause attached;
+        // a throw crash-loops with the real error in the pod log.
+        const clock = fakeClock();
+        const probeSchema = vi
+          .fn()
+          .mockRejectedValue(new Error("Project does not exist"));
+
+        await expect(
+          waitForBackfillSchema({
+            probeSchema,
+            timeoutMs: 20_000,
+            pollIntervalMs: 5_000,
+            sleep: clock.sleep,
+            now: clock.now,
+          }),
+        ).rejects.toThrow(/schema.*not ready/i);
+
+        // 5 probes: t=0, 5s, 10s, 15s, 20s — the deadline probe still runs.
+        expect(probeSchema).toHaveBeenCalledTimes(5);
+      });
+    });
+  });
+});
+
 describe("execute", () => {
   const projectFindMany = vi.mocked(mockedPrisma.project.findMany);
   const instanceFindMany = vi.mocked(
     mockedPrisma.processManagerInstance.findMany,
   );
+  const queryRaw = vi.mocked(mockedPrisma.$queryRaw);
 
   beforeEach(() => {
     vi.clearAllMocks();
+    queryRaw.mockResolvedValue([] as never);
     instanceFindMany.mockResolvedValue([] as never);
     requestClusteringMock.mockResolvedValue(undefined);
   });
@@ -295,6 +386,19 @@ describe("execute", () => {
         expect(requestClusteringMock).toHaveBeenCalledWith(
           expect.objectContaining({ tenantId: "p1", trigger: "bootstrap" }),
         );
+      });
+
+      it("probes the schema before walking any projects", async () => {
+        // The hook can fire before the app's first boot has applied
+        // migrations; walking first is exactly the crash that failed
+        // `helm install` with BackoffLimitExceeded.
+        projectFindMany.mockResolvedValue([] as never);
+
+        await execute();
+
+        const probeOrder = queryRaw.mock.invocationCallOrder[0]!;
+        const walkOrder = projectFindMany.mock.invocationCallOrder[0]!;
+        expect(probeOrder).toBeLessThan(walkOrder);
       });
     });
   });

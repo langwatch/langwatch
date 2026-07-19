@@ -811,7 +811,7 @@ datasetS3Migration:
 topicClusteringBackfill:
   ## @param topicClusteringBackfill.enabled [default: true] Render the post-install/post-upgrade Job that seeds per-project topic clustering schedules (ADR-051). Disabling it on an upgrade stops topic clustering for pre-existing projects.
   enabled: true
-  ## @param topicClusteringBackfill.backoffLimit [default: 3] Job backoffLimit — retries on transient failure. The task is idempotent, and retries also absorb the race against app-boot database migrations.
+  ## @param topicClusteringBackfill.backoffLimit [default: 3] Job backoffLimit — retries on transient failure; the task is idempotent. The migration race is NOT what retries are for: the task itself waits up to 10 minutes for the app's first boot to apply the schema before walking, so a fresh install does not burn its retries crash-looping on a database that has no tables yet.
   backoffLimit: 3
   # activeDeadlineSeconds is the budget for the JOB AS A WHOLE, not per attempt,
   # and it takes precedence over backoffLimit: once the deadline passes the Job

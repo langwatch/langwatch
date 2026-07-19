@@ -34,12 +34,17 @@
   ORDERING CAVEAT (same as dataset-s3-migration). Prisma/ClickHouse migrations
   in this chart run on APP BOOT (`start:prepare:db`), not as a Helm hook, so
   `hook-weight` cannot order this Job after them — post-upgrade hooks fire once
-  resources are SUBMITTED, not once the Deployment has rolled out. If this Job
-  wins the race against a not-yet-migrated database it fails and the Job's
-  `backoffLimit` retries it, by which point the app has normally migrated. Use
-  `helm upgrade --wait` (or Argo/Flux, which wait on rollout) to make the
-  ordering deterministic rather than merely probable. Weight 10 puts it after
-  the dataset-s3-migration hook (5) so the two backfills don't contend.
+  resources are SUBMITTED, not once the Deployment has rolled out. The TASK
+  ITSELF closes the race: before walking any projects it waits up to 10
+  minutes for its tables to exist, so winning the race against a
+  not-yet-migrated database means a quiet poll, not a crash. Relying on
+  `backoffLimit` for this was disproven in chart e2e — on a fresh cluster the
+  app's image pull + first boot outlasts all three retries' backoff, and the
+  hook failed the whole `helm install` with BackoffLimitExceeded. Retries
+  remain for genuinely transient failures; `helm upgrade --wait` (or
+  Argo/Flux) still makes the ordering deterministic rather than merely
+  tolerated. Weight 10 puts it after the dataset-s3-migration hook (5) so the
+  two backfills don't contend.
 
   hook-delete-policy `before-hook-creation` clears the prior run's Job before
   re-creating it, so reruns are clean; a FAILED run is deliberately left on the
