@@ -839,7 +839,13 @@ export function EvaluationsV3Table({
               versionId: copied.workflowVersionId,
             });
           }
-          addTarget(applyForkedAgentToTarget(target, copied, newTargetId));
+          addTarget(
+            applyForkedAgentToTarget({
+              baseTarget: target,
+              forked: copied,
+              newTargetId,
+            }),
+          );
         } catch (err) {
           logger.error(
             { err, sourceAgentId: plan.sourceAgentId },

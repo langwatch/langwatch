@@ -47,15 +47,19 @@ export const planDuplicateTarget = (
  *
  * Exported so the ID-plugging logic can be unit-tested without a tRPC client.
  */
-export const applyForkedAgentToTarget = (
-  baseTarget: TargetConfig,
+export const applyForkedAgentToTarget = ({
+  baseTarget,
+  forked,
+  newTargetId,
+}: {
+  baseTarget: TargetConfig;
   forked: {
     id: string;
     workflowId?: string;
     workflowVersionId?: string;
-  },
-  newTargetId: string,
-): TargetConfig => ({
+  };
+  newTargetId: string;
+}): TargetConfig => ({
   ...baseTarget,
   id: newTargetId,
   dbAgentId: forked.id,

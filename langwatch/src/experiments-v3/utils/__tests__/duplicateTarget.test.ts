@@ -139,15 +139,15 @@ describe("applyForkedAgentToTarget", () => {
 
   describe("given a workflow-type agent fork result (with workflowId + workflowVersionId)", () => {
     it("plugs the forked agent id and the forked workflow ids into the new target (#5879 scenario 2)", () => {
-      const result = applyForkedAgentToTarget(
+      const result = applyForkedAgentToTarget({
         baseTarget,
-        {
+        forked: {
           id: "agent_forked",
           workflowId: "wf_forked",
           workflowVersionId: "wv_forked",
         },
-        "target-new",
-      );
+        newTargetId: "target-new",
+      });
 
       expect(result).toMatchObject({
         id: "target-new",
@@ -158,15 +158,15 @@ describe("applyForkedAgentToTarget", () => {
     });
 
     it("does not keep the source's dbAgentId, workflowId or workflowVersionId", () => {
-      const result = applyForkedAgentToTarget(
+      const result = applyForkedAgentToTarget({
         baseTarget,
-        {
+        forked: {
           id: "agent_forked",
           workflowId: "wf_forked",
           workflowVersionId: "wv_forked",
         },
-        "target-new",
-      );
+        newTargetId: "target-new",
+      });
 
       expect(result.dbAgentId).not.toBe("agent_source");
       expect(result.workflowId).not.toBe("wf_source");
@@ -184,11 +184,11 @@ describe("applyForkedAgentToTarget", () => {
         workflowVersionId: undefined,
       };
 
-      const result = applyForkedAgentToTarget(
-        codeBaseTarget,
-        { id: "agent_forked" },
-        "target-new",
-      );
+      const result = applyForkedAgentToTarget({
+        baseTarget: codeBaseTarget,
+        forked: { id: "agent_forked" },
+        newTargetId: "target-new",
+      });
 
       expect(result).toMatchObject({
         id: "target-new",
@@ -204,11 +204,11 @@ describe("applyForkedAgentToTarget", () => {
     // bug from #5879. Unconditional assignment (not conditional spread) is
     // what guarantees this.
     it("clears stale workflow fields on the base target when the fork has none", () => {
-      const result = applyForkedAgentToTarget(
+      const result = applyForkedAgentToTarget({
         baseTarget, // has wf_source / wv_source
-        { id: "agent_forked" }, // no workflow fields
-        "target-new",
-      );
+        forked: { id: "agent_forked" }, // no workflow fields
+        newTargetId: "target-new",
+      });
 
       expect(result.workflowId).toBeUndefined();
       expect(result.workflowVersionId).toBeUndefined();

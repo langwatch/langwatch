@@ -197,7 +197,7 @@ export class AgentService {
     /**
      * Set when the source agent is workflow-type and a workflow was forked.
      * Callers that need a runnable target (e.g. workbench duplicate) must
-     * publish this workflow separately via `workflows.publish` — `copyAgent`
+     * publish this workflow separately via `workflow.publish` — `copyAgent`
      * leaves it intentionally unpublished so the cross-project replicate flow
      * can review the copy before publishing (see #5879).
      */
