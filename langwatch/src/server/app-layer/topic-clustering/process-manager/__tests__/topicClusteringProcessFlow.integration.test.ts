@@ -160,6 +160,7 @@ describe("topic clustering process flow (store + manager + dispatcher)", () => {
       });
       await manager.handleWake({ wake: wake!, now: wake!.wakeAt });
 
+      const recordedStarts: unknown[] = [];
       const recordedCompletions: unknown[] = [];
       const dispatcher = new OutboxDispatcherService({
         store,
@@ -174,6 +175,14 @@ describe("topic clustering process flow (store + manager + dispatcher)", () => {
             }),
           },
           commands: {
+            // This object must satisfy the FULL TopicClusteringOutcomeCommands
+            // contract. It once omitted recordClusteringRunStarted; the
+            // handler's best-effort try/catch swallowed the resulting
+            // TypeError, so the test passed green while exercising the
+            // "announcement failed" path on every dispatch.
+            recordClusteringRunStarted: async (args) => {
+              recordedStarts.push(args);
+            },
             recordClusteringRunCompleted: async (args) => {
               recordedCompletions.push(args);
             },
@@ -186,6 +195,10 @@ describe("topic clustering process flow (store + manager + dispatcher)", () => {
 
       const report = await dispatcher.runOnce({ now: wake!.wakeAt + 1 });
       expect(report.dispatched).toHaveLength(1);
+      // The page is announced before it is worked, so "run in progress" is a
+      // recorded fact even for a single-page run.
+      expect(recordedStarts).toHaveLength(1);
+      expect(recordedStarts[0]).toMatchObject({ page: 1 });
       expect(recordedCompletions).toHaveLength(1);
 
       // In production the command becomes a run_completed event the
