@@ -168,3 +168,31 @@ func TestListModels_SendsXAPIKeyForAnthropicStyleServers(t *testing.T) {
 		t.Fatalf("models = %v — x-api-key header not sent, server rejected the probe", models)
 	}
 }
+
+// Discovery must honor the same customer-endpoint policy Dispatch applies:
+// a base URL that BlockLocalHTTPCalls would reject at dispatch time must
+// not be contacted by the model probe either (SSRF + key exfiltration).
+func TestListModels_HonorsCustomerEndpointPolicy(t *testing.T) {
+	var hit bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hit = true
+		_, _ = w.Write([]byte(`{"data":[{"id":"m"}]}`))
+	}))
+	defer srv.Close()
+
+	router := &BifrostRouter{
+		endpointPolicy: newCustomerEndpointPolicy(true, false, nil),
+	}
+	models, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-local", ProviderID: domain.ProviderCustom, APIKey: "sk-secret", Extra: map[string]string{"base_url": srv.URL}},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if hit {
+		t.Fatal("local endpoint was contacted despite BlockLocalHTTPCalls — discovery bypasses the SSRF policy")
+	}
+	if len(models) != 0 {
+		t.Fatalf("models = %v, want none from a policy-blocked endpoint", models)
+	}
+}

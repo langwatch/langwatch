@@ -768,6 +768,18 @@ func (r *BifrostRouter) ListModels(ctx context.Context, creds []domain.Credentia
 		wg.Add(1)
 		go func(i int, cred domain.Credential, base string) {
 			defer wg.Done()
+			// Same customer-endpoint policy Dispatch applies before using
+			// base_url (local-address blocking, HTTPS requirement, host
+			// allowlist) — discovery contacts the same customer-controlled
+			// URL and carries the credential's key, so it must not reach
+			// endpoints normal traffic would reject.
+			if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
+				if r.logger != nil {
+					r.logger.Warn("model discovery blocked by endpoint policy, skipping",
+						zap.String("credential_id", cred.ID), zap.Error(err))
+				}
+				return
+			}
 			ids, err := fetchUpstreamModels(ctx, base, cred.APIKey)
 			if err != nil {
 				if r.logger != nil {

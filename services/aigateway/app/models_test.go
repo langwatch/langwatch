@@ -20,6 +20,7 @@ func modelIDs(models []domain.Model) []string {
 }
 
 // @scenario "GET /v1/models returns aliases + allowed models"
+// @scenario "GET /v1/models does not query endpoints when an allowlist is set"
 // With an allowlist configured, the list is authoritative: aliases plus the
 // allowlist, and no upstream discovery — models outside the allowlist would
 // be blocked at dispatch anyway, so querying endpoints for them is noise.
