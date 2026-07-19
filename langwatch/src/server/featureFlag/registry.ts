@@ -151,12 +151,17 @@ export const FEATURE_FLAGS = [
   {
     key: "release_ui_ai_governance_enabled",
     scope: "PRODUCT",
-    // ADR-038 ships dark behind this flag: it additionally gates the
-    // onboarding intent fork and the org "Primary use" setting. GA is a
-    // later PostHog rollout (SaaS) + flipping this default (self-hosted).
-    defaultValue: false,
+    // On by default (ADR-038 Decision 7): self-hosted installations get
+    // governance (AI-tools device login, /me, admin surfaces, the
+    // onboarding intent fork, the org "Primary use" setting) with zero
+    // configuration. SaaS stays PostHog-governed: a per-org off-condition
+    // (or an operator store row / RELEASE_UI_AI_GOVERNANCE_ENABLED=0)
+    // re-arms every gate for that org. This default and the auth-cli
+    // device-login fallback are a pinned pair, move them together
+    // (governanceGaDefaults.unit.test.ts enforces it).
+    defaultValue: true,
     description:
-      "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
+      "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). On by default; switch off per org via PostHog or the operator store to hide governance and refuse AI-tools device login. Distinct from release_ui_ai_gateway_menu_enabled: the gateway product ships on its own flag.",
   },
   // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
   // `trace_analytics` / rollup `trace_analytics_rollup` tables (Phases 1+2)
