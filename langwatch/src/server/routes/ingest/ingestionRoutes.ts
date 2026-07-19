@@ -910,21 +910,44 @@ secured
           ? resourceMetrics.length > 0
           : resourceMetrics != null;
         if (hasMetricPayload) {
-          const govProject = await ensureHiddenGovernanceProject(
-            prisma,
-            source.organizationId,
-          );
-          stampMetricOriginAttrs({ request: parsed.request, source });
-          const result =
-            await getApp().traces.metricCollection.handleOtlpMetricRequest({
-              tenantId: govProject.id,
-              organizationId: source.organizationId,
-              metricRequest: parsed.request,
-              piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-            });
-          rejectedDataPoints = result.rejectedDataPoints;
-          acceptedDataPoints = result.acceptedDataPoints;
-          parseHint = result.errorMessage;
+          // Scoped away from the outer catch, which turns anything it sees into
+          // a `parseHint` on a 202 `accepted: true`. Past parsing, a throw is no
+          // longer the sender's bad payload — it is ours, and acking it drops
+          // the batch for good. In both exits below the source event is
+          // deliberately not recorded: the collector re-sends this same
+          // request, so counting it now double-counts it.
+          try {
+            const govProject = await ensureHiddenGovernanceProject(
+              prisma,
+              source.organizationId,
+            );
+            stampMetricOriginAttrs({ request: parsed.request, source });
+            const result =
+              await getApp().traces.metricCollection.handleOtlpMetricRequest({
+                tenantId: govProject.id,
+                organizationId: source.organizationId,
+                metricRequest: parsed.request,
+                piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+              });
+            if (result.outcome === "unavailable") {
+              return c.json(
+                { accepted: false, error: result.errorMessage },
+                503,
+              );
+            }
+            rejectedDataPoints = result.rejectedDataPoints;
+            acceptedDataPoints = result.acceptedDataPoints;
+            parseHint = result.errorMessage;
+          } catch (error) {
+            logger.error(
+              { error, sourceId: source.id },
+              "otel metrics ingest failed after parsing; answering retryably",
+            );
+            return c.json(
+              { accepted: false, error: "failed to record data point" },
+              503,
+            );
+          }
         }
       }
     } catch (err) {

@@ -25,11 +25,34 @@ export interface MetricRequestCollectionDeps {
   >;
 }
 
-export interface MetricRequestCollectionResult {
-  acceptedDataPoints: number;
-  rejectedDataPoints: number;
-  errorMessage?: string;
-}
+/**
+ * The outcome of an OTLP metric request.
+ *
+ * The two cases are deliberately separate shapes rather than a counter pair.
+ * An OTLP `partialSuccess` body means the server rejected those points
+ * *permanently* and the client must not re-send them, so folding a failure
+ * that is ours — a queue outage, say — into `rejectedDataPoints` tells every
+ * collector in the fleet to drop data it would otherwise have retried. As a
+ * counter pair the two are one indistinguishable `+= n`; as a discriminated
+ * union, conflating them is a type error at the call site.
+ */
+export type MetricRequestCollectionResult =
+  | {
+      outcome: "collected";
+      acceptedDataPoints: number;
+      /** Rejected for good — the caller must NOT retry these. */
+      rejectedDataPoints: number;
+      errorMessage?: string;
+    }
+  | {
+      /**
+       * Nothing was durably accepted. `recordDataPoints` enqueues the batch in
+       * one call, so this is all-or-nothing: the caller must retry the whole
+       * request, and the route must answer with a retryable status.
+       */
+      outcome: "unavailable";
+      errorMessage: string;
+    };
 
 /** Returned in place of a persistence exception, which may name internals. */
 const PERSISTENCE_ERROR_MESSAGE = "failed to record data point";
@@ -94,8 +117,8 @@ export class MetricRequestCollectionService {
             acceptedAt,
           });
 
-        let acceptedDataPoints = preparation.accepted.length;
-        let rejectedDataPoints = preparation.rejectedDataPoints;
+        const acceptedDataPoints = preparation.accepted.length;
+        const rejectedDataPoints = preparation.rejectedDataPoints;
         const errors = [...preparation.errors];
 
         if (preparation.accepted.length > 0) {
@@ -104,13 +127,14 @@ export class MetricRequestCollectionService {
               preparation.accepted.map(({ dataPoint }) => dataPoint),
             );
           } catch (error) {
-            acceptedDataPoints = 0;
-            rejectedDataPoints += preparation.accepted.length;
             // Preparation errors describe the caller's own payload and are
             // safe to return. A persistence failure is ours: its message can
             // name internal hosts, tables and queries, so the sender gets a
             // stable string and the detail goes to the log only.
-            errors.push(`canonical metric batch: ${PERSISTENCE_ERROR_MESSAGE}`);
+            span.setAttribute(
+              "metrics.ingestion.unavailable",
+              preparation.accepted.length,
+            );
             this.logger.error(
               {
                 error,
@@ -122,6 +146,10 @@ export class MetricRequestCollectionService {
               },
               "Failed to enqueue canonical metric data point batch",
             );
+            return {
+              outcome: "unavailable",
+              errorMessage: PERSISTENCE_ERROR_MESSAGE,
+            };
           }
         }
 
@@ -158,6 +186,7 @@ export class MetricRequestCollectionService {
           ? errors.join("; ").slice(0, 1024)
           : undefined;
         return {
+          outcome: "collected",
           acceptedDataPoints,
           rejectedDataPoints,
           ...(errorMessage ? { errorMessage } : {}),

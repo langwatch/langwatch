@@ -79,7 +79,11 @@ describe("MetricRequestCollectionService", () => {
       metricRequest: gaugeRequest({ value: 42 }),
     });
 
-    expect(result).toEqual({ acceptedDataPoints: 1, rejectedDataPoints: 0 });
+    expect(result).toEqual({
+      outcome: "collected",
+      acceptedDataPoints: 1,
+      rejectedDataPoints: 0,
+    });
     expect(recordDataPoints).toHaveBeenCalledTimes(1);
     expect(recordDataPoints.mock.calls[0]![0][0]).toMatchObject({
       tenantId: requestContext.tenantId,
@@ -101,7 +105,11 @@ describe("MetricRequestCollectionService", () => {
       metricRequest: gaugeRequest({ values: [1, 2, 3] }),
     });
 
-    expect(result).toEqual({ acceptedDataPoints: 3, rejectedDataPoints: 0 });
+    expect(result).toEqual({
+      outcome: "collected",
+      acceptedDataPoints: 3,
+      rejectedDataPoints: 0,
+    });
     expect(recordDataPoints).toHaveBeenCalledTimes(1);
     expect(recordDataPoints.mock.calls[0]![0]).toHaveLength(3);
   });
@@ -218,9 +226,10 @@ describe("MetricRequestCollectionService", () => {
   });
 
   describe("when persisting a point throws", () => {
+    const internals =
+      "connect ECONNREFUSED clickhouse-shard-3.internal:9440 while INSERT INTO metric_data_points";
+
     it("reports the failure without echoing internals to the caller", async () => {
-      const internals =
-        "connect ECONNREFUSED clickhouse-shard-3.internal:9440 while INSERT INTO metric_data_points";
       const { service } = makeService(async () => {
         throw new Error(internals);
       });
@@ -230,13 +239,27 @@ describe("MetricRequestCollectionService", () => {
         metricRequest: gaugeRequest({ value: 1 }),
       });
 
-      expect(result.acceptedDataPoints).toBe(0);
-      expect(result.rejectedDataPoints).toBe(1);
-      expect(result.errorMessage).toBe(
-        "canonical metric batch: failed to record data point",
-      );
+      expect(result.errorMessage).toBe("failed to record data point");
       expect(result.errorMessage).not.toContain("clickhouse-shard-3");
       expect(result.errorMessage).not.toContain("INSERT INTO");
+    });
+
+    it("reports the batch as unavailable rather than rejected", async () => {
+      const { service } = makeService(async () => {
+        throw new Error(internals);
+      });
+
+      const result = await service.handleOtlpMetricRequest({
+        ...requestContext,
+        metricRequest: gaugeRequest({ value: 1 }),
+      });
+
+      // A persistence failure is ours, so the point must stay retryable. If
+      // this ever reports `collected` with a non-zero `rejectedDataPoints`,
+      // the route answers 200 + partialSuccess and every collector in the
+      // fleet drops the batch it could have re-sent.
+      expect(result.outcome).toBe("unavailable");
+      expect(result).not.toHaveProperty("rejectedDataPoints");
     });
   });
 });

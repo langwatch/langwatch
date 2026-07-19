@@ -103,6 +103,7 @@ describe("POST /api/otel/v1/metrics", () => {
     mockGetActivePlan.mockResolvedValue({ name: "free" });
     mockNotifyPlanLimitReached.mockResolvedValue(undefined);
     mockHandleMetrics.mockResolvedValue({
+      outcome: "collected",
       acceptedDataPoints: 1,
       rejectedDataPoints: 0,
     });
@@ -128,6 +129,7 @@ describe("POST /api/otel/v1/metrics", () => {
 
   it("returns OTLP partial success when some data points are rejected", async () => {
     mockHandleMetrics.mockResolvedValue({
+      outcome: "collected",
       acceptedDataPoints: 1,
       rejectedDataPoints: 2,
       errorMessage: "two malformed points",
@@ -143,5 +145,23 @@ describe("POST /api/otel/v1/metrics", () => {
       },
     });
     expect(mockHandleMetrics).toHaveBeenCalledOnce();
+  });
+
+  describe("when the batch could not be persisted", () => {
+    it("answers with a retryable status instead of a partial success", async () => {
+      mockHandleMetrics.mockResolvedValue({
+        outcome: "unavailable",
+        errorMessage: "failed to record data point",
+      });
+
+      const response = await postMetrics();
+      const body = await response.json();
+
+      // OTLP reads 200 + partialSuccess as "permanently rejected, do not
+      // retry". Answering that on our own queue outage makes every collector
+      // drop its buffer, so the batch has to come back as retryable instead.
+      expect(response.status).toBe(503);
+      expect(body).not.toHaveProperty("partialSuccess");
+    });
   });
 });
