@@ -7,6 +7,7 @@ import {
 } from "~/server/app-layer/config";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import {
+  incrementEsFoldPostStoreFailure,
   incrementEsFoldProjectionTotal,
   incrementEsMapProjectionTotal,
   incrementEsProjectionTotal,
@@ -65,6 +66,14 @@ import type { ReplayMarkerChecker } from "./replayMarkerCheck";
  */
 const DEFAULT_FOLD_COALESCE_MAX_BATCH = 500;
 const SLOW_PROJECTION_OPERATION_MS = 5_000;
+
+/**
+ * Event ids carried in a post-store-failure log line. A coalesced batch holds
+ * up to DEFAULT_FOLD_COALESCE_MAX_BATCH events and the whole line would be
+ * unreadable; the ids exist to locate the affected aggregate for reconciliation,
+ * and the aggregate id already narrows it. eventCount reports the true size.
+ */
+const MAX_LOGGED_EVENT_IDS = 10;
 
 /**
  * The router only ever dispatches reactors on the live event path — the
@@ -1435,17 +1444,70 @@ export class ProjectionRouter<
           },
         });
 
-        // After fold succeeds, dispatch to reactors for this fold
+        // After fold succeeds, dispatch to reactors for this fold.
+        //
+        // The fold state is durable by this point. Anything that throws from
+        // here on fails the job without un-writing it, so the queue redelivers
+        // events the store already contains — see recordPostStoreFailure.
         const reactors = this.reactorsForFold.get(projectionName);
         if (reactors && reactors.length > 0) {
-          await this.dispatchToReactors({
-            foldName: projectionName,
-            reactors,
-            events: [event],
-            foldState,
-          });
+          try {
+            await this.dispatchToReactors({
+              foldName: projectionName,
+              reactors,
+              events: [event],
+              foldState,
+            });
+          } catch (error) {
+            this.recordPostStoreFailure({
+              projectionName,
+              stage: "reactor_dispatch",
+              events: [event],
+              error,
+            });
+            throw error;
+          }
         }
       },
+    );
+  }
+
+  /**
+   * Records a failure that happened after the fold's state was durably stored.
+   *
+   * Distinct from a plain fold failure: the store already holds this batch, so
+   * the retry re-applies it. Accumulating folds (spanCount + 1, cost sums, id
+   * appends) double-count as a result — nothing on this path deduplicates by
+   * event id.
+   *
+   * Logged at warn with the aggregate and event ids so the affected traces can
+   * be identified and reconciled after an incident — the metric says how often,
+   * the log says which.
+   */
+  private recordPostStoreFailure({
+    projectionName,
+    stage,
+    events,
+    error,
+  }: {
+    projectionName: string;
+    stage: "reactor_dispatch";
+    events: EventType[];
+    error: unknown;
+  }): void {
+    incrementEsFoldPostStoreFailure(projectionName, stage);
+    const first = events[0];
+    this.logger.warn(
+      {
+        projection: projectionName,
+        stage,
+        tenantId: first ? String(first.tenantId) : undefined,
+        aggregateId: first ? String(first.aggregateId) : undefined,
+        eventCount: events.length,
+        eventIds: events.slice(0, MAX_LOGGED_EVENT_IDS).map((e) => e.id),
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "Fold failed after its state was stored — the retry will re-apply events the store already holds",
     );
   }
 
@@ -1557,12 +1619,25 @@ export class ProjectionRouter<
         // the same state. See ProjectionRouter.collapseByJobId.
         const reactors = this.reactorsForFold.get(projectionName);
         if (reactors && reactors.length > 0) {
-          await this.dispatchToReactors({
-            foldName: projectionName,
-            reactors,
-            events: toApply,
-            foldState,
-          });
+          try {
+            await this.dispatchToReactors({
+              foldName: projectionName,
+              reactors,
+              events: toApply,
+              foldState,
+            });
+          } catch (error) {
+            // Worse here than on the single-event path: the whole coalesced
+            // batch is re-applied, so one failure can double-count up to
+            // DEFAULT_FOLD_COALESCE_MAX_BATCH events against one aggregate.
+            this.recordPostStoreFailure({
+              projectionName,
+              stage: "reactor_dispatch",
+              events: toApply,
+              error,
+            });
+            throw error;
+          }
         }
       },
     );

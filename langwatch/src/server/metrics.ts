@@ -932,6 +932,39 @@ export const getLangyRateLimitCounter = (outcome: "rejected" | "fail_open") =>
   langyRateLimitTotal.labels(outcome);
 
 // ============================================================================
+// Fold redelivery
+// ============================================================================
+
+register.removeSingleMetric("es_fold_post_store_failure_total");
+const esFoldPostStoreFailure = new Counter({
+  name: "es_fold_post_store_failure_total",
+  help: "Fold deliveries that threw after their state was durably stored, by stage",
+  labelNames: ["projection_name", "stage"] as const,
+});
+
+/**
+ * A fold threw *after* its state was already written durably.
+ *
+ * Queue delivery is at-least-once and the fold's state is stored before
+ * reactors are dispatched, so anything that throws from that point fails the
+ * job without un-writing it: the queue re-delivers events the store already
+ * holds. Folds accumulate rather than being idempotent (trace summary does
+ * `spanCount + 1` and sums cost), so the re-apply double-counts.
+ *
+ * Every other fold signal reports this as a plain failure, which is
+ * indistinguishable from one that threw *before* the write and is therefore
+ * harmless to retry. The two need opposite responses, so they need separate
+ * counters.
+ *
+ * Rate against `es_fold_projection_total{status="failed"}` for the share of
+ * fold failures that land in the dangerous half.
+ */
+export const incrementEsFoldPostStoreFailure = (
+  projectionName: string,
+  stage: "reactor_dispatch",
+) => esFoldPostStoreFailure.labels(projectionName, stage).inc();
+
+// ============================================================================
 // Stored Objects Metrics
 // ============================================================================
 
