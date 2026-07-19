@@ -117,9 +117,7 @@ independently:
   export.
 
 Both flags are enabled by default on self-hosted; on SaaS, PostHog
-release conditions decide per organization. Self-hosted deployers can
-switch either one off with an env override, e.g.
-`RELEASE_UI_AI_GOVERNANCE_ENABLED=0` in `langwatch/.env`.
+release conditions decide per organization.
 
 When a gateway is wired up, the chrome is **persona-aware**: admins
 land on the org switcher + governance KPIs; engineers using a CLI
