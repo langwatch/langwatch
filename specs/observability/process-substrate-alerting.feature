@@ -43,7 +43,7 @@ Feature: The process substrate tells operators when it is in trouble
     And an operator can opt out with a single value
     And where alerts are routed remains the operator's choice
 
-  Scenario: Dashboards live next to the metrics they read
-    Given the repo defines the substrate and topic clustering dashboards
-    Then each dashboard imports into any Grafana pointed at the deployment's Prometheus
-    And a metric change and its dashboard change land in the same review
+  Scenario: Production dashboards live with the infrastructure that serves them
+    Given the substrate and topic clustering dashboards are tracked in the infra repository
+    Then production Grafana serves them from reviewed, versioned JSON
+    And a metric rename in this repository is caught by its alert rules referencing the old name

@@ -14,13 +14,14 @@ The event-sourcing substrate is the best-instrumented area of the app —
 process-manager evolutions and outbox dispatch; GroupQueue polls its own
 `gq_*` family. The chart scrapes all of it (`templates/prometheus.yaml`).
 
-And then nothing listens. The repo contains **no alert rule and no
-dashboard for its own metrics** — not in the chart, not in provisioning,
-nowhere. Counters written explicitly "to be alerted on"
-(`langwatch_edge_spool_fail_open_total`,
-`langwatch_evaluator_loop_blocked_total`) ship without an alert. Prod
-Grafana is managed out of band, so every alert and dashboard that exists
-today is hand-built, unversioned, and unreviewable. Meanwhile ADR-051
+And then this repo ships nothing that listens. Prod observability lives
+in `langwatch-saas/infrastructure/grafana/` — reviewed dashboard and
+alert JSON for AWS Managed Grafana, including an event-sourcing runtime
+dashboard — but the public repo carries **no alert rule at all**, so
+self-hosted deployments get silence, counters written explicitly "to be
+alerted on" (`langwatch_edge_spool_fail_open_total`,
+`langwatch_evaluator_loop_blocked_total`) ship alert-less, and a metric
+added here has no in-repo contract keeping it alive. Meanwhile ADR-051
 moved topic clustering onto durable wakes and a lease-fenced outbox —
 failure modes (dead-lettered intents, overdue wakes, suppressed
 duplicate intents) that are *designed* to be quiet in the product and
@@ -45,11 +46,15 @@ outcomes exist only as events and log lines).
    rules define *what is wrong*, values define *who hears it*.
    `prometheus.alerting.enabled` (default true) opts out.
 
-2. **Dashboards ship in the repo** under
-   `dev/observability/dashboards/*.json` — plain Grafana dashboard JSON,
-   importable into any Grafana (prod, or the local LGTM stack). They are
-   versioned next to the metrics they read, so a metric rename in a PR
-   shows up as a dashboard diff in the same PR.
+2. **Dashboards live in the infra repo**, not here: prod Grafana (AWS
+   Managed Grafana) is provisioned from
+   `langwatch-saas/infrastructure/grafana/*.json` — reviewed JSON records
+   published via `gcx api /api/dashboards/db --context lw-prod`. The
+   substrate panels extend the existing `langwatch-event-sourcing-runtime`
+   dashboard there; topic clustering gets its own dashboard alongside it.
+   This public repo ships no dashboards — a metric rename here must be
+   paired with a dashboard PR there (the alert rules below are the
+   in-repo guard that the metric still exists).
 
 3. **The substrate emits the latency signals the alerts need:**
    - `es_process_wake_lag_milliseconds{process_name}` — scheduledFor →
@@ -78,17 +83,19 @@ outcomes exist only as events and log lines).
   someone reading Loki.
 - Self-hosted operators inherit sane alerts for free and can silence or
   extend them through standard Prometheus tooling.
-- The dashboards directory is the start of dashboards-as-code; prod
-  Grafana imports remain a manual step until provisioning is wired
-  (deliberately out of scope here).
+- Prod dashboards and their Grafana-managed alert routing (Slack
+  contact point, notification policies) stay in `langwatch-saas`
+  infrastructure, where they already live; the chart rules are the
+  self-hosted and defense-in-depth tier.
 - Rules are chart-tested by the existing `helm template` CI matrix.
 
 ## Alternatives considered
 
-- **Grafana-provisioned alerting** (alert rules as Grafana YAML):
-  rejected for now — prod Grafana is out-of-band and unprovisioned, so
-  the rules would run nowhere by default; Prometheus rules run wherever
-  the chart runs.
+- **Grafana-managed alerting only** (extend the `langwatch-saas` alert
+  records and skip chart rules): leaves every self-hosted deployment
+  silent and gives this repo no contract over its own metric names;
+  Prometheus rules run wherever the chart runs, and the Grafana tier
+  remains the prod routing layer on top.
 - **A metrics helper in `@langwatch/observability`** to unify the two
   registries and naming conventions: real gap, separate change — noted,
   not taken here.
