@@ -94,7 +94,7 @@ export class LogRequestCollectionService {
           resource_log_count: logRequest.resourceLogs?.length ?? 0,
         },
       },
-      async (span) => {
+      async (span): Promise<LogRequestCollectionResult> => {
         const preparation = await prepareCanonicalLogRecords({
           tenantId,
           organizationId,
