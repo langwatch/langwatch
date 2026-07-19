@@ -187,8 +187,12 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
   `import()` only when `-o yaml` is actually requested (why `printResult` is now
   async; a bare `require` would be invisible to Bun's bundler).
 - tsup builds the CLI separately from the library entries: CJS-only, minified, no
-  dts, no sourcemaps, `splitting: false` (single `dist/cli/index.js`; dynamic
-  imports keep their lazy semantics). Library entries are unchanged (dual format +
+  dts, no sourcemaps, `splitting: false` (one `dist/cli/bundle.js`; `onSuccess`
+  writes a tiny `dist/cli/index.js` stub that enables Node's compile cache —
+  `$TMPDIR/node-compile-cache/<version>-<arch>-<hash>/`, guarded for Node 20/Bun —
+  before the bundle is parsed; dynamic imports keep their lazy semantics). chalk
+  is also off the boot path (lazy, only for error renders/agent mode).
+  Library entries are unchanged (dual format +
   dts + sourcemaps). tsup builds config-array entries concurrently, so `clean` is
   replaced by `rm -rf dist` in the build script — a config-level clean raced the
   other build's output.

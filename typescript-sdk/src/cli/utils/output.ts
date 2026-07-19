@@ -40,7 +40,7 @@
  */
 import type * as yaml from "js-yaml";
 import { Option, type Command } from "commander";
-import { disableOutputColor, setOutputFormat } from "./errorOutput";
+import { setOutputFormat } from "./outputScope";
 
 /**
  * js-yaml is only needed for `-o yaml`, so it is loaded lazily and memoized:
@@ -100,6 +100,19 @@ export interface ResolvedOutput {
   /** Agent mode is active (flag or env): colour and spinners are off. */
   agent: boolean;
 }
+
+/**
+ * Whether the caller asked for a format EXPLICITLY (any spelling) — as
+ * opposed to agent mode merely being active in the environment. Commands
+ * whose default output is already agent-friendly raw text (help-tree,
+ * skills get) use this to keep that default unless a machine format was
+ * actually requested.
+ */
+export const hasExplicitFormatRequest = (options?: RawOutputFlags): boolean =>
+  options?.output !== undefined ||
+  options?.json !== undefined ||
+  options?.jq !== undefined ||
+  options?.format === "json";
 
 const isTruthyEnvValue = (value: string | undefined): boolean =>
   value !== undefined && value !== "" && value !== "0" && value !== "false";
@@ -326,9 +339,17 @@ export const printResult = async (
  *
  * Under the daemon these land in the request's AsyncLocalStorage scope, so
  * two concurrent requests in one execution window cannot clobber each other's
- * format or colour (see utils/errorOutput.ts).
+ * format or colour (see utils/outputScope.ts).
+ *
+ * Async because the colour half needs chalk, and chalk is kept off the
+ * cold-start path: `disableOutputColor` lives in errorOutput.ts and is
+ * imported lazily, only when agent mode actually asks for colour-off. The
+ * `preAction` hook awaits this, so the disabler has run before the command's
+ * action (and its own chalk imports) executes.
  */
-export const applyOutputContext = (resolved: ResolvedOutput): void => {
+export const applyOutputContext = async (
+  resolved: ResolvedOutput,
+): Promise<void> => {
   // Machine formats fail as structured documents; agent mode's document is the
   // compact single-line form (see renderErrorAsJson), everything else pretty.
   setOutputFormat(
@@ -338,7 +359,10 @@ export const applyOutputContext = (resolved: ResolvedOutput): void => {
         ? "agents"
         : "json",
   );
-  if (resolved.agent) disableOutputColor();
+  if (resolved.agent) {
+    const { disableOutputColor } = await import("./errorOutput.js");
+    disableOutputColor();
+  }
 };
 
 /**

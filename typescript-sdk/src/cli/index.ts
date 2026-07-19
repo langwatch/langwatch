@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 
+// First side effect: turn on Node's compile cache so everything the boot
+// path loads after this (dotenv, commander, …) compiles from cache on warm
+// runs. Must precede every other import — see compileCache.ts.
+import "./compileCache";
+
 // Load environment variables BEFORE any other imports
 import { config } from "dotenv";
 
