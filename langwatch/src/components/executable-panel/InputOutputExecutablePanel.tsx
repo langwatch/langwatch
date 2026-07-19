@@ -1,5 +1,5 @@
 import { Box, mergeRefs, VStack } from "@chakra-ui/react";
-import debounce from "lodash.debounce";
+import { debounce } from "lodash-es";
 import { motion } from "motion/react";
 import React, {
   type ForwardedRef,
