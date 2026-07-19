@@ -1,7 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalMetricDataPoint } from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
 import type { RecordMetricCorrelationCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import { MetricRequestCollectionService } from "../metric-request-collection.service";
+import {
+  type MetricRequestCollectionResult,
+  MetricRequestCollectionService,
+} from "../metric-request-collection.service";
+
+/** Narrows the result union so a test can assert on the collected counters. */
+function expectCollected(
+  result: MetricRequestCollectionResult,
+): Extract<MetricRequestCollectionResult, { outcome: "collected" }> {
+  if (result.outcome !== "collected") {
+    throw new Error(`expected a collected result, got "${result.outcome}"`);
+  }
+  return result;
+}
 
 function makeService(
   recordDataPointsImpl: (
@@ -213,9 +226,10 @@ describe("MetricRequestCollectionService", () => {
       },
     });
 
-    expect(result.acceptedDataPoints).toBe(1);
-    expect(result.rejectedDataPoints).toBe(1);
-    expect(result.errorMessage).toContain("maximum 262144");
+    const collected = expectCollected(result);
+    expect(collected.acceptedDataPoints).toBe(1);
+    expect(collected.rejectedDataPoints).toBe(1);
+    expect(collected.errorMessage).toContain("maximum 262144");
     expect(recordDataPoints).toHaveBeenCalledTimes(1);
     expect(recordMetricCorrelations).toHaveBeenCalledTimes(1);
     expect(recordMetricCorrelations.mock.calls[0]![0][0]).toMatchObject({
