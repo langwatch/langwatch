@@ -197,6 +197,7 @@ specs/               # BDD feature specs
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
 | Using -- on pnpm tasks, pnpm adds the -- automatically | Using e.g. `pnpm test:unit path/to/file` directly |
 | Using positional parameters for functions with multiple args | Use named parameters via object destructuring: `fn({ a, b })` not `fn(a, b)` |
+| A workspace package tsconfig without `incremental` + `tsBuildInfoFile` | Every package tsconfig sets `"incremental": true` and its own `"tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/<pkg>.tsbuildinfo"`. Without it each typecheck re-checks cold; without a per-package path the packages clobber each other's cache |
 
 ## Database
 
