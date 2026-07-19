@@ -57,18 +57,28 @@ type ClickHouseLimits struct {
 	MaxServerMemory   int64 // <max_server_memory_usage> — ClickHouse's own soft ceiling, under the container's
 	MarkCacheSize     int64 // <mark_cache_size> — kept small on purpose; the rest are zeroed below
 
-	// LightweightLogs disables ClickHouse's high-volume self-telemetry
+	// LightweightLogsEnabled disables ClickHouse's high-volume self-telemetry
 	// (NoisySystemLogs) and bounds what is left by SystemLogTTLDays. On stock
 	// defaults these tables are unbounded: a laptop measured 610 MiB of them
 	// after ~5 days of ordinary dev, 303 MiB of it text_log alone. haven already
 	// caps memory two ways, so leaving log disk unbounded was the odd one out.
-	LightweightLogs bool
-	// SystemLogTTLDays bounds the system logs that survive LightweightLogs.
-	// Ignored unless LightweightLogs is set.
+	LightweightLogsEnabled bool
+	// SystemLogTTLDays bounds the system logs that survive LightweightLogsEnabled.
+	// Ignored unless LightweightLogsEnabled is set.
 	SystemLogTTLDays int
 }
 
-// NoisySystemLogs are the system tables LightweightLogs turns off: pure volume
+// EffectiveSystemLogTTLDays is SystemLogTTLDays with the zero-value fallback
+// applied — the single place the fallback rule lives, shared by the rendered
+// config and the retrofit statements so the two can never drift.
+func (l ClickHouseLimits) EffectiveSystemLogTTLDays() int {
+	if l.SystemLogTTLDays <= 0 {
+		return DefaultSystemLogTTLDays
+	}
+	return l.SystemLogTTLDays
+}
+
+// NoisySystemLogs are the system tables LightweightLogsEnabled turns off: pure volume
 // with no local-debugging value. text_log duplicates what the container already
 // writes to stdout; the metric logs are sampled telemetry nobody reads on a dev
 // box (asynchronous_metric_log alone reached 70M rows in the measurement above);
@@ -83,7 +93,7 @@ var NoisySystemLogs = []string{
 	"query_metric_log",
 }
 
-// KeptSystemLogs are the system tables LightweightLogs keeps, capped at
+// KeptSystemLogs are the system tables LightweightLogsEnabled keeps, capped at
 // SystemLogTTLDays. These are the ones actually worth reaching for locally:
 // query_log answers "why was that slow", part_log explains merge behaviour, and
 // error_log/crash_log are tiny and matter exactly when something broke.
@@ -103,11 +113,11 @@ var KeptSystemLogs = []string{
 func DefaultClickHouseLimits() ClickHouseLimits {
 	const containerMB = 1536 // 1.5 GiB
 	return ClickHouseLimits{
-		ContainerMemoryMB: containerMB,
-		MaxServerMemory:   int64(containerMB) * 9 / 10 * (1 << 20), // 1.35 GiB
-		MarkCacheSize:     64 << 20,                                // 64 MiB
-		LightweightLogs:   true,
-		SystemLogTTLDays:  DefaultSystemLogTTLDays,
+		ContainerMemoryMB:      containerMB,
+		MaxServerMemory:        int64(containerMB) * 9 / 10 * (1 << 20), // 1.35 GiB
+		MarkCacheSize:          64 << 20,                                // 64 MiB
+		LightweightLogsEnabled: true,
+		SystemLogTTLDays:       DefaultSystemLogTTLDays,
 	}
 }
 
@@ -124,9 +134,9 @@ const ClickHouseConfigFile = "zzz-thuis.xml"
 // is never mounted — but leaving it behind invites editing the wrong file.
 var LegacyClickHouseConfigFiles = []string{"zzz-thuis-memory.xml"}
 
-// RenderClickHouseConfig fills in the config.d memory-tuning override. "thuis" —
-// Dutch for "home" — names this the same way thuishaven does: proven on a
-// long-running low-RAM home instance before landing here.
+// RenderClickHouseConfig fills in the config.d memory-and-log-policy override.
+// "thuis" — Dutch for "home" — names this the same way thuishaven does: proven
+// on a long-running low-RAM home instance before landing here.
 func RenderClickHouseConfig(l ClickHouseLimits) string {
 	return fmt.Sprintf(clickHouseConfigTemplate, l.MaxServerMemory, l.MarkCacheSize, renderLogConfig(l))
 }
@@ -136,15 +146,11 @@ func RenderClickHouseConfig(l ClickHouseLimits) string {
 // over the image's own), a <ttl> bounds the ones kept, and the <logger> block
 // quiets the server log itself — the image's stock config logs at trace with a
 // 1000M x 10 rotation in the container layer, which is pure disk on a dev box.
-// Empty when LightweightLogs is off, leaving the image's stock behaviour
+// Empty when LightweightLogsEnabled is off, leaving the image's stock behaviour
 // untouched.
 func renderLogConfig(l ClickHouseLimits) string {
-	if !l.LightweightLogs {
+	if !l.LightweightLogsEnabled {
 		return ""
-	}
-	ttlDays := l.SystemLogTTLDays
-	if ttlDays <= 0 {
-		ttlDays = DefaultSystemLogTTLDays
 	}
 	var b strings.Builder
 	b.WriteString("\n    <!-- lightweight logs: HAVEN_CLICKHOUSE_FULL_LOGS=1 restores the stock ones -->\n")
@@ -157,9 +163,30 @@ func renderLogConfig(l ClickHouseLimits) string {
 		fmt.Fprintf(&b, "    <%s remove=\"1\"/>\n", name)
 	}
 	for _, name := range KeptSystemLogs {
-		fmt.Fprintf(&b, "    <%s><ttl>event_date + INTERVAL %d DAY</ttl></%s>\n", name, ttlDays, name)
+		fmt.Fprintf(&b, "    <%s><ttl>event_date + INTERVAL %d DAY</ttl></%s>\n", name, l.EffectiveSystemLogTTLDays(), name)
 	}
 	return b.String()
+}
+
+// SystemLogRetrofitStatements are the idempotent DDLs that bring an
+// already-running server in line with the rendered config: the config governs
+// table *creation*, so a server that predates the policy keeps its unbounded
+// tables until the disabled ones are dropped (the server will not recreate
+// them) and the kept ones are given the TTL. Empty when LightweightLogsEnabled
+// is off. Derived from the same lists and TTL as renderLogConfig so the two
+// can never drift.
+func SystemLogRetrofitStatements(l ClickHouseLimits) []string {
+	if !l.LightweightLogsEnabled {
+		return nil
+	}
+	var stmts []string
+	for _, name := range NoisySystemLogs {
+		stmts = append(stmts, "DROP TABLE IF EXISTS system."+name)
+	}
+	for _, name := range KeptSystemLogs {
+		stmts = append(stmts, fmt.Sprintf("ALTER TABLE system.%s MODIFY TTL event_date + INTERVAL %d DAY", name, l.EffectiveSystemLogTTLDays()))
+	}
+	return stmts
 }
 
 const clickHouseConfigTemplate = `<!-- generated by haven (thuishaven) — do not edit -->

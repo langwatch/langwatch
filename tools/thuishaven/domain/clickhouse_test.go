@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -90,7 +91,7 @@ func TestRenderClickHouseConfig(t *testing.T) {
 
 	t.Run("given full logs are requested", func(t *testing.T) {
 		l := DefaultClickHouseLimits()
-		l.LightweightLogs = false
+		l.LightweightLogsEnabled = false
 
 		t.Run("when rendering the config", func(t *testing.T) {
 			t.Run("leaves the stock system logs untouched", func(t *testing.T) {
@@ -103,6 +104,59 @@ func TestRenderClickHouseConfig(t *testing.T) {
 			t.Run("still applies the memory tuning", func(t *testing.T) {
 				if !strings.Contains(RenderClickHouseConfig(l), "<max_server_memory_usage>") {
 					t.Error("memory tuning lost")
+				}
+			})
+		})
+	})
+}
+
+// @scenario "The managed ClickHouse keeps its own telemetry lightweight"
+func TestSystemLogRetrofitStatements(t *testing.T) {
+	t.Run("given the default limits", func(t *testing.T) {
+		stmts := SystemLogRetrofitStatements(DefaultClickHouseLimits())
+
+		t.Run("when building the retrofit statements", func(t *testing.T) {
+			t.Run("drops every noisy system log", func(t *testing.T) {
+				for _, name := range NoisySystemLogs {
+					want := "DROP TABLE IF EXISTS system." + name
+					if !slices.Contains(stmts, want) {
+						t.Errorf("missing %q in %v", want, stmts)
+					}
+				}
+			})
+
+			t.Run("gives every kept system log the same TTL as the rendered config", func(t *testing.T) {
+				for _, name := range KeptSystemLogs {
+					want := "ALTER TABLE system." + name + " MODIFY TTL event_date + INTERVAL 7 DAY"
+					if !slices.Contains(stmts, want) {
+						t.Errorf("missing %q in %v", want, stmts)
+					}
+				}
+			})
+		})
+	})
+
+	t.Run("given full logs are requested", func(t *testing.T) {
+		l := DefaultClickHouseLimits()
+		l.LightweightLogsEnabled = false
+
+		t.Run("when building the retrofit statements", func(t *testing.T) {
+			t.Run("emits nothing — the stock tables are left alone", func(t *testing.T) {
+				if stmts := SystemLogRetrofitStatements(l); len(stmts) != 0 {
+					t.Errorf("expected no statements, got %v", stmts)
+				}
+			})
+		})
+	})
+
+	t.Run("given a non-positive TTL", func(t *testing.T) {
+		l := DefaultClickHouseLimits()
+		l.SystemLogTTLDays = 0
+
+		t.Run("when resolving the effective TTL", func(t *testing.T) {
+			t.Run("falls back to the default", func(t *testing.T) {
+				if got := l.EffectiveSystemLogTTLDays(); got != DefaultSystemLogTTLDays {
+					t.Errorf("got %d, want %d", got, DefaultSystemLogTTLDays)
 				}
 			})
 		})

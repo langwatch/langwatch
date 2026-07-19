@@ -101,9 +101,12 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 	if err := s.waitHealthy(ctx, ep.HTTPPort, 40*time.Second); err != nil {
 		return 0, err
 	}
-	if configChanged {
-		s.applySystemLogPolicy(ctx)
-	}
+	// Every Ensure, not just when the config changed: the statements are a
+	// handful of idempotent DDLs, and gating them on configChanged made the
+	// retrofit one-shot — any failure between writing the config file and the
+	// DDL loop (interrupted image pull, docker error, ctx cancel) left the file
+	// looking current, so no later run would ever retry the reclaim.
+	s.applySystemLogPolicy(ctx)
 	return ep.HTTPPort, nil
 }
 
@@ -132,21 +135,13 @@ func (s *Server) writeConfig() (bool, error) {
 // The config governs table *creation*, so a server that has been running since
 // before the policy keeps its unbounded tables until they are dropped (the
 // disabled ones, which the server will simply not recreate) or given a TTL (the
-// kept ones). Best-effort by design: reclaiming disk must never be what stops a
-// stack from coming up, and every statement here is idempotent.
+// kept ones). The statements live in domain next to the rendered config so the
+// two derive from the same lists and TTL. Best-effort by design: reclaiming
+// disk must never be what stops a stack from coming up, and every statement is
+// idempotent.
 func (s *Server) applySystemLogPolicy(ctx context.Context) {
-	if !s.limits.LightweightLogs {
-		return
-	}
-	ttlDays := s.limits.SystemLogTTLDays
-	if ttlDays <= 0 {
-		ttlDays = domain.DefaultSystemLogTTLDays
-	}
-	for _, name := range domain.NoisySystemLogs {
-		_ = s.exec(ctx, "DROP TABLE IF EXISTS system."+name)
-	}
-	for _, name := range domain.KeptSystemLogs {
-		_ = s.exec(ctx, fmt.Sprintf("ALTER TABLE system.%s MODIFY TTL event_date + INTERVAL %d DAY", name, ttlDays))
+	for _, stmt := range domain.SystemLogRetrofitStatements(s.limits) {
+		_ = s.exec(ctx, stmt)
 	}
 }
 
