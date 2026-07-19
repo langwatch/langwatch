@@ -86,9 +86,10 @@ export interface TopicClusteringOutcomeCommands {
  *   retries with backoff; the final attempt records a durable run_failed
  *   instead and retires the message dispatched, so the failure is a visible
  *   outcome rather than a dead row an operator has to find.
- * - the OUTCOME write — never retried through the outbox, because that would
- *   redeliver the intent and re-run the expensive page that already
- *   succeeded. See the comment at the call site.
+ * - the OUTCOME write — never retried through the outbox, on EITHER branch,
+ *   because that would redeliver the intent and re-run a page that has already
+ *   either succeeded or exhausted its attempts. Both call sites swallow and
+ *   log; see the comments there.
  */
 export function createTopicClusteringIntentHandlers(params: {
   runPort: TopicClusteringRunPort;

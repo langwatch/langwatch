@@ -208,6 +208,7 @@ export class ProcessRuntime {
       maxAttempts: config.outbox?.maxAttempts,
       leaseDurationMs: config.outbox?.leaseDurationMs,
       retryDelayMs: config.outbox?.retryDelayMs,
+      concurrency: config.outbox?.concurrency,
       processNames: [config.name],
     });
     const outboxWorker = new ProcessOutboxWorker({

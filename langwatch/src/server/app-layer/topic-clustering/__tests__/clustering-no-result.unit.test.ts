@@ -38,7 +38,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", () => ({
 }));
 
 // The deployment shape that triggers the bug: no clustering endpoint at all.
-vi.mock("../../../env.mjs", () => ({
+vi.mock("~/env.mjs", () => ({
   env: { LANGEVALS_ENDPOINT: undefined },
 }));
 

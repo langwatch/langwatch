@@ -60,6 +60,15 @@ export interface OutboxDispatcherServiceOptions {
    * them for lack of a handler. Omitted means unfiltered.
    */
   processNames?: readonly string[];
+  /**
+   * How many leased messages this dispatcher may have in flight at once.
+   * Default 1 (strictly sequential), which is what every caller got before
+   * this option existed. Raise it only for a domain whose effect is slow and
+   * genuinely parallel-safe — the lease already fences each message
+   * individually, so the bound here is about load on the downstream service,
+   * not about correctness.
+   */
+  concurrency?: number;
   tracer?: Tracer;
   logger?: Logger;
 }
@@ -101,6 +110,7 @@ export class OutboxDispatcherService {
   private readonly retryDelayMs: (params: { attempt: number }) => number;
   private readonly leaseDurationMs: number;
   private readonly processNames: readonly string[] | undefined;
+  private readonly concurrency: number;
   private readonly tracer: Tracer;
   private readonly logger: Logger;
 
@@ -111,6 +121,7 @@ export class OutboxDispatcherService {
     this.retryDelayMs = options.retryDelayMs ?? defaultRetryDelayMs;
     this.leaseDurationMs = options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
     this.processNames = options.processNames;
+    this.concurrency = Math.max(1, options.concurrency ?? 1);
     this.tracer =
       options.tracer ?? trace.getTracer("langwatch.process-manager");
     this.logger =
@@ -129,9 +140,27 @@ export class OutboxDispatcherService {
     });
 
     const report: DispatchReport = { dispatched: [], retried: [], dead: [] };
-    for (const message of leased) {
-      await this.dispatchOne({ message, now: params.now, report });
+    if (this.concurrency <= 1) {
+      for (const message of leased) {
+        await this.dispatchOne({ message, now: params.now, report });
+      }
+      return report;
     }
+
+    // Bounded pool over the leased batch. Each message is independently
+    // lease-fenced, so the only thing being bounded here is concurrent load on
+    // whatever the handlers call.
+    let cursor = 0;
+    const workers = Array.from(
+      { length: Math.min(this.concurrency, leased.length) },
+      async () => {
+        while (cursor < leased.length) {
+          const message = leased[cursor++]!;
+          await this.dispatchOne({ message, now: params.now, report });
+        }
+      },
+    );
+    await Promise.all(workers);
     return report;
   }
 

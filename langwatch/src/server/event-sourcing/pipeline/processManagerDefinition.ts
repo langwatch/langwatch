@@ -130,6 +130,8 @@ export interface ProcessManagerConfig<
     maxAttempts?: number;
     leaseDurationMs?: number;
     retryDelayMs?: (params: { attempt: number }) => number;
+    /** In-flight dispatches per loop. Default 1 (sequential). */
+    concurrency?: number;
   };
   schedule?: { everyMs: number };
   readonly _eventType?: E;

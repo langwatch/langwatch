@@ -26,7 +26,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", () => ({
   getClickHouseClientForProject: vi.fn(),
 }));
 
-vi.mock("../../../env.mjs", () => ({
+vi.mock("~/env.mjs", () => ({
   env: { LANGEVALS_ENDPOINT: "http://langevals.test" },
 }));
 

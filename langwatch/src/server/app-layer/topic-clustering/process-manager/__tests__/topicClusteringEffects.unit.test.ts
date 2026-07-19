@@ -26,12 +26,74 @@ function makeMessage(overrides: Partial<DispatchableMessage> = {}): Dispatchable
 
 function makeCommands() {
   return {
+    recordClusteringRunStarted: vi.fn().mockResolvedValue(undefined),
     recordClusteringRunCompleted: vi.fn().mockResolvedValue(undefined),
     recordClusteringRunFailed: vi.fn().mockResolvedValue(undefined),
   };
 }
 
 describe("createTopicClusteringIntentHandlers", () => {
+  describe("when a page begins", () => {
+    it("announces the run before doing the work", async () => {
+      const commands = makeCommands();
+      const order: string[] = [];
+      commands.recordClusteringRunStarted.mockImplementation(async () => {
+        order.push("started");
+      });
+      const handlers = createTopicClusteringIntentHandlers({
+        runPort: {
+          runClusteringPage: vi.fn().mockImplementation(async () => {
+            order.push("clustered");
+            return {
+              mode: "incremental",
+              tracesProcessed: 10,
+              topicsCount: 1,
+              subtopicsCount: 1,
+            };
+          }),
+        },
+        commands,
+        clock: () => 999,
+      });
+
+      await handlers["topic_clustering.run"]!({ message: makeMessage() });
+
+      expect(commands.recordClusteringRunStarted).toHaveBeenCalledWith({
+        tenantId: "project-1",
+        occurredAt: 999,
+        runId: "20260717",
+        page: 1,
+      });
+      // Announcing after the fact would leave the whole page — minutes of
+      // clustering — invisible, which is the window the badge exists for.
+      expect(order).toEqual(["started", "clustered"]);
+    });
+
+    it("still clusters when the announcement cannot be recorded", async () => {
+      const commands = makeCommands();
+      commands.recordClusteringRunStarted.mockRejectedValue(
+        new Error("event store unavailable"),
+      );
+      const runClusteringPage = vi.fn().mockResolvedValue({
+        mode: "incremental",
+        tracesProcessed: 10,
+        topicsCount: 1,
+        subtopicsCount: 1,
+      });
+      const handlers = createTopicClusteringIntentHandlers({
+        runPort: { runClusteringPage },
+        commands,
+        clock: () => 999,
+      });
+
+      await handlers["topic_clustering.run"]!({ message: makeMessage() });
+
+      // A status announcement must never cost the run it announces.
+      expect(runClusteringPage).toHaveBeenCalledTimes(1);
+      expect(commands.recordClusteringRunCompleted).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when a clustering page succeeds", () => {
     it("records the completed outcome with the page facts", async () => {
       const commands = makeCommands();
