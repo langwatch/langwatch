@@ -1,5 +1,5 @@
 // Auto-generated — do not edit manually.
-// Regenerate with: bash docs/scripts/sync-prompts.sh
+// Regenerate with: ./docs/scripts/sync-prompts.sh
 
 export const PROMPTS = {
   tracing: `Instrument my code with LangWatch
