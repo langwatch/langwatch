@@ -5,6 +5,10 @@
 **Status:** Proposed
 
 > **Lifecycle amendment (2026-07-18):** WP4 superseded the holder TTL and eager release/transfer decisions below with Redis-time, per-holder renewable leases. Release and transfer now mutate lease membership only; Redis expiry and the durable-store lifecycle reclaim shared bytes lazily. See the current [GroupQueue architecture](../../../langwatch/src/server/event-sourcing/queues/groupQueue/ARCHITECTURE.md#per-holder-renewable-leases).
+>
+> **Migration (WP4 → leases).** Deployment procedure, canary criteria, rollback, dashboards, and the desired-versus-live state comparison are specified once in [ADR-029's WP4 amendment](./029-groupqueue-content-addressed-payload-store.md) and are not repeated here — the two ADRs ship in the same rolling deploy and share one migration. In short: no schema change and no backfill, one rolling deploy guarded by `LEGACY_HOLDER_LEASE_GUARD` for cross-version safety, canary on one replica watching `gq_jobs_dropped_total{reason="missing_blob"}`, rollback by `kubectl rollout undo` with no data step.
+>
+> Lease deadlines are scored with Redis `TIME` rather than a client clock, so the migration carries no worker-clock-skew requirement.
 
 **Amends:** [ADR-029](./029-groupqueue-content-addressed-payload-store.md) (GroupQueue content-addressed tiered payload store). ADR-029's tiered store, GQ2 envelope, holder-set reclaim, and queue wiring stand; this ADR hardens the blob lifecycle against the correctness, security, and design gaps a three-pass review (tests / security / code) surfaced after the implementation landed.
 
