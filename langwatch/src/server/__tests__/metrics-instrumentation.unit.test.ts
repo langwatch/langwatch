@@ -120,6 +120,31 @@ describe("ES pipeline metrics", () => {
     });
   });
 
+  /**
+   * The redelivery signals answer three different questions during an incident —
+   * did dedup have anything to check against, did it skip anything, and how much
+   * did a blind retry re-apply. A rename or accidental removal breaks a
+   * dashboard silently, so each name is pinned.
+   */
+  describe("when the fold redelivery metrics are loaded", () => {
+    it("registers es_fold_dedup_unavailable_total counter", () => {
+      const metric = register.getSingleMetric("es_fold_dedup_unavailable_total");
+      expect(metric).toBeDefined();
+    });
+
+    it("registers es_fold_duplicate_events_skipped_total counter", () => {
+      const metric = register.getSingleMetric(
+        "es_fold_duplicate_events_skipped_total",
+      );
+      expect(metric).toBeDefined();
+    });
+
+    it("registers es_fold_blind_reapply_events histogram", () => {
+      const metric = register.getSingleMetric("es_fold_blind_reapply_events");
+      expect(metric).toBeDefined();
+    });
+  });
+
   describe("when deprecated metrics are removed", () => {
     it("does not register collector_index_delay_milliseconds", () => {
       const metric = register.getSingleMetric(

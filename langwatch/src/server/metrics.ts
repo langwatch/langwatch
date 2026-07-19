@@ -833,6 +833,28 @@ export const incrementEsFoldDuplicateEventsSkipped = (
   count = 1,
 ) => esFoldDuplicateEventsSkipped.labels(projectionName).inc(count);
 
+register.removeSingleMetric("es_fold_blind_reapply_events");
+const esFoldBlindReapplyEvents = new Histogram({
+  name: "es_fold_blind_reapply_events",
+  help: "Events re-applied on a retry that carried no applied-event-id set to check against",
+  labelNames: ["projection_name"] as const,
+  buckets: [1, 2, 5, 10, 25, 50, 100, 250, 500],
+});
+
+/**
+ * Blast radius of a blind re-apply, in events.
+ *
+ * `es_fold_dedup_unavailable_total` counts the *occurrences* of a retry
+ * arriving with nothing to check against; this measures how much accumulation
+ * each one re-applies. One re-applied event on a coalesced batch of 500 and
+ * 500 of them are the same increment on the counter and very different
+ * incidents — a coalescing fold can double-count an entire batch at once.
+ */
+export const observeEsFoldBlindReapplyEvents = (
+  projectionName: string,
+  events: number,
+) => esFoldBlindReapplyEvents.labels(projectionName).observe(events);
+
 // ============================================================================
 // Stored Objects Metrics
 // ============================================================================

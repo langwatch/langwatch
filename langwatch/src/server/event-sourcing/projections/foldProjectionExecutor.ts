@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   incrementEsFoldDuplicateEventsSkipped,
   incrementEsFoldRefoldTotal,
+  observeEsFoldBlindReapplyEvents,
 } from "~/server/metrics";
 import type { Event } from "../domain/types";
 import type {
@@ -11,6 +12,13 @@ import type {
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:fold-executor");
+
+/**
+ * Event ids carried in a blind-reapply log line. A coalesced batch can hold up
+ * to COALESCE_MAX_BATCH events; the ids are for identifying which aggregates to
+ * reconcile afterwards, and a handful is enough to find the trace.
+ */
+const MAX_LOGGED_EVENT_IDS = 10;
 
 function compareFoldEvents<State, E extends Event>(
   projection: FoldProjectionDefinition<State, E>,
@@ -150,12 +158,40 @@ export class FoldProjectionExecutor {
    * (counters, sums, appends) rather than being idempotent, so re-applying
    * would double-count silently.
    */
-  private dropAlreadyApplied<E extends Event>(
-    projectionName: string,
-    events: E[],
-    appliedEventIds: readonly string[],
-  ): E[] {
-    if (appliedEventIds.length === 0 || events.length === 0) return events;
+  private dropAlreadyApplied<E extends Event>({
+    projectionName,
+    events,
+    appliedEventIds,
+    context,
+  }: {
+    projectionName: string;
+    events: E[];
+    appliedEventIds: readonly string[];
+    context: ProjectionStoreContext;
+  }): E[] {
+    if (events.length === 0) return events;
+
+    if (appliedEventIds.length === 0) {
+      // A retry with no record of what an earlier attempt applied cannot tell a
+      // redelivery from a fresh event, so everything here is about to be folded
+      // on top of state that may already contain it. `dedup_unavailable` counts
+      // that this happened; this records how much it is about to re-apply.
+      if ((context.deliveryAttempt ?? 1) > 1) {
+        observeEsFoldBlindReapplyEvents(projectionName, events.length);
+        logger.warn(
+          {
+            projection: projectionName,
+            tenantId: context.tenantId,
+            aggregateId: context.aggregateId,
+            deliveryAttempt: context.deliveryAttempt,
+            reapplying: events.length,
+            eventIds: events.slice(0, MAX_LOGGED_EVENT_IDS).map((e) => e.id),
+          },
+          "Retry has no applied-event-id set — re-folding events that may already be in the stored state (accumulating folds will double-count)",
+        );
+      }
+      return events;
+    }
 
     const applied = new Set(appliedEventIds);
     const fresh = events.filter((event) => !applied.has(event.id));
@@ -210,8 +246,12 @@ export class FoldProjectionExecutor {
     // A redelivery of an event already folded into the loaded state: the state
     // is already correct, so there is nothing to apply and nothing to write.
     if (
-      this.dropAlreadyApplied(projection.name, [event], appliedEventIds)
-        .length === 0
+      this.dropAlreadyApplied({
+        projectionName: projection.name,
+        events: [event],
+        appliedEventIds,
+        context,
+      }).length === 0
     ) {
       return loaded ?? projection.init();
     }
@@ -340,11 +380,12 @@ export class FoldProjectionExecutor {
       }
     }
 
-    const fresh = this.dropAlreadyApplied(
-      projection.name,
-      ordered,
+    const fresh = this.dropAlreadyApplied({
+      projectionName: projection.name,
+      events: ordered,
       appliedEventIds,
-    );
+      context,
+    });
     // Every event in the batch was a redelivery — the loaded state already
     // reflects them all, so re-storing it would only churn the durable row.
     if (fresh.length === 0) {
