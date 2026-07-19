@@ -47,6 +47,21 @@ export interface SchemaWaitDeps {
  * which crash-loops with the real error in the pod log rather than hanging
  * until the Job deadline kills it with no cause attached.
  */
+/**
+ * The schema never appeared inside the wait. An ORDERING condition, not a
+ * failure of the backfill itself, so callers may treat it as a skip.
+ */
+export class BackfillSchemaNotReadyError extends Error {
+  constructor(timeoutMs: number, cause: unknown) {
+    super(
+      `Database schema not ready after ${Math.round(timeoutMs / 1000)}s; ` +
+        "the app's first boot applies migrations — check that the app deployment is coming up",
+      { cause },
+    );
+    this.name = "BackfillSchemaNotReadyError";
+  }
+}
+
 export async function waitForBackfillSchema(
   deps: SchemaWaitDeps,
 ): Promise<void> {
@@ -64,11 +79,7 @@ export async function waitForBackfillSchema(
       return;
     } catch (error) {
       if (now() >= deadline) {
-        throw new Error(
-          `Database schema not ready after ${Math.round(timeoutMs / 1000)}s; ` +
-            "the app's first boot applies migrations — check that the app deployment is coming up",
-          { cause: error },
-        );
+        throw new BackfillSchemaNotReadyError(timeoutMs, error);
       }
       logger.warn(
         { attempt, error },
@@ -182,14 +193,33 @@ export async function backfillTopicClusteringSchedules(
 }
 
 export default async function execute() {
-  await waitForBackfillSchema({
-    probeSchema: async () => {
-      // Every table the walk reads. Existence is the question, not content —
-      // an empty result is a healthy answer on a fresh install.
-      await prisma.$queryRaw`SELECT 1 FROM "Project" LIMIT 1`;
-      await prisma.$queryRaw`SELECT 1 FROM "ProcessManagerInstance" LIMIT 1`;
-    },
-  });
+  try {
+    await waitForBackfillSchema({
+      probeSchema: async () => {
+        // Every table the walk reads. Existence is the question, not content —
+        // an empty result is a healthy answer on a fresh install.
+        await prisma.$queryRaw`SELECT 1 FROM "Project" LIMIT 1`;
+        await prisma.$queryRaw`SELECT 1 FROM "ProcessManagerInstance" LIMIT 1`;
+      },
+    });
+  } catch (error) {
+    if (!(error instanceof BackfillSchemaNotReadyError)) throw error;
+    // Skip rather than fail. Migrations run on app boot, so on a fresh
+    // install this Job can legitimately outlive its own wait — and failing
+    // here fails the whole `helm install`, which this backfill must never do.
+    //
+    // Skipping is safe because the backfill is no longer the reconciliation
+    // path: clustering bootstrap is level-triggered on ingest, so every
+    // ACTIVE project re-asserts its own schedule within the claim window.
+    // What is left for this Job is dormant projects, which by definition are
+    // not clustering right now and lose nothing by waiting for the next
+    // upgrade or a manual run.
+    logger.warn(
+      { error },
+      "Schema not ready inside the wait; skipping the backfill without failing the deploy — active projects self-schedule on ingest, dormant ones are picked up by the next run",
+    );
+    return;
+  }
 
   await initializeDefaultApp();
   const app = getApp();

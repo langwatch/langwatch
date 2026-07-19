@@ -199,25 +199,34 @@ without new infrastructure.
 
 ### 6. Bootstrap, backfill, and legacy removal
 
-- The trace pipeline's `projectMetadata` reactor — which already owns
-  the moment `firstMessage` flips true — additionally dispatches
-  `requestClustering` (bootstrap) so every newly-active project gets a
-  process row and a first wake.
+- The trace pipeline's `projectMetadata` reactor dispatches
+  `requestClustering` (bootstrap) on **every** real ingest, not only when
+  `firstMessage` flips. This is deliberately **level-triggered**: an edge
+  that is missed — a failed bootstrap, a project predating the feature, a
+  deploy gap — is missed forever, and leaves a project with no `nextWakeAt`
+  and nothing to notice. Re-asserting is safe because a bootstrap request
+  cannot start a run or move a wake (`nextDailySlot` is anchored to the
+  project's hash slot, not relative to now), and affordable because the
+  injected implementation is rate-limited per project
+  (`createRateLimitedBootstrap`, one commit per project per claim window).
 - A task (`backfillTopicClusteringSchedules`) seeds processes for
   existing eligible projects (`firstMessage: true`). Safe to re-run:
   bootstrap is idempotent.
-- **That task runs on deploy, not by hand.** The chart ships it as a
-  `post-install,post-upgrade` Helm hook Job
+- **The task covers dormant projects only.** Any project that ingests
+  re-asserts its own schedule, so the task's remaining job is projects that
+  have ingested nothing since the upgrade. The chart still ships it as a
+  `post-install,post-upgrade` hook Job
   (`templates/topic-clustering-backfill-job.yaml`, toggled by
-  `topicClusteringBackfill.enabled`). This is load-bearing: the reactor
-  bootstrap above only fires for projects that ingest a trace *after*
-  the upgrade, so without the hook a deploy leaves zero wakes for every
-  pre-existing project and clustering stops platform-wide until an
-  operator remembers the CLI. Because bootstrap is idempotent the hook
-  re-runs harmlessly on every upgrade. Caveat: migrations run on app
-  boot rather than as a hook, so `hook-weight` cannot order the Job
-  after them — the Job's `backoffLimit` absorbs that race, and
-  `helm upgrade --wait` makes it deterministic.
+  `topicClusteringBackfill.enabled`) so a deploy seeds itself, but it is no
+  longer load-bearing and **must never fail the deploy**: migrations run on
+  app boot rather than as a hook, so on a fresh cluster the Job can outlive
+  its own schema wait, and it exits 0 in that case rather than failing
+  `helm install`. Whatever it skips is picked up by the next upgrade, a
+  manual run, or the project's own next trace.
+- Only a `manual` request can be reported as "in flight". A bootstrap
+  request starts no run, so counting one would render "Running" for a
+  project where nothing runs — and, being re-asserted on ingest, would
+  latch permanently for every active project.
 - The settings-page manual trigger dispatches `requestClustering`
   (manual) via tRPC instead of enqueueing a BullMQ job. The CLI task
   (`runTopicClustering`) calls the core function directly and loops

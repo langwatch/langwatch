@@ -4,14 +4,18 @@
 
   WHY THIS EXISTS. ADR-051 moved topic clustering off the `/api/cron/
   schedule_topic_clustering` CronJob and onto durable per-project process
-  wakes. Those wakes are created when a project first ingests a trace (the
-  projectMetadata reactor's bootstrap) — which does nothing for the projects
-  that ALREADY ingested before the upgrade. Without this Job, a deploy of
-  ADR-051 leaves every existing project without a `ProcessManagerInstance`
-  row — and therefore without the `nextWakeAt` the scheduler fires on — so
-  topic clustering silently stops platform-wide until an operator remembers to
-  run `pnpm run task backfillTopicClusteringSchedules` by hand. The whole point
-  of a hook is that the deploy seeds itself.
+  wakes. Those wakes are asserted whenever a project ingests a real trace, so
+  the fleet largely seeds itself — but a project that has ingested NOTHING
+  since the upgrade never gets the chance. This Job covers exactly that
+  remainder, so an upgrade does not leave dormant projects unclustered until
+  someone runs `pnpm run task backfillTopicClusteringSchedules` by hand.
+
+  IT IS NOT THE RECONCILIATION PATH. It used to be: bootstrap was
+  edge-triggered on a project's first-message transition, so any missed edge
+  was permanent and this Job was the only repair. Bootstrap is level-triggered
+  now (rate-limited per project), so an ACTIVE project that loses its schedule
+  re-asserts it on its next trace. That is why this Job may skip itself
+  without failing the deploy.
 
   Properties that make it safe to fire on every upgrade:
 
@@ -24,6 +28,11 @@
       unscheduled clustering run. (Each unskipped request does append one
       event; the `nextWakeAt` skip is what keeps repeat runs from growing the
       log once the workers have caught up.)
+    - NEVER FAILS THE DEPLOY: if the schema has not appeared by the end of the
+      task's wait, it logs and exits 0 rather than failing `helm install`.
+      Migrations run on app boot, so on a fresh cluster this Job can
+      legitimately outlive its own wait; the work it would have done is
+      picked up by the next upgrade or a manual run.
     - PARTIAL FAILURE IS A FAILURE: one project's error is logged and skipped so
       the rest of the fleet still gets scheduled, but the task then exits
       non-zero. The Job retries (`backoffLimit`) rather than reporting a

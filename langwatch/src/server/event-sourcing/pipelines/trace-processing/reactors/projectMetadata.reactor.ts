@@ -11,9 +11,17 @@ const logger = createLogger(
 export interface ProjectMetadataReactorDeps {
   projects: ProjectService;
   /**
-   * ADR-051: a project's first real trace also bootstraps its topic
-   * clustering process (creates the process row and schedules the first
-   * daily wake). Best-effort — the backfill task is the reconciliation path.
+   * ADR-051: ensures the project's topic clustering process exists and has a
+   * scheduled daily wake.
+   *
+   * Called on EVERY real ingest, not just the first — this is the
+   * reconciliation path, so a project that somehow lost its schedule gets it
+   * back on its next trace instead of waiting for an operator to run the
+   * backfill. Safe to call repeatedly: a bootstrap-trigger request evolves an
+   * already-bootstrapped process to the same state and cannot move its wake.
+   * The injected implementation is rate-limited (see
+   * createRateLimitedBootstrap), so this costs at most one commit per project
+   * per claim window.
    */
   bootstrapTopicClustering?: (projectId: string) => Promise<void>;
 }
@@ -69,6 +77,26 @@ export function createProjectMetadataReactor(
           return;
         }
 
+        // Level-triggered, so it runs BEFORE the already-marked early return
+        // below: an established project is exactly the case that used to be
+        // unreachable here, and exactly the case the deploy backfill existed
+        // to repair.
+        //
+        // Own error handling: a bootstrap failure must not be reported as a
+        // metadata failure, and must not stop the metadata write that follows.
+        // Failing is survivable now — the next trace re-asserts it.
+        try {
+          await deps.bootstrapTopicClustering?.(tenantId);
+        } catch (error) {
+          logger.error(
+            {
+              tenantId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Topic clustering bootstrap failed — retried on this project's next trace (non-fatal)",
+          );
+        }
+
         // Already marked — nothing to do
         if (project.firstMessage && project.integrated) {
           return;
@@ -96,25 +124,6 @@ export function createProjectMetadataReactor(
           },
         });
 
-        // Own error handling: by this point the metadata write has already
-        // COMMITTED, so letting a bootstrap failure fall through to the outer
-        // catch would report "Failed to update project metadata" for a write
-        // that succeeded — and hide the thing that actually broke. A failure
-        // here means the project has no scheduled clustering wake; the deploy
-        // backfill (backfillTopicClusteringSchedules) is the recovery path.
-        if (!project.firstMessage) {
-          try {
-            await deps.bootstrapTopicClustering?.(tenantId);
-          } catch (error) {
-            logger.error(
-              {
-                tenantId,
-                error: error instanceof Error ? error.message : String(error),
-              },
-              "Project metadata updated, but topic clustering bootstrap failed — project has no scheduled clustering wake until the backfill task re-runs (non-fatal)",
-            );
-          }
-        }
       } catch (error) {
         logger.error(
           {

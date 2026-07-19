@@ -186,6 +186,7 @@ import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { AppendStore } from "./projections/mapProjection.types";
 import type { StateProjectionStore } from "./projections/stateProjection.types";
 import { createTenantId } from "./domain/tenantId";
+import { createRateLimitedBootstrap } from "../app-layer/topic-clustering/topicClusteringBootstrapGate";
 import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
@@ -533,11 +534,18 @@ export class PipelineRegistry {
       recordClusteringRunFailed: (args) =>
         commands.recordClusteringRunFailed(args),
     };
-    this.bootstrapTopicClustering.resolve((projectId) =>
-      commands.requestClustering({
-        tenantId: projectId,
-        occurredAt: Date.now(),
-        trigger: "bootstrap",
+    // Level-triggered bootstrap: the projectMetadata reactor asks on every
+    // real ingest, and this claim keeps that to one commit per project per
+    // window. See createRateLimitedBootstrap for why re-asking is safe.
+    this.bootstrapTopicClustering.resolve(
+      createRateLimitedBootstrap({
+        redis: this.deps.redis,
+        bootstrap: (projectId) =>
+          commands.requestClustering({
+            tenantId: projectId,
+            occurredAt: Date.now(),
+            trigger: "bootstrap",
+          }),
       }),
     );
 
