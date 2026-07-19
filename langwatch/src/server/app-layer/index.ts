@@ -1,11 +1,3 @@
-// Handled errors
-
-export type { SerializedHandledError } from "@langwatch/handled-error";
-export {
-  HandledError,
-  NotFoundError,
-  ValidationError,
-} from "@langwatch/handled-error";
 // App (composition root)
 export {
   App,
