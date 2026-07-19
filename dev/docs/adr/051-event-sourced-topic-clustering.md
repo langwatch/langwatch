@@ -21,7 +21,8 @@ substantial BullMQ holdout after ADR-014:
 
 - A Kubernetes CronJob hits `/api/cron/schedule_topic_clustering`, which
   fans out one BullMQ job per eligible project with a delay of up to 24
-  hours (a sha256 hash of the project id spreads load across the day).
+  hours (a sha256 hash of the project id was meant to spread load across
+  the day; it does not — see the wake slot below).
 - A standalone BullMQ worker (concurrency 3) runs
   `clusterTopicsForProject`, and pagination through the trace backlog
   works by re-enqueueing a job carrying a `search_after` cursor in its
@@ -119,10 +120,21 @@ in the status projection, not here — the process state stays private
 decision memory. No prompts, trace content, or credentials.
 
 - **On wake** — emit a `run:<yyyymmdd>` intent and schedule the next
-  wake at the project's next daily slot. The slot keeps today's sha256
-  hash-spread (hour = hash % 24, minute = hash % 60) so fleet load stays
-  spread across the day, but the timer is now a durable Postgres column
-  instead of a delayed Redis job.
+  wake at the project's next daily slot, a stable minute of the UTC day
+  derived from a sha256 of the project id. The timer is now a durable
+  Postgres column instead of a delayed Redis job.
+
+  The legacy spread this replaces did not work: it read the digest with
+  `parseInt(hex, 16)`, which overflows `Number.MAX_SAFE_INTEGER` and
+  rounds to a multiple of 2^203, so `% 24` and `% 60` both collapsed and
+  the entire fleet fell into 15 slots at hours 00, 08 and 16 — three
+  daily spikes, measured, not the claimed spread. Under BullMQ that was
+  one cron burst absorbed by a queue; against the wake worker's fixed
+  drain rate it is a genuine thundering herd. The slot is now taken as a
+  single remainder over the day's 1440 minutes (`% 24` and `% 60` share
+  a factor, so pairing them would give 120 combinations, not 1440).
+  Deploying this moves every project's slot once; a daily job simply
+  gets one longer or shorter interval, and the slot is stable after.
 - **On `requested` (manual)** — emit a `run:manual:<occurredAt>` intent
   immediately. Manual runs do not disturb the daily schedule.
 - **On `requested` (bootstrap)** — initialize state and schedule the

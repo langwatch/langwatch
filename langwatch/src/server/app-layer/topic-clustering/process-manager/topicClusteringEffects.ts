@@ -44,6 +44,12 @@ export interface TopicClusteringRunPort {
 
 /** The pipeline commands the effect reports its outcome through. */
 export interface TopicClusteringOutcomeCommands {
+  recordClusteringRunStarted(params: {
+    tenantId: string;
+    occurredAt: number;
+    runId: string;
+    page: number;
+  }): Promise<void>;
   recordClusteringRunCompleted(params: {
     tenantId: string;
     occurredAt: number;
@@ -96,6 +102,35 @@ export function createTopicClusteringIntentHandlers(params: {
   const runHandler: IntentHandler = async ({ message }) => {
     const intent = topicClusteringRunIntentSchema.parse(message.payload);
     const projectId = message.projectId;
+
+    // Announce the page before working it, so "a run is in progress" is a
+    // recorded fact rather than something the settings page has to infer.
+    // A scheduled run emits nothing at its start (the wake is internal to
+    // the process) and a single-page run never had an in-flight moment in
+    // the log at all, so the badge was unreachable for both.
+    //
+    // Best-effort by design: this is a status announcement, and losing it
+    // must never cost the clustering page that follows. Retrying it through
+    // the outbox would redeliver the whole intent and re-bill the page.
+    try {
+      await params.commands.recordClusteringRunStarted({
+        tenantId: projectId,
+        occurredAt: clock(),
+        runId: intent.runId,
+        page: intent.page,
+      });
+    } catch (error) {
+      logger.warn(
+        {
+          projectId,
+          runId: intent.runId,
+          page: intent.page,
+          attempt: message.attempt,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Could not record clustering run start; running the page anyway (the run shows as in progress only once a page completes)",
+      );
+    }
 
     let outcome: ClusteringPageOutcome;
     try {

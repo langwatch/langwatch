@@ -70,14 +70,23 @@ describe("nextDailySlot", () => {
     expect(nextDailySlot(PROJECT_ID, afterMs)).toBeGreaterThan(afterMs);
   });
 
-  it("spreads different projects across different slots", () => {
+  it("spreads a fleet of projects across the whole day, not a few spikes", () => {
     const base = 1_752_700_000_000;
-    const slots = new Set(
-      ["p1", "p2", "p3", "p4", "p5"].map(
-        (id) => nextDailySlot(id, base) % DAY_MS,
-      ),
-    );
-    expect(slots.size).toBeGreaterThan(1);
+    const ids = Array.from({ length: 2_000 }, (_, i) => `project-${i}`);
+    const slots = new Set<number>();
+    const hours = new Set<number>();
+    for (const id of ids) {
+      const offset = nextDailySlot(id, base) % DAY_MS;
+      slots.add(offset);
+      hours.add(Math.floor(offset / (60 * 60 * 1000)));
+    }
+
+    // The previous assertion here was `slots.size > 1`, which cannot fail:
+    // it passed while the whole fleet sat in 15 slots across hours 0/8/16,
+    // because parseInt on a 64-hex-digit hash rounds to a multiple of 2^203.
+    // Pin the property the ADR actually claims.
+    expect(hours.size).toBe(24);
+    expect(slots.size).toBeGreaterThan(1_000);
   });
 });
 

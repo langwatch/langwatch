@@ -693,18 +693,34 @@ export const storeResults = async (
   projectId: string,
   clusteringResult: TopicClusteringResponse | undefined,
   isIncremental: boolean,
-): Promise<ClusteringStoreSummary> => {
+): Promise<ClusteringStoreSummary | null> => {
+  // NO RESULT IS A SKIP, NOT AN EMPTY CLUSTERING.
+  //
+  // This used to default an absent result to empty arrays and fall through.
+  // In batch mode that walked straight into the delete-then-recreate below,
+  // wiping the project's entire topic model and writing nothing back — and it
+  // still returned a summary, so the caller's `not_configured` skip was
+  // unreachable and the run was recorded as "completed, 0 topics" moments
+  // after destroying the model. `fetchTopics*Clustering` returns undefined
+  // whenever LANGEVALS_ENDPOINT is unset, so on any deployment without a
+  // clustering endpoint that was every batch run.
+  //
+  // Returning null makes it a true no-op: no delete, no writes, and the
+  // callers report it as a skip rather than a successful empty run.
+  if (!clusteringResult) {
+    logger.warn(
+      { projectId, isIncremental },
+      "clustering returned no result; storing nothing and leaving the existing topic model untouched",
+    );
+    return null;
+  }
+
   const {
     topics,
     subtopics,
     traces: tracesToAssign,
     cost,
-  } = clusteringResult ?? {
-    topics: [] as TopicClusteringTopic[],
-    subtopics: [] as TopicClusteringSubtopic[],
-    traces: [] as TopicClusteringTraceTopicMap[],
-    cost: undefined,
-  };
+  } = clusteringResult;
 
   logger.info(
     {
@@ -716,7 +732,13 @@ export const storeResults = async (
     "found new topics, subtopics and traces to assign for project",
   );
 
-  if (!isIncremental) {
+  // Batch mode REPLACES the topic model, so it deletes the old one first.
+  // Only ever do that when there is a new model to put back: an empty result
+  // from an otherwise successful call would leave the project with no topics
+  // at all, which is strictly worse than keeping the previous ones. The delete
+  // and the createMany below are not one transaction, so an empty delete is a
+  // permanent loss, not a rollback.
+  if (!isIncremental && topics.length > 0) {
     await prisma.topic.deleteMany({
       where: { projectId, parentId: { not: null } },
     });
@@ -946,10 +968,50 @@ const postToTopicClustering = async (opts: {
   body: BatchClusteringParams | IncrementalClusteringParams;
   kind: "topic_clustering_batch" | "topic_clustering_incremental";
 }) => {
-  return stagedLangevalsFetch({
-    url: opts.url,
-    body: opts.body,
-    projectId: opts.projectId,
-    kind: opts.kind,
-  });
+  // Every clustering call carries a deadline — see
+  // TOPIC_CLUSTERING_REQUEST_DEADLINE_MS for why an unbounded one is a
+  // data-loss race and not just a slow request.
+  //
+  // An explicit controller rather than AbortSignal.timeout(): the deadline is
+  // then driven by an ordinary timer, which tests can advance to exercise this
+  // branch for real instead of asserting around it.
+  const controller = new AbortController();
+  const deadline = setTimeout(() => {
+    controller.abort();
+  }, TOPIC_CLUSTERING_REQUEST_DEADLINE_MS);
+  deadline.unref?.();
+
+  try {
+    return await stagedLangevalsFetch({
+      url: opts.url,
+      body: opts.body,
+      projectId: opts.projectId,
+      kind: opts.kind,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    // Our own deadline firing is a fact we know at the throw site, so it is
+    // classified here rather than guessed at from the message later (see
+    // clustering-error.ts). It is the clustering service failing to answer in
+    // time — ours, not the customer's, and worth retrying: the outbox
+    // redelivers the intent and the next attempt gets a fresh deadline.
+    if (controller.signal.aborted) {
+      logger.warn(
+        {
+          projectId: opts.projectId,
+          kind: opts.kind,
+          deadlineMs: TOPIC_CLUSTERING_REQUEST_DEADLINE_MS,
+        },
+        "Topic clustering request aborted at its deadline; failing the page so the outbox retries inside the lease",
+      );
+      throw new ClusteringError(
+        CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
+        `Topic clustering request to langevals exceeded its ${TOPIC_CLUSTERING_REQUEST_DEADLINE_MS}ms deadline (${opts.kind})`,
+        { cause: error },
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(deadline);
+  }
 };

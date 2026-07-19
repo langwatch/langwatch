@@ -3,6 +3,7 @@ import type { StateProjectionStore } from "../../projections/stateProjection.typ
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
 import {
   RecordClusteringRunCompletedCommand,
+  RecordClusteringRunStartedCommand,
   RecordClusteringRunFailedCommand,
   RequestTopicClusteringCommand,
 } from "./commands";
@@ -58,6 +59,7 @@ export function createTopicClusteringProcessingPipeline(
 
   return builder
     .withCommand("requestClustering", RequestTopicClusteringCommand)
+    .withCommand("recordClusteringRunStarted", RecordClusteringRunStartedCommand)
     .withCommand(
       "recordClusteringRunCompleted",
       RecordClusteringRunCompletedCommand,

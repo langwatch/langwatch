@@ -237,5 +237,61 @@ describe("createTopicClusteringIntentHandlers", () => {
         }),
       );
     });
+
+    /**
+     * The failure path used to let a failing outcome-write propagate while the
+     * success path swallowed it. That asymmetry meant the WORST case — the page
+     * failed AND we could not say so — was the one that lost the record: the
+     * outbox marked the message dead and no run_failed was ever written.
+     */
+    describe("when recording the failure itself fails", () => {
+      it("does not rethrow, so the outbox cannot retire the message without a recorded outcome", async () => {
+        const commands = makeCommands();
+        commands.recordClusteringRunFailed.mockRejectedValue(
+          new Error("clickhouse append failed"),
+        );
+        const runClusteringPage = vi
+          .fn()
+          .mockRejectedValue(
+            new ClusteringError(
+              CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
+              "langevals unavailable",
+            ),
+          );
+        const handlers = createTopicClusteringIntentHandlers({
+          runPort: { runClusteringPage },
+          commands,
+          clock: () => 999,
+        });
+
+        await expect(
+          handlers["topic_clustering.run"]!({
+            message: makeMessage({ attempt: 3 }),
+          }),
+        ).resolves.toBeUndefined();
+      });
+
+      it("does not retry the page that already exhausted every attempt", async () => {
+        const commands = makeCommands();
+        commands.recordClusteringRunFailed.mockRejectedValue(
+          new Error("clickhouse append failed"),
+        );
+        const runClusteringPage = vi
+          .fn()
+          .mockRejectedValue(new Error("langevals unavailable"));
+        const handlers = createTopicClusteringIntentHandlers({
+          runPort: { runClusteringPage },
+          commands,
+          clock: () => 999,
+        });
+
+        await handlers["topic_clustering.run"]!({
+          message: makeMessage({ attempt: 3 }),
+        });
+
+        expect(runClusteringPage).toHaveBeenCalledTimes(1);
+        expect(commands.recordClusteringRunCompleted).not.toHaveBeenCalled();
+      });
+    });
   });
 });

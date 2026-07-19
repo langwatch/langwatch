@@ -49,18 +49,19 @@ function isRunInFlight(
 }
 
 /**
- * The legacy fan-out spread each project's daily BullMQ job by hashing the
- * project id over the day. The wake slot preserves that exact computation
- * (including parseInt's float rounding of the 256-bit hex — deterministic,
- * and slot-compatible with what projects had before ADR-051).
+ * The project's stable minute of the UTC day, derived from a sha256 of its
+ * id (ADR-051 §"On wake").
+ *
+ * The legacy computation read the digest with `parseInt(hex, 16)` — 64 hex
+ * digits, far past Number.MAX_SAFE_INTEGER — so it rounded to a multiple of
+ * 2^203 and both `% 24` and `% 60` collapsed: the whole fleet landed in 15
+ * slots at hours 00, 08 and 16. Taking one remainder over the day's 1440
+ * minutes from 32 exact bits gives every minute, evenly.
  */
 function dailySlotOffsetMs(projectId: string): number {
-  const hash = crypto.createHash("sha256");
-  hash.update(projectId);
-  const hashNumber = parseInt(hash.digest("hex"), 16);
-  const distributionHour = hashNumber % 24;
-  const distributionMinute = hashNumber % 60;
-  return distributionHour * 60 * 60 * 1000 + distributionMinute * 60 * 1000;
+  const digest = crypto.createHash("sha256").update(projectId).digest();
+  const minuteOfDay = digest.readUInt32BE(0) % (24 * 60);
+  return minuteOfDay * 60 * 1000;
 }
 
 /** The next occurrence of the project's daily slot strictly after `afterMs`. */

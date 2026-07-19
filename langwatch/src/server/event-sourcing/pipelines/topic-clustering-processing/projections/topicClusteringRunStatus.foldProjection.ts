@@ -11,11 +11,13 @@ import type {
   TopicClusteringRequestedEvent,
   TopicClusteringRunCompletedEvent,
   TopicClusteringRunFailedEvent,
+  TopicClusteringRunStartedEvent,
 } from "../schemas/events";
 import {
   TopicClusteringRequestedEventSchema,
   TopicClusteringRunCompletedEventSchema,
   TopicClusteringRunFailedEventSchema,
+  TopicClusteringRunStartedEventSchema,
 } from "../schemas/events";
 
 /**
@@ -58,6 +60,7 @@ const topicClusteringEvents = [
   TopicClusteringRequestedEventSchema,
   TopicClusteringRunCompletedEventSchema,
   TopicClusteringRunFailedEventSchema,
+  TopicClusteringRunStartedEventSchema,
 ] as const;
 
 export class TopicClusteringRunStatusFoldProjection
@@ -115,6 +118,24 @@ export class TopicClusteringRunStatusFoldProjection
       ProjectId: String(event.aggregateId),
       LastRequestedAt: event.occurredAt,
       LastRequestTrigger: event.data.trigger,
+    };
+  }
+
+  handleTopicClusteringRunStarted(
+    event: TopicClusteringRunStartedEvent,
+    state: TopicClusteringRunStatusData,
+  ): TopicClusteringRunStatusData {
+    // Page 1 opens a run; later pages of the same run keep the counters the
+    // completion handler has been accumulating. A start for a DIFFERENT run
+    // supersedes whatever was recorded as in progress — the stale-run guard
+    // has already decided the old one is gone.
+    const sameRun = state.InProgressRunId === event.data.runId;
+    return {
+      ...state,
+      ProjectId: String(event.aggregateId),
+      InProgressRunId: event.data.runId,
+      InProgressTraces: sameRun ? state.InProgressTraces : 0,
+      InProgressPages: sameRun ? state.InProgressPages : 0,
     };
   }
 

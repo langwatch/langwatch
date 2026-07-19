@@ -47,6 +47,34 @@ export type TopicClusteringRequestedEvent = z.infer<
 >;
 
 /**
+ * TopicClusteringRunStarted — the effect began working a page.
+ *
+ * Without it the log only records how runs END, so "a run is in progress"
+ * is not rebuildable by replay: a scheduled run emits nothing at its start
+ * (the wake is process-internal), and a run that finishes in a single page
+ * never looks in-flight at all. The settings page has to infer it, and got
+ * it wrong.
+ */
+export const topicClusteringRunStartedEventDataSchema = z.object({
+  /** Logical run identity, shared by every page of one backlog walk. */
+  runId: z.string(),
+  /** 1-based page number within the run. */
+  page: z.number(),
+});
+export type TopicClusteringRunStartedEventData = z.infer<
+  typeof topicClusteringRunStartedEventDataSchema
+>;
+
+export const TopicClusteringRunStartedEventSchema = EventSchema.extend({
+  type: z.literal(TOPIC_CLUSTERING_EVENT_TYPES.RUN_STARTED),
+  version: z.literal(TOPIC_CLUSTERING_EVENT_VERSIONS.RUN_STARTED),
+  data: topicClusteringRunStartedEventDataSchema,
+});
+export type TopicClusteringRunStartedEvent = z.infer<
+  typeof TopicClusteringRunStartedEventSchema
+>;
+
+/**
  * TopicClusteringRunCompleted — one clustering page finished (including
  * gate-skipped pages). `runId` identifies the logical run (all pages of one
  * backlog walk share it); `nextSearchAfter` present means the backlog has
@@ -116,5 +144,6 @@ export type TopicClusteringRunFailedEvent = z.infer<
 /** Union of all topic clustering processing event types. */
 export type TopicClusteringProcessingEvent =
   | TopicClusteringRequestedEvent
+  | TopicClusteringRunStartedEvent
   | TopicClusteringRunCompletedEvent
   | TopicClusteringRunFailedEvent;

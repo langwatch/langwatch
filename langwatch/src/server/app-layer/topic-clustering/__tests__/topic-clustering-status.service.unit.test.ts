@@ -15,7 +15,14 @@ function projectionRow(
   overrides: Partial<TopicClusteringRunProjectionRow> = {},
 ): TopicClusteringRunProjectionRow {
   return {
+    id: "topicrun_1",
     projectId: PROJECT_ID,
+    CreatedAt: NOW - 1_000_000,
+    UpdatedAt: NOW,
+    OccurredAt: NOW,
+    AcceptedAt: NOW,
+    LastEventId: "event-1",
+    ProjectionVersion: "1",
     LastRequestedAt: null,
     LastRequestTrigger: null,
     LastRunAt: null,

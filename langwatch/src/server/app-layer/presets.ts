@@ -1481,6 +1481,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       } as AppCommands["langy"],
       topicClustering: {
         requestClustering: noop,
+        recordClusteringRunStarted: noop,
         recordClusteringRunCompleted: noop,
         recordClusteringRunFailed: noop,
       } as AppCommands["topicClustering"],

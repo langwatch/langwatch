@@ -32,6 +32,19 @@ Feature: Event-sourced topic clustering scheduling
     And the daily schedule is not disturbed
     And if the cadence gate declines the run, the skip reason is recorded and visible
 
+  Scenario: A run in progress is visible while it is still working
+    Given a clustering run has started and has not finished
+    When the user opens the topic clustering settings page
+    Then they see that a run is in progress
+    And this holds for a scheduled run as much as a manual one
+    And it holds for a run that finishes in a single page
+
+  Scenario: Asking for a run while one is already working says so
+    Given a clustering run is already in progress
+    When the user asks to run clustering from the settings page
+    Then they are told a run is already in progress
+    And they are not told a new run has started
+
   Scenario: A large backlog is processed page by page through durable cursors
     Given a clustering run that fills a whole page of traces
     When the run completes with a continuation cursor

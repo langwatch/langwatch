@@ -493,6 +493,9 @@ export class PipelineRegistry {
 
     // Outcome commands are late-bound: the intent handlers exist before the
     // pipeline (and its command dispatchers) are registered.
+    const recordStarted = new Deferred<
+      (args: Record<string, unknown>) => Promise<void>
+    >("topicClusteringRecordStarted");
     const recordCompleted = new Deferred<
       (args: Record<string, unknown>) => Promise<void>
     >("topicClusteringRecordCompleted");
@@ -505,6 +508,7 @@ export class PipelineRegistry {
       handlers: createTopicClusteringIntentHandlers({
         runPort: this.deps.topicClustering.runPort,
         commands: {
+          recordClusteringRunStarted: (args) => recordStarted.fn(args),
           recordClusteringRunCompleted: (args) => recordCompleted.fn(args),
           recordClusteringRunFailed: (args) => recordFailed.fn(args),
         },
@@ -515,6 +519,11 @@ export class PipelineRegistry {
       maxAttempts: TOPIC_CLUSTERING_MAX_ATTEMPTS,
       leaseDurationMs: TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
       processNames: [TOPIC_CLUSTERING_PROCESS_NAME],
+      // ADR-051 §4 promises langevals sees the same load profile as the old
+      // worker's `concurrency: 3`. Leasing three at a time is not enough on
+      // its own — the dispatcher runs its batch sequentially unless told
+      // otherwise, which made effective concurrency 1 per replica.
+      concurrency: TOPIC_CLUSTERING_OUTBOX_BATCH_SIZE,
     });
     const topicClusteringOutboxWorker = new ProcessOutboxWorker({
       dispatcher: outboxDispatcher,
@@ -548,6 +557,9 @@ export class PipelineRegistry {
     );
 
     const commands = mapCommands(pipeline.commands);
+    recordStarted.resolve((args) =>
+      commands.recordClusteringRunStarted(args as never),
+    );
     recordCompleted.resolve((args) =>
       commands.recordClusteringRunCompleted(args as never),
     );

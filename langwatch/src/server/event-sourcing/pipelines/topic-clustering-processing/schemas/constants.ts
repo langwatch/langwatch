@@ -8,12 +8,14 @@
 
 export const TOPIC_CLUSTERING_EVENT_TYPES = {
   REQUESTED: "lw.obs.topic_clustering.requested",
+  RUN_STARTED: "lw.obs.topic_clustering.run_started",
   RUN_COMPLETED: "lw.obs.topic_clustering.run_completed",
   RUN_FAILED: "lw.obs.topic_clustering.run_failed",
 } as const;
 
 export const TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES = [
   TOPIC_CLUSTERING_EVENT_TYPES.REQUESTED,
+  TOPIC_CLUSTERING_EVENT_TYPES.RUN_STARTED,
   TOPIC_CLUSTERING_EVENT_TYPES.RUN_COMPLETED,
   TOPIC_CLUSTERING_EVENT_TYPES.RUN_FAILED,
 ] as const;
@@ -23,12 +25,14 @@ export type TopicClusteringProcessingEventType =
 
 export const TOPIC_CLUSTERING_COMMAND_TYPES = {
   REQUEST: "lw.obs.topic_clustering.request",
+  RECORD_RUN_STARTED: "lw.obs.topic_clustering.record_run_started",
   RECORD_RUN_COMPLETED: "lw.obs.topic_clustering.record_run_completed",
   RECORD_RUN_FAILED: "lw.obs.topic_clustering.record_run_failed",
 } as const;
 
 export const TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES = [
   TOPIC_CLUSTERING_COMMAND_TYPES.REQUEST,
+  TOPIC_CLUSTERING_COMMAND_TYPES.RECORD_RUN_STARTED,
   TOPIC_CLUSTERING_COMMAND_TYPES.RECORD_RUN_COMPLETED,
   TOPIC_CLUSTERING_COMMAND_TYPES.RECORD_RUN_FAILED,
 ] as const;
@@ -39,6 +43,7 @@ export type TopicClusteringProcessingCommandType =
 /** Event schema versions using calendar versioning (YYYY-MM-DD). */
 export const TOPIC_CLUSTERING_EVENT_VERSIONS = {
   REQUESTED: "2026-07-17",
+  RUN_STARTED: "2026-07-19",
   RUN_COMPLETED: "2026-07-17",
   RUN_FAILED: "2026-07-17",
 } as const;

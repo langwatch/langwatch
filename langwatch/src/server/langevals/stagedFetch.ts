@@ -43,6 +43,13 @@ interface StagedFetchOptions {
   projectId: string;
   kind: LangevalsCallKind;
   headers?: Record<string, string>;
+  /**
+   * Optional client deadline / cancellation, forwarded verbatim to fetch().
+   * Callers whose work is leased elsewhere (e.g. the topic-clustering outbox)
+   * must bound the call below their lease, or a slow response outlives the
+   * lease and a second replica re-runs the same work concurrently.
+   */
+  signal?: AbortSignal;
 }
 
 function maxBytesForKind(kind: LangevalsCallKind): number {
@@ -73,7 +80,7 @@ function maxBytesForKind(kind: LangevalsCallKind): number {
 export async function stagedLangevalsFetch(
   opts: StagedFetchOptions,
 ): Promise<Response> {
-  const { url, body, projectId, kind, headers = {} } = opts;
+  const { url, body, projectId, kind, headers = {}, signal } = opts;
 
   const serialized = Buffer.from(JSON.stringify(body), "utf-8");
   const bytes = serialized.byteLength;
@@ -106,6 +113,7 @@ export async function stagedLangevalsFetch(
       // staged path below.
       headers: { ...headers, "Content-Type": "application/json" },
       body: serialized,
+      ...(signal ? { signal } : {}),
     });
   }
 
@@ -143,6 +151,7 @@ export async function stagedLangevalsFetch(
         "Content-Type": "application/json",
         [STAGED_PAYLOAD_HEADER]: stagedUrl,
       },
+      ...(signal ? { signal } : {}),
     });
   } finally {
     // Best-effort delete: by the time fetch() resolves, langevals has

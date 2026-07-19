@@ -3,6 +3,7 @@ import {
   topicClusteringRequestedEventDataSchema,
   topicClusteringRunCompletedEventDataSchema,
   topicClusteringRunFailedEventDataSchema,
+  topicClusteringRunStartedEventDataSchema,
 } from "./schemas/events";
 
 /**
@@ -34,6 +35,25 @@ export const RequestTopicClusteringCommand = defineCommand({
     d.trigger === "bootstrap"
       ? `${String(d.tenantId)}:topic_clustering:bootstrap`
       : `${String(d.tenantId)}:topic_clustering:request:${d.occurredAt}`,
+});
+
+export const RecordClusteringRunStartedCommand = defineCommand({
+  commandType: "lw.obs.topic_clustering.record_run_started",
+  eventType: "lw.obs.topic_clustering.run_started",
+  eventVersion: "2026-07-19",
+  aggregateType: "topic_clustering",
+  schema: topicClusteringRunStartedEventDataSchema,
+  aggregateId: (d) => String(d.tenantId),
+  // Keyed per page, so a redelivered intent re-announces the same page
+  // rather than appending a second start for it.
+  idempotencyKey: (d) =>
+    `${String(d.tenantId)}:topic_clustering:${d.runId}:page-${d.page}:started`,
+  spanAttributes: (d) => ({
+    "payload.run_id": d.runId,
+    "payload.page": d.page,
+  }),
+  makeJobId: (d) =>
+    `${String(d.tenantId)}:topic_clustering:${d.runId}:page-${d.page}:started`,
 });
 
 export const RecordClusteringRunCompletedCommand = defineCommand({
