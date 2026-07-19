@@ -61,7 +61,7 @@ function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
     maxAttempts: INGESTION_PULL_MAX_ATTEMPTS,
     leaseDurationMs: INGESTION_PULL_LEASE_DURATION_MS,
     processNames: [INGESTION_PULL_PROCESS_NAME],
-    dispatchConcurrency: INGESTION_PULL_CONCURRENCY,
+    concurrency: INGESTION_PULL_CONCURRENCY,
   });
   const processOutboxWorker = new ProcessOutboxWorker({
     dispatcher: outboxDispatcher,

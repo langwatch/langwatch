@@ -203,10 +203,6 @@ export const ingestionPullProcessDefinition: ProcessDefinition<IngestionPullProc
       if (input.kind === "event") {
         return evolveEvent(previousState, input.event);
       }
-      return evolveWake(
-        previousState,
-        input.scheduledFor,
-        input.handledAt ?? input.scheduledFor,
-      );
+      return evolveWake(previousState, input.scheduledFor, input.now);
     },
   };
