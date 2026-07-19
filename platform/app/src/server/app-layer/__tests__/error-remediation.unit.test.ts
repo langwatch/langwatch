@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { REMEDIATION_CODES, REMEDIATION_DOC_PATHS } from "../error-remediation";
 
 // platform/app/src/server/app-layer/__tests__ → repo root → docs/
-const DOCS_ROOT = path.resolve(__dirname, "../../../../../docs");
+const DOCS_ROOT = path.resolve(__dirname, "../../../../../../docs");
 
 describe("error remediation registry", () => {
   it.each(REMEDIATION_DOC_PATHS)("docs page exists: %s", (docsPath) => {

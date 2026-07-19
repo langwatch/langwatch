@@ -44,7 +44,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** repo-root/langwatch/scripts → repo root → services/.../AGENTS.md */
 const AGENTS_MD_PATH = path.resolve(
   __dirname,
-  "../../services/langyagent/internal/assets/AGENTS.md",
+  "../../../services/langyagent/internal/assets/AGENTS.md",
 );
 
 const MODEL = "openai/gpt-5-mini";
