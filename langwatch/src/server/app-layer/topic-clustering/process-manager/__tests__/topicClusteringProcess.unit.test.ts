@@ -33,10 +33,13 @@ function makeEvent(overrides: {
 function evolveEvent(
   previousState: TopicClusteringProcessState,
   event: TopicClusteringProcessingEvent,
+  /** Handling instant; defaults to prompt delivery. Pass it to model lag. */
+  now?: number,
 ) {
+  const envelope = toTopicClusteringProcessEnvelope(event);
   return topicClusteringProcessDefinition.evolve({
     previousState,
-    input: { kind: "event", event: toTopicClusteringProcessEnvelope(event) },
+    input: { kind: "event", event: envelope, now: now ?? envelope.occurredAt },
   });
 }
 
@@ -134,6 +137,7 @@ describe("topicClusteringProcessDefinition", () => {
         runId: "20260717",
         page: 1,
         updatedAtMs: scheduledFor,
+        startedAtMs: scheduledFor,
       });
       expect(evolution.nextWakeAt).toBe(
         nextDailySlot(PROJECT_ID, scheduledFor),
@@ -258,6 +262,110 @@ describe("topicClusteringProcessDefinition", () => {
           data: { trigger: "manual" },
         }),
       );
+
+      expect(evolution.intents).toEqual([]);
+      expect(evolution.state.currentRun).toEqual(state.currentRun);
+    });
+  });
+
+  describe("when a manual request arrives while a stale run is still recorded", () => {
+    it("preempts the abandoned run instead of silently dropping the request", () => {
+      const occurredAt = Date.UTC(2026, 6, 17, 14, 0);
+      const state: TopicClusteringProcessState = {
+        ...bootstrappedState(),
+        currentRun: {
+          runId: "20260716",
+          page: 4,
+          updatedAtMs: occurredAt - 60_000,
+          startedAtMs: occurredAt - TOPIC_CLUSTERING_STALE_RUN_MS - 1,
+        },
+      };
+
+      const evolution = evolveEvent(
+        state,
+        makeEvent({
+          type: "lw.obs.topic_clustering.requested",
+          occurredAt,
+          data: { trigger: "manual", requestedByUserId: "user-1" },
+        }),
+      );
+
+      // "Run now" against a wedged run used to be a no-op while the route
+      // still answered {success:true} and the UI toasted "will start shortly".
+      expect(evolution.intents).toEqual([
+        {
+          messageKey: `run:manual-${occurredAt}:page-1`,
+          intentType: "topic_clustering.run",
+          payload: { runId: `manual-${occurredAt}`, page: 1, searchAfter: null },
+        },
+      ]);
+      expect(evolution.state.currentRun?.runId).toBe(`manual-${occurredAt}`);
+    });
+  });
+
+  describe("when an event is delivered long after it occurred", () => {
+    it("rearms the wake from the present, never behind it", () => {
+      const occurredAt = Date.UTC(2026, 6, 17, 14, 0);
+      const now = occurredAt + 3 * DAY_MS;
+
+      const evolution = evolveEvent(
+        bootstrappedState(),
+        makeEvent({
+          type: "lw.obs.topic_clustering.requested",
+          occurredAt,
+          data: { trigger: "bootstrap" },
+        }),
+        now,
+      );
+
+      // Scheduling from business time put nextWakeAt in the past: the wake
+      // fired immediately, regenerated a messageKey the outbox had already
+      // dispatched, and skipDuplicates swallowed the insert — leaving
+      // currentRun set with nothing in flight and a day of clustering lost.
+      expect(evolution.nextWakeAt).toBeGreaterThan(now);
+      expect(evolution.nextWakeAt).toBe(nextDailySlot(PROJECT_ID, now));
+    });
+  });
+
+  describe("when a long backlog walk stalls after making progress", () => {
+    it("is abandoned a stale window after it started, not after its last page", () => {
+      const scheduledFor = Date.UTC(2026, 6, 17, 9, 30);
+      const state: TopicClusteringProcessState = {
+        ...bootstrappedState(),
+        currentRun: {
+          runId: "20260716",
+          page: 7,
+          // Paged recently, so the last-page clock still looks healthy...
+          updatedAtMs: scheduledFor - 60_000,
+          // ...but the run itself began beyond the stale window.
+          startedAtMs: scheduledFor - TOPIC_CLUSTERING_STALE_RUN_MS - 1,
+        },
+      };
+
+      const evolution = evolveWake(state, scheduledFor);
+
+      // Measuring staleness from the last page let a walk refresh its own
+      // reprieve every page, deferring the slot and wedging the project for
+      // ~48h against ADR-051's documented one-day bound.
+      expect(evolution.intents).toHaveLength(1);
+      expect(evolution.state.currentRun?.runId).toBe("20260717");
+    });
+  });
+
+  describe("when a backlog walk is progressing within the stale window", () => {
+    it("keeps ownership of the project across pages", () => {
+      const scheduledFor = Date.UTC(2026, 6, 17, 9, 30);
+      const state: TopicClusteringProcessState = {
+        ...bootstrappedState(),
+        currentRun: {
+          runId: "20260717",
+          page: 7,
+          updatedAtMs: scheduledFor - 60_000,
+          startedAtMs: scheduledFor - 60 * 60 * 1000,
+        },
+      };
+
+      const evolution = evolveWake(state, scheduledFor);
 
       expect(evolution.intents).toEqual([]);
       expect(evolution.state.currentRun).toEqual(state.currentRun);
@@ -405,6 +513,112 @@ describe("topicClusteringProcessDefinition", () => {
       expect(evolution.intents).toEqual([]);
       expect(evolution.state.currentRun).toBeNull();
       expect(evolution.nextWakeAt).toBe(nextDailySlot(PROJECT_ID, occurredAt));
+    });
+  });
+
+  describe("when an event is handled long after it occurred", () => {
+    it("schedules the next slot ahead of the present, not behind it", () => {
+      const occurredAt = Date.UTC(2026, 6, 17, 2, 0);
+      // A backed-up subscriber delivers the event a full day late.
+      const now = occurredAt + DAY_MS;
+
+      const evolution = evolveEvent(
+        bootstrappedState(),
+        makeEvent({
+          type: "lw.obs.topic_clustering.requested",
+          occurredAt,
+          data: { trigger: "bootstrap" },
+        }),
+        now,
+      );
+
+      // Scheduling from business time put nextWakeAt in the PAST, which fired
+      // an immediate wake whose run intent collided with an already-dispatched
+      // messageKey and was dropped, losing a day's clustering with no signal.
+      expect(evolution.nextWakeAt).toBe(nextDailySlot(PROJECT_ID, now));
+      expect(evolution.nextWakeAt!).toBeGreaterThan(now);
+    });
+  });
+
+  describe("when a backlog walk stalls hours after starting", () => {
+    it("is reclaimed by the next daily wake rather than deferring it a second day", () => {
+      const startedAtMs = Date.UTC(2026, 6, 17, 2, 0);
+      const state: TopicClusteringProcessState = {
+        ...bootstrappedState(),
+        currentRun: {
+          runId: "20260717",
+          page: 51,
+          // Pages flowed for five hours, then the walk died silently.
+          updatedAtMs: startedAtMs + 5 * 60 * 60 * 1000,
+          startedAtMs,
+        },
+      };
+
+      const evolution = evolveWake(state, startedAtMs + DAY_MS);
+
+      // Measuring staleness from the last page made this run look fresh at the
+      // next slot (19h < 20h), skipping it and wedging the project for 48h.
+      expect(evolution.state.currentRun?.runId).toBe("20260718");
+      expect(evolution.intents).toHaveLength(1);
+    });
+
+    it("keeps deferring while the walk is genuinely young", () => {
+      const startedAtMs = Date.UTC(2026, 6, 17, 2, 0);
+      const state: TopicClusteringProcessState = {
+        ...bootstrappedState(),
+        currentRun: { runId: "20260717", page: 4, updatedAtMs: startedAtMs, startedAtMs },
+      };
+
+      const evolution = evolveWake(state, startedAtMs + 60_000);
+
+      expect(evolution.state.currentRun).toEqual(state.currentRun);
+      expect(evolution.intents).toEqual([]);
+    });
+  });
+
+  describe("when a manual request arrives while a stale run is still recorded", () => {
+    it("starts a run instead of silently deferring to a dead one", () => {
+      const startedAtMs = 1_000_000;
+      const occurredAt = startedAtMs + TOPIC_CLUSTERING_STALE_RUN_MS + 1;
+      const state: TopicClusteringProcessState = {
+        ...bootstrappedState(),
+        currentRun: {
+          runId: "20260717",
+          page: 3,
+          updatedAtMs: startedAtMs,
+          startedAtMs,
+        },
+      };
+
+      const evolution = evolveEvent(
+        state,
+        makeEvent({
+          type: "lw.obs.topic_clustering.requested",
+          occurredAt,
+          data: { trigger: "manual" },
+        }),
+      );
+
+      // Deferring here made "Run now" a no-op for as long as the wedge lasted,
+      // while the route still reported success back to the user.
+      expect(evolution.intents).toHaveLength(1);
+      expect(evolution.state.currentRun?.runId).toBe(`manual-${occurredAt}`);
+    });
+
+    it("mints the same run id when the request is redelivered late", () => {
+      const occurredAt = 5_000_000;
+      const event = makeEvent({
+        type: "lw.obs.topic_clustering.requested",
+        occurredAt,
+        data: { trigger: "manual" },
+      });
+
+      const prompt = evolveEvent(bootstrappedState(), event, occurredAt);
+      const late = evolveEvent(bootstrappedState(), event, occurredAt + DAY_MS);
+
+      // Run identity must come from business time, or a redelivery would mint
+      // a second run alongside the first.
+      expect(late.state.currentRun?.runId).toBe(prompt.state.currentRun?.runId);
     });
   });
 });

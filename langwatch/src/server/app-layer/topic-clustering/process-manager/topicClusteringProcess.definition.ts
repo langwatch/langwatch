@@ -20,14 +20,33 @@ import {
 } from "./topicClusteringProcess.types";
 
 /**
- * A run that has shown no durable activity for this long is considered
- * abandoned: the daily wake stops deferring to it and starts a fresh run.
- * Kept under the 24h wake period so one lost completion event cannot block
- * scheduling for more than a day; comfortably above the outbox retry
- * horizon so a healthy backlog walk (which refreshes `updatedAtMs` on every
- * page) is never preempted.
+ * A run that began this long ago is considered abandoned: the daily wake
+ * stops deferring to it and starts a fresh run, and a manual request may
+ * preempt it.
+ *
+ * Measured from the run's START, not its last page. Measuring from the last
+ * page made this bound unenforceable: a backlog walk refreshes `updatedAtMs`
+ * on every page, so a walk that starts at its slot and stalls five hours in
+ * still looks fresh at the next slot, defers it, and only recovers a day
+ * later — 48h of no clustering against a documented ≤24h. Sitting under the
+ * 24h wake period is what makes "one lost completion event cannot block
+ * scheduling for more than a day" actually true.
  */
 export const TOPIC_CLUSTERING_STALE_RUN_MS = 20 * 60 * 60 * 1000;
+
+/**
+ * Whether a run should still be treated as owning the project at `refMs`.
+ * Rows written before `startedAtMs` existed fall back to `updatedAtMs`.
+ */
+function isRunInFlight(
+  state: TopicClusteringProcessState,
+  refMs: number,
+): boolean {
+  const run = state.currentRun;
+  if (run === null) return false;
+  const startedAtMs = run.startedAtMs ?? run.updatedAtMs;
+  return refMs - startedAtMs < TOPIC_CLUSTERING_STALE_RUN_MS;
+}
 
 /**
  * The legacy fan-out spread each project's daily BullMQ job by hashing the
@@ -140,9 +159,18 @@ function isCurrentRun(
 function evolveEvent(
   previousState: TopicClusteringProcessState,
   envelope: ProcessEventEnvelope,
+  now: number,
 ): Evolution<TopicClusteringProcessState> {
   const view = topicClusteringProcessEventViewSchema.parse(envelope.payload);
-  const occurredAt = envelope.occurredAt;
+  const eventAt = envelope.occurredAt;
+  // Clamp the scheduling reference to the present, exactly as the wake branch
+  // does. `occurredAt` is business time, so a backed-up subscriber can deliver
+  // an event whose next daily slot has ALREADY passed. Scheduling from it
+  // writes a nextWakeAt in the past; that wake fires at once, regenerates a
+  // messageKey the outbox already dispatched, and the duplicate insert is
+  // dropped — leaving `currentRun` set with no intent in flight and a day of
+  // clustering silently skipped.
+  const refMs = Math.max(eventAt, now);
   const base: TopicClusteringProcessState = {
     ...previousState,
     projectId: envelope.processKey,
@@ -153,36 +181,48 @@ function evolveEvent(
     case TOPIC_CLUSTERING_EVENT_TYPES.REQUESTED: {
       if (view.trigger !== "manual") {
         // Bootstrap: ensure the process exists and the first wake is set.
-        return settle(base, occurredAt);
+        return settle(base, refMs);
       }
-      if (base.currentRun !== null) {
-        // A run is already walking the backlog; the projection shows it.
-        return settle(base, occurredAt);
+      if (isRunInFlight(base, refMs)) {
+        // A live run is walking the backlog; the projection shows it.
+        return settle(base, refMs);
       }
-      const runId = `manual-${occurredAt}`;
+      // A run that is merely RECORDED — stale, its effect long dead — must not
+      // swallow the request. Deferring to it made "Run now" a silent no-op for
+      // as long as the wedge lasted while the UI reported success, which is
+      // exactly the state a user presses the button in.
+      //
+      // Identity comes from business time, never `refMs`: a redelivered
+      // request must mint the same runId, or it would start a second run.
+      const runId = `manual-${eventAt}`;
       return settle(
         {
           ...base,
-          currentRun: { runId, page: 1, updatedAtMs: occurredAt },
+          currentRun: {
+            runId,
+            page: 1,
+            updatedAtMs: refMs,
+            startedAtMs: refMs,
+          },
         },
-        occurredAt,
+        refMs,
         [runIntent({ runId, page: 1, searchAfter: null })],
       );
     }
 
     case TOPIC_CLUSTERING_EVENT_TYPES.RUN_COMPLETED: {
       if (view.runId === null || view.page === null) {
-        return settle(base, occurredAt);
+        return settle(base, refMs);
       }
       if (!isCurrentRun(previousState, view.runId)) {
         // A late outcome from a superseded run. Acting on it would resurrect
         // the old run as `currentRun` and emit a continuation intent, so two
         // backlog walks would page the same project at once, each refreshing
         // the other's in-flight guard. The live run owns the project.
-        return settle(base, occurredAt);
+        return settle(base, refMs);
       }
       if (!view.hasNextPage) {
-        return settle({ ...base, currentRun: null }, occurredAt);
+        return settle({ ...base, currentRun: null }, refMs);
       }
       const nextPage = view.page + 1;
       return settle(
@@ -191,10 +231,17 @@ function evolveEvent(
           currentRun: {
             runId: view.runId,
             page: nextPage,
-            updatedAtMs: occurredAt,
+            updatedAtMs: refMs,
+            // Carry the original start forward. Restamping it per page would
+            // make a walk immortal: every completed page would push the
+            // stale-run deadline out and no wake could ever reclaim it.
+            startedAtMs:
+              previousState.currentRun?.startedAtMs ??
+              previousState.currentRun?.updatedAtMs ??
+              refMs,
           },
         },
-        occurredAt,
+        refMs,
         [
           runIntent({
             runId: view.runId,
@@ -210,12 +257,12 @@ function evolveEvent(
         // Mirror of the completion guard: a late failure from a superseded
         // run must not null out the LIVE run, or the next wake would start a
         // third run alongside the one still walking the backlog.
-        return settle(base, occurredAt);
+        return settle(base, refMs);
       }
-      return settle({ ...base, currentRun: null }, occurredAt);
+      return settle({ ...base, currentRun: null }, refMs);
 
     default:
-      return settle(base, occurredAt);
+      return settle(base, refMs);
   }
 }
 
@@ -238,11 +285,7 @@ function evolveWake(
   // "a schedule gap after recovery self-heals").
   const refMs = Math.max(scheduledFor, now);
 
-  const inFlight =
-    previousState.currentRun !== null &&
-    refMs - previousState.currentRun.updatedAtMs <
-      TOPIC_CLUSTERING_STALE_RUN_MS;
-  if (inFlight) {
+  if (isRunInFlight(previousState, refMs)) {
     // An active backlog walk owns the project; skip this slot.
     return settle(previousState, refMs);
   }
@@ -251,7 +294,7 @@ function evolveWake(
   return settle(
     {
       ...previousState,
-      currentRun: { runId, page: 1, updatedAtMs: refMs },
+      currentRun: { runId, page: 1, updatedAtMs: refMs, startedAtMs: refMs },
     },
     refMs,
     [runIntent({ runId, page: 1, searchAfter: null })],
@@ -270,7 +313,7 @@ export const topicClusteringProcessDefinition: ProcessDefinition<TopicClustering
       input: ProcessInput;
     }) => {
       if (input.kind === "event") {
-        return evolveEvent(previousState, input.event);
+        return evolveEvent(previousState, input.event, input.now);
       }
       return evolveWake(previousState, input.scheduledFor, input.now);
     },

@@ -33,13 +33,24 @@ export interface TopicClusteringProcessState {
   /**
    * The run currently in flight, or null when idle. Guards a wake or manual
    * request from piling a second run onto an active backlog walk. Cleared by
-   * the final run_completed / run_failed, or abandoned by a wake once
-   * `updatedAtMs` is older than the stale-run window.
+   * the final run_completed / run_failed, or abandoned once `startedAtMs` is
+   * older than the stale-run window.
    */
   currentRun: {
     runId: string;
     page: number;
     updatedAtMs: number;
+    /**
+     * When the run began. Staleness is measured from here, NOT from
+     * `updatedAtMs`: a long backlog walk refreshes `updatedAtMs` on every
+     * page, so a walk that starts near its slot and stalls hours later would
+     * still look fresh at the next slot and defer it — wedging the project
+     * for two days against a documented one-day bound.
+     *
+     * Optional for forward-compatibility with rows written before this field
+     * existed; those read as `updatedAtMs` and at worst allow one extra run.
+     */
+    startedAtMs?: number;
   } | null;
 }
 

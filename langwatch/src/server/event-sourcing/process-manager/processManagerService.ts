@@ -106,7 +106,7 @@ export class ProcessManagerService<State> {
         const existing = await this.store.findByRef<State>({ ref });
         const evolution = this.definition.evolve({
           previousState: existing?.state ?? this.definition.initialState,
-          input: { kind: "event", event: envelope },
+          input: { kind: "event", event: envelope, now },
           ref,
         });
 

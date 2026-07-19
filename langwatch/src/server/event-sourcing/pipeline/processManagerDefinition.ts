@@ -66,7 +66,18 @@ export interface ProcessEvolution<State> {
 export interface ProcessHandlerContext<
   Intents extends Record<string, IntentSpec<any>>,
 > {
+  /**
+   * The instant the input refers to: the event's `occurredAt`, or the slot a
+   * wake was scheduled for. May be arbitrarily far in the past when the
+   * subscriber backed up or the fleet was down.
+   */
   at: number;
+  /**
+   * Wall-clock at which this input is actually being handled. Schedule from
+   * `Math.max(at, now)`, never from `at` alone, or a lagged input writes a
+   * `nextWakeAt` that is already behind the present.
+   */
+  now: number;
   key: string;
   projectId: string;
   intents: IntentFactories<Intents>;
@@ -82,25 +93,12 @@ export type EventHandler<
   context: ProcessHandlerContext<Intents>,
 ) => ProcessEvolution<State>;
 
-/**
- * Wake handlers additionally see wall-clock, because `at` is the slot the
- * wake was *scheduled* for, which may be far in the past when the fleet has
- * been down. A handler that reschedules from `at` alone replays every missed
- * slot one commit at a time on recovery; clamping with `Math.max(at, now)`
- * collapses the whole gap into a single catch-up.
- */
-export interface ProcessWakeContext<
-  Intents extends Record<string, IntentSpec<any>>,
-> extends ProcessHandlerContext<Intents> {
-  now: number;
-}
-
 export type WakeHandler<
   State,
   Intents extends Record<string, IntentSpec<any>>,
 > = (
   state: State,
-  context: ProcessWakeContext<Intents>,
+  context: ProcessHandlerContext<Intents>,
 ) => ProcessEvolution<State>;
 
 export interface ProcessManagerConfig<

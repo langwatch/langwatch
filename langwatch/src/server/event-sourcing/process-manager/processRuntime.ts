@@ -156,7 +156,8 @@ export class ProcessRuntime {
             return {
               state: previousState,
               nextWakeAt:
-                envelope.occurredAt + (config.schedule?.everyMs ?? 0),
+                Math.max(envelope.occurredAt, input.now) +
+                (config.schedule?.everyMs ?? 0),
               intents: [],
             };
           }
@@ -169,6 +170,7 @@ export class ProcessRuntime {
           }
           const evolution = handler(previousState, envelope.payload, {
             at: envelope.occurredAt,
+            now: input.now,
             key: envelope.processKey,
             projectId: envelope.projectId,
             intents: factories,
