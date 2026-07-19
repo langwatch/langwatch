@@ -11,21 +11,14 @@ packages:
   - "../packages/handled-error"
 
 minimumReleaseAge: 10080
-# Version-pinned exemptions for releases still inside the 7-day maturity
-# window (as of 2026-07-18). Version-qualified so only the pinned release
-# bypasses the gate; drop each entry once that version ages past it.
+# Adding workspace packages forces a re-resolve; these shipped fresh releases
+# inside the age gate with no older version satisfying the requested ranges.
+# Version-pinned so only the pinned release bypasses the gate; drop each entry
+# once that version ages past it.
 minimumReleaseAgeExclude:
   - ws@8.21.1
   - "@browserbasehq/sdk@2.16.0"
   - postcss@8.5.19
-
-minimumReleaseAgeExclude:
-  # Adding the @langwatch/automations workspace package forces a full
-  # re-resolve; these shipped fresh releases inside the age gate with no
-  # older version satisfying the requested ranges. Remove once they age.
-  - ws
-  - "@browserbasehq/sdk"
-  - "postcss"
 
 overrides:
   pino: ^10.3.0
