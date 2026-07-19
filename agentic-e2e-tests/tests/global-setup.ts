@@ -92,6 +92,71 @@ async function waitForApi(): Promise<void> {
   );
 }
 
+/**
+ * Refuses to run against an app configured for a different origin.
+ *
+ * This suite creates real organisations, projects and traces. It must point at
+ * a disposable database, and the app's own `BASE_HOST` is the most reliable
+ * signal available over HTTP of *which* instance answered: a dedicated e2e
+ * instance reports the URL it was started on, while a shared dev instance
+ * reports the developer's own.
+ *
+ * This check exists because its absence cost us: a run against a directly
+ * addressed API server silently used the dev database — `server.mts` loads
+ * `.env` with `override: true`, so the exported `DATABASE_URL` was ignored —
+ * and wrote test tenants into it. Nothing failed; the tests passed. The fix is
+ * to override via `langwatch/.env.portless`, which is loaded last and wins.
+ *
+ * A mismatch is also what breaks sign-in: `/api/auth/*` rejects state-changing
+ * requests whose `Origin` doesn't match `BASE_HOST` with 403 INVALID_ORIGIN.
+ */
+async function verifyDedicatedInstance(): Promise<void> {
+  if (process.env.E2E_ALLOW_ORIGIN_MISMATCH === "1") {
+    console.log(
+      "\n⚠️  E2E_ALLOW_ORIGIN_MISMATCH=1 — skipping the dedicated-instance check.\n" +
+        "   The suite will create real data wherever this app points.",
+    );
+    return;
+  }
+
+  const url =
+    `${BASE_URL}/api/trpc/publicEnv?batch=1` +
+    `&input=${encodeURIComponent('{"0":{"json":{}}}')}`;
+  const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  const body = (await response.json()) as Array<{
+    result?: { data?: { json?: { BASE_HOST?: string } } };
+  }>;
+  const baseHost = body?.[0]?.result?.data?.json?.BASE_HOST;
+
+  if (!baseHost) {
+    throw new Error("Could not read BASE_HOST from publicEnv.");
+  }
+
+  const reported = new URL(baseHost).origin;
+  const target = new URL(BASE_URL).origin;
+
+  if (reported !== target) {
+    throw new Error(
+      `\n❌ The app at ${target} reports BASE_HOST ${reported}.\n\n` +
+        `Those must match. A mismatch means this is very likely a shared dev\n` +
+        `instance reached on another port — and this suite writes real rows,\n` +
+        `so running it here would pollute that instance's database. Sign-in\n` +
+        `would also fail: /api/auth/* rejects requests whose Origin doesn't\n` +
+        `match BASE_HOST.\n\n` +
+        `Start a dedicated instance, and override its databases in\n` +
+        `langwatch/.env.portless — exported shell variables do NOT work,\n` +
+        `because server.mts loads .env with override:true. Set at least:\n` +
+        `  DATABASE_URL=...        (a disposable database)\n` +
+        `  CLICKHOUSE_URL=...      (a disposable database)\n` +
+        `  BASE_HOST=${target}\n` +
+        `  NEXTAUTH_URL=${target}\n\n` +
+        `To override anyway, set E2E_ALLOW_ORIGIN_MISMATCH=1.\n`,
+    );
+  }
+
+  console.log(`✅ Dedicated instance confirmed (BASE_HOST ${reported})`);
+}
+
 function validateEnvironment(): void {
   console.log("\n🔍 Validating environment configuration...");
 
@@ -144,6 +209,7 @@ export default async function globalSetup(): Promise<void> {
   validateEnvironment();
   await waitForApp();
   await waitForApi();
+  await verifyDedicatedInstance();
 
   console.log("\n" + "=".repeat(60));
   console.log("Global setup complete, starting tests...");

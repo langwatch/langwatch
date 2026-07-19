@@ -22,6 +22,64 @@ pnpm install   # First time only
 pnpm test
 ```
 
+## Tiers
+
+The suite is split by cost, not by feature area — see
+[ADR-010](../dev/docs/adr/010-e2e-testing-strategy.md) (headless-tier amendment)
+and [`specs/ci/e2e-tiers.feature`](../specs/ci/e2e-tiers.feature).
+
+| Project | Browser | Parallel | Runs on | Contains |
+| ------- | ------- | -------- | ------- | -------- |
+| `api` | no | fully | every PR | HTTP/queue/side-effect assertions |
+| `cli` | no | fully | every PR | the CLI binary against a temp `HOME` |
+| `ui` | yes | serial | schedule / pre-release | the capped 5-10 browser happy paths |
+
+```bash
+pnpm test --project=api     # headless, fast, safe to run wide
+pnpm test --project=ui      # browser tier
+```
+
+The headless projects provision **their own organisation, team, project and API
+key per test** (`tests/support/tenant.ts`), so they share no state and run
+`fullyParallel`. The `ui` project stays serial: its specs share the one
+`auth.setup` organisation, and the members specs toggle an enterprise licence on
+it that would leak into the spec asserting the Free plan. Migrating those specs
+onto the tenant helper is what will unblock parallelising it too.
+
+### Pointing the suite at a disposable database — read this first
+
+**This suite creates real organisations, projects, traces and datasets.** Point
+it at a database you are willing to lose.
+
+Exporting `DATABASE_URL` in your shell **does not work**, and fails silently:
+`langwatch/src/server.mts` loads `.env` with `override: true`, so `.env` beats
+anything the shell exports. The only channel that wins is
+**`langwatch/.env.portless`**, loaded last, also with override (it is gitignored
+and disposable — haven writes it too).
+
+```bash
+# langwatch/.env.portless
+DATABASE_URL=postgresql://…/lw_e2e            # a disposable database
+CLICKHOUSE_URL=http://…/lw_e2e                # a disposable database
+BASE_HOST=http://localhost:6570               # must match where you call
+NEXTAUTH_URL=http://localhost:6570
+```
+
+`BASE_HOST` matters twice. `/api/auth/*` rejects state-changing requests whose
+`Origin` doesn't match it (403 `INVALID_ORIGIN`), and global setup refuses to
+run when the app reports a `BASE_HOST` different from `BASE_URL` — that mismatch
+is the clearest signal over HTTP that you have reached a shared dev instance
+rather than a dedicated one. Escape hatch, if you know better:
+`E2E_ALLOW_ORIGIN_MISMATCH=1`.
+
+### Service dependencies
+
+`api` tests that ingest a trace and wait for something downstream of it —
+`automations-dispatch.spec.ts` in particular — need **ClickHouse** running, as
+projection is what makes a trace visible to the dispatcher. `POST /api/collector`
+returns 200 regardless, so a missing ClickHouse shows up as a dispatch timeout,
+not an ingestion error. Tenant and annotation specs are Postgres-only.
+
 ## Architecture
 
 ### Test Environment
@@ -47,15 +105,43 @@ Tests run against a **locally-running Next.js dev server** with Docker providing
 ```text
 agentic-e2e-tests/
 ├── tests/
-│   └── scenarios/
-│       ├── steps.ts              # Gherkin-style step definitions
-│       ├── scenario-editor.spec.ts
-│       ├── scenario-library.spec.ts
-│       └── scenario-execution.spec.ts
+│   ├── support/                  # headless harness
+│   │   ├── tenant.ts             # per-test org/project/API-key provisioning
+│   │   ├── fixtures.ts           # `test` with `tenant` + `api` fixtures
+│   │   ├── api.ts                # REST client, list-envelope normalising, polling
+│   │   ├── trpc.ts               # batched/superjson tRPC calls
+│   │   ├── traces.ts             # trace ingestion + wait-until-queryable
+│   │   ├── shape.ts              # structural diffing for contract drift
+│   │   └── contract.ts           # golden-file assertions
+│   ├── contracts/                # committed response shapes
+│   ├── api/                      # headless specs (no browser)
+│   ├── cli/                      # headless specs driving the CLI binary
+│   ├── scenarios/                # browser specs
+│   │   ├── steps.ts              # Gherkin-style step definitions
+│   │   └── scenario-*.spec.ts
+│   ├── members/                  # browser specs
+│   └── settings/                 # browser specs
 ├── .auth/                        # Auth state (gitignored)
 ├── playwright-report/            # HTML test reports
 └── test-results/                 # Artifacts from failed tests
 ```
+
+### Schema-drift contracts
+
+`expectMatchesContract(name, payload)` compares a live response against a
+committed shape in `tests/contracts/`, separating **breaking** changes (a
+promised field vanished or changed type) from **additive** drift (a new field
+appeared — safe, but it should be an explicit decision).
+
+Draft a new contract with `E2E_RECORD_CONTRACTS=1`, then read the generated file
+before committing it. Recording is for authoring a contract, never for making a
+failure go away.
+
+This exists because of a real bug it would have caught: every annotations route
+answers `{ data: … }`, the MCP client cast the response straight to an array,
+and because the cast is unchecked the compiler could not see it —
+`platform_list_annotations` reported "No annotations found" for every project
+and no test failed.
 
 ## Test Design
 
