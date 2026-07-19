@@ -132,8 +132,12 @@ cheap ones can run wide:
 | Project    | Browser | Parallel   | Runs on          | Contains                                       |
 | ---------- | ------- | ---------- | ---------------- | ---------------------------------------------- |
 | `api`      | no      | fully      | every PR         | Tier 3 — HTTP/queue/side-effect assertions     |
-| `cli`      | no      | fully      | every PR         | Tier 3 — spawned binary against a temp `HOME`  |
-| `ui`       | yes     | per-worker | schedule/release | Tier 2 — the capped 5-10 happy paths           |
+| `ui`       | yes     | serial     | schedule/release | Tier 2 — the capped 5-10 happy paths           |
+
+Tier 3 is not confined to this package. CLI coverage already has a home in
+`typescript-sdk/__tests__/e2e/cli/`, which spawns the compiled binary against a
+hermetic `HOME` and lives beside the binary it tests; new CLI e2e belongs there,
+not in a second harness. The tier is a definition, not a directory.
 
 ### This also resolves a live drift
 

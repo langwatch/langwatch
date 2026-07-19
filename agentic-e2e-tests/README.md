@@ -31,8 +31,11 @@ and [`specs/ci/e2e-tiers.feature`](../specs/ci/e2e-tiers.feature).
 | Project | Browser | Parallel | Runs on | Contains |
 | ------- | ------- | -------- | ------- | -------- |
 | `api` | no | fully | every PR | HTTP/queue/side-effect assertions |
-| `cli` | no | fully | every PR | the CLI binary against a temp `HOME` |
 | `ui` | yes | serial | schedule / pre-release | the capped 5-10 browser happy paths |
+
+CLI e2e deliberately lives elsewhere — `typescript-sdk/__tests__/e2e/cli/`
+spawns the compiled binary against a hermetic `HOME`, beside the binary it
+tests. Add CLI coverage there, not here.
 
 ```bash
 pnpm test --project=api     # headless, fast, safe to run wide
@@ -115,7 +118,6 @@ agentic-e2e-tests/
 │   │   └── contract.ts           # golden-file assertions
 │   ├── contracts/                # committed response shapes
 │   ├── api/                      # headless specs (no browser)
-│   ├── cli/                      # headless specs driving the CLI binary
 │   ├── scenarios/                # browser specs
 │   │   ├── steps.ts              # Gherkin-style step definitions
 │   │   └── scenario-*.spec.ts

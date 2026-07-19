@@ -93,10 +93,16 @@ export default defineConfig({
    * Tiers differ by cost, not by feature area — see
    * dev/docs/adr/010-e2e-testing-strategy.md (headless-tier amendment).
    *
-   *   api / cli  Tier 3. No browser, no shared state: every test provisions
-   *              its own org + project over HTTP, so they run fully parallel
-   *              and are eligible to block a PR.
-   *   ui         Tier 2. The capped 5-10 browser happy paths.
+   *   api   Tier 3. No browser, no shared state: every test provisions its own
+   *         org + project over HTTP, so they run fully parallel and are
+   *         eligible to block a PR.
+   *   ui    Tier 2. The capped 5-10 browser happy paths.
+   *
+   * There is deliberately no `cli` project here. CLI e2e already has a home in
+   * `typescript-sdk/__tests__/e2e/cli/`, which spawns the compiled binary
+   * against a hermetic HOME and lives in the same package as the binary it
+   * tests. Duplicating that harness here would split CLI coverage across two
+   * suites for no gain.
    */
   projects: [
     /* Headless: HTTP-level assertions against a real app, queues and DB. */
@@ -105,13 +111,6 @@ export default defineConfig({
       testDir: "./tests/api",
       /* No browser is launched for this project — these tests never touch a
        * `page`, only the request context. */
-      use: { extraHTTPHeaders: { Origin: AUTH_ORIGIN } },
-    },
-
-    /* Headless: spawns the real CLI binary against a temp HOME. */
-    {
-      name: "cli",
-      testDir: "./tests/cli",
       use: { extraHTTPHeaders: { Origin: AUTH_ORIGIN } },
     },
 
@@ -131,7 +130,7 @@ export default defineConfig({
     {
       name: "ui",
       testDir: "./tests",
-      testIgnore: ["**/api/**", "**/cli/**", "**/*.setup.ts"],
+      testIgnore: ["**/api/**", "**/*.setup.ts"],
       fullyParallel: false,
       workers: 1,
       use: {
