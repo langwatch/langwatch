@@ -1,7 +1,7 @@
 import {
   INGESTION_PULL_PROCESSING_COMMAND_TYPES,
   INGESTION_PULL_PROCESSING_EVENT_TYPES,
-} from "@ee/governance/event-sourcing/pipelines/ingestion-pull-processing/schemas/constants";
+} from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/constants";
 
 /** Enterprise identifiers composed into the runtime's complete type sets. */
 export const ENTERPRISE_EVENT_TYPE_IDENTIFIERS = [

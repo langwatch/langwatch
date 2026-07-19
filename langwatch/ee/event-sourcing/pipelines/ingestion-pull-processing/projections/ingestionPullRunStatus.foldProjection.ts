@@ -4,7 +4,7 @@ import {
 } from "~/server/event-sourcing/projections/abstractFoldProjection";
 import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
 import {
-  INGESTION_PULL_PROJECTION_VERSION,
+  INGESTION_PULL_PROJECTION_VERSIONS,
   INGESTION_PULL_RUN_OUTCOME,
 } from "../schemas/constants";
 import {
@@ -34,7 +34,7 @@ export interface IngestionPullRunStatusData {
   LastEventOccurredAt: number;
 }
 
-const events = [
+const ingestionPullEvents = [
   IngestionPullConfiguredEventSchema,
   IngestionPullDisabledEventSchema,
   IngestionPullRunCompletedEventSchema,
@@ -44,18 +44,20 @@ const events = [
 export class IngestionPullRunStatusFoldProjection
   extends AbstractFoldProjection<
     IngestionPullRunStatusData,
-    typeof events,
+    typeof ingestionPullEvents,
     "CreatedAt",
     "UpdatedAt",
     "LastEventOccurredAt",
     StateProjectionStore<IngestionPullRunStatusData>
   >
-  implements FoldEventHandlers<typeof events, IngestionPullRunStatusData>
+  implements
+    FoldEventHandlers<typeof ingestionPullEvents, IngestionPullRunStatusData>
 {
   readonly name = "ingestionPullRunStatus";
-  readonly version = INGESTION_PULL_PROJECTION_VERSION;
+  readonly version = INGESTION_PULL_PROJECTION_VERSIONS.RUN_STATUS;
   readonly store: StateProjectionStore<IngestionPullRunStatusData>;
-  protected readonly events = events;
+
+  protected readonly events = ingestionPullEvents;
 
   constructor(deps: {
     store: StateProjectionStore<IngestionPullRunStatusData>;
@@ -82,7 +84,7 @@ export class IngestionPullRunStatusFoldProjection
   handleIngestionPullConfigured(
     event: IngestionPullConfiguredEvent,
     state: IngestionPullRunStatusData,
-  ) {
+  ): IngestionPullRunStatusData {
     return {
       ...state,
       SourceId: event.data.sourceId,
@@ -95,7 +97,7 @@ export class IngestionPullRunStatusFoldProjection
   handleIngestionPullDisabled(
     event: IngestionPullDisabledEvent,
     state: IngestionPullRunStatusData,
-  ) {
+  ): IngestionPullRunStatusData {
     return {
       ...state,
       SourceId: event.data.sourceId,
@@ -107,7 +109,7 @@ export class IngestionPullRunStatusFoldProjection
   handleIngestionPullRunCompleted(
     event: IngestionPullRunCompletedEvent,
     state: IngestionPullRunStatusData,
-  ) {
+  ): IngestionPullRunStatusData {
     return {
       ...state,
       SourceId: event.data.sourceId,
@@ -124,7 +126,7 @@ export class IngestionPullRunStatusFoldProjection
   handleIngestionPullRunFailed(
     event: IngestionPullRunFailedEvent,
     state: IngestionPullRunStatusData,
-  ) {
+  ): IngestionPullRunStatusData {
     return {
       ...state,
       SourceId: event.data.sourceId,

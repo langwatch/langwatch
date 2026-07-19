@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 export const INGESTION_PULL_PROCESS_NAME = "ingestionPull" as const;
-export const INGESTION_PULL_INTENT_TYPE = "ingestion_pull.run" as const;
+
+export const INGESTION_PULL_PROCESS_INTENT_TYPES = {
+  /** Run one pull attempt for the source from its durable cursor. */
+  RUN: "ingestion_pull.run",
+} as const;
 
 export const ingestionPullRunIntentSchema = z.object({
   sourceId: z.string(),
@@ -31,3 +35,6 @@ export const ingestionPullProcessEventViewSchema = z.object({
   cursor: z.string().nullable(),
   runId: z.string().nullable(),
 });
+export type IngestionPullProcessEventView = z.infer<
+  typeof ingestionPullProcessEventViewSchema
+>;

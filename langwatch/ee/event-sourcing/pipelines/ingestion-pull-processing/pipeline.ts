@@ -13,10 +13,25 @@ import {
 } from "./projections/ingestionPullRunStatus.foldProjection";
 import type { IngestionPullProcessingEvent } from "./schemas/events";
 
-export function createIngestionPullProcessingPipeline(deps: {
+export interface IngestionPullProcessingPipelineDeps {
+  /** Rebuildable per-source cursor and operator-facing run status. */
   runStatusStore: StateProjectionStore<IngestionPullRunStatusData>;
+  /** The process-manager subscriber and any future live consumers. */
   subscribers?: EventSubscriberDefinition<IngestionPullProcessingEvent>[];
-}) {
+}
+
+/**
+ * Creates the ingestion-pull-processing pipeline definition.
+ *
+ * Aggregate: `ingestion_pull` (aggregateId = sourceId, TenantId = hidden
+ * governance project id) — one ordered stream per ingestion source.
+ *
+ * Scheduling and pull execution live outside the static definition in the
+ * ingestion pull process manager and transactional process outbox.
+ */
+export function createIngestionPullProcessingPipeline(
+  deps: IngestionPullProcessingPipelineDeps,
+) {
   let builder = definePipeline<IngestionPullProcessingEvent>()
     .withName("ingestion_pull_processing")
     .withAggregateType("ingestion_pull")
@@ -24,9 +39,11 @@ export function createIngestionPullProcessingPipeline(deps: {
       "ingestionPullRunStatus",
       new IngestionPullRunStatusFoldProjection({ store: deps.runStatusStore }),
     );
+
   for (const subscriber of deps.subscribers ?? []) {
     builder = builder.withEventSubscriber(subscriber.name, subscriber);
   }
+
   return builder
     .withCommand("configure", ConfigureIngestionPullCommand)
     .withCommand("disable", DisableIngestionPullCommand)

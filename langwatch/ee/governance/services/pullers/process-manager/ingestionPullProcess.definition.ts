@@ -1,16 +1,18 @@
 import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
-import { INGESTION_PULL_EVENT_TYPES } from "@ee/governance/event-sourcing/pipelines/ingestion-pull-processing/schemas/constants";
-import type { IngestionPullProcessingEvent } from "@ee/governance/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
+import { INGESTION_PULL_EVENT_TYPES } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/constants";
+import type { IngestionPullProcessingEvent } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
 import type {
   Evolution,
   ProcessDefinition,
   ProcessEventEnvelope,
+  ProcessInput,
   ProcessIntent,
 } from "~/server/event-sourcing/process-manager";
 
 import {
-  INGESTION_PULL_INTENT_TYPE,
+  INGESTION_PULL_PROCESS_INTENT_TYPES,
   INGESTION_PULL_PROCESS_NAME,
+  type IngestionPullProcessEventView,
   type IngestionPullProcessState,
   type IngestionPullRunIntent,
   ingestionPullProcessEventViewSchema,
@@ -43,17 +45,23 @@ export function toIngestionPullProcessEnvelope(
     tenantId: String(event.tenantId),
     projectId: String(event.tenantId),
     processKey: event.data.sourceId,
-    payload: {
-      sourceId: event.data.sourceId,
-      cron: "cron" in event.data ? event.data.cron : null,
-      cursor:
-        "cursor" in event.data
-          ? event.data.cursor
-          : "nextCursor" in event.data
-            ? event.data.nextCursor
-            : null,
-      runId: "runId" in event.data ? event.data.runId : null,
-    },
+    payload: buildProcessEventView(event),
+  };
+}
+
+function buildProcessEventView(
+  event: IngestionPullProcessingEvent,
+): IngestionPullProcessEventView {
+  return {
+    sourceId: event.data.sourceId,
+    cron: "cron" in event.data ? event.data.cron : null,
+    cursor:
+      "cursor" in event.data
+        ? event.data.cursor
+        : "nextCursor" in event.data
+          ? event.data.nextCursor
+          : null,
+    runId: "runId" in event.data ? event.data.runId : null,
   };
 }
 
@@ -68,7 +76,7 @@ const INITIAL_STATE: IngestionPullProcessState = {
 function runIntent(params: IngestionPullRunIntent): ProcessIntent {
   return {
     messageKey: `pull:${params.sourceId}:${params.runId}`,
-    intentType: INGESTION_PULL_INTENT_TYPE,
+    intentType: INGESTION_PULL_PROCESS_INTENT_TYPES.RUN,
     payload: params,
   };
 }
@@ -86,102 +94,119 @@ function settle(
   };
 }
 
+function evolveEvent(
+  previousState: IngestionPullProcessState,
+  envelope: ProcessEventEnvelope,
+): Evolution<IngestionPullProcessState> {
+  const view = ingestionPullProcessEventViewSchema.parse(envelope.payload);
+
+  switch (envelope.eventType) {
+    case INGESTION_PULL_EVENT_TYPES.CONFIGURED:
+      if (view.cron === null) {
+        throw new Error("configured ingestion pull requires a cron");
+      }
+      assertValidPullSchedule(view.cron);
+      return settle(
+        {
+          ...previousState,
+          sourceId: view.sourceId,
+          enabled: true,
+          cron: view.cron,
+          cursor: previousState.sourceId ? previousState.cursor : view.cursor,
+        },
+        envelope.occurredAt,
+      );
+    case INGESTION_PULL_EVENT_TYPES.DISABLED:
+      return {
+        state: {
+          ...previousState,
+          sourceId: view.sourceId,
+          enabled: false,
+          cron: null,
+          currentRun: null,
+        },
+        nextWakeAt: null,
+        intents: [],
+      };
+    case INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED:
+      return settle(
+        {
+          ...previousState,
+          cursor: view.cursor,
+          currentRun:
+            previousState.currentRun?.runId === view.runId
+              ? null
+              : previousState.currentRun,
+        },
+        envelope.occurredAt,
+      );
+    case INGESTION_PULL_EVENT_TYPES.RUN_FAILED:
+      return settle(
+        {
+          ...previousState,
+          currentRun:
+            previousState.currentRun?.runId === view.runId
+              ? null
+              : previousState.currentRun,
+        },
+        envelope.occurredAt,
+      );
+    default:
+      return settle(previousState, envelope.occurredAt);
+  }
+}
+
+function evolveWake(
+  previousState: IngestionPullProcessState,
+  scheduledFor: number,
+  handledAt: number,
+): Evolution<IngestionPullProcessState> {
+  if (!previousState.enabled || !previousState.cron) {
+    return { state: previousState, nextWakeAt: null, intents: [] };
+  }
+
+  const active =
+    previousState.currentRun !== null &&
+    handledAt - previousState.currentRun.startedAt <
+      INGESTION_PULL_STALE_RUN_MS;
+  if (active) return settle(previousState, handledAt);
+
+  const runId = String(scheduledFor);
+  return settle(
+    {
+      ...previousState,
+      currentRun: { runId, scheduledFor, startedAt: handledAt },
+    },
+    handledAt,
+    [
+      runIntent({
+        sourceId: previousState.sourceId,
+        runId,
+        scheduledFor,
+        cursor: previousState.cursor,
+      }),
+    ],
+  );
+}
+
 export const ingestionPullProcessDefinition: ProcessDefinition<IngestionPullProcessState> =
   {
     name: INGESTION_PULL_PROCESS_NAME,
     initialState: INITIAL_STATE,
-    evolve: ({ previousState, input }) => {
-      if (input.kind === "wake") {
-        const handledAt = input.handledAt ?? input.scheduledFor;
-        if (!previousState.enabled || !previousState.cron) {
-          return { state: previousState, nextWakeAt: null, intents: [] };
-        }
-        const active =
-          previousState.currentRun !== null &&
-          handledAt - previousState.currentRun.startedAt <
-            INGESTION_PULL_STALE_RUN_MS;
-        if (active) return settle(previousState, handledAt);
-
-        const runId = String(input.scheduledFor);
-        return settle(
-          {
-            ...previousState,
-            currentRun: {
-              runId,
-              scheduledFor: input.scheduledFor,
-              startedAt: handledAt,
-            },
-          },
-          handledAt,
-          [
-            runIntent({
-              sourceId: previousState.sourceId,
-              runId,
-              scheduledFor: input.scheduledFor,
-              cursor: previousState.cursor,
-            }),
-          ],
-        );
+    evolve: ({
+      previousState,
+      input,
+    }: {
+      previousState: IngestionPullProcessState;
+      input: ProcessInput;
+    }) => {
+      if (input.kind === "event") {
+        return evolveEvent(previousState, input.event);
       }
-
-      const view = ingestionPullProcessEventViewSchema.parse(
-        input.event.payload,
+      return evolveWake(
+        previousState,
+        input.scheduledFor,
+        input.handledAt ?? input.scheduledFor,
       );
-      switch (input.event.eventType) {
-        case INGESTION_PULL_EVENT_TYPES.CONFIGURED:
-          if (view.cron === null) {
-            throw new Error("configured ingestion pull requires a cron");
-          }
-          assertValidPullSchedule(view.cron);
-          return settle(
-            {
-              ...previousState,
-              sourceId: view.sourceId,
-              enabled: true,
-              cron: view.cron,
-              cursor: previousState.sourceId
-                ? previousState.cursor
-                : view.cursor,
-            },
-            input.event.occurredAt,
-          );
-        case INGESTION_PULL_EVENT_TYPES.DISABLED:
-          return {
-            state: {
-              ...previousState,
-              sourceId: view.sourceId,
-              enabled: false,
-              cron: null,
-              currentRun: null,
-            },
-            nextWakeAt: null,
-            intents: [],
-          };
-        case INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED:
-          return settle(
-            {
-              ...previousState,
-              cursor: view.cursor,
-              currentRun:
-                previousState.currentRun?.runId === view.runId
-                  ? null
-                  : previousState.currentRun,
-            },
-            input.event.occurredAt,
-          );
-        case INGESTION_PULL_EVENT_TYPES.RUN_FAILED:
-          return settle(
-            {
-              ...previousState,
-              currentRun:
-                previousState.currentRun?.runId === view.runId
-                  ? null
-                  : previousState.currentRun,
-            },
-            input.event.occurredAt,
-          );
-        default:
-          return settle(previousState, input.event.occurredAt);
-      }
     },
   };

@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 
-import { createIngestionPullProcessingPipeline } from "@ee/governance/event-sourcing/pipelines/ingestion-pull-processing";
+import { createIngestionPullProcessingPipeline } from "@ee/event-sourcing/pipelines/ingestion-pull-processing";
 import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import {
   createIngestionPullIntentHandlers,
@@ -33,17 +33,12 @@ export interface EnterprisePipelineSetConfig {
   runsWorkers: boolean;
 }
 
-/**
- * Registers the complete enterprise pipeline set with the shared event-sourcing
- * runtime. Domain definitions and their process/effect wiring remain under
- * /ee; the core registry only composes this set with the core pipelines.
- */
-export function registerEnterprisePipelineSet(
-  deps: EnterprisePipelineSetConfig & {
-    eventSourcing: EventSourcing;
-    processStore: ProcessStore;
-  },
-) {
+type EnterprisePipelineRuntimeDeps = EnterprisePipelineSetConfig & {
+  eventSourcing: EventSourcing;
+  processStore: ProcessStore;
+};
+
+function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
   const processManager = new ProcessManagerService({
     definition: ingestionPullProcessDefinition,
     store: deps.processStore,
@@ -116,13 +111,30 @@ export function registerEnterprisePipelineSet(
   }
 
   return {
-    commands: { ingestionPull: ingestionPullCommands },
+    commands: ingestionPullCommands,
+    processManager,
+    processOutboxWorker,
+  };
+}
+
+/**
+ * Registers the complete enterprise pipeline set with the shared event-sourcing
+ * runtime. Domain definitions and their process/effect wiring remain under
+ * /ee; the core registry only composes this set with the core pipelines.
+ */
+export function registerEnterprisePipelineSet(
+  deps: EnterprisePipelineRuntimeDeps,
+) {
+  const ingestionPull = registerIngestionPullPipeline(deps);
+
+  return {
+    commands: { ingestionPull: ingestionPull.commands },
     processManagers: {
-      [INGESTION_PULL_PROCESS_NAME]: processManager,
+      [INGESTION_PULL_PROCESS_NAME]: ingestionPull.processManager,
     },
-    notifyOutbox: () => processOutboxWorker.notify(),
+    notifyOutbox: () => ingestionPull.processOutboxWorker.notify(),
     runsWorkers: deps.runsWorkers,
-    stop: () => processOutboxWorker.stop(),
+    stop: () => ingestionPull.processOutboxWorker.stop(),
   };
 }
 

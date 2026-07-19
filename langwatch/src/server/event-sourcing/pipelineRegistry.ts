@@ -14,7 +14,7 @@ import {
 import {
   registerEnterprisePipelineSet,
   type EnterprisePipelineSetConfig,
-} from "@ee/event-sourcing/enterprisePipelineSet";
+} from "@ee/event-sourcing/pipelineSet";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";

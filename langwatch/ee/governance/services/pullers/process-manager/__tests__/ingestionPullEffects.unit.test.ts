@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createIngestionPullIntentHandlers,
-  INGESTION_PULL_INTENT_TYPE,
+  INGESTION_PULL_PROCESS_INTENT_TYPES,
 } from "..";
 
 const message = (attempt: number) => ({
@@ -10,7 +10,7 @@ const message = (attempt: number) => ({
   processKey: "source-1",
   tenantId: "gov-project",
   messageKey: "pull:source-1:run-1",
-  intentType: INGESTION_PULL_INTENT_TYPE,
+  intentType: INGESTION_PULL_PROCESS_INTENT_TYPES.RUN,
   sourceEventId: null,
   attempt,
   payload: {
@@ -33,7 +33,9 @@ describe("ingestion pull outbox effect", () => {
       commands: { recordRunCompleted, recordRunFailed: vi.fn() },
       clock: () => 200,
     });
-    await handlers[INGESTION_PULL_INTENT_TYPE]!({ message: message(1) });
+    await handlers[INGESTION_PULL_PROCESS_INTENT_TYPES.RUN]!({
+      message: message(1),
+    });
     expect(recordRunCompleted).toHaveBeenCalledWith({
       tenantId: "gov-project",
       occurredAt: 200,
@@ -51,7 +53,9 @@ describe("ingestion pull outbox effect", () => {
       commands: { recordRunCompleted: vi.fn(), recordRunFailed: vi.fn() },
     });
     await expect(
-      handlers[INGESTION_PULL_INTENT_TYPE]!({ message: message(1) }),
+      handlers[INGESTION_PULL_PROCESS_INTENT_TYPES.RUN]!({
+        message: message(1),
+      }),
     ).rejects.toThrow("provider down");
   });
 
@@ -62,7 +66,9 @@ describe("ingestion pull outbox effect", () => {
       commands: { recordRunCompleted: vi.fn(), recordRunFailed },
       clock: () => 200,
     });
-    await handlers[INGESTION_PULL_INTENT_TYPE]!({ message: message(3) });
+    await handlers[INGESTION_PULL_PROCESS_INTENT_TYPES.RUN]!({
+      message: message(3),
+    });
     expect(recordRunFailed).toHaveBeenCalledWith(
       expect.objectContaining({
         sourceId: "source-1",
@@ -87,7 +93,9 @@ describe("ingestion pull outbox effect", () => {
     });
 
     await expect(
-      handlers[INGESTION_PULL_INTENT_TYPE]!({ message: message(3) }),
+      handlers[INGESTION_PULL_PROCESS_INTENT_TYPES.RUN]!({
+        message: message(3),
+      }),
     ).rejects.toThrow("event log unavailable");
     expect(recordRunFailed).not.toHaveBeenCalled();
   });

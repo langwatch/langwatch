@@ -1,9 +1,6 @@
 import { generate } from "@langwatch/ksuid";
 import { Prisma, type PrismaClient } from "@prisma/client";
-import {
-  INGESTION_PULL_RUN_KSUID_RESOURCE,
-  type IngestionPullRunStatusData,
-} from "@ee/governance/event-sourcing/pipelines/ingestion-pull-processing";
+import type { IngestionPullRunStatusData } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/projections/ingestionPullRunStatus.foldProjection";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
   StateProjectionStore,
@@ -11,6 +8,7 @@ import type {
 } from "~/server/event-sourcing/projections/stateProjection.types";
 
 type Row = Prisma.IngestionPullRunProjectionGetPayload<object>;
+const INGESTION_PULL_RUN_KSUID_RESOURCE = "ingpullrun";
 
 function fromRow(row: Row): StoredProjection<IngestionPullRunStatusData> {
   const {
