@@ -13,6 +13,7 @@ import type React from "react";
 import { Fragment, type ReactNode, useLayoutEffect, useRef } from "react";
 import type { MediaPartData } from "~/components/simulations/MediaPart";
 import { collectMediaParts } from "~/components/traces/mediaParts";
+import type { TraceMediaRef } from "~/server/app-layer/traces/media-refs";
 import { useDensityTokens } from "../../hooks/useDensityTokens";
 import { useDensityStore } from "../../stores/densityStore";
 import { formatPreview } from "../../utils/previewFormatter";
@@ -23,14 +24,41 @@ const COMFORTABLE_LABEL_WIDTH = "60px";
 interface IOPreviewProps {
   input: string | null;
   output: string | null;
+  /**
+   * Media refs from the trace summary (fold-derived). When present they are
+   * the source of truth for the row's thumbnail/indicators — the summary's
+   * input/output are flattened text with no parts left to parse. Absent
+   * (older summaries, sample data), the row text is media-hint parsed.
+   */
+  inputMediaRefs?: TraceMediaRef[];
+  outputMediaRefs?: TraceMediaRef[];
 }
 
-export const IOPreview: React.FC<IOPreviewProps> = ({ input, output }) => {
+export const IOPreview: React.FC<IOPreviewProps> = ({
+  input,
+  output,
+  inputMediaRefs,
+  outputMediaRefs,
+}) => {
   const density = useDensityStore((s) => s.density);
   if (density === "comfortable") {
-    return <ComfortableIOPreview input={input} output={output} />;
+    return (
+      <ComfortableIOPreview
+        input={input}
+        output={output}
+        inputMediaRefs={inputMediaRefs}
+        outputMediaRefs={outputMediaRefs}
+      />
+    );
   }
-  return <CompactIOPreview input={input} output={output} />;
+  return (
+    <CompactIOPreview
+      input={input}
+      output={output}
+      inputMediaRefs={inputMediaRefs}
+      outputMediaRefs={outputMediaRefs}
+    />
+  );
 };
 
 /**
@@ -221,6 +249,21 @@ function mediaSrc(media: Extract<MediaPartData, { source: unknown }>): string {
     : `data:${media.source.mimeType};base64,${media.source.value}`;
 }
 
+/** Summary-provided refs → the row media summary (preferred source). */
+export function rowMediaFromRefs(
+  refs: TraceMediaRef[] | undefined,
+): RowMedia | null {
+  if (!refs || refs.length === 0) return null;
+  const summary: RowMedia = { ...NO_ROW_MEDIA };
+  for (const ref of refs) {
+    if (ref.kind === "image") summary.imageSrc ??= ref.url;
+    else if (ref.kind === "audio") summary.hasAudio = true;
+    else if (ref.kind === "video") summary.hasVideo = true;
+    else summary.hasAttachment = true;
+  }
+  return summary;
+}
+
 export function collectRowMedia(raw: string | null): RowMedia {
   if (raw === null) return NO_ROW_MEDIA;
   const parts = collectMediaParts(raw);
@@ -304,41 +347,52 @@ const RowMediaBadges: React.FC<{ media: RowMedia; thumbSize: string }> = ({
   );
 };
 
-function buildRow(raw: string | null): {
+function buildRow(
+  raw: string | null,
+  refs?: TraceMediaRef[],
+): {
   text: string;
   isChat: boolean;
   isTool: boolean;
   media: RowMedia;
 } {
-  if (raw === null)
+  if (raw === null && (!refs || refs.length === 0))
     return { text: "", isChat: false, isTool: false, media: NO_ROW_MEDIA };
-  const parsed = tryParseChat(raw);
+  const parsed = raw === null ? null : tryParseChat(raw);
   // Keep newlines as real `\n` — the row text renders them with
   // `whiteSpace="pre-line"`, and `renderWithBreakMarkers` decorates each
   // break with a non-selectable marker at render time.
-  const formatted = formatPreview(raw, { maxChars: 200, newlines: "preserve" });
+  const formatted =
+    raw === null
+      ? { text: "" }
+      : formatPreview(raw, { maxChars: 200, newlines: "preserve" });
   return {
     text: formatted.text,
-    isChat: parsed.isChat,
-    isTool: parsed.isTool,
-    media: collectRowMedia(raw),
+    isChat: parsed?.isChat ?? false,
+    isTool: parsed?.isTool ?? false,
+    media: rowMediaFromRefs(refs) ?? collectRowMedia(raw),
   };
 }
 
-const CompactIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => {
+const CompactIOPreview: React.FC<IOPreviewProps> = ({
+  input,
+  output,
+  inputMediaRefs,
+  outputMediaRefs,
+}) => {
   const tokens = useDensityTokens();
   return (
     <VStack align="start" gap={0.5} fontFamily="mono">
       {input !== null && (
         <CompactRow
-          row={buildRow(input)}
+          row={buildRow(input, inputMediaRefs)}
           fontSize={tokens.ioFontSize}
           direction="input"
         />
       )}
       {output !== null && (
         <CompactRow
-          row={buildRow(output)}
+          row={buildRow(output, outputMediaRefs)}
           fontSize={tokens.ioFontSize}
           direction="output"
         />
@@ -424,7 +478,12 @@ const RoleIcon: React.FC<{
   return null;
 };
 
-const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
+const ComfortableIOPreview: React.FC<IOPreviewProps> = ({
+  input,
+  output,
+  inputMediaRefs,
+  outputMediaRefs,
+}) => (
   <VStack align="stretch" gap={2} fontFamily="mono">
     {input !== null && (
       <ComfortableRow
@@ -434,7 +493,7 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
         text={
           formatPreview(input, { maxChars: 200, newlines: "preserve" }).text
         }
-        media={collectRowMedia(input)}
+        media={rowMediaFromRefs(inputMediaRefs) ?? collectRowMedia(input)}
       />
     )}
     {output !== null && (
@@ -445,7 +504,7 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
         text={
           formatPreview(output, { maxChars: 200, newlines: "preserve" }).text
         }
-        media={collectRowMedia(output)}
+        media={rowMediaFromRefs(outputMediaRefs) ?? collectRowMedia(output)}
       />
     )}
   </VStack>

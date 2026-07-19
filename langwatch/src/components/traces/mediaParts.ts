@@ -12,6 +12,7 @@
  * `image_url` content-part shapes here.
  */
 import type { MediaPartData } from "~/components/simulations/MediaPart";
+import type { TraceMediaRef } from "~/server/app-layer/traces/media-refs";
 import { containsMediaMarkers } from "~/server/stored-objects/media-markers";
 import { visitContentPart } from "~/server/stored-objects/visit-content-part";
 import { pcm16ToWavBase64, resolveRawPcmFormat } from "~/shared/audio/pcmToWav";
@@ -127,6 +128,22 @@ export function mediaPartToMediaData(part: unknown): MediaPartData | null {
     unknown: () => null,
   });
   return result ?? null;
+}
+
+/**
+ * Expand a compact trace-summary media ref (fold-derived, url-only) back into
+ * the `MediaPartData` shape `MediaPart`/`TraceMediaPart` render.
+ */
+export function mediaRefToMediaData(ref: TraceMediaRef): MediaPartData {
+  if (ref.kind === "file") {
+    return {
+      type: "binary",
+      mimeType: ref.mimeType ?? "application/octet-stream",
+      url: ref.url,
+      ...(ref.filename ? { filename: ref.filename } : {}),
+    };
+  }
+  return { type: ref.kind, source: { type: "url", value: ref.url } };
 }
 
 /** Map a single raw content part to audio `MediaPartData`, or null when it is not audio. */

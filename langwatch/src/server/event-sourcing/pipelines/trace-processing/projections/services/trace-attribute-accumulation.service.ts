@@ -1,4 +1,8 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import {
+  RESERVED_INPUT_MEDIA_REFS,
+  RESERVED_OUTPUT_MEDIA_REFS,
+} from "~/server/app-layer/traces/media-refs";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { NormalizedSpan } from "../../schemas/spans";
 import type { TraceOriginService } from "./trace-origin.service";
@@ -242,12 +246,17 @@ export class TraceAttributeAccumulationService {
     outputSource,
     inputIsFallback,
     outputIsFallback,
+    inputMediaRefs,
+    outputMediaRefs,
   }: {
     state: TraceSummaryData;
     span: NormalizedSpan;
     outputSource: string;
     inputIsFallback: boolean;
     outputIsFallback: boolean;
+    /** Compact JSON media refs following the winning IO, or null to clear. */
+    inputMediaRefs: string | null;
+    outputMediaRefs: string | null;
   }): Record<string, string> {
     const spanAttrs = this.extractAttributes(span);
     const merged = { ...spanAttrs, ...state.attributes };
@@ -327,6 +336,20 @@ export class TraceAttributeAccumulationService {
       merged["langwatch.reserved.output_is_fallback"] = "true";
     } else {
       delete merged["langwatch.reserved.output_is_fallback"];
+    }
+
+    // Media refs ride the summary so the trace list and drawer summary can
+    // render thumbnails/players without reloading span payloads. They follow
+    // the same winner as ComputedInput/Output (see TraceIOAccumulationService).
+    if (inputMediaRefs) {
+      merged[RESERVED_INPUT_MEDIA_REFS] = inputMediaRefs;
+    } else {
+      delete merged[RESERVED_INPUT_MEDIA_REFS];
+    }
+    if (outputMediaRefs) {
+      merged[RESERVED_OUTPUT_MEDIA_REFS] = outputMediaRefs;
+    } else {
+      delete merged[RESERVED_OUTPUT_MEDIA_REFS];
     }
 
     // PII redaction status tracking - accumulate span IDs by severity

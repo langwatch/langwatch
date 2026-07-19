@@ -539,6 +539,8 @@ export function applySpanToAnalytics({
     outputSource: OUTPUT_SOURCE.INFERRED,
     inputIsFallback: false,
     outputIsFallback: false,
+    inputMediaRefs: null,
+    outputMediaRefs: null,
   });
 
   accumulateReservedTokenSums(attributes, span);

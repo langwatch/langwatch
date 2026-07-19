@@ -190,7 +190,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
               <Box paddingY="6px" marginBottom="38px">
                 <RedactedField field="input">
                   {inputMedia.length > 0 && (
-                    <VStack align="stretch" gap={2} marginBottom={2}>
+                    <VStack align="flex-start" gap={2} marginBottom={2}>
                       {inputMedia.map((part, i) => (
                         <TraceMediaPart key={`input-media-${i}`} part={part} />
                       ))}
@@ -220,7 +220,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
               }
             >
               {outputMedia.length > 0 && (
-                <VStack align="stretch" gap={2} paddingTop={2}>
+                <VStack align="flex-start" gap={2} paddingTop={2}>
                   {outputMedia.map((part, i) => (
                     <TraceMediaPart key={`output-media-${i}`} part={part} />
                   ))}

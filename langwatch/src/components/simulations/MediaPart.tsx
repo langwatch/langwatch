@@ -322,7 +322,14 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
         alt={mimeType ?? "image"}
         onLoad={handleLoad}
         onError={handleError}
-        style={{ maxHeight: "200px", borderRadius: "6px" }}
+        // maxWidth caps upscaling in stretch layouts: without it a tiny
+        // image (an 8x8 icon) inflates to container width.
+        style={{
+          maxHeight: "200px",
+          maxWidth: "min(100%, 400px)",
+          width: "auto",
+          borderRadius: "6px",
+        }}
       />
     );
   }

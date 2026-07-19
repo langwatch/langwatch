@@ -177,7 +177,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
   return (
     <Box position="relative" width="full">
       {mediaParts.length > 0 && (
-        <VStack align="stretch" gap={2} marginBottom={2}>
+        <VStack align="flex-start" gap={2} marginBottom={2}>
           {mediaParts.map((p, i) => (
             <TraceMediaPart key={`trace-media-${i}`} part={p} />
           ))}

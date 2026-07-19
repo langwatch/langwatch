@@ -1,6 +1,8 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
 import { LuCalendarClock, LuFileText, LuFlaskConical } from "react-icons/lu";
+import { mediaRefToMediaData } from "~/components/traces/mediaParts";
+import { TraceMediaPart } from "~/components/traces/TraceMediaPart";
 import { PrivacyDroppedNotice } from "~/components/ui/PrivacyDroppedNotice";
 import { RedactedField } from "~/components/ui/RedactedField";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -8,6 +10,11 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
+import {
+  parseMediaRefs,
+  RESERVED_INPUT_MEDIA_REFS,
+  RESERVED_OUTPUT_MEDIA_REFS,
+} from "~/server/app-layer/traces/media-refs";
 import { useTraceEvaluations } from "../../../hooks/useTraceEvaluations";
 import { useTraceEvents } from "../../../hooks/useTraceEvents";
 import { useTraceResources } from "../../../hooks/useTraceResources";
@@ -41,7 +48,18 @@ export function TraceSummaryAccordions({
   // nulls `input`/`output` and sets these flags. The IO section then reads as a
   // "Redacted" state, NOT an "empty" one: there IS content, it is just hidden.
   const hasRedactedIO = !!(trace.inputRedacted || trace.outputRedacted);
-  const traceAttributes = trace.attributes ?? {};
+  // The media_refs reserved attributes are rendering plumbing (consumed by
+  // the media strips below and the table's preview column) — as metadata
+  // rows they are two long JSON blobs that drown the real attributes.
+  const traceAttributes = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(trace.attributes ?? {}).filter(
+          ([key]) => !key.startsWith("langwatch.reserved.media_refs."),
+        ),
+      ),
+    [trace.attributes],
+  );
   // Trace-level events are read as their own query (like evaluations), not off
   // the header: the fold no longer carries them, so they're derived from
   // stored_spans on demand. Includes legacy `/track-event` payloads, which the
@@ -236,6 +254,9 @@ export function TraceSummaryAccordions({
                     ) : (
                       <MissingIORow label="Input" mode="input" />
                     )}
+                    <SummaryMediaStrip
+                      refsJson={trace.attributes[RESERVED_INPUT_MEDIA_REFS]}
+                    />
                   </RedactedField>
                   <RedactedField
                     field="output"
@@ -252,6 +273,9 @@ export function TraceSummaryAccordions({
                     ) : (
                       <MissingIORow label="Output" mode="output" />
                     )}
+                    <SummaryMediaStrip
+                      refsJson={trace.attributes[RESERVED_OUTPUT_MEDIA_REFS]}
+                    />
                   </RedactedField>
                 </VStack>
               </Section>
@@ -492,6 +516,35 @@ export function TraceSummaryAccordions({
  * on the left) so the two read as siblings — same hierarchy, just with
  * the body replaced by a muted placeholder.
  */
+/**
+ * Media widgets (players, images, attachment chips) for the fold-derived
+ * media refs riding the summary's reserved attributes — the trace-level
+ * input/output are flattened text, so this strip is how the summary panel
+ * surfaces the recording/image/attachment the winning span IO carried.
+ * Renders nothing for media-free traces. Rendered below its IOViewer like
+ * attachments below an email body; items keep their natural size
+ * (align="flex-start" — stretching would blow a small image up to panel
+ * width).
+ */
+function SummaryMediaStrip({
+  refsJson,
+}: {
+  refsJson: string | undefined;
+}): React.JSX.Element | null {
+  const refs = useMemo(() => parseMediaRefs(refsJson), [refsJson]);
+  if (refs.length === 0) return null;
+  return (
+    <VStack align="flex-start" gap={2} paddingTop={2}>
+      {refs.map((ref, i) => (
+        <TraceMediaPart
+          key={`${ref.url}-${i}`}
+          part={mediaRefToMediaData(ref)}
+        />
+      ))}
+    </VStack>
+  );
+}
+
 function MissingIORow({
   label,
   mode,
