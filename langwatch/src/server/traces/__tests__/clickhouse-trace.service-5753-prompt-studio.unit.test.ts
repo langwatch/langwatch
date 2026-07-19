@@ -211,8 +211,12 @@ describe("ClickHouseTraceService.getSpanForPromptStudio — #5753 blob resolutio
         const assistantMessage = result!.messages.find(
           (m) => m.role === "assistant",
         );
+        // Mock fixture sets `langwatch.output` to a plain string (FULL_OUTPUT),
+        // so `content` is a string here. Cast keeps the assertion narrow
+        // without weakening the Message type's broader `string | ContentPart[]
+        // | null | undefined` shape that real runtime messages can carry.
         expect(
-          Buffer.byteLength(assistantMessage!.content, "utf8"),
+          Buffer.byteLength(assistantMessage!.content as string, "utf8"),
         ).toBeGreaterThan(IO_PREVIEW_BYTES);
       });
     });
