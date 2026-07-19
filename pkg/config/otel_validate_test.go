@@ -237,6 +237,12 @@ func TestResolve_TracesExporterNoneTurnsOnlySpansOff(t *testing.T) {
 	assert.Empty(t, o.resolved.tracesEndpoint)
 	assert.Equal(t, "http://collector:4318/v1/metrics", o.resolved.metricsEndpoint,
 		"OTEL_TRACES_EXPORTER governs traces, not metrics")
+
+	// PrimaryOTLP feeds the langy relay's direct span POST. Leaving it live
+	// here would keep shipping spans after the operator turned span export
+	// off — an off-switch that does not switch off.
+	base, _ := o.PrimaryOTLP()
+	assert.Empty(t, base, "no span-carrying endpoint may survive OTEL_TRACES_EXPORTER=none")
 }
 
 func TestResolve_RefusesUnknownTracesExporters(t *testing.T) {

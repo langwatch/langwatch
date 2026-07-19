@@ -171,8 +171,15 @@ func (o *OTel) Resolve(environment string) error {
 
 	r := resolvedOTel{set: true, headers: headers, sampler: sampler}
 	if !o.SDKDisabled {
-		r.baseEndpoint = baseEndpoint
-		if !strings.EqualFold(strings.TrimSpace(o.TracesExporter), "none") {
+		if strings.EqualFold(strings.TrimSpace(o.TracesExporter), "none") {
+			// Span export is off, so no span-carrying endpoint may survive.
+			// baseEndpoint is what PrimaryOTLP hands to callers that POST
+			// spans themselves (the langy relay), and those bypass the SDK
+			// exporter entirely — leaving it set would keep shipping spans
+			// after the operator asked for none. Leaving both empty is the
+			// whole mechanism: no field here carries a span destination.
+		} else {
+			r.baseEndpoint = baseEndpoint
 			if tracesOverride := strings.TrimSpace(o.ExporterTracesEndpoint); tracesOverride != "" {
 				r.tracesEndpoint = tracesOverride
 			} else {
@@ -454,6 +461,10 @@ func (o *OTel) DebugCollector() (endpoint string, headers map[string]string) {
 // LangWatch's own copy of worker telemetry. Requires Resolve. Note the
 // signal-specific OTEL_EXPORTER_OTLP_TRACES_ENDPOINT override does NOT feed
 // this path — direct forwarders compose their own signal URL from the base.
+//
+// Every consumer today POSTs spans, so OTEL_TRACES_EXPORTER=none empties this
+// too: an operator who turned span export off must not keep receiving spans
+// from a forwarder that never touches the SDK exporter.
 func (o *OTel) PrimaryOTLP() (endpoint string, headers map[string]string) {
 	o.mustBeResolved()
 	return o.resolved.baseEndpoint, o.resolved.headers
