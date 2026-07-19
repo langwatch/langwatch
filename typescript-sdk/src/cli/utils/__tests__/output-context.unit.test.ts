@@ -132,29 +132,29 @@ describe("applyOutputContext", () => {
     savedLevel = chalk.level;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     chalk.level = savedLevel;
-    applyOutputContext(resolveOutputOptions({}, {}));
+    await applyOutputContext(resolveOutputOptions({}, {}));
   });
 
-  it("turns colour off and marks output as machine in agent mode", () => {
-    applyOutputContext(resolveOutputOptions({ agent: true }, {}));
+  it("turns colour off and marks output as machine in agent mode", async () => {
+    await applyOutputContext(resolveOutputOptions({ agent: true }, {}));
 
     expect(chalk.level).toBe(0);
     expect(getOutputFormat()).toBe("agents");
   });
 
-  it("marks every machine format as structured for the error path, keeping agents compact", () => {
+  it("marks every machine format as structured for the error path, keeping agents compact", async () => {
     for (const format of ["json", "yaml"] as const) {
-      applyOutputContext(resolveOutputOptions({ output: format }, {}));
+      await applyOutputContext(resolveOutputOptions({ output: format }, {}));
       expect(getOutputFormat()).toBe("json");
     }
-    applyOutputContext(resolveOutputOptions({ output: "agents" }, {}));
+    await applyOutputContext(resolveOutputOptions({ output: "agents" }, {}));
     expect(getOutputFormat()).toBe("agents");
   });
 
-  it("keeps the human default untouched", () => {
-    applyOutputContext(resolveOutputOptions({}, {}));
+  it("keeps the human default untouched", async () => {
+    await applyOutputContext(resolveOutputOptions({}, {}));
 
     expect(chalk.level).toBe(savedLevel);
     expect(getOutputFormat()).toBe("text");
