@@ -1,6 +1,6 @@
-import { definePipeline } from "../../";
-import type { StateProjectionStore } from "../../projections/stateProjection.types";
-import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
+import { definePipeline } from "~/server/event-sourcing";
+import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
+import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 import {
   ConfigureIngestionPullCommand,
   DisableIngestionPullCommand,

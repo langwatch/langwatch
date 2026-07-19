@@ -1,12 +1,14 @@
 import { generate } from "@langwatch/ksuid";
 import { Prisma, type PrismaClient } from "@prisma/client";
-import type { IngestionPullRunStatusData } from "~/server/event-sourcing/pipelines/ingestion-pull-processing";
+import {
+  INGESTION_PULL_RUN_KSUID_RESOURCE,
+  type IngestionPullRunStatusData,
+} from "@ee/governance/event-sourcing/pipelines/ingestion-pull-processing";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
   StateProjectionStore,
   StoredProjection,
 } from "~/server/event-sourcing/projections/stateProjection.types";
-import { KSUID_RESOURCES } from "~/utils/constants";
 
 type Row = Prisma.IngestionPullRunProjectionGetPayload<object>;
 
@@ -31,9 +33,7 @@ function fromRow(row: Row): StoredProjection<IngestionPullRunStatusData> {
   };
 }
 
-export class PrismaIngestionPullRunProjectionRepository
-  implements StateProjectionStore<IngestionPullRunStatusData>
-{
+export class PrismaIngestionPullRunProjectionRepository implements StateProjectionStore<IngestionPullRunStatusData> {
   constructor(private readonly prisma: PrismaClient) {}
 
   async load(
@@ -71,7 +71,7 @@ export class PrismaIngestionPullRunProjectionRepository
       await tx.ingestionPullRunProjection.upsert({
         where: { sourceId },
         create: {
-          id: generate(KSUID_RESOURCES.INGESTION_PULL_RUN).toString(),
+          id: generate(INGESTION_PULL_RUN_KSUID_RESOURCE).toString(),
           sourceId,
           projectId,
           ...data,

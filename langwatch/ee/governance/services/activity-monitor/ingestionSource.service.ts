@@ -106,7 +106,7 @@ async function syncPullProcessBestEffort(
   try {
     await syncIngestionPullSource({
       prisma,
-      commands: getApp().ingestionPull,
+      commands: getApp().commands.ingestionPull,
       source,
     });
   } catch (error) {
@@ -154,9 +154,7 @@ export class IngestionSourceService {
    * carries the prior hash with `expiresAt > now`, both hashes match
    * the same source.
    */
-  async findByIngestSecret(
-    rawSecret: string,
-  ): Promise<IngestionSource | null> {
+  async findByIngestSecret(rawSecret: string): Promise<IngestionSource | null> {
     const candidateHash = hashIngestSecret(rawSecret);
     const direct = await this.prisma.ingestionSource.findFirst({
       where: { ingestSecretHash: candidateHash, archivedAt: null },
@@ -171,7 +169,10 @@ export class IngestionSourceService {
     const candidates = await this.prisma.ingestionSource.findMany({
       where: {
         archivedAt: null,
-        parserConfig: { path: ["_rotation", "priorHash"], equals: candidateHash },
+        parserConfig: {
+          path: ["_rotation", "priorHash"],
+          equals: candidateHash,
+        },
       },
     });
     const now = Date.now();
@@ -319,11 +320,14 @@ export class IngestionSourceService {
   ): Promise<{ source: IngestionSource; ingestSecret: string }> {
     const existing = await this.findById(id, organizationId);
     if (!existing) {
-      throw new Error(`IngestionSource ${id} not found in org ${organizationId}`);
+      throw new Error(
+        `IngestionSource ${id} not found in org ${organizationId}`,
+      );
     }
     const newSecret = generateIngestSecret();
     const newHash = hashIngestSecret(newSecret);
-    const priorParser = (existing.parserConfig as Record<string, unknown>) ?? {};
+    const priorParser =
+      (existing.parserConfig as Record<string, unknown>) ?? {};
     const merged = encryptParserConfigCredentials({
       ...priorParser,
       _rotation: {
@@ -344,7 +348,9 @@ export class IngestionSourceService {
   async archive(id: string, organizationId: string): Promise<IngestionSource> {
     const existing = await this.findById(id, organizationId);
     if (!existing) {
-      throw new Error(`IngestionSource ${id} not found in org ${organizationId}`);
+      throw new Error(
+        `IngestionSource ${id} not found in org ${organizationId}`,
+      );
     }
     const source = await this.prisma.ingestionSource.update({
       where: { id: existing.id },

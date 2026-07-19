@@ -1,5 +1,5 @@
-import { INGESTION_PULL_PROCESSING_EVENT_TYPES } from "~/server/event-sourcing/pipelines/ingestion-pull-processing/schemas/constants";
-import type { IngestionPullProcessingEvent } from "~/server/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
+import { INGESTION_PULL_PROCESSING_EVENT_TYPES } from "@ee/governance/event-sourcing/pipelines/ingestion-pull-processing/schemas/constants";
+import type { IngestionPullProcessingEvent } from "@ee/governance/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
 import type {
   HandleResult,
   ProcessEventEnvelope,

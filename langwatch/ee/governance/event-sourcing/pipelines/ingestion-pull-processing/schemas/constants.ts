@@ -27,3 +27,5 @@ export const INGESTION_PULL_RUN_OUTCOME = {
   COMPLETED: "completed",
   FAILED: "failed",
 } as const;
+
+export const INGESTION_PULL_RUN_KSUID_RESOURCE = "ingpullrun";

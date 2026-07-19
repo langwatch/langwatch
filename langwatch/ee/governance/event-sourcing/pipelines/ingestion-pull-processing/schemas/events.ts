@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { EventSchema } from "../../../domain/types";
+import { EventSchema } from "~/server/event-sourcing/domain/types";
 import {
   INGESTION_PULL_EVENT_TYPES,
   INGESTION_PULL_EVENT_VERSION,

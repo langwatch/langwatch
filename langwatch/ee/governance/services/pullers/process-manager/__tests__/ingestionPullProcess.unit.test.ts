@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { INGESTION_PULL_EVENT_TYPES } from "~/server/event-sourcing/pipelines/ingestion-pull-processing";
+import { INGESTION_PULL_EVENT_TYPES } from "@ee/governance/event-sourcing/pipelines/ingestion-pull-processing";
 import type { ProcessEventEnvelope } from "~/server/event-sourcing/process-manager";
 import {
   type IngestionPullProcessState,

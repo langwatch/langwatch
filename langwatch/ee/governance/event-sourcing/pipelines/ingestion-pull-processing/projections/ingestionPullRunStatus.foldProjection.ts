@@ -1,8 +1,8 @@
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
-} from "../../../projections/abstractFoldProjection";
-import type { StateProjectionStore } from "../../../projections/stateProjection.types";
+} from "~/server/event-sourcing/projections/abstractFoldProjection";
+import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
 import {
   INGESTION_PULL_PROJECTION_VERSION,
   INGESTION_PULL_RUN_OUTCOME,
