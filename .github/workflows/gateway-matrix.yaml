@@ -19,7 +19,6 @@ name: gateway-matrix
 #   - pkg/**                         (shared HTTP/health helpers)
 #   - platform/app/src/server/gateway/  (control plane)
 #   - platform/app/src/server/event-sourcing/pipelines/trace-processing/
-#     reactors/gatewayBudgetSync.reactor.ts
 # Triggers:
 #   - PR push (path-filtered to gateway-relevant files only — doc-only
 #     PRs don't pay the ~$0.07 cost)
@@ -49,7 +48,7 @@ on:
       - 'go.mod'
       - 'go.sum'
       - 'platform/app/src/server/gateway/**'
-      - 'platform/app/src/server/event-sourcing/pipelines/trace-processing/reactors/gatewayBudgetSync.reactor.ts'
+      - 'platform/app/src/server/event-sourcing/pipelines/trace-processing/**'
       - 'platform/app/src/server/routes/gateway-internal.ts'
       - 'charts/gateway/**'
       - '.github/workflows/gateway-matrix.yaml'

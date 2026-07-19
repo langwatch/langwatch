@@ -204,7 +204,7 @@ jobs:
             "package/platform/app/dist/scenario-child-process.js"
             "package/services/langevals/pyproject.toml"
             # langevals resolves the python SDK as a local path dependency,
-            # so the tarball must ship python-sdk/pyproject.toml + src/.
+            # so the tarball must ship sdks/python/pyproject.toml + src/.
             "package/sdks/python/pyproject.toml"
             "package/sdks/python/src"
             # langwatch's pnpm-workspace.yaml lists "../mcp-server" as a

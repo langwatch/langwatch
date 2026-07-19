@@ -53,10 +53,10 @@ jobs:
       NEXTAUTH_URL: "http://localhost:5570"
       API_TOKEN_JWT_SECRET: "test-jwt-secret-for-e2e"
       # Trust the in-repo TEST license keypair so the members suite
-      # (agentic-e2e-tests/tests/members/steps.ts withEnterpriseLicense()) can
+      # (tests/agentic-e2e/tests/members/steps.ts withEnterpriseLicense()) can
       # activate a test ENTERPRISE license and exercise member-invitation flows
       # above the free-tier maxMembers=1 cap. Public key only (safe to commit) — matches
-      # TEST_PUBLIC_KEY in langwatch/ee/licensing/__tests__/fixtures/testKeys.ts.
+      # TEST_PUBLIC_KEY in platform/app/ee/licensing/__tests__/fixtures/testKeys.ts.
       # Must be on the app process env before `pnpm start` boots — constants.ts
       # resolves PUBLIC_KEY from this var once at module load. gitleaks:allow
       LANGWATCH_LICENSE_PUBLIC_KEY: |
