@@ -31,3 +31,8 @@ CREATE TABLE IF NOT EXISTS "TopicClusteringRunProjection" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "TopicClusteringRunProjection_projectId_key"
   ON "TopicClusteringRunProjection" ("projectId");
+
+-- Rollback: DROP TABLE "TopicClusteringRunProjection";
+-- Safe to drop — this is a read model, rebuildable by replaying the event
+-- log (see the replay scenario in specs/topic-clustering/
+-- event-sourced-scheduling.feature); no source-of-truth data lives here.

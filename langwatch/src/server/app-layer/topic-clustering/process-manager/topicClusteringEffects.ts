@@ -69,7 +69,7 @@ export interface TopicClusteringOutcomeCommands {
     page: number;
     error: string;
     errorCode: string;
-    userActionable: boolean;
+    isUserActionable: boolean;
   }): Promise<void>;
 }
 
@@ -91,6 +91,155 @@ export interface TopicClusteringOutcomeCommands {
  *   either succeeded or exhausted its attempts. Both call sites swallow and
  *   log; see the comments there.
  */
+/** Everything a page's bookkeeping needs to identify itself in logs/events. */
+interface PageContext {
+  projectId: string;
+  runId: string;
+  page: number;
+  attempt: number;
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Announce the page before working it, so "a run is in progress" is a
+ * recorded fact rather than something the settings page has to infer.
+ * A scheduled run emits nothing at its start (the wake is internal to
+ * the process) and a single-page run never had an in-flight moment in
+ * the log at all, so the badge was unreachable for both.
+ *
+ * Best-effort by design: this is a status announcement, and losing it
+ * must never cost the clustering page that follows. Retrying it through
+ * the outbox would redeliver the whole intent and re-bill the page.
+ */
+async function announceRunStarted(params: {
+  commands: TopicClusteringOutcomeCommands;
+  context: PageContext;
+  occurredAt: number;
+}): Promise<void> {
+  const { projectId, runId, page, attempt } = params.context;
+  try {
+    await params.commands.recordClusteringRunStarted({
+      tenantId: projectId,
+      occurredAt: params.occurredAt,
+      runId,
+      page,
+    });
+  } catch (error) {
+    logger.warn(
+      { projectId, runId, page, attempt, error: errorText(error) },
+      "Could not record clustering run start; running the page anyway (the run shows as in progress only once a page completes)",
+    );
+  }
+}
+
+/**
+ * The final-attempt failure record. Swallow-and-log like the success path,
+ * and for the same reason: the OUTCOME WRITE is never worth a redelivery.
+ * This branch used to let a failing write propagate, which was strictly
+ * worse than the failure it was reporting — the outbox marked the message
+ * dead, so no run_failed event was ever written, `currentRun` stayed pinned
+ * at this page, and the settings page showed a run stuck in progress with
+ * no error on it. The asymmetry bought nothing: the retry it triggered
+ * could only re-run the page that had ALREADY failed maxAttempts times.
+ *
+ * Swallowed, the process self-heals on the same schedule as the success
+ * path — the stale-run guard abandons the pinned run after
+ * TOPIC_CLUSTERING_STALE_RUN_MS and the next daily wake starts fresh.
+ */
+async function recordClusteringFailure(params: {
+  commands: TopicClusteringOutcomeCommands;
+  context: PageContext;
+  occurredAt: number;
+  error: unknown;
+}): Promise<void> {
+  const { projectId, runId, page, attempt } = params.context;
+  const errorMessage = errorText(params.error);
+  const classified = classifyClusteringError(params.error);
+  logger.error(
+    { projectId, runId, page, attempt, error: errorMessage, errorCode: classified.code },
+    "Clustering page failed on final attempt; recording run_failed",
+  );
+  try {
+    await params.commands.recordClusteringRunFailed({
+      tenantId: projectId,
+      occurredAt: params.occurredAt,
+      runId,
+      page,
+      error: errorMessage,
+      errorCode: classified.code,
+      isUserActionable: classified.isUserActionable,
+    });
+  } catch (recordError) {
+    logger.error(
+      {
+        projectId,
+        runId,
+        page,
+        attempt,
+        error: errorMessage,
+        errorCode: classified.code,
+        recordError: errorText(recordError),
+      },
+      "Clustering page failed on final attempt AND recording run_failed failed; the run stalls until the next daily wake abandons it and starts fresh",
+    );
+  }
+}
+
+/**
+ * The completion record. The clustering work is DONE and already durable:
+ * topics are written, traces assigned, a Cost row billed. Only the
+ * bookkeeping is left, and it gets its own failure handling because the two
+ * have opposite retry economics. Rethrowing here would hand the message back
+ * to the outbox, which redelivers the whole intent — re-running embeddings
+ * and LLM naming over the same page and billing it again — to fix a write
+ * that costs nothing to lose. We cannot make the page cheaply replayable
+ * either: the effect has no read of the run projection to short-circuit on,
+ * so "already recorded" is not knowable from here.
+ *
+ * So: swallow the redelivery, never the signal. The failure is logged loudly
+ * with the full outcome (an operator can replay the command by hand), and
+ * the process self-heals within a day — `currentRun` stays pinned at this
+ * page's start, the stale-run guard abandons it after
+ * TOPIC_CLUSTERING_STALE_RUN_MS, and the next daily wake starts a fresh run
+ * that re-derives the remaining backlog from live unassigned traces. The
+ * cost of this branch is a deferred remainder, not lost or doubled work.
+ */
+async function recordClusteringSuccess(params: {
+  commands: TopicClusteringOutcomeCommands;
+  context: PageContext;
+  occurredAt: number;
+  outcome: ClusteringPageOutcome;
+}): Promise<void> {
+  const { projectId, runId, page, attempt } = params.context;
+  const { outcome } = params;
+  try {
+    await params.commands.recordClusteringRunCompleted({
+      tenantId: projectId,
+      occurredAt: params.occurredAt,
+      runId,
+      page,
+      mode: outcome.mode,
+      tracesProcessed: outcome.tracesProcessed,
+      topicsCount: outcome.topicsCount,
+      subtopicsCount: outcome.subtopicsCount,
+      ...(outcome.skippedReason
+        ? { skippedReason: outcome.skippedReason }
+        : {}),
+      ...(outcome.nextSearchAfter
+        ? { nextSearchAfter: outcome.nextSearchAfter }
+        : {}),
+    });
+  } catch (error) {
+    logger.error(
+      { projectId, runId, page, attempt, error: errorText(error), outcome },
+      "Clustering page succeeded but recording its outcome failed; NOT re-running the page. The run stalls until the next daily wake abandons it and starts fresh",
+    );
+  }
+}
+
 export function createTopicClusteringIntentHandlers(params: {
   runPort: TopicClusteringRunPort;
   commands: TopicClusteringOutcomeCommands;
@@ -102,155 +251,50 @@ export function createTopicClusteringIntentHandlers(params: {
 
   const runHandler: IntentHandler = async ({ message }) => {
     const intent = topicClusteringRunIntentSchema.parse(message.payload);
-    const projectId = message.projectId;
+    const context: PageContext = {
+      projectId: message.projectId,
+      runId: intent.runId,
+      page: intent.page,
+      attempt: message.attempt,
+    };
 
-    // Announce the page before working it, so "a run is in progress" is a
-    // recorded fact rather than something the settings page has to infer.
-    // A scheduled run emits nothing at its start (the wake is internal to
-    // the process) and a single-page run never had an in-flight moment in
-    // the log at all, so the badge was unreachable for both.
-    //
-    // Best-effort by design: this is a status announcement, and losing it
-    // must never cost the clustering page that follows. Retrying it through
-    // the outbox would redeliver the whole intent and re-bill the page.
-    try {
-      await params.commands.recordClusteringRunStarted({
-        tenantId: projectId,
-        occurredAt: clock(),
-        runId: intent.runId,
-        page: intent.page,
-      });
-    } catch (error) {
-      logger.warn(
-        {
-          projectId,
-          runId: intent.runId,
-          page: intent.page,
-          attempt: message.attempt,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Could not record clustering run start; running the page anyway (the run shows as in progress only once a page completes)",
-      );
-    }
+    await announceRunStarted({
+      commands: params.commands,
+      context,
+      occurredAt: clock(),
+    });
 
     let outcome: ClusteringPageOutcome;
     try {
       outcome = await params.runPort.runClusteringPage({
-        projectId,
+        projectId: context.projectId,
         searchAfter: intent.searchAfter,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      // Attempts below the cap rethrow so the outbox retries with backoff;
+      // only the final attempt records the durable, visible failure.
       if (message.attempt < maxAttempts) {
         logger.warn(
-          { projectId, runId: intent.runId, page: intent.page, attempt: message.attempt, error: errorMessage },
+          { ...context, error: errorText(error) },
           "Clustering page failed; outbox will retry",
         );
         throw error;
       }
-      const classified = classifyClusteringError(error);
-      logger.error(
-        {
-          projectId,
-          runId: intent.runId,
-          page: intent.page,
-          attempt: message.attempt,
-          error: errorMessage,
-          errorCode: classified.code,
-        },
-        "Clustering page failed on final attempt; recording run_failed",
-      );
-      // Same swallow-and-log as the success path below, and for the same
-      // reason: the OUTCOME WRITE is never worth a redelivery. This branch
-      // used to let a failing write propagate, which was strictly worse than
-      // the failure it was reporting — the outbox marked the message dead, so
-      // no run_failed event was ever written, `currentRun` stayed pinned at
-      // this page, and the settings page showed a run stuck in progress with
-      // no error on it. The asymmetry bought nothing: the retry it triggered
-      // could only re-run the page that had ALREADY failed maxAttempts times.
-      //
-      // Swallowed, the process self-heals on the same schedule as the success
-      // path — the stale-run guard abandons the pinned run after
-      // TOPIC_CLUSTERING_STALE_RUN_MS and the next daily wake starts fresh.
-      try {
-        await params.commands.recordClusteringRunFailed({
-          tenantId: projectId,
-          occurredAt: clock(),
-          runId: intent.runId,
-          page: intent.page,
-          error: errorMessage,
-          errorCode: classified.code,
-          userActionable: classified.userActionable,
-        });
-      } catch (recordError) {
-        logger.error(
-          {
-            projectId,
-            runId: intent.runId,
-            page: intent.page,
-            attempt: message.attempt,
-            error: errorMessage,
-            errorCode: classified.code,
-            recordError:
-              recordError instanceof Error
-                ? recordError.message
-                : String(recordError),
-          },
-          "Clustering page failed on final attempt AND recording run_failed failed; the run stalls until the next daily wake abandons it and starts fresh",
-        );
-      }
+      await recordClusteringFailure({
+        commands: params.commands,
+        context,
+        occurredAt: clock(),
+        error,
+      });
       return;
     }
 
-    // The clustering work is DONE and already durable: topics are written,
-    // traces assigned, a Cost row billed. Only the bookkeeping is left, and
-    // it gets its own failure handling because the two have opposite retry
-    // economics. Rethrowing here would hand the message back to the outbox,
-    // which redelivers the whole intent — re-running embeddings and LLM
-    // naming over the same page and billing it again — to fix a write that
-    // costs nothing to lose. We cannot make the page cheaply replayable
-    // either: the effect has no read of the run projection to short-circuit
-    // on, so "already recorded" is not knowable from here.
-    //
-    // So: swallow the redelivery, never the signal. The failure is logged
-    // loudly with the full outcome (an operator can replay the command by
-    // hand), and the process self-heals within a day — `currentRun` stays
-    // pinned at this page's start, the stale-run guard abandons it after
-    // TOPIC_CLUSTERING_STALE_RUN_MS, and the next daily wake starts a fresh
-    // run that re-derives the remaining backlog from live unassigned traces.
-    // The cost of this branch is a deferred remainder, not lost or doubled
-    // work.
-    try {
-      await params.commands.recordClusteringRunCompleted({
-        tenantId: projectId,
-        occurredAt: clock(),
-        runId: intent.runId,
-        page: intent.page,
-        mode: outcome.mode,
-        tracesProcessed: outcome.tracesProcessed,
-        topicsCount: outcome.topicsCount,
-        subtopicsCount: outcome.subtopicsCount,
-        ...(outcome.skippedReason
-          ? { skippedReason: outcome.skippedReason }
-          : {}),
-        ...(outcome.nextSearchAfter
-          ? { nextSearchAfter: outcome.nextSearchAfter }
-          : {}),
-      });
-    } catch (error) {
-      logger.error(
-        {
-          projectId,
-          runId: intent.runId,
-          page: intent.page,
-          attempt: message.attempt,
-          error: error instanceof Error ? error.message : String(error),
-          outcome,
-        },
-        "Clustering page succeeded but recording its outcome failed; NOT re-running the page. The run stalls until the next daily wake abandons it and starts fresh",
-      );
-    }
+    await recordClusteringSuccess({
+      commands: params.commands,
+      context,
+      occurredAt: clock(),
+      outcome,
+    });
   };
 
   return {

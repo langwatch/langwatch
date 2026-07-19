@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Boundary stubs for the `execute()` entrypoint: the app-layer bootstrap and
-// the Prisma client. `vi.mock` is hoisted above these imports by vitest.
-const requestClusteringMock = vi.fn();
+// the Prisma client. `vi.mock` factories are hoisted above every other
+// statement, so anything they reference must be hoisted with them.
+const { requestClusteringMock } = vi.hoisted(() => ({
+  requestClusteringMock: vi.fn(),
+}));
 vi.mock("~/server/app-layer/presets", () => ({
   initializeDefaultApp: vi.fn().mockResolvedValue(undefined),
 }));

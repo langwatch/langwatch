@@ -234,7 +234,7 @@ describe("createTopicClusteringIntentHandlers", () => {
         page: 1,
         error: "langevals unavailable",
         errorCode: "clustering_service",
-        userActionable: false,
+        isUserActionable: false,
       });
     });
 
@@ -264,7 +264,7 @@ describe("createTopicClusteringIntentHandlers", () => {
       expect(commands.recordClusteringRunFailed).toHaveBeenCalledWith(
         expect.objectContaining({
           errorCode: "model_not_configured",
-          userActionable: true,
+          isUserActionable: true,
         }),
       );
     });
@@ -295,7 +295,7 @@ describe("createTopicClusteringIntentHandlers", () => {
       expect(commands.recordClusteringRunFailed).toHaveBeenCalledWith(
         expect.objectContaining({
           errorCode: "internal",
-          userActionable: false,
+          isUserActionable: false,
         }),
       );
     });

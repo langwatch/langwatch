@@ -19,7 +19,7 @@ export interface TopicClusteringStatus {
    */
   lastRunErrorCode: string | null;
   /** True when the customer can resolve the failure themselves. */
-  lastRunErrorUserActionable: boolean;
+  isLastRunErrorUserActionable: boolean;
   lastRunTracesProcessed: number;
   lastRunTopicsCount: number;
   lastRunSubtopicsCount: number;
@@ -34,12 +34,12 @@ export interface TopicClusteringStatus {
    * refuse "Run now" until the next daily wake, even though the process
    * itself would have preempted the dead run.
    */
-  inProgress: boolean;
+  isInProgress: boolean;
   /**
    * Whether a run is underway, including one that has been asked for but has
    * not reached the effect yet.
    *
-   * `inProgress` is the recorded fact and covers a run from the moment it
+   * `isInProgress` is the recorded fact and covers a run from the moment it
    * starts working. It cannot cover the gap BEFORE that: a manual request is
    * committed as an event, the process turns it into an intent, and the
    * outbox dispatches it — usually seconds, but longer under a backlog. In
@@ -51,7 +51,7 @@ export interface TopicClusteringStatus {
    * reading as "running" at the moment a new request would preempt it,
    * instead of pinning the UI to "Running" forever.
    */
-  runInFlight: boolean;
+  isRunInFlight: boolean;
   /** Epoch ms of the next scheduled daily run, or null when unscheduled. */
   nextRunAt: number | null;
 }
@@ -71,7 +71,7 @@ export class TopicClusteringStatusService {
 
     const lastRequestedAt = projection?.LastRequestedAt ?? null;
     const lastRunAt = projection?.LastRunAt ?? null;
-    const inProgress =
+    const isInProgress =
       projection?.InProgressRunId != null &&
       this.now() -
         // Rows folded before the column existed fall back to the latest
@@ -88,14 +88,14 @@ export class TopicClusteringStatusService {
       lastRunMode: projection?.LastRunMode ?? null,
       lastRunSkippedReason: projection?.LastRunSkippedReason ?? null,
       lastRunErrorCode: projection?.LastRunErrorCode ?? null,
-      lastRunErrorUserActionable:
+      isLastRunErrorUserActionable:
         projection?.LastRunErrorUserActionable ?? false,
       lastRunTracesProcessed: projection?.LastRunTracesProcessed ?? 0,
       lastRunTopicsCount: projection?.LastRunTopicsCount ?? 0,
       lastRunSubtopicsCount: projection?.LastRunSubtopicsCount ?? 0,
-      inProgress,
-      runInFlight:
-        inProgress || this.hasUnansweredRequest({ lastRequestedAt, lastRunAt }),
+      isInProgress,
+      isRunInFlight:
+        isInProgress || this.hasUnansweredRequest({ lastRequestedAt, lastRunAt }),
       nextRunAt: nextWakeAt?.getTime() ?? null,
     };
   }
@@ -107,7 +107,7 @@ export class TopicClusteringStatusService {
    */
   async isRunInFlight(params: { projectId: string }): Promise<boolean> {
     const status = await this.getByProjectId(params);
-    return status.runInFlight;
+    return status.isRunInFlight;
   }
 
   private hasUnansweredRequest(params: {

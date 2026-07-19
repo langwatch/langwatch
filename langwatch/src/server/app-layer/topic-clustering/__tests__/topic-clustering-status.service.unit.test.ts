@@ -72,8 +72,8 @@ describe("TopicClusteringStatusService", () => {
         lastRunTracesProcessed: 0,
         lastRunTopicsCount: 0,
         lastRunSubtopicsCount: 0,
-        inProgress: false,
-        runInFlight: false,
+        isInProgress: false,
+        isRunInFlight: false,
         nextRunAt: null,
       });
     });
@@ -99,8 +99,8 @@ describe("TopicClusteringStatusService", () => {
         projection: projectionRow({ LastRequestedAt: NOW - 5_000 }),
       }).getByProjectId({ projectId: PROJECT_ID });
 
-      expect(status.runInFlight).toBe(true);
-      expect(status.inProgress).toBe(false);
+      expect(status.isRunInFlight).toBe(true);
+      expect(status.isInProgress).toBe(false);
     });
 
     it("keeps reporting it in flight right up to the stale-run window", async () => {
@@ -110,7 +110,7 @@ describe("TopicClusteringStatusService", () => {
         }),
       }).getByProjectId({ projectId: PROJECT_ID });
 
-      expect(status.runInFlight).toBe(true);
+      expect(status.isRunInFlight).toBe(true);
     });
 
     it("stops reporting it in flight once the scheduler would abandon it", async () => {
@@ -120,7 +120,7 @@ describe("TopicClusteringStatusService", () => {
         }),
       }).getByProjectId({ projectId: PROJECT_ID });
 
-      expect(status.runInFlight).toBe(false);
+      expect(status.isRunInFlight).toBe(false);
     });
   });
 
@@ -134,7 +134,7 @@ describe("TopicClusteringStatusService", () => {
         }),
       }).getByProjectId({ projectId: PROJECT_ID });
 
-      expect(status.runInFlight).toBe(false);
+      expect(status.isRunInFlight).toBe(false);
     });
 
     it("treats an outcome recorded at the request instant as answering it", async () => {
@@ -145,7 +145,7 @@ describe("TopicClusteringStatusService", () => {
         }),
       }).getByProjectId({ projectId: PROJECT_ID });
 
-      expect(status.runInFlight).toBe(false);
+      expect(status.isRunInFlight).toBe(false);
     });
   });
 
@@ -160,8 +160,8 @@ describe("TopicClusteringStatusService", () => {
         }),
       }).getByProjectId({ projectId: PROJECT_ID });
 
-      expect(status.inProgress).toBe(true);
-      expect(status.runInFlight).toBe(true);
+      expect(status.isInProgress).toBe(true);
+      expect(status.isRunInFlight).toBe(true);
     });
   });
 
@@ -174,8 +174,8 @@ describe("TopicClusteringStatusService", () => {
         }),
       }).getByProjectId({ projectId: PROJECT_ID });
 
-      expect(status.inProgress).toBe(true);
-      expect(status.runInFlight).toBe(true);
+      expect(status.isInProgress).toBe(true);
+      expect(status.isRunInFlight).toBe(true);
     });
 
     it("stops reporting it running once the scheduler would abandon it", async () => {
@@ -191,20 +191,20 @@ describe("TopicClusteringStatusService", () => {
         }),
       }).getByProjectId({ projectId: PROJECT_ID });
 
-      expect(status.inProgress).toBe(false);
-      expect(status.runInFlight).toBe(false);
+      expect(status.isInProgress).toBe(false);
+      expect(status.isRunInFlight).toBe(false);
     });
 
     it("bounds rows folded before the start column existed by their latest event", async () => {
       const status = await serviceReading({
         projection: projectionRow({
           InProgressRunId: "20260717T093000",
-          InProgressStartedAt: undefined as unknown as null,
+          InProgressStartedAt: null,
           OccurredAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS,
         }),
       }).getByProjectId({ projectId: PROJECT_ID });
 
-      expect(status.inProgress).toBe(false);
+      expect(status.isInProgress).toBe(false);
     });
   });
 
@@ -244,7 +244,7 @@ describe("TopicClusteringStatusService", () => {
       }).getByProjectId({ projectId: PROJECT_ID });
 
       expect(status.lastRunErrorCode).toBe("model_provider_auth");
-      expect(status.lastRunErrorUserActionable).toBe(true);
+      expect(status.isLastRunErrorUserActionable).toBe(true);
     });
 
     it("never exposes the raw provider error text", async () => {
@@ -274,7 +274,7 @@ describe("TopicClusteringStatusService", () => {
       }).getByProjectId({ projectId: PROJECT_ID });
 
       expect(status.lastRunErrorCode).toBe("clustering_service");
-      expect(status.lastRunErrorUserActionable).toBe(false);
+      expect(status.isLastRunErrorUserActionable).toBe(false);
     });
   });
 

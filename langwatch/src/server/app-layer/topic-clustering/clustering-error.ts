@@ -61,7 +61,7 @@ export type ClusteringErrorCode =
 
 export interface ClassifiedClusteringError {
   code: ClusteringErrorCode;
-  userActionable: boolean;
+  isUserActionable: boolean;
 }
 
 /**
@@ -96,7 +96,7 @@ export class ClusteringError extends Error {
     this.code = code;
   }
 
-  get userActionable(): boolean {
+  get isUserActionable(): boolean {
     return USER_ACTIONABLE_CODES.has(this.code);
   }
 }
@@ -105,7 +105,7 @@ export function classifyClusteringError(
   error: unknown,
 ): ClassifiedClusteringError {
   if (error instanceof ClusteringError) {
-    return { code: error.code, userActionable: error.userActionable };
+    return { code: error.code, isUserActionable: error.isUserActionable };
   }
   // Raised by the model-resolution cascade itself, which already knows exactly
   // which feature and role had nothing set. It is thrown from shared code we
@@ -114,11 +114,11 @@ export function classifyClusteringError(
   if (error instanceof ModelNotConfiguredError) {
     return {
       code: CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
-      userActionable: true,
+      isUserActionable: true,
     };
   }
   // Unattributed: a bug, a dependency we did not wrap, an infrastructure
   // failure. Fail closed — we do not tell someone their configuration is
   // broken on the strength of not recognising an error.
-  return { code: CLUSTERING_ERROR_CODES.INTERNAL, userActionable: false };
+  return { code: CLUSTERING_ERROR_CODES.INTERNAL, isUserActionable: false };
 }

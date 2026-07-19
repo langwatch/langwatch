@@ -117,7 +117,7 @@ Feature: Event-sourced topic clustering scheduling
     When projections are replayed from the event log
     Then the settings page shows the same last-run facts as before
 
-  Scenario: The legacy scheduling stack is gone
-    Then no BullMQ topic clustering queue or worker exists
-    And no cron endpoint schedules topic clustering
-    And trace assignments still flow through the AssignTopic command queue
+  Scenario: Clustering no longer depends on the retired scheduling path
+    Then clustering runs on its durable per-project schedule with no external scheduler to configure
+    And there is no separate clustering scheduler left for an operator to run or monitor
+    And traces keep being assigned to topics exactly as before

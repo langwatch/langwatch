@@ -10,6 +10,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useState } from "react";
+import type { ClusteringErrorCode } from "~/server/app-layer/topic-clustering/clustering-error";
+import type {
+  TopicClusteringRunMode,
+  TopicClusteringSkipReason,
+} from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/constants";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
@@ -27,9 +32,22 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
  * A code with no entry here is treated as ours to fix, which is also what an
  * unrecognised or mis-scoped classification degrades to.
  */
-const CLUSTERING_FAILURE_GUIDANCE: Record<
-  string,
-  { title: string; description: string }
+/**
+ * The server sends bare strings for codes/reasons/modes; these lookups narrow
+ * them back onto the canonical unions so an unknown value falls through to
+ * each call site's fallback instead of silently rendering nothing new.
+ */
+function copyFor<K extends string, V>(
+  map: Partial<Record<K, V>>,
+  key: string | null,
+): V | undefined {
+  return key ? map[key as K] : undefined;
+}
+
+// Deliberately Partial: a code with no entry is treated as ours to fix (see
+// the doc above), so exhaustiveness would defeat the fallback.
+const CLUSTERING_FAILURE_GUIDANCE: Partial<
+  Record<ClusteringErrorCode, { title: string; description: string }>
 > = {
   model_not_configured: {
     title: "No model is set up for topic clustering",
@@ -165,7 +183,9 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
   );
 }
 
-const SKIP_REASON_COPY: Record<string, string> = {
+// Exhaustive over the union on purpose: adding a skip reason without copy for
+// it is a compile error here, not a blank line in the UI.
+const SKIP_REASON_COPY: Record<TopicClusteringSkipReason, string> = {
   recently_clustered:
     "Skipped, your topics were rebuilt recently so this run was not needed yet",
   not_enough_traces: "Skipped, not enough new traces to group yet",
@@ -173,13 +193,13 @@ const SKIP_REASON_COPY: Record<string, string> = {
 };
 
 /** What each run mode did, in the customer's terms rather than the enum's. */
-const RUN_MODE_COPY: Record<string, string> = {
+const RUN_MODE_COPY: Record<TopicClusteringRunMode, string> = {
   batch: "Rebuilt all topics",
   incremental: "Sorted new traces into your existing topics",
 };
 
-function outcomeBadge(outcome: string | null, runInFlight: boolean) {
-  if (runInFlight) return <Badge colorPalette="blue">Running</Badge>;
+function outcomeBadge(outcome: string | null, isRunInFlight: boolean) {
+  if (isRunInFlight) return <Badge colorPalette="blue">Running</Badge>;
   switch (outcome) {
     case "completed":
       return <Badge colorPalette="green">Completed</Badge>;
@@ -203,7 +223,7 @@ function ClusteringStatusCard({
     { projectId },
     {
       refetchInterval: (data) => {
-        if (data?.runInFlight) return RUNNING_POLL_MS;
+        if (data?.isRunInFlight) return RUNNING_POLL_MS;
         if (
           lastTriggeredAt !== null &&
           Date.now() - lastTriggeredAt < REQUEST_SETTLE_WINDOW_MS
@@ -232,7 +252,7 @@ function ClusteringStatusCard({
               <Text fontWeight="medium">Last run</Text>
               {outcomeBadge(
                 status.data.lastRunOutcome,
-                status.data.runInFlight,
+                status.data.isRunInFlight,
               )}
               {status.data.lastRunAt && (
                 <Text color="fg.muted">
@@ -244,9 +264,10 @@ function ClusteringStatusCard({
               <Text fontSize="sm" color="fg.muted">
                 {/* The mode is only trustworthy on a completed run: a failure
                     leaves the previous run's mode in place. */}
-                {status.data.lastRunMode &&
-                  RUN_MODE_COPY[status.data.lastRunMode] &&
-                  `${RUN_MODE_COPY[status.data.lastRunMode]!}. `}
+                {(() => {
+                  const modeCopy = copyFor(RUN_MODE_COPY, status.data.lastRunMode);
+                  return modeCopy ? `${modeCopy}. ` : null;
+                })()}
                 Organized {status.data.lastRunTracesProcessed} traces into{" "}
                 {status.data.lastRunTopicsCount} topics and{" "}
                 {status.data.lastRunSubtopicsCount} subtopics.
@@ -255,17 +276,18 @@ function ClusteringStatusCard({
             {status.data.lastRunOutcome === "skipped" &&
               status.data.lastRunSkippedReason && (
                 <Text fontSize="sm" color="fg.muted">
-                  {SKIP_REASON_COPY[status.data.lastRunSkippedReason] ??
+                  {copyFor(SKIP_REASON_COPY, status.data.lastRunSkippedReason) ??
                     "Skipped"}
                   .
                 </Text>
               )}
             {status.data.lastRunOutcome === "failed" &&
               (() => {
-                const guidance = status.data.lastRunErrorUserActionable
-                  ? CLUSTERING_FAILURE_GUIDANCE[
-                      status.data.lastRunErrorCode ?? ""
-                    ]
+                const guidance = status.data.isLastRunErrorUserActionable
+                  ? copyFor(
+                      CLUSTERING_FAILURE_GUIDANCE,
+                      status.data.lastRunErrorCode,
+                    )
                   : undefined;
                 return guidance ? (
                   <Alert.Root status="warning">

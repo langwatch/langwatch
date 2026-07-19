@@ -148,7 +148,7 @@ describe("topic clustering langevals requests", () => {
         // and the timeout is a known, retryable upstream condition.
         expect(classifyClusteringError(error)).toEqual({
           code: CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
-          userActionable: false,
+          isUserActionable: false,
         });
       });
     });
@@ -169,7 +169,7 @@ describe("topic clustering langevals requests", () => {
 
         expect(classifyClusteringError(error)).toEqual({
           code: CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
-          userActionable: false,
+          isUserActionable: false,
         });
       });
     });
@@ -208,7 +208,7 @@ describe("topic clustering langevals requests", () => {
 
         expect(classifyClusteringError(error)).toEqual({
           code: CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
-          userActionable: false,
+          isUserActionable: false,
         });
       });
     });

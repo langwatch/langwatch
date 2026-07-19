@@ -61,9 +61,15 @@ export class PrismaTopicClusteringRunProjectionRepository
     context: ProjectionStoreContext,
   ): Promise<void> {
     const projectId = String(context.tenantId);
+    // `state` legitimately carries CreatedAt/UpdatedAt (the fold base class
+    // maintains them inside state), but the envelope's copies are the ones
+    // being persisted — destructure state's out so the explicit assignment
+    // below is the only source, not a spread-order accident.
     const {
       LastEventOccurredAt: _checkpoint,
       ProjectId: _projectId,
+      CreatedAt: _stateCreatedAt,
+      UpdatedAt: _stateUpdatedAt,
       ...state
     } = projection.state;
     const data = {

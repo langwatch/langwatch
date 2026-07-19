@@ -1144,7 +1144,7 @@ cronjobs:
     limits: { cpu: 100m, memory: 64Mi }
 
   # Individual cron job configurations
-  ## @extra cronjobs.jobs Individual cron job endpoints and schedules.
+  ## @param cronjobs.jobs [object] Individual cron job endpoints and schedules. Ships empty — every first-party sweep now runs on the workers Deployment's event-sourced path. Retained as an extension point for operator-defined jobs.
   # INTENTIONALLY EMPTY. Every job that used to live here has moved onto the
   # workers Deployment's event-sourced path (see the note below), so the chart
   # currently ships no CronJobs at all. The template is retained as the

@@ -74,7 +74,14 @@ const topicClusteringEvents = [
 export class TopicClusteringRunStatusFoldProjection
   extends AbstractFoldProjection<
     TopicClusteringRunStatusData,
-    typeof topicClusteringEvents
+    typeof topicClusteringEvents,
+    "CreatedAt",
+    "UpdatedAt",
+    "LastEventOccurredAt",
+    // The base defaults Store to FoldProjectionStore<State>; this projection
+    // persists through the state-projection contract instead, and `store`
+    // must be declared against the same generic or TS2416 rejects it.
+    StateProjectionStore<TopicClusteringRunStatusData>
   >
   implements
     FoldEventHandlers<
@@ -213,7 +220,7 @@ export class TopicClusteringRunStatusFoldProjection
       LastRunOutcome: TOPIC_CLUSTERING_RUN_OUTCOME.FAILED,
       LastRunError: event.data.error,
       LastRunErrorCode: event.data.errorCode ?? null,
-      LastRunErrorUserActionable: event.data.userActionable ?? false,
+      LastRunErrorUserActionable: event.data.isUserActionable ?? false,
       LastRunSkippedReason: null,
       // A failed run produced no counts. Without these resets the row keeps the
       // PREVIOUS (successful) run's numbers, so the settings page renders a

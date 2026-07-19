@@ -27,7 +27,7 @@ describe("classifyClusteringError", () => {
 
       expect(classifyClusteringError(error)).toEqual({
         code: "clustering_service",
-        userActionable: false,
+        isUserActionable: false,
       });
     });
 
@@ -39,7 +39,7 @@ describe("classifyClusteringError", () => {
 
       expect(classifyClusteringError(error)).toEqual({
         code: "model_not_configured",
-        userActionable: true,
+        isUserActionable: true,
       });
     });
   });
@@ -58,7 +58,7 @@ describe("classifyClusteringError", () => {
 
       expect(classifyClusteringError(error)).toEqual({
         code: "model_not_configured",
-        userActionable: true,
+        isUserActionable: true,
       });
     });
   });
@@ -80,14 +80,14 @@ describe("classifyClusteringError", () => {
     ])("attributes it to us, not the customer: %s", (message) => {
       expect(classifyClusteringError(new Error(message))).toEqual({
         code: "internal",
-        userActionable: false,
+        isUserActionable: false,
       });
     });
 
     it("does not guess from a non-Error value either", () => {
       expect(classifyClusteringError("401 unauthorized")).toEqual({
         code: "internal",
-        userActionable: false,
+        isUserActionable: false,
       });
     });
   });

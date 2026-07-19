@@ -203,11 +203,14 @@ export const clusterTopicsForProject = async (
 
   const mode = isIncrementalProcessing ? "incremental" : "batch";
 
-  // Keep paging while the page was full, even if this batch had too few
-  // usable traces to cluster. Progress is driven by the page boundary
-  // (returnedCount / lastSort from the page CTE), not the post-filter usable
-  // count — older eligible traces can sit beyond a full page of empty-input
-  // (or already-clustered) traces, and stopping here would strand them.
+  // Keep paging while the page returned more than a trivial handful of raw
+  // rows (>10 — the legacy heuristic, kept bit-identical; NOT "page was
+  // full", which would be the CTE's 2000). Progress is driven by the page
+  // boundary (returnedCount / lastSort from the page CTE), not the
+  // post-filter usable count — older eligible traces can sit beyond a page
+  // of empty-input (or already-clustered) traces, and stopping on the
+  // usable count would strand them. Worst case of the loose threshold is
+  // one extra near-empty page before the walk ends.
   const nextSearchAfter =
     returnedCount > 10 && lastSort ? lastSort : undefined;
 
