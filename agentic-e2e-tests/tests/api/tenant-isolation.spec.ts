@@ -33,22 +33,52 @@ test.describe("Feature: headless test isolation", () => {
   });
 
   test.describe("when two tenants exist at once", () => {
-    test("neither can see the other's data", async ({ request, api, tenant }) => {
-      await api.post("/api/dataset", { name: "First tenant dataset" });
+    test("neither can see the other's data", async ({
+      playwright,
+      request,
+      api,
+      tenant,
+      baseURL,
+    }) => {
+      const datasetName = `First tenant dataset ${Date.now()}`;
+      await api.post("/api/dataset", { name: datasetName });
 
-      // A second, fully independent tenant on its own request context, so it
-      // carries its own session cookie rather than inheriting the first.
-      const otherContext = await request.storageState().then(() => request);
-      const other = await provisionTenant(otherContext, { label: "neighbour" });
-
-      expect(other.projectId).not.toBe(tenant.projectId);
-      expect(other.apiKey).not.toBe(tenant.apiKey);
-
-      const otherDatasets = await request.get("/api/dataset", {
-        headers: { "X-Auth-Token": other.apiKey },
+      // A genuinely separate context, so the second tenant signs in on its own
+      // cookie jar instead of replacing the first's session. Reusing `request`
+      // here would make this test pass for the wrong reason.
+      const neighbourContext = await playwright.request.newContext({
+        baseURL,
+        extraHTTPHeaders: {
+          Origin: process.env.E2E_AUTH_ORIGIN ?? baseURL ?? "",
+        },
       });
-      expect(otherDatasets.ok()).toBe(true);
-      expect(listOf(await otherDatasets.json())).toEqual([]);
+
+      try {
+        const other = await provisionTenant(neighbourContext, {
+          label: "neighbour",
+        });
+
+        expect(other.projectId).not.toBe(tenant.projectId);
+        expect(other.apiKey).not.toBe(tenant.apiKey);
+
+        // The neighbour sees an empty project...
+        const neighbourDatasets = await neighbourContext.get("/api/dataset", {
+          headers: { "X-Auth-Token": other.apiKey },
+        });
+        expect(neighbourDatasets.ok()).toBe(true);
+        expect(listOf(await neighbourDatasets.json())).toEqual([]);
+
+        // ...while the first tenant still sees its own, so the isolation is
+        // mutual rather than the second tenant simply having nothing yet.
+        const ownDatasets = listOf<{ name: string }>(
+          await request.get("/api/dataset", {
+            headers: { "X-Auth-Token": tenant.apiKey },
+          }).then((response) => response.json()),
+        );
+        expect(ownDatasets.map((dataset) => dataset.name)).toContain(datasetName);
+      } finally {
+        await neighbourContext.dispose();
+      }
     });
   });
 });

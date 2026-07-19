@@ -47,6 +47,11 @@ export class ProjectApi {
     return this.parse<T>(response, "PATCH", path);
   }
 
+  async delete<T>(path: string): Promise<T> {
+    const response = await this.request.delete(path, { headers: this.headers });
+    return this.parse<T>(response, "DELETE", path);
+  }
+
   /** Raw form, for tests that assert on rejection rather than success. */
   async rawPost(path: string, body: unknown, headers?: Record<string, string>) {
     return this.request.post(path, {

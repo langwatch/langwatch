@@ -19,7 +19,11 @@ async function waitForApp(): Promise<void> {
         signal: AbortSignal.timeout(5000),
       });
 
-      if (response.ok || response.status === 302) {
+      // Any HTTP response proves something is listening and serving. We don't
+      // require a specific status because the headless tiers can target the
+      // API server directly, where `/` is a legitimate 404 — the SPA isn't
+      // running. The publicEnv check below is the real readiness gate.
+      if (response.status > 0) {
         console.log(`✅ App is ready (status: ${response.status})`);
         return;
       }

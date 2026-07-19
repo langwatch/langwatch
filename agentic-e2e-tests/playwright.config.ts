@@ -15,6 +15,19 @@ const BASE_URL = process.env.BASE_URL ?? "http://localhost:5570";
 const AUTH_FILE = path.join(__dirname, ".auth", "user.json");
 const IS_CI = !!process.env.CI;
 
+/* `/api/auth/*` state-changing requests are gated on Origin (falling back to
+ * Referer) matching the app's own BASE_HOST — see
+ * langwatch/src/server/better-auth/originGate.ts. A browser sends that header
+ * for free; a bare HTTP client does not, so the headless projects send it
+ * explicitly or every sign-in 403s with INVALID_ORIGIN.
+ *
+ * It defaults to BASE_URL, which is correct whenever the app is reached at its
+ * own base URL (CI runs `PORT=5570 pnpm start`, and start.sh aligns BASE_HOST
+ * to PORT). Override with E2E_AUTH_ORIGIN when hitting the API on a different
+ * origin to the configured BASE_HOST — e.g. calling the API server directly on
+ * PORT+1000 while .env still pins BASE_HOST to the default port. */
+const AUTH_ORIGIN = process.env.E2E_AUTH_ORIGIN ?? BASE_URL;
+
 export default defineConfig({
   testDir: "./tests",
 
@@ -90,14 +103,16 @@ export default defineConfig({
     {
       name: "api",
       testDir: "./tests/api",
-      /* No `use` block on purpose — these tests never touch a `page`, so no
-       * browser is launched for this project. */
+      /* No browser is launched for this project — these tests never touch a
+       * `page`, only the request context. */
+      use: { extraHTTPHeaders: { Origin: AUTH_ORIGIN } },
     },
 
     /* Headless: spawns the real CLI binary against a temp HOME. */
     {
       name: "cli",
       testDir: "./tests/cli",
+      use: { extraHTTPHeaders: { Origin: AUTH_ORIGIN } },
     },
 
     /* Setup project - runs authentication once for the browser tier */
