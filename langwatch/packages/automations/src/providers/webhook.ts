@@ -37,15 +37,22 @@ export function isReservedWebhookHeader(name: string): boolean {
   );
 }
 
-/** Drops reserved keys and entries with empty names/values. Header values are
- *  stripped of CR/LF so a stored header can never smuggle a second one. */
+/** RFC 7230 header-name token: dropping a smuggling attempt beats mangling it
+ *  into a name (`X-Custom\r\nX-Injected: evil` → `X-CustomX-Injected: evil`)
+ *  that the HTTP stack rejects at send time, poisoning every dispatch. */
+const HEADER_NAME_TOKEN_RX = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+
+/** Drops reserved keys, entries with empty names/values, and names that are
+ *  not valid header tokens. Values are stripped of CR/LF so a stored header
+ *  can never smuggle a second one. */
 export function sanitizeWebhookHeaders(
   headers: Record<string, string>,
 ): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {
     const key = name.trim();
-    if (!key || isReservedWebhookHeader(key)) continue;
+    if (!key || !HEADER_NAME_TOKEN_RX.test(key)) continue;
+    if (isReservedWebhookHeader(key)) continue;
     const clean = value.replace(/[\r\n\0]+/g, " ").trim();
     if (!clean) continue;
     out[key] = clean;

@@ -86,7 +86,11 @@ export type RecordMetricCommandData = z.infer<
 
 export const resolveOriginCommandDataSchema = z.object({
   tenantId: z.string(),
-  traceId: z.string(),
+  // Must be non-empty: an empty traceId becomes an empty aggregateId on the
+  // resulting OriginResolvedEvent, which then fails validation downstream in
+  // the automations pipeline (recordTriggerMatch requires a non-empty traceId).
+  // Reject here so the bad value never reaches the event store.
+  traceId: z.string().min(1),
   origin: z.string(),
   reason: z.string(),
   occurredAt: z.number(),

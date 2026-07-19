@@ -13,7 +13,7 @@ Classified: 93
 | specs/home/learning-resources.feature | "Displays video link" | KEEP | `LearningResources.tsx` renders a "Watch videos" CTA pointing at YouTube; no test bound |
 | specs/home/learning-resources.feature | "Documentation link points to docs site" | KEEP | `resources[0].href` in `LearningResources.tsx` is "https://docs.langwatch.ai" — contains "docs.langwatch.ai"; no test bound |
 | specs/home/learning-resources.feature | "Video link points to YouTube" | KEEP | `resources[1].href` in `LearningResources.tsx` is "https://www.youtube.com/@LangWatch/videos" — contains "youtube.com/@LangWatch"; no test bound |
-| specs/home/learning-resources.feature | "Documentation click is tracked" | DELETE | `LearningResources.tsx` has no analytics call; grep for "documentation_click" finds only the unused `welcome/ResourcesCard.tsx`, not the home `LearningResources` |
+| specs/home/learning-resources.feature | "Documentation click is tracked" | DELETE | `LearningResources.tsx` has no analytics call; grep for "documentation_click" now finds nothing at all — the only hit was the unused `welcome/ResourcesCard.tsx`, since deleted as unreferenced |
 | specs/home/learning-resources.feature | "Video click is tracked" | DELETE | `LearningResources.tsx` does not emit any "video_click" tracking event; no analytics import or `trackEvent` call in the component |
 | specs/home/learning-resources.feature | "Section has descriptive title" | KEEP | `LearningResources.tsx` renders `<Heading>Learning resources</Heading>`; no test bound |
 | specs/home/learning-resources.feature | "Card has appropriate styling" | KEEP | `ResourceCardItem` in `LearningResources.tsx` applies `borderRadius`, `background`, `padding` styles per resource; no test bound |

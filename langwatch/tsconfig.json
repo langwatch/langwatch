@@ -17,6 +17,7 @@
 		"isolatedModules": true,
 		"jsx": "react-jsx",
 		"incremental": true,
+		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsc-editor.tsbuildinfo",
 		"noUncheckedIndexedAccess": true,
 		"verbatimModuleSyntax": true,
 		"baseUrl": ".",

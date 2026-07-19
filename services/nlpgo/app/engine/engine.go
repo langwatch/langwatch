@@ -311,7 +311,7 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case dsl.ComponentHTTP:
 		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case dsl.ComponentSignature:
-		return e.runSignature(ctx, req, node, inputs, ns)
+		return e.runSignature(ctx, node, inputs, ns)
 	case dsl.ComponentPromptingTechnique:
 		// Decorator: produces no outputs of its own; signature nodes
 		// reference it via a parameter and apply it at LLM-call time.
@@ -507,16 +507,25 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 	return out, nil
 }
 
-func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
+func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
 	if e.llm == nil {
 		return nil, &NodeError{Type: "llm_executor_unavailable", Message: "LLM executor not yet wired"}
 	}
-	llmCfg := resolveLLMConfig(node, execReq.Workflow)
-	model := ""
-	provider := ""
-	if llmCfg != nil && llmCfg.Model != nil {
-		model, provider = splitModel(*llmCfg.Model)
+	// Nodes own their LLM config (spec_version 1.5): there is no
+	// workflow-level default to fall back to. The app materializes a
+	// model on every llm parameter at save time and migrates legacy
+	// DSLs on read, so a missing model here is stale client state —
+	// fail with a clear, user-fixable error instead of dispatching an
+	// empty model for the gateway to 400 on.
+	llmCfg := paramLLMConfig(node.Data.Parameters)
+	if llmCfg == nil || llmCfg.Model == nil || *llmCfg.Model == "" {
+		return nil, &NodeError{
+			NodeID:  node.ID,
+			Type:    "llm_model_not_set",
+			Message: "LLM node has no model selected. Open the node and choose a model.",
+		}
 	}
+	model, provider := splitModel(*llmCfg.Model)
 	// Emit the PromptApiService.get + Prompt.compile span pair when this
 	// signature node is bound to a saved prompt config (configId set on
 	// the DSL). Both spans inherit ctx's current span as parent so they
@@ -1488,27 +1497,6 @@ func paramLLMConfig(params []dsl.Field) *dsl.LLMConfig {
 			return nil
 		}
 		return &c
-	}
-	return nil
-}
-
-// resolveLLMConfig returns the effective LLM config for a signature
-// node, falling back to workflow.DefaultLLM when the node-level
-// `llm` parameter is missing, null, or carries no model. Mirrors
-// langwatch_nlp's `has_llm_node_using_default_llm` (regression
-// 6d3d8a823) — a workflow with a signature node relying on
-// default_llm pre-fix had its default_llm blanked before dispatch
-// because the previous `node.type == "llm"` check never matched
-// (signature nodes carry an `llm` parameter, not a node of type
-// "llm"). Without this fallback, dispatch would emit an empty model
-// and the gateway would 400.
-func resolveLLMConfig(node *dsl.Node, w *dsl.Workflow) *dsl.LLMConfig {
-	if cfg := paramLLMConfig(node.Data.Parameters); cfg != nil &&
-		cfg.Model != nil && *cfg.Model != "" {
-		return cfg
-	}
-	if w != nil {
-		return w.DefaultLLM
 	}
 	return nil
 }

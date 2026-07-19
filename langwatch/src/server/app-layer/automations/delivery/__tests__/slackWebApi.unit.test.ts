@@ -9,6 +9,7 @@ const mockedSend = vi.mocked(sendHttpDestination);
 
 function respond(status: number, body: unknown) {
   mockedSend.mockResolvedValue({
+    responseHeaders: {},
     status,
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
@@ -155,18 +156,21 @@ describe("listSlackChannels", () => {
     it("walks every page and returns the union of them", async () => {
       mockedSend
         .mockResolvedValueOnce({
+          responseHeaders: {},
           status: 200,
           body: JSON.stringify(
             channelPage({ ids: ["C1", "C2"], nextCursor: "cursor-2" }),
           ),
         })
         .mockResolvedValueOnce({
+          responseHeaders: {},
           status: 200,
           body: JSON.stringify(
             channelPage({ ids: ["C3"], nextCursor: "cursor-3" }),
           ),
         })
         .mockResolvedValueOnce({
+          responseHeaders: {},
           status: 200,
           body: JSON.stringify(channelPage({ ids: ["C4"] })),
         });
@@ -186,12 +190,14 @@ describe("listSlackChannels", () => {
     it("sends the cursor Slack handed back on the next request", async () => {
       mockedSend
         .mockResolvedValueOnce({
+          responseHeaders: {},
           status: 200,
           body: JSON.stringify(
             channelPage({ ids: ["C1"], nextCursor: "dGVhbTpDMDYx" }),
           ),
         })
         .mockResolvedValueOnce({
+          responseHeaders: {},
           status: 200,
           body: JSON.stringify(channelPage({ ids: ["C2"] })),
         });
@@ -204,6 +210,7 @@ describe("listSlackChannels", () => {
 
     it("stops at the page cap rather than spinning on an endless cursor", async () => {
       mockedSend.mockResolvedValue({
+        responseHeaders: {},
         status: 200,
         body: JSON.stringify(
           channelPage({ ids: ["C1"], nextCursor: "never-ends" }),
@@ -219,6 +226,7 @@ describe("listSlackChannels", () => {
     it("keeps the pages it already gathered when a later page fails", async () => {
       mockedSend
         .mockResolvedValueOnce({
+          responseHeaders: {},
           status: 200,
           body: JSON.stringify(
             channelPage({ ids: ["C1"], nextCursor: "cursor-2" }),
@@ -260,10 +268,12 @@ describe("listSlackChannels", () => {
       // asks for public channels only, which channels:read alone can serve.
       mockedSend
         .mockResolvedValueOnce({
+          responseHeaders: {},
           status: 200,
           body: JSON.stringify({ ok: false, error: "missing_scope" }),
         })
         .mockResolvedValueOnce({
+          responseHeaders: {},
           status: 200,
           body: JSON.stringify({
             ok: true,

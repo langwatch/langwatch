@@ -10,7 +10,7 @@ import type { WebhookDeliveryOutcome } from "@prisma/client";
  */
 
 /** The debugging context a failed attempt keeps — the receiver's truncated
- *  response, scrubbed of our configured header values by the writer. */
+ *  response, stored exactly as the endpoint sent it (ADR-040 §6). */
 export interface WebhookFailureResponse {
   body?: string;
   headers?: Record<string, string>;

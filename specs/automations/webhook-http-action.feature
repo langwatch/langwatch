@@ -136,8 +136,7 @@ Feature: Webhook (generic HTTP) automation action
     Scenario: A failed attempt keeps the receiver's response for debugging
       Given a webhook automation whose endpoint answers an error
       When the attempt fails
-      Then the truncated response body and headers are stored
-      And any configured header value echoed back is masked before storage
+      Then the truncated response body and headers are stored exactly as the endpoint sent them
       And the stored response is deleted with the row by the prune
 
     Scenario: The delivery log is pruned after 30 days

@@ -188,7 +188,9 @@ services, repositories, dispatch helpers and delivery senders under
 `server/app-layer/automations` (the `triggers` name is retired); process
 managers, subscribers and dispatch wiring under
 `server/event-sourcing/pipelines/automations`; provider definitions split
-per side into `shared/automations/providers`,
+per side into the `@langwatch/automations` workspace package
+(`packages/automations/src/providers`, shared across app/CLI/MCP — not the
+`shared/automations/providers` path originally planned here),
 `features/automations/providers`, and
 `server/app-layer/automations/providers`. Consumers import the new
 locations directly.
@@ -216,4 +218,6 @@ observability are outside this decision.
 - [`specs/automations/process-manager-dispatch.feature`](../../../specs/automations/process-manager-dispatch.feature)
 - [`specs/automations/dispatch-timing.feature`](../../../specs/automations/dispatch-timing.feature)
 - ADR-049 (process-manager inbox/state/outbox)
-- ADR-051 (durable revision-fenced wakes)
+- ADR-051 (event-sourced topic clustering scheduling — introduces the durable
+  revision-fenced wake pattern this ADR generalises; in flight on PR #5902,
+  not yet on main)

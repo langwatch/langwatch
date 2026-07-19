@@ -24,7 +24,7 @@ import {
 
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
-import { ValidationError } from "~/server/app-layer/handled-error";
+import { ValidationError } from "@langwatch/handled-error";
 import { prisma } from "~/server/db";
 import { revokeLangySessionApiKey } from "~/server/app-layer/langy/langyApiKey";
 import { createLogger } from "@langwatch/observability";

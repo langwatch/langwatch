@@ -195,10 +195,11 @@ export function AutomationDrawer({
   const queryClient = api.useContext();
   const { filterParams } = useFilterParams();
   const projectId = project?.id ?? "";
-  const { enabled: webhookEnabled } = useFeatureFlag(
-    "release_webhook_automations",
-    { projectId: project?.id, enabled: !!project },
-  );
+  const { enabled: webhookEnabled, isLoading: webhookFlagLoading } =
+    useFeatureFlag("release_webhook_automations", {
+      projectId: project?.id,
+      enabled: !!project,
+    });
 
   const draft = useDraft();
   const section = useSection();
@@ -292,6 +293,13 @@ export function AutomationDrawer({
     ) {
       return;
     }
+    // The webhook feature flag can still be loading on mount (it defaults
+    // to false while in flight). Don't latch prefilledFromParams until it
+    // resolves, or a SEND_WEBHOOK prefill on a genuinely enabled project
+    // is silently dropped and never retried.
+    if (initialAction === TriggerAction.SEND_WEBHOOK && webhookFlagLoading) {
+      return;
+    }
     if (initialSource === "customGraph") {
       dispatch({ type: "SET_SOURCE", value: "customGraph" });
       // Alerts require a severity — seed the default so the fresh draft can
@@ -342,7 +350,7 @@ export function AutomationDrawer({
     }
     prefilledFromParams.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [webhookFlagLoading]);
 
   // Edit prefill from the saved trigger.
   const triggerQuery = api.automation.getTriggerById.useQuery(

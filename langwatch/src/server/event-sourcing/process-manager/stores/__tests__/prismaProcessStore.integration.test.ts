@@ -534,4 +534,131 @@ describe("PrismaProcessStore", () => {
     expect(await store.findMessagesByRef({ ref: projectOne })).toHaveLength(1);
     expect(await store.findMessagesByRef({ ref: projectTwo })).toHaveLength(1);
   });
+
+  it("prunes only dispatched rows past the cutoff, across projects and statuses", async () => {
+    const base = 1_700_000_000_000;
+    const cutoff = base + 10_000;
+
+    const oldDispatchedProjectOne = ref("old-dispatched-1", "project-1");
+    const oldDispatchedProjectTwo = ref("old-dispatched-2", "project-2");
+    const freshDispatched = ref("fresh-dispatched", "project-1");
+    const stillPending = ref("still-pending", "project-1");
+    const deadLetter = ref("dead-letter", "project-1");
+
+    await store.commit(
+      commit({
+        target: oldDispatchedProjectOne,
+        sourceEventId: "event-old-1",
+        messages: [message("old-dispatched-1-msg")],
+        now: base,
+      }),
+    );
+    await store.commit(
+      commit({
+        target: oldDispatchedProjectTwo,
+        sourceEventId: "event-old-2",
+        tenantId: "tenant-2",
+        messages: [message("old-dispatched-2-msg")],
+        now: base,
+      }),
+    );
+    await store.commit(
+      commit({
+        target: freshDispatched,
+        sourceEventId: "event-fresh",
+        messages: [message("fresh-dispatched-msg")],
+        now: base,
+      }),
+    );
+    await store.commit(
+      commit({
+        target: deadLetter,
+        sourceEventId: "event-dead",
+        messages: [message("dead-letter-msg")],
+        now: base,
+      }),
+    );
+    // Committed with a nextAttemptAt past the lease scan's `now` below, so it
+    // is never leased and stays genuinely pending (not just un-dispatched).
+    await store.commit(
+      commit({
+        target: stillPending,
+        sourceEventId: "event-pending",
+        messages: [message("still-pending-msg")],
+        now: cutoff + 5_000,
+      }),
+    );
+
+    const leased = await store.leaseDueMessages({
+      now: base,
+      limit: 10,
+      leaseDurationMs: 30_000,
+    });
+    const leaseFor = (messageKey: string) =>
+      leased.find((row) => row.messageKey === messageKey)!;
+
+    await store.markDispatched({
+      identity: {
+        processName,
+        projectId: "project-1",
+        messageKey: "old-dispatched-1-msg",
+      },
+      leaseToken: leaseFor("old-dispatched-1-msg").leaseToken,
+      now: base + 1_000,
+    });
+    await store.markDispatched({
+      identity: {
+        processName,
+        projectId: "project-2",
+        messageKey: "old-dispatched-2-msg",
+      },
+      leaseToken: leaseFor("old-dispatched-2-msg").leaseToken,
+      now: base + 1_000,
+    });
+    await store.markDispatched({
+      identity: {
+        processName,
+        projectId: "project-1",
+        messageKey: "fresh-dispatched-msg",
+      },
+      leaseToken: leaseFor("fresh-dispatched-msg").leaseToken,
+      now: cutoff + 1_000,
+    });
+    await store.markFailed({
+      identity: {
+        processName,
+        projectId: "project-1",
+        messageKey: "dead-letter-msg",
+      },
+      leaseToken: leaseFor("dead-letter-msg").leaseToken,
+      now: base + 1_000,
+      nextAttemptAt: base + 2_000,
+      dead: true,
+    });
+
+    const deletedCount = await store.deleteDispatchedBefore({
+      processName,
+      before: cutoff,
+    });
+
+    // The call must not throw (this doubles as the regression test for the
+    // cross-tenant multitenancy-guard bug) and must delete exactly the two
+    // dispatched rows older than the cutoff, regardless of project.
+    expect(deletedCount).toBe(2);
+
+    const remaining = await prisma.processManagerOutbox.findMany({
+      where: {
+        processName,
+        projectId: { in: ["project-1", "project-2"] },
+      },
+      orderBy: { messageKey: "asc" },
+    });
+    expect(
+      remaining.map((row) => ({ key: row.messageKey, status: row.status })),
+    ).toEqual([
+      { key: "dead-letter-msg", status: "dead" },
+      { key: "fresh-dispatched-msg", status: "dispatched" },
+      { key: "still-pending-msg", status: "pending" },
+    ]);
+  });
 });

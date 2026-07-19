@@ -3,6 +3,7 @@ import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import type { GraphAlertDispatchResult } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import {
   evaluateGraphTrigger,
   type GraphTriggerEvaluationDeps,
@@ -731,6 +732,51 @@ describe("evaluateGraphTrigger", () => {
           reason: "real-time",
         }),
       ).rejects.toThrow("provider unreachable");
+    });
+  });
+
+  describe("given a breach whose dispatch throws a typed DispatchError", () => {
+    it("keeps the claim when the failure is terminal (retryable: false), so a dead endpoint is not re-posted every evaluation", async () => {
+      harness.dispatch.mockRejectedValue(
+        new DispatchError({ message: "webhook revoked", retryable: false }),
+      );
+
+      await expect(
+        evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        }),
+      ).rejects.toThrow("webhook revoked");
+
+      // Terminal failure: the claim is NOT rolled back, so the next
+      // evaluation's open pre-check sees it and backs off instead of
+      // re-POSTing to a permanently broken endpoint.
+      expect(harness.triggerSent.claimCalls).toBe(1);
+      expect(harness.triggerSent.deleteCalls).toHaveLength(0);
+      expect(harness.triggerSent.openRows).toHaveLength(1);
+    });
+
+    it("rolls the claim back when the failure is retryable (retryable: true), so the outbox retry can re-dispatch", async () => {
+      harness.dispatch.mockRejectedValue(
+        new DispatchError({ message: "provider 503", retryable: true }),
+      );
+
+      await expect(
+        evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        }),
+      ).rejects.toThrow("provider 503");
+
+      // Transient failure: the claim IS rolled back so a retry can re-claim
+      // and re-dispatch, same as the untyped-Error case above.
+      expect(harness.triggerSent.claimCalls).toBe(1);
+      expect(harness.triggerSent.deleteCalls).toHaveLength(1);
+      expect(harness.triggerSent.openRows).toHaveLength(0);
     });
   });
 

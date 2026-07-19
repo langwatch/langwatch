@@ -1,87 +1,47 @@
-import { Box, Code, Text, VStack } from "@chakra-ui/react";
+import { Box, Text, VStack } from "@chakra-ui/react";
 
+import {
+  resolveScenarioError,
+  scenarioErrorTitle,
+} from "~/server/scenarios/scenario-infra-error";
 import { CONSOLE_COLORS } from "./constants";
-
-interface ParsedError {
-  name?: string;
-  message?: string;
-  stack?: string;
-}
-
-/**
- * Parses error string and returns structured error object
- * Single Responsibility: Safely parses error JSON or handles plain strings
- */
-function parseError(errorString?: string): ParsedError | null {
-  if (!errorString) return null;
-
-  // Check if it looks like JSON (starts with { and ends with })
-  if (errorString.trim().startsWith("{") && errorString.trim().endsWith("}")) {
-    try {
-      return JSON.parse(errorString);
-    } catch {
-      // If JSON parsing fails, return the raw string as message
-      return { message: errorString };
-    }
-  }
-
-  // If it's not JSON, treat as plain string message
-  return { message: errorString };
-}
 
 interface ErrorDetailsProps {
   error: string;
 }
 
 /**
- * Error details component
- * Single Responsibility: Displays structured error information in console format
+ * Error details component.
+ *
+ * Normalizes every run error into a clean, actionable handled error — a stable
+ * title + human message + optional hint — and never shows a raw stack trace or
+ * child-process dump. `resolveScenarioError` renders the encoded envelope the
+ * failure handler produces directly, and classifies any other error string
+ * (e.g. the scenario SDK's `{ name, message, stack }`) on the fly so it reads
+ * the same.
+ *
+ * @see ~/server/scenarios/scenario-infra-error
  */
 export function ErrorDetails({ error }: ErrorDetailsProps) {
-  const parsedError = parseError(error);
-
-  if (!parsedError) return null;
+  const handled = resolveScenarioError(error);
 
   return (
-    <Box>
+    <Box data-testid="scenario-handled-error">
       <Text color={CONSOLE_COLORS.failureColor} fontWeight="semibold" mb={1}>
-        Error Details:
+        {scenarioErrorTitle(handled.code)}
       </Text>
-      <VStack align="start" gap={1} pl={2}>
-        {parsedError.name && (
-          <Text color={CONSOLE_COLORS.failureColor} fontSize="sm">
-            <Text as="span" color="white">
-              Type:
-            </Text>{" "}
-            {parsedError.name}
+      <VStack align="start" gap={2} pl={2}>
+        <Text color={CONSOLE_COLORS.consoleText} fontSize="sm">
+          {handled.message}
+        </Text>
+        {handled.hint && (
+          <Text
+            color={CONSOLE_COLORS.warningColor}
+            fontSize="sm"
+            data-testid="scenario-handled-error-hint"
+          >
+            {handled.hint}
           </Text>
-        )}
-        {parsedError.message && (
-          <Text color={CONSOLE_COLORS.failureColor} fontSize="sm">
-            <Text as="span" color="white">
-              Message:
-            </Text>{" "}
-            {parsedError.message}
-          </Text>
-        )}
-        {parsedError.stack && (
-          <Box>
-            <Text color="white" fontSize="sm" mb={1}>
-              Stack Trace:
-            </Text>
-            <Code
-              colorPalette="red"
-              bg="transparent"
-              color={CONSOLE_COLORS.failureColor}
-              fontSize="xs"
-              whiteSpace="pre-wrap"
-              display="block"
-              width="100%"
-              pl={2}
-            >
-              {parsedError.stack}
-            </Code>
-          </Box>
         )}
       </VStack>
     </Box>

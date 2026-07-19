@@ -1,4 +1,4 @@
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 
 /**
  * Domain errors raised by the automation authoring path (ADR-036). Each is a

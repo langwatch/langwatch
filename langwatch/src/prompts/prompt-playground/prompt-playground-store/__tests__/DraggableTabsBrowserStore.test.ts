@@ -365,6 +365,37 @@ describe("DraggableTabsBrowserStore", () => {
         expect(store.getState().activeWindowId).toBe(newWindowId);
         expect(store.getState().windows[1]?.activeTabId).toBe(newTabId);
       });
+
+      // Characterization test, not a regression test: it locks the invariant
+      // that splitTab commits plain, unaliased data, but it passes against both
+      // cloneDeep(sourceTab.data) and cloneDeep(current(sourceTab).data). The
+      // commit that introduced current() claimed lodash-es cloneDeep throws on
+      // an immer draft; that could not be reproduced against immer@11 /
+      // lodash-es@4.18 (cloneDeep returns a correct plain clone either way), so
+      // there is no failing case to pin. current() is kept because taking the
+      // snapshot before cloning is the correct way to leave a recipe, not
+      // because it fixes an observed crash.
+      it("stores plain, fully detached data on the split tab", () => {
+        const originalData = createTabData({ meta: { title: "Original" } });
+        store.getState().addTab({ data: originalData });
+        const tabId = store.getState().windows[0]?.tabs[0]?.id;
+        expect(tabId).toBeDefined();
+
+        store.getState().splitTab({ tabId: tabId! });
+
+        const sourceData = store.getState().windows[0]?.tabs[0]?.data;
+        const clonedData = store.getState().windows[1]?.tabs[0]?.data;
+        expect(sourceData).toBeDefined();
+        expect(clonedData).toBeDefined();
+
+        // A revoked draft proxy throws on any property access here.
+        expect(() => JSON.parse(JSON.stringify(clonedData))).not.toThrow();
+
+        // Same content, but no object identity shared with the source.
+        expect(clonedData).toEqual(sourceData);
+        expect(clonedData).not.toBe(sourceData);
+        expect(clonedData!.meta).not.toBe(sourceData!.meta);
+      });
     });
   });
 

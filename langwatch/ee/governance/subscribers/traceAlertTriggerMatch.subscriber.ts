@@ -4,19 +4,10 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type { TriggerMatchRecordedEventData } from "~/server/event-sourcing/pipelines/automations/schemas/events";
-import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedSubscriber";
+import type { RecordTriggerMatchPort } from "~/server/event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
+import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedReactor";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
-
-export interface RecordTriggerMatchPort {
-  send(
-    data: TriggerMatchRecordedEventData & {
-      tenantId: string;
-      occurredAt: number;
-    },
-  ): Promise<void>;
-}
 
 /** Post-traceSummary, origin-guarded handoff into the automations pipeline. */
 export function createTraceAlertTriggerMatchHandler(deps: {
@@ -28,6 +19,11 @@ export function createTraceAlertTriggerMatchHandler(deps: {
     context: TriggerContext<TraceSummaryData>,
   ): Promise<void> => {
     if (!passesTraceOriginGuards(event, context.state)) return;
+    // Events already committed with an empty aggregateId (see the traceId
+    // guard in originGate.reactor) would fail recordTriggerMatch validation
+    // and poison the reactor job. There is no trace to match a trigger
+    // against, so skip rather than throw.
+    if (!context.aggregateId) return;
     const triggers = await deps.triggers.getActiveTraceTriggersForProject(
       context.tenantId,
     );

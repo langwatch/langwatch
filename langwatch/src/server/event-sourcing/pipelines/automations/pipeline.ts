@@ -1,4 +1,7 @@
+import { createLogger } from "@langwatch/observability";
+
 import { definePipeline } from "../../pipeline/staticBuilder";
+import { toSafeFailureDiagnostic } from "../../process-manager/failureDiagnostic";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import { RecordTriggerMatchCommand } from "./commands/recordTriggerMatch.command";
 import {
@@ -16,6 +19,7 @@ import {
   INITIAL_SETTLEMENT_STATE,
   type SettlementState,
   settleBoundary,
+  TRIGGER_SETTLEMENT_PROCESS_NAME,
 } from "./process-manager/triggerSettlement.process";
 import {
   createLogOverflowHandler,
@@ -43,6 +47,40 @@ import {
 } from "./projections/automationAudit.mapProjection";
 import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "./schemas/constants";
 import type { AutomationEvent } from "./schemas/events";
+
+const logger = createLogger("langwatch:triggers:automations-pipeline");
+
+/** triggerSettlement is keyed per-trigger (aggregateType "trigger") and only
+ *  wakes when it has pending matches, so — unlike graphAlertSweep/
+ *  webhookDeliveryPrune — it has no singleton schedule of its own to hang
+ *  outbox retention off. Pruning it from its own onWake would fire a global
+ *  cross-tenant delete from every single trigger's wake (a thundering herd),
+ *  so instead we piggyback on webhookDeliveryPrune's existing daily wake —
+ *  the same singleton-PM retention mechanism sweep/prune already use for
+ *  themselves — to also prune triggerSettlement's dispatched outbox rows,
+ *  the highest-volume PM in this pipeline. */
+const TRIGGER_SETTLEMENT_OUTBOX_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+function runWebhookDeliveryPruneWithTriggerSettlementRetention(
+  deps: WebhookDeliveryPruneDeps,
+) {
+  const pruneWebhookDeliveries = runWebhookDeliveryPrune(deps);
+  return async (): Promise<void> => {
+    await pruneWebhookDeliveries();
+    const startedAt = (deps.now ?? Date.now)();
+    try {
+      await deps.deleteDispatchedBefore({
+        processName: TRIGGER_SETTLEMENT_PROCESS_NAME,
+        before: startedAt - TRIGGER_SETTLEMENT_OUTBOX_RETENTION_MS,
+      });
+    } catch (error) {
+      logger.warn(
+        toSafeFailureDiagnostic(error),
+        "triggerSettlement outbox retention failed",
+      );
+    }
+  };
+}
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (states, intents, evolve/wake handlers, outbox tuning)
@@ -162,7 +200,11 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
         .state<WebhookDeliveryPruneState>({ lastPruneAt: null })
         .schedule({ everyMs: WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS })
         .onWake(webhookDeliveryPruneWake)
-        .intent("prune", pruneSchema, runWebhookDeliveryPrune(deps.prune)),
+        .intent(
+          "prune",
+          pruneSchema,
+          runWebhookDeliveryPruneWithTriggerSettlementRetention(deps.prune),
+        ),
     )
     .build();
 }

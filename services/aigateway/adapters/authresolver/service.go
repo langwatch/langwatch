@@ -46,20 +46,25 @@ type ConfigFetcher interface {
 // listens for. Kept as a sealed string set so callers can switch
 // exhaustively without leaking control-plane internals into this package.
 const (
-	ChangeKindProviderBindingUpdated = "PROVIDER_BINDING_UPDATED"
+	ChangeKindProviderBindingUpdated = "MODEL_PROVIDER_UPDATED"
+	ChangeKindBudgetCreated          = "BUDGET_CREATED"
 	ChangeKindBudgetUpdated          = "BUDGET_UPDATED"
-	ChangeKindVirtualKeyUpdated      = "VIRTUAL_KEY_UPDATED"
+	ChangeKindBudgetDeleted          = "BUDGET_DELETED"
+	ChangeKindVirtualKeyCreated      = "VK_CREATED"
+	ChangeKindVirtualKeyConfigUpdate = "VK_CONFIG_UPDATED"
+	ChangeKindVirtualKeyRotated      = "VK_ROTATED"
+	ChangeKindVirtualKeyRevoked      = "VK_REVOKED"
 )
 
 // CacheChange is one cache-invalidation hint surfaced by ChangePoller.
 // Mirrors the wire shape from the control plane's /changes endpoint.
 type CacheChange struct {
-	Kind                 string
-	VirtualKeyID         string
-	BudgetID             string
-	ProviderCredentialID string
-	ProjectID            string
-	Revision             string
+	Kind            string
+	VirtualKeyID    string
+	BudgetID        string
+	ModelProviderID string
+	ProjectID       string
+	Revision        string
 }
 
 // ChangePoller is the upstream that streams cache-invalidation events
@@ -522,7 +527,7 @@ func (s *Service) changeFeedLoop(ctx context.Context) {
 				return true
 			}
 			for _, ch := range changes {
-				s.applyChange(ch)
+				s.applyChange(orgID, ch)
 			}
 			if nextRev != "" {
 				cursor.since = nextRev
@@ -552,39 +557,43 @@ func (s *Service) changeFeedLoop(ctx context.Context) {
 // once with a kind-specific predicate and removes matching entries; the
 // next request for those VKs takes a cold miss and re-resolves with the
 // fresh control-plane state.
-func (s *Service) applyChange(ch CacheChange) {
+func (s *Service) applyChange(organizationID string, ch CacheChange) {
 	switch ch.Kind {
 	case ChangeKindProviderBindingUpdated:
-		if ch.ProviderCredentialID == "" {
+		// The control plane emits ModelProvider.id. Config materialization puts
+		// that same ID in Credential.ID; ProviderID is only the provider type
+		// (for example "openai") and is not a cache invalidation join key.
+		if ch.ModelProviderID == "" {
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			for _, c := range b.Config.Credentials {
-				if c.ID == ch.ProviderCredentialID {
+				if c.ID == ch.ModelProviderID {
 					return true
 				}
 			}
 			return false
-		}, "provider_binding_updated", ch.ProviderCredentialID)
-	case ChangeKindBudgetUpdated:
-		// BUDGET_UPDATED's project_id is the only stable join key
-		// (budget_id alone doesn't appear in the bundle; budgets nest
-		// under scopes). Evicting all bundles for the affected project
-		// is conservative but correct — the next request re-fetches
-		// the fresh limit/spent pair from the control plane.
-		if ch.ProjectID == "" {
+		}, "model_provider_updated", ch.ModelProviderID)
+	case ChangeKindBudgetCreated, ChangeKindBudgetUpdated, ChangeKindBudgetDeleted:
+		// Only PROJECT-scoped creates carry project_id. Updates, deletes, and
+		// every other scope omit it, so invalidate the polled organization in
+		// those cases rather than leaving a stale budget enforced until TTL.
+		if ch.ProjectID != "" {
+			s.evictWhere(func(b *domain.Bundle) bool {
+				return b.ProjectID == ch.ProjectID
+			}, "budget_updated", ch.ProjectID)
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
-			return b.ProjectID == ch.ProjectID
-		}, "budget_updated", ch.ProjectID)
-	case ChangeKindVirtualKeyUpdated:
+			return b.OrganizationID == organizationID
+		}, "budget_updated", organizationID)
+	case ChangeKindVirtualKeyConfigUpdate, ChangeKindVirtualKeyRotated, ChangeKindVirtualKeyRevoked:
 		if ch.VirtualKeyID == "" {
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.VirtualKeyID == ch.VirtualKeyID
-		}, "virtual_key_updated", ch.VirtualKeyID)
+		}, "virtual_key_config_updated", ch.VirtualKeyID)
 	}
 }
 

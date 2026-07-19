@@ -233,6 +233,29 @@ func baseCfg() egressAdapterConfig {
 	}
 }
 
+func TestCheckedDialAddressRejectsPrivateResolution(t *testing.T) {
+	cfg := baseCfg()
+	cfg.resolve = func(context.Context, string) ([]net.IP, error) {
+		return []net.IP{net.ParseIP("169.254.169.254")}, nil
+	}
+	a := &egressAdapter{cfg: cfg}
+	if _, err := a.checkedDialAddress(context.Background(), "metadata.google.internal", "443"); err == nil {
+		t.Fatal("private resolved address was accepted")
+	}
+}
+
+func TestCheckedDialAddressPinsPublicResolution(t *testing.T) {
+	cfg := baseCfg()
+	cfg.resolve = func(context.Context, string) ([]net.IP, error) {
+		return []net.IP{net.ParseIP("8.8.8.8")}, nil
+	}
+	a := &egressAdapter{cfg: cfg}
+	got, err := a.checkedDialAddress(context.Background(), "example.com", "443")
+	if err != nil || got != "8.8.8.8:443" {
+		t.Fatalf("checked address = %q, err = %v", got, err)
+	}
+}
+
 // ---- Rung 2: allow-list set means restrict to it ----
 
 func TestEgress_ListedHostIsAllowedAndTunnels(t *testing.T) {

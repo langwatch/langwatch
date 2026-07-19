@@ -94,7 +94,15 @@ const classifyEvaluatorExecutionError = (
   if (status !== 401 && status !== 403) return undefined;
 
   return new EvaluatorExecutionError(rawMessage, {
-    meta: { httpStatus: status },
+    meta: { httpStatus: status, reason: "auth_failed" },
+    // A 401/403 from the evaluator's LLM call is the customer's credential or
+    // config, not our backend — override the class's platform default.
+    // `meta.reason` carries the typed sub-classifier (same convention as the
+    // Go envelopes) so clients can branch without parsing the message.
+    fault: "customer",
+    tips: [
+      "Check the API key and model configuration for this evaluator — the provider rejected the call with 401/403",
+    ],
   });
 };
 

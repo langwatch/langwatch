@@ -1,4 +1,4 @@
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 
 /**
  * Thrown when a caller supplies BOTH a top-level `prompt` field AND a system

@@ -24,46 +24,15 @@ const LOG_ERROR_CHARS = 500;
 /** How much of the receiver's failure response body the log row keeps. */
 const LOG_RESPONSE_CHARS = 4000;
 
-/** Mask every configured header VALUE out of stored text. The receiver may
- *  echo the request's Authorization header back in its error output — our
- *  customer's secret must not persist even via their response. */
-export function scrubHeaderValues({
-  text,
-  headers,
-}: {
-  text: string;
-  headers: Record<string, string>;
-}): string {
-  let out = text;
-  for (const value of Object.values(headers)) {
-    if (!value) continue;
-    out = out.split(value).join("***");
-  }
-  return out;
-}
-
 function captureFailureResponse({
   result,
-  sentHeaders,
 }: {
   result: WebhookSendResult | undefined;
-  sentHeaders: Record<string, string>;
 }): WebhookFailureResponse | null {
   if (!result) return null;
-  const scrub = (text: string) =>
-    scrubHeaderValues({ text, headers: sentHeaders });
   return {
-    body: scrub(result.body).slice(0, LOG_RESPONSE_CHARS),
-    ...(result.responseHeaders
-      ? {
-          headers: Object.fromEntries(
-            Object.entries(result.responseHeaders).map(([name, value]) => [
-              name,
-              scrub(value),
-            ]),
-          ),
-        }
-      : {}),
+    body: result.body.slice(0, LOG_RESPONSE_CHARS),
+    ...(result.responseHeaders ? { headers: result.responseHeaders } : {}),
     ...(result.retryAfterMs !== undefined
       ? { retryAfterMs: result.retryAfterMs }
       : {}),
@@ -75,12 +44,13 @@ function captureFailureResponse({
  * (ADR-040 §5 + §6) as a single unit: on 2xx a `success` row, on a classified
  * non-2xx a `retryable`/`terminal` row, on a transport/SSRF throw a row with
  * the error and no status. A failed attempt keeps the receiver's truncated
- * response (body + headers) for debugging — industry-baseline plaintext,
- * scrubbed of our configured header values, deleted with the row by the
- * prune. The
- * classified DispatchError is always re-thrown so the outbox retry contract
- * is unchanged — logging is a side effect that never swallows a dispatch
- * failure, and a logging failure never breaks dispatch.
+ * response (body + headers) VERBATIM for debugging — industry-baseline
+ * plaintext, deliberately unredacted (ADR-040 §6: what the receiver echoes
+ * is the receiver's own output; our request content is never stored at all),
+ * deleted with the row by the prune. The classified DispatchError is always
+ * re-thrown so the outbox retry contract is unchanged — logging is a side
+ * effect that never swallows a dispatch failure, and a logging failure never
+ * breaks dispatch.
  */
 export async function deliverWebhook({
   send = sendWebhook,
@@ -146,22 +116,19 @@ export async function deliverWebhook({
     return result;
   } catch (err) {
     const retryable = isDispatchError(err) && err.retryable;
-    // The classified message may quote the receiver's error response; our
-    // configured header values are scrubbed even if the receiver echoes
-    // them back. Request content never appears here.
-    const error = scrubHeaderValues({
-      text: err instanceof Error ? err.message : String(err),
-      headers: headers ?? {},
-    }).slice(0, LOG_ERROR_CHARS);
+    // The classified message may quote the receiver's error response —
+    // stored as-is. Our request content (URL, headers, body) never appears
+    // here; the message is built from the response side only.
+    const error = (err instanceof Error ? err.message : String(err)).slice(
+      0,
+      LOG_ERROR_CHARS,
+    );
     await safeRecord({
       ...baseRow,
       responseStatus: result?.status ?? null,
       latencyMs: Date.now() - startedAt,
       error,
-      response: captureFailureResponse({
-        result,
-        sentHeaders: headers ?? {},
-      }),
+      response: captureFailureResponse({ result }),
       outcome: retryable ? "retryable" : "terminal",
     });
     throw err;

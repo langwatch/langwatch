@@ -191,6 +191,12 @@ ENVIRONMENT
     LANGWATCH_HAVEN_CH_STOP_IDLE=1  Daemon stops the CH container when no stacks run.
     LANGWATCH_HAVEN_CH_MEMORY_MB    CH container memory ceiling in MB (default 1536).
     HAVEN_CH_IMAGE=<image>       Override the pinned Altinity ClickHouse image.
+    HAVEN_CLICKHOUSE_FULL_LOGS=1 Keep ClickHouse's stock logging. By default
+                                 haven disables the high-volume system logs
+                                 (text_log, trace_log, the metric logs), caps
+                                 the rest, and quiets the server log to
+                                 warnings with a small bounded rotation.
+    HAVEN_CLICKHOUSE_LOG_TTL_DAYS=7  How long the kept system logs live.
     LANGWATCH_HAVEN_PG=0         Do not manage Postgres (use .env DATABASE_URL).
     HAVEN_PG_FORMULA=postgresql@16  brew formula to start if none is running
                                  (an already-running postgresql@NN, any version,

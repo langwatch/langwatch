@@ -25,4 +25,6 @@ const (
 	AttrFallbackWinningProvider   = "langwatch.fallback.winning_provider"
 	AttrFallbackWinningCredential = "langwatch.fallback.winning_credential"
 	AttrThreadID                  = "langwatch.thread_id"
+	AttrErrorType                 = "error.type"
+	AttrUpstreamStatusCode        = "langwatch.upstream.status_code"
 )

@@ -21,9 +21,9 @@ function buildConfig(
  * ADR-038: the flow branches on the declared intent, recomputed from state —
  * the generic navigator itself stays linear (constraint C1).
  *
- * The whole intent fork ships dark behind release_ui_ai_governance_enabled
- * (v5): with the flag off (or still loading) the flow is exactly the
- * pre-fork one — no intent screen at all. False-while-loading is safe:
+ * The intent fork rides release_ui_ai_governance_enabled (v5, on by
+ * default): with the flag off (or still loading) the flow is exactly the
+ * pre-fork one, no intent screen at all. False-while-loading is safe:
  * both shapes start at ORGANIZATION, so a late flag flip only inserts
  * screens ahead of the user.
  *

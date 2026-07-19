@@ -2,6 +2,7 @@ package aigateway
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -71,7 +72,9 @@ func defaultConfig() Config {
 			BaseURL: "http://localhost:5560",
 		},
 		OTel: config.OTel{
-			SampleRatio: 1.0, // overridden to 0.1 for non-local in LoadConfig
+			// Left unset so an operator-supplied ratio is distinguishable from
+			// the default; resolved in LoadConfig.
+			SampleRatio: config.UnsetSampleRatio,
 		},
 	}
 }
@@ -89,18 +92,38 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Hydrate(&cfg); err != nil {
 		return Config{}, err
 	}
+	cfg.OTel.SampleRatioSet = os.Getenv("OTEL_SAMPLE_RATIO") != ""
 	applyLegacyEnvAliases(&cfg)
+	if err := validateHostedEgressSecurity(cfg); err != nil {
+		return Config{}, err
+	}
 	if cfg.CustomerTraceBridge.BaseURL == "" {
 		cfg.CustomerTraceBridge.BaseURL = cfg.ControlPlane.BaseURL
 	}
-	// Apply environment-aware sample ratio default when not explicitly set.
-	if cfg.OTel.SampleRatio == 1.0 && cfg.Environment != "local" {
-		cfg.OTel.SampleRatio = 0.1
+	if err := cfg.OTel.Resolve(cfg.Environment); err != nil {
+		return Config{}, err
 	}
 	if err := config.Validate(ctx, cfg); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// validateHostedEgressSecurity makes the SSRF controls a startup invariant for
+// deployed gateway instances. Local/self-hosted development keeps the legacy
+// permissive default, but a hosted process must never silently boot with the
+// compatibility defaults after a missing or misspelled environment variable.
+func validateHostedEgressSecurity(cfg Config) error {
+	if cfg.Environment == "" || cfg.Environment == "local" {
+		return nil
+	}
+	if !cfg.BlockLocalHTTPCalls {
+		return fmt.Errorf("hosted gateway requires BLOCK_LOCAL_HTTP_CALLS=true")
+	}
+	if !cfg.RequireHTTPSCustomerEndpoints {
+		return fmt.Errorf("hosted gateway requires REQUIRE_HTTPS_CUSTOM_ENDPOINTS=true")
+	}
+	return nil
 }
 
 // applyLegacyEnvAliases reads the chart/saas-style env var names that the

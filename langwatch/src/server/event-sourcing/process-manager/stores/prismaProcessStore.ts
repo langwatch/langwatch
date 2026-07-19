@@ -415,13 +415,20 @@ export class PrismaProcessStore implements ProcessStore {
     processName: string;
     before: number;
   }): Promise<number> {
-    const result = await this.prisma.processManagerOutbox.deleteMany({
-      where: {
-        processName: params.processName,
-        status: "dispatched",
-        dispatchedAt: { lt: asDate(params.before) },
-      },
-    });
-    return result.count;
+    // Cross-tenant retention sweep: this prunes dispatched outbox rows for a
+    // process name across every project, so it has no `projectId` predicate
+    // and the multitenancy guard would otherwise throw on every scheduled
+    // prune tick. Opt out via the guard's sanctioned `-- @tenancy:` marker
+    // (see dbMultiTenancyProtection.ts and the scheduler's due-scan in
+    // scheduled-job.repository.ts for the same pattern) — this is a
+    // system-owned maintenance sweep, not a tenant-scoped read/write.
+    const affected = await this.prisma.$executeRaw`
+      DELETE FROM "ProcessManagerOutbox"
+      WHERE "processName" = ${params.processName}
+        AND "status" = 'dispatched'::"ProcessManagerOutboxStatus"
+        AND "dispatchedAt" < ${asDate(params.before)}
+      -- @tenancy: process-manager outbox retention cross-tenant sweep (system-owned maintenance)
+    `;
+    return affected;
   }
 }

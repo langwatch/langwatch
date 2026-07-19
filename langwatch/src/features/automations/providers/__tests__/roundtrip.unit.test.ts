@@ -12,7 +12,7 @@ import type { EmailSlice } from "../email/client";
 import { emailActionParamsSchema } from "@langwatch/automations/providers/email";
 import type { SlackSlice } from "../slack/client";
 import { slackActionParamsSchema } from "@langwatch/automations/providers/slack";
-import type { SavedTriggerRow } from "../types";
+import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 
 /**
  * Build a `SavedTriggerRow` from a provider's `toActionParams` output so we can

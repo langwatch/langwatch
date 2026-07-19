@@ -8,9 +8,39 @@ import {
   buildOtelResourceAttributes,
   handleCancelledJobResult,
   handleFailedJobResult,
+  parseChildProcessResult,
   type ProcessorDependencies,
 } from "../scenario.processor";
 import type { ExecutionJobData } from "../execution/execution-pool";
+
+describe("parseChildProcessResult", () => {
+  it("extracts the result line from stdout mixed with pino logs", () => {
+    const stdout = [
+      '{"level":30,"time":1,"msg":"spawning"}',
+      '{"level":50,"time":2,"err":"boom","msg":"scenario execution failed"}',
+      '{"success":false,"error":"self-signed certificate in certificate chain"}',
+    ].join("\n");
+    expect(parseChildProcessResult(stdout)).toEqual({
+      success: false,
+      error: "self-signed certificate in certificate chain",
+    });
+  });
+
+  it("returns the last result line and its reasoning on success", () => {
+    const stdout =
+      '{"level":30,"msg":"hi"}\n{"success":true,"reasoning":"looks good"}\n';
+    expect(parseChildProcessResult(stdout)).toEqual({
+      success: true,
+      reasoning: "looks good",
+    });
+  });
+
+  it("returns null when no result line is present", () => {
+    expect(parseChildProcessResult('{"level":30,"msg":"only logs"}')).toBeNull();
+    expect(parseChildProcessResult("")).toBeNull();
+    expect(parseChildProcessResult("not json at all")).toBeNull();
+  });
+});
 
 describe("buildOtelResourceAttributes", () => {
   it("always includes langwatch.origin.source=platform", () => {

@@ -251,6 +251,60 @@ describe("trigger settlement intent handlers integration", () => {
     });
   });
 
+  describe("given two triggers share an identical candidate trace set", () => {
+    it("keys the tenant daily cap slot on triggerId so each trigger's recipients count", async () => {
+      const emailTemplates = {
+        slackTemplateType: null,
+        slackTemplate: null,
+        emailSubjectTemplate: "Alert: {{ trigger.name }}",
+        emailBodyTemplate: "Matched {{ matches.size }} trace",
+      };
+      const triggerA = trigger(TriggerAction.SEND_EMAIL, {
+        id: "trigger-a",
+        actionParams: { members: ["ops@example.com"] },
+        templates: emailTemplates,
+      });
+      const { deps, raw } = makeDeps(triggerA);
+      raw.triggers.getActiveTraceTriggersForProject.mockImplementation(
+        async () => [
+          triggerA,
+          trigger(TriggerAction.SEND_EMAIL, {
+            id: "trigger-b",
+            actionParams: { members: ["ops@example.com"] },
+            templates: emailTemplates,
+          }),
+        ],
+      );
+
+      const digestPayload = (triggerId: string) => ({
+        triggerId,
+        traceIds: ["trace-1"],
+        boundary: 1_000,
+      });
+      const handler = createNotifyDigestHandler(deps);
+
+      await handler(
+        digestPayload("trigger-a"),
+        context("process:trigger-a:digest:1000:batch"),
+      );
+      await handler(
+        digestPayload("trigger-b"),
+        context("process:trigger-b:digest:1000:batch"),
+      );
+
+      const tenantDedupKeys = raw.consumeTenantEmailCapSlot.mock.calls.map(
+        (call) => (call[0] as { dedupKey: string }).dedupKey,
+      );
+      expect(tenantDedupKeys).toHaveLength(2);
+      expect(tenantDedupKeys[0]).toContain("trigger-a");
+      expect(tenantDedupKeys[1]).toContain("trigger-b");
+      // The two dispatches share the same trace set (same digest) yet must
+      // not collide on the tenant daily-cap claim — the ADR-031 backstop
+      // counts each trigger's recipients only if the keys differ.
+      expect(tenantDedupKeys[0]).not.toBe(tenantDedupKeys[1]);
+    });
+  });
+
   describe("given a notify trace was sent in an earlier settle window", () => {
     it("uses the send claim to suppress a duplicate across windows", async () => {
       const activeTrigger = trigger(TriggerAction.SEND_EMAIL, {

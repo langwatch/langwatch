@@ -3,6 +3,15 @@ Feature: Simulation Runner Service
   I need to orchestrate scenario execution
   So that scenarios can be run against various targets
 
+  # NOTE: the SimulationRunnerService class this feature was written against no
+  # longer exists — it was superseded and deleted once nothing imported it. The
+  # behaviour it describes is still required and now lives in
+  # src/server/scenarios/execution/: data-prefetcher.ts loads the scenario and
+  # passes situation/criteria through, serialized-adapters/ resolves the HTTP
+  # and prompt-config targets, and execution-pool.ts + scenario-child-process.ts
+  # run it. Steps below still name SimulationRunnerService; rewording them
+  # against the surviving modules is tracked as follow-up, not done here.
+  #
   # Per AUDIT_MANIFEST.md: 25 scenarios → 16 DUPLICATE (now bound or already
   # covered elsewhere via @scenario JSDoc against simulation-runner.router,
   # orchestrator, http-agent.adapter, prompt-config.adapter, scenario.processor.*,

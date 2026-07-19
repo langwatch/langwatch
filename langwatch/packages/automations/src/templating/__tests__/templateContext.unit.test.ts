@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildTemplateContext } from "../templateContext";
+import {
+  buildGraphAlertTemplateContext,
+  buildReportTemplateContext,
+  buildTemplateContext,
+} from "../templateContext";
 
 const baseArgs = {
   trigger: {
@@ -69,6 +73,65 @@ describe("buildTemplateContext", () => {
       });
       expect(ctx.digest.windowStart).toBeNull();
       expect(ctx.digest.windowEnd).toBeNull();
+    });
+  });
+
+  describe("given a trigger name carrying CR/LF header-injection payload", () => {
+    const hostileName = "Alert\r\nBcc: attacker@evil.test";
+
+    it("strips CR/LF from trigger.name so it can't inject an email header", () => {
+      const ctx = buildTemplateContext({
+        ...baseArgs,
+        trigger: { ...baseArgs.trigger, name: hostileName },
+        matches: [{ traceId: "a" }],
+      });
+      expect(ctx.trigger.name).toBe("Alert Bcc: attacker@evil.test");
+      expect(ctx.trigger.name).not.toMatch(/[\r\n]/);
+    });
+  });
+});
+
+describe("buildGraphAlertTemplateContext", () => {
+  describe("given a trigger name carrying CR/LF header-injection payload", () => {
+    it("strips CR/LF from trigger.name so it can't inject an email header", () => {
+      const ctx = buildGraphAlertTemplateContext({
+        trigger: {
+          id: "trg_1",
+          name: "Spike\r\nBcc: attacker@evil.test",
+          alertType: "WARNING",
+        },
+        graph: { id: "graph_1", name: "Trace count" },
+        metric: { label: "Trace count", seriesName: "0/trace_id/cardinality" },
+        condition: { operator: "gt", threshold: 10, timePeriodMinutes: 30 },
+        currentValue: 12,
+        occurredAt: new Date("2026-05-29T00:00:00.000Z"),
+        reason: "real-time",
+        project: { id: "proj_1", name: "Acme", slug: "acme" },
+        baseHost: "https://app.langwatch.ai",
+      });
+      expect(ctx.trigger.name).toBe("Spike Bcc: attacker@evil.test");
+      expect(ctx.trigger.name).not.toMatch(/[\r\n]/);
+    });
+  });
+});
+
+describe("buildReportTemplateContext", () => {
+  describe("given a trigger name carrying CR/LF header-injection payload", () => {
+    it("strips CR/LF from trigger.name so it can't inject an email header", () => {
+      const ctx = buildReportTemplateContext({
+        trigger: { id: "trg_1", name: "Weekly\r\nBcc: attacker@evil.test" },
+        report: {
+          sourceKind: "traceQuery",
+          sourceLabel: "Top 5 matching traces",
+          scheduleLabel: "every Monday at 09:00 (UTC)",
+        },
+        viewUrl: "https://app.langwatch.ai/acme/messages",
+        occurredAt: new Date("2026-05-29T00:00:00.000Z"),
+        project: { id: "proj_1", name: "Acme", slug: "acme" },
+        baseHost: "https://app.langwatch.ai",
+      });
+      expect(ctx.trigger.name).toBe("Weekly Bcc: attacker@evil.test");
+      expect(ctx.trigger.name).not.toMatch(/[\r\n]/);
     });
   });
 });

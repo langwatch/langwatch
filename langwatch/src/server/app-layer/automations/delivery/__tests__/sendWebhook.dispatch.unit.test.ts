@@ -21,6 +21,7 @@ const mockedRateLimit = vi.mocked(rateLimit);
 
 function sendResolves(overrides?: { status?: number; retryAfterMs?: number }) {
   mockedSend.mockResolvedValue({
+    responseHeaders: {},
     status: overrides?.status ?? 200,
     body: "ok",
     retryAfterMs: overrides?.retryAfterMs,

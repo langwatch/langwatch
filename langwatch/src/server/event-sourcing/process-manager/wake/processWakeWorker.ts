@@ -1,5 +1,6 @@
 import type { Logger } from "@langwatch/observability";
 
+import { toSafeFailureDiagnostic } from "../failureDiagnostic";
 import type { HandleResult } from "../processManagerService";
 import type { DueWake, ProcessStore } from "../stores/processStore.types";
 
@@ -113,8 +114,9 @@ export class ProcessWakeWorker {
         await this.handleOne(wake);
       }
     } catch (error) {
+      const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
       this.logger.error(
-        { error: error instanceof Error ? error.message : String(error) },
+        { errorType, errorMessage },
         "ProcessWakeWorker scan failed; the next poll will retry",
       );
     }
@@ -139,12 +141,14 @@ export class ProcessWakeWorker {
       // since this wake was scheduled — it stands down silently.
     } catch (error) {
       // The wake stays due; the next poll retries it.
+      const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
       this.logger.error(
         {
           processName: wake.ref.processName,
           projectId: wake.ref.projectId,
           processKey: wake.ref.processKey,
-          error: error instanceof Error ? error.message : String(error),
+          errorType,
+          errorMessage,
         },
         "Wake handling failed; the next poll will retry",
       );

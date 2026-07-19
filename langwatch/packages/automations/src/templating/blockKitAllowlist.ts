@@ -142,6 +142,14 @@ const MAX_SECTION_FIELDS = 10;
 const MAX_SECTION_FIELD_CHARS = 2000;
 const MAX_CONTEXT_ELEMENTS = 10;
 
+// Slack's documented maxima for the two raw-ish blocks. A `markdown` block's
+// `text` is a plain string (Slack rejects the whole message past 12000 chars); a
+// `header` block's plain_text caps at 150. Enforced defensively so a hostile
+// template can't trip `invalid_blocks` (not retryable — it loses the whole
+// notification rather than degrading).
+export const MAX_MARKDOWN_TEXT_CHARS = 12_000;
+export const MAX_HEADER_TEXT_CHARS = 150;
+
 /** Appended to any text this module cuts, so the reader knows the block is
  *  showing part of the content rather than all of it. */
 const TRUNCATION_MARKER = "\n…(truncated)";
@@ -294,6 +302,71 @@ function sanitizeRichText(
   return { ...block, elements };
 }
 
+// Slack treats `&`, `<`, `>` as the control characters that open mrkdwn links
+// (`<https://evil|click>`) and broadcasts (`<!channel>` / `<!here>`). Mirrors the
+// `mrkdwn_escape` template filter (engine.ts) so a `markdown` block — whose
+// `text` is a raw string Slack parses directly, NOT a template-escaped text
+// object — cannot carry attacker-controlled trace content that forges a
+// broadcast ping or a link. Escaping angle brackets also neutralises markdown
+// autolinks / raw HTML (`<https://…>`, `<script>`) in the same pass.
+function escapeMrkdwnControlChars(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/**
+ * `markdown` — a raw-markdown block whose `text` is a plain string Slack renders
+ * directly (no text object, so nothing upstream escaped it). A block without a
+ * string `text` is unusable and dropped (→ fallback delivers). The text is
+ * escaped so a `<!channel>` broadcast or `<url|text>` link cannot ride in on
+ * customer content, then capped to Slack's documented maximum (past which
+ * `invalid_blocks` fails the whole message). Escaping before capping keeps the
+ * final length under the cap.
+ */
+function sanitizeMarkdown(
+  block: Record<string, unknown>,
+): Record<string, unknown> | null {
+  if (typeof block.text !== "string" || block.text.length === 0) return null;
+  const text = capText(
+    escapeMrkdwnControlChars(block.text),
+    MAX_MARKDOWN_TEXT_CHARS,
+  );
+  const out: Record<string, unknown> = { type: "markdown", text };
+  if (typeof block.block_id === "string") out.block_id = block.block_id;
+  return out;
+}
+
+/**
+ * `header` — a bold banner. Slack accepts ONLY a `plain_text` object here (it
+ * does NOT parse mrkdwn, so there is no broadcast/link vector), and rejects the
+ * whole message past 150 characters. A stray `mrkdwn`-typed header would fail
+ * `invalid_blocks`, so the text object is coerced to `plain_text` and capped; a
+ * header with no valid text object is dropped (→ fallback delivers).
+ */
+function sanitizeHeader(
+  block: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const parsed = sanitizeTextObject(block.text);
+  if (!parsed) return null;
+  // Header text is a single-line plain_text field — the multi-line truncation
+  // marker would itself make Slack reject the block as invalid_blocks.
+  const capped = capText(parsed.text as string, MAX_HEADER_TEXT_CHARS).replace(
+    /\n/g,
+    " ",
+  );
+  if (capped.length === 0) return null;
+  const textObject: Record<string, unknown> = {
+    type: "plain_text",
+    text: capped,
+  };
+  if (typeof parsed.emoji === "boolean") textObject.emoji = parsed.emoji;
+  const out: Record<string, unknown> = { type: "header", text: textObject };
+  if (typeof block.block_id === "string") out.block_id = block.block_id;
+  return out;
+}
+
 function sanitizeVerifiedBlock(
   block: Record<string, unknown>,
 ): Record<string, unknown> | null {
@@ -309,6 +382,12 @@ function sanitizeVerifiedBlock(
       return sanitizeContext(block);
     case "rich_text":
       return sanitizeRichText(block);
+    case "markdown":
+      return sanitizeMarkdown(block);
+    case "header":
+      return sanitizeHeader(block);
+    // `divider` is the only remaining allowlisted type — it carries no content,
+    // so it passes through unchanged.
     default:
       return block;
   }

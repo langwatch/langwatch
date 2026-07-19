@@ -9,6 +9,10 @@ import {
   Verdict,
 } from "~/server/scenarios/scenario-event.enums";
 import { ScenarioFailureHandler } from "../scenario-failure-handler";
+import {
+  ScenarioInfraErrorCode,
+  decodeScenarioError,
+} from "../scenario-infra-error";
 
 const mockFinishRun = vi.fn().mockResolvedValue(undefined);
 
@@ -37,7 +41,7 @@ describe("ScenarioFailureHandler", () => {
   });
 
   describe("when called with an error", () => {
-    it("dispatches finishRun with ERROR status", async () => {
+    it("dispatches finishRun with ERROR status and a plain-text reasoning", async () => {
       await handler.ensureFailureEventsEmitted({
         ...baseParams,
         error: "Child process exited with code 1",
@@ -51,10 +55,28 @@ describe("ScenarioFailureHandler", () => {
           status: ScenarioRunStatus.ERROR,
           results: expect.objectContaining({
             verdict: Verdict.FAILURE,
-            error: "Child process exited with code 1",
+            // reasoning stays a plain human sentence for text consumers
+            reasoning: "Child process exited with code 1",
           }),
         }),
       );
+    });
+
+    it("encodes the error as a handled-error envelope the drawer can decode", async () => {
+      await handler.ensureFailureEventsEmitted({
+        ...baseParams,
+        error:
+          "fetch failed: self-signed certificate in certificate chain (SELF_SIGNED_CERT_IN_CHAIN)",
+      });
+
+      const results = (
+        mockFinishRun.mock.calls[0]?.[0] as {
+          results: { error: string };
+        }
+      ).results;
+      const decoded = decodeScenarioError(results.error);
+      expect(decoded?.code).toBe(ScenarioInfraErrorCode.UntrustedCertificate);
+      expect(decoded?.hint).toBeDefined();
     });
   });
 

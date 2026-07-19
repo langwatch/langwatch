@@ -72,6 +72,23 @@ describe("sanitizeWebhookHeaders", () => {
     });
   });
 
+  describe("when header names carry CR/LF or other non-token characters", () => {
+    it("drops the entry so a name cannot smuggle a second header", () => {
+      expect(
+        sanitizeWebhookHeaders({ "X-Custom\r\nX-Injected: evil": "value" }),
+      ).toEqual({});
+    });
+
+    it("drops a name with spaces or colons rather than sending an invalid token", () => {
+      expect(sanitizeWebhookHeaders({ "X Bad Name": "v" })).toEqual({});
+      expect(sanitizeWebhookHeaders({ "X-Bad:Name": "v" })).toEqual({});
+    });
+
+    it("still drops a smuggled name that collapses to a reserved header", () => {
+      expect(sanitizeWebhookHeaders({ "Host\r\n": "evil.com" })).toEqual({});
+    });
+  });
+
   describe("when entries are empty", () => {
     it("drops blank names and blank values", () => {
       expect(sanitizeWebhookHeaders({ "": "x", "X-Empty": "  " })).toEqual({});

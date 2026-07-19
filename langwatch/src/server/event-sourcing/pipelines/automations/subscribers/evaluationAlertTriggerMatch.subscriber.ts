@@ -1,10 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { RecordTriggerMatchPort } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { EvaluationProcessingEvent } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/events";
+import type { TriggerMatchRecordedEventData } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 
 import {
@@ -16,6 +16,21 @@ import type { TriggerService } from "~/server/app-layer/automations/trigger.serv
 const logger = createLogger(
   "langwatch:triggers:evaluation-alert-trigger-match-subscriber",
 );
+
+/**
+ * Port for handing a matched trigger off into the automations pipeline. Defined
+ * here in the OSS automations pipeline (Apache-2.0) so the Enterprise
+ * trace-alert subscriber depends inward on OSS, never the reverse. The payload
+ * is a plain, license-agnostic shape with nothing EE-specific.
+ */
+export interface RecordTriggerMatchPort {
+  send(
+    data: TriggerMatchRecordedEventData & {
+      tenantId: string;
+      occurredAt: number;
+    },
+  ): Promise<void>;
+}
 
 export function createEvaluationAlertTriggerMatchHandler(deps: {
   triggers: TriggerService;

@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
@@ -82,6 +83,47 @@ describe("handleError()", () => {
       expect(body).toHaveProperty("limitType", "prompts");
       expect(body).toHaveProperty("current", 5);
       expect(body).toHaveProperty("max", 5);
+    });
+  });
+
+  describe("when error carries remediation fields", () => {
+    it("emits tips, docsUrl and fault in the body", async () => {
+      const error = new (class extends HandledError {
+        constructor() {
+          super("query_memory_exceeded", "Query exceeded its memory limit", {
+            httpStatus: 422,
+            fault: "customer",
+            tips: ["Narrow the time range"],
+            docsUrl: "https://docs.langwatch.ai/traces",
+          });
+        }
+      })();
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      expect(res.status).toBe(422);
+      const body = await res.json();
+      expect(body.error).toBe("query_memory_exceeded");
+      expect(body.tips).toEqual(["Narrow the time range"]);
+      expect(body.docsUrl).toBe("https://docs.langwatch.ai/traces");
+      expect(body.fault).toBe("customer");
+    });
+
+    it("omits remediation keys when the error has none", async () => {
+      const error = new (class extends HandledError {
+        constructor() {
+          super("plain_handled", "nothing to add", { httpStatus: 400 });
+        }
+      })();
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      const body = await res.json();
+      expect(body).not.toHaveProperty("tips");
+      expect(body).not.toHaveProperty("docsUrl");
+      expect(body.fault).toBe("customer");
     });
   });
 
