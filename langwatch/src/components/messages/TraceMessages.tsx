@@ -10,12 +10,19 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import React, { type PropsWithChildren, useEffect, useState } from "react";
+import React, {
+  type PropsWithChildren,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { CornerDownRight } from "react-feather";
+import { collectMediaParts } from "~/components/traces/mediaParts";
+import { TraceMediaPart } from "~/components/traces/TraceMediaPart";
+import { BlurredContentGate } from "~/features/traces-v2/components/BlurredContentGate";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
 import { Annotations } from "../../components/Annotations";
-import { BlurredContentGate } from "~/features/traces-v2/components/BlurredContentGate";
 import { Markdown } from "../../components/Markdown";
 import { EventsCounter } from "../../components/messages/EventsCounter";
 import {
@@ -77,6 +84,18 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
   );
 
   const showAnnotations = action == "new" || conversationHasSomeComments;
+
+  // Media carried in the trace IO (recordings, images, attachments) renders
+  // as real widgets above the extracted text — the text extraction itself
+  // only surfaces prose.
+  const inputMedia = useMemo(
+    () => collectMediaParts(trace.input?.value),
+    [trace.input?.value],
+  );
+  const outputMedia = useMemo(
+    () => collectMediaParts(trace.output?.value),
+    [trace.output?.value],
+  );
 
   // Workaround for all trace messages to have the same width in case any of the others has annotations
   useEffect(() => {
@@ -170,6 +189,13 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
             >
               <Box paddingY="6px" marginBottom="38px">
                 <RedactedField field="input">
+                  {inputMedia.length > 0 && (
+                    <VStack align="stretch" gap={2} marginBottom={2}>
+                      {inputMedia.map((part, i) => (
+                        <TraceMediaPart key={`input-media-${i}`} part={part} />
+                      ))}
+                    </VStack>
+                  )}
                   <Markdown>
                     {translationState.translatedTextInput &&
                     translationState.translationActive
@@ -193,6 +219,13 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   0)
               }
             >
+              {outputMedia.length > 0 && (
+                <VStack align="stretch" gap={2} paddingTop={2}>
+                  {outputMedia.map((part, i) => (
+                    <TraceMediaPart key={`output-media-${i}`} part={part} />
+                  ))}
+                </VStack>
+              )}
               {trace.error && !trace.output?.value ? (
                 <VStack alignItems="flex-start" gap={2} paddingY={2}>
                   <Box

@@ -64,6 +64,79 @@ describe("IOPreview newline marker", () => {
   });
 });
 
+describe("IOPreview media badges", () => {
+  const imageInput = JSON.stringify([
+    {
+      role: "user",
+      content: [
+        { type: "image_url", image_url: { url: "/api/files/p1/img1" } },
+        { type: "text", text: "what is in this picture?" },
+      ],
+    },
+  ]);
+  const audioInput = JSON.stringify([
+    {
+      role: "user",
+      content: [
+        {
+          type: "input_audio",
+          input_audio: { url: "/api/files/p1/a1", mimeType: "audio/wav" },
+        },
+      ],
+    },
+  ]);
+  const pdfInput = JSON.stringify([
+    {
+      role: "user",
+      content: [
+        {
+          type: "binary",
+          mimeType: "application/pdf",
+          url: "/api/files/p1/f1",
+          filename: "report.pdf",
+        },
+      ],
+    },
+  ]);
+
+  describe("given a root input carrying an image part", () => {
+    /** @scenario "The trace list shows a tiny thumbnail when the root input carries an image" */
+    it("leads the preview row with a small thumbnail of the image", () => {
+      const { getByTestId, container } = renderPreview(imageInput, null);
+      expect(getByTestId("io-preview-thumbnail")).toHaveAttribute(
+        "src",
+        "/api/files/p1/img1",
+      );
+      // The text preview still renders next to it.
+      expect(container.textContent).toContain("what is in this picture?");
+    });
+  });
+
+  describe("given a root input carrying an audio recording", () => {
+    /** @scenario "The trace list marks audio and attachments without inflating the row" */
+    it("shows a compact audio indicator", () => {
+      const { getByTestId } = renderPreview(audioInput, null);
+      expect(getByTestId("io-preview-audio")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a root input carrying a PDF attachment", () => {
+    it("shows a compact attachment indicator", () => {
+      const { getByTestId } = renderPreview(pdfInput, null);
+      expect(getByTestId("io-preview-attachment")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a plain text input", () => {
+    it("renders no media badges", () => {
+      const { queryByTestId } = renderPreview("just some text", null);
+      expect(queryByTestId("io-preview-thumbnail")).toBeNull();
+      expect(queryByTestId("io-preview-audio")).toBeNull();
+      expect(queryByTestId("io-preview-attachment")).toBeNull();
+    });
+  });
+});
+
 describe("shouldHideBreakMarker", () => {
   // The clamp shows 2 lines, so a 40px clamped box is two 20px lines: the
   // last visible line (where the `…` lands) starts at y=20.

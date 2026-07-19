@@ -33,6 +33,7 @@
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { resolveRawPcmFormat, wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
 import { binaryInputPartSchema } from "./binary-part";
 import { coerceContentToArray } from "./coerce-content-to-array";
 import { isReadbackSafe } from "./safe-media-types";
@@ -70,8 +71,12 @@ export interface ExtractedRef {
  * Returns the (possibly new) part and an optional ref. `part` is unknown
  * because the upstream walker no longer pre-validates against a single
  * schema — the visitor's shape-dispatch handles each variant directly.
+ *
+ * Exported for the generic value walker (`value-media-extractor.ts`), which
+ * finds media parts in arbitrary JSON values (trace span attributes) rather
+ * than the scenario event's message/messages envelope.
  */
-async function processContentPart({
+export async function processContentPart({
   part,
   projectId,
   purpose,
@@ -98,6 +103,12 @@ async function processContentPart({
       if (mediaPart.source.type !== "data") return noOp;
 
       const { value: base64, mimeType } = mediaPart.source;
+      // The dispatcher casts `source` from wire data without validating the
+      // payload type — a non-string `value` (arbitrary object walked by the
+      // generic value extractor) is not an inline media part.
+      if (typeof base64 !== "string" || typeof mimeType !== "string") {
+        return noOp;
+      }
 
       // For document parts, reject MIME types the read path can't faithfully
       // serve. The /api/files route downgrades anything outside the allowlist to
@@ -275,7 +286,7 @@ async function processContentPart({
       if (!audioPart.data) return noOp;
 
       const format = audioPart.format?.toLowerCase();
-      const mimeType =
+      let mimeType =
         audioPart.mimeType ??
         (format === "wav"
           ? "audio/wav"
@@ -289,7 +300,23 @@ async function processContentPart({
                   ? "audio/webm"
                   : "application/octet-stream");
 
-      const bytes = Buffer.from(audioPart.data, "base64");
+      let bytes = Buffer.from(audioPart.data, "base64");
+
+      // Raw, header-less realtime formats (pcm16, G.711) are unplayable when
+      // served back as-is — no container, so <audio> rejects them. Wrap them
+      // into a WAV container AT STORE TIME so the externalized reference is
+      // plain playable audio/wav everywhere. Applies identically on the
+      // scenario and trace extraction paths, so the same recording still
+      // hashes to one stored object.
+      const rawFormat = resolveRawPcmFormat(format, mimeType);
+      if (rawFormat) {
+        const wrapped = wrapRawPcmToWav(new Uint8Array(bytes), rawFormat);
+        if (wrapped) {
+          bytes = Buffer.from(wrapped);
+          mimeType = "audio/wav";
+        }
+      }
+
       const stored = await service.storeFromBytes({
         projectId,
         purpose,

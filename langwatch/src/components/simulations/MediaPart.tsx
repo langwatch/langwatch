@@ -13,6 +13,7 @@
 import { Badge, Box, Icon, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink, File, FileText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { resolveRawPcmFormat, wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
 import { api } from "~/utils/api";
 import type { AudioPlaybackProps } from "./useSequentialAudioPlayback";
 
@@ -195,6 +196,47 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
     setProbeEnabled(true);
   }
 
+  // Legacy raw-PCM references: objects stored before store-time WAV wrapping
+  // carry header-less pcm16 / G.711 bytes under a raw mime type — a bare
+  // <audio src> cannot decode those. Fetch the bytes once, wrap them in a
+  // WAV container client-side, and play from a blob URL. New objects are
+  // wrapped at store time and never take this path.
+  const rawUrlFormat =
+    isUrlBased && category === "audio"
+      ? resolveRawPcmFormat(undefined, mimeType)
+      : null;
+  const [wrappedSrc, setWrappedSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (!rawUrlFormat) {
+      setWrappedSrc(null);
+      return;
+    }
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    void (async () => {
+      try {
+        const response = await fetch(src, { credentials: "same-origin" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        const wav = wrapRawPcmToWav(bytes, rawUrlFormat);
+        if (!wav) throw new Error("empty audio payload");
+        objectUrl = URL.createObjectURL(
+          new Blob([wav as BlobPart], { type: "audio/wav" }),
+        );
+        if (!cancelled) setWrappedSrc(objectUrl);
+      } catch {
+        if (!cancelled) handleError();
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+    // handleError is a stable-in-practice component function; src/format are
+    // the real inputs of this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src, rawUrlFormat]);
+
   // Missing or error placeholder
   if (status === "missing" || (status === "error" && src === "")) {
     return (
@@ -252,7 +294,10 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
         <audio
           data-testid="media-part-audio"
           controls
-          src={src}
+          // Legacy raw-PCM URLs wait for the client-side WAV wrap; an <audio>
+          // without src renders a disabled shell instead of firing a decode
+          // error for bytes the browser can never play.
+          src={rawUrlFormat ? (wrappedSrc ?? undefined) : src}
           // `onLoad` does not fire on <audio>/<video>; the right hook is
           // `onLoadedData` (metadata + first frame ready) — fires only
           // after the browser has actually decoded enough to play, so

@@ -268,15 +268,17 @@ export function visitContentPart<R>(
     o["type"] === "image_url" &&
     typeof o["image_url"] === "object" &&
     o["image_url"] !== null &&
-    (o["image_url"] as Record<string, unknown>)["url"]
+    typeof (o["image_url"] as Record<string, unknown>)["url"] === "string"
   ) {
     const url = (o["image_url"] as Record<string, unknown>)["url"] as string;
     return visitor.imageUrl ? visitor.imageUrl(url) : visitor.unknown?.(part);
   }
 
-  // Bare {image:"..."} shape (rare; some fixtures)
-  if (o["image"]) {
-    const src = o["image"] as string;
+  // Bare {image:"..."} shape (rare; some fixtures). The value must be a
+  // string — the generic value walker dispatches arbitrary objects here, and
+  // a non-string `image` property (e.g. {image: {width}}) is not a part.
+  if (typeof o["image"] === "string" && o["image"]) {
+    const src = o["image"];
     return visitor.bareImage ? visitor.bareImage(src) : visitor.unknown?.(part);
   }
 
@@ -457,15 +459,17 @@ export async function visitContentPartAsync<R>(
     o["type"] === "image_url" &&
     typeof o["image_url"] === "object" &&
     o["image_url"] !== null &&
-    (o["image_url"] as Record<string, unknown>)["url"]
+    typeof (o["image_url"] as Record<string, unknown>)["url"] === "string"
   ) {
     const url = (o["image_url"] as Record<string, unknown>)["url"] as string;
     return visitor.imageUrl ? visitor.imageUrl(url) : visitor.unknown?.(part);
   }
 
-  // Bare {image:"..."} shape (rare; some fixtures)
-  if (o["image"]) {
-    const src = o["image"] as string;
+  // Bare {image:"..."} shape (rare; some fixtures). The value must be a
+  // string — the generic value walker dispatches arbitrary objects here, and
+  // a non-string `image` property (e.g. {image: {width}}) is not a part.
+  if (typeof o["image"] === "string" && o["image"]) {
+    const src = o["image"];
     return visitor.bareImage ? visitor.bareImage(src) : visitor.unknown?.(part);
   }
 

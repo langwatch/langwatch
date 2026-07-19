@@ -9,22 +9,24 @@
  * header makes the exact same samples playable, with no re-encode.
  *
  * React-free and isomorphic (base64 via `Buffer` on the server, `atob`/`btoa`
- * in the browser) to match `audioParts.ts`, which imports this on the
- * traces-v2 transcript parse path that also runs during SSR.
+ * in the browser): the client wraps inline base64 turns before playback, and
+ * the stored-objects content extractor wraps raw-PCM bytes at store time so
+ * externalized references are served as playable `audio/wav` from day one.
  *
- * Scope note: only `pcm16` is wrapped here (24 kHz mono 16-bit little-endian —
- * the OpenAI Realtime capture default). The companded G.711 formats
- * (`g711_ulaw` / `g711_alaw`) need a µ-law/A-law → linear-PCM decode we do not
- * do inline yet, and externalized (URL) raw-PCM references need server-side
- * wrapping on store — both are tracked as follow-ups. `resolveRawPcmFormat`
- * still recognises the G.711 formats so the caller can avoid emitting a
- * silently-broken player for them.
+ * Formats: `pcm16` (24 kHz mono 16-bit little-endian, the OpenAI Realtime
+ * capture default) is wrapped as linear PCM. The companded G.711 formats
+ * (`g711_ulaw` / `g711_alaw`, 8 kHz telephony) are wrapped WITHOUT decoding —
+ * WAV carries them natively via fmt codes 7 (µ-law) and 6 (A-law), which
+ * browsers decode.
  */
 
 export type RawPcmFormat = "pcm16" | "g711_ulaw" | "g711_alaw";
 
 /** OpenAI Realtime capture default for raw `pcm16` (samples per second). */
 const PCM16_SAMPLE_RATE = 24000;
+
+/** Telephony sample rate for the companded G.711 formats. */
+const G711_SAMPLE_RATE = 8000;
 
 /**
  * Classify a raw / header-less realtime audio format from an `input_audio`
@@ -57,39 +59,55 @@ export function resolveRawPcmFormat(
 export function pcm16ToWavBase64(dataBase64: string): string | null {
   try {
     const pcm = base64ToBytes(dataBase64);
-    if (pcm.length === 0) return null;
-    return bytesToBase64(wrapPcm16(pcm, PCM16_SAMPLE_RATE));
+    const wrapped = wrapRawPcmToWav(pcm, "pcm16");
+    return wrapped ? bytesToBase64(wrapped) : null;
   } catch {
     return null;
   }
 }
 
-/** Prepend a canonical PCM WAV header (mono, 16-bit) to raw pcm16 bytes. */
-function wrapPcm16(pcm: Uint8Array, sampleRate: number): Uint8Array {
+/**
+ * Wrap raw realtime audio bytes in a WAV container for the given format.
+ * Returns null for an empty payload. The samples are never re-encoded —
+ * pcm16 gets a linear-PCM header (fmt 1); G.711 keeps its companded bytes
+ * under fmt 7 (µ-law) / fmt 6 (A-law).
+ */
+export function wrapRawPcmToWav(
+  samples: Uint8Array,
+  format: RawPcmFormat,
+): Uint8Array | null {
+  if (samples.length === 0) return null;
+  const spec =
+    format === "pcm16"
+      ? { fmtCode: 1, bitsPerSample: 16, sampleRate: PCM16_SAMPLE_RATE }
+      : {
+          fmtCode: format === "g711_ulaw" ? 7 : 6,
+          bitsPerSample: 8,
+          sampleRate: G711_SAMPLE_RATE,
+        };
   const channels = 1;
-  const bitsPerSample = 16;
-  const blockAlign = (channels * bitsPerSample) / 8;
-  const byteRate = sampleRate * blockAlign;
+  const blockAlign = (channels * spec.bitsPerSample) / 8;
+  const byteRate = spec.sampleRate * blockAlign;
 
-  const out = new Uint8Array(44 + pcm.length);
+  const out = new Uint8Array(44 + samples.length);
   const view = new DataView(out.buffer);
   // RIFF chunk descriptor
   writeAscii(view, 0, "RIFF");
-  view.setUint32(4, 36 + pcm.length, true);
+  view.setUint32(4, 36 + samples.length, true);
   writeAscii(view, 8, "WAVE");
   // "fmt " sub-chunk
   writeAscii(view, 12, "fmt ");
-  view.setUint32(16, 16, true); // PCM fmt chunk size
-  view.setUint16(20, 1, true); // audioFormat = 1 (linear PCM)
+  view.setUint32(16, 16, true); // fmt chunk size
+  view.setUint16(20, spec.fmtCode, true);
   view.setUint16(22, channels, true);
-  view.setUint32(24, sampleRate, true);
+  view.setUint32(24, spec.sampleRate, true);
   view.setUint32(28, byteRate, true);
   view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitsPerSample, true);
+  view.setUint16(34, spec.bitsPerSample, true);
   // "data" sub-chunk
   writeAscii(view, 36, "data");
-  view.setUint32(40, pcm.length, true);
-  out.set(pcm, 44);
+  view.setUint32(40, samples.length, true);
+  out.set(samples, 44);
   return out;
 }
 

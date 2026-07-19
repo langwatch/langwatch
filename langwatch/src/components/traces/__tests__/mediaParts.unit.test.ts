@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { audioPartToMediaData, collectAudioParts } from "../audioParts";
+import {
+  audioPartToMediaData,
+  collectAudioParts,
+  collectMediaParts,
+  mediaPartToMediaData,
+} from "../mediaParts";
 
 describe("audioPartToMediaData", () => {
   describe("given an OpenAI input_audio part", () => {
@@ -253,6 +258,131 @@ describe("collectAudioParts", () => {
       expect(
         collectAudioParts({ messages: [{ role: "user", content: "hi" }] }),
       ).toEqual([]);
+    });
+  });
+});
+
+describe("mediaPartToMediaData", () => {
+  describe("given an image_url part", () => {
+    it("maps externalized and data-URI urls to an image source", () => {
+      expect(
+        mediaPartToMediaData({
+          type: "image_url",
+          image_url: { url: "/api/files/p1/i1" },
+        }),
+      ).toEqual({
+        type: "image",
+        source: { type: "url", value: "/api/files/p1/i1" },
+      });
+    });
+  });
+
+  describe("given a binary attachment part", () => {
+    it("passes a PDF reference through as a chip-renderable binary", () => {
+      const part = {
+        type: "binary",
+        mimeType: "application/pdf",
+        url: "/api/files/p1/f1",
+        filename: "report.pdf",
+      };
+      expect(mediaPartToMediaData(part)).toEqual(part);
+    });
+
+    it("returns null for a binary with no payload at all", () => {
+      expect(
+        mediaPartToMediaData({ type: "binary", mimeType: "application/pdf" }),
+      ).toBeNull();
+    });
+  });
+
+  describe("given an AG-UI document part", () => {
+    it("maps a url source to an attachment binary", () => {
+      expect(
+        mediaPartToMediaData({
+          type: "document",
+          source: {
+            type: "url",
+            value: "/api/files/p1/d1",
+            mimeType: "application/pdf",
+          },
+        }),
+      ).toEqual({
+        type: "binary",
+        mimeType: "application/pdf",
+        url: "/api/files/p1/d1",
+      });
+    });
+  });
+
+  describe("given an AG-UI video part", () => {
+    it("passes the url source through as video", () => {
+      const part = {
+        type: "video",
+        source: {
+          type: "url",
+          value: "/api/files/p1/v1",
+          mimeType: "video/mp4",
+        },
+      };
+      expect(mediaPartToMediaData(part)).toEqual(part);
+    });
+  });
+});
+
+describe("collectMediaParts", () => {
+  const imagePart = {
+    type: "image_url",
+    image_url: { url: "/api/files/p1/i1" },
+  };
+  const pdfPart = {
+    type: "binary",
+    mimeType: "application/pdf",
+    url: "/api/files/p1/f1",
+    filename: "report.pdf",
+  };
+
+  describe("given messages carrying an image and a pdf", () => {
+    it("collects both media kinds", () => {
+      const value = [
+        { role: "user", content: [imagePart, { type: "text", text: "hi" }] },
+        { role: "assistant", content: [pdfPart] },
+      ];
+      const parts = collectMediaParts(value);
+      expect(parts).toHaveLength(2);
+      expect(parts[0]).toMatchObject({ type: "image" });
+      expect(parts[1]).toMatchObject({
+        type: "binary",
+        filename: "report.pdf",
+      });
+    });
+  });
+
+  describe("given a typed-raw envelope whose value is a JSON string", () => {
+    it("parses through the nested string and finds the media", () => {
+      const value = {
+        type: "raw",
+        value: JSON.stringify([{ role: "user", content: [imagePart] }]),
+      };
+      expect(collectMediaParts(value)).toHaveLength(1);
+    });
+  });
+
+  describe("given an external http image_url", () => {
+    it("does not surface it as collected inline media", () => {
+      // External links stay links — collecting them would auto-fetch
+      // third-party content on every trace open.
+      const value = [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: { url: "https://cdn.example/i.png" },
+            },
+          ],
+        },
+      ];
+      expect(collectMediaParts(value)).toEqual([]);
     });
   });
 });

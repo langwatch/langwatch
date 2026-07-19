@@ -1,7 +1,18 @@
 import { chakra, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { ArrowDown, ArrowUp, Bot, User, Wrench } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  AudioLines,
+  Bot,
+  Film,
+  Paperclip,
+  User,
+  Wrench,
+} from "lucide-react";
 import type React from "react";
 import { Fragment, type ReactNode, useLayoutEffect, useRef } from "react";
+import type { MediaPartData } from "~/components/simulations/MediaPart";
+import { collectMediaParts } from "~/components/traces/mediaParts";
 import { useDensityTokens } from "../../hooks/useDensityTokens";
 import { useDensityStore } from "../../stores/densityStore";
 import { formatPreview } from "../../utils/previewFormatter";
@@ -185,12 +196,122 @@ function renderWithBreakMarkers(text: string): ReactNode {
   ));
 }
 
+/**
+ * Compact media summary for a preview row: the first image becomes a tiny
+ * thumbnail, everything else collapses into per-kind indicator icons. The
+ * collection is media-hint gated, so text-only rows never pay a JSON parse.
+ */
+interface RowMedia {
+  imageSrc: string | null;
+  hasAudio: boolean;
+  hasVideo: boolean;
+  hasAttachment: boolean;
+}
+
+const NO_ROW_MEDIA: RowMedia = {
+  imageSrc: null,
+  hasAudio: false,
+  hasVideo: false,
+  hasAttachment: false,
+};
+
+function mediaSrc(media: Extract<MediaPartData, { source: unknown }>): string {
+  return media.source.type === "url"
+    ? media.source.value
+    : `data:${media.source.mimeType};base64,${media.source.value}`;
+}
+
+export function collectRowMedia(raw: string | null): RowMedia {
+  if (raw === null) return NO_ROW_MEDIA;
+  const parts = collectMediaParts(raw);
+  if (parts.length === 0) return NO_ROW_MEDIA;
+  const summary: RowMedia = { ...NO_ROW_MEDIA };
+  for (const part of parts) {
+    if (part.type === "binary") {
+      const mime = part.mimeType.toLowerCase();
+      if (mime.startsWith("audio/")) summary.hasAudio = true;
+      else if (mime.startsWith("video/")) summary.hasVideo = true;
+      else if (mime.startsWith("image/")) {
+        summary.imageSrc ??=
+          part.url ??
+          (part.data ? `data:${part.mimeType};base64,${part.data}` : null);
+      } else summary.hasAttachment = true;
+    } else if (part.type === "image") {
+      summary.imageSrc ??= mediaSrc(part);
+    } else if (part.type === "audio") {
+      summary.hasAudio = true;
+    } else {
+      summary.hasVideo = true;
+    }
+  }
+  return summary;
+}
+
+/**
+ * Thumbnail + indicator icons rendered at the start of a preview row.
+ * Renders nothing for media-free rows.
+ */
+const RowMediaBadges: React.FC<{ media: RowMedia; thumbSize: string }> = ({
+  media,
+  thumbSize,
+}) => {
+  if (
+    !media.imageSrc &&
+    !media.hasAudio &&
+    !media.hasVideo &&
+    !media.hasAttachment
+  ) {
+    return null;
+  }
+  return (
+    <Flex align="center" gap={1} flexShrink={0}>
+      {media.imageSrc && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          data-testid="io-preview-thumbnail"
+          src={media.imageSrc}
+          alt=""
+          loading="lazy"
+          style={{
+            height: thumbSize,
+            width: thumbSize,
+            objectFit: "cover",
+            borderRadius: "4px",
+            display: "block",
+          }}
+        />
+      )}
+      {media.hasAudio && (
+        <Icon boxSize="12px" color="fg.muted" data-testid="io-preview-audio">
+          <AudioLines />
+        </Icon>
+      )}
+      {media.hasVideo && (
+        <Icon boxSize="12px" color="fg.muted" data-testid="io-preview-video">
+          <Film />
+        </Icon>
+      )}
+      {media.hasAttachment && (
+        <Icon
+          boxSize="12px"
+          color="fg.muted"
+          data-testid="io-preview-attachment"
+        >
+          <Paperclip />
+        </Icon>
+      )}
+    </Flex>
+  );
+};
+
 function buildRow(raw: string | null): {
   text: string;
   isChat: boolean;
   isTool: boolean;
+  media: RowMedia;
 } {
-  if (raw === null) return { text: "", isChat: false, isTool: false };
+  if (raw === null)
+    return { text: "", isChat: false, isTool: false, media: NO_ROW_MEDIA };
   const parsed = tryParseChat(raw);
   // Keep newlines as real `\n` — the row text renders them with
   // `whiteSpace="pre-line"`, and `renderWithBreakMarkers` decorates each
@@ -200,6 +321,7 @@ function buildRow(raw: string | null): {
     text: formatted.text,
     isChat: parsed.isChat,
     isTool: parsed.isTool,
+    media: collectRowMedia(raw),
   };
 }
 
@@ -226,7 +348,7 @@ const CompactIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => {
 };
 
 interface CompactRowProps {
-  row: { text: string; isChat: boolean; isTool: boolean };
+  row: { text: string; isChat: boolean; isTool: boolean; media: RowMedia };
   fontSize: string;
   direction: "input" | "output";
 }
@@ -256,6 +378,7 @@ const CompactRow: React.FC<CompactRowProps> = ({
           {isInput ? <ArrowUp /> : <ArrowDown />}
         </Icon>
         <RoleIcon row={row} color={accent} direction={direction} />
+        <RowMediaBadges media={row.media} thumbSize="20px" />
       </Flex>
       {/* Preserve real newlines coming through formatPreview (the row text
           used to inline-render `↵` glyphs — now wraps onto a real second
@@ -311,6 +434,7 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
         text={
           formatPreview(input, { maxChars: 200, newlines: "preserve" }).text
         }
+        media={collectRowMedia(input)}
       />
     )}
     {output !== null && (
@@ -321,6 +445,7 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
         text={
           formatPreview(output, { maxChars: 200, newlines: "preserve" }).text
         }
+        media={collectRowMedia(output)}
       />
     )}
   </VStack>
@@ -331,7 +456,8 @@ const ComfortableRow: React.FC<{
   labelColor: string | { base: string; _dark: string };
   textColor: string;
   text: string;
-}> = ({ label, labelColor, textColor, text }) => (
+  media: RowMedia;
+}> = ({ label, labelColor, textColor, text, media }) => (
   <HStack align="flex-start" gap={2}>
     <Text
       textStyle="sm"
@@ -342,6 +468,7 @@ const ComfortableRow: React.FC<{
     >
       {label}
     </Text>
+    <RowMediaBadges media={media} thumbSize="28px" />
     <ClampedPreviewText text={text} textStyle="sm" color={textColor} />
   </HStack>
 );

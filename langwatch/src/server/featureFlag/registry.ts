@@ -154,6 +154,20 @@ export const FEATURE_FLAGS = [
     description:
       "Routes over-threshold OTLP spans via a transient S3 spool at the ingestion edge (ADR-022). Off = current behavior (full value flows through the command queue; capOversizedAttributes(256 KB) is the only cap).",
   },
+  // Externalizes inline media (base64 audio turns, data-URI images, file
+  // attachments) from span attributes into the content-addressed
+  // stored-objects store at the ingestion edge, before the command is staged.
+  // Fail-open by construction (any error keeps the original inline payload)
+  // and skipped for projects with data-privacy content-drop rules, so it is
+  // safe on by default — self-hosted deployments get playable media without
+  // configuration, matching the scenario-events path which always extracts.
+  {
+    key: "release_trace_media_extraction",
+    scope: "PRODUCT",
+    defaultValue: true,
+    description:
+      "Externalizes inline media (audio, images, files) from span content into the content-addressed stored-objects store at the ingestion edge, replacing base64 payloads with /api/files references. Off = media rides inline through the pipeline as before.",
+  },
   {
     key: "release_ui_ai_governance_enabled",
     scope: "PRODUCT",
