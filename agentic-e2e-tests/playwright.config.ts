@@ -24,9 +24,11 @@ export default defineConfig({
   /* Ignore the MCP seed file - it's only for planning exploration */
   testIgnore: ["**/seed.spec.ts"],
 
-  /* Run tests sequentially - important for agentic debugging */
-  fullyParallel: false,
-  workers: 1,
+  /* Parallelism is decided per project, not globally. The headless projects
+   * provision their own tenant per test and run wide; the browser project
+   * still shares one org across its specs and stays serial (see below). */
+  fullyParallel: true,
+  workers: process.env.E2E_WORKERS ? Number(process.env.E2E_WORKERS) : undefined,
 
   /* Fail the build on CI if you accidentally left test.only in the source code */
   forbidOnly: IS_CI,
@@ -73,17 +75,50 @@ export default defineConfig({
    */
   webServer: undefined,
 
-  /* Project configurations */
+  /* Project configurations
+   *
+   * Tiers differ by cost, not by feature area — see
+   * dev/docs/adr/010-e2e-testing-strategy.md (headless-tier amendment).
+   *
+   *   api / cli  Tier 3. No browser, no shared state: every test provisions
+   *              its own org + project over HTTP, so they run fully parallel
+   *              and are eligible to block a PR.
+   *   ui         Tier 2. The capped 5-10 browser happy paths.
+   */
   projects: [
-    /* Setup project - runs authentication once */
+    /* Headless: HTTP-level assertions against a real app, queues and DB. */
+    {
+      name: "api",
+      testDir: "./tests/api",
+      /* No `use` block on purpose — these tests never touch a `page`, so no
+       * browser is launched for this project. */
+    },
+
+    /* Headless: spawns the real CLI binary against a temp HOME. */
+    {
+      name: "cli",
+      testDir: "./tests/cli",
+    },
+
+    /* Setup project - runs authentication once for the browser tier */
     {
       name: "setup",
       testMatch: /.*\.setup\.ts/,
     },
 
-    /* Main test project - uses authenticated state */
+    /* Browser tier - uses authenticated state.
+     *
+     * Still serial. Its specs share the one `auth.setup` org, and the members
+     * specs toggle an enterprise licence on it, which would leak into
+     * settings/plans-comparison.spec.ts asserting the Free plan. The per-test
+     * tenant helper in tests/support/tenant.ts is what will unblock
+     * parallelising this too, once these specs are migrated onto it. */
     {
-      name: "chromium",
+      name: "ui",
+      testDir: "./tests",
+      testIgnore: ["**/api/**", "**/cli/**", "**/*.setup.ts"],
+      fullyParallel: false,
+      workers: 1,
       use: {
         ...devices["Desktop Chrome"],
         storageState: AUTH_FILE,
