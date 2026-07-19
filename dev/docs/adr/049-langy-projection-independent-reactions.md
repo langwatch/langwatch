@@ -355,6 +355,36 @@ operational state back in ClickHouse.
 - The pilot adds Postgres storage and worker polling load; both are bounded by
   Langy's low event volume and indexed process queries.
 
+## Amendment (2026-07-19): migrated onto the ADR-052 builder
+
+The pilot landed its process manager by hand: a literal `ProcessDefinition`, a
+literal `Record<intentType, IntentHandler>`, a bespoke subscriber, and a
+`ProcessManagerService` / `OutboxDispatcherService` / `ProcessOutboxWorker`
+trio constructed in `pipelineRegistry`. That predated the ADR-052 builder;
+`eventSourcing.ts` still carried the note that "only Langy still hand-rolls its
+outbox".
+
+It is now declared on its own pipeline via `.withProcessManager`, exactly like
+`triggerSettlement` and `topicClustering`. **No behaviour changes** — the same
+events produce the same decisions and the same two intents. What changes is
+ownership:
+
+- the topology (state, intents, content boundary, per-event decisions, outbox
+  lease) is declared in one place instead of split across four files;
+- intent payloads are schema-validated at emit time, not only at dispatch;
+- message keys are auto-qualified `process:<conversationId>:<key>`, so two
+  conversations cannot collide on one turn id;
+- the process inbox keys on `idempotencyKey ?? id`, so a redelivered command
+  is a logical no-op rather than a second physical event;
+- `ProcessRuntime` owns the manager, subscriber and outbox worker, and stops
+  them with `EventSourcing.close()`.
+
+Liveness is still **out**, for the reason given above: durable event activity
+is not proof the ephemeral heartbeat is stale. The process declares no
+`.schedule()` and no wake handler, and `agentTurnLiveness` remains the sole
+liveness owner. Moving it to `nextWakeAt` + a fail-turn intent needs an
+observed-liveness input contract, and is the natural follow-up.
+
 ## References
 
 - Behavioral spec: [`specs/langy/langy-projection-independent-reactions.feature`](../../../specs/langy/langy-projection-independent-reactions.feature)

@@ -8,10 +8,14 @@ import {
   type IntentHandler,
 } from "~/server/event-sourcing/process-manager";
 
-import {
-  langyConversationProcessDefinition,
-  toLangyProcessEnvelope,
-} from "../langyConversationProcess.definition";
+import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
+import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
+import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
+
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import type { LangyConversationProcessState } from "../langyConversationProcess.types";
+import { langyConversationProcess } from "../langyConversationProcess";
+import { createStubLangyEffectPorts } from "../langyEffectPorts";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   LANGY_PROCESS_INTENT_TYPES,
@@ -22,7 +26,24 @@ import {
   CONVERSATION_ID,
   PROJECT_ID,
   T0,
+  toLangyProcessEnvelope,
 } from "./helpers/langyEventFixtures";
+
+/**
+ * The EXACT definition the runtime mounts — built through the pipeline's own
+ * `langyConversationProcess` applier and the runtime's
+ * `buildProcessDefinition`, so these tests cover the generated evolve
+ * (intent-key prefixing, undeclared-event guard, schema-validated intent
+ * payloads) rather than a re-implementation. The effect ports are stubs:
+ * evolve never dispatches.
+ */
+const langyConversationProcessDefinition = buildProcessDefinition(
+  buildProcessManager<LangyConversationProcessingEvent>({
+    name: LANGY_CONVERSATION_PROCESS_NAME,
+    applier: langyConversationProcess(createStubLangyEffectPorts().ports),
+  }).config,
+) as ProcessDefinition<LangyConversationProcessState>;
+
 
 const ref = {
   processName: LANGY_CONVERSATION_PROCESS_NAME,
@@ -83,7 +104,7 @@ describe("Langy process outbox lease fencing", () => {
       // A leases the dispatch and blocks inside its handler (a live turn still
       // waiting on the manager).
       const runA = dispatcherA.runOnce({ now: T0, limit: 1 });
-      await vi.waitFor(() => expect(delivered).toContain("A:dispatch:turn_1"));
+      await vi.waitFor(() => expect(delivered).toContain(`A:process:${CONVERSATION_ID}:dispatch:turn_1`));
 
       const fastHandler = vi.fn<IntentHandler>(async ({ message }) => {
         delivered.push(`B:${message.messageKey}`);
@@ -97,8 +118,8 @@ describe("Langy process outbox lease fencing", () => {
       // After the 100ms lease has expired but while A is still in-flight, B
       // re-leases the row and delivers the SAME turn a second time.
       const reportB = await dispatcherB.runOnce({ now: T0 + 200, limit: 1 });
-      expect(reportB.dispatched).toEqual(["dispatch:turn_1"]);
-      expect(delivered).toEqual(["A:dispatch:turn_1", "B:dispatch:turn_1"]);
+      expect(reportB.dispatched).toEqual([`process:${CONVERSATION_ID}:dispatch:turn_1`]);
+      expect(delivered).toEqual([`A:process:${CONVERSATION_ID}:dispatch:turn_1`, `B:process:${CONVERSATION_ID}:dispatch:turn_1`]);
 
       // A finally completes; its markDispatched is fenced by B's superseding
       // lease, so the double delivery already happened and cannot be undone.
@@ -129,7 +150,7 @@ describe("Langy process outbox lease fencing", () => {
       });
 
       const runA = dispatcherA.runOnce({ now: T0, limit: 1 });
-      await vi.waitFor(() => expect(delivered).toContain("A:dispatch:turn_1"));
+      await vi.waitFor(() => expect(delivered).toContain(`A:process:${CONVERSATION_ID}:dispatch:turn_1`));
 
       const fastHandler = vi.fn<IntentHandler>(async ({ message }) => {
         delivered.push(`B:${message.messageKey}`);
@@ -148,7 +169,7 @@ describe("Langy process outbox lease fencing", () => {
       });
       expect(reportB.dispatched).toEqual([]);
       expect(fastHandler).not.toHaveBeenCalled();
-      expect(delivered).toEqual(["A:dispatch:turn_1"]);
+      expect(delivered).toEqual([`A:process:${CONVERSATION_ID}:dispatch:turn_1`]);
 
       releaseSlow();
       await runA;

@@ -4,6 +4,8 @@ import type { AppendStore } from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type { StateProjectionStore } from "../../../projections/stateProjection.types";
 import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
+import { createStubLangyEffectPorts } from "~/server/app-layer/langy/process-manager";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "~/server/app-layer/langy/process-manager";
 import {
   agentRespondedEvent,
   CONVERSATION_ID,
@@ -42,8 +44,10 @@ function stateStore<T>(): StateProjectionStore<T> {
   };
 }
 
+// `langyConversationProcess` is deliberately absent: the process is declared
+// on the pipeline now, so ProcessRuntime generates its `pm:langyConversation`
+// subscriber. These are the hand-written live consumers only.
 const SUBSCRIBER_NAMES = [
-  "langyConversationProcess",
   "agentTurnLiveness",
   "langyConversationUpdateBroadcast",
 ] as const;
@@ -65,6 +69,7 @@ function buildPipeline(
     langyAnalyticsEventProjectionStore:
       appendStore<LangyAnalyticsEventProjectionRecord>(analyticsAppend),
     subscribers,
+    langyProcessPorts: createStubLangyEffectPorts().ports,
     ...overrides,
   };
   return {
@@ -118,6 +123,27 @@ describe("langy-conversation-processing pipeline shape", () => {
         expect(pipeline.mapProjections.get("langyAnalyticsEvent")?.definition).not.toBe(
           pipeline.mapProjections.get("langyMessageOperational")?.definition,
         );
+      });
+    });
+
+    describe("when inspecting the declared process manager", () => {
+      it("declares the conversation process on the pipeline", () => {
+        // ADR-052: the topology lives here, not in the registry. If this
+        // regresses to zero the process silently stops being mounted.
+        const { pipeline } = buildPipeline();
+
+        const pm = pipeline.processManagers.get(
+          LANGY_CONVERSATION_PROCESS_NAME,
+        );
+        expect(pm).toBeDefined();
+        expect(pm!.config.eventTypes.length).toBeGreaterThan(0);
+        // The content boundary is what keeps message parts and tokens out of
+        // process state and outbox rows.
+        expect(pm!.config.toPayload).toBeDefined();
+        expect(Object.keys(pm!.config.intents).sort()).toEqual([
+          "langy.conversation.generate_title",
+          "langy.conversation.worker_dispatch",
+        ]);
       });
     });
 

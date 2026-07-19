@@ -114,16 +114,7 @@ import {
   mintLangySessionApiKeyForUser,
   revokeLangySessionApiKey,
 } from "../app-layer/langy/langyApiKey";
-import {
-  createLangyEffectPorts,
-  createLangyIntentHandlers,
-  LANGY_OUTBOX_LEASE_DURATION_MS,
-} from "../app-layer/langy/process-manager/langyEffectPorts";
-import {
-  createLangyProcessSubscriber,
-  langyConversationProcessDefinition,
-  LANGY_CONVERSATION_PROCESS_NAME,
-} from "../app-layer/langy/process-manager";
+import { createLangyEffectPorts } from "../app-layer/langy/process-manager/langyEffectPorts";
 import type { LangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
 import {
@@ -441,7 +432,7 @@ export class PipelineRegistry {
     const experimentRunPipeline = this.registerExperimentRunPipeline({
       wireExperimentDeps,
     });
-    const { pipeline: langyConversationPipeline, processOutboxWorker } =
+    const { pipeline: langyConversationPipeline } =
       this.registerLangyConversationPipeline();
     const { pipeline: topicClusteringPipeline } =
       this.registerTopicClusteringPipeline();
@@ -480,13 +471,13 @@ export class PipelineRegistry {
       /** Late-bind the execution pool for scenario execution reactor. */
       scenarioExecutionHandle,
       // Starting and notifying are private composition concerns so a web role
-      // cannot accidentally start the worker. App shutdown only needs stop().
-      // Topic clustering's workers are runtime-owned now (ADR-052) and stop
-      // with EventSourcing.stop(); only Langy still hand-rolls its outbox.
-      processOutboxWorker: {
+      // cannot accidentally start the workers. App shutdown only needs stop().
+      // Langy and topic clustering are runtime-owned (ADR-052) and stop with
+      // EventSourcing.close(); only the enterprise set still runs its own
+      // outbox and wake workers.
+      enterpriseWorkers: {
         stop: async () => {
           await Promise.all([
-            processOutboxWorker.stop(),
             enterprisePipelines.stop(),
             enterpriseWakeWorker.stop(),
           ]);
@@ -573,10 +564,6 @@ export class PipelineRegistry {
       }) => Promise<void>
     >("langyGenerateTitle");
 
-    const processManager = new ProcessManagerService({
-      definition: langyConversationProcessDefinition,
-      store: this.deps.repositories.processStore,
-    });
     const effectPorts = createLangyEffectPorts({
       handoffStore: this.deps.langy.handoffStore,
       worker: this.deps.langy.worker,
@@ -595,26 +582,6 @@ export class PipelineRegistry {
       titleGenerator: this.deps.langy.titleGenerator,
       saveTitle: (args) => saveTitle.fn(args),
     });
-    const outboxDispatcher = new OutboxDispatcherService({
-      store: this.deps.repositories.processStore,
-      handlers: createLangyIntentHandlers({ ports: effectPorts }),
-      logger,
-      // The outbox table is shared across process managers (ADR-051); an
-      // unscoped dispatcher would lease other domains' intents and
-      // retry-churn them for lack of a handler.
-      processNames: [LANGY_CONVERSATION_PROCESS_NAME],
-      // The lease MUST outlive the slowest accepted dispatch, or a healthy
-      // long-running turn loses its lease mid-flight and a second instance
-      // re-delivers it concurrently (the completing handler is then fenced
-      // out and the message never retires). The generic 30s default is unsafe
-      // against the 60s dispatch budget.
-      leaseDurationMs: LANGY_OUTBOX_LEASE_DURATION_MS,
-    });
-    const processOutboxWorker = new ProcessOutboxWorker({
-      dispatcher: outboxDispatcher,
-      logger,
-    });
-
     const conversationReader = {
       read: async ({
         projectId,
@@ -639,10 +606,6 @@ export class PipelineRegistry {
       },
     };
 
-    const processSubscriber = createLangyProcessSubscriber({
-      processManager,
-      notifyOutbox: () => processOutboxWorker.notify(),
-    });
     const livenessSubscriber = createAgentTurnLivenessSubscriber({
       buffer: this.deps.langy.buffer,
       conversations: conversationReader,
@@ -668,8 +631,8 @@ export class PipelineRegistry {
         langyMessageProjectionStore: this.deps.repositories.langyMessageStorage,
         langyAnalyticsEventProjectionStore:
           this.deps.repositories.langyAnalyticsEventStorage,
+        langyProcessPorts: effectPorts,
         subscribers: [
-          processSubscriber,
           livenessSubscriber,
           broadcastSubscriber,
           admissionLifecycleSubscriber,
@@ -698,10 +661,10 @@ export class PipelineRegistry {
         model: args.model,
       }),
     );
-    if (this.deps.langy.runsWorkers) {
-      processOutboxWorker.start();
-    }
-    return { pipeline, processOutboxWorker };
+    // The outbox worker, dispatcher and process service are owned by
+    // ProcessRuntime now that the process is declared on the pipeline; the
+    // registry no longer constructs or starts them.
+    return { pipeline };
   }
 
   private registerEvaluationPipeline({

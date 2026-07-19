@@ -1086,10 +1086,10 @@ export function initializeDefaultApp(options?: {
     },
   });
   gracefulCloseables.push({
-    // The langy + automation process outbox/wake workers share one stop
-    // composite exposed by the registry.
-    name: "process-outbox-workers",
-    close: () => commands.processOutboxWorker.stop(),
+    // The enterprise process outbox/wake workers share one stop composite
+    // exposed by the registry; everything else is runtime-owned (ADR-052).
+    name: "enterprise-process-workers",
+    close: () => commands.enterpriseWorkers.stop(),
   });
   if (scheduler) {
     gracefulCloseables.push({
@@ -1509,7 +1509,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           /* noop */
         },
       },
-      processOutboxWorker: {
+      enterpriseWorkers: {
         stop: async () => {
           // Test preset has no background process workers.
         },

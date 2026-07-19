@@ -6,21 +6,26 @@ import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   OutboxDispatcherService,
   PrismaProcessStore,
-  ProcessManagerService,
   type ProcessRef,
 } from "~/server/event-sourcing/process-manager";
 import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 
-import { langyConversationProcessDefinition } from "../langyConversationProcess.definition";
+import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
+import {
+  buildIntentHandlers,
+  ProcessRuntime,
+} from "~/server/event-sourcing/process-manager/processRuntime";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+
+import { langyConversationProcess } from "../langyConversationProcess";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   type LangyConversationProcessState,
 } from "../langyConversationProcess.types";
 import {
-  createLangyIntentHandlers,
   createStubLangyEffectPorts,
+  type LangyEffectPorts,
 } from "../langyEffectPorts";
-import { createLangyProcessSubscriber } from "../langyProcessSubscriber";
 import {
   agentRespondedEvent,
   agentTurnAcceptedEvent,
@@ -34,7 +39,6 @@ const projectId = `${namespace}-project`;
 const conversationId = `${namespace}-conversation`;
 const turnId = `${namespace}-turn`;
 const userId = `${namespace}-user`;
-const PROCESS_NOW = 1;
 
 const store = new PrismaProcessStore(prisma);
 const ref: ProcessRef = {
@@ -95,18 +99,26 @@ afterEach(async () => {
   await prisma.processManagerInstance.deleteMany({ where });
 });
 
-describe("Langy process subscriber and outbox with Postgres", () => {
+function buildLangyManager(ports: LangyEffectPorts) {
+  return buildProcessManager<LangyConversationProcessingEvent>({
+    name: LANGY_CONVERSATION_PROCESS_NAME,
+    applier: langyConversationProcess(ports),
+  });
+}
+
+describe("Langy process manager and outbox with Postgres", () => {
   it("commits each event once and dispatches its durable intents through typed stubs", async () => {
-    const notifyOutbox = vi.fn();
-    const processManager = new ProcessManagerService({
-      definition: langyConversationProcessDefinition,
-      store,
+    const { ports, calls } = createStubLangyEffectPorts();
+    const definition = buildLangyManager(ports);
+    // The real production path: ProcessRuntime generates the
+    // `pm:langyConversation` subscriber from the pipeline declaration.
+    const runtime = new ProcessRuntime({ store, consumersEnabled: false });
+    const { subscribers } = runtime.registerPipeline<LangyConversationProcessingEvent>({
+      pipelineName: "langy-conversation-processing",
+      processManagers: new Map([[LANGY_CONVERSATION_PROCESS_NAME, definition]]),
     });
-    const subscriber = createLangyProcessSubscriber({
-      processManager,
-      notifyOutbox,
-      clock: () => PROCESS_NOW,
-    });
+    const subscriber = subscribers[0];
+    if (!subscriber) throw new Error("runtime generated no subscriber");
     const events = lifecycle();
 
     for (const event of events) {
@@ -132,27 +144,30 @@ describe("Langy process subscriber and outbox with Postgres", () => {
         }),
       }),
     );
+    // The builder qualifies every message key with the process key, so two
+    // conversations can never collide on one turn id.
     expect(messages.map((message) => message.messageKey).sort()).toEqual([
-      `dispatch:${turnId}`,
-      `title:${turnId}`,
+      `process:${conversationId}:dispatch:${turnId}`,
+      `process:${conversationId}:title:${turnId}`,
     ]);
-    expect(notifyOutbox).toHaveBeenCalledTimes(3);
 
     const persisted = JSON.stringify({ instance, messages });
     expect(persisted).not.toContain(SENTINELS.runToken);
     expect(persisted).not.toContain(SENTINELS.questionText);
     expect(persisted).not.toContain(SENTINELS.answerText);
 
-    const { ports, calls } = createStubLangyEffectPorts();
     const dispatcher = new OutboxDispatcherService({
       store,
-      handlers: createLangyIntentHandlers({ ports }),
+      // Generated from the declared intents, schema validation included.
+      handlers: buildIntentHandlers(definition.config),
     });
-    const report = await dispatcher.runOnce({ now: PROCESS_NOW, limit: 10 });
+    // The generated subscriber commits against real wall time, so the
+    // dispatch window must be read against the same clock.
+    const report = await dispatcher.runOnce({ now: Date.now() + 1, limit: 10 });
 
     expect(report.dispatched.sort()).toEqual([
-      `dispatch:${turnId}`,
-      `title:${turnId}`,
+      `process:${conversationId}:dispatch:${turnId}`,
+      `process:${conversationId}:title:${turnId}`,
     ]);
     expect(report.retried).toEqual([]);
     expect(report.dead).toEqual([]);

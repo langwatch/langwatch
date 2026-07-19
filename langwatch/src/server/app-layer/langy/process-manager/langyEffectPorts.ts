@@ -238,32 +238,6 @@ export function createLangyEffectPorts(
   };
 }
 
-/**
- * Binds the typed ports to the outbox's intent types, validating each
- * payload against its schema before it crosses the port boundary.
- */
-export function createLangyIntentHandlers(params: {
-  ports: LangyEffectPorts;
-}): Record<string, IntentHandler> {
-  const { ports } = params;
-  return {
-    [LANGY_PROCESS_INTENT_TYPES.WORKER_DISPATCH]: async ({ message }) => {
-      const intent = langyWorkerDispatchIntentSchema.parse(message.payload);
-      await ports.workerDispatch.dispatchTurn({
-        ...intent,
-        projectId: message.projectId,
-      });
-    },
-    [LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE]: async ({ message }) => {
-      const intent = langyGenerateTitleIntentSchema.parse(message.payload);
-      await ports.titleGeneration.generateTitle({
-        ...intent,
-        projectId: message.projectId,
-      });
-    },
-  };
-}
-
 export interface StubLangyEffectCalls {
   dispatchedTurns: Array<LangyWorkerDispatchIntent & { projectId: string }>;
   titleRequests: Array<LangyGenerateTitleIntent & { projectId: string }>;
