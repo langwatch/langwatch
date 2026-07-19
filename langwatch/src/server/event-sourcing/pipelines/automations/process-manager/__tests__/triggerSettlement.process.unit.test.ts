@@ -137,11 +137,12 @@ describe("trigger settlement process", () => {
             action: TriggerAction.ADD_TO_DATASET,
             actionClass: "persist",
           }),
-          { ...context, at: 1_000 },
+          { ...context, at: 1_000, now: 1_000 },
         );
         const firstWake = definition.config.onWake!(firstRound.state, {
           ...context,
           at: 31_000,
+          now: 31_000,
         });
         const secondRound = evolve(
           firstWake.state,
@@ -149,11 +150,12 @@ describe("trigger settlement process", () => {
             action: TriggerAction.ADD_TO_DATASET,
             actionClass: "persist",
           }),
-          { ...context, at: 31_001 },
+          { ...context, at: 31_001, now: 31_001 },
         );
         const secondWake = definition.config.onWake!(secondRound.state, {
           ...context,
           at: 61_001,
+          now: 61_001,
         });
 
         expect(firstWake.intents?.map((intent) => intent.messageKey)).toEqual([
@@ -228,6 +230,7 @@ describe("trigger settlement process", () => {
           match({ traceId: "newest" }),
           {
             at: MAX_PENDING_MATCHES + 1,
+            now: MAX_PENDING_MATCHES + 1,
             key: "trigger-1",
             projectId: "project-1",
             intents: buildIntentFactories(definition.config.intents),
