@@ -23,28 +23,28 @@ export interface TopicClusteringStatus {
   lastRunTracesProcessed: number;
   lastRunTopicsCount: number;
   lastRunSubtopicsCount: number;
-  /** A backlog walk is currently between pages. */
+  /**
+   * A run is working right now, as recorded by `run_started`. The effect
+   * announces every page before working it, so this covers scheduled and
+   * manual runs alike, from the first page, including runs that finish in a
+   * single page. Cleared by the terminal `run_completed` / `run_failed`.
+   */
   inProgress: boolean;
   /**
-   * Best available evidence that a run is underway right now.
+   * Whether a run is underway, including one that has been asked for but has
+   * not reached the effect yet.
    *
-   * It is INFERRED, not read: the pipeline has no `run_started` event, so
-   * nothing is written when a run begins. The projection's in-progress marker
-   * (`inProgress`) is only written when a page reports that more pages remain,
-   * so a project small enough to cluster in a single page never sets it, and
-   * even a large project does not set it until its first page finishes. The
-   * only other trace a running run leaves behind is its request: a request
-   * with no outcome recorded after it means the run it asked for has not
-   * reported back yet.
+   * `inProgress` is the recorded fact and covers a run from the moment it
+   * starts working. It cannot cover the gap BEFORE that: a manual request is
+   * committed as an event, the process turns it into an intent, and the
+   * outbox dispatches it — usually seconds, but longer under a backlog. In
+   * that gap the only evidence is the request itself, so a request with no
+   * outcome after it still reads as in-flight.
    *
-   * Bounded by the same window the scheduler uses to abandon a run, so a
-   * request whose run died without ever recording an outcome stops reading as
-   * "running" at the same moment a new request would preempt it, rather than
-   * pinning the UI to "Running" forever.
-   *
-   * Scheduled runs are started by the scheduler itself and record no request,
-   * so their first page is invisible here; from the second page on
-   * `inProgress` covers them.
+   * That inference is bounded by the same window the scheduler uses to
+   * abandon a run, so a request whose run died before announcing itself stops
+   * reading as "running" at the moment a new request would preempt it,
+   * instead of pinning the UI to "Running" forever.
    */
   runInFlight: boolean;
   /** Epoch ms of the next scheduled daily run, or null when unscheduled. */

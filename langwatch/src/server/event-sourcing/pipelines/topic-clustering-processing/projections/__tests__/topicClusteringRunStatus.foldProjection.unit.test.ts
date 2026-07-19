@@ -59,12 +59,12 @@ function initState(): TopicClusteringRunStatusData {
 describe("TopicClusteringRunStatusFoldProjection", () => {
   describe("when a run starts", () => {
     it("marks the project as having a run in progress", () => {
-      const state = projection.fold(
+      const state = projection.apply(
+        initState(),
         baseEvent({
           type: "lw.obs.topic_clustering.run_started",
           data: { runId: "20260717", page: 1 },
         }),
-        initState(),
       );
 
       expect(state.InProgressRunId).toBe("20260717");
@@ -74,41 +74,41 @@ describe("TopicClusteringRunStatusFoldProjection", () => {
       // The badge used to be set only on the has-next-page branch of
       // run_completed, so a run that finishes in one page — the common case —
       // was never once visible as running.
-      const started = projection.fold(
+      const started = projection.apply(
+        initState(),
         baseEvent({
           type: "lw.obs.topic_clustering.run_started",
           data: { runId: "20260717", page: 1 },
         }),
-        initState(),
       );
       expect(started.InProgressRunId).toBe("20260717");
 
-      const finished = projection.fold(
+      const finished = projection.apply(
+        started,
         baseEvent({
           type: "lw.obs.topic_clustering.run_completed",
           data: completedData(),
         }),
-        started,
       );
       expect(finished.InProgressRunId).toBeNull();
     });
 
     it("hands over to a new run without carrying the old one's counters", () => {
-      const previous = projection.fold(
+      const previous = projection.apply(
+        initState(),
         baseEvent({
           type: "lw.obs.topic_clustering.run_completed",
           data: completedData({ nextSearchAfter: [1, "t"] }),
         }),
-        initState(),
       );
       expect(previous.InProgressTraces).toBe(100);
 
-      const superseded = projection.fold(
+      const superseded = projection.apply(
+        previous,
         baseEvent({
           type: "lw.obs.topic_clustering.run_started",
           data: { runId: "20260718", page: 1 },
         }),
-        previous,
       );
 
       expect(superseded.InProgressRunId).toBe("20260718");
