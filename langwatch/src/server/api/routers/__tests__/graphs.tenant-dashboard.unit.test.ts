@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 import { graphsRouter } from "../graphs";
 
+vi.mock("../../../auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock("../../../license-enforcement", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../../license-enforcement")>();

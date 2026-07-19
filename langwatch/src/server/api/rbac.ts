@@ -1297,7 +1297,7 @@ async function loadScopeResolution(
     : [];
 
   return {
-    organizationRole: orgMember.role,
+    organizationRole,
     bindingsByScope,
     customRoleById: new Map(customRoles.map((c) => [c.id, c])),
     needsLegacyFallback,
