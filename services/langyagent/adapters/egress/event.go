@@ -29,14 +29,15 @@ const (
 	egressDeniedCleartext egressDecision = "denied_cleartext"
 	// egressDeniedSNIMismatch: the TLS ClientHello SNI did not match the CONNECT
 	// authority the decision was made against (domain-fronting attempt).
-	egressDeniedSNIMismatch egressDecision = "denied_sni_mismatch"
+	egressDeniedSNIMismatch    egressDecision = "denied_sni_mismatch"
+	egressDeniedPrivateAddress egressDecision = "denied_private_address"
 )
 
 // blocked reports whether a decision denied the flow (no bytes reach the
 // destination). Used at the call site to choose 403 vs. tunnel.
 func (d egressDecision) blocked() bool {
 	switch d {
-	case egressDenied, egressDeniedCleartext, egressDeniedSNIMismatch:
+	case egressDenied, egressDeniedCleartext, egressDeniedSNIMismatch, egressDeniedPrivateAddress:
 		return true
 	default:
 		return false
@@ -68,10 +69,16 @@ type logEgressMonitor struct {
 	log *zap.Logger
 }
 
+// newLogEgressMonitor returns the default egress monitor, which reports each
+// decision to the service log. It is the fallback when no richer sink is wired.
 func newLogEgressMonitor(log *zap.Logger) *logEgressMonitor {
 	return &logEgressMonitor{log: log}
 }
 
+// record emits one structured line per egress decision — allowed or refused —
+// so a tenant's outbound attempts stay auditable. Host and port are recorded;
+// request contents and credentials deliberately are not. A nil monitor or nil
+// logger is a no-op so callers never have to guard the call site.
 func (m *logEgressMonitor) record(e egressEvent) {
 	if m == nil || m.log == nil {
 		return

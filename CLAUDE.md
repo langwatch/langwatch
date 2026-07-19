@@ -129,7 +129,7 @@ pnpm test:integration # Integration tests
 pnpm test:e2e         # E2E tests
 ```
 
-When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven doctor` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `langwatch/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-backend"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `langwatch/server.log`; grep it as the fallback when the stack is down.
+When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven doctor` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `langwatch/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `langwatch/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure
 
@@ -197,6 +197,7 @@ specs/               # BDD feature specs
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
 | Using -- on pnpm tasks, pnpm adds the -- automatically | Using e.g. `pnpm test:unit path/to/file` directly |
 | Using positional parameters for functions with multiple args | Use named parameters via object destructuring: `fn({ a, b })` not `fn(a, b)` |
+| A workspace package tsconfig without `incremental` + `tsBuildInfoFile` | Every package tsconfig sets `"incremental": true` and its own `"tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/<pkg>.tsbuildinfo"`. Without it each typecheck re-checks cold; without a per-package path the packages clobber each other's cache |
 
 ## Database
 

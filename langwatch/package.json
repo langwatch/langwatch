@@ -102,6 +102,7 @@
     "@langwatch/scenario": "file:vendor/langwatch-scenario-0.4.10.tgz",
     "@langwatch/automations": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/ssrf": "workspace:*",
     "@microlink/react-json-view": "^1.31.21",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
