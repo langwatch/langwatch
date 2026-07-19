@@ -7,6 +7,7 @@ package nlpgo
 
 import (
 	"context"
+	"os"
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
@@ -69,7 +70,9 @@ func defaultConfig() Config {
 			SandboxPython:            "python3",
 		},
 		OTel: config.OTel{
-			SampleRatio: 1.0, // overridden to 0.1 for non-local in LoadConfig
+			// Left unset so an operator-supplied ratio is distinguishable
+			// from the default; resolved in LoadConfig.
+			SampleRatio: config.UnsetSampleRatio,
 		},
 	}
 }
@@ -80,8 +83,9 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Hydrate(&cfg); err != nil {
 		return Config{}, err
 	}
-	if cfg.OTel.SampleRatio == 1.0 && cfg.Environment != "local" {
-		cfg.OTel.SampleRatio = 0.1
+	cfg.OTel.SampleRatioSet = os.Getenv("OTEL_SAMPLE_RATIO") != ""
+	if err := cfg.OTel.Resolve(cfg.Environment); err != nil {
+		return Config{}, err
 	}
 	if err := config.Validate(ctx, cfg); err != nil {
 		return Config{}, err

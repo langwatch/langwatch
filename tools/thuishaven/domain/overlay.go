@@ -159,8 +159,8 @@ func (s Stack) observabilityEnv() []string {
 	}
 	otlp := fmt.Sprintf("http://127.0.0.1:%d", s.ObservabilityOTLPPort)
 	env := []string{
-		"OTEL_EXPORTER_OTLP_ENDPOINT=" + otlp,   // TS: traces + logs + metrics
-		"OTEL_DEBUG_COLLECTOR_ENDPOINT=" + otlp, // Go: dual-export, additive to the product trace path
+		"OTEL_EXPORTER_OTLP_ENDPOINT=" + otlp,   // official name — TS app AND Go services (their own telemetry)
+		"OTEL_DEBUG_COLLECTOR_ENDPOINT=" + otlp, // Go OTLP logs ride this; span/metric export dedupes when equal to the official endpoint
 		"PINO_OTEL_ENABLED=true",
 		"OTEL_METRICS_ENABLED=true",
 		"LOG_OTEL_LEVEL=debug",

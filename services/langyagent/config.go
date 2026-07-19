@@ -34,6 +34,7 @@ package langyagent
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -178,7 +179,9 @@ func defaultConfig() Config {
 		EgressRequireTLS:    true,
 		EgressSNICrossCheck: true,
 		OTel: config.OTel{
-			SampleRatio: 1.0, // overridden to 0.1 for non-local in LoadConfig
+			// Left unset so an operator-supplied ratio is distinguishable
+			// from the default; resolved in LoadConfig.
+			SampleRatio: config.UnsetSampleRatio,
 		},
 	}
 }
@@ -189,11 +192,12 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Hydrate(&cfg); err != nil {
 		return Config{}, err
 	}
+	cfg.OTel.SampleRatioSet = os.Getenv("OTEL_SAMPLE_RATIO") != ""
 	// Derive the listen address from PORT (kept as its own env var). Set after
 	// Hydrate so PORT always wins over any stray SERVER_ADDR.
 	cfg.Server.Addr = fmt.Sprintf(":%d", cfg.Port)
-	if cfg.OTel.SampleRatio == 1.0 && cfg.Environment != "local" {
-		cfg.OTel.SampleRatio = 0.1
+	if err := cfg.OTel.Resolve(cfg.Environment); err != nil {
+		return Config{}, err
 	}
 	if err := cfg.Log.Validate(); err != nil {
 		return Config{}, err

@@ -68,11 +68,22 @@ func TraceRegistryMiddleware(registry *customertracebridge.Registry, defaultEndp
 				return
 			}
 			if registry != nil {
+				// Both halves come from Config so they are always the pair the
+				// control plane materialized together. Bundle.ProjectID rides the
+				// auth JWT on a slower refresh clock; pairing it with the config's
+				// token exports one project's traces under another's ingest token.
+				traceProjectID := bundle.Config.TraceProjectID
+				if traceProjectID == "" && bundle.Config.ProjectOTLPToken != "" {
+					// Inconsistent payload: fail closed rather than guess an id.
+					// Guessing is what leaks; dropping only costs telemetry.
+					clog.Get(r.Context()).Warn("otlp_trace_project_missing",
+						zap.String("vk_id", bundle.VirtualKeyID))
+				}
 				if err := registry.SetFromBundle(
-					bundle.ProjectID, bundle.Config.ProjectOTLPToken, defaultEndpoint,
+					traceProjectID, bundle.Config.ProjectOTLPToken, defaultEndpoint,
 				); err != nil {
 					clog.Get(r.Context()).Warn("otlp_endpoint_rejected",
-						zap.String("project_id", bundle.ProjectID), zap.Error(err))
+						zap.String("project_id", traceProjectID), zap.Error(err))
 				}
 			}
 			next.ServeHTTP(w, r)
