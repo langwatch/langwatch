@@ -411,10 +411,16 @@ export function initializeDefaultApp(options?: {
     ),
     "OrganizationService",
   );
-  const traceService = TraceService.create(prisma, {
-    blobStore,
-    ioExtractionService,
-  });
+  const traceService = TraceService.create(
+    prisma,
+    {
+      blobStore,
+      ioExtractionService,
+    },
+    // The same traced store the traces group exposes: without it the service
+    // lazily builds a second, untraced default for coding-agent enrichment.
+    logRecordStorage,
+  );
 
   const evaluationExecution = traced(
     new EvaluationExecutionService({
