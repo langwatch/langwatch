@@ -115,6 +115,61 @@ describe("TopicClusteringRunStatusFoldProjection", () => {
       expect(superseded.InProgressTraces).toBe(0);
       expect(superseded.InProgressPages).toBe(0);
     });
+
+    it("dates the run from its first event and never restamps it per page", () => {
+      // The status service expires a wedged run from this timestamp on the
+      // scheduler's stale-run clock; restamping per page would make a stalled
+      // backlog walk look forever fresh — the same immortal-walk bug the
+      // process fixed by measuring staleness from the run's start.
+      const started = projection.apply(
+        initState(),
+        baseEvent({
+          type: "lw.obs.topic_clustering.run_started",
+          occurredAt: 10_000,
+          data: { runId: "20260717T093000", page: 1 },
+        }),
+      );
+      expect(started.InProgressStartedAt).toBe(10_000);
+
+      const paged = projection.apply(
+        started,
+        baseEvent({
+          type: "lw.obs.topic_clustering.run_completed",
+          occurredAt: 20_000,
+          data: completedData({
+            runId: "20260717T093000",
+            nextSearchAfter: [1, "t"],
+          }),
+        }),
+      );
+      expect(paged.InProgressStartedAt).toBe(10_000);
+
+      const finished = projection.apply(
+        paged,
+        baseEvent({
+          type: "lw.obs.topic_clustering.run_completed",
+          occurredAt: 30_000,
+          data: completedData({ runId: "20260717T093000", page: 2 }),
+        }),
+      );
+      expect(finished.InProgressStartedAt).toBeNull();
+    });
+
+    it("dates a run it never saw start from its first observed page", () => {
+      // run_started is a best-effort announcement; when it is lost, the
+      // continuation page opens the run in the projection and must carry a
+      // start time, or the wedge bound has nothing to expire from.
+      const paged = projection.apply(
+        initState(),
+        baseEvent({
+          type: "lw.obs.topic_clustering.run_completed",
+          occurredAt: 15_000,
+          data: completedData({ nextSearchAfter: [1, "t"] }),
+        }),
+      );
+
+      expect(paged.InProgressStartedAt).toBe(15_000);
+    });
   });
 
   describe("when a clustering request is recorded", () => {

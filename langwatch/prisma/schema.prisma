@@ -3160,6 +3160,9 @@ model TopicClusteringRunProjection {
   InProgressRunId        String? @map("inProgressRunId")
   InProgressTraces       Int     @default(0) @map("inProgressTraces")
   InProgressPages        Int     @default(0) @map("inProgressPages")
+  /// Business time the in-progress run opened; bounds how long the read
+  /// model may report it as running (mirrors the process's stale-run guard).
+  InProgressStartedAt    Float?  @map("inProgressStartedAt")
 
   CreatedAt         Float  @map("createdAt")
   UpdatedAt         Float  @map("updatedAt")

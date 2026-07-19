@@ -51,6 +51,14 @@ export interface TopicClusteringRunStatusData {
   InProgressRunId: string | null;
   InProgressTraces: number;
   InProgressPages: number;
+  /**
+   * Business time the in-progress run opened (its first event), carried
+   * unchanged across the run's pages — the projection-side mirror of the
+   * process's `startedAtMs`, so the read model can stop reporting a run whose
+   * terminal outcome write was lost on the SAME clock the scheduler uses to
+   * abandon it.
+   */
+  InProgressStartedAt: number | null;
   CreatedAt: number;
   UpdatedAt: number;
   LastEventOccurredAt: number;
@@ -106,6 +114,7 @@ export class TopicClusteringRunStatusFoldProjection
       InProgressRunId: null,
       InProgressTraces: 0,
       InProgressPages: 0,
+      InProgressStartedAt: null,
     };
   }
 
@@ -136,6 +145,9 @@ export class TopicClusteringRunStatusFoldProjection
       InProgressRunId: event.data.runId,
       InProgressTraces: sameRun ? state.InProgressTraces : 0,
       InProgressPages: sameRun ? state.InProgressPages : 0,
+      InProgressStartedAt: sameRun
+        ? state.InProgressStartedAt
+        : event.occurredAt,
     };
   }
 
@@ -156,6 +168,12 @@ export class TopicClusteringRunStatusFoldProjection
         InProgressRunId: data.runId,
         InProgressTraces: tracesSoFar,
         InProgressPages: pagesSoFar,
+        // A completion can open a run the projection never saw start (the
+        // best-effort run_started announcement was lost); date the run from
+        // this first observed event, never restamping an already-open run.
+        InProgressStartedAt: sameRun
+          ? state.InProgressStartedAt
+          : event.occurredAt,
       };
     }
 
@@ -180,6 +198,7 @@ export class TopicClusteringRunStatusFoldProjection
       InProgressRunId: null,
       InProgressTraces: 0,
       InProgressPages: 0,
+      InProgressStartedAt: null,
     };
   }
 
@@ -211,6 +230,7 @@ export class TopicClusteringRunStatusFoldProjection
       InProgressRunId: null,
       InProgressTraces: 0,
       InProgressPages: 0,
+      InProgressStartedAt: null,
     };
   }
 }

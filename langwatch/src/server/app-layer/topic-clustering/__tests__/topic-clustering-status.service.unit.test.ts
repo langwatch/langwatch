@@ -39,6 +39,7 @@ function projectionRow(
     InProgressRunId: null,
     InProgressTraces: 0,
     InProgressPages: 0,
+    InProgressStartedAt: null,
     ...overrides,
   } as TopicClusteringRunProjectionRow;
 }
@@ -154,12 +155,56 @@ describe("TopicClusteringStatusService", () => {
         projection: projectionRow({
           LastRequestedAt: NOW - 10_000,
           LastRunAt: NOW - 5_000,
-          InProgressRunId: "20260717",
+          InProgressRunId: "20260717T093000",
+          InProgressStartedAt: NOW - 10_000,
         }),
       }).getByProjectId({ projectId: PROJECT_ID });
 
       expect(status.inProgress).toBe(true);
       expect(status.runInFlight).toBe(true);
+    });
+  });
+
+  describe("given a run whose terminal outcome write was lost", () => {
+    it("keeps reporting it running inside the scheduler's stale-run window", async () => {
+      const status = await serviceReading({
+        projection: projectionRow({
+          InProgressRunId: "20260717T093000",
+          InProgressStartedAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS + 1,
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.inProgress).toBe(true);
+      expect(status.runInFlight).toBe(true);
+    });
+
+    it("stops reporting it running once the scheduler would abandon it", async () => {
+      // The terminal run_completed/run_failed write is best-effort; when it is
+      // lost, InProgressRunId stays set forever. Unbounded, that pinned the
+      // badge to "Running" and made the route refuse "Run now" until the next
+      // daily wake — even though the process itself would have preempted the
+      // dead run. The read must expire on the SAME clock the scheduler uses.
+      const status = await serviceReading({
+        projection: projectionRow({
+          InProgressRunId: "20260717T093000",
+          InProgressStartedAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS,
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.inProgress).toBe(false);
+      expect(status.runInFlight).toBe(false);
+    });
+
+    it("bounds rows folded before the start column existed by their latest event", async () => {
+      const status = await serviceReading({
+        projection: projectionRow({
+          InProgressRunId: "20260717T093000",
+          InProgressStartedAt: undefined as unknown as null,
+          OccurredAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS,
+        }),
+      }).getByProjectId({ projectId: PROJECT_ID });
+
+      expect(status.inProgress).toBe(false);
     });
   });
 

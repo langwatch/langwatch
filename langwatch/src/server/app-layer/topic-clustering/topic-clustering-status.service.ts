@@ -27,7 +27,12 @@ export interface TopicClusteringStatus {
    * A run is working right now, as recorded by `run_started`. The effect
    * announces every page before working it, so this covers scheduled and
    * manual runs alike, from the first page, including runs that finish in a
-   * single page. Cleared by the terminal `run_completed` / `run_failed`.
+   * single page. Cleared by the terminal `run_completed` / `run_failed` —
+   * and, because that terminal write is best-effort and can be lost, ALSO
+   * bounded by the scheduler's stale-run window from the run's start. An
+   * unbounded read here pinned the badge to "Running" and made the route
+   * refuse "Run now" until the next daily wake, even though the process
+   * itself would have preempted the dead run.
    */
   inProgress: boolean;
   /**
@@ -66,7 +71,14 @@ export class TopicClusteringStatusService {
 
     const lastRequestedAt = projection?.LastRequestedAt ?? null;
     const lastRunAt = projection?.LastRunAt ?? null;
-    const inProgress = projection?.InProgressRunId != null;
+    const inProgress =
+      projection?.InProgressRunId != null &&
+      this.now() -
+        // Rows folded before the column existed fall back to the latest
+        // applied event's business time — later than the true start, so the
+        // bound only ever errs toward "still running" for one extra window.
+        (projection.InProgressStartedAt ?? projection.OccurredAt) <
+        TOPIC_CLUSTERING_STALE_RUN_MS;
 
     return {
       lastRequestedAt,

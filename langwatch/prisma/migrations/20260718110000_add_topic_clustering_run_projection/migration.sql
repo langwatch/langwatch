@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS "TopicClusteringRunProjection" (
   "inProgressRunId" TEXT,
   "inProgressTraces" INTEGER NOT NULL DEFAULT 0,
   "inProgressPages" INTEGER NOT NULL DEFAULT 0,
+  "inProgressStartedAt" DOUBLE PRECISION,
   "createdAt" DOUBLE PRECISION NOT NULL,
   "updatedAt" DOUBLE PRECISION NOT NULL,
   "occurredAt" DOUBLE PRECISION NOT NULL,
