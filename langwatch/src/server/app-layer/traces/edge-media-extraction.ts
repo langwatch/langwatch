@@ -42,7 +42,7 @@ import type {
   OtlpKeyValue,
   OtlpSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
-import { getFeatureFlagStore } from "~/server/featureFlag";
+import { featureFlagService } from "~/server/featureFlag";
 import { getEdgeMediaExtractFailOpenCounter } from "~/server/metrics";
 import type { ExtractedRef } from "~/server/stored-objects/content-extractor";
 import { containsMediaMarkers } from "~/server/stored-objects/media-markers";
@@ -70,11 +70,14 @@ export interface EdgeMediaExtractionDeps {
 }
 
 async function defaultIsEnabled(projectId: string): Promise<boolean> {
-  const enabled = await getFeatureFlagStore().get(
-    "release_trace_media_extraction",
-    { projectId },
-  );
-  return enabled === true;
+  // Read through the layered service, NOT the raw postgres store: the store
+  // returns null when no operator row exists, and this flag ships enabled by
+  // registry default — only the service applies that default (store row →
+  // PostHog rule → registry default).
+  return await featureFlagService.isEnabled("release_trace_media_extraction", {
+    distinctId: projectId,
+    projectId,
+  });
 }
 
 async function defaultHasContentDropRules(projectId: string): Promise<boolean> {
