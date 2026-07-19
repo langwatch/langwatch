@@ -314,8 +314,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       this.queueName,
     );
 
-    // The GQ2 content-addressed blob lifecycle — tiered store, renewable
-    // per-holder leases, and the encode/decode/take/release seams.
+    // The GQ2 content-addressed blob lifecycle — tiered store and the
+    // encode/decode/renew/release seams. Staging Lua acquires holder leases.
     this.blobLifecycle = new EnvelopeBlobLifecycle({
       redis: this.redisConnection,
       queueName: this.queueName,
