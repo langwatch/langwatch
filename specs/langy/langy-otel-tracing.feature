@@ -123,6 +123,36 @@ Feature: Langy agent activity is traced into the user's project
     Then the customer's trace still contains the worker's complete activity
 
   # ============================================================================
+  # Provenance cannot be forged by the worker
+  #
+  # The worker is model-driven and prompt-injectable, so anything it says about
+  # who it is must be treated as a claim, not a fact. LangWatch marks its own
+  # telemetry as platform-internal; a worker that brands its spans the same way
+  # would launder customer content into LangWatch's own view, so the claim is
+  # removed on the way to the customer's project no matter how it is dressed up.
+  # ============================================================================
+
+  Scenario: A worker cannot claim its telemetry is LangWatch's own
+    Given the worker claims its telemetry is LangWatch's own
+    When the manager forwards that activity to the customer's project
+    Then the provenance claim is absent from the forwarded trace
+
+  Scenario: Repeating the provenance claim does not smuggle it through
+    Given the worker repeats its provenance claim several times in one batch
+    When the manager forwards that activity to the customer's project
+    Then no copy of the provenance claim survives in the forwarded trace
+
+  Scenario: Moving the provenance claim onto individual spans does not smuggle it through
+    Given the worker attaches its provenance claim to individual spans
+    When the manager forwards that activity to the customer's project
+    Then the provenance claim is absent from every forwarded span
+
+  Scenario: Repeating a reserved grouping key does not override the manager's value
+    Given the worker repeats a reserved grouping key several times in one batch
+    When the manager forwards that activity to the customer's project
+    Then the forwarded trace carries only the manager's value for that key
+
+  # ============================================================================
   # Manager-mediated LLM calls (phase 2)
   # ============================================================================
 
