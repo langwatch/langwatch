@@ -63,11 +63,11 @@ jobs:
       - uses: ./.github/actions/setup-pnpm-node
         with:
           cache-dependency-path: "pnpm-lock.yaml"
-          install-dir: langwatch
+          install-dir: platform/app
 
       # Runs even when the Go half already failed, so a divergence report names
       # both sides in one log instead of making you re-run to see the second.
       - name: TypeScript half of the corpus
         if: ${{ !cancelled() }}
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm --filter @langwatch/ssrf test:unit

@@ -159,9 +159,15 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
 
+      # node-gyp is no longer bundled on PATH under Node-24 + npm-11; the
+      # unified workspace pulls in native modules (node-pty via mcp/typescript)
+      # whose install scripts need it. Same workaround as setup-pnpm-node.
+      - name: Install node-gyp
+        run: npm install -g node-gyp@latest
+
       - name: Install langwatch deps
         working-directory: platform/app
-        run: pnpm install --frozen-lockfile
+        run: CI=true pnpm install --frozen-lockfile
 
       - name: Apply DB migrations
         working-directory: platform/app
