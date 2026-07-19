@@ -290,6 +290,9 @@ func logWouldRefuse(opts SSRFOptions, host string, addr netip.Addr) {
 	)
 }
 
+// resolveHost looks up every address for host, falling back to the system
+// resolver when the options carry none. Tests inject their own resolver here to
+// exercise multi-answer and DNS-rebinding sequences without real DNS.
 func resolveHost(host string, opts SSRFOptions) ([]net.IP, error) {
 	r := opts.Resolver
 	if r == nil {

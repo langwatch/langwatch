@@ -36,6 +36,11 @@ export type Category = "global" | "metadata" | "special";
 // parse to a 4- or 16-byte array ourselves and mask-compare against prefixes.
 // ---------------------------------------------------------------------------
 
+/**
+ * Parse a dotted-quad IPv4 literal to 4 network-order bytes, or null when it is
+ * not one. Deliberately strict: no octal, hex, or shorthand forms, since those
+ * alternate spellings of a private address are a standard filter bypass.
+ */
 function ipv4ToBytes(input: string): Uint8Array | null {
   const parts = input.split(".");
   if (parts.length !== 4) return null;
@@ -49,6 +54,11 @@ function ipv4ToBytes(input: string): Uint8Array | null {
   return bytes;
 }
 
+/**
+ * Parse an IPv6 literal to 16 network-order bytes, or null when it is not one.
+ * Handles `::` elision and a trailing embedded IPv4 (`::ffff:1.2.3.4`), both of
+ * which have to resolve here so the mapped form cannot dodge classification.
+ */
 function ipv6ToBytes(input: string): Uint8Array | null {
   let s = input;
   const zone = s.indexOf("%"); // strip scope/zone id (fe80::1%eth0)
@@ -125,12 +135,22 @@ function unmap(bytes: Uint8Array): Uint8Array {
 // Prefix matching.
 // ---------------------------------------------------------------------------
 
+/**
+ * A CIDR block in compared form: the network bytes, the significant bit count,
+ * and the RFC that reserves it. `rfc` is carried so a refusal can tell an
+ * operator *which* registry entry matched rather than just "blocked".
+ */
 interface Prefix {
   bytes: Uint8Array;
   bits: number;
   rfc: string;
 }
 
+/**
+ * Parse a `"10.0.0.0/8"`-style literal into a {@link Prefix}. Throws rather than
+ * returning null: these are module-level constants, so a malformed entry is a
+ * programming error that must fail at import, never a silently absent rule.
+ */
 function parsePrefix({ cidr, rfc }: { cidr: string; rfc: string }): Prefix {
   const slash = cidr.lastIndexOf("/");
   const bytes = ipToBytes(cidr.slice(0, slash));
@@ -241,7 +261,8 @@ const SPECIAL_PREFIXES: Prefix[] = [
   parsePrefix({ cidr: "ff00::/8", rfc: "RFC4291 multicast" }),
 ];
 
-function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+/** Whether two addresses are byte-for-byte identical. */
+function bytesEqual({ a, b }: { a: Uint8Array; b: Uint8Array }): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) return false;
@@ -259,7 +280,8 @@ export function classify(ip: string): Category {
   if (!raw) return "special";
   const addr = unmap(raw);
 
-  if (METADATA_ADDRESSES.some((m) => bytesEqual(m, addr))) return "metadata";
+  if (METADATA_ADDRESSES.some((m) => bytesEqual({ a: m, b: addr })))
+    return "metadata";
   for (const prefix of SPECIAL_PREFIXES) {
     if (prefixContains({ prefix, addr })) return "special";
   }
