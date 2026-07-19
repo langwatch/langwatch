@@ -16,9 +16,14 @@ import {
 } from "~/server/evaluations/evaluation-run.mappers";
 import type {
   NormalizedSpan,
-  NormalizedSpanKind,
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+// NormalizedSpanKind is a runtime enum (used as `NormalizedSpanKind.UNSPECIFIED`
+// below), so it must be a value import — `import type` strips the binding at
+// runtime and `.UNSPECIFIED` would throw TypeError. The other two
+// (`NormalizedSpan`, `NormalizedStatusCode`) are only used in type positions
+// in this file, so they stay as `import type` for cleaner tree-shaking.
+import { NormalizedSpanKind } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
 import type { Event, Span, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
