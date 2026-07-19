@@ -57,7 +57,10 @@ export async function queryMetricUsageEstimates({
         uniqExact(tuple(SeriesId, AcceptedHour)) AS ActiveSeriesHours,
         uniqExact(PointId) AS AcceptedPoints,
         sum(CanonicalSourceBytes) AS CanonicalRetainedBytes,
-        uniqExact(tuple(SeriesId, AcceptedHour)) AS ProjectedEventEquivalentUsage
+        -- Billing counts one event-equivalent per active series-hour, so this
+        -- is ActiveSeriesHours by definition. Aliased rather than repeated:
+        -- ClickHouse does not CSE two identical uniqExact states into one.
+        ActiveSeriesHours AS ProjectedEventEquivalentUsage
         FROM (
         SELECT
           PointId,

@@ -103,4 +103,16 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.event_log
 -- +goose Down
 -- Canonical log cutover is intentionally irreversible; event payloads remain
 -- replayable and the legacy table is not modified or dropped.
+--
+-- The event_log._size_bytes change above IS reversible. To restore the state
+-- 00049 left it in (metric folded out, log still billable), uncomment and run
+-- manually. Down migrations stay commented out to prevent accidental loss.
+--
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.log_usage_estimates;
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.log_records;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.event_log
+--   MODIFY COLUMN `_size_bytes` UInt32
+--     MATERIALIZED if(AggregateType = 'metric', 0, byteSize(EventPayload, ProcessingTraceparent))
+--     CODEC(Delta(4), ZSTD(1))
+--   SETTINGS alter_sync = 1, mutations_sync = 0;
 

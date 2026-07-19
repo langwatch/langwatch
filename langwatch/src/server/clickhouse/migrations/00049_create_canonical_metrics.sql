@@ -67,6 +67,14 @@ SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 
 -- Series metadata only. LastSeenAt is both the replacement version and TTL
 -- anchor: a late old point cannot replace a newer observation in its partition.
+--
+-- KNOWN TENSION (same shape as metric_usage_estimates below): this partitions
+-- by LastSeenAt while the dedup key is (TenantId, SeriesId). LastSeenAt is not
+-- part of that key, and merges never cross partitions — so a series observed
+-- in two different weeks keeps one row per week, permanently. There is no
+-- reader today (only the insert, the TTL reconciler and retention config), so
+-- nothing is wrong right now. Any future reader MUST dedup explicitly, via
+-- FINAL or argMax(<col>, LastSeenAt); a plain SELECT returns stale duplicates.
 -- +goose StatementBegin
 CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.metric_series
 (
