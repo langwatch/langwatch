@@ -359,7 +359,6 @@ type Workflow struct {
 	Icon            string            `json:"icon"`
 	Description     string            `json:"description"`
 	Version         string            `json:"version"`
-	DefaultLLM      *LLMConfig        `json:"default_llm,omitempty"`
 	Nodes           []Node            `json:"nodes"`
 	Edges           []Edge            `json:"edges"`
 	State           WorkflowState     `json:"state"`

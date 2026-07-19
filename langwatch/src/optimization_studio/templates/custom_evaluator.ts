@@ -1,5 +1,10 @@
-import type { End, Entry, Signature, Workflow } from "../types/dsl";
-import { DEFAULT_MAX_TOKENS } from "../utils/registryUtils";
+import {
+  LATEST_SPEC_VERSION,
+  type End,
+  type Entry,
+  type Signature,
+  type Workflow,
+} from "../types/dsl";
 
 export const entryNode = () => ({
   id: "entry",
@@ -23,16 +28,11 @@ export const entryNode = () => ({
 });
 
 export const customEvaluatorTemplate: Workflow = {
-  spec_version: "1.4",
+  spec_version: LATEST_SPEC_VERSION,
   name: "Custom Evaluator",
   icon: "✅",
   description: "Create a custom evaluator to be used in other workflows",
   version: "1.0",
-  default_llm: {
-    model: "openai/gpt-5",
-    temperature: 1,
-    max_tokens: DEFAULT_MAX_TOKENS,
-  },
   template_adapter: "default",
   workflow_type: "evaluator",
   enable_tracing: true,
