@@ -879,7 +879,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       // Should not import from the main app
       expect(createMcpServerSrc).not.toContain("~/server/");
       expect(createMcpServerSrc).not.toContain("../server/");
-      expect(createMcpServerSrc).not.toContain("langwatch/src/");
+      expect(createMcpServerSrc).not.toContain("platform/app/src/");
     });
   });
 
