@@ -87,7 +87,11 @@ describe("LogRequestCollectionService", () => {
       logRequest: logRequest(),
     });
 
-    expect(result).toEqual({ acceptedLogRecords: 1, rejectedLogRecords: 0 });
+    expect(result).toEqual({
+      outcome: "collected",
+      acceptedLogRecords: 1,
+      rejectedLogRecords: 0,
+    });
     expect(records).toHaveLength(1);
     expect(records[0]).toMatchObject({
       organizationId: args.organizationId,
@@ -106,14 +110,21 @@ describe("LogRequestCollectionService", () => {
     );
   });
 
-  it("rejects a correlated log when its trace contribution cannot be queued", async () => {
+  it("keeps a correlated log accepted when its trace contribution cannot be queued", async () => {
     const { service } = makeService({ contributionFails: true });
+
     const result = await service.handleOtlpLogRequest({
       ...args,
       logRequest: logRequest(),
     });
-    expect(result.acceptedLogRecords).toBe(0);
-    expect(result.rejectedLogRecords).toBe(1);
+
+    // The canonical record is already durably enqueued and is the source of
+    // truth; the contribution is best-effort correlation, as in the metric
+    // pipeline. Rejecting here would tell the sender to discard a log we
+    // have in fact accepted, and a retry would re-ingest it.
+    expect(result.outcome).toBe("collected");
+    expect(result.acceptedLogRecords).toBe(1);
+    expect(result.rejectedLogRecords).toBe(0);
   });
 
   it("bounds duplicated trace I/O while retaining the full canonical log", async () => {
@@ -135,18 +146,37 @@ describe("LogRequestCollectionService", () => {
     ).toBe(true);
   });
 
-  it("reports canonical command failures as partial rejection", async () => {
-    const { service, recordLogContributions } = makeService({
-      storageFails: true,
+  describe("when the canonical batch cannot be persisted", () => {
+    it("reports the batch as unavailable rather than rejected", async () => {
+      const { service, recordLogContributions } = makeService({
+        storageFails: true,
+      });
+
+      const result = await service.handleOtlpLogRequest({
+        ...args,
+        logRequest: logRequest(),
+      });
+
+      // A persistence failure is ours, so the records must stay retryable. If
+      // this ever reports `collected` with a non-zero `rejectedLogRecords`,
+      // the route answers 200 + partialSuccess and every collector in the
+      // fleet drops the batch it could have re-sent.
+      expect(result.outcome).toBe("unavailable");
+      expect(result).not.toHaveProperty("rejectedLogRecords");
+      expect(recordLogContributions).not.toHaveBeenCalled();
     });
-    const result = await service.handleOtlpLogRequest({
-      ...args,
-      logRequest: logRequest(),
+
+    it("does not echo storage internals back to the sender", async () => {
+      const { service } = makeService({ storageFails: true });
+
+      const result = await service.handleOtlpLogRequest({
+        ...args,
+        logRequest: logRequest(),
+      });
+
+      expect(result.errorMessage).toBe("failed to record log record");
+      expect(result.errorMessage).not.toContain("storage unavailable");
     });
-    expect(result.acceptedLogRecords).toBe(0);
-    expect(result.rejectedLogRecords).toBe(1);
-    expect(result.errorMessage).toContain("storage unavailable");
-    expect(recordLogContributions).not.toHaveBeenCalled();
   });
 
   it("enqueues each accepted request as one canonical and one contribution batch", async () => {

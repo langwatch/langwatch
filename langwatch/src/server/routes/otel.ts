@@ -514,6 +514,14 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
         piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
       });
 
+      // Nothing was durably accepted, and the cause is ours. OTLP treats a 200
+      // with `partialSuccess` as a permanent rejection the client must not
+      // re-send, so answering that here would turn a queue blip into fleet-wide
+      // data loss. 503 is in OTLP's retryable set.
+      if (result.outcome === "unavailable") {
+        return c.json({ error: result.errorMessage }, { status: 503 });
+      }
+
       return c.json(
         result.rejectedLogRecords > 0
           ? {
