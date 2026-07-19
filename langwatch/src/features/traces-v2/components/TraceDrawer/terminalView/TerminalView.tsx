@@ -238,7 +238,7 @@ export const TerminalView = memo(function TerminalView({
     [],
   );
 
-  const [atBottom, setAtBottom] = useState(true);
+  const [isAtBottom, setIsAtBottom] = useState(true);
   const [trackedFullIndex, setTrackedFullIndex] =
     useState(lastVisibleFullIndex);
 
@@ -249,7 +249,7 @@ export const TerminalView = memo(function TerminalView({
     const el = screenRef.current;
     if (!el) return;
     const viewportBottom = el.scrollTop + el.clientHeight;
-    setAtBottom(el.scrollHeight - viewportBottom <= NEAR_BOTTOM_PX);
+    setIsAtBottom(el.scrollHeight - viewportBottom <= NEAR_BOTTOM_PX);
 
     let best = visibleIndices[0] ?? -1;
     for (const fullIndex of visibleIndices) {
@@ -266,15 +266,15 @@ export const TerminalView = memo(function TerminalView({
   // something the screen fights you on.
   const prevEntryCountRef = useRef(entries.length);
   useEffect(() => {
-    const grew = entries.length > prevEntryCountRef.current;
+    const hasGrown = entries.length > prevEntryCountRef.current;
     prevEntryCountRef.current = entries.length;
     const el = screenRef.current;
     if (!el) return;
-    if (grew && atBottom) {
+    if (hasGrown && isAtBottom) {
       el.scrollTop = el.scrollHeight;
     }
     syncToScroll();
-    // Only re-run when the entry count changes — `syncToScroll`/`atBottom`
+    // Only re-run when the entry count changes — `syncToScroll`/`isAtBottom`
     // would otherwise re-fire this on every scroll frame.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries.length]);
@@ -283,7 +283,7 @@ export const TerminalView = memo(function TerminalView({
     const el = screenRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-    setAtBottom(true);
+    setIsAtBottom(true);
     setTrackedFullIndex(lastVisibleFullIndex);
   }, [lastVisibleFullIndex]);
 
@@ -356,7 +356,7 @@ export const TerminalView = memo(function TerminalView({
         </VStack>
       </Box>
 
-      {!atBottom && <JumpToBottomPill onClick={jumpToBottom} />}
+      {!isAtBottom && <JumpToBottomPill onClick={jumpToBottom} />}
 
       <StatusLine
         stepCount={visibleIndices.length}
@@ -397,8 +397,7 @@ function JumpToBottomPill({ onClick }: { onClick: () => void }) {
       zIndex={1}
     >
       <Text
-        as="button"
-        onClick={onClick}
+        asChild
         {...CELL}
         color={TERMINAL_TOKENS.faint}
         bg={TERMINAL_TOKENS.frameBg}
@@ -406,7 +405,11 @@ function JumpToBottomPill({ onClick }: { onClick: () => void }) {
         cursor="pointer"
         _hover={{ color: TERMINAL_TOKENS.screenFg }}
       >
-        Jump to bottom (click) ↓
+        {/* A real button, typed explicitly: inside a form, the default
+            `type` would be submit. */}
+        <button type="button" onClick={onClick}>
+          Jump to bottom (click) ↓
+        </button>
       </Text>
     </Box>
   );

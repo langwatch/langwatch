@@ -311,46 +311,15 @@ export function parseAnsi(input: string): AnsiLine[] {
     if (ch === ESC) {
       const nextCh = input[i + 1];
       if (nextCh === "[") {
-        // CSI: params/intermediates (0x20-0x3F) then one final byte
-        // (0x40-0x7E). We only act on the SGR final byte `m`; the rest
-        // (cursor moves, clears, …) are consumed and dropped.
-        let j = i + 2;
-        while (j < len) {
-          const code = input.charCodeAt(j);
-          if (code >= 0x20 && code <= 0x3f) {
-            j++;
-            continue;
-          }
-          break;
+        const csi = scanCsi(input, i);
+        if (csi.sgrParams !== null) {
+          setStyle(applySgr(style, csi.sgrParams));
         }
-        const finalCode = j < len ? input.charCodeAt(j) : -1;
-        const hasValidFinalByte = finalCode >= 0x40 && finalCode <= 0x7e;
-        if (hasValidFinalByte && input[j] === "m") {
-          setStyle(applySgr(style, input.slice(i + 2, j)));
-        }
-        // Consume the final byte only when it really is one. A sequence
-        // interrupted mid-params (chunked/truncated output) is followed by a
-        // REAL character — often `\n` — which must be re-processed as text,
-        // not swallowed as the sequence's final byte (that eats line breaks).
-        i = hasValidFinalByte ? j + 1 : j;
+        i = csi.next;
         continue;
       }
       if (nextCh === "]") {
-        // OSC: `ESC ] … (BEL | ESC \)`. Used for window titles etc. Skip the
-        // whole thing.
-        let j = i + 2;
-        while (j < len) {
-          if (input[j] === "\x07") {
-            j++;
-            break;
-          }
-          if (input[j] === ESC && input[j + 1] === "\\") {
-            j += 2;
-            break;
-          }
-          j++;
-        }
-        i = j;
+        i = scanOsc(input, i);
         continue;
       }
       // Some other escape (charset select `ESC(`, `ESC=`, a lone ESC at end
@@ -406,4 +375,55 @@ export function parseAnsi(input: string): AnsiLine[] {
   }
 
   return lines;
+}
+
+/**
+ * Scan a CSI sequence (`ESC [ params final`) starting at the ESC at `start`:
+ * params/intermediates are 0x20-0x3F, then one final byte in 0x40-0x7E.
+ * Returns the index to resume at and, when the sequence was a complete SGR
+ * (final byte `m`), its parameter string — every other final byte (cursor
+ * moves, clears, …) is consumed and dropped.
+ *
+ * The final byte is consumed only when it really is one: a sequence
+ * interrupted mid-params (chunked/truncated output) is followed by a REAL
+ * character — often `\n` — which must be re-processed as text, not swallowed
+ * as the sequence's final byte (that eats line breaks).
+ */
+function scanCsi(
+  input: string,
+  start: number,
+): { next: number; sgrParams: string | null } {
+  const len = input.length;
+  let j = start + 2;
+  while (j < len) {
+    const code = input.charCodeAt(j);
+    if (code >= 0x20 && code <= 0x3f) {
+      j++;
+      continue;
+    }
+    break;
+  }
+  const finalCode = j < len ? input.charCodeAt(j) : -1;
+  const hasValidFinalByte = finalCode >= 0x40 && finalCode <= 0x7e;
+  return {
+    next: hasValidFinalByte ? j + 1 : j,
+    sgrParams:
+      hasValidFinalByte && input[j] === "m" ? input.slice(start + 2, j) : null,
+  };
+}
+
+/**
+ * Scan an OSC sequence (`ESC ] … (BEL | ESC \)`) starting at the ESC at
+ * `start` — window titles and the like. Returns the index just past its
+ * terminator, or the end of input when unterminated.
+ */
+function scanOsc(input: string, start: number): number {
+  const len = input.length;
+  let j = start + 2;
+  while (j < len) {
+    if (input[j] === "\x07") return j + 1;
+    if (input[j] === ESC && input[j + 1] === "\\") return j + 2;
+    j++;
+  }
+  return j;
 }

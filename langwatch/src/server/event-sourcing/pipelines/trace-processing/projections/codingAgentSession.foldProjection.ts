@@ -1,3 +1,5 @@
+import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
@@ -7,22 +9,20 @@ import type {
   FoldProjectionStore,
 } from "~/server/event-sourcing/projections/foldProjection.types";
 import {
-  logRecordReceivedEventSchema,
-  metricRecordReceivedEventSchema,
-  spanReceivedEventSchema,
   type LogRecordReceivedEvent,
+  logRecordReceivedEventSchema,
   type MetricRecordReceivedEvent,
+  metricRecordReceivedEventSchema,
   type SpanReceivedEvent,
+  spanReceivedEventSchema,
 } from "../schemas/events";
-import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
-import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import {
   applyLogToCodingAgentSession,
   applyMetricToCodingAgentSession,
   applySpanToCodingAgentSession,
-  isCodingAgentLogRecord,
   CODING_AGENT_SPAN_NAMES,
   createInitCodingAgentSession,
+  isCodingAgentLogRecord,
   isCodingAgentMetric,
 } from "./services/coding-agent-session.derivation";
 import type { CodingAgentSessionData } from "./services/coding-agent-session.types";
@@ -132,10 +132,7 @@ export class CodingAgentSessionFoldProjection
     // chat trace would pay that cost on every one of its spans only to discover
     // at the end that it is not a coding agent. One set lookup instead.
     const rawName = (event.data.span as { name?: unknown } | undefined)?.name;
-    if (
-      typeof rawName !== "string" ||
-      !CODING_AGENT_SPAN_NAMES.has(rawName)
-    ) {
+    if (typeof rawName !== "string" || !CODING_AGENT_SPAN_NAMES.has(rawName)) {
       return state;
     }
 
@@ -321,7 +318,7 @@ export function projectCodingAgentSessionToRow({
     agentVersion: state.agentVersion ?? "",
     sessionId: state.sessionId ?? "",
     finalRequestId: state.finalRequestId ?? "",
-    userId: "",
+    userId: state.userId ?? "",
     terminalType: state.terminalType ?? "",
     entrypoint: state.entrypoint ?? "",
 

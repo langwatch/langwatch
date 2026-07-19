@@ -156,17 +156,22 @@ export const WaterfallView = memo(function WaterfallView({
   // so the trace's bounds stay readable; the rest are decimated by an
   // integer stride so the remaining marks stay evenly spaced. The
   // ResizeObserver fires on every drag so the count tracks the user's
-  // resize in real time.
-  const timelinePanelRef = useRef<HTMLDivElement>(null);
+  // resize in real time. A CALLBACK ref, not an effect: the panel is
+  // conditionally rendered (narrow drawers drop it entirely), and a
+  // mount-time effect would never attach the observer when the panel
+  // appears later as the drawer widens.
   const [timelinePanelWidth, setTimelinePanelWidth] = useState(0);
-  useEffect(() => {
-    const el = timelinePanelRef.current;
+  const timelineObserverRef = useRef<ResizeObserver | null>(null);
+  const timelinePanelRef = useCallback((el: HTMLDivElement | null) => {
+    timelineObserverRef.current?.disconnect();
+    timelineObserverRef.current = null;
     if (!el) return;
-    const measure = () => setTimelinePanelWidth(el.clientWidth);
-    measure();
-    const observer = new ResizeObserver(measure);
+    setTimelinePanelWidth(el.clientWidth);
+    const observer = new ResizeObserver(() =>
+      setTimelinePanelWidth(el.clientWidth),
+    );
     observer.observe(el);
-    return () => observer.disconnect();
+    timelineObserverRef.current = observer;
   }, []);
   const visibleTimeMarkers = useMemo(() => {
     if (timeMarkers.length <= 2) return timeMarkers;

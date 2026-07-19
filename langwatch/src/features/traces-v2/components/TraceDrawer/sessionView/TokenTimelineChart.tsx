@@ -62,13 +62,18 @@ export function TokenTimelineChart({
                     ),
                   );
             const reusedPx = barPx - freshPx;
+            const description = `Call ${point.index + 1} of ${points.length} · ${formatCompact(total)} tokens: ${formatCompact(point.cacheReadTokens)} from cache, ${formatCompact(fresh)} fresh${isRebuild ? ` · cache REBUILT (${formatCompact(point.cacheCreationTokens)})` : ""}`;
             return (
               <Tooltip
                 key={point.index}
-                content={`Call ${point.index + 1} of ${points.length} · ${formatCompact(total)} tokens: ${formatCompact(point.cacheReadTokens)} from cache, ${formatCompact(fresh)} fresh${isRebuild ? ` — cache REBUILT (${formatCompact(point.cacheCreationTokens)})` : ""}`}
+                content={description}
                 positioning={{ placement: "top" }}
               >
                 <Box
+                  // Focusable so the tooltip's story is reachable without a
+                  // mouse; the label carries the same text for screen readers.
+                  tabIndex={0}
+                  aria-label={description}
                   flex="1 1 0"
                   maxWidth="32px"
                   minWidth="3px"

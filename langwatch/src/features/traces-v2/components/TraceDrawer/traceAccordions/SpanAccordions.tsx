@@ -252,18 +252,27 @@ export function SpanAccordions({
                         // The raw event name is redundant once it's been
                         // turned into a human summary — dropping it keeps the
                         // nested attribute table from repeating the headline.
+                        const eventName = log.attributes["event.name"];
                         if (summary !== null) delete attributes["event.name"];
                         if (log.bodyRedacted) {
                           attributes.body = log.bodyVisibleTo
                             ? `[redacted — visible to ${log.bodyVisibleTo}]`
                             : "[redacted]";
-                        } else if (log.body) {
+                        } else if (log.body && log.body !== eventName) {
+                          // Same discrimination the redaction layer applies:
+                          // claude stamps the event-name MARKER into the
+                          // top-level body, and copying that would both add a
+                          // redundant row and overwrite the real content the
+                          // raw api_*_body records carry under the `body`
+                          // attribute.
                           attributes.body = log.body;
                         }
                         return (
                           <EventCard
                             key={`${log.timeUnixMs}-${i}`}
-                            name={summary ?? log.attributes["event.name"] ?? "log"}
+                            name={
+                              summary ?? log.attributes["event.name"] ?? "log"
+                            }
                             timestampMs={log.timeUnixMs}
                             anchorMs={span.startTimeMs}
                             attributes={attributes}

@@ -7,7 +7,10 @@ import {
   extractAssistantTextFromResponseBody,
   isConversationalQuerySource,
 } from "../claudeCode";
-import { createExtractorContext, createLogExtractorContext } from "./_testHelpers";
+import {
+  createExtractorContext,
+  createLogExtractorContext,
+} from "./_testHelpers";
 
 const SCOPE = "com.anthropic.claude_code.events";
 
@@ -88,12 +91,6 @@ describe("ClaudeCodeExtractor.applyLog", () => {
 
     expect(ctx.out).toEqual({});
     expect(ctx.recordRule).not.toHaveBeenCalled();
-  });
-
-  it("span-side apply is a no-op for a non-llm_request span", () => {
-    const extractor = new ClaudeCodeExtractor();
-    expect(extractor.id).toBe("claude-code");
-    expect(typeof extractor.apply).toBe("function");
   });
 });
 
@@ -318,7 +315,12 @@ describe("extractAssistantOutputFromResponseBody", () => {
     const body = JSON.stringify({
       content: [
         { type: "text", text: "Let me check." },
-        { type: "tool_use", id: "toolu_1", name: "Bash", input: { command: "ls /tmp" } },
+        {
+          type: "tool_use",
+          id: "toolu_1",
+          name: "Bash",
+          input: { command: "ls /tmp" },
+        },
       ],
     });
     const out = extractAssistantOutputFromResponseBody(body) ?? "";
@@ -328,7 +330,9 @@ describe("extractAssistantOutputFromResponseBody", () => {
   });
 
   it("matches the text-only extractor for a plain text reply", () => {
-    const body = JSON.stringify({ content: [{ type: "text", text: "PONG-Z" }] });
+    const body = JSON.stringify({
+      content: [{ type: "text", text: "PONG-Z" }],
+    });
     expect(extractAssistantOutputFromResponseBody(body)).toBe("PONG-Z");
     expect(extractAssistantTextFromResponseBody(body)).toBe("PONG-Z");
   });

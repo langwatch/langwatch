@@ -28,12 +28,9 @@ export class CodingAgentSessionStore
     state: CodingAgentSessionState,
     context: ProjectionStoreContext,
   ): Promise<void> {
-    const row = this.toRow(state, context);
-    if (row === null) return;
-    await this.repo.upsert(
-      row.row,
-      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
-    );
+    const result = this.toRow(state, context);
+    if (result === null) return;
+    await this.repo.upsert(result.row, result.retentionDays);
   }
 
   async storeBatch(
@@ -44,7 +41,14 @@ export class CodingAgentSessionStore
   ): Promise<void> {
     const rows = entries
       .map(({ state, context }) => this.toRow(state, context))
-      .filter((r): r is { row: ReturnType<typeof projectCodingAgentSessionToRow>; retentionDays: number } => r !== null);
+      .filter(
+        (
+          r,
+        ): r is {
+          row: ReturnType<typeof projectCodingAgentSessionToRow>;
+          retentionDays: number;
+        } => r !== null,
+      );
 
     if (rows.length === 0) return;
 
@@ -53,7 +57,9 @@ export class CodingAgentSessionStore
       return;
     }
     await Promise.all(
-      rows.map(({ row, retentionDays }) => this.repo.upsert(row, retentionDays)),
+      rows.map(({ row, retentionDays }) =>
+        this.repo.upsert(row, retentionDays),
+      ),
     );
   }
 

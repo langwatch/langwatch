@@ -1045,7 +1045,11 @@ export function initializeDefaultApp(options?: {
     // `traceList` is already built above, in scope in this closure.
     codingAgentSessions: traced(
       new CodingAgentSessionService(repositories.codingAgentSession, {
-        listConversationTraces: async ({ tenantId, conversationId }) => {
+        listConversationTraces: async ({
+          tenantId,
+          conversationId,
+          aroundStartedAtMs,
+        }) => {
           // getByTraceId merges what this returns as the COMPLETE session, so
           // page until exhausted: a first-page-only read would silently report
           // stale totals for a long session (and with ascending sort could
@@ -1054,12 +1058,20 @@ export function initializeDefaultApp(options?: {
           // the truncation is observable, never silent.
           const pageSize = 200;
           const maxPages = 20;
+          // The scan needs a time bound (partition pruning), but it must be
+          // anchored on the SESSION's era, not on today: a `now - 365d` lower
+          // bound would silently drop every sibling of a session older than a
+          // year. A year before the opened trace covers any plausible spread
+          // of one conversation's traces.
+          const yearMs = 365 * 24 * 60 * 60 * 1000;
+          const from =
+            Math.min(aroundStartedAtMs || Date.now(), Date.now()) - yearMs;
           const items: Array<{ traceId: string; startedAtMs: number }> = [];
           for (let page = 1; page <= maxPages; page++) {
             const result = await traceList.getList({
               tenantId,
               timeRange: {
-                from: Date.now() - 365 * 24 * 60 * 60 * 1000,
+                from,
                 to: Date.now(),
               },
               sort: { columnId: "time", direction: "asc" },

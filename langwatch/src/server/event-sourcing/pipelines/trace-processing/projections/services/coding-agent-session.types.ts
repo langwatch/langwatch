@@ -48,6 +48,13 @@ export interface CodingAgentSessionData {
    * actually ended the session, without carrying a byte of it.
    */
   finalRequestId: string | null;
+  /**
+   * The human who ran the session, as the agent reports it. Claude Code stamps
+   * `user.id` (and usually `user.email`) on every log event; the other agents
+   * send no user identity at all (verified against live telemetry), so for
+   * them this stays null rather than guessing.
+   */
+  userId: string | null;
 
   // ── Shape ─────────────────────────────────────────────────────────────
   modelCalls: number;
@@ -64,7 +71,11 @@ export interface CodingAgentSessionData {
    * ids are what we count.
    */
   subAgents: number;
-  /** The distinct sub-agent ids seen. Bounded. */
+  /**
+   * Bookkeeping only, not projected to the row: the dedup set behind
+   * `subAgents`. The ids are ephemeral per-session UUIDs, so the row carries
+   * the COUNT (`SubAgents`) and the TYPES (`SubAgentTypes`), never the ids.
+   */
   subAgentIds: string[];
   /** In the order they happened, batched, failures marked in place. */
   steps: SessionStep[];

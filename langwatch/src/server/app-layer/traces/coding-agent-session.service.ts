@@ -49,6 +49,12 @@ export class CodingAgentSessionService {
       listConversationTraces: (params: {
         tenantId: string;
         conversationId: string;
+        /**
+         * The opened trace's start, when known — lets the lookup anchor its
+         * time window on the SESSION's era instead of on today, so opening an
+         * old session still finds its siblings.
+         */
+        aroundStartedAtMs?: number;
       }) => Promise<ConversationTraceRef[]>;
     },
   ) {}
@@ -86,6 +92,7 @@ export class CodingAgentSessionService {
     const siblings = await this.deps.listConversationTraces({
       tenantId: projectId,
       conversationId,
+      aroundStartedAtMs: startedAtMs,
     });
 
     // The opened trace is part of the merge no matter what the membership

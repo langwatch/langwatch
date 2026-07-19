@@ -7,17 +7,22 @@
  * the spec describes.
  */
 import { describe, expect, it } from "vitest";
-import type { LogRecordReceivedEventData } from "../../../schemas/events";
-import { NormalizedStatusCode, type NormalizedSpan } from "../../../schemas/spans";
-import type { MetricRecordReceivedEventData } from "../../../schemas/events";
+import type {
+  LogRecordReceivedEventData,
+  MetricRecordReceivedEventData,
+} from "../../../schemas/events";
+import {
+  type NormalizedSpan,
+  NormalizedStatusCode,
+} from "../../../schemas/spans";
 import {
   applyLogToCodingAgentSession,
   applyMetricToCodingAgentSession,
   applySpanToCodingAgentSession,
-  cacheHitRate,
   CODING_AGENT_LOG_SCOPES,
   CODING_AGENT_SPAN_NAMES,
   type CodingAgentSessionData,
+  cacheHitRate,
   createInitCodingAgentSession,
   isCodingAgentMetric,
   isCodingAgentSession,
@@ -76,7 +81,11 @@ function metric(
   value: number,
   attributes: Record<string, string> = {},
 ): MetricRecordReceivedEventData {
-  return { metricName, value, attributes } as unknown as MetricRecordReceivedEventData;
+  return {
+    metricName,
+    value,
+    attributes,
+  } as unknown as MetricRecordReceivedEventData;
 }
 
 type Item =
@@ -219,7 +228,9 @@ describe("coding agent session", () => {
 
     it("marks a reply cut off by the token limit as truncated, not as an answer", () => {
       const state = fold([
-        { span: span("claude_code.llm_request", { stop_reason: "max_tokens" }) },
+        {
+          span: span("claude_code.llm_request", { stop_reason: "max_tokens" }),
+        },
       ]);
 
       expect(state.truncated).toBe(true);
@@ -262,7 +273,12 @@ describe("coding agent session", () => {
 
     it("records the approval mode the session ran under", () => {
       const state = fold([
-        { log: log({ "event.name": "permission_mode_changed", to_mode: "plan" }) },
+        {
+          log: log({
+            "event.name": "permission_mode_changed",
+            to_mode: "plan",
+          }),
+        },
       ]);
 
       expect(state.permissionMode).toBe("plan");
@@ -274,7 +290,12 @@ describe("coding agent session", () => {
       const state = fold([
         { log: log({ "event.name": "api_error", status_code: "529" }) },
         { log: log({ "event.name": "api_error", status_code: "429" }) },
-        { log: log({ "event.name": "api_retries_exhausted", total_attempts: "5" }) },
+        {
+          log: log({
+            "event.name": "api_retries_exhausted",
+            total_attempts: "5",
+          }),
+        },
         { log: log({ "event.name": "api_refusal" }) },
       ]);
 
@@ -308,8 +329,18 @@ describe("coding agent session", () => {
       // A skill invoked proactively arrives on the span; a /slash skill on the
       // event. Reading one path loses half of them.
       const state = fold([
-        { span: span("claude_code.tool", { tool_name: "Skill", skill_name: "deep-research" }) },
-        { log: log({ "event.name": "skill_activated", "skill.name": "code-review" }) },
+        {
+          span: span("claude_code.tool", {
+            tool_name: "Skill",
+            skill_name: "deep-research",
+          }),
+        },
+        {
+          log: log({
+            "event.name": "skill_activated",
+            "skill.name": "code-review",
+          }),
+        },
       ]);
 
       expect(state.skills).toEqual(["deep-research", "code-review"]);
@@ -340,7 +371,9 @@ describe("coding agent session", () => {
     // This is what makes it safe to summarise an unbounded session at all.
     it("does not grow with the length of the session", () => {
       const small = fold(
-        Array.from({ length: 10 }, (_, i) => ({ span: tool(`T${i % 3}`, i * 10) })),
+        Array.from({ length: 10 }, (_, i) => ({
+          span: tool(`T${i % 3}`, i * 10),
+        })),
       );
       const huge = fold(
         Array.from({ length: 20_000 }, (_, i) => ({
@@ -360,7 +393,9 @@ describe("coding agent session", () => {
 
   describe("a trace that is not a coding agent", () => {
     it("is not a session", () => {
-      const state = fold([{ span: span("openai.chat", { model: "gpt-5-mini" }) }]);
+      const state = fold([
+        { span: span("openai.chat", { model: "gpt-5-mini" }) },
+      ]);
 
       expect(isCodingAgentSession(state)).toBe(false);
       expect(state.agent).toBeNull();
@@ -417,8 +452,12 @@ describe("time", () => {
     // Pure friction: the agent was idle and so was the person. Nothing else in
     // the telemetry surfaces it.
     const state = fold([
-      { span: span("claude_code.tool.blocked_on_user", { duration_ms: 12_000 }) },
-      { span: span("claude_code.tool.blocked_on_user", { duration_ms: 3_000 }) },
+      {
+        span: span("claude_code.tool.blocked_on_user", { duration_ms: 12_000 }),
+      },
+      {
+        span: span("claude_code.tool.blocked_on_user", { duration_ms: 3_000 }),
+      },
     ]);
 
     expect(state.blockedOnUserMs).toBe(15_000);
@@ -559,11 +598,23 @@ describe("context health", () => {
 
   it("keeps the single worst rebuild across several, not the last one", () => {
     const state = fold([
-      { span: span("claude_code.llm_request", { cache_creation_tokens: 100_000 }) },
+      {
+        span: span("claude_code.llm_request", {
+          cache_creation_tokens: 100_000,
+        }),
+      },
       // Rebuild #1: 60% of 100k.
-      { span: span("claude_code.llm_request", { cache_creation_tokens: 60_000 }) },
+      {
+        span: span("claude_code.llm_request", {
+          cache_creation_tokens: 60_000,
+        }),
+      },
       // Rebuild #2: 90% of 60k, but smaller in absolute tokens than #1.
-      { span: span("claude_code.llm_request", { cache_creation_tokens: 54_000 }) },
+      {
+        span: span("claude_code.llm_request", {
+          cache_creation_tokens: 54_000,
+        }),
+      },
     ]);
 
     expect(state.cacheRebuildCount).toBe(2);
@@ -591,8 +642,18 @@ describe("the guardrails", () => {
 
   it("counts every widening of what the agent was allowed to do", () => {
     const state = fold([
-      { log: log({ "event.name": "permission_mode_changed", to_mode: "acceptEdits" }) },
-      { log: log({ "event.name": "permission_mode_changed", to_mode: "bypassPermissions" }) },
+      {
+        log: log({
+          "event.name": "permission_mode_changed",
+          to_mode: "acceptEdits",
+        }),
+      },
+      {
+        log: log({
+          "event.name": "permission_mode_changed",
+          to_mode: "bypassPermissions",
+        }),
+      },
     ]);
 
     expect(state.permissionChanges).toBe(2);
@@ -603,7 +664,9 @@ describe("the guardrails", () => {
     // The API already retried it on another model, so the human never saw it.
     // Counting it would overstate how often the agent refused them.
     const state = fold([
-      { log: log({ "event.name": "api_refusal", server_fallback_hop: "true" }) },
+      {
+        log: log({ "event.name": "api_refusal", server_fallback_hop: "true" }),
+      },
       { log: log({ "event.name": "api_refusal", category: "cyber" }) },
     ]);
 
@@ -618,8 +681,16 @@ describe("what came out of it (metrics)", () => {
   // say whether anything came of it.
   it("records lines changed, commits and pull requests", () => {
     const state = fold([
-      { metric: metric("claude_code.lines_of_code.count", 120, { type: "added" }) },
-      { metric: metric("claude_code.lines_of_code.count", 30, { type: "removed" }) },
+      {
+        metric: metric("claude_code.lines_of_code.count", 120, {
+          type: "added",
+        }),
+      },
+      {
+        metric: metric("claude_code.lines_of_code.count", 30, {
+          type: "removed",
+        }),
+      },
       { metric: metric("claude_code.commit.count", 2) },
       { metric: metric("claude_code.pull_request.count", 1) },
     ]);
@@ -653,7 +724,9 @@ describe("what came out of it (metrics)", () => {
 
   it("splits active time between the human and the agent", () => {
     const state = fold([
-      { metric: metric("claude_code.active_time.total", 300, { type: "user" }) },
+      {
+        metric: metric("claude_code.active_time.total", 300, { type: "user" }),
+      },
       { metric: metric("claude_code.active_time.total", 900, { type: "cli" }) },
     ]);
 
@@ -667,8 +740,19 @@ describe("pointers to the heavy data", () => {
     // The projection is an aggregate, not a copy: request_id reaches the exact
     // response body, session.id reaches the rest of the run. No content.
     const state = fold([
-      { log: log({ "event.name": "user_prompt", prompt_length: "412", "session.id": "sess-1" }) },
-      { log: log({ "event.name": "assistant_response", response_length: "1800" }) },
+      {
+        log: log({
+          "event.name": "user_prompt",
+          prompt_length: "412",
+          "session.id": "sess-1",
+        }),
+      },
+      {
+        log: log({
+          "event.name": "assistant_response",
+          response_length: "1800",
+        }),
+      },
       { span: span("claude_code.llm_request", { request_id: "req_first" }) },
       { span: span("claude_code.llm_request", { request_id: "req_last" }) },
     ]);
@@ -680,6 +764,31 @@ describe("pointers to the heavy data", () => {
     // The LAST call's id — the pointer to the body that ended the session.
     expect(state.finalRequestId).toBe("req_last");
     expect(JSON.stringify(state)).not.toContain("prompt_text");
+  });
+
+  it("keeps who ran it: claude stamps user.id on every log event", () => {
+    const state = fold([
+      {
+        log: log({
+          "event.name": "user_prompt",
+          prompt_length: "5",
+          "user.id": "acct-uuid-1",
+          "user.email": "dev@example.com",
+        }),
+      },
+    ]);
+
+    expect(state.userId).toBe("acct-uuid-1");
+  });
+
+  it("stays null when the agent sends no user identity at all", () => {
+    // gemini and opencode events carry no user.* attributes (verified against
+    // live telemetry) — an empty guess would be worse than an honest null.
+    const state = fold([
+      { log: log({ "event.name": "user_prompt", prompt_length: "5" }) },
+    ]);
+
+    expect(state.userId).toBeNull();
   });
 });
 
@@ -787,4 +896,3 @@ describe("MCP servers, read off the tool name", () => {
     expect(state.mcpTools).toEqual([]);
   });
 });
-

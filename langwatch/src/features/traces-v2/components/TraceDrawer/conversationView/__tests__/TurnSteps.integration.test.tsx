@@ -67,7 +67,11 @@ function renderStrip() {
 describe("TurnSteps", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseQuery.mockReturnValue({ data: SPANS, isLoading: false, isError: false });
+    mockUseQuery.mockReturnValue({
+      data: SPANS,
+      isLoading: false,
+      isError: false,
+    });
   });
 
   describe("given a coding-agent turn that ran steps", () => {
@@ -82,7 +86,9 @@ describe("TurnSteps", () => {
     it("reveals the model call and the tool run once opened", async () => {
       renderStrip();
 
-      await userEvent.click(screen.getByRole("button", { name: /2 steps ran/ }));
+      await userEvent.click(
+        screen.getByRole("button", { name: /2 steps ran/ }),
+      );
 
       expect(screen.getByText("Bash")).toBeInTheDocument();
       expect(screen.getByText("pnpm test")).toBeInTheDocument();
@@ -91,7 +97,9 @@ describe("TurnSteps", () => {
 
     it("fetches the spans only after it is opened", async () => {
       renderStrip();
-      await userEvent.click(screen.getByRole("button", { name: /2 steps ran/ }));
+      await userEvent.click(
+        screen.getByRole("button", { name: /2 steps ran/ }),
+      );
 
       const lastCall = mockUseQuery.mock.calls.at(-1);
       expect(lastCall?.[1]).toMatchObject({ enabled: true });

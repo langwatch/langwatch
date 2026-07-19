@@ -188,6 +188,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     terminalType: null,
     entrypoint: null,
     finalRequestId: null,
+    userId: null,
 
     modelCalls: 0,
     toolCalls: 0,
@@ -397,6 +398,9 @@ function withIdentity(
       str(resourceAttrs["service.version"]),
     terminalType: state.terminalType ?? str(attrs["terminal.type"]),
     entrypoint: state.entrypoint ?? str(attrs["app.entrypoint"]),
+    // Claude stamps user identity on log events, not spans; other agents send
+    // none at all, so a session they produce honestly keeps null here.
+    userId: state.userId ?? str(attrs["user.id"]) ?? str(attrs["user.email"]),
   };
 }
 

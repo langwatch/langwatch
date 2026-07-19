@@ -111,6 +111,13 @@ Feature: Coding agent session summary
     When the session is summarised
     Then the session records which MCP server and which skill were used
 
+  Scenario: The session records who ran it, when the agent says so
+    Given the agent stamps a user identity on its events
+    When the session is summarised
+    Then the session records that user
+    # Claude Code sends a user id on every event; agents that send none keep
+    # the field empty rather than guessing.
+
   Scenario: The summary stays bounded no matter how long the session runs
     Given a runaway session with 20000 spans
     When the session is summarised

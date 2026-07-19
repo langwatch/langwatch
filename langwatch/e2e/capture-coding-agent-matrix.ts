@@ -31,7 +31,6 @@ void (async () => {
     viewport: { width: 1600, height: 950 },
   });
 
-  // Fresh credentials login.
   await page.goto(`${BASE_URL}/auth/signin`);
   await page.waitForSelector('input[name="email"], input[type="email"]', {
     timeout: 30_000,
@@ -63,21 +62,19 @@ void (async () => {
   await page.waitForTimeout(1500);
   await shoot(page, "01-traces-list");
 
-  // Outer session: Terminal tab.
   await page.goto(
     `${BASE_URL}/${PROJECT}/traces/${OUTER_TRACE}?drawer.mode=terminal`,
   );
   await page.waitForTimeout(6000);
   await shoot(page, "02-outer-terminal");
 
-  // Outer session: Session tab.
   await page.goto(
     `${BASE_URL}/${PROJECT}/traces/${OUTER_TRACE}?drawer.mode=session`,
   );
   await page.waitForTimeout(6000);
   await shoot(page, "03-outer-session");
 
-  // Child claude session: Session tab (sub-session recorded independently).
+  // The child claude session proves sub-sessions record independently.
   await page.goto(
     `${BASE_URL}/${PROJECT}/traces/${CHILD_TRACE}?drawer.mode=session`,
   );

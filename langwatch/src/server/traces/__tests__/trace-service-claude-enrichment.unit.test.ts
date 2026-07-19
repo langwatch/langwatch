@@ -83,7 +83,10 @@ function claudeLlmSpan(over: Partial<Span> = {}): Span {
     input: null,
     output: null,
     error: null,
-    timestamps: { started_at: 1_700_000_000_000, finished_at: 1_700_000_001_000 },
+    timestamps: {
+      started_at: 1_700_000_000_000,
+      finished_at: 1_700_000_001_000,
+    },
     metrics: { prompt_tokens: 120, completion_tokens: 8, cost: null },
     params: { request_id: REQUEST_ID, query_source: REPL },
     model: "claude-opus-4-8[1m]",
@@ -143,11 +146,20 @@ function logRow(
  */
 const CLAUDE_LOG_ROWS: StoredLogRecordRow[] = [
   logRow(
-    { "event.name": "user_prompt", prompt: "summarise the repo", query_source: REPL },
+    {
+      "event.name": "user_prompt",
+      prompt: "summarise the repo",
+      query_source: REPL,
+    },
     100,
   ),
   logRow(
-    { "event.name": "api_request", request_id: REQUEST_ID, query_source: REPL, cost_usd: "0.0421" },
+    {
+      "event.name": "api_request",
+      request_id: REQUEST_ID,
+      query_source: REPL,
+      cost_usd: "0.0421",
+    },
     200,
   ),
   logRow(
@@ -185,8 +197,14 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
       const trace = await service.getById(PROJECT_ID, TRACE_ID, protections);
       const span = trace?.spans?.[0];
 
-      expect(span?.input).toEqual({ type: "text", value: "summarise the repo" });
-      expect(span?.output).toEqual({ type: "text", value: "Here is the summary." });
+      expect(span?.input).toEqual({
+        type: "text",
+        value: "summarise the repo",
+      });
+      expect(span?.output).toEqual({
+        type: "text",
+        value: "Here is the summary.",
+      });
       expect(span?.metrics?.cost).toBe(0.0421);
     });
 
@@ -281,7 +299,7 @@ describe("TraceService — multi-trace read enrichment", () => {
   const enrichedInput = { type: "text", value: "summarise the repo" };
   const enrichedOutput = { type: "text", value: "Here is the summary." };
 
-  describe("getTracesWithSpans", () => {
+  describe("when reading via getTracesWithSpans", () => {
     it("enriches a coding-agent trace with input, output, and cost", async () => {
       mockGetTracesWithSpans.mockResolvedValue([
         makeTrace({ origin: "coding_agent", spans: [claudeLlmSpan()] }),
@@ -319,7 +337,7 @@ describe("TraceService — multi-trace read enrichment", () => {
     });
   });
 
-  describe("getTracesByThreadId", () => {
+  describe("when reading via getTracesByThreadId", () => {
     it("enriches a coding-agent trace returned for the thread", async () => {
       mockGetTracesByThreadId.mockResolvedValue([
         makeTrace({ origin: "coding_agent", spans: [claudeLlmSpan()] }),
@@ -350,7 +368,7 @@ describe("TraceService — multi-trace read enrichment", () => {
     });
   });
 
-  describe("getTracesWithSpansByThreadIds", () => {
+  describe("when reading via getTracesWithSpansByThreadIds", () => {
     it("enriches each coding-agent trace, reading logs per trace", async () => {
       mockGetTracesWithSpansByThreadIds.mockResolvedValue([
         makeTrace({ origin: "coding_agent", spans: [claudeLlmSpan()] }),

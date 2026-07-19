@@ -328,6 +328,97 @@ describe("buildCodingAgentTranscript", () => {
     });
   });
 
+  describe("given a span that declares its tool by attribute under an unfamiliar name", () => {
+    it("keeps the tool: the declaration is the evidence, not the span name", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          {
+            spanId: "t1",
+            name: "mcp.tools.call",
+            startTimeMs: 1_000,
+            endTimeMs: 1_200,
+            status: "ok",
+            params: { "tool.name": "search_docs" },
+          } as unknown as SpanDetail,
+        ],
+        logs: [],
+      });
+
+      expect(transcript.entries).toMatchObject([
+        { kind: "tool", name: "search_docs" },
+      ]);
+      expect(transcript.totals.toolCalls).toBe(1);
+    });
+  });
+
+  describe("given claude's nested tool lifecycle spans", () => {
+    it("counts the tool once: the execution/blocked children declare no tool of their own", () => {
+      // Verified against live telemetry: only `claude_code.tool` carries
+      // `tool_name`; the `.execution` and `.blocked_on_user` children do not.
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          toolSpan({ name: "Bash", atMs: 1_000 }),
+          {
+            spanId: "exec",
+            name: "claude_code.tool.execution",
+            startTimeMs: 1_010,
+            endTimeMs: 1_090,
+            status: "ok",
+            params: {},
+          } as unknown as SpanDetail,
+          {
+            spanId: "blocked",
+            name: "claude_code.tool.blocked_on_user",
+            startTimeMs: 1_001,
+            endTimeMs: 1_005,
+            status: "ok",
+            params: {},
+          } as unknown as SpanDetail,
+        ],
+        logs: [],
+      });
+
+      expect(transcript.totals.toolCalls).toBe(1);
+      expect(
+        transcript.entries.filter((entry) => entry.kind === "tool"),
+      ).toHaveLength(1);
+    });
+  });
+
+  describe("given session milestone events", () => {
+    it("turns refusals, sub-agent spawns, commits and skill activations into notes", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [],
+        logs: [
+          log({ "event.name": "claude_code.api_refusal" }, 1_000),
+          log(
+            {
+              "event.name": "claude_code.subtask_invoked",
+              description: "review the diff",
+            },
+            2_000,
+          ),
+          log({ "event.name": "claude_code.commit" }, 3_000),
+          log(
+            { "event.name": "claude_code.skill_activated", skill_name: "pdf" },
+            4_000,
+          ),
+        ],
+      });
+
+      expect(transcript.entries).toMatchObject([
+        { kind: "note", level: "error", text: "The model refused to answer." },
+        {
+          kind: "note",
+          level: "info",
+          text: "Sub-agent spawned: review the diff",
+        },
+        { kind: "note", level: "info", text: "A commit was created." },
+        { kind: "note", level: "info", text: "Skill activated: pdf" },
+      ]);
+    });
+  });
+
   describe("given a trace that is not a coding agent", () => {
     it("returns an empty transcript rather than guessing at one", () => {
       const transcript = buildCodingAgentTranscript({

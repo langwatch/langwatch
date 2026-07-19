@@ -61,9 +61,7 @@ export const TerminalPatch = memo(function TerminalPatch({
               <PatchLine
                 key={lineIndex}
                 line={line}
-                // Only lines present in the new file get a new-file number;
-                // a removed line has none, exactly as the CLI shows it.
-                lineNumber={newLineNumberAt({ hunk, index: lineIndex })}
+                lineNumber={newLineNumbers(hunk)[lineIndex] ?? null}
               />
             ))}
           </Box>
@@ -74,24 +72,20 @@ export const TerminalPatch = memo(function TerminalPatch({
 });
 
 /**
- * The new-file line number for a patch line: hunks count from `newStart`, and
- * removed lines don't advance it (they don't exist in the new file).
+ * The new-file line number for every line of a hunk: counting starts at
+ * `newStart`, and removed lines get null without advancing it (they don't
+ * exist in the new file). One linear pass per hunk, memoised because the
+ * render maps over the same hunk once per line.
  */
-function newLineNumberAt({
-  hunk,
-  index,
-}: {
-  hunk: PatchHunk;
-  index: number;
-}): number | null {
-  const line = hunk.lines[index];
-  if (line?.startsWith("-")) return null;
+const newLineNumberCache = new WeakMap<PatchHunk, Array<number | null>>();
+function newLineNumbers(hunk: PatchHunk): Array<number | null> {
+  const cached = newLineNumberCache.get(hunk);
+  if (cached) return cached;
 
   let n = hunk.newStart;
-  for (let i = 0; i < index; i++) {
-    if (!hunk.lines[i]?.startsWith("-")) n++;
-  }
-  return n;
+  const numbers = hunk.lines.map((line) => (line.startsWith("-") ? null : n++));
+  newLineNumberCache.set(hunk, numbers);
+  return numbers;
 }
 
 function PatchLine({
@@ -112,7 +106,9 @@ function PatchLine({
       minWidth="full"
       // Full-width, saturated — the same block a real diff pager draws, not
       // a subtle tint clinging to the text.
-      bg={isAdd ? DIFF_TOKENS.addBg : isRemove ? DIFF_TOKENS.removeBg : undefined}
+      bg={
+        isAdd ? DIFF_TOKENS.addBg : isRemove ? DIFF_TOKENS.removeBg : undefined
+      }
     >
       <Text
         {...CELL}

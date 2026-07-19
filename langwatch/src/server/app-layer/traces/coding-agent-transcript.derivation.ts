@@ -122,11 +122,6 @@ export interface TranscriptLogRecord {
   attributes: Record<string, unknown>;
 }
 
-const TOOL_SPAN_NAMES = new Set([
-  "claude_code.tool",
-  // opencode encodes the tool in the span name, so it is matched by prefix below.
-]);
-
 const MODEL_CALL_SPAN_NAMES = new Set([
   "claude_code.llm_request",
   "opencode.llm",
@@ -154,76 +149,54 @@ export function buildCodingAgentTranscript({
   spans: SpanDetail[];
   logs: TranscriptLogRecord[];
 }): CodingAgentTranscript {
-  const entries: TranscriptEntry[] = [];
+  const fromSpans = collectSpanEntries(spans);
+  const fromLogs = collectLogEntries(logs);
+
+  const entries = [...fromSpans.entries, ...fromLogs.entries];
+
   // Replies derived from span OUTPUT are held apart: when the same trace also
   // carries reply-bearing LOG events (gemini emits both an llm_call span and
   // an api_response event for one call), the log wins and the span-derived
   // duplicates are dropped.
+  const hasLogReply = fromLogs.entries.some(
+    (entry) => entry.kind === "assistant_message",
+  );
+  if (!hasLogReply) entries.push(...fromSpans.spanReplies);
+
+  // Time is the only ordering every agent agrees on. Spans and logs arrive on
+  // separate exporters and separate batches, so neither stream's arrival order
+  // says anything about what actually happened first.
+  entries.sort((a, b) => a.atMs - b.atMs);
+
+  return {
+    agent: detectAgentFrom({ spans, logs }),
+    sessionId: fromLogs.sessionId,
+    entries,
+    totals: fromSpans.totals,
+    subAgents: [...fromSpans.subAgentToolCounts.entries()]
+      .map(([agentId, count]) => ({ agentId, toolCalls: count }))
+      .sort((a, b) => b.toolCalls - a.toolCalls),
+  };
+}
+
+function collectSpanEntries(spans: SpanDetail[]): {
+  entries: TranscriptEntry[];
+  spanReplies: TranscriptEntry[];
+  totals: CodingAgentTranscript["totals"];
+  subAgentToolCounts: Map<string, number>;
+} {
+  const entries: TranscriptEntry[] = [];
   const spanReplies: TranscriptEntry[] = [];
-
-  const agent = detectAgentFrom({ spans, logs });
-  let sessionId: string | null = null;
-
   const subAgentToolCounts = new Map<string, number>();
-  let modelCalls = 0;
-  let toolCalls = 0;
-  let tokens = 0;
-  let costUsd = 0;
+  const totals = { modelCalls: 0, toolCalls: 0, tokens: 0, costUsd: 0 };
 
   for (const span of spans) {
     if (isModelCallSpan(span.name)) {
-      modelCalls += 1;
-      const inputTokens =
-        readNumber(span.params, "input_tokens") ??
-        readNumber(span.params, "gen_ai.usage.input_tokens") ??
-        // opencode instruments through the Vercel AI SDK (v5 names).
-        readNumber(span.params, "ai.usage.inputTokens") ??
-        // codex reports per-turn usage under its own namespace.
-        readNumber(
-          span.params,
-          "codex.turn.token_usage.non_cached_input_tokens",
-        ) ??
-        0;
-      const outputTokens =
-        readNumber(span.params, "output_tokens") ??
-        readNumber(span.params, "gen_ai.usage.output_tokens") ??
-        readNumber(span.params, "ai.usage.outputTokens") ??
-        readNumber(span.params, "codex.turn.token_usage.output_tokens") ??
-        0;
-      const metricTokens =
-        (span.metrics?.promptTokens ?? 0) +
-        (span.metrics?.completionTokens ?? 0);
-      const callTokens =
-        metricTokens > 0
-          ? metricTokens
-          : (readNumber(span.params, "codex.turn.token_usage.total_tokens") ??
-            inputTokens + outputTokens);
-      const callCostUsd = span.metrics?.cost ?? 0;
-      tokens += callTokens;
-      costUsd += callCostUsd;
-      entries.push({
-        kind: "model_call",
-        atMs: span.startTimeMs,
-        model:
-          readString(span.params, "gen_ai.request.model") ??
-          readString(span.params, "ai.model.id") ??
-          readString(span.params, "model"),
-        tokens: callTokens,
-        costUsd: callCostUsd,
-        durationMs:
-          span.endTimeMs && span.startTimeMs
-            ? span.endTimeMs - span.startTimeMs
-            : null,
-        spanId: span.spanId,
-        inputTokens,
-        outputTokens,
-        cacheReadTokens:
-          readNumber(span.params, "cache_read_tokens") ??
-          readNumber(span.params, "gen_ai.usage.cache_read.input_tokens") ??
-          0,
-        cacheCreationTokens:
-          readNumber(span.params, "cache_creation_tokens") ?? 0,
-      });
+      const call = modelCallEntry(span);
+      totals.modelCalls += 1;
+      totals.tokens += call.tokens;
+      totals.costUsd += call.costUsd;
+      entries.push(call);
       // Agents whose reply rides the SPAN (opencode via the Vercel AI SDK,
       // copilot with content capture, gemini's llm_call) get their assistant
       // message from the span's extracted output. Claude never lands here:
@@ -236,22 +209,24 @@ export function buildCodingAgentTranscript({
           kind: "assistant_message",
           atMs: span.endTimeMs ?? span.startTimeMs,
           text: spanReplyText,
-          model:
-            readString(span.params, "gen_ai.request.model") ??
-            readString(span.params, "ai.model.id") ??
-            readString(span.params, "model"),
+          model: modelOf(span),
         });
       }
       continue;
     }
 
+    // A span is a tool run when it DECLARES a tool: either by attribute
+    // (`tool_name` / `tool.name` — claude, codex) or by the opencode span-name
+    // encoding. No name allowlist on top: the declaration is the evidence, and
+    // an allowlist here silently dropped attribute-backed tools under span
+    // names it had never seen.
     const toolName = resolveToolName({
       spanName: span.name,
       attrs: (span.params ?? {}) as Record<string, unknown>,
     });
-    if (!isToolSpan(span.name) || toolName === null) continue;
+    if (toolName === null) continue;
 
-    toolCalls += 1;
+    totals.toolCalls += 1;
 
     // A sub-agent's tools are kept IN the sequence but marked, rather than
     // hoisted out of it. Dropping them lost the work entirely; flattening them
@@ -283,6 +258,70 @@ export function buildCodingAgentTranscript({
     });
   }
 
+  return { entries, spanReplies, totals, subAgentToolCounts };
+}
+
+function modelCallEntry(span: SpanDetail): TranscriptEntry & {
+  kind: "model_call";
+} {
+  const inputTokens =
+    readNumber(span.params, "input_tokens") ??
+    readNumber(span.params, "gen_ai.usage.input_tokens") ??
+    // opencode instruments through the Vercel AI SDK (v5 names).
+    readNumber(span.params, "ai.usage.inputTokens") ??
+    // codex reports per-turn usage under its own namespace.
+    readNumber(span.params, "codex.turn.token_usage.non_cached_input_tokens") ??
+    0;
+  const outputTokens =
+    readNumber(span.params, "output_tokens") ??
+    readNumber(span.params, "gen_ai.usage.output_tokens") ??
+    readNumber(span.params, "ai.usage.outputTokens") ??
+    readNumber(span.params, "codex.turn.token_usage.output_tokens") ??
+    0;
+  const metricTokens =
+    (span.metrics?.promptTokens ?? 0) + (span.metrics?.completionTokens ?? 0);
+  const tokens =
+    metricTokens > 0
+      ? metricTokens
+      : (readNumber(span.params, "codex.turn.token_usage.total_tokens") ??
+        inputTokens + outputTokens);
+
+  return {
+    kind: "model_call",
+    atMs: span.startTimeMs,
+    model: modelOf(span),
+    tokens,
+    costUsd: span.metrics?.cost ?? 0,
+    durationMs:
+      span.endTimeMs && span.startTimeMs
+        ? span.endTimeMs - span.startTimeMs
+        : null,
+    spanId: span.spanId,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens:
+      readNumber(span.params, "cache_read_tokens") ??
+      readNumber(span.params, "gen_ai.usage.cache_read.input_tokens") ??
+      0,
+    cacheCreationTokens: readNumber(span.params, "cache_creation_tokens") ?? 0,
+  };
+}
+
+function modelOf(span: SpanDetail): string | null {
+  return (
+    readString(span.params, "gen_ai.request.model") ??
+    readString(span.params, "ai.model.id") ??
+    readString(span.params, "model")
+  );
+}
+
+function collectLogEntries(logs: TranscriptLogRecord[]): {
+  entries: TranscriptEntry[];
+  sessionId: string | null;
+} {
+  const entries: TranscriptEntry[] = [];
+  let sessionId: string | null = null;
+
   for (const log of logs) {
     const event = normalizeEventName(readString(log.attributes, "event.name"));
     if (event === null) continue;
@@ -293,25 +332,7 @@ export function buildCodingAgentTranscript({
     if (entry !== null) entries.push(entry);
   }
 
-  const hasLogReply = entries.some(
-    (entry) => entry.kind === "assistant_message",
-  );
-  if (!hasLogReply) entries.push(...spanReplies);
-
-  // Time is the only ordering every agent agrees on. Spans and logs arrive on
-  // separate exporters and separate batches, so neither stream's arrival order
-  // says anything about what actually happened first.
-  entries.sort((a, b) => a.atMs - b.atMs);
-
-  return {
-    agent,
-    sessionId,
-    entries,
-    totals: { modelCalls, toolCalls, tokens, costUsd },
-    subAgents: [...subAgentToolCounts.entries()]
-      .map(([agentId, count]) => ({ agentId, toolCalls: count }))
-      .sort((a, b) => b.toolCalls - a.toolCalls),
-  };
+  return { entries, sessionId };
 }
 
 function logToEntry({
@@ -461,6 +482,58 @@ function logToEntry({
         text: readString(attrs, "error") ?? "The session hit an error.",
       };
 
+    case "api_refusal":
+      return {
+        kind: "note",
+        atMs,
+        level: "error",
+        event,
+        text: "The model refused to answer.",
+      };
+
+    case "subtask_invoked": {
+      const description = readString(attrs, "description");
+      return {
+        kind: "note",
+        atMs,
+        level: "info",
+        event,
+        text: description
+          ? `Sub-agent spawned: ${description}`
+          : "A sub-agent was spawned.",
+      };
+    }
+
+    case "commit": {
+      const message = readString(attrs, "message");
+      return {
+        kind: "note",
+        atMs,
+        level: "info",
+        event,
+        text: message ? `Commit created: ${message}` : "A commit was created.",
+      };
+    }
+
+    case "skill_activated": {
+      const skill =
+        readString(attrs, "skill_name") ?? readString(attrs, "skill");
+      return {
+        kind: "note",
+        atMs,
+        level: "info",
+        event,
+        text: skill ? `Skill activated: ${skill}` : "A skill was activated.",
+      };
+    }
+
+    // Deliberately NOT transcript entries: `api_request` (the request side is
+    // already the model_call span — a second line per call would double every
+    // beat), `session_created` / `session_idle` (lifecycle bookkeeping, no
+    // conversational content), and `mcp_server_connection` /
+    // `hook_execution_complete` / `at_mention` (session setup and input
+    // mechanics — the fold counts them; a replay of the conversation does not
+    // relive them).
     default:
       return null;
   }
@@ -496,10 +569,6 @@ function detectAgentFrom({
     if (agent !== "unknown") return agent;
   }
   return "unknown";
-}
-
-function isToolSpan(spanName: string): boolean {
-  return TOOL_SPAN_NAMES.has(spanName) || spanName.startsWith("opencode.tool.");
 }
 
 function isModelCallSpan(spanName: string): boolean {
