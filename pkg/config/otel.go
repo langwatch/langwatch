@@ -387,10 +387,16 @@ func debugCollectorMustBeLocal(endpoint string) error {
 	}
 	if strings.HasSuffix(host, ".localhost") {
 		ips, err := lookupHostIPs(host)
-		if err != nil || len(ips) == 0 {
+		if err != nil {
 			return fmt.Errorf(
-				"OTEL_DEBUG_COLLECTOR_ENDPOINT host %q did not resolve (%v) — use localhost or 127.0.0.1 instead",
+				"OTEL_DEBUG_COLLECTOR_ENDPOINT host %q did not resolve — use localhost or 127.0.0.1 instead: %w",
 				host, err,
+			)
+		}
+		if len(ips) == 0 {
+			return fmt.Errorf(
+				"OTEL_DEBUG_COLLECTOR_ENDPOINT host %q resolved to no addresses — use localhost or 127.0.0.1 instead",
+				host,
 			)
 		}
 		for _, ip := range ips {

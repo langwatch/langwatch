@@ -85,10 +85,10 @@ func TestResolve_RejectsOffBoxDebugCollectors(t *testing.T) {
 func TestResolve_RejectsOutOfRangeLegacySampleRatio(t *testing.T) {
 	for _, ratio := range []float64{-1, -0.001, 1.001, 10} {
 		o := OTel{SampleRatio: ratio}
-		assert.Error(t, o.Resolve("production"), "ratio %v must be refused before it reaches the sampler", ratio)
+		require.Error(t, o.Resolve("production"), "ratio %v must be refused before it reaches the sampler", ratio)
 	}
 	nan := OTel{SampleRatioSet: true, SampleRatio: math.NaN()}
-	assert.Error(t, nan.Resolve("production"), "NaN must be refused before it reaches the sampler")
+	require.Error(t, nan.Resolve("production"), "NaN must be refused before it reaches the sampler")
 }
 
 func TestResolve_AcceptsTheFullLegacySampleRatioRange(t *testing.T) {
@@ -218,8 +218,8 @@ func TestResolve_HonoursTheDeprecatedHeadersName(t *testing.T) {
 func TestResolve_RefusesUnsupportedProtocols(t *testing.T) {
 	for _, protocol := range []string{"grpc", "http/json"} {
 		o := OTel{ExporterProtocol: protocol}
-		assert.Error(t, o.Resolve("production"),
-			"protocol %q states an intent our exporters cannot fulfil — silence would be a lie", protocol)
+		require.Error(t, o.Resolve("production"),
+			"protocol %q states an intent our exporters cannot satisfy — silence would be a lie", protocol)
 	}
 }
 

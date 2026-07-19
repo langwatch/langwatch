@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseTraceparent_valid(t *testing.T) {
@@ -85,7 +86,7 @@ func TestRegistry_Set_ClearsWithEmpty(t *testing.T) {
 func TestRegistry_SetFromBundle_RegistersTokenAsAuthHeader(t *testing.T) {
 	r := NewRegistry()
 
-	assert.NoError(t, r.SetFromBundle("proj-1", "tok-1", "http://app:5560/api/otel"))
+	require.NoError(t, r.SetFromBundle("proj-1", "tok-1", "http://app:5560/api/otel"))
 
 	endpoint, headers, ok := r.Lookup("proj-1")
 	assert.True(t, ok)

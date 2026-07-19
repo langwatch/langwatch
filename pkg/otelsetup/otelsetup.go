@@ -319,7 +319,7 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	// Ordered so that only a ratio of 1.0 or above means "sample everything".
 	// The previous arrangement made AlwaysSample the default branch, which put
 	// every out-of-range value — a negative typo, or 10 meaning "10%" — onto
-	// full export, maximising exactly what the operator was trying to reduce.
+	// full export, amplifying exactly what the operator was trying to reduce.
 	// config.OTel.Resolve rejects those at boot; this fails toward exporting
 	// nothing for callers that construct Options directly. NaN lands here too:
 	// it compares false against both bounds.

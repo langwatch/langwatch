@@ -182,7 +182,7 @@ type traceStreamWrapper struct {
 	closeOnce          sync.Once
 	bodyMu             sync.Mutex
 	body               []byte
-	bodyDropped        bool
+	isBodyDropped      bool
 }
 
 func (w *traceStreamWrapper) Next(ctx context.Context) bool {
@@ -201,7 +201,7 @@ func (w *traceStreamWrapper) Err() error          { return w.inner.Err() }
 // captureChunk appends chunk to the body accumulator under the cap.
 // Called from Next() after the inner iterator advances, so we capture
 // exactly once per chunk regardless of how many times the caller reads
-// Chunk(). bodyDropped flips once we've truncated so onClose can stamp
+// Chunk(). isBodyDropped flips once we've truncated so onClose can stamp
 // a langwatch.reserved.trace_body_truncated marker downstream.
 func (w *traceStreamWrapper) captureChunk(chunk []byte) {
 	if len(chunk) == 0 {
@@ -209,17 +209,17 @@ func (w *traceStreamWrapper) captureChunk(chunk []byte) {
 	}
 	w.bodyMu.Lock()
 	defer w.bodyMu.Unlock()
-	if w.bodyDropped {
+	if w.isBodyDropped {
 		return
 	}
 	remaining := responseBodyCap - len(w.body)
 	if remaining <= 0 {
-		w.bodyDropped = true
+		w.isBodyDropped = true
 		return
 	}
 	if len(chunk) > remaining {
 		w.body = append(w.body, chunk[:remaining]...)
-		w.bodyDropped = true
+		w.isBodyDropped = true
 		return
 	}
 	w.body = append(w.body, chunk...)
