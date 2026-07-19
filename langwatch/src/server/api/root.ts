@@ -16,6 +16,7 @@ import { annotationScoreRouter } from "./routers/annotationScore";
 import { apiKeyRouter } from "./routers/apiKey";
 import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
+import { chartsProtoStateRouter } from "./routers/chartsProtoState";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
@@ -90,6 +91,7 @@ const coreRouters = {
   traces: tracesRouter,
   tracesV2: tracesV2Router,
   traceQuery: traceQueryRouter,
+  chartsProtoState: chartsProtoStateRouter,
   spans: spansRouter,
   analytics: analyticsRouter,
   monitors: monitorsRouter,

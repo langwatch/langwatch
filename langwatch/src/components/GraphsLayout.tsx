@@ -92,6 +92,20 @@ export default function GraphsLayout({
               <CustomDashboardsSection projectSlug={project.slug} />
             )}
           </VStack>
+          <VStack align="start" width="full" gap={1}>
+            <SmallLabel
+              paddingX={4}
+              paddingTop={4}
+              paddingBottom={2}
+              color="fg"
+              textStyle="xs"
+            >
+              Prototype
+            </SmallLabel>
+            <MenuLink href={`/${project?.slug}/analytics/charts-proto`}>
+              Charts (#5670)
+            </MenuLink>
+          </VStack>
         </VStack>
         <Container maxWidth={showFilters ? "1612" : "1200"} padding={4} paddingBottom={16}>
           {children}

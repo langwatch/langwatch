@@ -484,6 +484,13 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/[project]/analytics/reports")),
       },
       {
+        // PROTOTYPE (#5670 S1) -- guided query-builder dashboard. Re-registered
+        // 2026-07-19 per owner order: reachability overrides the finding-1
+        // throwaway-unregister (still never-merge; owner decides disposition).
+        path: "/:project/analytics/charts-proto",
+        ...page(() => import("./pages/[project]/analytics/charts-proto")),
+      },
+      {
         path: "/:project/analytics/topics",
         ...page(() => import("./pages/[project]/analytics/topics")),
       },
