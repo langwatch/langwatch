@@ -200,7 +200,7 @@ export class ProcessManagerService<State> {
       };
     });
 
-    return await this.store.commit({
+    const result = await this.store.commit({
       ref,
       tenantId: params.tenantId,
       userId: params.userId,
@@ -211,6 +211,30 @@ export class ProcessManagerService<State> {
       messages,
       now: params.now,
     });
+
+    if (
+      result.outcome === "committed" &&
+      result.duplicateMessageKeys.length > 0
+    ) {
+      // The state commit succeeded but one or more intents were suppressed as
+      // already-dispatched. That is legitimate idempotency on redelivery, and
+      // it is ALSO how a scheduling bug hides: the process believes work is in
+      // flight while nothing was ever enqueued. Never let it pass silently.
+      this.logger.warn(
+        {
+          processName: ref.processName,
+          processKey: ref.processKey,
+          projectId: ref.projectId,
+          tenantId: params.tenantId,
+          sourceEventId: params.sourceEventId,
+          duplicateMessageKeys: result.duplicateMessageKeys,
+          insertedCount: result.insertedMessageKeys.length,
+        },
+        "Process-manager commit suppressed already-dispatched intents",
+      );
+    }
+
+    return result;
   }
 
   /**
