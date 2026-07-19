@@ -78,7 +78,7 @@ export { GET, POST, PUT, PATCH, DELETE } from "./things.service";
 - **Tracing + logging** via `@langwatch/observability` (automatic, disable with `tracer: false` / `logger: false`)
 - **Auth, org, resource limits** applied in the right order per-endpoint
 - **Input/output/params/query validation** from Zod schemas, auto-wired to OpenAPI
-- **Error formatting** that duck-types `HandledError` (code, meta, reasons, traceId/spanId) and catches Zod errors
+- **Error formatting + logging** for `HandledError` (code, meta, reasons, traceId/spanId, fault/tips/docsUrl) and Zod errors
 - **Versioned routing** at `/api/{name}/{date}/...` with forward-copying from previous versions
 
 ## Handler signature
@@ -188,10 +188,21 @@ v.sse(
 
 Throw `HandledError` subclasses (from `@langwatch/handled-error`). The framework:
 
-1. Catches and serializes them with `code`, `meta`, `reasons`, `traceId`/`spanId`
-2. Catches `ZodError` and maps each issue to a `schema_failure` reason (cher-style)
+1. Catches and serializes them with `code`, `meta`, `reasons`, `traceId`/`spanId`,
+   plus the remediation channel (`fault`, `tips`, `docsUrl`)
+2. Catches `ZodError` and promotes it to a `ValidationError`, mapping each issue
+   to a `schema_failure` reason (cher-style)
 3. Returns union format for unversioned requests (includes legacy `error` field)
 4. Returns clean format for versioned requests
+5. Logs the failure — handled errors by `fault` (`customer` → warn, `platform` /
+   `provider` → error), anything unhandled at `error` with its cause, since the
+   response deliberately flattens it to "An unknown error occurred"
+
+Only real `HandledError` instances are trusted. An object that merely grows a
+`code` + `httpStatus` + `serialize()` is treated as unknown and answered with a
+500 — it cannot talk its way into choosing its own status.
+
+Request bodies are never logged.
 
 Validation error example:
 

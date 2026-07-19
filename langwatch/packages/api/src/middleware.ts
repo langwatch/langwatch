@@ -16,6 +16,7 @@ import {
   updateCurrentContext,
 } from "@langwatch/observability/context";
 
+import { RESOLVED_ERROR_STATUS } from "./errors.js";
 import { getSSECompletion } from "./sse.js";
 
 // ---------------------------------------------------------------------------
@@ -162,9 +163,16 @@ export function loggerMiddleware(options?: { name?: string }) {
         const logRequest = () => {
           const requestError = error || c.error;
           const duration = Date.now() - start;
-          const statusCode = requestError
-            ? getStatusCodeFromError(requestError)
-            : c.res.status;
+          // Prefer the status the error handler actually sent. Re-deriving it
+          // from the error disagrees with the response whenever the two
+          // encodings differ -- a ZodError has no `httpStatus`, so it derived
+          // 500 while the caller received 422.
+          const resolvedErrorStatus = c.get(RESOLVED_ERROR_STATUS) as
+            | number
+            | undefined;
+          const statusCode =
+            resolvedErrorStatus ??
+            (requestError ? getStatusCodeFromError(requestError) : c.res.status);
 
           logHttpRequest(logger, {
             method: c.req.method,
