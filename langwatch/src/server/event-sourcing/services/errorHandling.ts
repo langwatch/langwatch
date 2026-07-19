@@ -470,7 +470,7 @@ export function classifyClickHouseError(error: unknown): ErrorCategory {
   // shell. Single shallow pass: the translation wraps the driver error
   // directly, no deep recursion needed.
   const candidates =
-    error instanceof HandledError && error.reasons.length > 0
+    error instanceof HandledError && (error.reasons ?? []).length > 0
       ? error.reasons
       : [error];
 

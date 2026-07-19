@@ -4,6 +4,11 @@ import events from "events";
 import { existsSync } from "fs";
 import Module from "module";
 
+// Registers the Grafana trace-link builder with @langwatch/handled-error.
+// Registration only stores a function (env is read per serialize()), so a
+// static import is safe despite the dotenv dance below.
+import "./server/handled-error-wiring";
+
 // `override: true` lets `.env` win over values that scripts/start.sh exported
 // before this entry runs. start.sh defaults LW_GATEWAY_BASE_URL,
 // LW_GATEWAY_PUBLIC_URL, LANGWATCH_API_URL etc. based on $PORT when those vars
@@ -64,10 +69,6 @@ const originalResolveFilename = (Module as any)._resolveFilename;
 // the dotenv.config() calls above so it reads the loaded .env/.env.portless
 // (OTEL_EXPORTER_OTLP_ENDPOINT); it is a no-op when observability is unconfigured.
 await import("./instrumentation.node");
-
-// Registers the Grafana trace-link builder with @langwatch/handled-error
-// (side-effect import; see the module for why order doesn't matter).
-await import("./server/handled-error-wiring");
 
 // Intentional inline dynamic import (exception to the "no inline import" rule):
 // - `./start` must not evaluate until after dotenv.config() above has run,
