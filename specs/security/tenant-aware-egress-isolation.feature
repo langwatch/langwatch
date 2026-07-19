@@ -130,7 +130,7 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
       And connector A names exact endpoint addresses and TCP port 443
       When organization A dispatches through connector A
       Then only connector A's endpoint can be reached
-      And the endpoint security group accepts only the egress workload identity
+      And the endpoint accepts connections only from the authorized egress service
 
     @security @integration @unimplemented
     Scenario: A tenant cannot use another tenant's private connector
@@ -159,7 +159,7 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
     @security @integration @unimplemented
     Scenario: The general worker cannot bypass the webhook executor
       Given a process worker tries to connect directly to an arbitrary public host
-      Then the worker network policy denies the connection
+      Then the connection is denied
       And legitimate webhook delivery still succeeds through the executor
 
   Rule: Every untrusted Langy worker has its own gVisor sandbox
@@ -190,9 +190,9 @@ Feature: Tenant-aware outbound egress and untrusted workload isolation
 
     @security @integration @unimplemented
     Scenario: A Langy worker cannot bypass the external egress service
-      Given tenant-controlled code ignores proxy environment variables
+      Given tenant-controlled code ignores its proxy configuration
       When it connects directly to a public address
-      Then the sandbox network policy denies the connection
+      Then the connection is denied
       And an allowed destination succeeds only through the external egress service
 
     @deployment

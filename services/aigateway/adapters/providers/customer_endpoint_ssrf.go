@@ -70,7 +70,7 @@ func defaultEndpointResolver(ctx context.Context, host string) ([]net.IP, error)
 // not explicitly allowlisted. Sharing pkg/ssrf keeps the underlying "which range
 // is this address in" decision identical across this validator, the Langy egress
 // proxy and the TypeScript app — one rule set, tested by one corpus.
-func endpointAddressError(ip net.IP, blockLocal, allowlisted bool) error {
+func endpointAddressError(ip net.IP, shouldBlockLocal, isAllowlisted bool) error {
 	addr, ok := netip.AddrFromSlice(ip)
 	if !ok {
 		return fmt.Errorf("customer endpoint resolves to an unparseable address")
@@ -85,7 +85,7 @@ func endpointAddressError(ip net.IP, blockLocal, allowlisted bool) error {
 		if addr.IsUnspecified() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() {
 			return fmt.Errorf("customer endpoint resolves to a reserved address")
 		}
-		if blockLocal && !allowlisted {
+		if shouldBlockLocal && !isAllowlisted {
 			return fmt.Errorf("customer endpoint resolves to a non-public address")
 		}
 	}

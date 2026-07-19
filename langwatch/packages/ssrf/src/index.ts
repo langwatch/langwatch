@@ -131,7 +131,7 @@ interface Prefix {
   rfc: string;
 }
 
-function parsePrefix(cidr: string, rfc: string): Prefix {
+function parsePrefix({ cidr, rfc }: { cidr: string; rfc: string }): Prefix {
   const slash = cidr.lastIndexOf("/");
   const bytes = ipToBytes(cidr.slice(0, slash));
   if (!bytes) throw new Error(`@langwatch/ssrf: bad prefix ${cidr}`);
@@ -139,7 +139,13 @@ function parsePrefix(cidr: string, rfc: string): Prefix {
 }
 
 /** Whether addr (already unmapped) falls inside prefix. */
-function prefixContains(prefix: Prefix, addr: Uint8Array): boolean {
+function prefixContains({
+  prefix,
+  addr,
+}: {
+  prefix: Prefix;
+  addr: Uint8Array;
+}): boolean {
   if (prefix.bytes.length !== addr.length) return false; // different family
   let bits = prefix.bits;
   let i = 0;
@@ -184,34 +190,55 @@ const METADATA_ADDRESSES = [
  */
 const SPECIAL_PREFIXES: Prefix[] = [
   // IPv4
-  parsePrefix("0.0.0.0/8", "RFC1122 this network / unspecified"),
-  parsePrefix("10.0.0.0/8", "RFC1918 private"),
-  parsePrefix("100.64.0.0/10", "RFC6598 CGNAT / shared address space"),
-  parsePrefix("127.0.0.0/8", "RFC1122 loopback"),
-  parsePrefix("169.254.0.0/16", "RFC3927 link-local"),
-  parsePrefix("172.16.0.0/12", "RFC1918 private"),
-  parsePrefix("192.0.0.0/24", "RFC6890 IETF protocol assignments"),
-  parsePrefix("192.0.2.0/24", "RFC5737 TEST-NET-1 documentation"),
-  parsePrefix("192.88.99.0/24", "RFC7526 6to4 relay anycast, deprecated"),
-  parsePrefix("192.168.0.0/16", "RFC1918 private"),
-  parsePrefix("198.18.0.0/15", "RFC2544 benchmarking"),
-  parsePrefix("198.51.100.0/24", "RFC5737 TEST-NET-2 documentation"),
-  parsePrefix("203.0.113.0/24", "RFC5737 TEST-NET-3 documentation"),
-  parsePrefix("224.0.0.0/4", "RFC5771 multicast"),
-  parsePrefix("240.0.0.0/4", "RFC1112 reserved incl. 255.255.255.255 broadcast"),
+  parsePrefix({ cidr: "0.0.0.0/8", rfc: "RFC1122 this network / unspecified" }),
+  parsePrefix({ cidr: "10.0.0.0/8", rfc: "RFC1918 private" }),
+  parsePrefix({
+    cidr: "100.64.0.0/10",
+    rfc: "RFC6598 CGNAT / shared address space",
+  }),
+  parsePrefix({ cidr: "127.0.0.0/8", rfc: "RFC1122 loopback" }),
+  parsePrefix({ cidr: "169.254.0.0/16", rfc: "RFC3927 link-local" }),
+  parsePrefix({ cidr: "172.16.0.0/12", rfc: "RFC1918 private" }),
+  parsePrefix({
+    cidr: "192.0.0.0/24",
+    rfc: "RFC6890 IETF protocol assignments",
+  }),
+  parsePrefix({
+    cidr: "192.0.2.0/24",
+    rfc: "RFC5737 TEST-NET-1 documentation",
+  }),
+  parsePrefix({
+    cidr: "192.88.99.0/24",
+    rfc: "RFC7526 6to4 relay anycast, deprecated",
+  }),
+  parsePrefix({ cidr: "192.168.0.0/16", rfc: "RFC1918 private" }),
+  parsePrefix({ cidr: "198.18.0.0/15", rfc: "RFC2544 benchmarking" }),
+  parsePrefix({
+    cidr: "198.51.100.0/24",
+    rfc: "RFC5737 TEST-NET-2 documentation",
+  }),
+  parsePrefix({
+    cidr: "203.0.113.0/24",
+    rfc: "RFC5737 TEST-NET-3 documentation",
+  }),
+  parsePrefix({ cidr: "224.0.0.0/4", rfc: "RFC5771 multicast" }),
+  parsePrefix({
+    cidr: "240.0.0.0/4",
+    rfc: "RFC1112 reserved incl. 255.255.255.255 broadcast",
+  }),
   // IPv6
-  parsePrefix("::/128", "RFC4291 unspecified"),
-  parsePrefix("::1/128", "RFC4291 loopback"),
-  parsePrefix("64:ff9b::/96", "RFC6052 well-known NAT64"),
-  parsePrefix("64:ff9b:1::/48", "RFC8215 local-use NAT64"),
-  parsePrefix("100::/64", "RFC6666 discard-only"),
-  parsePrefix("2001::/32", "RFC4380 Teredo"),
-  parsePrefix("2001:db8::/32", "RFC3849 documentation"),
-  parsePrefix("2002::/16", "RFC3056 6to4"),
-  parsePrefix("3fff::/20", "RFC9637 documentation"),
-  parsePrefix("fc00::/7", "RFC4193 unique-local"),
-  parsePrefix("fe80::/10", "RFC4291 link-local unicast"),
-  parsePrefix("ff00::/8", "RFC4291 multicast"),
+  parsePrefix({ cidr: "::/128", rfc: "RFC4291 unspecified" }),
+  parsePrefix({ cidr: "::1/128", rfc: "RFC4291 loopback" }),
+  parsePrefix({ cidr: "64:ff9b::/96", rfc: "RFC6052 well-known NAT64" }),
+  parsePrefix({ cidr: "64:ff9b:1::/48", rfc: "RFC8215 local-use NAT64" }),
+  parsePrefix({ cidr: "100::/64", rfc: "RFC6666 discard-only" }),
+  parsePrefix({ cidr: "2001::/32", rfc: "RFC4380 Teredo" }),
+  parsePrefix({ cidr: "2001:db8::/32", rfc: "RFC3849 documentation" }),
+  parsePrefix({ cidr: "2002::/16", rfc: "RFC3056 6to4" }),
+  parsePrefix({ cidr: "3fff::/20", rfc: "RFC9637 documentation" }),
+  parsePrefix({ cidr: "fc00::/7", rfc: "RFC4193 unique-local" }),
+  parsePrefix({ cidr: "fe80::/10", rfc: "RFC4291 link-local unicast" }),
+  parsePrefix({ cidr: "ff00::/8", rfc: "RFC4291 multicast" }),
 ];
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -234,7 +261,7 @@ export function classify(ip: string): Category {
 
   if (METADATA_ADDRESSES.some((m) => bytesEqual(m, addr))) return "metadata";
   for (const prefix of SPECIAL_PREFIXES) {
-    if (prefixContains(prefix, addr)) return "special";
+    if (prefixContains({ prefix, addr })) return "special";
   }
   return "global";
 }
@@ -251,14 +278,20 @@ export function isPublicAddress(ip: string): boolean {
 /**
  * Whether ip must be refused given whether local/private egress is permitted.
  * Metadata is always refused; other special ranges are refused only when
- * blockLocal is set. Mirrors Go's ssrf.Blocked.
+ * shouldBlockLocal is set. Mirrors Go's ssrf.Blocked.
  */
-export function blocked(ip: string, blockLocal: boolean): boolean {
+export function blocked({
+  ip,
+  shouldBlockLocal,
+}: {
+  ip: string;
+  shouldBlockLocal: boolean;
+}): boolean {
   switch (classify(ip)) {
     case "metadata":
       return true;
     case "special":
-      return blockLocal;
+      return shouldBlockLocal;
     default:
       return false;
   }

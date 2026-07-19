@@ -235,8 +235,7 @@ func ipBlocked(ip net.IP, opts SSRFOptions, host string) bool {
 		return true
 	}
 
-	legacy := legacyBlocked(addr)
-	if legacy {
+	if legacyBlocked(addr) {
 		opts.logger().Warn("ssrf_refused",
 			zap.String("host", host),
 			zap.String("address", addr.String()),
