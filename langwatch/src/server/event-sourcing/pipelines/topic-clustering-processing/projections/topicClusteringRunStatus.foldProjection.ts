@@ -204,6 +204,10 @@ export class TopicClusteringRunStatusFoldProjection
       LastRunTopicsCount: 0,
       LastRunSubtopicsCount: 0,
       LastRunPages: 0,
+      // Same reasoning: a failed run clustered nothing, so it has no mode.
+      // Leaving the previous run's mode attributed "Rebuilt all topics" to a
+      // run that failed.
+      LastRunMode: null,
       InProgressRunId: null,
       InProgressTraces: 0,
       InProgressPages: 0,

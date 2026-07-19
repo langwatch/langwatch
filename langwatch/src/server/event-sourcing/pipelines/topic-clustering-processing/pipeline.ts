@@ -32,6 +32,7 @@ export interface TopicClusteringProcessingPipelineDeps {
  *
  * Commands (write surface):
  * - requestClustering: manual/bootstrap ask -> topic_clustering.requested
+ * - recordClusteringRunStarted: a page began -> run_started
  * - recordClusteringRunCompleted: one page finished -> run_completed
  * - recordClusteringRunFailed: retries exhausted -> run_failed
  *

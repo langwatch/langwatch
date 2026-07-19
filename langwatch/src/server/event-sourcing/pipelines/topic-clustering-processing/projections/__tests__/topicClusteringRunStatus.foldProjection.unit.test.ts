@@ -278,5 +278,30 @@ describe("TopicClusteringRunStatusFoldProjection", () => {
       expect(state.LastRunSubtopicsCount).toBe(0);
       expect(state.LastRunPages).toBe(0);
     });
+
+    it("clears the previous run's mode rather than attributing it to the failure", () => {
+      let state = projection.apply(
+        initState(),
+        baseEvent({
+          type: "lw.obs.topic_clustering.run_completed",
+          occurredAt: 1_000,
+          data: completedData({ mode: "batch" }),
+        }),
+      );
+      expect(state.LastRunMode).toBe("batch");
+
+      state = projection.apply(
+        state,
+        baseEvent({
+          type: "lw.obs.topic_clustering.run_failed",
+          occurredAt: 2_000,
+          data: { runId: "20260718", page: 1, error: "langevals unavailable" },
+        }),
+      );
+
+      // Keeping it made the settings page say "Rebuilt all topics" about a run
+      // that clustered nothing.
+      expect(state.LastRunMode).toBeNull();
+    });
   });
 });
