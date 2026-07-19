@@ -76,9 +76,24 @@ export function nextDailySlot(projectId: string, afterMs: number): number {
   return candidate > afterMs ? candidate : candidate + 24 * 60 * 60 * 1000;
 }
 
-/** `20260717` — the scheduled run identity for the slot's UTC day. */
+/**
+ * `20260717T093000` — the scheduled run identity, from the instant the wake
+ * actually started the run (second precision).
+ *
+ * The instant — not just the UTC date — must be part of the identity. Two
+ * wakes CAN legitimately start runs on the same day: an outage that crosses
+ * midnight makes the missed slot fire as a catch-up at recovery, finish, and
+ * the day's real slot still arrives hours later. With a date-only id both
+ * runs mint the same `run:<id>:page-1` messageKey, and the outbox's unique
+ * index (status-independent, dispatched rows are not pruned) permanently
+ * drops the second insert — leaving `currentRun` set with no intent in
+ * flight: "Run now" no-ops behind the in-flight guard and the day's
+ * clustering is lost. Second precision suffices because a new run can only
+ * start after the previous one ended via a committed event, and the next
+ * wake slot is always a strictly later minute boundary.
+ */
 function runIdForSlot(slotMs: number): string {
-  return new Date(slotMs).toISOString().slice(0, 10).replace(/-/g, "");
+  return new Date(slotMs).toISOString().slice(0, 19).replace(/[-:]/g, "");
 }
 
 /**

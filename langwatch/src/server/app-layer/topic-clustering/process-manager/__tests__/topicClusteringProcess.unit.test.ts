@@ -132,18 +132,18 @@ describe("topicClusteringProcessDefinition", () => {
   });
 
   describe("when the daily wake fires with no run in flight", () => {
-    it("emits one run intent for the slot's day and reschedules", () => {
+    it("emits one run intent identified by the start instant and reschedules", () => {
       const scheduledFor = Date.UTC(2026, 6, 17, 9, 30);
       const evolution = evolveWake(bootstrappedState(), scheduledFor);
 
       expect(evolution.intents).toHaveLength(1);
       expect(evolution.intents[0]).toEqual({
-        messageKey: "run:20260717:page-1",
+        messageKey: "run:20260717T093000:page-1",
         intentType: "topic_clustering.run",
-        payload: { runId: "20260717", page: 1, searchAfter: null },
+        payload: { runId: "20260717T093000", page: 1, searchAfter: null },
       });
       expect(evolution.state.currentRun).toEqual({
-        runId: "20260717",
+        runId: "20260717T093000",
         page: 1,
         updatedAtMs: scheduledFor,
         startedAtMs: scheduledFor,
@@ -191,7 +191,7 @@ describe("topicClusteringProcessDefinition", () => {
       const evolution = evolveWake(state, scheduledFor);
 
       expect(evolution.intents).toHaveLength(1);
-      expect(evolution.state.currentRun?.runId).toBe("20260717");
+      expect(evolution.state.currentRun?.runId).toBe("20260717T093000");
     });
   });
 
@@ -215,8 +215,50 @@ describe("topicClusteringProcessDefinition", () => {
       }
 
       expect(intents).toHaveLength(1);
-      expect(intents[0]!.messageKey).toBe("run:20260717:page-1");
+      expect(intents[0]!.messageKey).toBe("run:20260717T093000:page-1");
       expect(nextWakeAt).toBeGreaterThan(now);
+    });
+  });
+
+  describe("when a catch-up run and the day's real slot fire on the same day", () => {
+    it("mints distinct run identities so the second intent cannot dedup against the first", () => {
+      // The fleet was down over midnight: yesterday's missed slot fires as a
+      // catch-up at recovery, completes within minutes, and the day's real
+      // slot still arrives hours later.
+      const missedSlot = Date.UTC(2026, 6, 16, 15, 47);
+      const recoveredAt = Date.UTC(2026, 6, 17, 9, 30);
+      const catchUp = evolveWake(bootstrappedState(), missedSlot, recoveredAt);
+      expect(catchUp.intents).toHaveLength(1);
+
+      const catchUpRunId = catchUp.state.currentRun!.runId;
+      const done = evolveEvent(
+        catchUp.state,
+        makeEvent({
+          type: "lw.obs.topic_clustering.run_completed",
+          occurredAt: recoveredAt + 5 * 60_000,
+          data: {
+            runId: catchUpRunId,
+            page: 1,
+            mode: "incremental",
+            tracesProcessed: 500,
+            topicsCount: 8,
+            subtopicsCount: 20,
+          },
+        }),
+      );
+      expect(done.state.currentRun).toBeNull();
+
+      const slotWake = evolveWake(done.state, Date.UTC(2026, 6, 17, 15, 47));
+
+      // A date-only run id made both wakes mint `run:20260717:page-1`; the
+      // outbox's unique messageKey index then dropped the second insert
+      // permanently, leaving currentRun set with no intent in flight — a
+      // silent day-long wedge during which "Run now" also no-ops.
+      expect(slotWake.intents).toHaveLength(1);
+      expect(slotWake.state.currentRun?.runId).not.toBe(catchUpRunId);
+      expect(slotWake.intents[0]!.messageKey).not.toBe(
+        catchUp.intents[0]!.messageKey,
+      );
     });
   });
 
@@ -463,7 +505,7 @@ describe("topicClusteringProcessDefinition", () => {
 
       // Measuring staleness from the last page made this run look fresh at the
       // next slot (19h < 20h), skipping it and wedging the project for 48h.
-      expect(evolution.state.currentRun?.runId).toBe("20260718");
+      expect(evolution.state.currentRun?.runId).toBe("20260718T020000");
       expect(evolution.intents).toHaveLength(1);
     });
 

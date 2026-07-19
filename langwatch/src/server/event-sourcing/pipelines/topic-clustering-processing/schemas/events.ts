@@ -81,7 +81,7 @@ export type TopicClusteringRunStartedEvent = z.infer<
  * more pages and the process should continue the walk.
  */
 export const topicClusteringRunCompletedEventDataSchema = z.object({
-  /** Logical run identity, e.g. `20260717` or `manual-1789000000000`. */
+  /** Logical run identity, e.g. `20260717T093000` or `manual-1789000000000`. */
   runId: z.string(),
   /** 1-based page number within the run. */
   page: z.number(),
