@@ -108,6 +108,14 @@ Feature: GroupQueue blob-handling hardening
     And the active-job heartbeat renews a lease throughout a long-running handler
     And no still-staged job is left pointing at a reclaimed blob
 
+  @integration @track3
+  Scenario: A sibling completing never strips a co-staged job's blob
+    Given two sibling jobs staged on one content-addressed payload
+    When the first sibling completes and releases its lease
+    Then the surviving sibling still leases the payload
+    And the payload is still readable when that sibling dispatches
+    And releasing the last lease leaves the payload to its backstop
+
   # ===========================================================================
   # Track 4 — idempotent lease transfer (no reclaim path)
   # ===========================================================================
@@ -217,6 +225,7 @@ Feature: GroupQueue blob-handling hardening
   #   AC3.1 crash expires             -> A crashed holder cannot leak a Redis blob indefinitely
   #   AC3.2 dispatch refreshes both   -> Dispatch refreshes the holder lease as well as the blob
   #   AC3.3 no premature reclaim      -> A live lease prevents reclaim while crashed sibling leases expire
+  #   AC3.4 sibling release is safe   -> A sibling completing never strips a co-staged job's blob
   # Track 4 — idempotent transfer
   #   AC4.1 atomic retry transfer     -> A retry transfers the lease ... in a single atomic step
   #   AC4.2 duplicate idempotency     -> Duplicate lease takes and releases are idempotent
@@ -231,6 +240,6 @@ Feature: GroupQueue blob-handling hardening
   # Track 6 — cluster-slot guard
   #   AC6.1 reject hash-tag-less name -> A queue name without a Redis hash tag is rejected at construction
   #
-  # Count: 19 behavioral ACs -> 19 scenarios. Streaming (the original AC1.2) was
+  # Count: 20 behavioral ACs -> 20 scenarios. Streaming (the original AC1.2) was
   # dropped in implementation — the cap is the memory bound (ADR-030 §1).
   # ===========================================================================
