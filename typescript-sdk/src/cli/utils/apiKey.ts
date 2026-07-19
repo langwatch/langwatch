@@ -41,9 +41,10 @@ export const checkApiKey = (): void => {
   if (!apiKey || apiKey.trim() === "") {
     const authUrl = `${getEndpoint()}/authorize`;
 
-    // Machine callers (`--format json`) get the structured document on stdout,
-    // same contract as every other failure: a `code` to match on beats prose.
-    if (getOutputFormat() === "json") {
+    // Machine callers (`-o json`, agent mode) get the structured document on
+    // stdout, same contract as every other failure: a `code` to match on beats
+    // prose.
+    if (getOutputFormat() !== "text") {
       console.log(
         renderErrorAsJson({
           code: "missing_api_key",

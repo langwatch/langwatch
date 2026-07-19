@@ -36,7 +36,7 @@ import { redactSecrets } from "../telemetry/events";
 import { withFallbackSuggestions } from "./errorSuggestions";
 
 /** The output format a command was invoked with. */
-export type CliOutputFormat = "json" | "text";
+export type CliOutputFormat = "json" | "agents" | "text";
 
 /**
  * The per-request output context: the format failures render in, and whether
@@ -83,7 +83,8 @@ export const currentOutputScope = (): OutputScope | undefined =>
   scopeStorage.getStore();
 
 export const setOutputFormat = (format: string | undefined): void => {
-  const resolved: CliOutputFormat = format === "json" ? "json" : "text";
+  const resolved: CliOutputFormat =
+    format === "json" ? "json" : format === "agents" ? "agents" : "text";
   const scope = scopeStorage.getStore();
   if (scope) scope.format = resolved;
   else ambientFormat = resolved;
@@ -119,8 +120,12 @@ export const disableOutputColor = (): void => {
  */
 export const resolveOutputFormat = (
   explicit?: string,
-): CliOutputFormat =>
-  explicit === undefined ? getOutputFormat() : explicit === "json" ? "json" : "text";
+): CliOutputFormat => {
+  if (explicit === undefined) return getOutputFormat();
+  if (explicit === "json") return "json";
+  if (explicit === "agents") return "agents";
+  return "text";
+};
 
 /**
  * Read any thrown value into the platform's structure, with the MESSAGE scrubbed.
@@ -243,7 +248,13 @@ export const renderErrorForHumans = (domain: CliDomainError): string => {
  * platform's.
  */
 export const renderErrorAsJson = (domain: CliDomainError): string =>
-  JSON.stringify(toCliErrorDocument(withFallbackSuggestions(domain)), null, 2);
+  JSON.stringify(
+    toCliErrorDocument(withFallbackSuggestions(domain)),
+    null,
+    // Agent mode's contract is compact single-line JSON (utils/output.ts);
+    // the pretty two-space form is for `-o json`, where a person may read it.
+    getOutputFormat() === "agents" ? 0 : 2,
+  );
 
 /**
  * A local argument/precondition failure, pre-shaped so the error path reports
@@ -285,7 +296,7 @@ export const reportCommandError = ({
   format?: string;
 }): void => {
   const domain = readCommandError(error);
-  const wantsJson = resolveOutputFormat(format) === "json";
+  const wantsJson = resolveOutputFormat(format) !== "text";
 
   if (wantsJson) {
     console.log(renderErrorAsJson(domain));

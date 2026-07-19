@@ -119,6 +119,21 @@ describe("given a failure the platform named", () => {
 
       expect(parsed).toMatchObject({ ok: false });
     });
+
+    it("stays a single compact line in agent mode, pretty with -o json", () => {
+      try {
+        setOutputFormat("agents");
+        const compact = renderErrorAsJson(readCommandError(domainError()));
+        expect(compact).not.toContain("\n");
+        expect(JSON.parse(compact)).toMatchObject({ ok: false });
+
+        setOutputFormat("json");
+        const pretty = renderErrorAsJson(readCommandError(domainError()));
+        expect(pretty).toContain("\n");
+      } finally {
+        setOutputFormat(undefined);
+      }
+    });
   });
 });
 

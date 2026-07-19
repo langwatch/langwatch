@@ -54,7 +54,8 @@ export interface AttentionReport {
   erroredTraces24h: number | null;
   runningExperiments: RunningExperiment[] | null;
   budgetsAtRisk: BudgetAtRisk[] | null;
-  /** Section key → why it could not be fetched. Empty when everything worked. */
+  /** Section key → why it could not be fetched, or was only partially checked.
+   * Empty when everything worked — the green all-clear keys off this. */
   errors: Record<string, string>;
 }
 
@@ -119,7 +120,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     // "Running" is a property of a run, and runs are only listed per
     // experiment — so check the latest run of just the most recently active
     // experiments rather than fanning out over all of them.
-    const candidates = list.experiments
+    const recent = list.experiments
       .filter(
         (experiment) =>
           experiment.lastRunAt !== null &&
@@ -128,8 +129,8 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       .sort(
         (a, b) =>
           new Date(b.lastRunAt ?? 0).getTime() - new Date(a.lastRunAt ?? 0).getTime(),
-      )
-      .slice(0, RUNNING_EXPERIMENT_CANDIDATES);
+      );
+    const candidates = recent.slice(0, RUNNING_EXPERIMENT_CANDIDATES);
 
     const checks = await Promise.allSettled(
       candidates.map(async (experiment): Promise<RunningExperiment | null> => {
@@ -150,9 +151,28 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         };
       }),
     );
-    // A candidate whose run-list call failed is skipped (not reported as
-    // running, not as failed) — the section itself only fails when the
-    // experiment LIST call failed.
+
+    // This scan is inherently PARTIAL (capped candidates, and only the first
+    // page of experiments). Whatever was found is still worth reporting, but
+    // the gaps must be on the record too: silently dropping them is how a
+    // running experiment the scan never looked at turns into a green
+    // "nothing needs your attention".
+    const failedChecks = checks.filter((check) => check.status === "rejected").length;
+    const gaps: string[] = [];
+    if (recent.length > candidates.length) {
+      gaps.push(
+        `only the ${RUNNING_EXPERIMENT_CANDIDATES} most recently active of ${recent.length} candidate experiments were checked`,
+      );
+    }
+    if (failedChecks > 0) {
+      gaps.push(
+        `${failedChecks} experiment${failedChecks === 1 ? "" : "s"} could not be checked`,
+      );
+    }
+    if (gaps.length > 0) {
+      attention.errors.runningExperiments = `incomplete scan: ${gaps.join("; ")}`;
+    }
+
     return checks.flatMap((check) =>
       check.status === "fulfilled" && check.value !== null ? [check.value] : [],
     );

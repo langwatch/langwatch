@@ -18,6 +18,10 @@ export const deleteMonitorCommand = async (
 
   const spinner = createSpinner(`Deleting monitor "${id}"...`).start();
 
+  let result: {
+    id: string;
+    deleted: boolean;
+  };
   try {
     const response = await fetch(`${endpoint}/api/monitors/${id}`, {
       method: "DELETE",
@@ -26,27 +30,29 @@ export const deleteMonitorCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to delete monitor: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "delete monitor" });
       process.exit(1);
     }
 
-    const result = (await response.json()) as {
+    result = (await response.json()) as {
       id: string;
       deleted: boolean;
     };
 
     spinner.succeed(`Monitor deleted (${result.id})`);
-
-    await printResult(result, {
-      ...options,
-      table: () => {
-        // The spinner's success line is the human output.
-      },
-    });
   } catch (error) {
     // No explicit `format`: see traces/search.ts — the preAction hook covers
     // every spelling; the `-f` commander default must not override it.
     failSpinner({ spinner, error, action: "delete monitor" });
     process.exit(1);
   }
+
+  // Rendering stays OUTSIDE the delete try: a printResult rejection (invalid
+  // --jq) must not report an already-deleted monitor as a delete failure.
+  await printResult(result, {
+    ...options,
+    table: () => {
+      // The spinner's success line is the human output.
+    },
+  });
 };

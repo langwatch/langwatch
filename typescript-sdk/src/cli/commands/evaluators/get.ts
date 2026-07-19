@@ -70,17 +70,21 @@ export const getEvaluatorCommand = async (idOrSlug: string, options?: RawOutputF
   const service = new EvaluatorsApiService();
   const spinner = createSpinner(`Fetching evaluator "${idOrSlug}"...`).start();
 
+  let evaluator: EvaluatorResponse;
   try {
-    const evaluator = await service.get(idOrSlug);
+    evaluator = await service.get(idOrSlug);
     spinner.succeed(`Found evaluator "${evaluator.name}"`);
-    await printResult(evaluator, {
-      ...options,
-      table: () => formatEvaluatorDetails(evaluator),
-    });
   } catch (error) {
     // No explicit `format`: see traces/search.ts — the preAction hook covers
     // every spelling; the `-f` commander default must not override it.
     failSpinner({ spinner, error, action: "fetch evaluator" });
     process.exit(1);
   }
+
+  // Rendering stays OUTSIDE the fetch try: a printResult rejection (invalid
+  // --jq) is a rendering failure, not a fetch failure.
+  await printResult(evaluator, {
+    ...options,
+    table: () => formatEvaluatorDetails(evaluator),
+  });
 };

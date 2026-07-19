@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-// Zod schema for local prompt config with permissive validation.
-//
 // Kept OUT of `types.ts` on purpose: `types.ts` is imported by `program.ts`,
 // which is on the always-loaded cold-start path of every CLI invocation, and
 // zod costs ~39ms to load. Only the prompt commands need this schema, and

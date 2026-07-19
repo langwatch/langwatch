@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { printResult, type RawOutputFlags } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
@@ -22,9 +23,11 @@ export const createMonitorCommand = async (
 
   const validModes = ["ON_MESSAGE", "AS_GUARDRAIL", "MANUALLY"];
   if (options.executionMode && !validModes.includes(options.executionMode)) {
-    console.error(
-      chalk.red(`Error: --execution-mode must be one of: ${validModes.join(", ")}`)
-    );
+    reportCommandError({
+      error: commandValidationError(
+        `--execution-mode must be one of: ${validModes.join(", ")}`,
+      ),
+    });
     process.exit(1);
   }
 
@@ -34,6 +37,13 @@ export const createMonitorCommand = async (
 
   const spinner = createSpinner(`Creating monitor "${name}"...`).start();
 
+  let monitor: {
+    id: string;
+    name: string;
+    checkType: string;
+    executionMode: string;
+    platformUrl?: string;
+  };
   try {
     let parameters: Record<string, unknown> = {};
     if (options.parameters) {
@@ -60,11 +70,11 @@ export const createMonitorCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to create monitor: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "create monitor" });
       process.exit(1);
     }
 
-    const monitor = (await response.json()) as {
+    monitor = (await response.json()) as {
       id: string;
       name: string;
       checkType: string;
@@ -73,28 +83,36 @@ export const createMonitorCommand = async (
     };
 
     spinner.succeed(`Monitor "${monitor.name}" created (${monitor.id})`);
-
-    await printResult(monitor, {
-      ...options,
-      table: () => {
-        console.log();
-        console.log(`  ${chalk.gray("ID:")}   ${chalk.green(monitor.id)}`);
-        console.log(`  ${chalk.gray("Type:")} ${monitor.checkType}`);
-        console.log(`  ${chalk.gray("Mode:")} ${monitor.executionMode}`);
-        if (monitor.platformUrl) {
-          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(monitor.platformUrl)}`);
-        }
-        console.log();
-      },
-    });
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      spinner.fail(chalk.red("--parameters must be valid JSON"));
-    } else {
-      // No explicit `format`: see traces/search.ts — the preAction hook covers
-      // every spelling; the `-f` commander default must not override it.
-      failSpinner({ spinner, error, action: "create monitor" });
-    }
+    // Route BOTH failure kinds through failSpinner: a direct spinner.fail()
+    // prints nothing in --json/--jq/agent mode (spinners are silent there),
+    // so an invalid --parameters would exit 1 with no machine-readable error.
+    // No explicit `format`: see traces/search.ts — the preAction hook covers
+    // every spelling; the `-f` commander default must not override it.
+    failSpinner({
+      spinner,
+      error:
+        error instanceof SyntaxError
+          ? commandValidationError("--parameters must be valid JSON")
+          : error,
+      action: "create monitor",
+    });
     process.exit(1);
   }
+
+  // Rendering stays OUTSIDE the create try: a printResult rejection (invalid
+  // --jq) must not report an already-created monitor as a create failure.
+  await printResult(monitor, {
+    ...options,
+    table: () => {
+      console.log();
+      console.log(`  ${chalk.gray("ID:")}   ${chalk.green(monitor.id)}`);
+      console.log(`  ${chalk.gray("Type:")} ${monitor.checkType}`);
+      console.log(`  ${chalk.gray("Mode:")} ${monitor.executionMode}`);
+      if (monitor.platformUrl) {
+        console.log(`  ${chalk.bold("View:")}  ${chalk.underline(monitor.platformUrl)}`);
+      }
+      console.log();
+    },
+  });
 };

@@ -1,13 +1,22 @@
 /**
  * `langwatch skills get <name>` — print a skill's body, raw, on stdout.
  * Agents pipe this straight into their context, so the default output is the
- * SKILL.md content itself in BOTH human and agent mode (same precedent as
- * `help-tree`); an explicit machine format (`-o json`, `-o yaml`, `--jq`)
- * returns the skill as a structured document instead.
+ * SKILL.md content itself in BOTH human and auto-detected agent mode (same
+ * precedent as `help-tree`); any EXPLICIT machine request (`-o json|agents|
+ * yaml`, `--json`, `--jq`, `-f json`) returns the skill as a structured
+ * document instead — an explicit `-o agents` is a request for compact JSON,
+ * not for the raw body an agent caller would have gotten anyway.
  */
-import { printResult, resolveOutputOptions, type RawOutputFlags } from "../../utils/output";
+import { printResult, type RawOutputFlags } from "../../utils/output";
 import { findSkill, SKILLS_BUNDLE } from "./installer";
 import { throwValidationError } from "./shared";
+
+/** Whether the caller asked for a format explicitly (any spelling). */
+const hasExplicitFormatRequest = (options: RawOutputFlags): boolean =>
+  options.output !== undefined ||
+  options.json !== undefined ||
+  options.jq !== undefined ||
+  options.format === "json";
 
 export const skillsGetCommand = async (
   name: string,
@@ -25,8 +34,7 @@ export const skillsGetCommand = async (
     );
   }
 
-  const { format } = resolveOutputOptions({ ...options });
-  if (format === "json" || format === "yaml") {
+  if (hasExplicitFormatRequest(options)) {
     await printResult(
       {
         slug: skill.isRecipe ? `recipes/${skill.slug}` : skill.slug,

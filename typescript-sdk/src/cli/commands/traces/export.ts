@@ -89,7 +89,7 @@ export const exportTracesCommand = async (options: {
       });
       await events.flush();
 
-      spinner.fail(`Export failed: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "export traces" });
       process.exit(1);
     }
 

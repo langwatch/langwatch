@@ -61,9 +61,13 @@ export const runExperimentCommand = async (
           console.log();
         }
       } else if (status.status === "failed") {
-        pollSpinner.fail(
-          `Experiment failed after ${status.progress}/${status.total} cells`,
-        );
+        failSpinner({
+          spinner: pollSpinner,
+          error: new Error(
+            `Experiment failed after ${status.progress}/${status.total} cells`,
+          ),
+          action: "run experiment",
+        });
         process.exit(1);
       } else {
         pollSpinner.warn(`Experiment ${status.status}`);

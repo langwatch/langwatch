@@ -25,7 +25,7 @@ export const listSecretsCommand = async (options?: {
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch secrets: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "fetch secrets" });
       process.exit(1);
     }
 

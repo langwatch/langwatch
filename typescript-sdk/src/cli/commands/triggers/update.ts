@@ -2,6 +2,7 @@ import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { commandValidationError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -30,7 +31,13 @@ export const updateTriggerCommand = async (
     if (options.alertType) body.alertType = options.alertType;
 
     if (Object.keys(body).length === 0) {
-      spinner.fail("No fields to update. Use --name, --active, --message, or --alert-type.");
+      failSpinner({
+        spinner,
+        error: commandValidationError(
+          "No fields to update. Use --name, --active, --message, or --alert-type.",
+        ),
+        action: "update trigger",
+      });
       process.exit(1);
     }
 
@@ -45,7 +52,7 @@ export const updateTriggerCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to update trigger: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "update trigger" });
       process.exit(1);
     }
 

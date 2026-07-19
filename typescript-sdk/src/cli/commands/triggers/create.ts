@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -21,7 +22,11 @@ export const createTriggerCommand = async (
 
   const validActions = ["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE"];
   if (!validActions.includes(options.action)) {
-    console.error(chalk.red(`Error: --action must be one of: ${validActions.join(", ")}`));
+    reportCommandError({
+      error: commandValidationError(
+        `--action must be one of: ${validActions.join(", ")}`,
+      ),
+    });
     process.exit(1);
   }
 
@@ -57,7 +62,7 @@ export const createTriggerCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to create trigger: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "create trigger" });
       process.exit(1);
     }
 
@@ -77,11 +82,16 @@ export const createTriggerCommand = async (
     }
     console.log();
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      spinner.fail(chalk.red("--filters must be valid JSON"));
-    } else {
-      failSpinner({ spinner, error, action: "create trigger" });
-    }
+    // Route BOTH failure kinds through failSpinner: a direct spinner.fail()
+    // prints nothing in --json/--jq/agent mode (spinners are silent there).
+    failSpinner({
+      spinner,
+      error:
+        error instanceof SyntaxError
+          ? commandValidationError("--filters must be valid JSON")
+          : error,
+      action: "create trigger",
+    });
     process.exit(1);
   }
 };

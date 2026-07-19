@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { commandValidationError } from "../../utils/errorOutput";
 import { printResult, type RawOutputFlags } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
@@ -25,6 +26,11 @@ export const updateMonitorCommand = async (
 
   const spinner = createSpinner(`Updating monitor "${id}"...`).start();
 
+  let monitor: {
+    id: string;
+    name: string;
+    enabled: boolean;
+  };
   try {
     const body: Record<string, unknown> = {};
     if (options.name) body.name = options.name;
@@ -50,38 +56,46 @@ export const updateMonitorCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to update monitor: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "update monitor" });
       process.exit(1);
     }
 
-    const monitor = (await response.json()) as {
+    monitor = (await response.json()) as {
       id: string;
       name: string;
       enabled: boolean;
     };
 
     spinner.succeed(`Monitor "${monitor.name}" updated`);
-
-    await printResult(monitor, {
-      ...options,
-      table: () => {
-        console.log();
-        console.log(`  ${chalk.gray("ID:")}      ${chalk.green(monitor.id)}`);
-        console.log(`  ${chalk.gray("Name:")}    ${chalk.cyan(monitor.name)}`);
-        console.log(
-          `  ${chalk.gray("Enabled:")} ${monitor.enabled ? chalk.green("yes") : chalk.gray("no")}`
-        );
-        console.log();
-      },
-    });
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      spinner.fail(chalk.red("--parameters must be valid JSON"));
-    } else {
-      // No explicit `format`: see traces/search.ts — the preAction hook covers
-      // every spelling; the `-f` commander default must not override it.
-      failSpinner({ spinner, error, action: "update monitor" });
-    }
+    // Route BOTH failure kinds through failSpinner: a direct spinner.fail()
+    // prints nothing in --json/--jq/agent mode (spinners are silent there),
+    // so an invalid --parameters would exit 1 with no machine-readable error.
+    // No explicit `format`: see traces/search.ts — the preAction hook covers
+    // every spelling; the `-f` commander default must not override it.
+    failSpinner({
+      spinner,
+      error:
+        error instanceof SyntaxError
+          ? commandValidationError("--parameters must be valid JSON")
+          : error,
+      action: "update monitor",
+    });
     process.exit(1);
   }
+
+  // Rendering stays OUTSIDE the update try: a printResult rejection (invalid
+  // --jq) must not report an already-updated monitor as an update failure.
+  await printResult(monitor, {
+    ...options,
+    table: () => {
+      console.log();
+      console.log(`  ${chalk.gray("ID:")}      ${chalk.green(monitor.id)}`);
+      console.log(`  ${chalk.gray("Name:")}    ${chalk.cyan(monitor.name)}`);
+      console.log(
+        `  ${chalk.gray("Enabled:")} ${monitor.enabled ? chalk.green("yes") : chalk.gray("no")}`
+      );
+      console.log();
+    },
+  });
 };

@@ -29,7 +29,7 @@ export const listGraphsCommand = async (options: {
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch graphs: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "fetch graphs" });
       process.exit(1);
     }
 

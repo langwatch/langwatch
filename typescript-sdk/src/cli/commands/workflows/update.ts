@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { commandValidationError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -24,7 +25,13 @@ export const updateWorkflowCommand = async (
     if (options.description) body.description = options.description;
 
     if (Object.keys(body).length === 0) {
-      spinner.fail("No fields to update. Use --name, --icon, or --description.");
+      failSpinner({
+        spinner,
+        error: commandValidationError(
+          "No fields to update. Use --name, --icon, or --description.",
+        ),
+        action: "update workflow",
+      });
       process.exit(1);
     }
 
@@ -42,7 +49,7 @@ export const updateWorkflowCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to update workflow: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "update workflow" });
       process.exit(1);
     }
 

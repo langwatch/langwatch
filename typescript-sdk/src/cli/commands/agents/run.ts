@@ -106,7 +106,7 @@ export const runAgentCommand = async (
 
       if (!response.ok) {
         const message = await formatFetchError(response);
-        runSpinner.fail(`Agent execution failed: ${message}`);
+        failSpinner({ spinner: runSpinner, error: new Error(message), action: "run agent" });
         process.exit(1);
       }
 

@@ -41,7 +41,7 @@ export function failSpinner({
   format?: string;
 }): void {
   const domain = readCommandError(error);
-  const wantsJson = resolveOutputFormat(format) === "json";
+  const wantsJson = resolveOutputFormat(format) !== "text";
 
   // Avoid double-prefixing when the message already starts with "Failed to …"
   // (either a service-layer `*ApiError` from `formatApiErrorForOperation`, or a
@@ -56,8 +56,9 @@ export function failSpinner({
   ].join("\n");
 
   // The machine's copy: structured, on stdout, and nothing else on stdout. The
-  // human's copy stays a single line on stderr — written directly, because
-  // under `--format json` the spinner itself is silent (see utils/spinner.ts).
+  // human's copy — one headline line plus the preserved Details/Suggestions
+  // block — goes to stderr, written directly, because under `--format json`
+  // the spinner itself is silent (see utils/spinner.ts).
   if (wantsJson) {
     console.log(renderErrorAsJson(domain));
     console.error(chalk.red(message));

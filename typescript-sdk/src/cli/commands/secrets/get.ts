@@ -25,7 +25,7 @@ export const getSecretCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch secret: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "fetch secret" });
       process.exit(1);
     }
 

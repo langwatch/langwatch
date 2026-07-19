@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { commandValidationError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -48,7 +49,7 @@ export const createGraphCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to create graph: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "create graph" });
       process.exit(1);
     }
 
@@ -65,11 +66,16 @@ export const createGraphCommand = async (
     console.log(`  ${chalk.gray("Dashboard:")} ${graph.dashboardId ?? chalk.gray("—")}`);
     console.log();
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      spinner.fail(chalk.red("--graph must be valid JSON"));
-    } else {
-      failSpinner({ spinner, error, action: "create graph" });
-    }
+    // Route BOTH failure kinds through failSpinner: a direct spinner.fail()
+    // prints nothing in --json/--jq/agent mode (spinners are silent there).
+    failSpinner({
+      spinner,
+      error:
+        error instanceof SyntaxError
+          ? commandValidationError("--graph and --filters must be valid JSON")
+          : error,
+      action: "create graph",
+    });
     process.exit(1);
   }
 };

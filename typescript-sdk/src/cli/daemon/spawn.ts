@@ -24,7 +24,11 @@ import { identityEnv, type DaemonIdentity } from "./identity";
  *     cwd), the login identity variables, locale (LANG/LC_*), temp dirs, and
  *     XDG_RUNTIME_DIR — socket placement MUST resolve identically on both
  *     sides or the client and daemon would look for the socket in different
- *     directories (identity.ts daemonSocketDir).
+ *     directories (identity.ts daemonSocketDir);
+ *   - the TLS trust-store variables (NODE_EXTRA_CA_CERTS, SSL_CERT_FILE,
+ *     SSL_CERT_DIR): they point at FILES, not project state, so forwarding
+ *     them leaks nothing — and without them the daemon's HTTPS calls fail
+ *     behind a private CA while the same command works in-process.
  */
 const BASELINE_ENV_VARS = [
   "PATH",
@@ -37,6 +41,9 @@ const BASELINE_ENV_VARS = [
   "TEMP",
   "TMP",
   "XDG_RUNTIME_DIR",
+  "NODE_EXTRA_CA_CERTS",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
 ] as const;
 
 function baselineEnv(env: NodeJS.ProcessEnv): Record<string, string> {

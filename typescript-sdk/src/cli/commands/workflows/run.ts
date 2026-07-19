@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { commandValidationError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -35,7 +36,7 @@ export const runWorkflowCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Workflow execution failed: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "run workflow" });
       process.exit(1);
     }
 
@@ -60,11 +61,16 @@ export const runWorkflowCommand = async (
       console.log();
     }
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      spinner.fail(chalk.red("--input must be valid JSON"));
-    } else {
-      failSpinner({ spinner, error, action: "run workflow" });
-    }
+    // Route BOTH failure kinds through failSpinner: a direct spinner.fail()
+    // prints nothing in --json/--jq/agent mode (spinners are silent there).
+    failSpinner({
+      spinner,
+      error:
+        error instanceof SyntaxError
+          ? commandValidationError("--input must be valid JSON")
+          : error,
+      action: "run workflow",
+    });
     process.exit(1);
   }
 };
