@@ -730,6 +730,105 @@ export const observeEsProcessOutboxDuration = ({
 }) =>
   esProcessOutboxDuration.labels(processName, intentType).observe(durationMs);
 
+// How late a wake fires relative to the instant it was scheduled for
+// (ADR-054): the direct answer to "is the scheduler stalling". Buckets run
+// to hours because a wake surviving a fleet outage legitimately fires very
+// late once — the ALERT is on sustained lag, not a single spike.
+register.removeSingleMetric("es_process_wake_lag_milliseconds");
+const esProcessWakeLag = new Histogram({
+  name: "es_process_wake_lag_milliseconds",
+  help: "Delay between a process wake's scheduled instant and it being handled",
+  labelNames: ["process_name"] as const,
+  buckets: [
+    100, 1000, 5000, 15000, 60000, 300000, 900000, 1800000, 3600000, 21600000,
+    86400000,
+  ],
+});
+
+export const observeEsProcessWakeLag = ({
+  processName,
+  lagMs,
+}: {
+  processName: string;
+  lagMs: number;
+}) => esProcessWakeLag.labels(processName).observe(Math.max(0, lagMs));
+
+// How long a committed intent sat in the outbox before its dispatch began
+// (ADR-054): the direct answer to "is the outbox draining". Excludes retry
+// waits by design — attempt > 1 rows re-enter with backoff, so only the
+// first attempt measures pure queueing delay.
+register.removeSingleMetric("es_process_outbox_dispatch_lag_milliseconds");
+const esProcessOutboxDispatchLag = new Histogram({
+  name: "es_process_outbox_dispatch_lag_milliseconds",
+  help: "Delay between an intent being committed and its first dispatch starting",
+  labelNames: ["process_name"] as const,
+  buckets: [
+    50, 250, 1000, 5000, 15000, 60000, 300000, 900000, 1800000, 3600000,
+  ],
+});
+
+export const observeEsProcessOutboxDispatchLag = ({
+  processName,
+  lagMs,
+}: {
+  processName: string;
+  lagMs: number;
+}) => esProcessOutboxDispatchLag.labels(processName).observe(Math.max(0, lagMs));
+
+// Commits whose intents were dropped as already-dispatched (ADR-054).
+// Legitimate on event redelivery — but a sustained per-process rate is
+// exactly how the ADR-051 lost-day scheduling bug hid, so it is measured,
+// logged AND alertable rather than only logged.
+register.removeSingleMetric("es_process_intents_suppressed_total");
+const esProcessIntentsSuppressed = new Counter({
+  name: "es_process_intents_suppressed_total",
+  help: "Process-manager commits whose intents were suppressed as already-dispatched",
+  labelNames: ["process_name"] as const,
+});
+
+export const incrementEsProcessIntentsSuppressed = ({
+  processName,
+  count,
+}: {
+  processName: string;
+  count: number;
+}) => esProcessIntentsSuppressed.labels(processName).inc(count);
+
+// --- Topic clustering domain metrics (ADR-051/ADR-054) ---
+// Run-page outcomes as the domain sees them, not just generic es_* counters:
+// `failed_final` is the alertable one (retries exhausted, run_failed
+// recorded); `failed_retryable` is expected noise under provider hiccups.
+register.removeSingleMetric("topic_clustering_page_total");
+const topicClusteringPageTotal = new Counter({
+  name: "topic_clustering_page_total",
+  help: "Topic clustering page executions by outcome",
+  labelNames: ["outcome"] as const,
+});
+
+export const incrementTopicClusteringPageTotal = ({
+  outcome,
+}: {
+  outcome: "completed" | "skipped" | "failed_retryable" | "failed_final";
+}) => topicClusteringPageTotal.labels(outcome).inc();
+
+register.removeSingleMetric("topic_clustering_page_duration_milliseconds");
+const topicClusteringPageDuration = new Histogram({
+  name: "topic_clustering_page_duration_milliseconds",
+  help: "Duration of one topic clustering page (langevals call included)",
+  labelNames: ["mode"] as const,
+  // A page is embeddings + LLM naming over up to 2000 traces — minutes are
+  // normal, and the outbox lease caps everything at 20.
+  buckets: [1000, 5000, 15000, 30000, 60000, 120000, 300000, 600000, 1200000],
+});
+
+export const observeTopicClusteringPageDuration = ({
+  mode,
+  durationMs,
+}: {
+  mode: "batch" | "incremental";
+  durationMs: number;
+}) => topicClusteringPageDuration.labels(mode).observe(durationMs);
+
 // --- Fold cache metrics ---
 register.removeSingleMetric("es_fold_cache_total");
 const esFoldCacheTotal = new Counter({

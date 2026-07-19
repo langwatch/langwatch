@@ -1,5 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 
+import {
+  incrementTopicClusteringPageTotal,
+  observeTopicClusteringPageDuration,
+} from "~/server/metrics";
+
 import type {
   IntentContext,
   IntentExecutor,
@@ -273,6 +278,7 @@ export function createTopicClusteringRunHandler(
 
     await announceRunStarted({ commands, context, occurredAt: clock() });
 
+    const pageStartedAtMs = clock();
     let outcome: ClusteringPageOutcome;
     try {
       outcome = await deps.runPort.runClusteringPage({
@@ -283,12 +289,16 @@ export function createTopicClusteringRunHandler(
       // Attempts below the cap rethrow so the outbox retries with backoff;
       // only the final attempt records the durable, visible failure.
       if (intentContext.attempt < maxAttempts) {
+        incrementTopicClusteringPageTotal({ outcome: "failed_retryable" });
         logger.warn(
           { ...context, error: errorText(error) },
           "Clustering page failed; outbox will retry",
         );
         throw error;
       }
+      // The alertable outcome (ADR-054): retries exhausted, run_failed
+      // recorded. failed_retryable above is expected provider noise.
+      incrementTopicClusteringPageTotal({ outcome: "failed_final" });
       await recordClusteringFailure({
         commands,
         context,
@@ -297,6 +307,14 @@ export function createTopicClusteringRunHandler(
       });
       return;
     }
+
+    incrementTopicClusteringPageTotal({
+      outcome: outcome.skippedReason ? "skipped" : "completed",
+    });
+    observeTopicClusteringPageDuration({
+      mode: outcome.mode,
+      durationMs: clock() - pageStartedAtMs,
+    });
 
     await recordClusteringSuccess({
       commands,

@@ -1,4 +1,19 @@
+import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
+
+async function metricValue(
+  name: string,
+  labels: Record<string, string>,
+): Promise<number> {
+  const metric = register.getSingleMetric(name);
+  if (!metric) return 0;
+  const { values } = await metric.get();
+  return (
+    values.find((v) =>
+      Object.entries(labels).every(([k, val]) => v.labels[k] === val),
+    )?.value ?? 0
+  );
+}
 
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 
@@ -346,6 +361,69 @@ describe("createTopicClusteringRunHandler", () => {
         expect(runClusteringPage).toHaveBeenCalledTimes(1);
         expect(commands.recordClusteringRunCompleted).not.toHaveBeenCalled();
       });
+    });
+  });
+});
+
+describe("run outcome metrics (ADR-054)", () => {
+  describe("when the final attempt fails", () => {
+    it("counts a failed_final page so the alert rule has a signal", async () => {
+      const before = await metricValue("topic_clustering_page_total", {
+        outcome: "failed_final",
+      });
+      const commands = makeCommands();
+      const run = createTopicClusteringRunHandler({
+        runPort: {
+          runClusteringPage: vi.fn().mockRejectedValue(new Error("down")),
+        },
+        commands: () => commands,
+        clock: () => 999,
+      });
+
+      await run(makePayload(), makeContext({ attempt: 3 }));
+
+      const after = await metricValue("topic_clustering_page_total", {
+        outcome: "failed_final",
+      });
+      expect(after).toBe(before + 1);
+    });
+  });
+
+  describe("when a gate skips the page", () => {
+    it("counts it as skipped, never as a failure", async () => {
+      const beforeSkipped = await metricValue("topic_clustering_page_total", {
+        outcome: "skipped",
+      });
+      const beforeFailed = await metricValue("topic_clustering_page_total", {
+        outcome: "failed_final",
+      });
+      const commands = makeCommands();
+      const run = createTopicClusteringRunHandler({
+        runPort: {
+          runClusteringPage: vi.fn().mockResolvedValue({
+            mode: "batch",
+            tracesProcessed: 0,
+            topicsCount: 0,
+            subtopicsCount: 0,
+            skippedReason: "recently_clustered",
+          }),
+        },
+        commands: () => commands,
+        clock: () => 999,
+      });
+
+      await run(makePayload(), makeContext());
+
+      expect(
+        await metricValue("topic_clustering_page_total", {
+          outcome: "skipped",
+        }),
+      ).toBe(beforeSkipped + 1);
+      expect(
+        await metricValue("topic_clustering_page_total", {
+          outcome: "failed_final",
+        }),
+      ).toBe(beforeFailed);
     });
   });
 });

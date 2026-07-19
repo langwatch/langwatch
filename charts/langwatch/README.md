@@ -574,6 +574,7 @@ projects** until `pnpm run task backfillTopicClusteringSchedules` is run by hand
 | Name                                              | Description                                | Value                           |
 | ------------------------------------------------- | ------------------------------------------ | ------------------------------- |
 | `prometheus.chartManaged`                         | Manage Prometheus via this chart.          | `true`                          |
+| `prometheus.alerting.enabled`                     | Load the chart's bundled alert rules (charts/langwatch/files/alerting-rules.yml) into the managed Prometheus. | `true`                          |
 | `prometheus.external.existingSecret`              | Existing secret with connection details.   | `""`                            |
 | `prometheus.external.secretKeys.host`             | Secret key for host.                       | `""`                            |
 | `prometheus.external.secretKeys.port`             | Secret key for port.                       | `""`                            |

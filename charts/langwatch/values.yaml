@@ -1307,6 +1307,14 @@ prometheus:
   ## @param prometheus.chartManaged [default: true] Manage Prometheus via this chart.
   chartManaged: true
 
+  # ADR-054: reviewed alert rules for the app's own metrics (process
+  # substrate, topic clustering) ship with the chart and are evaluated by
+  # the bundled Prometheus. They define WHAT is wrong; routing alerts to
+  # receivers (Alertmanager, PagerDuty, ...) remains operator configuration.
+  alerting:
+    ## @param prometheus.alerting.enabled [default: true] Load the chart's bundled alert rules (charts/langwatch/files/alerting-rules.yml) into the managed Prometheus.
+    enabled: true
+
   # External Prometheus configuration (when chartManaged: false)
   external:
     # Reference to existing secret containing connection details

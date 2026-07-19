@@ -12,6 +12,15 @@ data:
       scrape_interval: {{ .Values.prometheus.server.global.scrape_interval | default "15s" }}
       evaluation_interval: {{ .Values.prometheus.server.global.evaluation_interval | default "15s" }}
 
+    {{- if .Values.prometheus.alerting.enabled }}
+    # ADR-054: reviewed alert rules ship with the chart. The rules only
+    # define what is wrong; wiring receivers (Alertmanager) is up to the
+    # operator. This ConfigMap is mounted at /etc/config by the Prometheus
+    # sub-chart, so the sibling data key below is addressable directly.
+    rule_files:
+      - /etc/config/alerting_rules.yml
+    {{- end }}
+
     scrape_configs:
       - job_name: 'langwatch'
         kubernetes_sd_configs:
@@ -80,4 +89,8 @@ data:
             regex: (.+)
             target_label: __metrics_path__
             replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
+{{- if .Values.prometheus.alerting.enabled }}
+  alerting_rules.yml: |
+{{ .Files.Get "files/alerting-rules.yml" | indent 4 }}
+{{- end }}
 {{- end }}

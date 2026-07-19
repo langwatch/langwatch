@@ -10,6 +10,7 @@ import {
   trace,
 } from "@opentelemetry/api";
 import {
+  incrementEsProcessIntentsSuppressed,
   incrementEsProcessManagerTotal,
   observeEsProcessManagerDuration,
 } from "~/server/metrics";
@@ -216,6 +217,10 @@ export class ProcessManagerService<State> {
       result.outcome === "committed" &&
       result.duplicateMessageKeys.length > 0
     ) {
+      incrementEsProcessIntentsSuppressed({
+        processName: ref.processName,
+        count: result.duplicateMessageKeys.length,
+      });
       // The state commit succeeded but one or more intents were suppressed as
       // already-dispatched. That is legitimate idempotency on redelivery, and
       // it is ALSO how a scheduling bug hides: the process believes work is in

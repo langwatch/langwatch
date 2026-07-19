@@ -1,0 +1,125 @@
+{
+  "title": "Event Sourcing — Process Substrate",
+  "uid": "es-process-substrate",
+  "tags": ["langwatch", "event-sourcing", "adr-054"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "label": "Prometheus"
+      },
+      {
+        "name": "process",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": "label_values(es_process_manager_total, process_name)",
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Evolutions by outcome",
+      "description": "es_process_manager_total — committed is the healthy line; sustained failed fires EsProcessEvolutionFailures.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "sum by (process_name, outcome) (rate(es_process_manager_total{process_name=~\"$process\"}[5m]))",
+          "legendFormat": "{{process_name}} {{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Outbox delivery attempts by status",
+      "description": "es_process_outbox_total — any dead is a paged alert (EsProcessOutboxDeadLetter).",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "sum by (process_name, status) (increase(es_process_outbox_total{process_name=~\"$process\"}[5m]))",
+          "legendFormat": "{{process_name}} {{status}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Wake lag (p50 / p95)",
+      "description": "es_process_wake_lag_milliseconds — scheduled instant to handling. Sustained p50 over 15m fires EsProcessWakeLagHigh.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le, process_name) (rate(es_process_wake_lag_milliseconds_bucket{process_name=~\"$process\"}[15m])))",
+          "legendFormat": "{{process_name}} p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, process_name) (rate(es_process_wake_lag_milliseconds_bucket{process_name=~\"$process\"}[15m])))",
+          "legendFormat": "{{process_name}} p95"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Outbox dispatch lag (p50 / p95, first attempt)",
+      "description": "es_process_outbox_dispatch_lag_milliseconds — commit to first dispatch. Sustained p50 over 5m fires EsProcessOutboxDispatchLagHigh.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le, process_name) (rate(es_process_outbox_dispatch_lag_milliseconds_bucket{process_name=~\"$process\"}[15m])))",
+          "legendFormat": "{{process_name}} p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, process_name) (rate(es_process_outbox_dispatch_lag_milliseconds_bucket{process_name=~\"$process\"}[15m])))",
+          "legendFormat": "{{process_name}} p95"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Suppressed duplicate intents",
+      "description": "es_process_intents_suppressed_total — occasional is idempotency working; a sustained rate is how a scheduling identity bug hides (EsProcessIntentsSuppressedSustained).",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "sum by (process_name) (increase(es_process_intents_suppressed_total{process_name=~\"$process\"}[1h]))",
+          "legendFormat": "{{process_name}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Evolution duration (p95)",
+      "description": "es_process_manager_duration_milliseconds — evolve + commit; should stay tens of milliseconds.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, process_name, input_kind) (rate(es_process_manager_duration_milliseconds_bucket{process_name=~\"$process\"}[15m])))",
+          "legendFormat": "{{process_name}} {{input_kind}} p95"
+        }
+      ]
+    }
+  ]
+}

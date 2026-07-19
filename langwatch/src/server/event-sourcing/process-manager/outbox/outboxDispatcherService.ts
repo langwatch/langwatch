@@ -10,6 +10,7 @@ import {
 } from "@opentelemetry/api";
 import {
   incrementEsProcessOutboxTotal,
+  observeEsProcessOutboxDispatchLag,
   observeEsProcessOutboxDuration,
 } from "~/server/metrics";
 import { toSafeFailureDiagnostic } from "../failureDiagnostic";
@@ -203,6 +204,15 @@ export class OutboxDispatcherService {
       remoteParent,
       async (span) => {
         const startedAt = performance.now();
+        // Commit → first-dispatch delay (ADR-054): the substrate's direct
+        // "is the outbox draining" signal. First attempt only — retries
+        // re-enter with deliberate backoff, which is not queueing delay.
+        if (attempt === 1) {
+          observeEsProcessOutboxDispatchLag({
+            processName: message.processName,
+            lagMs: now - message.createdAt,
+          });
+        }
         try {
           const handler = this.handlers[message.intentType];
           if (!handler) {
