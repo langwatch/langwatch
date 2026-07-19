@@ -27,6 +27,15 @@ export function assertValidPullSchedule(cron: string): void {
   computeNextRunAt({ cron, timezone: "UTC", after: new Date() });
 }
 
+export function isValidPullSchedule(cron: string): boolean {
+  try {
+    assertValidPullSchedule(cron);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function nextWake(cron: string, after: number): number {
   return computeNextRunAt({
     cron,
@@ -107,10 +116,14 @@ function evolveEvent(
 
   switch (envelope.eventType) {
     case INGESTION_PULL_EVENT_TYPES.CONFIGURED:
-      if (view.cron === null) {
-        throw new Error("configured ingestion pull requires a cron");
+      // The command boundary validates the cron; this guard is for events
+      // that were committed anyway. Throwing here would poison the
+      // subscriber forever (evolve re-runs the same committed event on
+      // every retry), so degrade instead: keep the previous state and stand
+      // down until a valid reconfiguration arrives.
+      if (view.cron === null || !isValidPullSchedule(view.cron)) {
+        return { state: previousState, nextWakeAt: null, intents: [] };
       }
-      assertValidPullSchedule(view.cron);
       return settle(
         {
           ...previousState,

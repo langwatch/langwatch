@@ -5,7 +5,7 @@ import {
   INGESTION_PULL_EVENT_VERSIONS,
 } from "./schemas/constants";
 import {
-  ingestionPullConfiguredEventDataSchema,
+  ingestionPullConfiguredCommandDataSchema,
   ingestionPullDisabledEventDataSchema,
   ingestionPullRunCompletedEventDataSchema,
   ingestionPullRunFailedEventDataSchema,
@@ -19,7 +19,7 @@ export const ConfigureIngestionPullCommand = defineCommand({
   eventType: INGESTION_PULL_EVENT_TYPES.CONFIGURED,
   eventVersion: INGESTION_PULL_EVENT_VERSIONS.CONFIGURED,
   aggregateType: "ingestion_pull",
-  schema: ingestionPullConfiguredEventDataSchema,
+  schema: ingestionPullConfiguredCommandDataSchema,
   aggregateId: (data) => data.sourceId,
   idempotencyKey: (data) =>
     identity(data.sourceId, `configure:${data.configVersion}`),

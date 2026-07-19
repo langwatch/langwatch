@@ -43,23 +43,48 @@ function boot(at: number) {
 }
 
 describe("ingestionPullProcessDefinition", () => {
-  it("rejects invalid schedules before they enter process state", () => {
-    const at = Date.parse("2026-07-17T10:00:00Z");
-    expect(() =>
-      evolve(ingestionPullProcessDefinition.initialState, {
+  describe("when a committed configuration carries an invalid cron", () => {
+    it("disables the process instead of poisoning the subscriber", () => {
+      const at = Date.parse("2026-07-17T10:00:00Z");
+      const previousState = boot(at).state;
+      const result = evolve(previousState, {
         kind: "event",
         event: {
-          ...configured(at),
+          ...configured(Date.parse("2026-07-17T10:05:00Z")),
           payload: {
             sourceId: "source-1",
-            cron: "",
+            cron: "not a cron",
             cursor: null,
             runId: null,
           },
         },
-        now: at,
-      }),
-    ).toThrow("pull schedule must be a five-field cron expression");
+        now: Date.parse("2026-07-17T10:05:00Z"),
+      });
+      expect(result.state).toEqual(previousState);
+      expect(result.nextWakeAt).toBeNull();
+      expect(result.intents).toEqual([]);
+    });
+
+    it("disables the process when the committed configuration has no cron at all", () => {
+      const at = Date.parse("2026-07-17T10:00:00Z");
+      const previousState = boot(at).state;
+      const result = evolve(previousState, {
+        kind: "event",
+        event: {
+          ...configured(Date.parse("2026-07-17T10:05:00Z")),
+          payload: {
+            sourceId: "source-1",
+            cron: null,
+            cursor: null,
+            runId: null,
+          },
+        },
+        now: Date.parse("2026-07-17T10:05:00Z"),
+      });
+      expect(result.state).toEqual(previousState);
+      expect(result.nextWakeAt).toBeNull();
+      expect(result.intents).toEqual([]);
+    });
   });
 
   it("persists configuration and schedules the first cron wake", () => {
