@@ -128,6 +128,38 @@ describe("ingestionPullProcessDefinition", () => {
     expect(result.state.currentRun).toBeNull();
   });
 
+  describe("when a completion from a superseded run arrives late", () => {
+    it("keeps the live cursor instead of regressing it", () => {
+      const bootAt = Date.parse("2026-07-17T10:00:00Z");
+      const state: IngestionPullProcessState = {
+        ...boot(bootAt).state,
+        cursor: "cursor-live",
+        currentRun: {
+          runId: "run-2",
+          scheduledFor: Date.parse("2026-07-17T10:30:00Z"),
+          startedAt: Date.parse("2026-07-17T10:30:00Z"),
+        },
+      };
+      const lateAt = Date.parse("2026-07-17T10:31:00Z");
+      const result = evolve(state, {
+        kind: "event",
+        event: {
+          ...configured(lateAt),
+          eventType: INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED,
+          payload: {
+            sourceId: "source-1",
+            cron: null,
+            cursor: "cursor-stale",
+            runId: "run-1",
+          },
+        },
+        now: lateAt,
+      });
+      expect(result.state.cursor).toBe("cursor-live");
+      expect(result.state.currentRun).toEqual(state.currentRun);
+    });
+  });
+
   it("clears its wake when disabled and late outcomes cannot re-enable it", () => {
     const enabled = boot(Date.parse("2026-07-17T10:00:00Z")).state;
     const disabledAt = Date.parse("2026-07-17T10:01:00Z");

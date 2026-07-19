@@ -128,18 +128,20 @@ function evolveEvent(
         nextWakeAt: null,
         intents: [],
       };
-    case INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED:
+    case INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED: {
+      // Only the run this process is currently tracking may advance the
+      // durable cursor. A late completion from a superseded run would
+      // otherwise regress the live cursor and re-ingest its window.
+      const isCurrentRun = previousState.currentRun?.runId === view.runId;
       return settle(
         {
           ...previousState,
-          cursor: view.cursor,
-          currentRun:
-            previousState.currentRun?.runId === view.runId
-              ? null
-              : previousState.currentRun,
+          cursor: isCurrentRun ? view.cursor : previousState.cursor,
+          currentRun: isCurrentRun ? null : previousState.currentRun,
         },
         envelope.occurredAt,
       );
+    }
     case INGESTION_PULL_EVENT_TYPES.RUN_FAILED:
       return settle(
         {
