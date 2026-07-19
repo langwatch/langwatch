@@ -61,6 +61,40 @@ func TestLoadConfig_CanonicalEnv(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_HostedRequiresSSRFControls(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("ENVIRONMENT", "production")
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+	t.Setenv("BLOCK_LOCAL_HTTP_CALLS", "false")
+	t.Setenv("REQUIRE_HTTPS_CUSTOM_ENDPOINTS", "true")
+
+	_, err := LoadConfig(context.Background())
+	if err == nil {
+		t.Fatal("LoadConfig: expected hosted SSRF startup failure")
+	}
+	if got := err.Error(); got != "hosted gateway requires BLOCK_LOCAL_HTTP_CALLS=true" {
+		t.Fatalf("LoadConfig error = %q", got)
+	}
+}
+
+func TestLoadConfig_HostedRequiresHTTPS(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("ENVIRONMENT", "staging")
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+	t.Setenv("BLOCK_LOCAL_HTTP_CALLS", "true")
+	t.Setenv("REQUIRE_HTTPS_CUSTOM_ENDPOINTS", "false")
+
+	_, err := LoadConfig(context.Background())
+	if err == nil {
+		t.Fatal("LoadConfig: expected hosted HTTPS startup failure")
+	}
+	if got := err.Error(); got != "hosted gateway requires REQUIRE_HTTPS_CUSTOM_ENDPOINTS=true" {
+		t.Fatalf("LoadConfig error = %q", got)
+	}
+}
+
 // Legacy chart/saas env var names should resolve onto the canonical struct
 // fields when the canonical names are absent. This is the recovery path for
 // existing langwatch-saas terraform deployments where the gateway pod env

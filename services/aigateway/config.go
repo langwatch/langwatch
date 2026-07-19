@@ -2,6 +2,7 @@ package aigateway
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -90,6 +91,9 @@ func LoadConfig(ctx context.Context) (Config, error) {
 		return Config{}, err
 	}
 	applyLegacyEnvAliases(&cfg)
+	if err := validateHostedEgressSecurity(cfg); err != nil {
+		return Config{}, err
+	}
 	if cfg.CustomerTraceBridge.BaseURL == "" {
 		cfg.CustomerTraceBridge.BaseURL = cfg.ControlPlane.BaseURL
 	}
@@ -101,6 +105,23 @@ func LoadConfig(ctx context.Context) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// validateHostedEgressSecurity makes the SSRF controls a startup invariant for
+// deployed gateway instances. Local/self-hosted development keeps the legacy
+// permissive default, but a hosted process must never silently boot with the
+// compatibility defaults after a missing or misspelled environment variable.
+func validateHostedEgressSecurity(cfg Config) error {
+	if cfg.Environment == "" || cfg.Environment == "local" {
+		return nil
+	}
+	if !cfg.BlockLocalHTTPCalls {
+		return fmt.Errorf("hosted gateway requires BLOCK_LOCAL_HTTP_CALLS=true")
+	}
+	if !cfg.RequireHTTPSCustomerEndpoints {
+		return fmt.Errorf("hosted gateway requires REQUIRE_HTTPS_CUSTOM_ENDPOINTS=true")
+	}
+	return nil
 }
 
 // applyLegacyEnvAliases reads the chart/saas-style env var names that the
