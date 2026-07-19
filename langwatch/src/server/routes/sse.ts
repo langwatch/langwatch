@@ -264,7 +264,9 @@ secured.access(
           writeData({ type: "complete" });
           end();
         } catch (error) {
-          logSseError(error, { error, path, input }, "SSE handler error");
+          // No `input` here: it is the raw request payload, which may carry
+          // PII — same contract as the observable error path above.
+          logSseError(error, { error, path }, "SSE handler error");
           writeData(sseErrorFrame(error));
           end();
         }
