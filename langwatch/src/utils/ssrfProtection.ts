@@ -8,9 +8,16 @@
  * - Cloud provider internal domains (configured for AWS, see ssrfConstants.ts to extend)
  *
  * ## What's Blocked (only when BLOCK_LOCAL_HTTP_CALLS is true)
- * - IPv4 private: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16
- * - IPv6 private: ::1, ::, fc00::/7 (ULA), fe80::/10 (link-local)
- * - IPv4-mapped IPv6: ::ffff:x.x.x.x (extracted and checked as IPv4)
+ * Every non-globally-routable address, as classified by the shared
+ * `@langwatch/ssrf` rule set (one table, shared byte-for-byte with the Go
+ * services, held to one conformance corpus). That is the union of the IANA
+ * IPv4/IPv6 Special-Purpose registries, not just the classic private ranges:
+ * - IPv4 private/loopback/link-local: 10/8, 172.16/12, 192.168/16, 127/8, 169.254/16
+ * - IPv4 other special: 0.0.0.0/8, 100.64/10 (CGNAT), 192.0.2/24 · 198.51.100/24 ·
+ *   203.0.113/24 (TEST-NET), 198.18/15 (benchmarking), 224/4 (multicast), 240/4 (reserved)
+ * - IPv6: ::1, ::, fc00::/7 (ULA), fe80::/10 (link-local), NAT64, 6to4, Teredo,
+ *   2001:db8::/32 (documentation)
+ * - IPv4-mapped IPv6: ::ffff:x.x.x.x (unmapped and checked as IPv4)
  * - Hostnames resolving to any of the above
  *
  * ## DNS Rebinding Protection
@@ -25,6 +32,14 @@
  * - Uses redirect: 'manual' to intercept redirects
  * - Re-validates redirect URLs through SSRF checks
  * - Limits redirect chain to 10 hops to prevent infinite loops
+ *
+ * ## Timeouts
+ * Two independent bounds, both opt-in per call:
+ * - `init.signal` (e.g. `AbortSignal.timeout(ms)`) is forwarded to undici AND
+ *   carried across every redirect hop, so one signal bounds the WHOLE chain.
+ * - `init.headersTimeoutMs` / `init.bodyTimeoutMs` are set on the dispatching
+ *   Agent as a socket-level backstop, so a slowloris endpoint is still bounded
+ *   if the signal is ever dropped. Omitted → undici's 300s defaults apply.
  *
  * ## Behavior matrix
  *
@@ -64,6 +79,8 @@
  * @module ssrfProtection
  */
 
+import { createLogger } from "@langwatch/observability";
+import { classify as classifyEgressAddress } from "@langwatch/ssrf";
 import dns from "dns/promises";
 import { isIP } from "net";
 import {
@@ -72,7 +89,6 @@ import {
   fetch as undiciFetch,
 } from "undici";
 import { env } from "../env.mjs";
-import { createLogger } from "./logger";
 import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./ssrfConstants";
 
 const logger = createLogger("langwatch:ssrfProtection");
@@ -202,49 +218,19 @@ export function isBlockedCloudDomain(hostname: string): boolean {
 // IP Address Validation
 // ============================================================================
 
-function isPrivateIPv4(ip: string): boolean {
-  if (ip.startsWith("127.")) return true;
-  if (ip === "0.0.0.0") return true;
-  if (ip.startsWith("10.")) return true;
-  if (ip.startsWith("192.168.")) return true;
-
-  const match172 = ip.match(/^172\.(\d+)\./);
-  if (match172?.[1]) {
-    const second = parseInt(match172[1], 10);
-    if (second >= 16 && second <= 31) return true;
-  }
-
-  if (ip.startsWith("169.254.")) return true;
-
-  return false;
-}
-
+/**
+ * Whether an IP literal is non-globally-routable ("private or localhost" in the
+ * caller's sense). Delegates to the shared @langwatch/ssrf classifier so this
+ * app, the Go AI gateway, the Go Langy egress proxy and the NLP service all
+ * agree on exactly which addresses are unsafe to reach — the same rule set,
+ * expressed once, tested by one shared corpus. This now also covers the CGNAT,
+ * benchmarking, documentation, NAT64, 6to4 and reserved ranges the previous
+ * hand-rolled string checks silently missed. A cloud-metadata address is
+ * likewise non-global, so it is reported here too (it is additionally refused
+ * unconditionally by the metadata-host check, regardless of BLOCK_LOCAL).
+ */
 export function isPrivateOrLocalhostIP(ip: string): boolean {
-  const normalized = ip.toLowerCase();
-
-  if (normalized === "::1") return true;
-  if (normalized === "::") return true;
-  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
-  if (normalized.startsWith("fe80:")) return true;
-
-  const ipv4MappedMatch = normalized.match(/^::ffff:(.+)$/);
-  if (ipv4MappedMatch?.[1]) {
-    const mapped = ipv4MappedMatch[1];
-
-    if (mapped.includes(".")) {
-      return isPrivateIPv4(mapped);
-    }
-
-    const hexMatch = mapped.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
-    if (hexMatch?.[1] && hexMatch[2]) {
-      const high = parseInt(hexMatch[1], 16);
-      const low = parseInt(hexMatch[2], 16);
-      const reconstructed = `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`;
-      return isPrivateIPv4(reconstructed);
-    }
-  }
-
-  return isPrivateIPv4(ip);
+  return classifyEgressAddress(ip) !== "global";
 }
 
 // ============================================================================
@@ -524,6 +510,44 @@ const MAX_REDIRECTS = 10;
 
 export interface SSRFSafeFetchOptions extends RequestInit {
   _redirectCount?: number;
+  /**
+   * Set false to refuse redirects outright: a 3xx with a Location header
+   * throws instead of hopping. For callers whose SSRF policy is stricter than
+   * the default validator (e.g. the webhook channel, ADR-040 §4) — following
+   * a hop would re-validate through the weaker default policy.
+   */
+  followRedirects?: boolean;
+  /**
+   * Socket-level bound on how long the endpoint may take to send response
+   * HEADERS, in ms. Defence in depth behind `signal`: undici's own default is
+   * 300s, which is long enough for a slowloris endpoint to pin a worker slot.
+   * Omit to keep undici's default (long-running callers, e.g. LLM agents).
+   */
+  headersTimeoutMs?: number;
+  /**
+   * Socket-level bound on inactivity while streaming the response BODY, in ms.
+   * Same rationale as {@link headersTimeoutMs}.
+   */
+  bodyTimeoutMs?: number;
+}
+
+/** undici Agent options carrying the caller's socket-level bounds, if any. */
+interface AgentTimeoutOptions {
+  headersTimeout?: number;
+  bodyTimeout?: number;
+}
+
+function resolveAgentTimeouts(
+  init: SSRFSafeFetchOptions | undefined,
+): AgentTimeoutOptions {
+  const timeouts: AgentTimeoutOptions = {};
+  if (init?.headersTimeoutMs !== undefined) {
+    timeouts.headersTimeout = init.headersTimeoutMs;
+  }
+  if (init?.bodyTimeoutMs !== undefined) {
+    timeouts.bodyTimeout = init.bodyTimeoutMs;
+  }
+  return timeouts;
 }
 
 /**
@@ -540,8 +564,13 @@ export function createSSRFSafeFetchConfig({ isSaaS }: { isSaaS: boolean }): { re
 
 const defaultFetchConfig = createSSRFSafeFetchConfig({ isSaaS: !!env.IS_SAAS });
 
-function createIpPinningAgent(resolvedIp: string, tlsConfig: { rejectUnauthorized: boolean } = defaultFetchConfig): Agent {
+function createIpPinningAgent(
+  resolvedIp: string,
+  tlsConfig: { rejectUnauthorized: boolean } = defaultFetchConfig,
+  timeouts: AgentTimeoutOptions = {},
+): Agent {
   return new Agent({
+    ...timeouts,
     connect: {
       rejectUnauthorized: tlsConfig.rejectUnauthorized,
       lookup: (_hostname, _options, callback) => {
@@ -587,19 +616,28 @@ export async function fetchWithResolvedIp(
 
   const requestUrl = `${validated.protocol}//${validated.hostname}:${validated.port}${validated.path}`;
   const resolvedIp = getResolvedIpForPinning(validated);
+  const agentTimeouts = resolveAgentTimeouts(init);
 
   // Use IP pinning dispatcher when we have a resolved IP.
   // Always apply TLS config (e.g. rejectUnauthorized) via a custom Agent.
+  // The caller's socket-level bounds (if any) ride on the Agent so they hold
+  // even when `signal` is absent.
   const dispatcher =
     resolvedIp && isIP(resolvedIp) !== 0
-      ? createIpPinningAgent(resolvedIp, tlsConfig)
-      : new Agent({ connect: { rejectUnauthorized: tlsConfig.rejectUnauthorized } });
+      ? createIpPinningAgent(resolvedIp, tlsConfig, agentTimeouts)
+      : new Agent({
+          ...agentTimeouts,
+          connect: { rejectUnauthorized: tlsConfig.rejectUnauthorized },
+        });
 
   try {
     const response = await undiciFetch(requestUrl, {
       method: init?.method,
       headers,
       body: init?.body as string | undefined,
+      // Without this the caller's AbortSignal.timeout(...) is silently dropped
+      // and undici's 300s default is the only bound — across every redirect hop.
+      signal: init?.signal,
       redirect: "manual",
       dispatcher,
     });
@@ -607,6 +645,11 @@ export async function fetchWithResolvedIp(
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get("location");
       if (location) {
+        if (init?.followRedirects === false) {
+          throw new Error(
+            "Redirects are not followed for this destination — the endpoint must answer directly.",
+          );
+        }
         if (redirectCount >= MAX_REDIRECTS) {
           throw new Error(`Too many redirects (max ${MAX_REDIRECTS})`);
         }
@@ -624,8 +667,14 @@ export async function fetchWithResolvedIp(
 
         const redirectValidated = await validateUrlForSSRF(redirectUrl);
 
+        // `signal` and the socket-level bounds are carried into every hop, so
+        // one caller deadline bounds the WHOLE chain (up to MAX_REDIRECTS),
+        // not each hop independently.
         const redirectInit: SSRFSafeFetchOptions = {
           ...init,
+          signal: init?.signal,
+          headersTimeoutMs: init?.headersTimeoutMs,
+          bodyTimeoutMs: init?.bodyTimeoutMs,
           _redirectCount: redirectCount + 1,
         };
 
@@ -659,10 +708,13 @@ export async function fetchWithResolvedIp(
 /**
  * Combined SSRF validation and fetch in a single atomic operation.
  * This is the recommended way to make SSRF-safe requests.
+ *
+ * Pass `signal` (and optionally `headersTimeoutMs` / `bodyTimeoutMs`) to bound
+ * the request — see the Timeouts section of the module doc.
  */
 export async function ssrfSafeFetch(
   url: string,
-  init?: RequestInit,
+  init?: SSRFSafeFetchOptions,
 ): Promise<FetchResponse> {
   const validated = await validateUrlForSSRF(url);
   return fetchWithResolvedIp(validated, init);

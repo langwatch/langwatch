@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ProjectsApiService } from "@/client-sdk/services/projects/projects-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
@@ -13,7 +13,7 @@ export const listProjectsCommand = async (options?: {
   checkApiKey();
 
   const service = new ProjectsApiService();
-  const spinner = ora("Fetching projects...").start();
+  const spinner = createSpinner("Fetching projects...").start();
 
   try {
     const result = await service.list({ page: options?.page, limit: options?.limit });
@@ -60,7 +60,7 @@ export const listProjectsCommand = async (options?: {
       ),
     );
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch projects" });
+    failSpinner({ spinner, error, action: "fetch projects", format: options?.format });
     process.exit(1);
   }
 };

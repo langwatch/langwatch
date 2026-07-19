@@ -67,6 +67,12 @@ const REGISTRY: FeatureDescriptor[] = [
     description:
       "Model that judges whether a scenario met its success criteria.",
   },
+  {
+    key: "workflows.create_default",
+    role: "DEFAULT",
+    displayName: "New workflow model",
+    description: "Starts new workflows with a ready-to-use model.",
+  },
 
   // FAST — assistive / background surfaces.
   {
@@ -114,6 +120,13 @@ const REGISTRY: FeatureDescriptor[] = [
     // "(LLM)" suffix only made the column read like a glossary entry.
     displayName: "Topic clustering",
     description: "Names the clusters surfaced in Analytics → Topics.",
+  },
+  {
+    key: "langy.conversation_title",
+    role: "FAST",
+    displayName: "Langy chat titles",
+    description:
+      "Names each Langy conversation from its messages. Point this at a cheap model.",
   },
 
   // EMBEDDINGS — single line, no per-feature expand surfaced in the UI.

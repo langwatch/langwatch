@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import type { AggregateType } from "./domain/aggregateType";
 import type { Event, Projection } from "./domain/types";
 import type {
@@ -47,9 +47,11 @@ export class EventSourcingPipeline<
       aggregateType: definition.aggregateType,
       eventStore: definition.eventStore,
       foldProjections: definition.foldProjections,
+      stateProjections: definition.stateProjections,
       mapProjections: definition.mapProjections,
       reactors: definition.reactors,
       mapReactors: definition.mapReactors,
+      subscribers: definition.subscribers,
       globalQueue: definition.globalQueue,
       globalJobRegistry: definition.globalJobRegistry,
       featureFlagService: definition.featureFlagService,

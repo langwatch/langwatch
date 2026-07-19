@@ -151,12 +151,17 @@ export const FEATURE_FLAGS = [
   {
     key: "release_ui_ai_governance_enabled",
     scope: "PRODUCT",
-    // ADR-038 ships dark behind this flag: it additionally gates the
-    // onboarding intent fork and the org "Primary use" setting. GA is a
-    // later PostHog rollout (SaaS) + flipping this default (self-hosted).
-    defaultValue: false,
+    // On by default (ADR-038 Decision 7): self-hosted installations get
+    // governance (AI-tools device login, /me, admin surfaces, the
+    // onboarding intent fork, the org "Primary use" setting) with zero
+    // configuration. SaaS stays PostHog-governed: a per-org off-condition
+    // (or an operator store row / RELEASE_UI_AI_GOVERNANCE_ENABLED=0)
+    // re-arms every gate for that org. This default and the auth-cli
+    // device-login fallback are a pinned pair, move them together
+    // (governanceGaDefaults.unit.test.ts enforces it).
+    defaultValue: true,
     description:
-      "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
+      "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). On by default; switch off per org via PostHog or the operator store to hide governance and refuse AI-tools device login. Distinct from release_ui_ai_gateway_menu_enabled: the gateway product ships on its own flag.",
   },
   // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
   // `trace_analytics` / rollup `trace_analytics_rollup` tables (Phases 1+2)
@@ -182,31 +187,29 @@ export const FEATURE_FLAGS = [
     description:
       "Tripwire for ADR-034 Phase 3: when ON alongside release_event_sourced_analytics_read, runs the routed and legacy trace_summaries queries in parallel and logs divergence beyond a small tolerance. Returns the routed result either way.",
   },
-  // ADR-034 Phase 5 — moves custom-graph threshold-alert firing off the K8s
-  // cron onto the event-sourced path (real-time outbox reactor on
-  // trace-processing + 30s heartbeat for no-data / firing-resolve absence
-  // cases). SYSTEM scope: self-hosted (env + /ops/feature-flags store),
-  // never consults PostHog — the rollout is operator-driven per project
-  // rather than %-targeted, and we don't want PostHog outages or quota
-  // to flip trigger delivery. OFF (default) = cron handles the project's
-  // graph triggers as today. ON = cron skips that project's graph
-  // triggers; the event-sourced path takes over. The cron loop and the
-  // new path coexist per-project — graph triggers either fire from one
-  // OR the other for a given project, never both.
-  {
-    key: "release_es_graph_triggers_firing",
-    scope: "SYSTEM",
-    defaultValue: false,
-    description:
-      "Moves custom-graph threshold-alert firing off the K8s cron onto the event-sourced path (ADR-034 Phase 5). Self-hosted flag; toggle globally via RELEASE_ES_GRAPH_TRIGGERS_FIRING=1 or per-project from /ops/feature-flags. On = cron skips this project's graph triggers; real-time outbox reactor + heartbeat fire them. Off = cron handles as today.",
-    family: "Event sourcing",
-  },
+  // NOTE: `release_es_graph_triggers_firing` (ADR-034 Phase 5) was retired —
+  // the event-sourced graph-alert path is now unconditional and the K8s cron
+  // was removed, so there is no longer a cron/ES choice to gate.
   {
     key: "release_langy_enabled",
     scope: "PRODUCT",
     defaultValue: false,
     description:
       "Opens the Langy in-product assistant. Default off: only LangWatch staff (isLangwatchStaff() — @langwatch.ai email) get Langy out of the box. To open it for a specific project/org/user, flip the flag on via a PostHog rule, an operator-store row via /ops/feature-flags, or RELEASE_LANGY_ENABLED=true for a blanket on. Staff always bypass the flag so a global kill switch still leaves us able to debug.",
+  },
+  {
+    key: "release_langy_promo_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Shows the Langy teaser banner on the home page to users who do NOT have Langy yet (spec: specs/home/langy-home-banner.feature). Purely promotional — it never grants access; users who already have Langy (staff or release_langy_enabled) see the activation banner instead, regardless of this flag. Target the promo audience via a PostHog rule.",
+  },
+  {
+    key: "release_webhook_automations",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Offers the Webhook (generic HTTP request) delivery channel for automations (ADR-040). Gates the delivery-picker card, the save route accepting SEND_WEBHOOK, and the test-fire path. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_webhook_automations.",
   },
 ] as const satisfies readonly FeatureFlagDefinition[];
 

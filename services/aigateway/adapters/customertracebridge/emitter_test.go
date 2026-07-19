@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseTraceparent_valid(t *testing.T) {
@@ -80,6 +81,48 @@ func TestRegistry_Set_ClearsWithEmpty(t *testing.T) {
 
 	_, _, ok := r.Lookup("proj-1")
 	assert.False(t, ok)
+}
+
+func TestRegistry_SetFromBundle_RegistersTokenAsAuthHeader(t *testing.T) {
+	r := NewRegistry()
+
+	require.NoError(t, r.SetFromBundle("proj-1", "tok-1", "http://app:5560/api/otel"))
+
+	endpoint, headers, ok := r.Lookup("proj-1")
+	assert.True(t, ok)
+	assert.Equal(t, "http://app:5560/api/otel", endpoint)
+	assert.Equal(t, "tok-1", headers["X-Auth-Token"])
+}
+
+// A bundle whose OTLP token is gone means the control plane revoked or rotated
+// it. The cached entry must go WITH it — otherwise the bridge keeps exporting
+// this project's spans under the dead token until LRU pressure happens to
+// evict it, which on a quiet gateway is never.
+func TestRegistry_SetFromBundle_ClearedTokenRevokesTheCachedEntry(t *testing.T) {
+	r := NewRegistry()
+	assert.NoError(t, r.SetFromBundle("proj-1", "tok-1", "http://app:5560/api/otel"))
+
+	assert.NoError(t, r.SetFromBundle("proj-1", "", "http://app:5560/api/otel"))
+
+	_, _, ok := r.Lookup("proj-1")
+	assert.False(t, ok, "a revoked token must stop trace export immediately, not on LRU eviction")
+}
+
+func TestRegistry_SetFromBundle_ClearedEndpointRevokesTheCachedEntry(t *testing.T) {
+	r := NewRegistry()
+	assert.NoError(t, r.SetFromBundle("proj-1", "tok-1", "http://app:5560/api/otel"))
+
+	assert.NoError(t, r.SetFromBundle("proj-1", "tok-1", ""))
+
+	_, _, ok := r.Lookup("proj-1")
+	assert.False(t, ok)
+}
+
+func TestRegistry_SetFromBundle_IgnoresEmptyProject(t *testing.T) {
+	r := NewRegistry()
+
+	assert.NoError(t, r.SetFromBundle("", "tok-1", "http://app:5560/api/otel"))
+	assert.NoError(t, r.SetFromBundle("", "", ""))
 }
 
 func hexEncode(b []byte) string {

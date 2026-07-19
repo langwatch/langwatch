@@ -66,7 +66,13 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 }
 
 func (s *Server) start(ctx context.Context) error {
-	if exec.CommandContext(ctx, "brew", "list", "--formula", s.formula).Run() != nil {
+	if err := exec.CommandContext(ctx, "brew", "list", "--formula", s.formula).Run(); err != nil {
+		// A cancelled context kills the probe too, so a failed `brew list`
+		// only means "not installed" when the context is still alive —
+		// otherwise the honest answer is that we never got to look.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return fmt.Errorf("could not check whether %s is installed: %w", s.formula, ctxErr)
+		}
 		return fmt.Errorf("%s is not installed — `brew install %s` (or set HAVEN_PG_FORMULA to a version you already have)", s.formula, s.formula)
 	}
 	if err := exec.CommandContext(ctx, "brew", "services", "start", s.formula).Run(); err != nil {
@@ -145,9 +151,12 @@ func (s *Server) EnsureDatabase(ctx context.Context, database string) error {
 	return s.exec(ctx, "postgres", fmt.Sprintf("CREATE DATABASE %s OWNER %s", quoteIdent(database), quoteIdent(domain.PostgresRole)))
 }
 
-// DropDatabase removes a stack's database.
+// DropDatabase removes a stack's database. WITH (FORCE) terminates any
+// lingering connections first: a database being dropped has no legitimate
+// readers left (a stale dev server holding a pool open must not block the
+// drop), and plain DROP DATABASE refuses while anything is connected.
 func (s *Server) DropDatabase(ctx context.Context, database string) error {
-	return s.exec(ctx, "postgres", "DROP DATABASE IF EXISTS "+quoteIdent(database))
+	return s.exec(ctx, "postgres", "DROP DATABASE IF EXISTS "+quoteIdent(database)+" WITH (FORCE)")
 }
 
 // Databases lists the lw_* databases currently on the server.

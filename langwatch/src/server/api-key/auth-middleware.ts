@@ -1,12 +1,12 @@
+import { createLogger } from "@langwatch/observability";
 import type { Organization, PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
-import { TokenResolver, type OrgResolvedToken, type ResolvedToken } from "./token-resolver";
-import { ApiKeyPermissionDeniedError } from "./errors";
 import type { Permission } from "~/server/api/rbac";
+import { HandledError } from "@langwatch/handled-error";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
-import { DomainError } from "~/server/app-layer/domain-error";
-import { createLogger } from "~/utils/logger/server";
 import { getTokenType } from "./api-key-token.utils";
+import { ApiKeyPermissionDeniedError } from "./errors";
+import { type OrgResolvedToken, type ResolvedToken, TokenResolver } from "./token-resolver";
 
 const logger = createLogger("langwatch:api:unified-auth");
 const permissionLogger = createLogger("langwatch:api:api-key-ceiling");
@@ -382,7 +382,7 @@ export async function enforceApiKeyCeiling({
 export function apiKeyCeilingDenialResponse(
   error: unknown,
 ): { error: string; message: string; status: 403 } {
-  if (DomainError.isHandled(error) && error.kind === "api_key_permission_denied") {
+  if (HandledError.isHandled(error) && error.code === "api_key_permission_denied") {
     return { error: "Forbidden", message: error.message, status: 403 };
   }
   throw error;

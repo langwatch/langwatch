@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ApiKeysApiService } from "@/client-sdk/services/api-keys/api-keys-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -23,7 +23,7 @@ export const createApiKeyCommand = async (options: CreateApiKeyOptions): Promise
 
   const service = new ApiKeysApiService();
   const keyType = options.keyType ?? "service";
-  const spinner = ora(`Creating ${keyType} API key "${options.name}"...`).start();
+  const spinner = createSpinner(`Creating ${keyType} API key "${options.name}"...`).start();
 
   try {
     const result = await service.create({
@@ -50,7 +50,7 @@ export const createApiKeyCommand = async (options: CreateApiKeyOptions): Promise
     console.log(chalk.gray("Created:    ") + new Date(result.apiKey.createdAt).toLocaleString());
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "create API key" });
+    failSpinner({ spinner, error, action: "create API key", format: options?.format });
     process.exit(1);
   }
 };

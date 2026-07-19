@@ -6,18 +6,19 @@
  * - src/pages/api/annotations/[id].ts
  * - src/pages/api/annotations/trace/[trace].ts
  */
-import { nanoid } from "nanoid";
+
+import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
-import { prisma } from "~/server/db";
-import { createLogger } from "~/utils/logger/server";
+import { nanoid } from "nanoid";
 import type { Permission } from "~/server/api/rbac";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
+  apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
   extractCredentials,
-  apiKeyCeilingDenialResponse,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { prisma } from "~/server/db";
 
 const logger = createLogger("langwatch:annotations");
 const tokenResolver = TokenResolver.create(prisma);

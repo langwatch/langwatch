@@ -1,4 +1,4 @@
-import { sendSlackWebhook } from "../server/triggers/sendSlackWebhook";
+import { sendSlackWebhook } from "../server/app-layer/automations/delivery/sendSlackWebhook";
 
 export default async function execute(webhook: string) {
   await sendSlackWebhook({

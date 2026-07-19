@@ -1,4 +1,4 @@
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
@@ -20,7 +20,7 @@ export const updateTriggerCommand = async (
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
-  const spinner = ora(`Updating trigger "${id}"...`).start();
+  const spinner = createSpinner(`Updating trigger "${id}"...`).start();
 
   try {
     const body: Record<string, unknown> = {};
@@ -56,7 +56,7 @@ export const updateTriggerCommand = async (
       console.log(JSON.stringify(trigger, null, 2));
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "update trigger" });
+    failSpinner({ spinner, error, action: "update trigger", format: options?.format });
     process.exit(1);
   }
 };

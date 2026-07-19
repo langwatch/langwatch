@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fireActivityTrackingNurturing,
-  resetActivityTrackingCache,
   getActivityTrackingCacheSize,
+  resetActivityTrackingCache,
 } from "./activityTracking";
 
 // Suppress logger output
-vi.mock("../../../../src/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

@@ -19,12 +19,17 @@ import type { EvaluationRunService } from "./evaluations/evaluation-run.service"
 import type { EventExplorerService } from "./ops/event-explorer.service";
 import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { QueueService } from "./ops/queue.service";
+import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import type { ReplayService } from "./ops/replay.service";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
 import type { ShareService } from "./share/share.service";
 import type { SimulationRunService } from "./simulations/simulation-run.service";
+import type { LangyConversationService } from "./langy/langy-conversation.service";
+import type { LangyTurnService } from "./langy/langy-turn.service";
+import type { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
+import type { LangyMessageService } from "./langy/langy-message.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
@@ -38,9 +43,12 @@ import type { TokenizerService } from "./traces/tokenizer.service";
 import type { TraceListService } from "./traces/trace-list.service";
 import type { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import type { TraceSummaryService } from "./traces/trace-summary.service";
-import type { EmailSuppressionService } from "./triggers/emailSuppression.service";
-import type { TriggerService } from "./triggers/trigger.service";
-import type { TriggerTemplateService } from "./triggers/trigger-template.service";
+import type { EmailSuppressionService } from "./automations/emailSuppression.service";
+import type { TriggerService } from "./automations/trigger.service";
+import type {
+  TestFireResult,
+  TestFireTriggerInput,
+} from "./automations/trigger-template.service";
 import type { UsageService } from "./usage/usage.service";
 
 export interface DataRetentionDependencies {
@@ -52,6 +60,7 @@ export interface DataRetentionDependencies {
 
 export interface OpsDependencies {
   queues: QueueService;
+  scheduler: SchedulerOpsService;
   eventExplorer: EventExplorerService;
   replay: ReplayService;
   metricsCollector: OpsMetricsCollector | null;
@@ -87,9 +96,21 @@ export interface AppDependencies {
   suiteRuns: {
     runs: SuiteRunService;
   };
+  /** ADR-046: Langy conversations as an event-sourced projection. */
+  langy: {
+    conversations: LangyConversationService;
+    turns: LangyTurnService;
+    messages: LangyMessageService;
+    githubInstallations: LangyGithubInstallationsService;
+  };
   experiments: ExperimentService;
   triggers: TriggerService;
-  triggerTemplates: TriggerTemplateService;
+  /** Wraps `testFireTrigger(deps, input)` with the composition-time
+   *  `{baseHost, notifier}` bag already bound — the router only needs
+   *  to pass the per-call input. */
+  triggerTemplates: {
+    testFire: (input: TestFireTriggerInput) => Promise<TestFireResult>;
+  };
   emailSuppressions: EmailSuppressionService;
   organizations: OrganizationService;
   projects: ProjectService;

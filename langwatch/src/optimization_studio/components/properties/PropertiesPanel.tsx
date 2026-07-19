@@ -21,18 +21,15 @@ import { IfElsePropertiesPanel } from "./IfElsePropertiesPanel";
 import { SignaturePropertiesPanel } from "./llm-configs/signature-properties-panel/SignaturePropertiesPanel";
 import { PromptingTechniquePropertiesPanel } from "./PromptingTechniquePropertiesPanel";
 import { RetrievePropertiesPanel } from "./RetrievePropertiesPanel";
-import { WorkflowPropertiesPanel } from "./WorkflowPropertiesPanel";
 
 export function PropertiesPanel() {
   const {
     selectedNode,
-    workflowSelected,
     propertiesExpanded,
     setPropertiesExpanded,
   } = useWorkflowStore(
     useShallow((state) => ({
       selectedNode: state.nodes.find((n) => n.selected),
-      workflowSelected: state.workflowSelected,
       propertiesExpanded: state.propertiesExpanded,
       setPropertiesExpanded: state.setPropertiesExpanded,
     })),
@@ -83,26 +80,6 @@ export function PropertiesPanel() {
   }, [propertiesExpanded, setPropertiesExpanded]);
 
   const MotionDiv = motion.div;
-
-  if (!selectedNode && workflowSelected) {
-    return (
-      <Box
-        position={propertiesExpanded ? "absolute" : "relative"}
-        top={0}
-        right={0}
-        background="bg"
-        border="1px solid"
-        borderColor="border.emphasized"
-        borderTopWidth={0}
-        borderBottomWidth={0}
-        borderRightWidth={0}
-        zIndex={100}
-        height="full"
-      >
-        <WorkflowPropertiesPanel />
-      </Box>
-    );
-  }
 
   if (!selectedNode || !width) {
     return null;

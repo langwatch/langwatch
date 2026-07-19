@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { EvaluationResults, EvaluatorConfig } from "../../types";
 import {
   computeMetricStats,
-  computePairwiseAggregate,
+  computeComparisonAggregate,
   computeTargetAggregates,
   formatCost,
   formatLatency,
@@ -666,7 +666,7 @@ describe("computeTargetAggregates latencyStats and costStats", () => {
   });
 });
 
-describe("computePairwiseAggregate", () => {
+describe("computeComparisonAggregate", () => {
   const createResults = (
     overrides: Partial<EvaluationResults> = {},
   ): EvaluationResults => ({
@@ -689,122 +689,226 @@ describe("computePairwiseAggregate", () => {
     },
   };
 
-  it("returns null when evaluator has no pairwise config", () => {
-    const out = computePairwiseAggregate(
-      { id: "eval-1", pairwise: undefined },
-      createResults(),
-      3,
-    );
-    expect(out).toBeNull();
+  const threeWayEvaluator: Pick<EvaluatorConfig, "id" | "comparison"> = {
+    id: "eval-cmp",
+    comparison: {
+      variants: ["target-a", "target-b", "target-c"],
+      hasGoldenAnswer: true,
+      goldenField: "expected_output",
+      includeMetrics: [],
+      randomizeOrder: true,
+    },
+  };
+
+  describe("given an evaluator with no comparison config", () => {
+    it("returns null", () => {
+      const out = computeComparisonAggregate(
+        { id: "eval-1", pairwise: undefined, comparison: undefined },
+        createResults(),
+        3,
+      );
+      expect(out).toBeNull();
+    });
   });
 
-  it("tallies A/B/tie verdicts and skips missing/errored rows", () => {
-    const results = createResults({
-      evaluatorResults: {
-        "target-a": {
-          "eval-pw": [
-            {
-              status: "processed",
-              label: "A",
-              details: "A is closer to golden",
-              cost: { amount: 0.001 },
+  describe("given a legacy pairwise evaluator", () => {
+    describe("when verdicts use legacy slot labels", () => {
+      it("resolves A and B onto the variants they name", () => {
+        const results = createResults({
+          evaluatorResults: {
+            "target-a": {
+              "eval-pw": [
+                {
+                  status: "processed",
+                  label: "A",
+                  details: "A is closer to golden",
+                  cost: { amount: 0.001 },
+                },
+                {
+                  status: "processed",
+                  label: "B",
+                  details: "B is more concise",
+                  cost: { amount: 0.002 },
+                },
+                {
+                  status: "processed",
+                  label: "tie",
+                  details: "both equivalent",
+                  cost: { amount: 0.0015 },
+                },
+                { status: "error", details: "judge crashed" },
+                undefined,
+                { status: "processed", label: "A", cost: { amount: 0.0005 } },
+              ],
             },
-            {
-              status: "processed",
-              label: "B",
-              details: "B is more concise",
-              cost: { amount: 0.002 },
+          },
+        });
+        const agg = computeComparisonAggregate(pairwiseEvaluator, results, 6);
+        expect(agg).not.toBeNull();
+        expect(agg!.winsByLabel).toEqual({ "target-a": 2, "target-b": 1 });
+        expect(agg!.ties).toBe(1);
+        expect(agg!.decidedRows).toBe(4);
+        expect(agg!.topLabel).toBe("target-a");
+        expect(agg!.topCount).toBe(2);
+        expect(agg!.totalCost).toBeCloseTo(0.005, 5);
+      });
+    });
+
+    describe("when a row is errored or missing", () => {
+      it("does not count it as decided", () => {
+        const results = createResults({
+          evaluatorResults: {
+            "target-a": {
+              "eval-pw": [
+                { status: "error", details: "judge crashed" },
+                undefined,
+              ],
             },
-            {
-              status: "processed",
-              label: "tie",
-              details: "both equivalent",
-              cost: { amount: 0.0015 },
+          },
+        });
+        const agg = computeComparisonAggregate(pairwiseEvaluator, results, 2);
+        expect(agg!.decidedRows).toBe(0);
+        expect(agg!.topLabel).toBeUndefined();
+      });
+    });
+
+    describe("when cost is absent", () => {
+      it("totals zero rather than NaN", () => {
+        const results = createResults({
+          evaluatorResults: {
+            "target-a": { "eval-pw": [{ status: "processed", label: "A" }] },
+          },
+        });
+        const agg = computeComparisonAggregate(pairwiseEvaluator, results, 1);
+        expect(agg!.totalCost).toBe(0);
+      });
+    });
+
+    describe("when results are stored under the wrong target id", () => {
+      it("sees no verdicts", () => {
+        const results = createResults({
+          evaluatorResults: {
+            // Chip-style comparison results MUST land under the first
+            // variant — anything stored elsewhere is invisible here.
+            "target-b": { "eval-pw": [{ status: "processed", label: "A" }] },
+          },
+        });
+        const agg = computeComparisonAggregate(pairwiseEvaluator, results, 1);
+        expect(agg!.winsByLabel).toEqual({});
+        expect(agg!.decidedRows).toBe(0);
+      });
+    });
+  });
+
+  describe("given a three-way comparison", () => {
+    describe("when one variant wins the most rows", () => {
+      it("names it as the sole leader", () => {
+        const results = createResults({
+          evaluatorResults: {
+            "target-a": {
+              "eval-cmp": [
+                { status: "processed", label: "target-b" },
+                { status: "processed", label: "target-b" },
+                { status: "processed", label: "target-c" },
+                { status: "processed", label: "target-a" },
+                { status: "processed", label: "tie" },
+              ],
             },
-            { status: "error", details: "judge crashed" },
-            undefined,
-            { status: "processed", label: "A", cost: { amount: 0.0005 } },
-          ],
-        },
-      },
+          },
+        });
+        const agg = computeComparisonAggregate(threeWayEvaluator, results, 5);
+        expect(agg!.winsByLabel).toEqual({
+          "target-a": 1,
+          "target-b": 2,
+          "target-c": 1,
+        });
+        expect(agg!.ties).toBe(1);
+        expect(agg!.topLabel).toBe("target-b");
+        expect(agg!.topCount).toBe(2);
+        expect(agg!.decidedRows).toBe(5);
+      });
     });
-    const agg = computePairwiseAggregate(pairwiseEvaluator, results, 6);
-    expect(agg).not.toBeNull();
-    expect(agg!.counts).toEqual({ a: 2, b: 1, tie: 1 });
-    expect(agg!.totalCost).toBeCloseTo(0.005, 5);
-    expect(agg!.perRow[0]).toEqual({
-      label: "A",
-      reasoning: "A is closer to golden",
-      costAmount: 0.001,
-    });
-    expect(agg!.perRow[3]).toBeNull();
-    expect(agg!.perRow[4]).toBeNull();
-  });
 
-  it("handles missing cost gracefully", () => {
-    const results = createResults({
-      evaluatorResults: {
-        "target-a": {
-          "eval-pw": [{ status: "processed", label: "A" }],
-        },
-      },
+    describe("when the third variant wins", () => {
+      // Before the pairwise/N-way merge the tally only had A/B slots, so a
+      // third variant's wins were silently dropped and it could never lead.
+      it("counts its wins rather than dropping them", () => {
+        const results = createResults({
+          evaluatorResults: {
+            "target-a": {
+              "eval-cmp": [
+                { status: "processed", label: "target-c" },
+                { status: "processed", label: "target-c" },
+                { status: "processed", label: "target-a" },
+              ],
+            },
+          },
+        });
+        const agg = computeComparisonAggregate(threeWayEvaluator, results, 3);
+        expect(agg!.winsByLabel["target-c"]).toBe(2);
+        expect(agg!.topLabel).toBe("target-c");
+      });
     });
-    const agg = computePairwiseAggregate(pairwiseEvaluator, results, 1);
-    expect(agg!.totalCost).toBe(0);
-    expect(agg!.perRow[0]?.costAmount).toBe(0);
-  });
 
-  it("ignores results stored under the wrong target id", () => {
-    const results = createResults({
-      evaluatorResults: {
-        // Pairwise results MUST land under variantA — anything stored under
-        // variantB or another target is invisible to the aggregator.
-        "target-b": {
-          "eval-pw": [{ status: "processed", label: "A" }],
-        },
-      },
+    describe("when two variants share the lead", () => {
+      it("reports no sole leader", () => {
+        const results = createResults({
+          evaluatorResults: {
+            "target-a": {
+              "eval-cmp": [
+                { status: "processed", label: "target-a" },
+                { status: "processed", label: "target-b" },
+              ],
+            },
+          },
+        });
+        const agg = computeComparisonAggregate(threeWayEvaluator, results, 2);
+        expect(agg!.topCount).toBe(1);
+        expect(agg!.topLabel).toBeUndefined();
+      });
     });
-    const agg = computePairwiseAggregate(pairwiseEvaluator, results, 1);
-    expect(agg!.counts).toEqual({ a: 0, b: 0, tie: 0 });
-  });
 
-  it("tallies labels that arrive as the variant's prompt handle (Option C)", () => {
-    // Regression for the handle-vs-promptId mismatch (PR #5142 review):
-    // orchestrator emits the prompt HANDLE (e.g. "say-hi") as the verdict
-    // label, not the target id or promptId. The aggregator must match it
-    // through the `handles` hint or every handle-shaped label gets dropped
-    // and the header collapses to 0/0/0 "Tied".
-    const results = createResults({
-      evaluatorResults: {
-        "target-a": {
-          "eval-pw": [
-            { status: "processed", label: "say-hi", details: "A wins" },
-            { status: "processed", label: "be-formal", details: "B wins" },
-            { status: "processed", label: "tie", details: "equal" },
-          ],
-        },
-      },
+    describe("when every row ties", () => {
+      it("reports ties but no leader", () => {
+        const results = createResults({
+          evaluatorResults: {
+            "target-a": {
+              "eval-cmp": [
+                { status: "processed", label: "tie" },
+                { status: "processed", label: "tie" },
+              ],
+            },
+          },
+        });
+        const agg = computeComparisonAggregate(threeWayEvaluator, results, 2);
+        expect(agg!.ties).toBe(2);
+        expect(agg!.decidedRows).toBe(2);
+        expect(agg!.topCount).toBe(0);
+        expect(agg!.topLabel).toBeUndefined();
+      });
     });
-    const agg = computePairwiseAggregate(pairwiseEvaluator, results, 3, {
-      variantAHandle: "say-hi",
-      variantBHandle: "be-formal",
-    });
-    expect(agg!.counts).toEqual({ a: 1, b: 1, tie: 1 });
-  });
 
-  it("falls back to legacy A/B/tie when no handles are supplied", () => {
-    const results = createResults({
-      evaluatorResults: {
-        "target-a": {
-          "eval-pw": [
-            { status: "processed", label: "A" },
-            { status: "processed", label: "tie" },
-          ],
-        },
-      },
+    describe("when the judge labels winners by prompt handle", () => {
+      // The orchestrator emits a prompt's HANDLE (e.g. "say-hi") as the
+      // verdict label, not the target id. The aggregate keys wins by whatever
+      // identifier arrived; resolving it back to a variant is the renderer's
+      // job, because that needs the handle from a hook.
+      it("tallies the handles as they arrived", () => {
+        const results = createResults({
+          evaluatorResults: {
+            "target-a": {
+              "eval-cmp": [
+                { status: "processed", label: "say-hi" },
+                { status: "processed", label: "be-formal" },
+                { status: "processed", label: "say-hi" },
+              ],
+            },
+          },
+        });
+        const agg = computeComparisonAggregate(threeWayEvaluator, results, 3);
+        expect(agg!.winsByLabel).toEqual({ "say-hi": 2, "be-formal": 1 });
+        expect(agg!.topLabel).toBe("say-hi");
+      });
     });
-    // No `handles` arg → only the legacy slot labels match.
-    const agg = computePairwiseAggregate(pairwiseEvaluator, results, 2);
-    expect(agg!.counts).toEqual({ a: 1, b: 0, tie: 1 });
   });
 });

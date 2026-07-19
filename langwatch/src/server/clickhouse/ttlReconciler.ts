@@ -1,6 +1,6 @@
 import { createClient } from "@clickhouse/client";
 
-import { createLogger } from "../../utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import { RETENTION_MANAGED_TABLES } from "../data-retention/retentionPolicy.schema";
 import { parseConnectionUrl } from "./goose";
 
@@ -66,6 +66,13 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     retentionTTLColumn: "EventOccurredAt",
     retentionTTLColumnExpression: "toDateTime(EventOccurredAt / 1000)",
     envVar: "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  {
+    table: "langy_analytics_events",
+    ttlColumn: "OccurredAt",
+    retentionTTLColumn: "OccurredAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_LANGY_ANALYTICS_EVENTS_TTL_DAYS",
     hardcodedDefault: 49,
   },
   {

@@ -30,7 +30,7 @@ const (
 // Traces and logs carry resource attributes through to Tempo and Loki on their
 // own. Prometheus does not: its OTLP receiver promotes only the attributes named
 // in its config, and the bundle ships a fixed list that knows nothing about us.
-// Without this, every worktree's langwatch-backend metrics collapse into one
+// Without this, every worktree's langwatch-app metrics collapse into one
 // indistinguishable series and "filter Grafana to your worktree" quietly stops
 // being true for a third of the telemetry.
 //

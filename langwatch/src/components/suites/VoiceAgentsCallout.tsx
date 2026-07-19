@@ -7,9 +7,11 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 /**
  * Small announcement card pinned to the bottom of the simulations sidebar,
- * just above the collapse-toggle footer. Mirrors the in-app traces-v2
- * "Try the new Trace Explorer" callout pattern (gradient pill + arrow CTA +
- * snooze-on-dismiss) at a sidebar-friendly size.
+ * just above the collapse-toggle footer. A clean, subtle info card in the
+ * simulations blue accent (`colorPalette="blue"` surface tokens + arrow CTA +
+ * snooze-on-dismiss) at a sidebar-friendly size — styled with design-system
+ * semantic tokens so it matches the rest of the product and adapts to
+ * light/dark, rather than the previous clashing hardcoded blue→teal gradient.
  *
  * The CTA opens the public Voice docs (Scenario `voice/getting-started`)
  * in a new tab, so we render a plain `<a>` rather than the in-app `<Link>`
@@ -94,18 +96,19 @@ export function VoiceAgentsCallout() {
         style={{ textDecoration: "none", display: "block" }}
       >
         <Box
+          colorPalette="blue"
           position="relative"
           borderRadius="lg"
           padding={3}
-          color="white"
           overflow="hidden"
-          backgroundImage="linear-gradient(135deg, #0f766e 0%, #06b6d4 55%, #6366f1 100%)"
-          boxShadow="0 1px 2px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.12)"
-          transition="transform 0.12s ease, box-shadow 0.12s ease"
+          bg="colorPalette.subtle"
+          borderWidth="1px"
+          borderColor="colorPalette.muted"
+          transition="transform 0.12s ease, border-color 0.12s ease, background 0.12s ease"
           _hover={{
             transform: "translateY(-1px)",
-            boxShadow:
-              "0 2px 4px rgba(0,0,0,0.10), 0 8px 18px rgba(0,0,0,0.18)",
+            borderColor: "colorPalette.emphasized",
+            bg: "colorPalette.muted",
           }}
         >
           <HStack align="start" gap={2.5}>
@@ -116,8 +119,7 @@ export function VoiceAgentsCallout() {
               justifyContent="center"
               boxSize="26px"
               borderRadius="full"
-              bg="white/25"
-              boxShadow="inset 0 0 0 1px rgba(255,255,255,0.35)"
+              bg="colorPalette.solid"
             >
               <Icon as={LuMic} boxSize={3.5} color="white" />
             </Box>
@@ -125,23 +127,19 @@ export function VoiceAgentsCallout() {
               <Text
                 fontSize="xs"
                 fontWeight="700"
-                color="white"
+                color="colorPalette.fg"
                 lineHeight={1.25}
                 letterSpacing="-0.005em"
               >
                 Try voice agent simulations
               </Text>
-              <Text
-                fontSize="xs"
-                color="white/85"
-                lineHeight={1.4}
-              >
+              <Text fontSize="xs" color="fg.muted" lineHeight={1.4}>
                 Test your voice agent end-to-end with realtime voices.
               </Text>
               <HStack
                 gap={1}
                 marginTop={0.5}
-                color="white"
+                color="colorPalette.fg"
                 fontSize="xs"
                 fontWeight="600"
               >
@@ -154,15 +152,15 @@ export function VoiceAgentsCallout() {
             aria-label="Dismiss"
             size="xs"
             variant="ghost"
-            color="white/80"
+            color="fg.muted"
             position="absolute"
             top={1}
             right={1}
             minWidth="20px"
             height="20px"
             padding={0}
-            _hover={{ bg: "white/20", color: "white" }}
-            _active={{ bg: "white/30" }}
+            _hover={{ bg: "colorPalette.emphasized", color: "colorPalette.fg" }}
+            _active={{ bg: "colorPalette.emphasized" }}
             onClick={handleDismiss}
           >
             <LuX size={12} />

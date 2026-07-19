@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import type { ScenarioResponse } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
@@ -41,7 +41,7 @@ export const getScenarioCommand = async (id: string, options?: { format?: string
   checkApiKey();
 
   const service = new ScenariosApiService();
-  const spinner = ora(`Fetching scenario "${id}"...`).start();
+  const spinner = createSpinner(`Fetching scenario "${id}"...`).start();
 
   try {
     const scenario = await service.get(id);
@@ -52,7 +52,7 @@ export const getScenarioCommand = async (id: string, options?: { format?: string
     }
     formatScenarioDetails(scenario);
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch scenario" });
+    failSpinner({ spinner, error, action: "fetch scenario", format: options?.format });
     process.exit(1);
   }
 };

@@ -6,26 +6,47 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/contexts"
+	"github.com/langwatch/langwatch/pkg/otelsetup"
 	aigateway "github.com/langwatch/langwatch/services/aigateway/cmd"
-	langyagent "github.com/langwatch/langwatch/services/langy-agent/cmd"
+	langyagent "github.com/langwatch/langwatch/services/langyagent/cmd"
 	nlpgo "github.com/langwatch/langwatch/services/nlpgo/cmd"
 )
 
 // Version is set via ldflags at build time.
 var Version = "dev"
 
+// serviceTelemetryName is the canonical service.name a mono-binary subcommand
+// reports on every signal — the OTel resource (traces/logs/metrics via
+// otelsetup) and the per-line `service` field (pkg/clog) both read it from
+// ServiceInfo.Service. Uniform "langwatch-service-<cmd>" so the Go data-plane
+// services read consistently in Grafana:
+//
+//	langwatch-service-aigateway · langwatch-service-langyagent · langwatch-service-nlpgo
+//
+// alongside the app (langwatch-app) and the sandboxed Langy worker
+// (langwatch-service-langyworker, set in langyagent/adapters/opencode). An
+// explicit OTEL_SERVICE_NAME wins, matching the app's own precedence
+// (instrumentation.node.ts) and the official OTel convention.
+func serviceTelemetryName(cmd string) string {
+	if name := os.Getenv("OTEL_SERVICE_NAME"); name != "" {
+		return name
+	}
+	return "langwatch-service-" + cmd
+}
+
 // ServiceBoot is the entrypoint signature each service must implement.
 type ServiceBoot func(ctx context.Context, args []string) error
 
 var services = map[string]ServiceBoot{
-	"aigateway":   aigateway.Root,
-	"langy-agent": langyagent.Root,
-	"nlpgo":       nlpgo.Root,
+	"aigateway":  aigateway.Root,
+	"langyagent": langyagent.Root,
+	"nlpgo":      nlpgo.Root,
 }
 
 func main() {
@@ -41,11 +62,27 @@ func main() {
 	os.Exit(run(os.Args))
 }
 
-func run(args []string) int {
+func run(args []string) (code int) {
 	ctx := context.Background()
 	logger := clog.New(ctx, clog.Config{Level: "info"})
 	ctx = clog.Set(ctx, logger)
-	defer clog.HandlePanic(ctx, false)
+	// A panic on the main goroutine must exit non-zero: recover here (so the
+	// process logs a clean panic instead of a raw runtime crash) and set the
+	// named return to 1 so os.Exit reflects the failure to the orchestrator.
+	defer func() {
+		if r := recover(); r != nil {
+			clog.LogPanic(ctx, r)
+			// Ship buffered telemetry before the process exits — a fatal panic
+			// otherwise loses the BatchSpanProcessor's queued spans/metrics.
+			// Bounded so a stuck collector can't hang the exit. SIGKILL / OOM
+			// remain uncatchable; this covers the fatal panic the process DID
+			// observe.
+			flushCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			otelsetup.ForceFlushGlobal(flushCtx)
+			cancel()
+			code = 1
+		}
+	}()
 
 	args = args[1:]
 	if len(args) == 0 {
@@ -71,11 +108,17 @@ func run(args []string) int {
 		return 1
 	}
 
+	// clog.New stamps service/version/environment from the context's ServiceInfo,
+	// so the canonical name has to be on the context *before* the logger is built.
+	// The bootstrap logger above carries only the pre-dispatch failures (bad usage,
+	// unknown service), where there is no service name to stamp yet.
 	ctx = contexts.SetServiceInfo(ctx, contexts.ServiceInfo{
-		Service:     cmd,
+		Service:     serviceTelemetryName(cmd),
 		Version:     Version,
 		Environment: os.Getenv("ENVIRONMENT"),
 	})
+	logger = clog.New(ctx, clog.Config{Level: "info"})
+	ctx = clog.Set(ctx, logger)
 
 	if err := fn(ctx, args); err != nil {
 		logger.Error("service exited with error", zap.String("service", cmd), zap.Error(err))

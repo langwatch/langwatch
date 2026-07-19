@@ -11,6 +11,7 @@
  */
 
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import type { Project } from "@prisma/client";
 import { CostReferenceType, CostType, ExperimentType } from "@prisma/client";
 import type { JsonArray } from "@prisma/client/runtime/library";
@@ -23,6 +24,8 @@ import { type ZodError, ZodError as ZodErrorClass, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { fromZodError } from "zod-validation-error";
 import { evaluatorTempNameMap } from "~/components/checks/EvaluatorSelection";
+import { LEGACY_PAIRWISE_EVALUATOR_TYPE } from "~/experiments-v3/types";
+import { resolveDispatchEvaluatorType } from "~/experiments-v3/utils/normalizeComparison";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { getInputsOutputs } from "~/optimization_studio/utils/nodeUtils";
 import { getWorkflowEntryOutputs } from "~/optimization_studio/utils/workflowFields";
@@ -37,7 +40,7 @@ import {
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
-import { DomainError } from "~/server/app-layer/domain-error";
+import { HandledError } from "@langwatch/handled-error";
 import { EvaluatorMissingFieldError } from "~/server/app-layer/evaluations/errors";
 import { prisma } from "~/server/db";
 import {
@@ -74,12 +77,15 @@ import {
 } from "~/server/experiments/types";
 import { mapEsTargetsToTargets } from "~/server/experiments-v3/services/mappers";
 import { getPayloadSizeHistogram } from "~/server/metrics";
+import {
+  getResolvedDefaultForFeature,
+  type ReadCtx,
+} from "~/server/modelProviders/modelDefaults.read";
 import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
 import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
 import { rAGChunkSchema } from "~/server/tracer/types";
 import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
 
@@ -259,13 +265,13 @@ secured
           });
           const validationError = fromZodError(error);
           return c.json({ error: validationError.message }, 400);
-        } else if (DomainError.is(error)) {
+        } else if (HandledError.isHandled(error)) {
           logger.warn(
-            { kind: error.kind, meta: error.meta, projectId: project.id },
-            "domain error processing batch evaluation",
+            { code: error.code, meta: error.meta, projectId: project.id },
+            "handled error processing batch evaluation",
           );
           return c.json(
-            { error: error.kind, message: error.message },
+            { error: error.code, message: error.message },
             error.httpStatus as 400,
           );
         } else {
@@ -616,6 +622,83 @@ export const getEvaluatorDataForParams = (
   };
 };
 
+/**
+ * Translates a legacy 2-slot pairwise payload (`candidate_a_id` /
+ * `candidate_a_output` / ... `candidate_b_*`) into the N-way `candidates`
+ * shape `langevals/select_best_compare` expects. The payload half of
+ * `resolveDispatchEvaluatorType`'s redirect — the two travel together, at
+ * the same call site, so they cannot disagree the way orchestrator.ts and
+ * the old dispatch logic once did (#5528).
+ *
+ * A slot with no `candidate_*_id` is dropped rather than sent as an empty
+ * candidate — an incomplete legacy config should surface as "missing
+ * candidate output" the same way a native comparison with a missing variant
+ * does, not as a judge call over a blank second candidate.
+ */
+export const translateLegacyPairwisePayload = (
+  data: Record<string, unknown>,
+): Record<string, unknown> => {
+  const {
+    candidate_a_id,
+    candidate_a_output,
+    candidate_a_cost,
+    candidate_a_duration,
+    candidate_b_id,
+    candidate_b_output,
+    candidate_b_cost,
+    candidate_b_duration,
+    ...rest
+  } = data;
+
+  const candidates = [
+    candidate_a_id !== undefined
+      ? {
+          id: candidate_a_id,
+          output: candidate_a_output,
+          cost: candidate_a_cost,
+          duration: candidate_a_duration,
+        }
+      : undefined,
+    candidate_b_id !== undefined
+      ? {
+          id: candidate_b_id,
+          output: candidate_b_output,
+          cost: candidate_b_cost,
+          duration: candidate_b_duration,
+        }
+      : undefined,
+  ].filter((candidate) => candidate !== undefined);
+
+  return { ...rest, candidates };
+};
+
+/**
+ * Removes a legacy pairwise `prompt` setting that select_best_compare cannot
+ * render. The pairwise judge's template uses `{candidate_a_output}` /
+ * `{candidate_b_output}` slots; the N-way judge only substitutes
+ * `{candidates}` (plus `{input}` / `{golden}`). A saved prompt with no
+ * `{candidates}` placeholder — including pairwise's own untouched default —
+ * would reach the new judge with its instructions half-literal, so it's
+ * dropped, letting the caller fall back to select_best_compare's default.
+ *
+ * A prompt that DOES contain `{candidates}` is kept: a user who already
+ * migrated their wording to the new placeholder should keep it.
+ * `droppedPrompt` is returned (rather than logged in here) so the caller owns
+ * the log context, and pure-function tests stay dependency-free.
+ */
+export const stripIncompatiblePairwisePrompt = (
+  settings: Record<string, unknown>,
+): { settings: Record<string, unknown>; droppedPrompt: boolean } => {
+  if (
+    typeof settings.prompt === "string" &&
+    !settings.prompt.includes("{candidates}")
+  ) {
+    const { prompt: _incompatible, ...rest } = settings;
+    return { settings: rest, droppedPrompt: true };
+  }
+  return { settings, droppedPrompt: false };
+};
+
 export const getEvaluatorIncludingCustom = async (
   projectId: string,
   checkType: EvaluatorTypes,
@@ -655,6 +738,44 @@ export const getEvaluatorIncludingCustom = async (
   };
 
   return availableEvaluators[checkType];
+};
+
+/**
+ * Resolves the project's cascade-configured DEFAULT and EMBEDDINGS models
+ * into the `{ defaultModel, embeddingsModel }` shape that
+ * `getEvaluatorDefaultSettings` consumes for its `model` / `embeddings_model`
+ * fields.
+ *
+ * Without this, the legacy REST route fell through to the hardcoded global
+ * `DEFAULT_MODEL` (`getLatestOpenAIChatFlagship()`), bypassing the project's
+ * model cascade entirely for every API-triggered evaluation (issue #5468).
+ *
+ * The feature keys match the server-side evaluator-create path in
+ * `app/api/evaluators/.../app.v1.ts` (`evaluator.create_default` for the LLM
+ * model, `analytics.topic_clustering_embeddings` for the embeddings model).
+ * When the cascade has nothing configured at any scope, the resolver returns
+ * `null` and `getEvaluatorDefaultSettings` keeps the global fallback — no
+ * regression for projects without a custom default.
+ */
+export const resolveEvaluatorSettingsDefaults = async (
+  projectId: string,
+): Promise<{ defaultModel: string | null; embeddingsModel: string | null }> => {
+  const ctx: ReadCtx = { prisma, session: null };
+  const [resolvedDefault, resolvedEmbeddings] = await Promise.all([
+    getResolvedDefaultForFeature(ctx, {
+      projectId,
+      featureKey: "evaluator.create_default",
+    }),
+    getResolvedDefaultForFeature(ctx, {
+      projectId,
+      featureKey: "analytics.topic_clustering_embeddings",
+    }),
+  ]);
+
+  return {
+    defaultModel: resolvedDefault?.model ?? null,
+    embeddingsModel: resolvedEmbeddings?.model ?? null,
+  };
 };
 
 // --- Evaluator call handler (used by evaluations + guardrails routes) ---
@@ -773,6 +894,17 @@ async function handleEvaluatorCall(
       })
     : null;
 
+  // Every legacy `langevals/pairwise_compare` dispatch — from a saved
+  // evaluator, a monitor, or a bare slug — is transparently rerouted to
+  // select_best_compare here. This is the ONE place that makes that call
+  // (see resolveDispatchEvaluatorType's JSDoc), so a caller upstream (the
+  // Experiments Workbench orchestrator, a monitor's scheduled run) never
+  // needs to know the redirect happened; it keeps sending the 2-slot wire
+  // shape it always has, and isLegacyPairwiseDispatch below decides whether
+  // that shape needs translating before it reaches the new judge.
+  const isLegacyPairwiseDispatch = checkType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
+  checkType = resolveDispatchEvaluatorType(checkType) ?? checkType;
+
   const evaluatorDefinition =
     workflowEvaluatorDef ??
     (await getEvaluatorIncludingCustom(
@@ -830,13 +962,42 @@ async function handleEvaluatorCall(
   let settings: any = ((evaluatorSettings ?? monitor?.parameters) as any) ?? {};
 
   try {
-    settings = evaluatorSettingSchema?.parse({
+    // NB: `select_best_compare`'s settings schema is non-strict, so a legacy
+    // `swap_and_confirm` key with no equivalent field is silently dropped by
+    // the parse below rather than translated — `randomize_order` then falls
+    // back to its own default (`true`). Both fields default `true`, so this
+    // only differs for a legacy row that explicitly set
+    // `swap_and_confirm: false`; that row's candidate-ordering behavior
+    // flips silently on reroute. Narrow enough (and low-impact enough) to
+    // document rather than special-case.
+    const mergedSettings = {
       ...(!workflowEvaluatorDef
-        ? getEvaluatorDefaultSettings(evaluatorDefinition as any)
+        ? getEvaluatorDefaultSettings(
+            evaluatorDefinition as any,
+            await resolveEvaluatorSettingsDefaults(project.id),
+          )
         : {}),
-      ...(evaluatorSettings ?? (monitor ? (monitor.parameters as object) : {})),
+      ...(settings as Record<string, unknown>),
       ...(params.settings ? params.settings : {}),
-    });
+    };
+
+    // Drop a legacy pairwise `prompt` that can't render on the new judge (see
+    // stripIncompatiblePairwisePrompt), so select_best_compare's own default
+    // wins instead of forwarding unrendered pairwise placeholders. Stripped
+    // AFTER the full merge — including `params.settings` — so a prompt
+    // arriving via the request body can't bypass the strip the way stripping
+    // only the pre-merge DB/monitor settings would.
+    const { settings: finalSettings, droppedPrompt } = isLegacyPairwiseDispatch
+      ? stripIncompatiblePairwisePrompt(mergedSettings)
+      : { settings: mergedSettings, droppedPrompt: false };
+    if (droppedPrompt) {
+      logger.warn(
+        { projectId: project.id, checkType: LEGACY_PAIRWISE_EVALUATOR_TYPE },
+        "legacy pairwise_compare dispatch had a customized prompt with no {candidates} placeholder — dropping it in favor of select_best_compare's default rather than forwarding unrendered pairwise placeholders",
+      );
+    }
+
+    settings = evaluatorSettingSchema?.parse(finalSettings);
   } catch (error) {
     const message =
       error instanceof ZodErrorClass
@@ -869,7 +1030,9 @@ async function handleEvaluatorCall(
   try {
     data = getEvaluatorDataForParams(
       checkType,
-      params.data as Record<string, any>,
+      (isLegacyPairwiseDispatch
+        ? translateLegacyPairwisePayload(params.data as Record<string, any>)
+        : params.data) as Record<string, any>,
     );
   } catch (error) {
     const message =
@@ -899,14 +1062,14 @@ async function handleEvaluatorCall(
       data.data[requiredField] === undefined ||
       data.data[requiredField] === null
     ) {
-      const domainError = new EvaluatorMissingFieldError(
+      const handledError = new EvaluatorMissingFieldError(
         requiredField,
         evaluatorDefinition.name,
       );
       logger.warn(
         {
-          kind: domainError.kind,
-          meta: domainError.meta,
+          code: handledError.code,
+          meta: handledError.meta,
           projectId: project.id,
         },
         "missing required field for evaluator",
@@ -917,12 +1080,14 @@ async function handleEvaluatorCall(
           // this endpoint's existing wire shape for external API consumers.
           // `kind`/`meta` are additive so the workbench client can build a
           // friendly message (e.g. map candidate_a_id -> "Variant A")
-          // without depending on the message being a specific string.
-          error: domainError.message,
-          kind: domainError.kind,
-          meta: domainError.meta,
+          // without depending on the message being a specific string. The
+          // wire field is named `kind` for back-compat; it carries the
+          // HandledError `code`.
+          error: handledError.message,
+          kind: handledError.code,
+          meta: handledError.meta,
         },
-        domainError.httpStatus as 400,
+        handledError.httpStatus as 400,
       );
     }
   }

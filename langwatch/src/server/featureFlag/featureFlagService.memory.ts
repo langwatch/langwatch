@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger/server";
 import type {
   FeatureFlagEvaluateOptions,
   FeatureFlagServiceInterface,

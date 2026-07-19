@@ -14,6 +14,13 @@ data:
   LOG_LEVEL: {{ .Values.logging.level | quote }}
   LW_GATEWAY_BASE_URL: {{ .Values.controlPlane.baseUrl | quote }}
   {{- if .Values.otel.endpoint }}
+  # Official OpenTelemetry name, plus the deprecated LangWatch-only name so
+  # older gateway images keep reading their endpoint during upgrades. The
+  # service accepts both being set as long as the values are equal.
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.otel.endpoint | quote }}
   OTEL_OTLP_ENDPOINT: {{ .Values.otel.endpoint | quote }}
   {{- end }}
   SERVER_MAX_REQUEST_BODY_BYTES: {{ printf "%d" (int64 .Values.security.maxRequestBodyBytes) | quote }}
+  BLOCK_LOCAL_HTTP_CALLS: {{ .Values.security.blockLocalHTTPCalls | quote }}
+  REQUIRE_HTTPS_CUSTOM_ENDPOINTS: {{ .Values.security.requireHTTPSCustomEndpoints | quote }}
+  ALLOWED_PROXY_HOSTS: {{ join "," .Values.security.allowedProxyHosts | quote }}

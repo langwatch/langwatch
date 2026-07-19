@@ -6,7 +6,7 @@
 # **Use `make quickstart` — not direct compose.** ADR-004 (2026-05, #3860)
 # established `make quickstart` as the single entry point for local dev. It
 # sets VOLUME_PREFIX via scripts/dev.sh so per-worktree volumes (goose_bin,
-# app_modules, bullboard_modules, mcp_server_modules, see the volumes block)
+# app_modules, mcp_server_modules, see the volumes block)
 # get isolated names; running
 # `docker compose -f compose.dev.yml up` directly collapses every worktree
 # onto the same volumes.
@@ -25,7 +25,6 @@
 #
 # Per-worktree ports (create .env.dev in your worktree):
 #   APP_PORT=5560
-#   BULLBOARD_PORT=6380
 #   AI_SERVER_PORT=3456
 #
 # Debug logging (set in shell or .env.dev):
@@ -45,8 +44,8 @@ x-common-env: &common-env
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
   NODE_ENV: development
   SKIP_TIKTOKEN: 'true'
-  # Prod-like dev: IS_SAAS=true (from langwatch/.env) requires SSRF blocking.
-  BLOCK_LOCAL_HTTP_CALLS: "true"
+  # Customer-egress policy is sourced from langwatch/.env. Do not override it
+  # here: local/self-hosted setups may intentionally use private HTTP endpoints.
   # NOTE: infrastructure URLs (DATABASE_URL, REDIS_URL, CLICKHOUSE_URL,
   # LANGWATCH_NLP_SERVICE, LANGEVALS_ENDPOINT) are NOT set here. The
   # contributor's `langwatch/.env` is the source of truth — `quickstart`
@@ -343,32 +342,6 @@ services:
           cpus: "0.5"
 
   # =============================================================================
-  # DEBUG TOOLS (profile: debug)
-  # =============================================================================
-
-  bullboard:
-    image: node:24
-    working_dir: /app
-    profiles: [debug, scenarios, full]
-    volumes:
-      - ./bullboard:/app
-      - bullboard_modules:/app/node_modules
-    command: sh -c "corepack enable && pnpm -w install && pnpm start"
-    ports:
-      - "${BULLBOARD_PORT:-6380}:6380"
-    environment:
-      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
-      REDIS_URL: redis://redis:6379
-    depends_on:
-      redis:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          memory: 512m
-          cpus: "0.5"
-
-  # =============================================================================
   # TEST TOOLS (profile: test)
   # =============================================================================
 
@@ -431,8 +404,6 @@ volumes:
     name: ${VOLUME_PREFIX:-langwatch}-goose-bin
   app_modules:
     name: ${VOLUME_PREFIX:-langwatch}-app-modules
-  bullboard_modules:
-    name: ${VOLUME_PREFIX:-langwatch}-bullboard-modules
   # mcp-server is a standalone pnpm workspace whose install + build run in the
   # `init` container against the `./mcp-server` bind mount. Without isolation
   # the container install writes container-shaped pnpm symlinks into the host

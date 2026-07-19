@@ -6,9 +6,11 @@ import "dotenv/config";
 // (LANGWATCH_API_KEY, OTEL_EXPORTER_OTLP_ENDPOINT). Kept as the first import
 // so its side effects run before the worker modules below evaluate.
 import "./instrumentation.node";
+// Registers the Grafana trace-link builder with @langwatch/handled-error.
+import "./server/handled-error-wiring";
 import { setEnvironment } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
-import { createLogger } from "./utils/logger/server";
 
 setEnvironment(process.env.ENVIRONMENT ?? "local");
 

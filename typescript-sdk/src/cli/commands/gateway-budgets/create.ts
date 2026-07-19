@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import {
   type BudgetOnBreach,
   type BudgetWindow,
@@ -75,7 +75,7 @@ export const createGatewayBudgetCommand = async (
     : undefined;
 
   const service = new GatewayBudgetsApiService();
-  const spinner = ora(`Creating budget "${options.name}"...`).start();
+  const spinner = createSpinner(`Creating budget "${options.name}"...`).start();
 
   try {
     const budget = await service.create({
@@ -104,7 +104,7 @@ export const createGatewayBudgetCommand = async (
     console.log(`${chalk.bold("Resets:")}   ${new Date(budget.resets_at).toLocaleString()}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "create gateway budget" });
+    failSpinner({ spinner, error, action: "create gateway budget", format: options?.format });
     process.exit(1);
   }
 };

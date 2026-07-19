@@ -1,4 +1,4 @@
-import { DomainError } from "~/server/app-layer/domain-error";
+import { HandledError } from "@langwatch/handled-error";
 
 /**
  * Thrown when neither a top-level `prompt` nor a system message in
@@ -8,7 +8,7 @@ import { DomainError } from "~/server/app-layer/domain-error";
  * HTTP 400 Bad Request — the message is user-facing and surfaced verbatim
  * via the toast in the UI.
  */
-export class SystemPromptRequiredError extends DomainError {
+export class SystemPromptRequiredError extends HandledError {
   constructor(message?: string) {
     super("system_prompt_required", message ?? "System prompt is required.", {
       httpStatus: 400,

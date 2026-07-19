@@ -102,6 +102,10 @@ func (o *Orchestrator) postgresDrop(ctx context.Context, p UpParams, all bool) e
 			return err
 		}
 		for _, db := range dbs {
+			if domain.IsProtectedDatabase(db) {
+				fmt.Printf("kept %q (protected — the standing main database)\n", db)
+				continue
+			}
 			if err := o.pg.DropDatabase(ctx, db); err != nil {
 				return err
 			}

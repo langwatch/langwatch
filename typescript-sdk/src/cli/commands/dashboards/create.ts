@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -8,7 +8,7 @@ export const createDashboardCommand = async (name: string, options?: { format?: 
   checkApiKey();
 
   const service = new DashboardsApiService();
-  const spinner = ora(`Creating dashboard "${name}"...`).start();
+  const spinner = createSpinner(`Creating dashboard "${name}"...`).start();
 
   try {
     const dashboard = await service.create({ name });
@@ -23,7 +23,7 @@ export const createDashboardCommand = async (name: string, options?: { format?: 
       console.log(`  ${chalk.bold("View:")}  ${chalk.underline(dashboard.platformUrl)}`);
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "create dashboard" });
+    failSpinner({ spinner, error, action: "create dashboard", format: options?.format });
     process.exit(1);
   }
 };

@@ -34,7 +34,7 @@ import type { CodingAgentSessionData } from "./services/coding-agent-session.typ
  * three, because the agent splits the story across them. See the derivation for
  * why each is load-bearing.
  *
- * Writes `coding_agent_sessions` (migration 00042). A trace that is not a coding
+ * Writes `coding_agent_sessions` (migration 00049). A trace that is not a coding
  * agent never produces a row: the store drops the record when the fold saw no
  * model calls and no tool runs, so an ordinary LLM trace costs one name
  * comparison per span and nothing else.
@@ -205,7 +205,7 @@ export class CodingAgentSessionFoldProjection
 }
 
 /**
- * The row that lands in `coding_agent_sessions` (migration 00042). Field names
+ * The row that lands in `coding_agent_sessions` (migration 00049). Field names
  * mirror the ClickHouse columns 1:1 so the repository's record literal is a
  * straight mapping.
  */

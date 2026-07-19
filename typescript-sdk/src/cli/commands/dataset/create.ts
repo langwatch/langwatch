@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import type { DatasetColumnType } from "@/client-sdk/services/datasets/types";
 import { checkApiKey } from "../../utils/apiKey";
 import { createDatasetService } from "./service-factory";
@@ -46,7 +46,7 @@ export const createCommand = async (
   }
 
   const service = createDatasetService();
-  const spinner = ora(`Creating dataset "${name}"...`).start();
+  const spinner = createSpinner(`Creating dataset "${name}"...`).start();
 
   try {
     const dataset = await service.createDataset({ name, columnTypes });

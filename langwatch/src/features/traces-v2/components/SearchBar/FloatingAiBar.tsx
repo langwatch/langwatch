@@ -59,7 +59,7 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
           minHeight: "38px",
           borderTopLeftRadius: "var(--chakra-radii-lg)",
           boxShadow:
-            "0 4px 12px rgba(168,85,247,0.12), 0 2px 6px rgba(0,0,0,0.06)",
+            "0 4px 12px rgba(237,137,38,0.12), 0 2px 6px rgba(0,0,0,0.06)",
         }}
         initial={{ opacity: 0, filter: "blur(10px)" }}
         animate={{ opacity: 1, filter: "blur(0px)" }}

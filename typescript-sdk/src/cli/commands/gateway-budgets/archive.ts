@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { GatewayBudgetsApiService } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -11,7 +11,7 @@ export const archiveGatewayBudgetCommand = async (
   checkApiKey();
 
   const service = new GatewayBudgetsApiService();
-  const spinner = ora(`Archiving budget "${id}"...`).start();
+  const spinner = createSpinner(`Archiving budget "${id}"...`).start();
 
   try {
     const budget = await service.archive(id);
@@ -27,7 +27,7 @@ export const archiveGatewayBudgetCommand = async (
     console.log(chalk.gray("Archived at: ") + (budget.archived_at ? new Date(budget.archived_at).toLocaleString() : chalk.gray("—")));
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "archive gateway budget" });
+    failSpinner({ spinner, error, action: "archive gateway budget", format: options?.format });
     process.exit(1);
   }
 };

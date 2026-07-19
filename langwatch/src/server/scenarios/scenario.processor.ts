@@ -12,9 +12,10 @@
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 
+import { createLogger } from "@langwatch/observability";
 import { type ChildProcess, spawn } from "child_process";
 import path from "path";
-import { createLogger } from "~/utils/logger/server";
+import { env } from "~/env.mjs";
 import { getSharedClickHouseClient } from "../clickhouse/clickhouseClient";
 import {
   createContextFromJobData,
@@ -37,6 +38,7 @@ import {
   SCENARIO_LOG_CONTEXT_ENV,
 } from "./execution/child-logger";
 import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
+import { resolveChildTlsEnv } from "./execution/child-tls-env";
 import {
   createDataPrefetcherDependencies,
   prefetchScenarioData,
@@ -275,6 +277,57 @@ export function buildChildProcessEnv(
   ) as NodeJS.ProcessEnv;
 }
 
+/** The runner's structured stdout result line. */
+export interface ChildProcessResult {
+  success: boolean;
+  error?: string;
+  reasoning?: string;
+}
+
+/** Parse a single stdout line as the runner's result, or null if it isn't one. */
+function parseResultLine(line: string): ChildProcessResult | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const record = parsed as Record<string, unknown>;
+  if (typeof record.success !== "boolean") return null;
+  return {
+    success: record.success,
+    ...(typeof record.error === "string" ? { error: record.error } : {}),
+    ...(typeof record.reasoning === "string"
+      ? { reasoning: record.reasoning }
+      : {}),
+  };
+}
+
+/**
+ * Extract the runner's structured result from its stdout.
+ *
+ * The runner emits its logs (pino JSON) AND its final result line
+ * (`{"success":false,"error":"…"}`) on stdout; the result line is the only one
+ * carrying a boolean `success`. Scanning from the end returns it without
+ * mistaking a log line for the result. This lets the parent surface the child's
+ * real error (e.g. the flattened TLS cause) instead of the near-empty stderr.
+ *
+ * @internal Exported for testing
+ */
+export function parseChildProcessResult(
+  stdout: string,
+): ChildProcessResult | null {
+  const lines = stdout.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const result = parseResultLine(lines[i] ?? "");
+    if (result) return result;
+  }
+  return null;
+}
+
 /**
  * Execute a scenario run by spawning an isolated child process.
  *
@@ -415,12 +468,22 @@ async function spawnScenarioChildProcess(
       scenarioId,
       setId,
     });
+    // TLS for the runner's own fetch stack (EventReporter → platform, and the
+    // model API call). Forwards haven's trusted local CA when present; only in
+    // local non-SaaS dev does it fall back to relaxing TLS. Never in SaaS/prod.
+    // See resolveChildTlsEnv for the gating.
+    const tlsEnv = resolveChildTlsEnv({
+      isSaaS: !!env.IS_SAAS,
+      nodeEnv: process.env.NODE_ENV,
+      nodeExtraCaCerts: process.env.NODE_EXTRA_CA_CERTS,
+    });
     const childEnv = buildChildProcessEnv({
       LANGWATCH_API_KEY: telemetry.apiKey,
       LANGWATCH_ENDPOINT: telemetry.endpoint,
       SCENARIO_HEADLESS: "true",
       OTEL_RESOURCE_ATTRIBUTES: otelResourceAttrs,
       [SCENARIO_LOG_CONTEXT_ENV]: logContext,
+      ...tlsEnv,
     });
 
     const packageRoot = path.resolve(__dirname, "../../..");
@@ -444,6 +507,7 @@ async function spawnScenarioChildProcess(
     pool.registerChild(jobData.scenarioRunId, child);
 
     let stderr = "";
+    let stdout = "";
     let resolved = false;
 
     const cleanup = () => {
@@ -465,7 +529,9 @@ async function spawnScenarioChildProcess(
     }, CHILD_PROCESS.TIMEOUT_MS);
 
     child.stdout?.on("data", (data: Buffer) => {
-      const lines = data.toString().trim().split("\n");
+      const chunk = data.toString();
+      stdout += chunk;
+      const lines = chunk.trim().split("\n");
       for (const line of lines) {
         if (line) log("info", line);
       }
@@ -497,13 +563,21 @@ async function spawnScenarioChildProcess(
       }
 
       if (code !== 0) {
+        // Prefer the runner's own structured error (its flattened cause chain,
+        // e.g. the TLS reason) over the near-empty stderr — the failure handler
+        // classifies this string into a handled error for the drawer.
+        const childResult = parseChildProcessResult(stdout);
+        const error =
+          childResult?.error && childResult.error.trim().length > 0
+            ? childResult.error
+            : `Child process exited with code ${code}: ${stderr}`;
         log("error", `Child process exited with code ${code}`, {
           exitCode: code,
           stderr,
         });
         resolve({
           success: false,
-          error: `Child process exited with code ${code}: ${stderr}`,
+          error,
         });
         return;
       }

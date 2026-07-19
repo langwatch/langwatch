@@ -1,7 +1,5 @@
 import type { EvaluationAnalyticsRepository } from "~/server/app-layer/evaluations/repositories/evaluation-analytics.repository";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+import { BaseAnalyticsFoldStore } from "../../shared/analyticsStoreBase";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsData,
@@ -25,78 +23,19 @@ import {
  * `trimAttributesForAnalytics` inside the projection function so
  * payload-shaped keys never reach the wire.
  */
-export class EvaluationAnalyticsStore
-  implements FoldProjectionStore<EvaluationAnalyticsData>
-{
-  constructor(private readonly repo: EvaluationAnalyticsRepository) {}
-
-  async store(
-    state: EvaluationAnalyticsData,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
-    if (!hasPersistableSignal(state)) return;
-    const stateWithId: EvaluationAnalyticsData = state.evaluationId
-      ? state
-      : { ...state, evaluationId: String(context.aggregateId) };
-    const retentionDays =
-      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
-    const row = projectEvaluationAnalyticsStateToRow({
-      state: stateWithId,
-      tenantId: String(context.tenantId),
-      version: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
+export class EvaluationAnalyticsStore extends BaseAnalyticsFoldStore<
+  EvaluationAnalyticsData,
+  ReturnType<typeof projectEvaluationAnalyticsStateToRow>
+> {
+  constructor(repo: EvaluationAnalyticsRepository) {
+    super(repo, {
+      hasPersistableSignal,
+      stampAggregateId: (state, aggregateId) =>
+        state.evaluationId ? state : { ...state, evaluationId: aggregateId },
+      retentionCategory: "traces",
+      versionLatest: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
+      project: projectEvaluationAnalyticsStateToRow,
     });
-    await this.repo.upsert(row, retentionDays);
-  }
-
-  async storeBatch(
-    entries: Array<{
-      state: EvaluationAnalyticsData;
-      context: ProjectionStoreContext;
-    }>,
-  ): Promise<void> {
-    const batchRows = entries
-      .filter(({ state }) => hasPersistableSignal(state))
-      .map(({ state, context }) => {
-        const stateWithId: EvaluationAnalyticsData = state.evaluationId
-          ? state
-          : { ...state, evaluationId: String(context.aggregateId) };
-        return {
-          row: projectEvaluationAnalyticsStateToRow({
-            state: stateWithId,
-            tenantId: String(context.tenantId),
-            version: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
-          }),
-          retentionDays:
-            context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
-        };
-      });
-
-    if (batchRows.length === 0) return;
-
-    if (this.repo.upsertBatch) {
-      await this.repo.upsertBatch(batchRows);
-    } else {
-      await Promise.all(
-        batchRows.map(({ row, retentionDays }) =>
-          this.repo.upsert(row, retentionDays),
-        ),
-      );
-    }
-  }
-
-  /**
-   * No read-back, by design: the eval slim row is lossy, so fold state
-   * cannot be reconstructed from it. Returning null here means fold-state
-   * continuity comes from the two layers above this store — the
-   * RedisCachedFoldStore wrapped around it at registration (warm path) and
-   * the fold's `refoldOnStoreMiss` option (event-log rebuild on a miss).
-   * Same contract as the trace slim store.
-   */
-  async get(
-    _aggregateId: string,
-    _context: ProjectionStoreContext,
-  ): Promise<EvaluationAnalyticsData | null> {
-    return null;
   }
 }
 

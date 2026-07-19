@@ -13,6 +13,10 @@ import type {
   FieldMapping as StoreFieldMapping,
 } from "../types";
 import { convertFromUIMapping } from "./fieldMappingConverters";
+import {
+  toTargetOutputFields,
+  type PromptOutputField,
+} from "./targetOutputFields";
 
 /**
  * Parameters required to create prompt editor callbacks.
@@ -29,7 +33,14 @@ export type CreatePromptEditorCallbacksParams = {
       promptVersionNumber?: number;
       localPromptConfig?: LocalPromptConfig;
       inputs?: Array<{ identifier: string; type: Field["type"] }>;
-      outputs?: Array<{ identifier: string; type: Field["type"] }>;
+      // json_schema must survive here: the comparison config derives its
+      // selectable output fields (e.g. "answer", "next_step") from a variant's
+      // json_schema output. Dropping it collapses the field picker to nothing.
+      outputs?: Array<{
+        identifier: string;
+        type: Field["type"];
+        json_schema?: Field["json_schema"];
+      }>;
     },
   ) => void;
   setTargetMapping: (
@@ -58,7 +69,7 @@ export type SavedPromptData = {
   versionId?: string;
   version?: number;
   inputs?: Array<{ identifier: string; type: string }>;
-  outputs?: Array<{ identifier: string; type: string }>;
+  outputs?: PromptOutputField[];
 };
 
 /**
@@ -68,7 +79,7 @@ export type LoadedVersionData = {
   version: number;
   versionId: string;
   inputs?: Array<{ identifier: string; type: string }>;
-  outputs?: Array<{ identifier: string; type: string }>;
+  outputs?: PromptOutputField[];
 };
 
 /**
@@ -130,10 +141,7 @@ export const createPromptEditorCallbacks = ({
         identifier: i.identifier,
         type: i.type as Field["type"],
       })),
-      outputs: savedPrompt.outputs?.map((o) => ({
-        identifier: o.identifier,
-        type: o.type as Field["type"],
-      })),
+      outputs: toTargetOutputFields(savedPrompt.outputs),
     });
   },
 
@@ -148,10 +156,7 @@ export const createPromptEditorCallbacks = ({
         identifier: i.identifier,
         type: i.type as Field["type"],
       })),
-      outputs: loadedPrompt.outputs?.map((o) => ({
-        identifier: o.identifier,
-        type: o.type as Field["type"],
-      })),
+      outputs: toTargetOutputFields(loadedPrompt.outputs),
     });
   },
 

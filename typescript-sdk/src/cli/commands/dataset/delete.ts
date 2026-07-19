@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
@@ -11,7 +11,7 @@ export const deleteCommand = async (slugOrId: string, options?: { format?: strin
   checkApiKey();
 
   const service = createDatasetService();
-  const spinner = ora(`Deleting dataset "${slugOrId}"...`).start();
+  const spinner = createSpinner(`Deleting dataset "${slugOrId}"...`).start();
 
   try {
     const dataset = await service.deleteDataset(slugOrId);

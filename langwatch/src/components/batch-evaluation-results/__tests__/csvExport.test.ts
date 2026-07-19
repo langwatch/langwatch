@@ -19,7 +19,7 @@ const createMinimalData = (
   targetColumns: [],
   evaluatorIds: [],
   evaluatorNames: {},
-  pairwiseColumns: [],
+  comparisonColumns: [],
   rows: [],
   ...overrides,
 });

@@ -57,6 +57,62 @@ func TestStripFlag(t *testing.T) {
 	})
 }
 
+func TestFlagValue(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"space-separated value", []string{"--preset", "demo"}, "demo"},
+		{"equals-embedded value", []string{"--preset=demo"}, "demo"},
+		{"absent flag", []string{"--force"}, ""},
+		{"no args", nil, ""},
+		// A trailing --preset has no following value to return; the seed command
+		// rejects this shape via seedPresetArg rather than silently defaulting.
+		{"trailing flag without value", []string{"--preset"}, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := flagValue(tc.args, "--preset"); got != tc.want {
+				t.Errorf("flagValue(%q, --preset) = %q, want %q", tc.args, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSeedPresetArg(t *testing.T) {
+	t.Run("when --preset carries a value", func(t *testing.T) {
+		for _, args := range [][]string{{"--preset", "demo"}, {"--preset=demo"}} {
+			preset, err := seedPresetArg(args)
+			if err != nil {
+				t.Fatalf("seedPresetArg(%q) = %v, want nil error", args, err)
+			}
+			if preset != "demo" {
+				t.Errorf("seedPresetArg(%q) = %q, want %q", args, preset, "demo")
+			}
+		}
+	})
+	t.Run("when no preset is given, it returns the default empty preset", func(t *testing.T) {
+		preset, err := seedPresetArg(nil)
+		if err != nil {
+			t.Fatalf("seedPresetArg(nil) = %v, want nil error", err)
+		}
+		if preset != "" {
+			t.Errorf("seedPresetArg(nil) = %q, want empty", preset)
+		}
+	})
+	t.Run("when --preset trails without a value, it errors instead of seeding the default", func(t *testing.T) {
+		if _, err := seedPresetArg([]string{"--preset"}); err == nil {
+			t.Error("seedPresetArg accepted a trailing --preset with no value")
+		}
+	})
+	t.Run("when the preset is passed positionally, it errors instead of ignoring it", func(t *testing.T) {
+		if _, err := seedPresetArg([]string{"demo"}); err == nil {
+			t.Error("seedPresetArg accepted a positional preset it would have ignored")
+		}
+	})
+}
+
 func TestHasFlag(t *testing.T) {
 	if !hasFlag([]string{"4913", "--trusted"}, "--trusted") {
 		t.Error("hasFlag missed a present flag")
@@ -127,4 +183,58 @@ func gitInitTemp(t *testing.T) string {
 	run("init")
 	run("commit", "--allow-empty", "-m", "init")
 	return dir
+}
+
+// @scenario "The managed ClickHouse keeps its own telemetry lightweight"
+func TestClickHouseLimitsEnvWiring(t *testing.T) {
+	t.Run("given no ClickHouse log env vars", func(t *testing.T) {
+		t.Setenv("HAVEN_CLICKHOUSE_FULL_LOGS", "")
+		t.Setenv("HAVEN_CLICKHOUSE_LOG_TTL_DAYS", "")
+
+		t.Run("when resolving the limits", func(t *testing.T) {
+			l := clickHouseLimits()
+
+			t.Run("keeps lightweight logs on by default", func(t *testing.T) {
+				if !l.LightweightLogsEnabled {
+					t.Error("lightweight logs off without any env opt-out")
+				}
+			})
+		})
+	})
+
+	t.Run("given HAVEN_CLICKHOUSE_FULL_LOGS=1", func(t *testing.T) {
+		t.Setenv("HAVEN_CLICKHOUSE_FULL_LOGS", "1")
+
+		t.Run("when resolving the limits", func(t *testing.T) {
+			t.Run("restores full stock logging", func(t *testing.T) {
+				if clickHouseLimits().LightweightLogsEnabled {
+					t.Error("FULL_LOGS=1 did not disable lightweight logs")
+				}
+			})
+		})
+	})
+
+	t.Run("given HAVEN_CLICKHOUSE_FULL_LOGS=0", func(t *testing.T) {
+		t.Setenv("HAVEN_CLICKHOUSE_FULL_LOGS", "0")
+
+		t.Run("when resolving the limits", func(t *testing.T) {
+			t.Run("keeps lightweight logs on — only a truthy value opts out", func(t *testing.T) {
+				if !clickHouseLimits().LightweightLogsEnabled {
+					t.Error("FULL_LOGS=0 disabled lightweight logs; the flag is documented as =1")
+				}
+			})
+		})
+	})
+
+	t.Run("given HAVEN_CLICKHOUSE_LOG_TTL_DAYS=3", func(t *testing.T) {
+		t.Setenv("HAVEN_CLICKHOUSE_LOG_TTL_DAYS", "3")
+
+		t.Run("when resolving the limits", func(t *testing.T) {
+			t.Run("carries the override into the TTL", func(t *testing.T) {
+				if got := clickHouseLimits().SystemLogTTLDays; got != 3 {
+					t.Errorf("got TTL %d, want 3", got)
+				}
+			})
+		})
+	})
 }

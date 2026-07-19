@@ -9,8 +9,16 @@ import {
   observeEsFoldProjectionDuration,
   incrementEsMapProjectionTotal,
   observeEsMapProjectionDuration,
+  incrementEsProjectionTotal,
+  observeEsProjectionDuration,
   incrementEsReactorTotal,
   observeEsReactorDuration,
+  incrementEsSubscriberTotal,
+  observeEsSubscriberDuration,
+  incrementEsProcessManagerTotal,
+  observeEsProcessManagerDuration,
+  incrementEsProcessOutboxTotal,
+  observeEsProcessOutboxDuration,
   incrementEsFoldCacheTotal,
   observeEsFoldCacheGetDuration,
   observeEsFoldCacheStoreDuration,
@@ -58,6 +66,19 @@ describe("ES pipeline metrics", () => {
         "es_map_projection_duration_milliseconds",
       );
       expect(metric).toBeDefined();
+    });
+
+    it.each([
+      "es_projection_total",
+      "es_projection_duration_milliseconds",
+      "es_subscriber_total",
+      "es_subscriber_duration_milliseconds",
+      "es_process_manager_total",
+      "es_process_manager_duration_milliseconds",
+      "es_process_outbox_total",
+      "es_process_outbox_duration_milliseconds",
+    ])("registers %s", (metricName) => {
+      expect(register.getSingleMetric(metricName)).toBeDefined();
     });
 
     it("registers es_reactor_total counter", () => {
@@ -115,9 +136,7 @@ describe("ES pipeline metrics", () => {
     });
 
     it("does not register event_sourcing_checkpoint_lag", () => {
-      const metric = register.getSingleMetric(
-        "event_sourcing_checkpoint_lag",
-      );
+      const metric = register.getSingleMetric("event_sourcing_checkpoint_lag");
       expect(metric).toBeUndefined();
     });
   });
@@ -147,11 +166,11 @@ describe("ES pipeline metrics", () => {
 
   describe("when fold projection metrics are recorded", () => {
     it("increments fold projection total with correct labels", async () => {
-      incrementEsFoldProjectionTotal(
-        "test-pipeline",
-        "traceSummary",
-        "completed",
-      );
+      incrementEsFoldProjectionTotal({
+        pipelineName: "test-pipeline",
+        projectionName: "traceSummary",
+        status: "completed",
+      });
 
       const lines = await register.getSingleMetricAsString(
         "es_fold_projection_total",
@@ -162,7 +181,11 @@ describe("ES pipeline metrics", () => {
     });
 
     it("records fold projection duration with correct labels", async () => {
-      observeEsFoldProjectionDuration("test-pipeline", "traceSummary", 12.3);
+      observeEsFoldProjectionDuration({
+        pipelineName: "test-pipeline",
+        projectionName: "traceSummary",
+        durationMs: 12.3,
+      });
 
       const lines = await register.getSingleMetricAsString(
         "es_fold_projection_duration_milliseconds",
@@ -174,11 +197,11 @@ describe("ES pipeline metrics", () => {
 
   describe("when map projection metrics are recorded", () => {
     it("increments map projection total with correct labels", async () => {
-      incrementEsMapProjectionTotal(
-        "test-pipeline",
-        "evaluationSync",
-        "completed",
-      );
+      incrementEsMapProjectionTotal({
+        pipelineName: "test-pipeline",
+        projectionName: "evaluationSync",
+        status: "completed",
+      });
 
       const lines = await register.getSingleMetricAsString(
         "es_map_projection_total",
@@ -189,13 +212,148 @@ describe("ES pipeline metrics", () => {
     });
 
     it("records map projection duration with correct labels", async () => {
-      observeEsMapProjectionDuration("test-pipeline", "evaluationSync", 5.7);
+      observeEsMapProjectionDuration({
+        pipelineName: "test-pipeline",
+        projectionName: "evaluationSync",
+        durationMs: 5.7,
+      });
 
       const lines = await register.getSingleMetricAsString(
         "es_map_projection_duration_milliseconds",
       );
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('projection_name="evaluationSync"');
+    });
+  });
+
+  describe("when unified projection metrics are recorded", () => {
+    it("records fold, map, and state projections with bounded kind labels", async () => {
+      incrementEsFoldProjectionTotal({
+        pipelineName: "trace",
+        projectionName: "summary",
+        status: "completed",
+      });
+      incrementEsMapProjectionTotal({
+        pipelineName: "trace",
+        projectionName: "storage",
+        status: "failed",
+      });
+      incrementEsProjectionTotal({
+        pipelineName: "langy",
+        projectionKind: "state",
+        projectionName: "conversation",
+        status: "completed",
+      });
+      observeEsProjectionDuration({
+        pipelineName: "langy",
+        projectionKind: "state",
+        projectionName: "conversation",
+        durationMs: 7.5,
+      });
+
+      const totals = await register.getSingleMetricAsString(
+        "es_projection_total",
+      );
+      expect(totals).toContain('projection_kind="fold"');
+      expect(totals).toContain('projection_kind="map"');
+      expect(totals).toContain('projection_kind="state"');
+      expect(totals).toContain('projection_name="conversation"');
+
+      const durations = await register.getSingleMetricAsString(
+        "es_projection_duration_milliseconds",
+      );
+      expect(durations).toContain('pipeline_name="langy"');
+      expect(durations).toContain('projection_kind="state"');
+    });
+  });
+
+  describe("when subscriber and process-manager metrics are recorded", () => {
+    it("records subscriber outcomes and duration", async () => {
+      incrementEsSubscriberTotal({
+        pipelineName: "trace",
+        subscriberName: "audit",
+        status: "failed",
+      });
+      observeEsSubscriberDuration({
+        pipelineName: "trace",
+        subscriberName: "audit",
+        durationMs: 3.2,
+      });
+
+      const totals = await register.getSingleMetricAsString(
+        "es_subscriber_total",
+      );
+      expect(totals).toContain('subscriber_name="audit"');
+      expect(totals).toContain('status="failed"');
+
+      const durations = await register.getSingleMetricAsString(
+        "es_subscriber_duration_milliseconds",
+      );
+      expect(durations).toContain('pipeline_name="trace"');
+      expect(durations).toContain('subscriber_name="audit"');
+    });
+
+    it("records every process-manager outcome and outbox disposition", async () => {
+      const outcomes = [
+        "committed",
+        "duplicate_event",
+        "stale_wake",
+        "revision_conflict",
+        "failed",
+      ] as const;
+      for (const outcome of outcomes) {
+        incrementEsProcessManagerTotal({
+          processName: "langy-conversation",
+          inputKind: outcome === "stale_wake" ? "wake" : "event",
+          outcome,
+        });
+      }
+      observeEsProcessManagerDuration({
+        processName: "langy-conversation",
+        inputKind: "wake",
+        durationMs: 8,
+      });
+      const outboxStatuses = ["dispatched", "retried", "dead"] as const;
+      for (const status of outboxStatuses) {
+        incrementEsProcessOutboxTotal({
+          processName: "langy-conversation",
+          intentType: "worker-dispatch",
+          status,
+        });
+      }
+      observeEsProcessOutboxDuration({
+        processName: "langy-conversation",
+        intentType: "worker-dispatch",
+        durationMs: 12,
+      });
+
+      const processTotals = await register.getSingleMetricAsString(
+        "es_process_manager_total",
+      );
+      expect(processTotals).toContain('input_kind="event"');
+      for (const outcome of outcomes) {
+        expect(processTotals).toContain(`outcome="${outcome}"`);
+      }
+
+      const processDurations = await register.getSingleMetricAsString(
+        "es_process_manager_duration_milliseconds",
+      );
+      expect(processDurations).toContain('process_name="langy-conversation"');
+      expect(processDurations).toContain('input_kind="wake"');
+
+      const outboxTotals = await register.getSingleMetricAsString(
+        "es_process_outbox_total",
+      );
+      expect(outboxTotals).toContain('intent_type="worker-dispatch"');
+      for (const status of outboxStatuses) {
+        expect(outboxTotals).toContain(`status="${status}"`);
+      }
+
+      const outboxDurations = await register.getSingleMetricAsString(
+        "es_process_outbox_duration_milliseconds",
+      );
+      expect(outboxDurations).toContain('process_name="langy-conversation"');
+      expect(outboxDurations).toContain('intent_type="worker-dispatch"');
     });
   });
 

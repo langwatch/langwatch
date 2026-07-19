@@ -15,10 +15,11 @@
  * its flag state. The fix silently drops non-member ids and returns
  * `{ enabled: false }` when the filtered set is empty.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+
 import type { PrismaClient } from "@prisma/client";
-import { featureFlagRouter } from "../featureFlag";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
+import { featureFlagRouter } from "../featureFlag";
 
 const { mockIsEnabled } = vi.hoisted(() => ({
   mockIsEnabled: vi.fn<(...args: unknown[]) => Promise<boolean>>(),
@@ -28,7 +29,7 @@ vi.mock("../../../featureFlag", () => ({
   featureFlagService: { isEnabled: mockIsEnabled },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

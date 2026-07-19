@@ -5,8 +5,8 @@
  * @see specs/scenarios/pre-compiled-child-process.feature
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import path from "path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveChildProcessSpawn } from "../child-process-spawn";
 
 // vi.hoisted runs before vi.mock hoisting, so mockLogger is available in the factory
@@ -28,7 +28,7 @@ vi.mock("fs", () => ({
 }));
 
 // Mock the logger so we can assert on log calls
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: vi.fn(() => mockLogger),
 }));
 

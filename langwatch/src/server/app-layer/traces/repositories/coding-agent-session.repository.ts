@@ -1,7 +1,7 @@
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/codingAgentSession.foldProjection";
 
 /**
- * Persistence for the coding-agent session rollup (ADR-041, migration 00042).
+ * Persistence for the coding-agent session rollup (ADR-041, migration 00049).
  *
  * One row per session. Idempotent by construction: the table is a
  * ReplacingMergeTree(UpdatedAt) and every read dedups to the latest UpdatedAt

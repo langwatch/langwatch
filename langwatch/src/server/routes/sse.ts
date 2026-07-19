@@ -1,8 +1,7 @@
 /**
  * Hono route for SSE (Server-Sent Events) tRPC subscriptions.
  *
- * Replaces the Next.js Pages Router handler at
- * src/pages/api/sse/[...trpc].ts with a pure Hono app.
+ * Pure Hono app serving tRPC subscription procedures over SSE.
  *
  * The handler:
  * 1. Takes a tRPC procedure path from the URL (e.g. /api/sse/traces.onTraceUpdate)
@@ -16,6 +15,7 @@
 
 import superjson from "superjson";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+
 // Lazy-load appRouter — same reason as trpc.ts (circular dependency avoidance)
 let _appRouter: Awaited<typeof import("~/server/api/root")>["appRouter"] | null = null;
 async function getAppRouter() {
@@ -25,11 +25,63 @@ async function getAppRouter() {
   }
   return _appRouter;
 }
+
+import { createLogger } from "@langwatch/observability";
+import { TRPCError } from "@trpc/server";
 import { createInnerTRPCContext } from "~/server/api/trpc";
+import { HandledError } from "@langwatch/handled-error";
 import { getServerAuthSession } from "~/server/auth";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:sse");
+
+/**
+ * The SSE error frame. HTTP 200 is already on the wire when a stream fails, so
+ * the handled shape has to ride inside the frame: a HandledError (directly, or
+ * as a TRPCError cause) carries its full serialized domain error; a client-safe
+ * TRPCError keeps its message; anything else degrades to the generic unknown
+ * message — the raw detail stays server-side in the log (ADR-045).
+ */
+export function sseErrorFrame(err: unknown): Record<string, unknown> {
+  const handled = handledCauseOf(err);
+  if (handled) {
+    return {
+      type: "error",
+      message: handled.message,
+      domainError: handled.serialize(),
+    };
+  }
+  if (err instanceof TRPCError && err.code !== "INTERNAL_SERVER_ERROR") {
+    return { type: "error", message: err.message };
+  }
+  return { type: "error", message: "An unknown error occurred" };
+}
+
+/** The HandledError behind a stream failure, if there is one. */
+function handledCauseOf(err: unknown): HandledError | undefined {
+  const candidate = err instanceof TRPCError ? err.cause : err;
+  // isHandled also matches an instance from a second copy of the package,
+  // which bare `instanceof` misses — see its brand check.
+  return HandledError.isHandled(candidate) ? candidate : undefined;
+}
+
+/**
+ * Stream-failure logging, same fault-axis rule as the tRPC and Hono request
+ * loggers: customer-fault handled errors warn (spike-watched), platform /
+ * provider and unhandled errors log at error.
+ */
+function logSseError(err: unknown, logData: Record<string, unknown>, msg: string) {
+  const handled = handledCauseOf(err);
+  const level = handled && handled.fault === "customer" ? "warn" : "error";
+  logger[level](
+    {
+      ...logData,
+      ...(handled
+        ? { handledErrorCode: handled.code, handledErrorFault: handled.fault }
+        : {}),
+    },
+    msg,
+  );
+}
 
 const secured = createServiceApp({ basePath: "/api" });
 
@@ -194,12 +246,8 @@ secured.access(
                 end();
               },
               error: (err: unknown) => {
-                logger.error({ err, path }, "SSE observable error");
-                writeData({
-                  type: "error",
-                  message:
-                    err instanceof Error ? err.message : "Subscription error",
-                });
+                logSseError(err, { err, path }, "SSE observable error");
+                writeData(sseErrorFrame(err));
                 end();
               },
             });
@@ -216,12 +264,10 @@ secured.access(
           writeData({ type: "complete" });
           end();
         } catch (error) {
-          logger.error({ error, path, input }, "SSE handler error");
-          writeData({
-            type: "error",
-            message:
-              error instanceof Error ? error.message : "Internal server error",
-          });
+          // No `input` here: it is the raw request payload, which may carry
+          // PII — same contract as the observable error path above.
+          logSseError(error, { error, path }, "SSE handler error");
+          writeData(sseErrorFrame(error));
           end();
         }
       })();

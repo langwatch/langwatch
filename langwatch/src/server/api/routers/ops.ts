@@ -119,6 +119,14 @@ export const opsRouter = createTRPCRouter({
     return ops.queues.getQueues();
   }),
 
+  listScheduledJobs: protectedProcedure
+    .use(opsViewPermission)
+    .input(z.object({ limit: z.number().int().min(1).max(500).default(200) }))
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      return ops.scheduler.listScheduledJobs({ limit: input.limit });
+    }),
+
   listGroups: protectedProcedure
     .use(opsViewPermission)
     .input(

@@ -224,40 +224,49 @@ describe("useOpenTargetEditor", () => {
       );
     });
 
-    it("opens workflow in new tab for workflow agent target", async () => {
-      // Arrange: Mock window.open and the agent API
-      const mockWindowOpen = vi.spyOn(window, "open").mockImplementation(() => null);
-
+    it("opens agentWorkflowTargetEditor drawer for a workflow agent target", async () => {
+      // A workflow-type agent has no code of its own to edit inline — the
+      // drawer shows the linked workflow as a card (with a link to open the
+      // real graph editor) plus the same input-mapping UI every other agent
+      // target type gets. This must NOT fall back to window.open: a full
+      // graph editor doesn't belong in a sidebar, but the mapping UI does.
       mockAgentFetch.mockResolvedValue({
         id: "agent-3",
         name: "Workflow Agent",
         type: "workflow",
-        config: {
-          workflowId: "workflow-123",
-        },
+        workflowId: "workflow-123",
+        config: {},
       });
 
       const target = createAgentTarget("target-3", "agent-3");
 
       const { result } = renderHook(() => useOpenTargetEditor());
 
-      // Act: Open the target editor
       await act(async () => {
         await result.current.openTargetEditor(target);
       });
 
-      // Assert: Window.open was called with workflow URL
       await waitFor(() => {
-        expect(mockWindowOpen).toHaveBeenCalledWith(
-          "/test-project/studio/workflow-123",
-          "_blank",
+        expect(mockOpenDrawer).toHaveBeenCalledWith(
+          "agentWorkflowTargetEditor",
+          expect.objectContaining({
+            urlParams: expect.objectContaining({
+              targetId: "target-3",
+              agentId: "agent-3",
+            }),
+          }),
         );
       });
 
-      // Ensure no drawer was opened
-      expect(mockOpenDrawer).not.toHaveBeenCalled();
-
-      mockWindowOpen.mockRestore();
+      // Ensure no other agent drawer was opened for this target
+      expect(mockOpenDrawer).not.toHaveBeenCalledWith(
+        "agentHttpEditor",
+        expect.anything(),
+      );
+      expect(mockOpenDrawer).not.toHaveBeenCalledWith(
+        "agentCodeEditor",
+        expect.anything(),
+      );
     });
 
     it("does not open any drawer when agent has no dbAgentId", async () => {
@@ -281,6 +290,46 @@ describe("useOpenTargetEditor", () => {
       // Assert: No drawer opened, no API called
       expect(mockAgentFetch).not.toHaveBeenCalled();
       expect(mockOpenDrawer).not.toHaveBeenCalled();
+    });
+  });
+
+  // Re-editing an existing comparison column-target must qualify its Golden
+  // and Input field chips with the real dataset name ("Test Dataset.input"),
+  // not a generic fallback — the same info the add-flow already gets right.
+  describe("comparison target editing", () => {
+    it("passes the active dataset's name into comparisonContext", async () => {
+      const comparisonTarget: TargetConfig = {
+        id: "comparison-target-1",
+        type: "evaluator",
+        targetEvaluatorId: "eval-1",
+        inputs: [],
+        outputs: [],
+        mappings: {},
+        comparison: {
+          variants: ["target-a", "target-b"],
+          hasGoldenAnswer: true,
+          goldenField: "input",
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+      };
+
+      const { result } = renderHook(() => useOpenTargetEditor());
+
+      await act(async () => {
+        await result.current.openTargetEditor(comparisonTarget);
+      });
+
+      await waitFor(() => {
+        expect(mockOpenDrawer).toHaveBeenCalledWith(
+          "evaluatorEditor",
+          expect.objectContaining({
+            comparisonContext: expect.objectContaining({
+              datasetName: "Test Dataset",
+            }),
+          }),
+        );
+      });
     });
   });
 });

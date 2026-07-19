@@ -1,34 +1,35 @@
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import { createLogger } from "@langwatch/observability";
 import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { generateText } from "ai";
 import { createPatch } from "diff";
 import { nanoid } from "nanoid";
-import type { Session } from "~/server/auth";
 import { z } from "zod";
+import { fireWorkflowCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
+import type { Session } from "~/server/auth";
+import { captureException } from "~/utils/posthogErrorCapture";
 import {
   type Workflow,
   workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
-import { mergeLocalConfigsIntoDsl } from "../../../optimization_studio/utils/mergeLocalConfigs";
 import { migrateDSLVersion } from "../../../optimization_studio/types/migrate";
 import {
   clearDsl,
   recursiveAlphabeticallySortedKeys,
 } from "../../../optimization_studio/utils/dslUtils";
+import { mergeLocalConfigsIntoDsl } from "../../../optimization_studio/utils/mergeLocalConfigs";
 import type { Unpacked } from "../../../utils/types";
 import { DatasetService } from "../../datasets/dataset.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
+import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
+import { materializeNodeLlmConfigs } from "../../workflows/materializeNodeLlmConfigs";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { fireWorkflowCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
-import { captureException } from "~/utils/posthogErrorCapture";
-import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
-import { createLogger } from "../../../utils/logger/server";
 
 const autoComputeLogger = createLogger("langwatch:workflows:auto-compute");
 
@@ -1318,6 +1319,11 @@ export const saveOrCommitWorkflowVersion = async ({
     nodes: mergeLocalConfigsIntoDsl(input.dsl.nodes as any) as any,
     state: {},
   };
+  await materializeNodeLlmConfigs({
+    prisma: ctx.prisma,
+    projectId: input.projectId,
+    dsl: dslWithMergedConfigs,
+  });
   const dslWithoutStates = JSON.parse(JSON.stringify(dslWithMergedConfigs));
   const data = {
     commitMessage,

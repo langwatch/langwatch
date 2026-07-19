@@ -1,4 +1,5 @@
 import { on } from "node:events";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
@@ -15,7 +16,6 @@ import type { Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
-import { createLogger } from "~/utils/logger/server";
 import { evaluatorsSchema } from "../../evaluations/evaluators.generated";
 import {
   buildPreconditionTraceDataFromTrace,

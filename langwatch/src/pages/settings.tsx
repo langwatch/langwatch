@@ -104,8 +104,8 @@ function SettingsForm({
   const { hasPermission } = useOrganizationTeamProject();
   const { isLiteMember } = useLiteMemberGuard();
   const { openDrawer } = useDrawer();
-  // ADR-038 ships dark: the Primary use setting only exists where the
-  // governance surface it routes to is reachable.
+  // ADR-038: the Primary use setting only exists where the governance
+  // surface it routes to is reachable (flag on, which is the default).
   const { enabled: governanceEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     { organizationId: organization.id },
@@ -377,7 +377,7 @@ function SettingsForm({
                   render={({ field }) => (
                     <Switch
                       checked={field.value}
-                      onChange={(e) => field.onChange(e.target.checked)}
+                      onCheckedChange={({ checked }) => field.onChange(checked)}
                       disabled={!hasPermission("organization:manage")}
                     />
                   )}
@@ -744,7 +744,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   checked={
                     field.value && (organization?.presenceEnabled ?? true)
                   }
-                  onChange={(e) => field.onChange(e.target.checked)}
+                  onCheckedChange={({ checked }) => field.onChange(checked)}
                   disabled={
                     !userIsAdmin || !(organization?.presenceEnabled ?? true)
                   }
@@ -771,7 +771,9 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               render={({ field }) => (
                 <Switch
                   checked={field.value}
-                  onChange={(e) => handleTraceSharingChange(e.target.checked)}
+                  onCheckedChange={({ checked }) =>
+                    handleTraceSharingChange(checked)
+                  }
                   disabled={!userIsAdmin}
                 />
               )}

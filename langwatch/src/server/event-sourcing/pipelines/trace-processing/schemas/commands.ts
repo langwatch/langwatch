@@ -86,7 +86,11 @@ export type RecordMetricCommandData = z.infer<
 
 export const resolveOriginCommandDataSchema = z.object({
   tenantId: z.string(),
-  traceId: z.string(),
+  // Must be non-empty: an empty traceId becomes an empty aggregateId on the
+  // resulting OriginResolvedEvent, which then fails validation downstream in
+  // the automations pipeline (recordTriggerMatch requires a non-empty traceId).
+  // Reject here so the bad value never reaches the event store.
+  traceId: z.string().min(1),
   origin: z.string(),
   reason: z.string(),
   occurredAt: z.number(),
@@ -102,7 +106,7 @@ export type ResolveOriginCommandData = z.infer<
  * rejects pure-whitespace and over-long names without an extra transform
  * step that defineCommand's `z.ZodObject<z.ZodRawShape>` constraint
  * doesn't accept. Anything that fails this Zod check should bubble up
- * as a `ValidationError` (DomainError) rather than reaching the command
+ * as a `ValidationError` (HandledError) rather than reaching the command
  * pipeline.
  */
 export const changeTraceNameInputSchema = z.object({

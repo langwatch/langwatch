@@ -30,12 +30,14 @@ interface CreateNextContextOptions {
   res: any;
 }
 
+import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
+import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import type { OrganizationUserRole } from "@prisma/client";
 import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
 import superjson from "superjson";
 import { ZodError } from "zod";
-import { DomainError } from "~/server/app-layer/domain-error";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -43,10 +45,8 @@ import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { ModelProviderDisabledError } from "~/server/modelProviders/modelProviderDisabledError";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
-import { createLogger } from "../../utils/logger/server";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
 import { auditLog } from "../auditLog";
-import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
@@ -132,7 +132,7 @@ export function errorFormatterForTesting({
   error,
 }: {
   shape: any;
-  error: { cause?: unknown; message?: string };
+  error: { cause?: unknown; message?: string; code?: string };
 }) {
   const cause = error.cause as
     | { limitType?: string; current?: number; max?: number }
@@ -146,7 +146,7 @@ export function errorFormatterForTesting({
     : null;
 
   const domainError =
-    error.cause instanceof DomainError ? error.cause.serialize() : null;
+    HandledError.isHandled(error.cause) ? error.cause.serialize() : null;
 
   // Surface ModelNotConfiguredError on the wire so the frontend
   // interceptor in `utils/trpcError.ts::extractMissingModelInfo` can
@@ -188,10 +188,31 @@ export function errorFormatterForTesting({
       ? error.cause.toResponseBody()
       : null;
 
+  // A 5xx is an implementation failure, not user-facing copy. tRPC defaults
+  // the response message to the thrown Error's message, which can contain
+  // Prisma models, SQL, hostnames, or other platform internals. HandledError is
+  // the only exception: its message is explicitly authored as safe domain
+  // copy. The original error remains on the TRPCError for loggerMiddleware,
+  // exception capture, and OTel span recording.
+  const isInternalServerError =
+    error.code === "INTERNAL_SERVER_ERROR" ||
+    shape?.data?.code === "INTERNAL_SERVER_ERROR";
+  const message =
+    isInternalServerError && !HandledError.isHandled(error.cause)
+      ? HandledError.toUserMessage(error.cause)
+      : shape.message;
+  const shapeData = { ...shape.data };
+  if (isInternalServerError && !HandledError.isHandled(error.cause)) {
+    // tRPC includes stacks in development error shapes. Local callers should
+    // exercise the same safe wire contract as production callers.
+    delete shapeData.stack;
+  }
+
   return {
     ...shape,
+    message,
     data: {
-      ...shape.data,
+      ...shapeData,
       zodError: error.cause instanceof ZodError ? error.cause.flatten() : null,
       cause:
         missingModelCause ??
@@ -395,11 +416,7 @@ function isAuditLogExempt(path: string): boolean {
 
 const auditLogMutations = t.middleware(
   async ({ ctx, next, type, path, input }) => {
-    if (
-      type !== "mutation" ||
-      !ctx.session?.user ||
-      isAuditLogExempt(path)
-    ) {
+    if (type !== "mutation" || !ctx.session?.user || isAuditLogExempt(path)) {
       return next();
     }
 
@@ -481,7 +498,7 @@ export const tracerMiddleware = t.middleware(async ({ path, type, next }) => {
   );
 });
 
-function domainErrorToTRPCCode(error: DomainError): TRPCError["code"] {
+function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
   const map: Partial<Record<number, TRPCError["code"]>> = {
     400: "BAD_REQUEST",
     401: "UNAUTHORIZED",
@@ -495,16 +512,16 @@ function domainErrorToTRPCCode(error: DomainError): TRPCError["code"] {
 }
 
 /**
- * Converts DomainErrors thrown in procedures to properly-coded TRPCErrors.
- * Without this, DomainErrors fall through as INTERNAL_SERVER_ERROR.
+ * Converts HandledErrors thrown in procedures to properly-coded TRPCErrors.
+ * Without this, HandledErrors fall through as INTERNAL_SERVER_ERROR.
  * Placed inner to loggerMiddleware so the logger sees the correct code.
  */
-const domainErrorMiddleware = t.middleware(async ({ next }) => {
+const handledErrorMiddleware = t.middleware(async ({ next }) => {
   const result = await next();
-  if (!result.ok && result.error.cause instanceof DomainError) {
+  if (!result.ok && HandledError.isHandled(result.error.cause)) {
     const domainError = result.error.cause;
     throw new TRPCError({
-      code: domainErrorToTRPCCode(domainError),
+      code: handledErrorToTRPCCode(domainError),
       message: domainError.message,
       cause: domainError,
     });
@@ -587,20 +604,34 @@ export function handleTrpcCallLogging({
         : 500;
     logData.statusCode = resolvedStatus;
 
-    // Include domain error kind in log data for structured filtering
-    if (
-      result.error instanceof TRPCError &&
-      result.error.cause instanceof DomainError
-    ) {
-      logData.domainErrorKind = result.error.cause.kind;
+    const cause =
+      result.error instanceof TRPCError ? result.error.cause : undefined;
+    // isHandled also matches an instance from a second copy of the package,
+    // which bare `instanceof` misses — see its brand check.
+    const handledCause = HandledError.isHandled(cause) ? cause : undefined;
+
+    // Include handled error code + fault in log data for structured
+    // filtering (and spike alerting on handledErrorCode).
+    if (handledCause) {
+      logData.handledErrorCode = handledCause.code;
+      logData.handledErrorFault = handledCause.fault;
     }
 
-    // Only capture 5xx errors (actual bugs)
-    if (resolvedStatus >= 500) {
+    // Only unhandled 5xx errors are captured as exceptions: handled errors
+    // are expected failure modes with typed causes, not bugs.
+    if (resolvedStatus >= 500 && !handledCause) {
       capture(toError(result.error));
     }
 
-    const logLevel = getLogLevelFromStatusCode(resolvedStatus);
+    // Handled errors log by fault attribution, not status: customer-fault
+    // errors are expected (warn — watched for spikes), while platform and
+    // provider failures are incidents worth an error line. Unhandled errors
+    // stay status-based.
+    const logLevel = handledCause
+      ? handledCause.fault === "customer"
+        ? "warn"
+        : "error"
+      : getLogLevelFromStatusCode(resolvedStatus);
     log[logLevel](logData, "trpc call");
   } else {
     log.info(logData, "trpc call");
@@ -729,7 +760,7 @@ const permissionProcedureBuilder = <TParams extends ProcedureParams>(
       return procedure
         .use(tracerMiddleware as any)
         .use(loggerMiddleware as any)
-        .use(domainErrorMiddleware as any)
+        .use(handledErrorMiddleware as any)
         .use(middleware as any)
         .use(enforcePermissionCheck as any)
         .use(auditLogMutations as any) as any;

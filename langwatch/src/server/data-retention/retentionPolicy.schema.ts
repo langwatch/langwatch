@@ -184,6 +184,9 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
   // categorised "traces" until eval split-out lands).
   evaluation_analytics: "traces",
   evaluation_analytics_rollup: "traces",
+  // Content-free Langy event analytics derives from the canonical event log
+  // and ages/meters with the same project trace-retention policy.
+  langy_analytics_events: "traces",
   dspy_steps: "traces",
   simulation_runs: "scenarios",
   suite_runs: "scenarios",

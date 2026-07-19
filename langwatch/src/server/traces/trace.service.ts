@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
@@ -16,7 +17,6 @@ import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/eva
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
-import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 import { resolveOffloadedTracesBatch } from "./resolve-offloaded-traces-batch";

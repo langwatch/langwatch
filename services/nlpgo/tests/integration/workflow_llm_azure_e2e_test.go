@@ -5,7 +5,7 @@ package integration_test
 // Azure OpenAI counterpart to the OpenAI / Anthropic / Gemini live e2es.
 // Owner brief flagged Azure as one of the "tricky enterprise" providers
 // the migration must keep working — Azure needs endpoint + api_version
-// + deployment self-mapping (handled by withDeploymentMap in
+// + deployment self-mapping (handled by domain.WithDeploymentSelfMap, shared by
 // dispatcheradapter), plus the dispatcheradapter has to translate
 // litellm_params{api_base → endpoint} so customers' existing workflow
 // configs work bit-for-bit.
@@ -120,7 +120,7 @@ func (a liveAzureExecutorAdapter) Execute(ctx context.Context, req app.WorkflowR
 }
 
 // TestSync_RealWorkflowEndToEnd_Azure exercises the Azure-OpenAI inline-
-// credentials path: api_base + api_key → withDeploymentMap self-deployment
+// credentials path: api_base + api_key → domain.WithDeploymentSelfMap self-deployment
 // → BifrostRouter Azure dispatch. Owner-flagged enterprise provider.
 func TestSync_RealWorkflowEndToEnd_Azure(t *testing.T) {
 	apiKey := os.Getenv("AZURE_OPENAI_API_KEY")

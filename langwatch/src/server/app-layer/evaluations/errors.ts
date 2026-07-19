@@ -1,7 +1,13 @@
-import { DomainError, NotFoundError } from "../domain-error";
+import {
+  HandledError,
+  type HandledErrorOptions,
+  NotFoundError,
+} from "@langwatch/handled-error";
+
+import { remediation } from "../error-remediation";
 
 export class EvaluationNotFoundError extends NotFoundError {
-  declare readonly kind: "evaluation_not_found";
+  declare readonly code: "evaluation_not_found";
 
   constructor(
     evaluationId: string,
@@ -9,14 +15,15 @@ export class EvaluationNotFoundError extends NotFoundError {
   ) {
     super("evaluation_not_found", "Evaluation", evaluationId, {
       meta: { evaluationId },
+      ...remediation("evaluation_not_found"),
       ...options,
     });
     this.name = "EvaluationNotFoundError";
   }
 }
 
-export class TraceNotEvaluatableError extends DomainError {
-  declare readonly kind: "trace_not_evaluatable";
+export class TraceNotEvaluatableError extends HandledError {
+  declare readonly code: "trace_not_evaluatable";
 
   constructor(
     traceId: string,
@@ -25,14 +32,15 @@ export class TraceNotEvaluatableError extends DomainError {
     super("trace_not_evaluatable", `Trace ${traceId} is not evaluatable`, {
       meta: { traceId },
       httpStatus: 422,
+      ...remediation("trace_not_evaluatable"),
       ...options,
     });
     this.name = "TraceNotEvaluatableError";
   }
 }
 
-export class EvaluatorConfigError extends DomainError {
-  declare readonly kind: "evaluator_config_error";
+export class EvaluatorConfigError extends HandledError {
+  declare readonly code: "evaluator_config_error";
 
   constructor(
     message: string,
@@ -40,21 +48,23 @@ export class EvaluatorConfigError extends DomainError {
   ) {
     super("evaluator_config_error", message, {
       httpStatus: 422,
+      ...remediation("evaluator_config_error"),
       ...options,
     });
     this.name = "EvaluatorConfigError";
   }
 }
 
-export class EvaluatorExecutionError extends DomainError {
-  declare readonly kind: "evaluator_execution_error";
+export class EvaluatorExecutionError extends HandledError {
+  declare readonly code: "evaluator_execution_error";
 
-  constructor(
-    message: string,
-    options: { meta?: Record<string, unknown>; reasons?: readonly Error[] } = {},
-  ) {
+  constructor(message: string, options: HandledErrorOptions = {}) {
     super("evaluator_execution_error", message, {
       httpStatus: 502,
+      // The evaluator backend failed to run — an execution failure on our
+      // side, not caller error.
+      fault: "platform",
+      ...remediation("evaluator_execution_error"),
       ...options,
     });
     this.name = "EvaluatorExecutionError";
@@ -68,8 +78,8 @@ export class EvaluatorExecutionError extends DomainError {
  * carries the raw field name so the client can translate it into
  * user-facing language ("Variant A") instead of showing the wire identifier.
  */
-export class EvaluatorMissingFieldError extends DomainError {
-  declare readonly kind: "evaluator_missing_field";
+export class EvaluatorMissingFieldError extends HandledError {
+  declare readonly code: "evaluator_missing_field";
 
   constructor(
     field: string,
@@ -85,6 +95,7 @@ export class EvaluatorMissingFieldError extends DomainError {
         // client Bad Request, not a semantic 422) — existing API consumers
         // of this legacy endpoint keep seeing the same status code.
         httpStatus: 400,
+        ...remediation("evaluator_missing_field"),
         ...options,
       },
     );
@@ -93,7 +104,7 @@ export class EvaluatorMissingFieldError extends DomainError {
 }
 
 export class EvaluatorNotFoundError extends NotFoundError {
-  declare readonly kind: "evaluator_not_found";
+  declare readonly code: "evaluator_not_found";
 
   constructor(
     evaluatorType: string,
@@ -101,6 +112,7 @@ export class EvaluatorNotFoundError extends NotFoundError {
   ) {
     super("evaluator_not_found", "Evaluator", evaluatorType, {
       meta: { evaluatorType },
+      ...remediation("evaluator_not_found"),
       ...options,
     });
     this.name = "EvaluatorNotFoundError";

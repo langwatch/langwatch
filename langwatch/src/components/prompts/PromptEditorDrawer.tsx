@@ -70,7 +70,13 @@ export type PromptEditorDrawerProps = {
     version?: number;
     versionId?: string;
     inputs?: Array<{ identifier: string; type: string }>;
-    outputs?: Array<{ identifier: string; type: string }>;
+    // json_schema flows to the target so structured outputs stay field-selectable
+    // in the comparison config — see promptEditorCallbacks.onSave.
+    outputs?: Array<{
+      identifier: string;
+      type: string;
+      json_schema?: object | null;
+    }>;
   }) => void;
   /** If provided, loads an existing prompt for editing */
   promptId?: string;

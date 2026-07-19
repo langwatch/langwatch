@@ -297,7 +297,10 @@ export class EvaluationAnalyticsFoldProjection
    * event of a scheduled→completed pair arriving after cache expiry would
    * overwrite the row with a state missing the scheduled-time fields.
    */
-  override options: FoldProjectionOptions = { refoldOnStoreMiss: true };
+  override options: FoldProjectionOptions = {
+    eventOrdering: "acceptedAt",
+    refoldOnStoreMiss: true,
+  };
 
   constructor(deps: { store: FoldProjectionStore<EvaluationAnalyticsData> }) {
     super({

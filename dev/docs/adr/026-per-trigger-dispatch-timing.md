@@ -2,27 +2,42 @@
 
 **Date:** 2026-05-28 (debounce added 2026-06-01)
 
-**Status:** Accepted
+**Status:** Accepted, amended by ADR-052
+
+### 2026-07-18 amendment: deterministic process-manager settle windows
+
+ADR-052 replaces the Redis debounce job with durable process-manager state.
+Because event and inbox idempotency keys cannot expire, settlement now uses an
+anchored window identity made from the configured `traceDebounceMs` and
+`floor(occurredAt / max(traceDebounceMs, 1))`. Activity within one anchored
+window collapses to one logical match; activity in a later window records a new
+round and moves the durable wake forward. A zero debounce uses one-millisecond
+windows so exact redelivery still collapses while later eager activity re-arms.
+
+This preserves the legacy ability to re-arm after deduplication expires, but
+replaces the rolling reset-on-every-event behavior described in the historical
+Redis sections below. `TriggerSent(triggerId, traceId)` remains the permanent
+at-most-once side-effect gate.
 
 ## Context
 
 LangWatch triggers have four action types:
 
-| Action | Semantics |
-|---|---|
-| `SEND_EMAIL` | Sends a customer-visible message to one or more recipients |
-| `SEND_SLACK_MESSAGE` | Posts to a customer-configured Slack webhook |
-| `ADD_TO_DATASET` | Writes one or more rows to a LangWatch-managed dataset |
-| `ADD_TO_ANNOTATION_QUEUE` | Inserts items into a LangWatch-managed annotation queue |
+| Action                    | Semantics                                                  |
+| ------------------------- | ---------------------------------------------------------- |
+| `SEND_EMAIL`              | Sends a customer-visible message to one or more recipients |
+| `SEND_SLACK_MESSAGE`      | Posts to a customer-configured Slack webhook               |
+| `ADD_TO_DATASET`          | Writes one or more rows to a LangWatch-managed dataset     |
+| `ADD_TO_ANNOTATION_QUEUE` | Inserts items into a LangWatch-managed annotation queue    |
 
-Today's per-(trigger, trace) dedup via `TriggerSent` prevents the *same* trace from firing the trigger more than once. The dispatch pipeline has two distinct timing problems on top of that:
+Today's per-(trigger, trace) dedup via `TriggerSent` prevents the _same_ trace from firing the trigger more than once. The dispatch pipeline has two distinct timing problems on top of that:
 
 ### Problem 1 — notification storms (cadence)
 
 **N distinct traces matching the same trigger in a short window.** The pain is action-class dependent:
 
 - 1000 distinct matching traces in 5 minutes = **1000 Slack messages** (notification storm; customer churn risk; #monitoring channel becomes unusable).
-- 1000 distinct matching traces in 5 minutes = **1000 dataset rows** — which is often the *intent* (e.g., "capture every production trace where the user thumbs-down for an evaluation set").
+- 1000 distinct matching traces in 5 minutes = **1000 dataset rows** — which is often the _intent_ (e.g., "capture every production trace where the user thumbs-down for an evaluation set").
 
 The two action classes behave differently:
 
@@ -37,20 +52,20 @@ A trace in LangWatch is assembled from many spans that arrive over time — the 
 
 Today the two trigger reactors (`alertTrigger` on the trace pipeline, `evaluationAlertTrigger` on the evaluation pipeline) fire on **every** event into their pipeline. They re-evaluate every active trigger's filters against the current fold state and, if they match, dispatch. This eager evaluation produces three classes of problem:
 
-1. **Half-formed dispatch.** A trigger that filters on `output.matches: "refund granted"` will fire as soon as the first matching span is folded — even if the trace's *final* output (a span that arrives 10 seconds later) walks the refund back. The operator sees a notification for a state the trace never actually reached.
+1. **Half-formed dispatch.** A trigger that filters on `output.matches: "refund granted"` will fire as soon as the first matching span is folded — even if the trace's _final_ output (a span that arrives 10 seconds later) walks the refund back. The operator sees a notification for a state the trace never actually reached.
 2. **Half-formed persist.** `ADD_TO_DATASET` snapshots the trace at dispatch time. The row written to the dataset is truncated relative to what an operator browsing the trace UI sees a minute later. The dataset diverges from the trace.
 3. **Wasted re-evaluation.** A 50-span trace evaluates every active trigger ~50 times even though the verdict almost always stabilises on the last few spans. Cheap per-trigger but quadratic in the number of active triggers, and the early evaluations are by definition wrong-or-equal-to the final one.
 
 The dedup hop on `TriggerSent` makes (2) and (3) survivable — once a trigger has fired for a (trigger, trace) pair, subsequent matches no-op. But "first match wins" is exactly the half-formed problem.
 
-## Decision
+## Original decision (settlement mechanics amended by ADR-052)
 
 Add **two timing knobs** to the `Trigger` row, both per-trigger and independently tunable, that sit at different points in the dispatch pipeline:
 
-| Knob | When it fires | What it does |
-|---|---|---|
-| `traceDebounceMs` | Before filter evaluation | Wait for the trace to settle so the filter sees the final state |
-| `notificationCadence` | After dispatch decision | Batch matches inside a wall-clock window into one digest |
+| Knob                  | When it fires            | What it does                                                    |
+| --------------------- | ------------------------ | --------------------------------------------------------------- |
+| `traceDebounceMs`     | Before filter evaluation | Wait for the trace to settle so the filter sees the final state |
+| `notificationCadence` | After dispatch decision  | Batch matches inside a wall-clock window into one digest        |
 
 Both knobs ride the ADR-030 outbox queue: `traceDebounceMs` drives the `stage: "settle"` dedup TTL; `notificationCadence` drives the `stage: "cadence"` delay snapping.
 
@@ -74,7 +89,7 @@ The dispatcher routes on this classification at the top of its switch:
 
 ```ts
 function computeScheduledFor(action, cadence, now) {
-  if (PERSIST_TRIGGER_ACTIONS.has(action)) return now;        // immediate
+  if (PERSIST_TRIGGER_ACTIONS.has(action)) return now; // immediate
   if (cadence === "immediate") return now;
   // Snap to the NEXT wall-clock boundary so concurrent matches share one
   // dispatch time and coalesce — not now+window (which drifts per event).
@@ -115,7 +130,7 @@ Customers who want different cadences for different destinations create multiple
 
 Daily and weekly digests aren't included in v1 — they cross the "is this still a trigger or is it a report?" line and complicate retention semantics for the underlying outbox rows.
 
-### How the debounce rides the outbox queue
+### Historical Redis debounce mechanics (superseded by ADR-052)
 
 The settle stage rides the **main event-sourcing queue** (`event-sourcing/jobs`) as a stage-discriminated outbox payload, per ADR-030's 2026-06-02 revision — there is no `langwatch:outbox` queue and no separate `langwatch:trigger-evaluation` queue.
 
@@ -144,7 +159,11 @@ for (const trigger of triggers) {
       triggerId: trigger.id,
       traceId,
       reactorName: TRIGGER_NOTIFY_REACTOR_NAME,
-      auditDedupKey: auditDedupKey({ projectId: tenantId, triggerId: trigger.id, traceId }),
+      auditDedupKey: auditDedupKey({
+        projectId: tenantId,
+        triggerId: trigger.id,
+        traceId,
+      }),
       foldSnapshotAtEnqueue: { computedInput, computedOutput },
       traceDebounceMs: trigger.traceDebounceMs,
     },
@@ -161,7 +180,7 @@ The GroupQueue's Debounce Mode ensures:
 
 When the settle process callback matches, it re-enqueues a `stage: "cadence"` payload with `delay = computeScheduledFor(trigger.action, trigger.notificationCadence, now) - now`. The same queue carries it; the audit row identified by `auditDedupKey` follows it through the cadence boundary.
 
-### Where filter evaluation moves
+### Historical filter-evaluation move
 
 `evaluateAndDispatchTrigger(req)` becomes the single owner of:
 
@@ -170,7 +189,7 @@ When the settle process callback matches, it re-enqueues a `stage: "cadence"` pa
 3. Calling `triggers.claimSend(...)` for the ADR-030 at-most-once gate.
 4. Calling `dispatchTriggerAction(...)` — which itself routes to the outbox or inline path based on action class.
 
-The two reactors (`alertTrigger`, `evaluationAlertTrigger`) keep doing the pre-filter scan that decides *which* triggers are candidates for a given event (trace-only vs evaluation-required), but they no longer own the evaluation itself — they only emit enqueue requests.
+The two reactors (`alertTrigger`, `evaluationAlertTrigger`) keep doing the pre-filter scan that decides _which_ triggers are candidates for a given event (trace-only vs evaluation-required), but they no longer own the evaluation itself — they only emit enqueue requests.
 
 ### UI surface
 
@@ -181,7 +200,7 @@ Both knobs are surfaced in the staged authoring drawer (ADR-037):
 
 Both fields collapse into a single "Cadence" stage on the drawer (the secondary drawer pattern from ADR-037). The current values appear on the automations settings list as columns so an operator scanning the list can see at a glance which triggers are trading latency for completeness.
 
-## Rationale
+## Original rationale
 
 ### Why hardcoded action-class sets, not per-action runtime config
 
@@ -210,7 +229,7 @@ Between the two realistic candidates:
 
 30s wins as the default. 15s is offered as a first-class option so teams that have measured their P99 trace-completion latency can tighten up without a code change. Teams that need urgent (≤1s) notifications still flip the field to 0 explicitly — the visible setting in the drawer makes that trade-off legible at authoring time.
 
-### Why GroupQueue Debounce Mode, not a new primitive
+### Why GroupQueue Debounce Mode was originally chosen
 
 The deduplication-with-TTL pattern is already implemented in `src/server/event-sourcing/queues/queue.types.ts:DeduplicationConfig` and battle-tested by the projection-coalescing path. Reusing it means no new Redis key shape, no new Lua scripts, no new metrics surface — the existing `*:gq:*` keys cover it. The TTL-reset-on-overwrite semantics are exactly what "trace is still arriving" requires.
 
@@ -224,18 +243,18 @@ The earlier design used a separate `langwatch:trigger-evaluation` queue for sett
 
 Two debounce-shaped knobs sit at different points in the pipeline:
 
-| Knob | When it fires | What it does |
-|---|---|---|
-| `traceDebounceMs` | Before filter evaluation | Wait for trace to settle so the filter sees the final state |
-| `notificationCadence` | After dispatch decision | Batch matches inside a wall-clock window into one digest |
+| Knob                  | When it fires            | What it does                                                |
+| --------------------- | ------------------------ | ----------------------------------------------------------- |
+| `traceDebounceMs`     | Before filter evaluation | Wait for trace to settle so the filter sees the final state |
+| `notificationCadence` | After dispatch decision  | Batch matches inside a wall-clock window into one digest    |
 
 A trigger configured `traceDebounceMs: 60000` + `notificationCadence: 5min_digest` means "wait 60s for the trace to settle, then if it matches, hold the notification for the next 5-minute digest boundary." Each knob solves a different operator pain — bundling them would force a worse default for at least one class of trigger.
 
 ### Why debounce applies to all action classes, not notify-only
 
-`ADD_TO_DATASET` and `ADD_TO_ANNOTATION_QUEUE` rows are *more* sensitive to half-formed traces than notify actions — a truncated dataset row corrupts the customer's eval set in a way that is invisible until someone tries to use it. The cadence-vs-immediate split is notify-only because batching makes no sense for persist; debounce makes sense for both.
+`ADD_TO_DATASET` and `ADD_TO_ANNOTATION_QUEUE` rows are _more_ sensitive to half-formed traces than notify actions — a truncated dataset row corrupts the customer's eval set in a way that is invisible until someone tries to use it. The cadence-vs-immediate split is notify-only because batching makes no sense for persist; debounce makes sense for both.
 
-## Consequences
+## Original consequences (settlement mechanics amended by ADR-052)
 
 - **Two new `Trigger` columns.** Single `ALTER TABLE`s with defaults; instant on PG ≥ 11.
 - **Existing triggers default to `immediate` cadence and 30s debounce.** Cadence preserves current behavior; debounce is a one-time change to the half-formed-dispatch default. Operators who were depending on eager evaluation see a one-time change — flip `traceDebounceMs` to 0 if needed. A migration banner / changelog notes both.

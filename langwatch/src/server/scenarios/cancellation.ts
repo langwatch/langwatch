@@ -13,8 +13,8 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
-import { createLogger } from "~/utils/logger/server";
-import { ScenarioRunStatus, isCancellableStatus } from "./scenario-event.enums";
+import { createLogger } from "@langwatch/observability";
+import { isCancellableStatus, ScenarioRunStatus } from "./scenario-event.enums";
 import type { ScenarioRunData } from "./scenario-event.types";
 
 const logger = createLogger("langwatch:scenarios:cancellation");

@@ -1,7 +1,7 @@
-import type { ResolveOriginCommandData } from "../schemas/commands";
-import { createLogger } from "../../../../../utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
+import type { ResolveOriginCommandData } from "../schemas/commands";
 import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 
@@ -67,6 +67,17 @@ export function createOriginGateReactor(
       const { tenantId, aggregateId: traceId, foldState } = context;
 
       if (!needsOriginResolution(event, foldState)) return;
+
+      // Defensive: a trace aggregate with an empty ID can't be resolved, and
+      // scheduling one produces an OriginResolvedEvent with an empty
+      // aggregateId that blows up the automations pipeline later.
+      if (!traceId) {
+        logger.warn(
+          { tenantId, eventId: event.id, eventType: event.type },
+          "Skipping deferred origin resolution: empty traceId on trace event",
+        );
+        return;
+      }
 
       // No origin — schedule deferred resolution (5-min delay)
       logger.debug(

@@ -9,12 +9,17 @@ import (
 // Config carries the knobs the orchestrator + daemon need. Everything here is
 // resolved once by the composition root (cmd) and injected.
 type Config struct {
-	Naming                   domain.Naming
-	Home                     string        // thuishaven home dir (~/.langwatch/portless)
-	IdleTTL                  time.Duration // reap stacks whose heartbeat is older than this (0 = only reap dead launchers)
+	Naming  domain.Naming
+	Home    string        // thuishaven home dir (~/.langwatch/portless)
+	IdleTTL time.Duration // reap stacks whose heartbeat is older than this (0 = only reap dead launchers)
+	// DBIdleTTL is how long a worktree's databases may sit unused before the
+	// daemon prunes them in the background (0 disables pruning). Only databases
+	// haven itself tracked (via the activity clock) are ever touched, and the
+	// protected main database is always kept.
+	DBIdleTTL                time.Duration
 	HeartbeatEvery           time.Duration // launcher heartbeat cadence
 	DaemonArgv               []string      // how to (re)launch `haven daemon`
-	IsAgent                  bool          // token-free plain output for AI drivers (no colour/TUI)
+	IsAgent                  bool          // token-free plain output for AI drivers (no color/TUI)
 	ShouldManageClickHouse   bool          // haven provisions a shared ClickHouse container (colima) + per-slug DBs
 	ShouldStopClickHouseIdle bool          // daemon stops the managed CH container when the last stack is reaped
 	ShouldManagePostgres     bool          // haven ensures a shared brew-services Postgres + per-slug DBs
@@ -46,6 +51,15 @@ type PlanOptions struct {
 	ShouldSkipGateway         bool
 	ShouldSkipLangyAgent      bool
 	ShouldSeed                bool
-	IsStub                    bool // verification: echo servers instead of the real apps
-	RepoRoot                  string
+	// ShouldForce lets `up` replace a stack that is already running from this
+	// worktree: the live launcher is terminated (and waited on) before the new
+	// one provisions. Without it, `up` refuses when the stack is already up.
+	ShouldForce bool
+	// LangyTier is the local isolation posture for the langyagent worker, resolved
+	// from LANGY_UNSAFE_CONTAINER / LANGY_UNSAFE_HOST_ACCESS. The zero value is the
+	// sandboxed (production-like) default: the worker runs in colima with the
+	// per-worker UID sandbox on.
+	LangyTier domain.LangyTier
+	IsStub    bool // verification: echo servers instead of the real apps
+	RepoRoot  string
 }

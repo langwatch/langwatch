@@ -1,8 +1,4 @@
 import type {
-  OutboxEnqueueRequest,
-  OutboxReactorDefinition,
-} from "../../../outbox/outboxReactor.types";
-import type {
   ReactorContext,
   ReactorDefinition,
 } from "../../../reactors/reactor.types";
@@ -52,10 +48,10 @@ const MESSAGE_EVENT_TYPES = new Set<string>([
  * Wraps the reactor's `handle` with these guards so each call site
  * doesn't repeat the same preamble.
  */
-/** Pure guard check, shared between the `.withReactor` and `.withOutbox`
- *  variants below so both branches stay in sync. Returns true when the
- *  reactor's user-provided body should run. */
-function passesTraceOriginGuards(
+/** Pure guard check, shared between the reactor variant below and the
+ *  alert-trigger match subscriber (ADR-052) so both stay in sync. Returns
+ *  true when the reactor's/subscriber's user-provided body should run. */
+export function passesTraceOriginGuards(
   event: TraceProcessingEvent,
   foldState: TraceSummaryData,
 ): boolean {
@@ -136,50 +132,6 @@ export function defineOriginGuardedTraceReactor(opts: {
     async handle(event, context) {
       if (!passes(event, context)) return;
       await opts.handle(event, context);
-    },
-  };
-}
-
-/**
- * Outbox-flavored counterpart of `defineOriginGuardedTraceReactor`. Same
- * guards (stale event / non-message event / old trace / blocked guardrail /
- * origin-not-resolved), but the body returns an `OutboxEnqueueRequest[]`
- * instead of performing side effects. Used by `.withOutbox`-registered
- * reactors whose `decide()` builds settle payloads.
- */
-export function defineOriginGuardedTraceOutboxReactor(opts: {
-  name: string;
-  jobIdPrefix: string;
-  ttl?: number;
-  delay?: number;
-  isRelevant?: ExtraGuard;
-  decide: (
-    event: TraceProcessingEvent,
-    context: ReactorContext<TraceSummaryData>,
-  ) => Promise<OutboxEnqueueRequest[]>;
-}): OutboxReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
-  const passes = (
-    event: TraceProcessingEvent,
-    context: ReactorContext<TraceSummaryData>,
-  ): boolean =>
-    passesTraceOriginGuards(event, context.foldState) &&
-    (opts.isRelevant?.(event, context) ?? true);
-
-  return {
-    name: opts.name,
-    options: {
-      makeJobId: (payload) =>
-        `${opts.jobIdPrefix}:${payload.event.tenantId}:${payload.event.aggregateId}`,
-      ttl: opts.ttl ?? 30_000,
-      delay: opts.delay ?? 30_000,
-    },
-
-    // See the `.withReactor` twin above for why this is also a shouldReact.
-    shouldReact: passes,
-
-    async decide(event, context) {
-      if (!passes(event, context)) return [];
-      return opts.decide(event, context);
     },
   };
 }

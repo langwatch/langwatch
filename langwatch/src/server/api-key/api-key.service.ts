@@ -1,7 +1,17 @@
-import type { PrismaClient, ApiKey } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
+import type { ApiKey, PrismaClient } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import type { Permission } from "~/server/api/rbac";
+import {
+  MalformedCustomRolePermissionsError,
+  parseCustomRolePermissions,
+  permissionFormatSchema,
+} from "~/server/rbac/custom-role-permissions";
+import { checkRoleBindingPermission } from "~/server/rbac/role-binding-resolver";
+import { CUSTOM_ROLE_KIND, RoleRepository } from "~/server/role/repositories/role.repository";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { ApiKeyRepository, type ApiKeyWithBindings } from "./api-key.repository";
-import { RoleRepository, CUSTOM_ROLE_KIND } from "~/server/role/repositories/role.repository";
 import {
   generateApiKeyToken,
   hashSecret,
@@ -15,13 +25,6 @@ import {
   ApiKeyNotOwnedError,
   ApiKeyScopeViolationError,
 } from "./errors";
-import type { Permission } from "~/server/api/rbac";
-import { checkRoleBindingPermission } from "~/server/rbac/role-binding-resolver";
-import { parseCustomRolePermissions, permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
-import { DomainError } from "~/server/app-layer/domain-error";
-import { createLogger } from "~/utils/logger/server";
-import { generate } from "@langwatch/ksuid";
-import { KSUID_RESOURCES } from "~/utils/constants";
 
 const logger = createLogger("langwatch:api-key:service");
 
@@ -548,7 +551,7 @@ export class ApiKeyService {
         permissions: customRole.permissions,
       });
     } catch (err) {
-      if (DomainError.isHandled(err) && err.kind === "malformed_custom_role_permissions") {
+      if (err instanceof MalformedCustomRolePermissionsError) {
         throw new ApiKeyScopeViolationError(
           `Custom role ${customRoleId} has malformed permissions`,
           {

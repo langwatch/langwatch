@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -11,7 +11,7 @@ export const createEvaluatorCommand = async (
   checkApiKey();
 
   const service = new EvaluatorsApiService();
-  const spinner = ora(`Creating evaluator "${name}"...`).start();
+  const spinner = createSpinner(`Creating evaluator "${name}"...`).start();
 
   try {
     const evaluator = await service.create({
@@ -31,7 +31,7 @@ export const createEvaluatorCommand = async (
       console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
     }
   } catch (error) {
-    failSpinner({ spinner, error, action: "create evaluator" });
+    failSpinner({ spinner, error, action: "create evaluator", format: options?.format });
     process.exit(1);
   }
 };

@@ -132,6 +132,9 @@ function makeFakeMonitorRepository(): MonitorRepository {
     async getMonitorById() {
       return fullMonitor;
     },
+    async findAllByIds() {
+      return [];
+    },
   };
 }
 

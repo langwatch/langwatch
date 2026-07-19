@@ -5,6 +5,8 @@ import {
   markCutoffBatch,
   markCompletedBatch,
   unmarkBatch,
+  removeInFlightMarkers,
+  clearFailedBatchMarkers,
   getCompletedSet,
   getCutoffMarkers,
   cleanupAll,
@@ -37,9 +39,9 @@ function createRedisMock() {
           });
           return pipe;
         },
-        hdel: (key: string, field: string) => {
+        hdel: (key: string, ...fields: string[]) => {
           pipelineOps.push(() => {
-            store.get(key)?.delete(field);
+            for (const field of fields) store.get(key)?.delete(field);
           });
           return pipe;
         },
@@ -276,6 +278,160 @@ describe("replayMarkers", () => {
         const redis = createRedisMock();
         await markCompletedBatch({ redis, projectionName: "x", cutoffs: new Map() });
         expect(await redis.hlen("projection-replay:cutoff:x")).toBe(0);
+      });
+    });
+  });
+
+  describe("removeInFlightMarkers", () => {
+    it("removes cutoff fields across all projections, leaving completed set and done markers untouched", async () => {
+      const redis = createRedisMock();
+
+      // In-flight markers across two projections.
+      await markPendingBatch({
+        redis,
+        projectionName: "traceSummary",
+        aggKeys: ["t1:trace:a1", "t1:trace:a2"],
+      });
+      await markPendingBatch({
+        redis,
+        projectionName: "spanIndex",
+        aggKeys: ["t1:trace:a1", "t1:trace:a2"],
+      });
+
+      // A previously completed batch: done marker + completed-set entry.
+      const doneCutoffs = new Map([
+        ["t1:trace:done", { timestamp: 1700000000000, eventId: "evt-done" }],
+      ]);
+      await markCompletedBatch({
+        redis,
+        projectionName: "traceSummary",
+        cutoffs: doneCutoffs,
+      });
+
+      await removeInFlightMarkers({
+        redis,
+        projectionNames: ["traceSummary", "spanIndex"],
+        aggKeys: ["t1:trace:a1", "t1:trace:a2"],
+      });
+
+      // Cutoff fields removed in both projections.
+      expect(await redis.hlen("projection-replay:cutoff:traceSummary")).toBe(0);
+      expect(await redis.hlen("projection-replay:cutoff:spanIndex")).toBe(0);
+
+      // Done marker and completed set from the completed batch survive.
+      expect(
+        await redis.get(doneMarkerKey("traceSummary", "t1:trace:done")),
+      ).toBe("1700000000000:evt-done");
+      const completed = await redis.smembers(
+        "projection-replay:completed:traceSummary",
+      );
+      expect(completed).toContain("t1:trace:done");
+
+      // Removed in-flight aggregates are NOT recorded as completed.
+      expect(completed).not.toContain("t1:trace:a1");
+      expect(completed).not.toContain("t1:trace:a2");
+    });
+
+    describe("when aggKeys is empty", () => {
+      it("skips without executing a pipeline", async () => {
+        const redis = createRedisMock();
+        const originalPipeline = redis.pipeline;
+        let pipelineCalls = 0;
+        redis.pipeline = () => {
+          pipelineCalls++;
+          return originalPipeline();
+        };
+
+        await removeInFlightMarkers({
+          redis,
+          projectionNames: ["traceSummary"],
+          aggKeys: [],
+        });
+
+        expect(pipelineCalls).toBe(0);
+      });
+    });
+
+    describe("when projectionNames is empty", () => {
+      it("skips without executing a pipeline", async () => {
+        const redis = createRedisMock();
+        const originalPipeline = redis.pipeline;
+        let pipelineCalls = 0;
+        redis.pipeline = () => {
+          pipelineCalls++;
+          return originalPipeline();
+        };
+
+        await removeInFlightMarkers({
+          redis,
+          projectionNames: [],
+          aggKeys: ["t1:trace:a1"],
+        });
+
+        expect(pipelineCalls).toBe(0);
+      });
+    });
+  });
+
+  describe("clearFailedBatchMarkers", () => {
+    describe("when marker cleanup fails", () => {
+      it("resolves without throwing and logs the cleanup failure", async () => {
+        const failingRedis = {
+          pipeline: () => {
+            const pipe = {
+              hdel: (_key: string, ..._fields: string[]) => pipe,
+              exec: async () => {
+                throw new Error("redis connection lost");
+              },
+            };
+            return pipe;
+          },
+        } as any;
+        const entries: Record<string, unknown>[] = [];
+        const log = {
+          write: (entry: Record<string, unknown>) => entries.push(entry),
+        };
+
+        await expect(
+          clearFailedBatchMarkers({
+            redis: failingRedis,
+            projectionNames: ["traceSummary"],
+            aggKeys: ["t1:trace:a1"],
+            log,
+          }),
+        ).resolves.toBeUndefined();
+
+        expect(entries).toHaveLength(1);
+        expect(entries[0]).toMatchObject({ step: "error" });
+        expect(entries[0]!.error).toContain(
+          "failed to clear replay markers for failed batch",
+        );
+        expect(entries[0]!.error).toContain("redis connection lost");
+      });
+    });
+
+    describe("when marker cleanup succeeds", () => {
+      it("removes the markers and writes no log entry", async () => {
+        const redis = createRedisMock();
+        await markPendingBatch({
+          redis,
+          projectionName: "traceSummary",
+          aggKeys: ["t1:trace:a1"],
+        });
+        const entries: Record<string, unknown>[] = [];
+        const log = {
+          write: (entry: Record<string, unknown>) => entries.push(entry),
+        };
+
+        await clearFailedBatchMarkers({
+          redis,
+          projectionNames: ["traceSummary"],
+          aggKeys: ["t1:trace:a1"],
+          log,
+        });
+
+        expect(await redis.hlen("projection-replay:cutoff:traceSummary")).toBe(0);
+        expect(entries).toHaveLength(0);
       });
     });
   });

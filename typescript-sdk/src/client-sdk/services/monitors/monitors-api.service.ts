@@ -1,6 +1,7 @@
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfDomainError } from "@/client-sdk/services/_shared/throw-domain-error";
 
 export interface MonitorResponse {
   id: string;
@@ -85,6 +86,12 @@ export class MonitorsApiService {
         // leave as raw text
       }
       const message = formatApiErrorMessage({ error: parsed, options: { status: response.status } });
+      throwIfDomainError({
+        operation: options?.method ?? "GET",
+        error: parsed,
+        status: response.status,
+        message: `HTTP ${response.status}: ${message}`,
+      });
       throw new MonitorsApiError(
         `HTTP ${response.status}: ${message}`,
         options?.method ?? "GET",

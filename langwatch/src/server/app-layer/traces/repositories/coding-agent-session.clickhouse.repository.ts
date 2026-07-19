@@ -3,7 +3,7 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retenti
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/codingAgentSession.foldProjection";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import type { CodingAgentSessionRepository } from "./coding-agent-session.repository";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
@@ -14,7 +14,7 @@ const logger = createLogger(
 
 /**
  * ClickHouse persistence for the coding-agent session rollup (ADR-041,
- * migration 00042).
+ * migration 00049).
  *
  * The UInt64 columns are serialised as STRINGS in the JSONEachRow body: JSON
  * numbers cannot safely round-trip past 2^53, and a long session's token counts

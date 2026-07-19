@@ -1,6 +1,6 @@
 import { VStack } from "@chakra-ui/react";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
-import debounce from "lodash.debounce";
+import { debounce } from "lodash-es";
 import { useCallback, useMemo } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";

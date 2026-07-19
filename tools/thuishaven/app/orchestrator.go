@@ -2,7 +2,11 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
+	"slices"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -24,19 +28,22 @@ type Orchestrator struct {
 	obs   Observability
 	hyg   Hygiene
 	sem   Semaphore
-	log   *zap.Logger
+	// container is the colima VM the langyagent worker runs on in its container
+	// tiers (see domain.LangyTier). May be nil in tests that never launch it.
+	container ContainerRuntime
+	log       *zap.Logger
 }
 
 // New builds an Orchestrator from its injected dependencies.
-func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, ch ClickHouse, pg Postgres, rds Redis, obs Observability, hyg Hygiene, sem Semaphore, log *zap.Logger) *Orchestrator {
-	return &Orchestrator{cfg: cfg, proxy: proxy, store: store, sup: sup, sys: sys, ch: ch, pg: pg, rds: rds, obs: obs, hyg: hyg, sem: sem, log: log}
+func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, ch ClickHouse, pg Postgres, rds Redis, obs Observability, hyg Hygiene, sem Semaphore, container ContainerRuntime, log *zap.Logger) *Orchestrator {
+	return &Orchestrator{cfg: cfg, proxy: proxy, store: store, sup: sup, sys: sys, ch: ch, pg: pg, rds: rds, obs: obs, hyg: hyg, sem: sem, container: container, log: log}
 }
 
 // UpParams identify the worktree `up` runs in (resolved by the composition root).
 type UpParams struct {
-	WorktreeDir  string
-	LwDir        string
-	Branch       string
+	WorktreeDir      string
+	LwDir            string
+	Branch           string
 	ExplicitSlug     string // from LANGWATCH_SLUG; wins over the derived/cached slug
 	IsBaseline       bool   // this stack is the shared default others fall back to
 	IsLinkedWorktree bool   // a `git worktree add` checkout, not the primary clone
@@ -98,6 +105,11 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		Slug: slug, WorktreeDir: p.WorktreeDir, Branch: p.Branch,
 		LauncherPID: o.sys.Getpid(), RedisDB: domain.RedisDBForSlug(slug),
 		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
+		// Mirror planChildren: a separate `workers` lane exists only when workers
+		// are requested AND not hosted in-process. Persist it so restart targets
+		// the workers' own group rather than the API's when they share a process.
+		HasStandaloneWorkers: opts.ShouldStartWorkers && !opts.ShouldRunWorkersInProcess,
+		LangyTier:            opts.LangyTier,
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
@@ -138,15 +150,22 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	if err := o.store.SaveStack(st); err != nil {
 		return domain.Stack{}, nil, err
 	}
-	o.printStack(st)
-	go o.heartbeat(ctx, st)
-
 	cleanup := func() {
 		for _, s := range st.Services {
 			o.proxy.Remove(s.Name, slug)
 		}
 		o.store.RemoveStack(slug)
 	}
+	// Start (or refresh) the databases' idle clock: the daemon prunes databases
+	// whose slug has not been up for DBIdleTTL, and this is what "up" means.
+	// A silently stale clock could get this stack's databases pruned as idle
+	// once it unregisters, so a failed write fails the up.
+	if err := o.store.TouchDBActivity(st.Slug); err != nil {
+		cleanup()
+		return domain.Stack{}, nil, fmt.Errorf("recording database activity for %q: %w", st.Slug, err)
+	}
+	o.printStack(st)
+	go o.heartbeat(ctx, st)
 	return st, cleanup, nil
 }
 
@@ -188,7 +207,7 @@ func (o *Orchestrator) Setup(ctx context.Context) error {
 	scheme, port := o.proxy.Endpoint()
 	fmt.Println("thuishaven ready.")
 	fmt.Printf("  proxy:     %s://…langwatch.localhost (port %d)\n", scheme, port)
-	fmt.Println("  next:      `pnpm dev:haven` (or `make haven up`) in any worktree")
+	fmt.Println("  next:      `haven up` in any worktree")
 	fmt.Println("  dashboard: https://langwatch.localhost")
 	return nil
 }
@@ -198,31 +217,112 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err := o.proxy.EnsureReady(); err != nil {
 		return fmt.Errorf("could not start the portless proxy automatically (%w) — run `haven setup` once to bootstrap it by hand", err)
 	}
+	slug, err := o.resolveSlug(p)
+	if err != nil {
+		return err
+	}
+	// Serialize `up` per slug: two concurrent runs could both pass the
+	// already-running guard and then both register the same slug. The lock is
+	// held only through guard + registration — holding it across supervision
+	// would make `up --force` wait forever on the launcher it is meant to
+	// replace (flocks die with their process, so a killed launcher can't leak
+	// the slot).
+	release, _, err := o.sem.Acquire(ctx, "up-"+slug, 1)
+	if err != nil {
+		return err
+	}
+	registering := true
+	endRegistration := func() {
+		if registering {
+			registering = false
+			release()
+		}
+	}
+	defer endRegistration()
+	if err := o.replaceRunningStack(p, opts.ShouldForce); err != nil {
+		return err
+	}
 	o.ensureDaemon(p.WorktreeDir)
 	st, cleanup, err := o.provision(ctx, p, opts, true)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
+	endRegistration()
 
-	env := st.OverlayEnv()
+	// DOTENV_CONFIG_QUIET drops dotenv v17's promo line for any one-shot script
+	// that loads it via `import "dotenv/config"`; `pnpm -s` drops the lifecycle
+	// banner. Keeps the codegen/prepare/seed lanes as quiet as the services.
+	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")
 	// Codegen (prisma/zod/sdk-versions/mcp) then migrations — both finish before
 	// the services boot. Owned here so `pnpm dev` is simply `haven up`.
-	if err := o.sup.RunOnce(ctx, "codegen", p.LwDir, "pnpm run start:prepare:files", env); err != nil {
+	if err := o.sup.RunOnce(ctx, "codegen", p.LwDir, "pnpm -s run start:prepare:files", env); err != nil {
 		o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
 	}
-	if err := o.sup.RunOnce(ctx, "prepare", p.LwDir, "pnpm run start:prepare:db", env); err != nil {
+	if err := o.sup.RunOnce(ctx, "prepare", p.LwDir, "pnpm -s run start:prepare:db", env); err != nil {
 		o.log.Warn("db prepare failed (continuing)", zap.Error(err))
 	}
 	// Always seed. The seed is idempotent (a no-op once the stable local project +
 	// API key exist), so every `up` guarantees the same migrations AND the same
 	// seeded credential are in place — a freshly-provisioned DB is immediately
 	// usable with the well-known LANGWATCH_API_KEY, no manual sign-up.
-	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", env); err != nil {
+	//
+	// When haven manages Postgres the overlay carries a per-slug loopback
+	// DATABASE_URL (provably local) and the seed uses it. When it does not — DB
+	// management disabled, or Postgres failed to come up — the seed would inherit
+	// whatever DATABASE_URL is in .env, so guard that inherited URL exactly as
+	// `haven seed` does and skip (never seed a non-local database) rather than
+	// abort the up.
+	if hasEnvKey(env, "DATABASE_URL") {
+		if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
+			o.log.Warn("seed failed (continuing)", zap.Error(err))
+		}
+	} else if err := o.guardInheritedSeedEnv(p.LwDir); err != nil {
+		o.log.Warn("skipping seed — inherited database URL is not local", zap.Error(err))
+		fmt.Printf("haven: %v — skipping seed\n", err)
+	} else if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
 		o.log.Warn("seed failed (continuing)", zap.Error(err))
 	}
-	o.sup.Supervise(ctx, o.planChildren(st, opts, p.LwDir))
+	// In the container tiers (the sandboxed default and container-unsafe), the
+	// langyagent worker runs on colima rather than the host. Bring the VM up and
+	// ensure its image before planning; on failure, fail closed — skip langy rather
+	// than silently dropping to the unsafe host runner — and tell the user the
+	// explicit opt-in for host mode.
+	langyDockerHost := ""
+	if !opts.ShouldSkipLangyAgent && st.LangyTier.RunsInContainer() {
+		if dh, err := o.prepareLangyContainer(ctx, opts.RepoRoot); err != nil {
+			o.log.Warn("langyagent container unavailable — skipping it (set LANGY_UNSAFE_HOST_ACCESS=1 to run the worker on the host instead)",
+				zap.String("tier", st.LangyTier.String()), zap.Error(err))
+			opts.ShouldSkipLangyAgent = true
+		} else {
+			langyDockerHost = dh
+		}
+	}
+	o.sup.Supervise(ctx, o.planChildren(st, opts, p.LwDir, langyDockerHost))
 	return nil
+}
+
+// prepareLangyContainer brings colima up and ensures the langyagent image exists
+// on it, returning the docker socket the worker container should run against. The
+// image is built only when missing (or when HAVEN_LANGY_REBUILD=1 forces it) — the
+// first build takes minutes, every `up` after is a no-op check.
+func (o *Orchestrator) prepareLangyContainer(ctx context.Context, repoRoot string) (string, error) {
+	if o.container == nil {
+		return "", fmt.Errorf("no container runtime configured")
+	}
+	dockerHost, err := o.container.Ensure(ctx)
+	if err != nil {
+		return "", fmt.Errorf("colima (%s): %w", o.container.Profile(), err)
+	}
+	// Local `up` must reflect the checked-out agent code. Opt out explicitly for
+	// a fast restart with HAVEN_LANGY_REBUILD=0; the old opt-in default caused
+	// stale worker images to survive source edits.
+	shell := langyImageEnsureShell(langyImage, os.Getenv("HAVEN_LANGY_REBUILD") != "0")
+	fmt.Printf("  langyagent: ensuring container image %s (first build can take a few minutes)…\n", langyImage)
+	if err := o.sup.RunOnce(ctx, "langy-image", repoRoot, shell, []string{"DOCKER_HOST=" + dockerHost}); err != nil {
+		return "", fmt.Errorf("build %s: %w", langyImage, err)
+	}
+	return dockerHost, nil
 }
 
 // UpStub is the verification path: it provisions the stack exactly like Up, then
@@ -245,37 +345,78 @@ func (o *Orchestrator) UpStub(ctx context.Context, p UpParams, echo func(ports [
 	return nil
 }
 
-// Down tears the current worktree's routes + registry entry down without needing
-// the launcher process (useful after a crash). Unless shouldKeepDB is set it also drops
-// this stack's ClickHouse database — the "give me a fresh DB" affordance — so the
-// next `up` re-runs migrations into a clean, correctly-counted schema.
-func (o *Orchestrator) Down(ctx context.Context, p UpParams, shouldKeepDB bool) error {
+// replaceRunningStack is `up`'s already-running guard: when a live launcher
+// already runs this worktree's stack it refuses (the second `up` would fight the
+// first over routes and the registry entry) unless shouldForce is set, in which
+// case the old launcher is terminated — and waited on — so the new `up` takes
+// over cleanly.
+func (o *Orchestrator) replaceRunningStack(p UpParams, shouldForce bool) error {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return err
+	}
+	st, ok := o.stackBySlug(slug)
+	if !ok || st.LauncherPID == o.sys.Getpid() || !o.sys.ProcessAlive(st.LauncherPID) {
+		return nil
+	}
+	if !shouldForce {
+		return fmt.Errorf("stack %q is already running (launcher pid %d) — `haven restart [service]` to bounce a service, `haven down` to stop it, or `haven up --force` to replace it", slug, st.LauncherPID)
+	}
+	fmt.Printf("haven: stack %q is already running (pid %d) — replacing it (--force)\n", slug, st.LauncherPID)
+	o.sys.Terminate(st.LauncherPID)
+	o.waitForProcessesDead([]int{st.LauncherPID})
+	return nil
+}
+
+// Down tears the current worktree's stack down from anywhere: it stops a live
+// launcher (the supervised children die with their process group), removes the
+// routes, and drops the registry entry. Databases are KEPT by default — tearing
+// a stack down must not silently discard data; pass shouldDropDB (--drop-db) for
+// the "give me a fresh DB" affordance, so the next `up` re-runs migrations into
+// a clean, correctly-counted schema. Long-unused databases are pruned in the
+// background by the daemon (DBIdleTTL) or explicitly via `haven prune`.
+func (o *Orchestrator) Down(ctx context.Context, p UpParams, shouldDropDB bool) error {
+	slug, err := o.resolveSlug(p)
+	if err != nil {
+		return err
+	}
+	if st, ok := o.stackBySlug(slug); ok && st.LauncherPID != o.sys.Getpid() && o.sys.ProcessAlive(st.LauncherPID) {
+		o.sys.Terminate(st.LauncherPID)
+		o.waitForProcessesDead([]int{st.LauncherPID})
+		fmt.Printf("stopped launcher (pid %d)\n", st.LauncherPID)
 	}
 	for _, r := range domain.PerWorktreeServices {
 		o.proxy.Remove(r.Name, slug)
 	}
 	o.proxy.Remove(domain.ClickHouseService, slug)
 	o.proxy.Remove(domain.PostgresService, slug)
-	if o.ch != nil && o.cfg.ShouldManageClickHouse && !shouldKeepDB {
+	// Attempt every drop even if one fails, so route/registry cleanup always
+	// completes, but AGGREGATE the failures and return them. A dropped-DB request
+	// that silently retained the old database would let `haven down --drop-db &&
+	// haven up` reuse stale state while reporting a clean reset.
+	var dropErrs []error
+	if o.ch != nil && o.cfg.ShouldManageClickHouse && shouldDropDB {
 		db := domain.DatabaseForSlug(slug)
 		if err := o.ch.DropDatabase(ctx, db); err != nil {
 			o.log.Warn("could not drop clickhouse database", zap.String("db", db), zap.Error(err))
+			dropErrs = append(dropErrs, fmt.Errorf("dropping clickhouse database %q: %w", db, err))
 		} else {
 			fmt.Printf("dropped clickhouse database %q\n", db)
 		}
 	}
-	if o.pg != nil && o.cfg.ShouldManagePostgres && !shouldKeepDB {
+	if o.pg != nil && o.cfg.ShouldManagePostgres && shouldDropDB {
 		db := domain.DatabaseForSlug(slug)
 		if err := o.pg.DropDatabase(ctx, db); err != nil {
 			o.log.Warn("could not drop postgres database", zap.String("db", db), zap.Error(err))
+			dropErrs = append(dropErrs, fmt.Errorf("dropping postgres database %q: %w", db, err))
 		} else {
 			fmt.Printf("dropped postgres database %q\n", db)
 		}
 	}
 	o.store.RemoveStack(slug)
+	if len(dropErrs) > 0 {
+		return fmt.Errorf("stack %q stopped but database drop failed — state may be stale: %w", slug, errors.Join(dropErrs...))
+	}
 	fmt.Printf("stack %q torn down\n", slug)
 	return nil
 }
@@ -371,9 +512,184 @@ func (o *Orchestrator) ensureRedis(ctx context.Context, st *domain.Stack) {
 	})
 }
 
-// Seed reseeds the current stack's database — the "give me a fresh DB" affordance.
-func (o *Orchestrator) Seed(ctx context.Context, p UpParams) error {
-	return o.sup.RunOnce(ctx, "seed", p.LwDir, "pnpm run prisma:seed", nil)
+// SeedPresets are the seed variants beyond the plain static identity. "demo"
+// seeds the project as already past onboarding and ingests sample traces
+// through the running stack's collector, so the UI opens on real-looking data.
+var SeedPresets = []string{"demo"}
+
+// SeedOptions tune what `haven seed` layers on top of the stable identity.
+// Every extra is individually controllable: the flags map to HAVEN_SEED_*
+// env vars the seed script reads, so env-driven setups work identically.
+type SeedOptions struct {
+	Preset string
+	// ShouldIngestTraces ingests the deterministic sample traces through the
+	// running stack's collector after the seed (--traces / HAVEN_SEED_TRACES=1;
+	// always on for the demo preset).
+	ShouldIngestTraces bool
+	// ExtraEnv is appended to the seed child's environment — the HAVEN_SEED_*
+	// switches resolved from CLI flags (--first-message, --skip-model-providers).
+	ExtraEnv []string
+}
+
+// Seed reseeds the current stack's database — the "give me a fresh DB"
+// affordance. A preset layers a variant on top of the stable identity; the
+// empty preset is the unchanged default.
+func (o *Orchestrator) Seed(ctx context.Context, p UpParams, opts SeedOptions) error {
+	preset := opts.Preset
+	if preset != "" && !slices.Contains(SeedPresets, preset) {
+		return fmt.Errorf("unknown seed preset %q — available: %s", preset, strings.Join(SeedPresets, ", "))
+	}
+	// Seed the database this worktree's stack actually uses — not whatever
+	// DATABASE_URL happens to be inherited. seedEnv resolves the running stack and
+	// passes its overlay (per-slug loopback DATABASE_URL/CLICKHOUSE_URL, the local
+	// API key) into the child, mirroring the `up` path, so the env cmd.guardSeedEnv
+	// validated and the env the seed connects to are the same provably-local target.
+	env := o.seedEnv(p)
+	if preset != "" {
+		env = append(env, "HAVEN_SEED_PRESET="+preset)
+	}
+	env = append(env, opts.ExtraEnv...)
+	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm run prisma:seed", env), env); err != nil {
+		return err
+	}
+	if preset != "demo" && !opts.ShouldIngestTraces {
+		return nil
+	}
+	// The retry hint must repeat what the user actually ran: `--preset demo`
+	// would also flip the onboarding state for a plain `--traces` run.
+	retryCmd := "haven seed --traces"
+	if preset == "demo" {
+		retryCmd = "haven seed --preset demo"
+	}
+	if err := o.seedSampleTraces(ctx, p, retryCmd); err != nil {
+		return err
+	}
+	if preset != "demo" {
+		return nil
+	}
+	return o.seedRealisticPlatformData(ctx, p, retryCmd)
+}
+
+// seedEnv builds the base environment for the prisma:seed child: the running
+// stack's resolved overlay when one is registered (so the seed writes into this
+// worktree's per-slug database rather than whatever DATABASE_URL is inherited),
+// always carrying HAVEN_SEED_LANGWATCH_API_KEY so the seeded project key matches
+// the local ingestion key — otherwise a re-seed rotates it back to the default
+// and the subsequent sample-trace ingestion 401s. With no stack registered the
+// child inherits the (guardSeedEnv-validated) process/.env environment.
+func (o *Orchestrator) seedEnv(p UpParams) []string {
+	var env []string
+	if slug, err := o.resolveSlug(p); err == nil {
+		if st, ok := o.stackBySlug(slug); ok {
+			env = st.OverlayEnv()
+		}
+	}
+	if o.cfg.LocalAPIKey != "" && !hasEnvKey(env, "HAVEN_SEED_LANGWATCH_API_KEY") {
+		env = append(env, "HAVEN_SEED_LANGWATCH_API_KEY="+o.cfg.LocalAPIKey)
+	}
+	return env
+}
+
+// seedShell wraps a prisma:seed command with a best-effort feature-flag upsert:
+// once the seed lands, haven flips the dev feature set on (domain.SeededFeatureFlags)
+// so a fresh stack opens on Langy, governance, and the event-sourced surfaces
+// rather than the shipped-off defaults. Appended only when the seed targets a
+// managed database — the env carries the provably-local per-slug DATABASE_URL
+// (the same URL prisma:seed used); an inherited-.env seed is left untouched.
+//
+// The upsert is runtime-gated by HAVEN_SEED_FEATURE_FLAGS (set it to 0 to opt
+// out) and chained with `|| echo` so a missing psql or a transient hiccup never
+// fails the seed — enabling the dev feature set is a convenience, not a boot
+// requirement. `key` is the FeatureFlag primary key, so the write is idempotent.
+func seedShell(base string, env []string) string {
+	if !hasEnvKey(env, "DATABASE_URL") {
+		return base
+	}
+	sql := domain.FeatureFlagSeedSQL()
+	if sql == "" {
+		return base
+	}
+	return base + ` && if [ "$HAVEN_SEED_FEATURE_FLAGS" != "0" ]; then ` +
+		`psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qtA -c ` + shellSingleQuoted(sql) +
+		` || echo "haven: feature-flag seed skipped (continuing)"; fi`
+}
+
+// shellSingleQuoted wraps s in single quotes for safe embedding in a bash -lc
+// command, escaping any embedded single quotes via the '\” idiom.
+func shellSingleQuoted(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// guardInheritedSeedEnv validates the database URLs a seed with no managed-DB
+// overlay would inherit, resolved at the child's real precedence (process env
+// over the merged dotenv layers).
+func (o *Orchestrator) guardInheritedSeedEnv(lwDir string) error {
+	return domain.GuardSeedTargets(domain.LoadDotenv(lwDir), os.Getenv)
+}
+
+// hasEnvKey reports whether a KEY=VALUE slice already sets key.
+func hasEnvKey(env []string, key string) bool {
+	prefix := key + "="
+	for _, e := range env {
+		if strings.HasPrefix(e, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// seedSampleTraces ingests the deterministic demo traces through the running
+// stack's collector — the real pipeline, not a ClickHouse side door — so the
+// stack must be up. It talks to the app's loopback port over plain HTTP
+// (portless terminates TLS in front of it; Node does not trust the proxy's CA).
+func (o *Orchestrator) seedSampleTraces(ctx context.Context, p UpParams, retryCmd string) error {
+	env, err := o.liveSeedEnv(p, retryCmd)
+	if err != nil {
+		return err
+	}
+	return o.sup.RunOnce(ctx, "seed-traces", p.LwDir, "pnpm run seed:sample-traces", env)
+}
+
+// seedRealisticPlatformData adds coherent scenario, evaluation, and experiment
+// lifecycles after the lightweight sample traces. It deliberately uses the
+// collector + event-sourcing commands rather than inserting read models, so a
+// demo seed exercises the event log and projection workers customers run.
+func (o *Orchestrator) seedRealisticPlatformData(ctx context.Context, p UpParams, retryCmd string) error {
+	env, err := o.liveSeedEnv(p, retryCmd)
+	if err != nil {
+		return err
+	}
+	return o.sup.RunOnce(ctx, "seed-platform", p.LwDir, "pnpm run seed:realistic-platform", env)
+}
+
+// liveSeedEnv returns the running stack's complete environment overlay plus a
+// loopback collector endpoint. The complete overlay matters for seeders that
+// write both Postgres and ClickHouse; inheriting langwatch/.env would silently
+// target the primary checkout instead of this worktree's isolated databases.
+func (o *Orchestrator) liveSeedEnv(p UpParams, retryCmd string) ([]string, error) {
+	slug, err := o.resolveSlug(p)
+	if err != nil {
+		return nil, err
+	}
+	st, ok := o.stackBySlug(slug)
+	if !ok || !o.sys.ProcessAlive(st.LauncherPID) {
+		return nil, fmt.Errorf("stack %q is not running — sample data goes through the real collector, so start it (haven up) and re-run `%s`", slug, retryCmd)
+	}
+	var appPort int
+	for _, svc := range st.Services {
+		if svc.Name == "app" && !svc.IsFallback {
+			appPort = svc.Port
+		}
+	}
+	if appPort == 0 || !o.sys.PortInUse(appPort) {
+		return nil, fmt.Errorf("stack %q's app is not answering yet — wait for it to boot and re-run `%s`", slug, retryCmd)
+	}
+	env := append([]string{}, st.OverlayEnv()...)
+	env = append(env,
+		fmt.Sprintf("HAVEN_SEED_ENDPOINT=http://127.0.0.1:%d", appPort),
+		"HAVEN_SEED_LANGWATCH_API_KEY="+o.cfg.LocalAPIKey,
+	)
+	return env, nil
 }
 
 // runsLocally reports whether this worktree runs the service itself (vs falling

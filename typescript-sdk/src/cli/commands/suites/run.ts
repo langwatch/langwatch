@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { SuitesApiService } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -13,7 +13,7 @@ export const runSuiteCommand = async (
   checkApiKey();
 
   const service = new SuitesApiService();
-  const spinner = ora(`Scheduling suite run "${id}"...`).start();
+  const spinner = createSpinner(`Scheduling suite run "${id}"...`).start();
 
   try {
     const result = await service.run(id);
@@ -21,6 +21,13 @@ export const runSuiteCommand = async (
     spinner.succeed(
       `Suite run scheduled: ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId})`,
     );
+
+    // JSON first: the skipped-archived details are already inside the document,
+    // and prose printed before it would corrupt the parser's stdout.
+    if (options.format === "json") {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
 
     if (result.skippedArchived.scenarios.length > 0 || result.skippedArchived.targets.length > 0) {
       console.log();
@@ -31,11 +38,6 @@ export const runSuiteCommand = async (
       if (result.skippedArchived.targets.length > 0) {
         console.log(chalk.yellow(`    Targets: ${result.skippedArchived.targets.join(", ")}`));
       }
-    }
-
-    if (options.format === "json") {
-      console.log(JSON.stringify(result, null, 2));
-      return;
     }
 
     if (!options.wait) {
@@ -58,7 +60,7 @@ export const runSuiteCommand = async (
 
     // Poll for completion
     console.log();
-    const pollSpinner = ora("Waiting for suite run to complete...").start();
+    const pollSpinner = createSpinner("Waiting for suite run to complete...").start();
 
     const apiKey = process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
@@ -133,7 +135,7 @@ export const runSuiteCommand = async (
     console.log(`  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "run suite" });
+    failSpinner({ spinner, error, action: "run suite", format: options?.format });
     process.exit(1);
   }
 };

@@ -1,8 +1,8 @@
+import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import { LIMIT_TYPE_LABELS } from "./constants";
 import type { LimitType } from "./types";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:license-enforcement:limit-message");
 

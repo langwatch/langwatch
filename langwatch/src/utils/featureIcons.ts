@@ -23,6 +23,7 @@ import {
   TrainFront,
   TrendingUp,
   Workflow,
+  Zap,
 } from "lucide-react";
 
 export type FeatureKey =
@@ -42,6 +43,7 @@ export type FeatureKey =
   | "settings"
   | "agents"
   | "evaluators"
+  | "automations"
   | "gateway";
 
 export type FeatureConfig = {
@@ -52,7 +54,7 @@ export type FeatureConfig = {
 
 /**
  * Central configuration for feature icons and colors.
- * Used by MainMenu, QuickAccessLinks, and RecentItemsSection.
+ * Used by MainMenu and RecentItemsSection.
  */
 export const featureIcons: Record<FeatureKey, FeatureConfig> = {
   home: {
@@ -134,6 +136,11 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     icon: Percent,
     color: "green.500",
     label: "Evaluators",
+  },
+  automations: {
+    icon: Zap,
+    color: "orange.500",
+    label: "Automations",
   },
   gateway: {
     icon: TrainFront,

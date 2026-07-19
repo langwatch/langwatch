@@ -35,8 +35,11 @@ func Middleware(spanNamer func(*http.Request) string) func(http.Handler) http.Ha
 				),
 			)
 
-			// Our ops trace ID is ours; the customer's trace is separate.
-			ctx, span := tracer.Start(r.Context(), name,
+			// Our ops trace ID is ours; the customer's trace is separate. Preserve
+			// the causal relationship as a span link, though: this lets Grafana jump
+			// between a Langy/app trace and the gateway-owned trace without trusting
+			// an externally supplied trace ID as the parent of internal telemetry.
+			spanOptions := []trace.SpanStartOption{
 				trace.WithNewRoot(),
 				trace.WithSpanKind(trace.SpanKindServer),
 				trace.WithAttributes(
@@ -44,7 +47,18 @@ func Middleware(spanNamer func(*http.Request) string) func(http.Handler) http.Ha
 					attribute.String("http.request.method", r.Method),
 					attribute.String("url.path", r.URL.Path),
 				),
-			)
+			}
+			if observedSC.IsValid() {
+				spanOptions = append(spanOptions,
+					trace.WithLinks(trace.Link{SpanContext: observedSC}),
+					trace.WithAttributes(
+						attribute.String(clog.FieldObservedTraceID, observedSC.TraceID().String()),
+						attribute.String(clog.FieldObservedSpanID, observedSC.SpanID().String()),
+					),
+				)
+			}
+
+			ctx, span := tracer.Start(r.Context(), name, spanOptions...)
 			sc := span.SpanContext()
 			if sc.IsValid() {
 				w.Header().Set(HeaderTraceID, sc.TraceID().String())

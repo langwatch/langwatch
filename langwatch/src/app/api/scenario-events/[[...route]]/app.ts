@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { bodyLimit } from "hono/body-limit";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
@@ -13,7 +14,6 @@ import {
 } from "~/server/scenarios/schemas";
 import { extractInlineMediaFromEvent } from "~/server/stored-objects/content-extractor";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
-import { createLogger } from "~/utils/logger/server";
 import {
   encodeContent,
   encodeEnd,
@@ -96,7 +96,7 @@ secured.access(requires("scenarios:manage")).post(
     }
 
     // Enforce scenario set limit on RUN_STARTED events.
-    // ScenarioSetLimitExceededError (DomainError with httpStatus 403)
+    // ScenarioSetLimitExceededError (HandledError with httpStatus 403)
     // propagates to handleError which returns 403 + meta fields.
     await checkScenarioSetLimitForRunStarted({ project, event });
     await dispatchSimulationEvent(project.id, event);

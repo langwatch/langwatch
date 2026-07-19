@@ -13,10 +13,11 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { Swords } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
-import { BatchPairwiseWinnerCell } from "./BatchPairwiseWinnerCell";
+import { ComparisonWinnerCell } from "./ComparisonWinnerCell";
 import { BatchTargetCell } from "./BatchTargetCell";
 import { BatchTargetHeader } from "./BatchTargetHeader";
 import {
@@ -34,7 +35,7 @@ import {
 import type {
   BatchDatasetColumn,
   BatchEvaluationData,
-  BatchPairwiseColumn,
+  BatchComparisonColumn,
   BatchResultRow,
   BatchTargetColumn,
 } from "./types";
@@ -61,19 +62,19 @@ const columnHelper = createColumnHelper<BatchResultRow>();
 const buildColumns = (
   datasetColumns: BatchDatasetColumn[],
   targetColumns: BatchTargetColumn[],
-  pairwiseColumns: BatchPairwiseColumn[],
+  comparisonColumns: BatchComparisonColumn[],
   aggregatesMap: Map<string, BatchTargetAggregate>,
   rows: BatchResultRow[],
   hiddenColumns: Set<string>,
   targetColors?: Record<string, string>,
 ) => {
   // Evaluator ids whose per-row chip is redundant with the dedicated Winner
-  // column below — the generic `EvaluatorResultChip` renders the pairwise
+  // column below — the generic `EvaluatorResultChip` renders the comparison
   // verdict as `<target_XYZ> 1.00`, which reads as noise to users (dogfood
   // report). Suppressing them in the target cell keeps the Winner column
-  // the single source of the pairwise result.
-  const pairwiseEvaluatorIds = new Set(
-    pairwiseColumns.map((p) => p.evaluatorId),
+  // the single source of the comparison result.
+  const comparisonEvaluatorIds = new Set(
+    comparisonColumns.map((p) => p.evaluatorId),
   );
   const columns = [];
 
@@ -150,19 +151,19 @@ const buildColumns = (
     );
   }
 
-  // Map each pairwise column-target to its detected pairwise metadata so we
+  // Map each comparison column-target to its detected metadata so we
   // can render the winner cell (badge + winning output + reasoning) INSIDE
-  // the pairwise column's own cell — the user wants everything in one
+  // the comparison column's own cell — the user wants everything in one
   // place, not split across a target column and a trailing Winner column.
-  const pairwiseByTargetId = new Map(
-    pairwiseColumns.map((p) => [p.evaluatorId, p]),
+  const comparisonByTargetId = new Map(
+    comparisonColumns.map((p) => [p.evaluatorId, p]),
   );
 
   // Target columns with headers that include summary
   for (const targetCol of targetColumns) {
     const aggregates = aggregatesMap.get(targetCol.id) ?? null;
     const targetColor = targetColors?.[targetCol.id];
-    const pairwiseMeta = pairwiseByTargetId.get(targetCol.id);
+    const comparisonMeta = comparisonByTargetId.get(targetCol.id);
 
     columns.push(
       columnHelper.accessor((row) => row.targets[targetCol.id], {
@@ -178,15 +179,16 @@ const buildColumns = (
         minSize: 200,
         cell: ({ getValue, row }) => {
           const targetOutput = getValue();
-          // Pairwise column-target cell: render the dedicated Winner cell
+          // Comparison column-target cell: render the dedicated Winner cell
           // (badge + winning output + reasoning) instead of the generic
           // target output. That keeps everything the reader wants in one
           // column so they don't need to scroll to a trailing Winner column.
-          if (pairwiseMeta) {
+          if (comparisonMeta) {
             return (
-              <BatchPairwiseWinnerCell
-                column={pairwiseMeta}
-                verdict={pairwiseMeta.verdictsByRow[row.original.index]}
+              <ComparisonWinnerCell
+                column={comparisonMeta}
+                verdict={comparisonMeta.verdictsByRow[row.original.index]}
+                targetColors={targetColors}
               />
             );
           }
@@ -200,7 +202,7 @@ const buildColumns = (
           return (
             <BatchTargetCell
               targetOutput={targetOutput}
-              suppressedEvaluatorIds={pairwiseEvaluatorIds}
+              suppressedEvaluatorIds={comparisonEvaluatorIds}
             />
           );
         },
@@ -208,7 +210,50 @@ const buildColumns = (
     );
   }
 
+  // A comparison wired as an evaluator chip rather than as its own column has
+  // no target column to render its verdict inside, and its chip is suppressed
+  // above. Without a trailing Winner column the verdict would be invisible.
+  for (const column of trailingComparisonColumns(
+    comparisonColumns,
+    targetColumns,
+  )) {
+    columns.push(
+      columnHelper.display({
+        id: `comparison_${column.evaluatorId}`,
+        header: () => (
+          <HStack gap={1.5}>
+            <Swords size={14} />
+            <Text fontSize="12px" fontWeight="600">
+              {column.name}
+            </Text>
+          </HStack>
+        ),
+        size: 240,
+        minSize: 200,
+        cell: ({ row }) => (
+          <ComparisonWinnerCell
+            column={column}
+            verdict={column.verdictsByRow[row.original.index]}
+            targetColors={targetColors}
+          />
+        ),
+      }),
+    );
+  }
+
   return columns;
+};
+
+/**
+ * Comparison columns that need a Winner column of their own — i.e. those that
+ * are not already rendered inside a matching target column.
+ */
+export const trailingComparisonColumns = (
+  comparisonColumns: BatchComparisonColumn[],
+  targetColumns: BatchTargetColumn[],
+): BatchComparisonColumn[] => {
+  const targetIds = new Set(targetColumns.map((t) => t.id));
+  return comparisonColumns.filter((c) => !targetIds.has(c.evaluatorId));
 };
 
 export function SingleRunTable({
@@ -233,7 +278,7 @@ export function SingleRunTable({
     return buildColumns(
       data.datasetColumns,
       data.targetColumns,
-      data.pairwiseColumns ?? [],
+      data.comparisonColumns ?? [],
       aggregatesMap,
       data.rows,
       hiddenColumns,
@@ -305,11 +350,16 @@ export function SingleRunTable({
     (c) => !hiddenColumns.has(c.name),
   ).length;
   const targetColCount = data.targetColumns.length;
-  const pairwiseColCount = data.pairwiseColumns?.length ?? 0;
+  // Only the comparisons that get their own trailing column add width; one
+  // rendered inside a target column is already paid for by that column.
+  const comparisonColCount = trailingComparisonColumns(
+    data.comparisonColumns ?? [],
+    data.targetColumns,
+  ).length;
   const minTableWidth = calculateMinTableWidth(
     datasetColCount,
     targetColCount,
-    pairwiseColCount,
+    comparisonColCount,
   );
 
   const tableStyles = getTableStyles(minTableWidth);

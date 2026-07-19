@@ -1,7 +1,9 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { HandledError } from "@langwatch/handled-error";
 import { Hono } from "hono";
-import { handleError } from "../error-handler";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
+import { InternalServerError } from "../../shared/errors";
+import { handleError } from "../error-handler";
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(),
@@ -14,7 +16,7 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),
@@ -57,7 +59,7 @@ describe("handleError()", () => {
   }
 
   describe("when error is a LimitExceededError", () => {
-    it("returns 403 with DomainError shape", async () => {
+    it("returns 403 with HandledError shape", async () => {
       const error = new LimitExceededError("prompts", 5, 5);
       const app = createTestApp(error);
 
@@ -81,6 +83,47 @@ describe("handleError()", () => {
       expect(body).toHaveProperty("limitType", "prompts");
       expect(body).toHaveProperty("current", 5);
       expect(body).toHaveProperty("max", 5);
+    });
+  });
+
+  describe("when error carries remediation fields", () => {
+    it("emits tips, docsUrl and fault in the body", async () => {
+      const error = new (class extends HandledError {
+        constructor() {
+          super("query_memory_exceeded", "Query exceeded its memory limit", {
+            httpStatus: 422,
+            fault: "customer",
+            tips: ["Narrow the time range"],
+            docsUrl: "https://docs.langwatch.ai/traces",
+          });
+        }
+      })();
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      expect(res.status).toBe(422);
+      const body = await res.json();
+      expect(body.error).toBe("query_memory_exceeded");
+      expect(body.tips).toEqual(["Narrow the time range"]);
+      expect(body.docsUrl).toBe("https://docs.langwatch.ai/traces");
+      expect(body.fault).toBe("customer");
+    });
+
+    it("omits remediation keys when the error has none", async () => {
+      const error = new (class extends HandledError {
+        constructor() {
+          super("plain_handled", "nothing to add", { httpStatus: 400 });
+        }
+      })();
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      const body = await res.json();
+      expect(body).not.toHaveProperty("tips");
+      expect(body).not.toHaveProperty("docsUrl");
+      expect(body.fault).toBe("customer");
     });
   });
 
@@ -126,7 +169,7 @@ describe("handleError()", () => {
   });
 
   describe("when error has no recognizable shape (fallback 500)", () => {
-    it("includes the underlying error message", async () => {
+    it("does not expose the underlying error message", async () => {
       const error = Object.assign(new Error("database connection refused"), {
         name: "DatabaseError",
         code: "ECONNREFUSED",
@@ -137,19 +180,39 @@ describe("handleError()", () => {
 
       expect(res.status).toBe(500);
       const body = await res.json();
-      // Kind stays generic so clients can categorize, but message gains
-      // the actual cause so humans and assistants can act on it.
       expect(body.error).toBe("Internal server error");
-      expect(body.message).toContain("database connection refused");
-      expect(body.message).toContain("ECONNREFUSED");
+      expect(body.message).toBe("An unknown error occurred");
+      expect(JSON.stringify(body)).not.toContain("database connection refused");
+      expect(JSON.stringify(body)).not.toContain("ECONNREFUSED");
     });
 
-    it("surfaces the underlying message in production too", async () => {
-      // Hiding the message behind a generic string in prod is exactly
-      // the problem this error-handling PR set out to fix — API callers
-      // need a real message to diagnose. Prisma does not leak credentials
-      // via error.message, the codebase is public, and only API-key
-      // holders see these responses.
+    it("does not expose a message merely because it contains 'not found'", async () => {
+      const app = createTestApp(
+        new Error("relation internal_projection was not found on db.internal"),
+      );
+
+      const res = await app.request("/");
+      const body = await res.json();
+
+      expect(res.status).toBe(500);
+      expect(body.message).toBe("An unknown error occurred");
+      expect(JSON.stringify(body)).not.toContain("internal_projection");
+    });
+
+    it("sanitizes explicit 500 HttpErrors too", async () => {
+      const app = createTestApp(
+        new InternalServerError("Prisma connection pool exhausted"),
+      );
+
+      const res = await app.request("/");
+      const body = await res.json();
+
+      expect(res.status).toBe(500);
+      expect(body.message).toBe("An unknown error occurred");
+      expect(JSON.stringify(body)).not.toContain("Prisma");
+    });
+
+    it("uses the same sanitized message in production", async () => {
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = "production";
       try {
@@ -167,9 +230,12 @@ describe("handleError()", () => {
         expect(res.status).toBe(500);
         const body = await res.json();
         expect(body.error).toBe("Internal server error");
-        expect(body.message).toContain("ECONNREFUSED 10.0.0.42:5432");
-        expect(body.message).toContain("P1001");
-        expect(body.message).toContain("PrismaClientInitializationError");
+        expect(body.message).toBe("An unknown error occurred");
+        expect(JSON.stringify(body)).not.toContain("10.0.0.42:5432");
+        expect(JSON.stringify(body)).not.toContain("P1001");
+        expect(JSON.stringify(body)).not.toContain(
+          "PrismaClientInitializationError",
+        );
       } finally {
         process.env.NODE_ENV = originalEnv;
       }

@@ -25,15 +25,14 @@
  * Spec: specs/ai-governance/puller-framework/s3-polling.feature
  */
 import {
+  type _Object,
   GetObjectCommand,
   ListObjectsV2Command,
   S3Client,
-  type _Object,
 } from "@aws-sdk/client-s3";
+import { createLogger } from "@langwatch/observability";
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
-
-import { createLogger } from "~/utils/logger/server";
 import {
   captureException,
   toError,
@@ -42,9 +41,9 @@ import {
 
 import type {
   NormalizedPullEvent,
+  PullerAdapter,
   PullResult,
   PullRunOptions,
-  PullerAdapter,
 } from "./pullerAdapter";
 
 const logger = createLogger("langwatch:puller:s3_polling");

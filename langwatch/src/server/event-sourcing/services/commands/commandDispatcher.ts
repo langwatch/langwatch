@@ -1,18 +1,18 @@
 import { performance } from "node:perf_hooks";
-import type { createLogger } from "~/utils/logger/server";
-import { mapZodIssuesToLogContext } from "~/utils/zod";
+import type { createLogger } from "@langwatch/observability";
 import {
   incrementEsCommandTotal,
   observeEsCommandDuration,
 } from "~/server/metrics";
+import { mapZodIssuesToLogContext } from "~/utils/zod";
 import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 import type { Command, CommandHandler } from "../../commands/command";
 import { createCommand } from "../../commands/command";
 import type { CommandSchema } from "../../commands/commandSchema";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { CommandType } from "../../domain/commandType";
-import { createTenantId } from "../../domain/tenantId";
 import type { TenantId } from "../../domain/tenantId";
+import { createTenantId } from "../../domain/tenantId";
 import type { Event } from "../../domain/types";
 import { EventSchema } from "../../domain/types";
 import type { KillSwitchOptions } from "../../pipeline/staticBuilder.types";
@@ -107,12 +107,7 @@ export async function processCommand<EventType extends Event>(
     return;
   }
 
-  const command = createCommand(
-    tenantId,
-    aggregateId,
-    commandType,
-    validated,
-  );
+  const command = createCommand(tenantId, aggregateId, commandType, validated);
 
   const commandStartTime = performance.now();
   try {
@@ -186,7 +181,10 @@ export async function processCommand<EventType extends Event>(
           await handler.cleanupAfterStore(command);
         } catch (err) {
           log?.warn(
-            { error: err instanceof Error ? err.message : String(err), commandType },
+            {
+              error: err instanceof Error ? err.message : String(err),
+              commandType,
+            },
             "Post-store cleanup failed (best-effort) — event is durable, cleanup skipped",
           );
         }
@@ -210,6 +208,13 @@ export async function processCommand<EventType extends Event>(
 export interface CommandHandlerOptions<Payload> {
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
+  /**
+   * Serialize this command with every other command that enables the option
+   * for the same tenant and aggregate. This keeps command handling, event
+   * append, and projection staging atomic with respect to the next command
+   * for that aggregate while allowing other aggregates to run concurrently.
+   */
+  serializeByAggregate?: boolean;
   delay?: number;
   deduplication?: DeduplicationStrategy<Payload>;
   concurrency?: number;
@@ -218,4 +223,3 @@ export interface CommandHandlerOptions<Payload> {
   ) => Record<string, string | number | boolean>;
   killSwitch?: KillSwitchOptions;
 }
-

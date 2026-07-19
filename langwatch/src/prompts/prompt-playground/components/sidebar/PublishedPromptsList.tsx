@@ -1,6 +1,8 @@
 import { Skeleton } from "@chakra-ui/react";
 import { groupBy } from "lodash-es";
 import { useMemo } from "react";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { promptContextChip } from "~/features/langy/logic/langyContextChips";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
@@ -72,8 +74,17 @@ export function PublishedPromptsList() {
           defaultOpen={false}
         >
           {prompts.map((prompt) => (
-            <Sidebar.Item
+            // While the Langy panel is open the prompt can be pointed at and
+            // absorbed as context; its own click (open in a tab) is untouched.
+            // Inert while Langy is closed.
+            <LangyContextTarget
               key={prompt.id}
+              target={promptContextChip({
+                promptId: prompt.id,
+                handle: prompt.handle,
+              })}
+            >
+            <Sidebar.Item
               icon={
                 modelProviderIcons[
                   prompt.model?.split("/")[0] as keyof typeof modelProviderIcons
@@ -111,6 +122,7 @@ export function PublishedPromptsList() {
                 prompt={prompt}
               />
             </Sidebar.Item>
+            </LangyContextTarget>
           ))}
         </Sidebar.List>
       ))}

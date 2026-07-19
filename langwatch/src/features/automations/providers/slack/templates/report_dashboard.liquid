@@ -1,0 +1,60 @@
+{%- capture _sub -%}
+{{ report.sourceLabel | mrkdwn_escape }} · {{ report.scheduleLabel }}
+{%- endcapture -%}
+{%- comment -%}
+Slack plots at most 20 points per series. A `limit: 20` would chart only the
+FIRST 20 buckets of the period, so each panel takes every Nth bucket instead —
+the chart still spans the whole period, at a coarser resolution.
+{%- endcomment -%}
+{%- capture _panels -%}
+{%- for chart in charts limit: 8 -%}
+{%- if chart.isEmpty -%}{%- continue -%}{%- endif -%}
+{%- assign _bucket_count = chart.categories | size -%}
+{%- assign _stride = _bucket_count | divided_by: 20.0 | ceil -%}
+{%- if _stride < 1 -%}{%- assign _stride = 1 -%}{%- endif -%}
+{%- capture _chart_json -%}
+{%- if chart.type == "pie" -%}
+{ "type": "pie", "segments": [
+{%- for seg in chart.segments limit: 8 -%}
+{% unless forloop.first %},{% endunless %}{ "label": {{ seg.label | truncate: 40 | json }}, "value": {{ seg.value }} }
+{%- endfor -%}
+] }
+{%- else -%}
+{ "type": {{ chart.type | json }}, "series": [
+{%- for s in chart.series limit: 5 -%}
+{% unless forloop.first %},{% endunless %}{ "name": {{ s.name | truncate: 20 | json }}, "data": [
+{%- for p in s.data -%}
+{%- assign _keep = forloop.index0 | modulo: _stride -%}
+{%- if _keep == 0 -%}{% unless forloop.first %},{% endunless %}{ "label": {{ p.label | json }}, "value": {{ p.value }} }{%- endif -%}
+{%- endfor -%}
+] }
+{%- endfor -%}
+], "axis_config": { "categories": [
+{%- for c in chart.categories -%}
+{%- assign _keep = forloop.index0 | modulo: _stride -%}
+{%- if _keep == 0 -%}{% unless forloop.first %},{% endunless %}{{ c | json }}{%- endif -%}
+{%- endfor -%}
+], "x_label": "Time", "y_label": {{ chart.title | truncate: 50 | json }} } }
+{%- endif -%}
+{%- endcapture -%}
+,{ "type": "data_visualization", "block_id": {{ chart.id | prepend: "panel_" | json }}, "title": {{ chart.title | truncate: 50 | json }}, "chart": {{ _chart_json }} }
+{%- endfor -%}
+{%- endcapture -%}
+{%- capture _headlines -%}
+{% for chart in charts limit: 8 %}• *{{ chart.title | truncate: 50 | mrkdwn_escape }}* — {% if chart.isEmpty %}_no data_{% else %}{{ chart.total | round: 2 }}{% endif %}{% unless forloop.last %}
+{% endunless %}{% endfor %}
+{%- endcapture -%}
+{%- capture _view -%}
+<{{ viewUrl }}|Open dashboard ↗> · {{ occurredAt | date: "%b %d, %H:%M" }}
+{%- endcapture -%}
+[
+  { "type": "header", "text": { "type": "plain_text", "text": {{ trigger.name | prepend: "📊 " | truncate: 140 | json }}, "emoji": true } },
+  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _sub | json }} }] }
+  {%- if report.isEmpty -%}
+  ,{ "type": "section", "text": { "type": "mrkdwn", "text": "_No data for this period._" } }
+  {%- else -%}
+  {{ _panels }}
+  ,{ "type": "section", "text": { "type": "mrkdwn", "text": {{ _headlines | json }} } }
+  {%- endif -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _view | json }} }] }
+]

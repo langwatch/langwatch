@@ -1,9 +1,11 @@
 package controlplane
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -170,4 +172,36 @@ func TestProviderSlotToCredential_BaseURL(t *testing.T) {
 		})
 		assert.Empty(t, cred.Extra["base_url"])
 	})
+}
+
+// The trace-export project id and its OTLP token are materialized together by
+// the control plane and must survive decoding as a pair. Dropping project_id
+// here is what forced the middleware to reach for the auth JWT's project id
+// instead — a field on a different refresh clock, whose skew exported one
+// project's prompts and completions under another project's ingest token.
+func TestConfigWire_TraceProjectIDTravelsWithToken(t *testing.T) {
+	var wire configWire
+	require.NoError(t, json.Unmarshal(
+		[]byte(`{"project_id":"proj-trace","project_otlp_token":"tok-trace"}`),
+		&wire,
+	))
+
+	cfg := wire.toDomain()
+
+	assert.Equal(t, "proj-trace", cfg.TraceProjectID)
+	assert.Equal(t, "tok-trace", cfg.ProjectOTLPToken)
+}
+
+// A null project_id (org without an internal_governance project) must decode to
+// empty rather than to some other project's id — the middleware fails closed on
+// empty and exports nothing, which is the safe outcome.
+func TestConfigWire_AbsentTraceProjectIDIsEmpty(t *testing.T) {
+	var wire configWire
+	require.NoError(t, json.Unmarshal(
+		[]byte(`{"project_id":null,"project_otlp_token":"tok"}`),
+		&wire,
+	))
+	cfg := wire.toDomain()
+
+	assert.Empty(t, cfg.TraceProjectID)
 }

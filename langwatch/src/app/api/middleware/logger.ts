@@ -1,13 +1,13 @@
+import { createLogger } from "@langwatch/observability";
+import {
+  getStatusCodeFromError,
+  logHttpRequest,
+} from "@langwatch/observability/request";
 import type { Context, Next } from "hono";
 import {
   createContextFromHono,
   runWithContext,
 } from "../../../server/context/asyncContext";
-import {
-  getStatusCodeFromError,
-  logHttpRequest,
-} from "../../../server/middleware/requestLogging";
-import { createLogger } from "../../../utils/logger/server";
 
 const logger = createLogger("langwatch:api:hono");
 

@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
@@ -62,7 +62,7 @@ export const getSimulationRunCommand = async (
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
-  const spinner = ora(`Fetching simulation run "${runId}"...`).start();
+  const spinner = createSpinner(`Fetching simulation run "${runId}"...`).start();
 
   try {
     const response = await fetch(
@@ -165,7 +165,7 @@ export const getSimulationRunCommand = async (
 
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch simulation run" });
+    failSpinner({ spinner, error, action: "fetch simulation run", format: options?.format });
     process.exit(1);
   }
 };

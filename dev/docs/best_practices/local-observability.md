@@ -144,9 +144,9 @@ Two ways, both wired by `make observability-connect`:
 
    ```bash
    # Logs for one service, most recent first.
-   gcx logs query '{service_name="langwatch-backend"}' --since 15m
+   gcx logs query '{service_name="langwatch-app"}' --since 15m
    # Only warnings/errors.
-   gcx logs query '{service_name="langwatch-backend"} | level=~"WARN|ERROR"' --since 15m
+   gcx logs query '{service_name="langwatch-app"} | level=~"WARN|ERROR"' --since 15m
    # Everything for ONE trace, across services — the fast path from an error's
    # trace id (returned in the error body / the Langy "view trace" link) to its logs.
    gcx logs query '{service_name=~".+"} | trace_id="<traceId>"' --since 1h
@@ -162,7 +162,7 @@ Two ways, both wired by `make observability-connect`:
    stream selector:
 
    ```bash
-   gcx logs query '{service_name="langwatch-backend"} | langwatch_worktree="<slug>"' --since 15m
+   gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m
    ```
 
    In Tempo the same tag is `resource.langwatch.worktree` in TraceQL:

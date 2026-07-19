@@ -9,9 +9,17 @@ import {
   EVALUATION_PROCESSING_EVENT_TYPES,
 } from "../pipelines/evaluation-processing/schemas/constants";
 import {
+  AUTOMATIONS_COMMAND_TYPES,
+  AUTOMATIONS_EVENT_TYPES,
+} from "../pipelines/automations/schemas/constants";
+import {
   EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES,
   EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
 } from "../pipelines/experiment-run-processing/schemas/constants";
+import {
+  LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
+  LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
+} from "../pipelines/langy-conversation-processing/schemas/constants";
 import {
   BILLING_REPORTING_COMMAND_TYPES,
 } from "../pipelines/billing-reporting/schemas/constants";
@@ -38,11 +46,13 @@ const TEST_EVENT_TYPES = ["test.integration.event"] as const;
  * All event type identifiers defined in schemas.
  */
 export const EVENT_TYPE_IDENTIFIERS = [
+  ...AUTOMATIONS_EVENT_TYPES,
   ...TRACE_PROCESSING_EVENT_TYPES,
   ...EVALUATION_PROCESSING_EVENT_TYPES,
   ...EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
   ...SIMULATION_PROCESSING_EVENT_TYPES,
   ...SUITE_RUN_PROCESSING_EVENT_TYPES,
+  ...LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
   ...TEST_EVENT_TYPES,
 ] as const;
 
@@ -50,11 +60,13 @@ export const EVENT_TYPE_IDENTIFIERS = [
  * All command type identifiers defined in schemas.
  */
 export const COMMAND_TYPE_IDENTIFIERS = [
+  ...AUTOMATIONS_COMMAND_TYPES,
   ...TRACE_PROCESSING_COMMAND_TYPES,
   ...EVALUATION_PROCESSING_COMMAND_TYPES,
   ...EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES,
   ...SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
   ...SUITE_RUN_PROCESSING_COMMAND_TYPES,
+  ...LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
   ...BILLING_REPORTING_COMMAND_TYPES,
 ] as const;
 
@@ -70,12 +82,14 @@ const TEST_AGGREGATE_TYPE = "test_aggregate" as const;
  * via event handler in the trace-processing pipeline.
  */
 export const AGGREGATE_TYPE_IDENTIFIERS = [
+  "trigger",
   "trace",
   "evaluation",
   "experiment_run",
   "simulation_run",
   "simulation_set",
   "suite_run",
+  "langy_conversation",
   "billing_report",
   "global",
   TEST_AGGREGATE_TYPE,

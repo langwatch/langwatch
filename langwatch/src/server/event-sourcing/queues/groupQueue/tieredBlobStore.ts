@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 
-import type { Logger } from "pino";
+import type { Logger } from "@langwatch/observability";
 
 import { COMMAND_INLINE_THRESHOLD } from "~/server/app-layer/traces/lean-for-projection";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
@@ -333,7 +333,10 @@ export class TieredBlobStore {
       );
     } catch (err) {
       // A genuinely-absent or oversized/corrupt object is a missing blob → null
-      // → decode fail-safe (recover via replay). Anything else (network/5xx) is
+      // → decode fail-safe, which DISCARDS the job (#5538: replay rebuilds fold
+      // projections and never re-invokes reactors, so for a reactor-bearing fold
+      // this is permanent loss, not "recover via replay" as this once claimed —
+      // see `GroupQueue.dropStagedJob`). Anything else (network/5xx) is
       // transient and must retry, not drop the job (ADR-030 §2). Oversize is
       // an OBSERVABLE fail-safe — split from "just missing" so oncall can see a
       // real tamper / zip-bomb event distinct from "TTL reclaimed the blob".

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { ScenarioSetLimitExceededError } from "~/server/app-layer/usage/errors";
 import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 
@@ -10,7 +10,7 @@ vi.mock("~/server/organizations/resolveOrganizationId", () => ({
   resolveOrganizationId: vi.fn(),
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),
@@ -186,7 +186,7 @@ describe("scenario-events endpoint integration with scenario set limit", () => {
       const error = new ScenarioSetLimitExceededError(3, 3);
 
       expect(error.httpStatus).toBe(403);
-      expect(error.kind).toBe("scenario_set_limit_exceeded");
+      expect(error.code).toBe("scenario_set_limit_exceeded");
       expect(error.meta.current).toBe(3);
       expect(error.meta.max).toBe(3);
       expect(error.message).toContain("maximum number of scenario sets");

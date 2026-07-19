@@ -81,6 +81,5 @@ spec:
     - to:
         {{- toYaml .Values.networkPolicy.egressToProviders | nindent 8 }}
       ports:
-        - protocol: TCP
-          port: 443
+        {{- toYaml .Values.networkPolicy.providerPorts | nindent 8 }}
 {{- end }}

@@ -1103,16 +1103,12 @@ cronjobs:
       schedule: "0 0 * * *" # At midnight every day
       endpoint: "/api/cron/schedule_topic_clustering"
 
-    # Alert triggers job - checks and fires alerts
-    # See: https://kubespec.dev/batch/v1/CronJob#spec.schedule
-    ## @extra cronjobs.jobs.alertTriggers Alert triggers job.
-    ## @param cronjobs.jobs.alertTriggers.enabled [default: true] Enable alert triggers job.
-    ## @param cronjobs.jobs.alertTriggers.schedule [string, default: */3 * * * *] Cron schedule.
-    ## @param cronjobs.jobs.alertTriggers.endpoint [string, default: /api/cron/triggers] Endpoint path.
-    alertTriggers:
-      enabled: true
-      schedule: "*/3 * * * *" # Every 3 minutes
-      endpoint: "/api/cron/triggers"
+    # NOTE: the automation CronJobs are gone. The alertTriggers CronJob
+    # (`/api/cron/triggers`) was removed — custom-graph threshold alerts now
+    # fire from the event-sourced worker path (ADR-034) — and the webhook
+    # delivery-log prune runs as a daily scheduled process manager on the
+    # same worker path (ADR-040 §6), so neither needs a cron sweep. The
+    # workers Deployment (workers.enabled) is what runs them now.
 
   # =============================================================================
   # Kubernetes Pass-Through Configuration
@@ -1535,6 +1531,8 @@ clickhouse:
   backup:
     ## @param clickhouse.backup.enabled [default: false] Enable automated native ClickHouse backups.
     enabled: false
+    ## @param clickhouse.backup.metricsEnabled [default: false] Force backup-status metrics (system.backup_log gauges) on even when backups run out-of-band (e.g. a separate CronJob). Metrics are already emitted automatically when backup.enabled is true; set this only when this chart is not the one running the backups.
+    metricsEnabled: false
     ## @param clickhouse.backup.database [string, default: langwatch] Database to back up.
     database: "langwatch"
     ## @extra clickhouse.backup.full Full backup schedule.
@@ -1696,6 +1694,14 @@ gateway:
   secrets:
     existingSecretName: langwatch-app-secrets
 
+  ## @param gateway.security.blockLocalHTTPCalls [default: false] Reject tenant-supplied provider endpoints resolving to local/private networks. Keep false for local/self-hosted installs that intentionally use private services; set true for SaaS together with a restrictive gateway NetworkPolicy.
+  ## @param gateway.security.requireHTTPSCustomEndpoints [default: false] Require HTTPS for customer-configured provider endpoints. Hosted-cloud hardening; disabled by default for self-hosted compatibility.
+  ## @param gateway.security.allowedProxyHosts [array, default: []] Exact private endpoint hostnames allowed when blockLocalHTTPCalls is enabled. Cloud metadata remains blocked.
+  security:
+    blockLocalHTTPCalls: false
+    requireHTTPSCustomEndpoints: false
+    allowedProxyHosts: []
+
   # Trace export is OFF by default to keep the chart safe to install
   # without out-of-band auth-token plumbing. Earlier defaults pointed
   # at /api/otel without an auth token — the 401 storm from that
@@ -1717,30 +1723,30 @@ gateway:
 ## The Langy agent is the OpenCode "manager" pod that backs the in-product
 ## assistant. Internal-only (no ingress); the control plane reaches it over
 ## cluster DNS. The subchart defaults (image, probes, NetworkPolicy,
-## SecurityContext, single-replica) live in charts/langy-agent/values.yaml.
-## `langy-agent.chartManaged: false` (the default) disables the agent and the
+## SecurityContext, single-replica) live in charts/langyagent/values.yaml.
+## `langyagent.chartManaged: false` (the default) disables the agent and the
 ## app's wiring to it; flip to true once the prerequisite secret + opt-in
 ## steps are done (see docs/langy-github-app.md).
 ##
 ## WHY default off: the agent + app Deployments both reference a `secretKeyRef`
-## to `langwatch-langy-agent-auth` (created out-of-band — terraform / external-
+## to `langwatch-langyagent-auth` (created out-of-band — terraform / external-
 ## secrets / a manual `kubectl create secret`). The umbrella chart does NOT
 ## materialise that secret, so an upgrade with chartManaged=true on top of a
 ## values file that hasn't been prepared yields `CreateContainerConfigError`
 ## on the main app pod — turning an optional, dark-by-flag feature into a
 ## blocker for every operator's next upgrade. Default-off keeps existing
 ## installs unaffected; operators flip the switch when they're ready.
-## NOTE: hyphenated key — reference as (index .Values "langy-agent") in templates.
-langy-agent:
-  ## @param langy-agent.chartManaged [default: false] Lift the Langy agent pod as part of this chart. Default off so existing upgrades aren't broken by the absent shared Secret; opt in once the LANGY_INTERNAL_SECRET secret is created out-of-band.
+## NOTE: hyphenated key — reference as (index .Values "langyagent") in templates.
+langyagent:
+  ## @param langyagent.chartManaged [default: false] Lift the Langy agent pod as part of this chart. Default off so existing upgrades aren't broken by the absent shared Secret; opt in once the LANGY_INTERNAL_SECRET secret is created out-of-band.
   chartManaged: false
 
-  ## @param langy-agent.controlPlane.agentUrl [string, default: http://<release>-langy-agent:80] URL the app uses to reach the agent Service. Leave empty to auto-derive from the release name.
+  ## @param langyagent.controlPlane.agentUrl [string, default: http://<release>-langyagent:80] URL the app uses to reach the agent Service. Leave empty to auto-derive from the release name.
   controlPlane:
     agentUrl: ""
 
-  ## @param langy-agent.secrets.existingSecretName [string, default: langwatch-langy-agent-auth] Secret carrying LANGY_INTERNAL_SECRET, shared between the app and the agent pod. Created out-of-band (terraform / external-secrets); the umbrella chart does NOT materialise it.
-  ## @param langy-agent.secrets.internalSecretKey [string, default: LANGY_INTERNAL_SECRET] Key inside the existing Secret that holds the shared internal secret.
+  ## @param langyagent.secrets.existingSecretName [string, default: langwatch-langyagent-auth] Secret carrying LANGY_INTERNAL_SECRET, shared between the app and the agent pod. Created out-of-band (terraform / external-secrets); the umbrella chart does NOT materialise it.
+  ## @param langyagent.secrets.internalSecretKey [string, default: LANGY_INTERNAL_SECRET] Key inside the existing Secret that holds the shared internal secret.
   secrets:
-    existingSecretName: langwatch-langy-agent-auth
+    existingSecretName: langwatch-langyagent-auth
     internalSecretKey: LANGY_INTERNAL_SECRET
