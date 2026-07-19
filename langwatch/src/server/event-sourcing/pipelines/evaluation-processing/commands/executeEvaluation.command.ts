@@ -5,6 +5,7 @@ import {
   isAzureEvaluatorType,
 } from "../../../../app-layer/evaluations/azure-safety-env";
 import { getAzureSafetyEnvFromProject } from "../../../../app-layer/evaluations/azure-safety-env.server";
+import { HandledError } from "../../../../app-layer/handled-error";
 import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
@@ -332,6 +333,34 @@ export class ExecuteEvaluationCommand implements CommandHandler<
         this.deps.offloadInputs,
       );
     } catch (error) {
+      // A misconfigured evaluator (provider disabled, provider absent, model
+      // not set) is an expected state of the product, not a platform fault:
+      // the customer can fix it themselves from Settings → Model Providers.
+      // Treat it like the pre-execution config gates above — emit "skipped"
+      // with the message as `details` so the UI tells them what to change,
+      // and log at info so error telemetry only carries real faults. The
+      // stable `code` is what customer-health rules key off, so nothing has
+      // to pattern-match log message strings to find affected projects.
+      if (HandledError.isHandled(error)) {
+        logger.info(
+          {
+            code: error.code,
+            tenantId,
+            evaluationId: data.evaluationId,
+            evaluatorId: data.evaluatorId,
+            traceId: data.traceId,
+            ...error.meta,
+            error: error.message,
+          },
+          "Evaluator misconfigured — skipping evaluation",
+        );
+
+        return emitReported(data, tenantId, {
+          status: "skipped",
+          details: error.message,
+        });
+      }
+
       logger.error(
         {
           tenantId: tenantId,
