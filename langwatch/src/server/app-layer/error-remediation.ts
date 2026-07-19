@@ -133,6 +133,13 @@ const registry = {
       "If it persists, check the LangWatch status page or contact support",
     ],
   },
+  evaluator_input_too_large: {
+    tips: [
+      "Shorten the input sent to this evaluator — the payload exceeded the evaluator's size limit",
+      "Map the evaluator to a specific field rather than the whole trace, so only what it scores is sent",
+    ],
+    docsPath: "/evaluations/evaluators/list",
+  },
   evaluator_missing_field: {
     tips: [
       "Provide the missing field in the request (see meta.field)",

@@ -15,6 +15,7 @@ import { createTenantId } from "../../../../";
 import {
   EvaluatorConfigError,
   EvaluatorExecutionError,
+  EvaluatorInputTooLargeError,
 } from "../../../../../app-layer/evaluations/errors";
 import type { EvaluationCostRecorder } from "../../../../../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../../../../../app-layer/evaluations/evaluation-execution.service";
@@ -172,6 +173,23 @@ describe("Feature: Evaluator misconfiguration is a skip, not a failure", () => {
         expect(eventDataOf(events).details).toBe(
           "Provider anthropic is not configured",
         );
+      });
+    });
+  });
+
+  describe("given the evaluator input exceeds the size limit", () => {
+    describe("when the command handles the evaluation", () => {
+      /** @scenario An oversized evaluator payload is skipped with an actionable message */
+      it("skips with a message telling the customer to shorten the input", async () => {
+        const { command } = buildCommandWithMocks({
+          thrown: new EvaluatorInputTooLargeError(),
+        });
+
+        const events = await command.handle(buildCommand());
+
+        expect(eventDataOf(events).status).toBe("skipped");
+        expect(eventDataOf(events).details).toMatch(/too large|shorten/i);
+        expect(loggerSpies.error).not.toHaveBeenCalled();
       });
     });
   });

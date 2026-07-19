@@ -8,7 +8,10 @@ import {
   getEvaluationStatusCounter,
 } from "~/server/metrics";
 import { tryAndConvertTo } from "~/server/tracer/tracesMapping";
-import { EvaluatorExecutionError } from "../../evaluations/errors";
+import {
+  EvaluatorExecutionError,
+  EvaluatorInputTooLargeError,
+} from "../../evaluations/errors";
 import type {
   LangEvalsClient,
   LangEvalsEvaluateParams,
@@ -104,6 +107,15 @@ export class LangEvalsHttpClient implements LangEvalsClient {
       } catch {
         /* safe json parse fallback */
       }
+      // 413 is the customer's payload being too big, not our backend failing.
+      // Raised as its own customer-fault error so it reports as an actionable
+      // skip instead of an opaque `413 {"message":"Request Too Long"}`.
+      if (response.status === 413) {
+        throw new EvaluatorInputTooLargeError({
+          meta: { evaluatorType, httpStatus: response.status },
+        });
+      }
+
       throw new EvaluatorExecutionError(`${response.status} ${statusText}`, {
         meta: { evaluatorType, httpStatus: response.status },
       });
