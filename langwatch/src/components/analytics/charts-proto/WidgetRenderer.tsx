@@ -32,6 +32,14 @@ import { aggUnit, deltaTrend, formatAggValue, type StubResult } from "./stubData
 const GRID_STROKE = "color-mix(in srgb, currentColor 12%, transparent)";
 const AXIS_TICK = { fontSize: 11, fill: "currentColor", opacity: 0.55 };
 const MAX_LINE_SERIES = 6;
+const MAX_Y_AXIS_LABEL_LENGTH = 16;
+
+/** Truncate a bar-chart category label so it fits the fixed y-axis width; the
+ * tooltip (driven off the untruncated data, not the tick) still shows it in full. */
+const truncateYAxisLabel = (label: string): string =>
+  label.length <= MAX_Y_AXIS_LABEL_LENGTH
+    ? label
+    : label.slice(0, MAX_Y_AXIS_LABEL_LENGTH - 1) + "…";
 
 interface Props {
   spec: WidgetSpec;
@@ -151,6 +159,7 @@ function BarViz({ result, height }: { result: StubResult; height: number }) {
           dataKey="name"
           width={130}
           tick={AXIS_TICK}
+          tickFormatter={truncateYAxisLabel}
           axisLine={false}
           tickLine={false}
           interval={0}
