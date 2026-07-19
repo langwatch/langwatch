@@ -813,6 +813,25 @@ export function readEnvelopeLeaseFromHeader(
 }
 
 /**
+ * Every tiered ref the decoder would fetch, whether or not it carries a lease.
+ *
+ * The tenant guard MUST key off this rather than off {@link readEnvelopeLeaseFromHeader}:
+ * that one additionally requires `header.h`, so an envelope with a valid
+ * cross-tenant `ref` and no holder id yields no lease, skips the guard, and is
+ * still fetched by `decodeJobEnvelope` — which has no tenant check of its own.
+ * A forged or mis-routed envelope could read another tenant's blob that way.
+ * Validate the ref; use the lease only for renewal (ADR-030 §5).
+ */
+export function readEnvelopeTieredRefFromHeader(
+  header: EnvelopeHeader,
+): BlobRef | null {
+  if ((header.e === "redis" || header.e === "s3") && header.ref) {
+    return header.ref;
+  }
+  return null;
+}
+
+/**
  * Returns the GQ2 ref together with its per-stage lease holder identity, or
  * null for inline bodies, GQ1 refs, legacy JSON, and unreadable values.
  */
