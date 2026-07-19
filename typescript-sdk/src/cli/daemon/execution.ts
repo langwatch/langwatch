@@ -20,9 +20,11 @@ export type OutputStream = "stdout" | "stderr";
 export type OutputSink = (stream: OutputStream, chunk: Buffer) => void;
 
 /** ANSI SGR (colour/style) sequences — everything chalk emits. */
+// eslint-disable-next-line no-control-regex -- matching the ESC control char is the whole point
 const SGR_PATTERN = /\u001B\[[0-9;]*m/g;
 
 /** A trailing PARTIAL SGR: ESC, or ESC[ + parameters with no `m` yet. */
+// eslint-disable-next-line no-control-regex -- matching the ESC control char is the whole point
 const PARTIAL_SGR_AT_END = /\u001B(?:\[[0-9;]*)?$/;
 
 /**
