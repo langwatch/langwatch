@@ -36,7 +36,7 @@ OUTPUT CONTRACT (every command)
   Examples:
     langwatch trace search --jq '.traces[].traceId'
     langwatch monitor list -o json
-    langwatch experiment list --json slug,name,runsCount
+    langwatch evaluator list --json id,name,slug
     langwatch commands --flat --jq '.commands[].path'
 
 ERRORS ARE STRUCTURED
