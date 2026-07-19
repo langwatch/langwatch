@@ -230,7 +230,7 @@ export function createCommandExecutor({
         // against. Cancel/timeout never land here: those settle via `finish`,
         // and an aborted-while-queued acquire RESOLVES `completed` (see the
         // cancelled check above) rather than rejecting it.
-        reject(error);
+        reject(error instanceof Error ? error : new Error(String(error)));
       });
     });
 

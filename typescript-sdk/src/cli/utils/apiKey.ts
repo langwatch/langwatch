@@ -27,7 +27,8 @@ const loadEnvFileScoped = (): void => {
   const parsed = config({ quiet: true, processEnv: {} })?.parsed ?? {};
   for (const [key, value] of Object.entries(parsed)) {
     if (!key.startsWith("LANGWATCH_")) continue;
-    if (process.env[key] === undefined) process.env[key] = value;
+    // dotenv semantics: an already-set variable is never overwritten.
+    process.env[key] ??= value;
   }
 };
 
