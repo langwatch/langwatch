@@ -17,6 +17,29 @@ function listMarkdown(dir: string): string[] {
   return out;
 }
 
+// The skill directories actually written to disk, as repo-relative paths
+// (feature skills at the root, recipes under recipes/). Used to prove the
+// generated plugin.json advertises exactly this set — no more, no less.
+function actualSkillDirs(root: string): string[] {
+  const dirs: string[] = [];
+  const hasSkill = (p: string) => fs.existsSync(path.join(p, "SKILL.md"));
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name === ".git" || entry.name === ".claude-plugin") continue;
+    if (entry.name === "recipes") {
+      const recipesDir = path.join(root, "recipes");
+      for (const r of fs.readdirSync(recipesDir, { withFileTypes: true })) {
+        if (r.isDirectory() && hasSkill(path.join(recipesDir, r.name))) {
+          dirs.push(`recipes/${r.name}`);
+        }
+      }
+    } else if (hasSkill(path.join(root, entry.name))) {
+      dirs.push(entry.name);
+    }
+  }
+  return dirs;
+}
+
 function stripCode(markdown: string): string {
   return markdown
     .replace(/```[\s\S]*?```/g, "")
@@ -105,6 +128,54 @@ describe("sync publishes self-contained skills", () => {
     } finally {
       fs.rmSync(noGitDir, { recursive: true, force: true });
     }
+  });
+
+  describe("when it emits the Claude Code plugin marketplace", () => {
+    const readJson = (rel: string) =>
+      JSON.parse(fs.readFileSync(path.join(tmpDir, rel), "utf8"));
+
+    it("writes a marketplace.json naming the langwatch plugin at the repo root", () => {
+      const mp = readJson(".claude-plugin/marketplace.json");
+      expect(mp.name).toBe("langwatch");
+      expect(mp.plugins).toHaveLength(1);
+      expect(mp.plugins[0].name).toBe("langwatch");
+      expect(mp.plugins[0].source).toBe(".");
+    });
+
+    it("advertises exactly the skill directories that exist on disk", () => {
+      const plugin = readJson(".claude-plugin/plugin.json");
+      const declared = [...(plugin.skills as string[])].sort();
+      const onDisk = actualSkillDirs(tmpDir)
+        .map((d) => `./${d}`)
+        .sort();
+      expect(declared).toEqual(onDisk);
+    });
+
+    it("points every declared skill path at a real SKILL.md", () => {
+      const plugin = readJson(".claude-plugin/plugin.json");
+      for (const rel of plugin.skills as string[]) {
+        expect(
+          fs.existsSync(path.join(tmpDir, rel, "SKILL.md")),
+          `${rel}/SKILL.md missing`
+        ).toBe(true);
+      }
+    });
+
+    it("stamps the plugin version from version.txt", () => {
+      const version = fs
+        .readFileSync(path.join(tmpDir, "version.txt"), "utf8")
+        .trim();
+      expect(readJson(".claude-plugin/plugin.json").version).toBe(version);
+      expect(readJson(".claude-plugin/marketplace.json").plugins[0].version).toBe(
+        version
+      );
+    });
+
+    it("publishes a README carrying the plugin install command", () => {
+      const readme = fs.readFileSync(path.join(tmpDir, "README.md"), "utf8");
+      expect(readme).toContain("/plugin marketplace add langwatch/skills");
+      expect(readme).toContain("/plugin install langwatch@langwatch");
+    });
   });
 
   it("preserves intra-word underscores in identifiers like LANGWATCH_API_KEY", () => {
