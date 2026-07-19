@@ -718,9 +718,74 @@ func rawResponseFromBifrostError(berr *bfschemas.BifrostError) ([]byte, int, boo
 	return body, status, true
 }
 
-// ListModels returns an empty list — model discovery is VK-config-driven.
-func (r *BifrostRouter) ListModels(_ context.Context, _ []domain.Credential) ([]domain.Model, error) {
-	return nil, nil
+// modelsDiscoveryClient fetches /v1/models from self-hosted endpoints.
+// Short timeout on purpose: this feeds an interactive model-picker list,
+// and a slow endpoint must not hold the response hostage — it just gets
+// skipped this round.
+var modelsDiscoveryClient = &http.Client{Timeout: 5 * time.Second}
+
+// ListModels discovers models from credentials that carry a base URL
+// (self-hosted vLLM / LiteLLM / Anthropic-compatible servers — all serve
+// the OpenAI-shape GET /v1/models). Hosted credentials without a base URL
+// have no catalog to query and are skipped. A failing endpoint is skipped
+// too: one dead server must not blank out the whole list.
+func (r *BifrostRouter) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, error) {
+	var out []domain.Model
+	seen := make(map[string]bool)
+	for _, cred := range creds {
+		base := normalizeOpenAICompatBaseURL(credBaseURL(cred))
+		if base == "" {
+			continue
+		}
+		ids, err := fetchUpstreamModels(ctx, base, cred.APIKey)
+		if err != nil {
+			if r.logger != nil {
+				r.logger.Warn("model discovery failed for endpoint, skipping",
+					zap.String("credential_id", cred.ID), zap.Error(err))
+			}
+			continue
+		}
+		for _, id := range ids {
+			if id == "" || seen[id] {
+				continue
+			}
+			seen[id] = true
+			out = append(out, domain.Model{ID: id, Name: id, ProviderID: cred.ProviderID})
+		}
+	}
+	return out, nil
+}
+
+// fetchUpstreamModels GETs an endpoint's OpenAI-shape model list.
+func fetchUpstreamModels(ctx context.Context, baseURL, apiKey string) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/v1/models", nil)
+	if err != nil {
+		return nil, err
+	}
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+	resp, err := modelsDiscoveryClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("upstream /v1/models returned status %d", resp.StatusCode)
+	}
+	var parsed struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(parsed.Data))
+	for _, m := range parsed.Data {
+		ids = append(ids, m.ID)
+	}
+	return ids, nil
 }
 
 // --- Bifrost Account (multi-tenant credential provider) ---
