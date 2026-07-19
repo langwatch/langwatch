@@ -106,7 +106,7 @@ func TestPrettyEncoder_UnnamedLoggerHasNoEmptyParens(t *testing.T) {
 	assert.NotContains(t, stripANSI(buf.String()), "()")
 }
 
-// stripANSI removes the colour escapes prettyconsole writes, so assertions read
+// stripANSI removes the color escapes prettyconsole writes, so assertions read
 // against the text a human sees rather than the bytes a terminal consumes.
 func stripANSI(s string) string {
 	return ansiEscape.ReplaceAllString(s, "")
