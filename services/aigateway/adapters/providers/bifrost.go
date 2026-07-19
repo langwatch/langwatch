@@ -7,12 +7,15 @@ package providers
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tidwall/gjson"
@@ -790,6 +793,18 @@ const ProviderRequestTimeoutSeconds = 14 * 60
 
 func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfschemas.ProviderConfig, error) {
 	cfg := &bfschemas.ProviderConfig{}
+	if strings.HasPrefix(string(provider), anthropicCompatPrefix) {
+		ep, ok := anthropicCompatEndpoints.Load(string(provider))
+		if !ok {
+			return nil, fmt.Errorf("no endpoint registered for anthropic-compatible provider %q", provider)
+		}
+		endpoint := ep.(anthropicCompatEndpoint)
+		cfg.NetworkConfig.BaseURL = endpoint.baseURL
+		cfg.CustomProviderConfig = &bfschemas.CustomProviderConfig{
+			BaseProviderType: bfschemas.Anthropic,
+			IsKeyLess:        endpoint.keyless,
+		}
+	}
 	// Whole-gateway timeout ceiling. StreamIdleTimeoutInSeconds gets the
 	// same value: its 60s default is a per-chunk gap limit, and reasoning
 	// models can think for minutes before the first token without emitting
@@ -912,6 +927,15 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 	case domain.ProviderGemini:
 		return bfschemas.Gemini
 	case domain.ProviderAnthropic:
+		// Anthropic with a base-URL override (self-hosted server speaking
+		// the Anthropic Messages API natively — vLLM >= 0.24, Claude-
+		// compatible proxies) must not hit api.anthropic.com. Bifrost's
+		// Anthropic key has no per-key URL slot, so derive a per-endpoint
+		// custom provider (base type Anthropic) whose config carries the
+		// URL; bifrost creates it lazily on first dispatch.
+		if credBaseURL(cred) != "" {
+			return anthropicCompatProviderKey(cred)
+		}
 		return bfschemas.Anthropic
 	case domain.ProviderDeepSeek:
 		// DeepSeek is not in Bifrost's ModelProvider enum; its API is
@@ -951,6 +975,48 @@ const deepseekBaseURL = "https://api.deepseek.com"
 // it "api_base" — accept both.
 func credBaseURL(cred domain.Credential) string {
 	return credExtra(cred, "base_url", "api_base")
+}
+
+// anthropicCompatPrefix namespaces the provider keys derived for Anthropic
+// credentials with a base-URL override. The prefix keeps the keys out of
+// Bifrost's ModelProvider enum, so each endpoint gets its own lazily-created
+// provider instance (base type Anthropic) instead of mutating the shared
+// stock Anthropic provider.
+const anthropicCompatPrefix = "anthropic-url-"
+
+type anthropicCompatEndpoint struct {
+	baseURL string
+	// keyless marks credentials without an API key (unauthenticated
+	// self-hosted servers). Bifrost's key selection filters out
+	// empty-value keys for base provider Anthropic and fails the
+	// dispatch; CustomProviderConfig.IsKeyLess skips selection entirely.
+	keyless bool
+}
+
+// anthropicCompatEndpoints maps a derived provider key to its endpoint.
+// Bifrost resolves provider config by provider key alone — GetConfigForProvider
+// has no credential context — so mapProvider records the endpoint here before
+// the dispatch enqueues, and config resolution looks it up. Entries are tiny
+// and bounded by the number of distinct customer endpoints, so they are never
+// evicted.
+var anthropicCompatEndpoints sync.Map
+
+// anthropicCompatProviderKey derives the provider key for an Anthropic
+// credential with a base-URL override and registers its endpoint. The key is
+// a hash of the endpoint identity (URL + keyless-ness), so the same endpoint
+// always lands on the same bifrost worker pool, distinct endpoints never
+// collide, and rotating the API key value alone does not spawn a new provider.
+func anthropicCompatProviderKey(cred domain.Credential) bfschemas.ModelProvider {
+	endpoint := anthropicCompatEndpoint{
+		// Same "/v1"-stripping as the OpenAI-compat path: Bifrost's
+		// Anthropic provider appends the full "/v1/messages" path itself.
+		baseURL: normalizeOpenAICompatBaseURL(credBaseURL(cred)),
+		keyless: strings.TrimSpace(cred.APIKey) == "",
+	}
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|keyless=%t", endpoint.baseURL, endpoint.keyless)))
+	key := anthropicCompatPrefix + hex.EncodeToString(sum[:8])
+	anthropicCompatEndpoints.Store(key, endpoint)
+	return bfschemas.ModelProvider(key)
 }
 
 // normalizeOpenAICompatBaseURL strips a trailing "/v1" (and trailing
