@@ -21,6 +21,25 @@ import (
 // Version is set via ldflags at build time.
 var Version = "dev"
 
+// serviceTelemetryName is the canonical service.name a mono-binary subcommand
+// reports on every signal — the OTel resource (traces/logs/metrics via
+// otelsetup) and the per-line `service` field (pkg/clog) both read it from
+// ServiceInfo.Service. Uniform "langwatch-service-<cmd>" so the Go data-plane
+// services read consistently in Grafana:
+//
+//	langwatch-service-aigateway · langwatch-service-langyagent · langwatch-service-nlpgo
+//
+// alongside the app (langwatch-app) and the sandboxed Langy worker
+// (langwatch-service-langyworker, set in langyagent/adapters/opencode). An
+// explicit OTEL_SERVICE_NAME wins, matching the app's own precedence
+// (instrumentation.node.ts) and the official OTel convention.
+func serviceTelemetryName(cmd string) string {
+	if name := os.Getenv("OTEL_SERVICE_NAME"); name != "" {
+		return name
+	}
+	return "langwatch-service-" + cmd
+}
+
 // ServiceBoot is the entrypoint signature each service must implement.
 type ServiceBoot func(ctx context.Context, args []string) error
 
@@ -90,7 +109,7 @@ func run(args []string) (code int) {
 	}
 
 	ctx = contexts.SetServiceInfo(ctx, contexts.ServiceInfo{
-		Service:     cmd,
+		Service:     serviceTelemetryName(cmd),
 		Version:     Version,
 		Environment: os.Getenv("ENVIRONMENT"),
 	})
