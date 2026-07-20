@@ -5,6 +5,7 @@ import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import { createProjectApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -167,6 +168,17 @@ secured.access(requires("analytics:manage")).post(
       const project = c.get("project");
       const body = c.req.valid("json");
       logger.info({ projectId: project.id }, "Creating graph");
+
+      if (
+        body.dashboardId &&
+        !(await dashboardBelongsToProject(
+          prisma,
+          body.dashboardId,
+          project.id,
+        ))
+      ) {
+        return c.json({ error: "Dashboard not found" }, 404);
+      }
 
       let gridRow = body.gridRow;
       if (gridRow === undefined && body.dashboardId) {

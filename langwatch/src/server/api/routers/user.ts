@@ -424,6 +424,14 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ userId: z.string() }))
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
+      const user = ctx.session.user.impersonator ?? ctx.session.user;
+      if (
+        input.userId !== ctx.session.user.id &&
+        !checkIsAdmin({ email: user.email })
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
       // UserService.deactivate also force-revokes all the user's sessions
       // (Redis cache + DB) — see iter-24 progress notes for why.
       await UserService.create(ctx.prisma).deactivate({ id: input.userId });
@@ -433,6 +441,11 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ userId: z.string() }))
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
+      const user = ctx.session.user.impersonator ?? ctx.session.user;
+      if (!checkIsAdmin({ email: user.email })) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
       await UserService.create(ctx.prisma).reactivate({ id: input.userId });
       return { success: true };
     }),

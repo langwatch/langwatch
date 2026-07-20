@@ -777,13 +777,17 @@ async function checkPermissionFromBindings({
   });
   const groupIds = groupMemberships.map((m) => m.groupId);
 
-  // Fetch all matching RoleBindings for this user (direct + via groups) across all scopes
+  // Fetch all matching RoleBindings for this user (direct + via groups) across all scopes.
+  // The direct-binding branch is gated on current organization membership so a
+  // stale cross-org binding (one naming this user at a scope in an org they no
+  // longer/never belonged to) is never selected. Membership — not the binding
+  // row — is the tenancy boundary.
   const bindings = await prisma.roleBinding.findMany({
     where: {
       organizationId,
       scopeId: { in: scopeIds },
       OR: [
-        { userId },
+        { userId, user: { orgMemberships: { some: { organizationId } } } },
         ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
       ],
     },
@@ -798,7 +802,13 @@ async function checkPermissionFromBindings({
     if (!teamScope) return false;
 
     const teamUser = await prisma.teamUser.findFirst({
-      where: { userId, teamId: teamScope.scopeId },
+      // Gate the legacy fallback on org membership too: a stale cross-org
+      // TeamUser row must not confer access any more than a stale RoleBinding.
+      where: {
+        userId,
+        teamId: teamScope.scopeId,
+        team: { organization: { members: { some: { userId } } } },
+      },
       select: { role: true, assignedRoleId: true },
     });
 
@@ -889,6 +899,31 @@ async function resolveBindingPermission(
 }
 
 /**
+ * The single source of truth for "is this user a CURRENT member of this org,
+ * and with what role". `null` means no `OrganizationUser` row — the caller must
+ * fail closed rather than fall through to bindings, because a stale cross-org
+ * RoleBinding can still name a non-member at a project/team scope.
+ *
+ * Every scoped permission path derives membership through here so a future
+ * tenancy fix lands once instead of in each resolver.
+ */
+async function getCurrentOrganizationRole({
+  prisma,
+  userId,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+}): Promise<OrganizationUserRole | null> {
+  const member = await prisma.organizationUser?.findFirst({
+    where: { userId, organizationId },
+    select: { role: true },
+  });
+  return member?.role ?? null;
+}
+
+/**
  * Resolve a project permission check, returning the permission decision
  * along with the user's organization role.
  */
@@ -908,31 +943,30 @@ export async function resolveProjectPermission(
 
   const projectTeam = await ctx.prisma.project.findUnique?.({
     where: { id: projectId },
-    select: {
-      team: {
-        select: {
-          id: true,
-          organizationId: true,
-          organization: {
-            select: {
-              members: {
-                where: { userId: ctx.session.user.id },
-                select: { role: true },
-              },
-            },
-          },
-        },
-      },
-    },
+    select: { team: { select: { id: true, organizationId: true } } },
   });
 
   const teamId = projectTeam?.team.id;
   const organizationId = projectTeam?.team.organizationId;
-  const organizationRole =
-    projectTeam?.team.organization?.members[0]?.role ?? null;
 
   if (!teamId || !organizationId) {
-    return { permitted: false, organizationRole };
+    return { permitted: false, organizationRole: null };
+  }
+
+  const organizationRole = await getCurrentOrganizationRole({
+    prisma: ctx.prisma,
+    userId: ctx.session.user.id,
+    organizationId,
+  });
+
+  // Fail closed on current organization membership. A user who is not an
+  // OrganizationUser of the owning org is denied outright, even if a stale
+  // RoleBinding (created through a since-closed cross-org path) still names them
+  // at this project/team scope. The membership check — not the binding row — is
+  // the authoritative tenancy boundary. See the same gate in resolveTeamPermission
+  // and batchScopePermissions, and the direct-binding predicate below.
+  if (organizationRole === null) {
+    return { permitted: false, organizationRole: null };
   }
 
   const permitted = await checkPermissionFromBindings({
@@ -985,12 +1019,18 @@ export async function resolveTeamPermission(
     return { permitted: false, organizationRole: null };
   }
 
-  const organizationUser = await ctx.prisma.organizationUser?.findFirst({
-    where: { userId: ctx.session.user.id, organizationId: team.organizationId },
-    select: { role: true },
+  const organizationRole = await getCurrentOrganizationRole({
+    prisma: ctx.prisma,
+    userId: ctx.session.user.id,
+    organizationId: team.organizationId,
   });
 
-  const organizationRole = organizationUser?.role ?? null;
+  // Fail closed on current organization membership — a non-member is denied even
+  // if a stale cross-org binding names them at this team scope. See the matching
+  // gate in resolveProjectPermission.
+  if (organizationRole === null) {
+    return { permitted: false, organizationRole: null };
+  }
 
   const permitted = await checkPermissionFromBindings({
     prisma: ctx.prisma,
@@ -1208,11 +1248,14 @@ async function loadScopeResolution(
   const userId = ctx.session?.user?.id;
   if (!userId) return null;
 
-  const orgMember = await ctx.prisma.organizationUser?.findFirst({
-    where: { userId, organizationId: args.organizationId },
-    select: { role: true },
+  const organizationRole = await getCurrentOrganizationRole({
+    prisma: ctx.prisma,
+    userId,
+    organizationId: args.organizationId,
   });
-  if (!orgMember) return null;
+  // Fail closed on current membership — a non-member gets nothing, even if a
+  // stale cross-org binding names them at one of these scopes.
+  if (organizationRole === null) return null;
 
   const groupMemberships = await ctx.prisma.groupMembership.findMany({
     where: { userId, group: { organizationId: args.organizationId } },
@@ -1227,8 +1270,16 @@ async function loadScopeResolution(
           where: {
             organizationId: args.organizationId,
             scopeId: { in: scopeIds },
+            // Non-membership already short-circuits above, but gate the direct
+            // branch on membership too so this query is safe on its own if the
+            // early return is ever refactored away.
             OR: [
-              { userId },
+              {
+                userId,
+                user: {
+                  orgMemberships: { some: { organizationId: args.organizationId } },
+                },
+              },
               ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
             ],
           },
@@ -1274,7 +1325,7 @@ async function loadScopeResolution(
     : [];
 
   return {
-    organizationRole: orgMember.role,
+    organizationRole,
     bindingsByScope,
     customRoleById: new Map(customRoles.map((c) => [c.id, c])),
     needsLegacyFallback,

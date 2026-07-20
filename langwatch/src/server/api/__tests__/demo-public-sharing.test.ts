@@ -13,6 +13,9 @@ const mockPrisma = {
   project: {
     findUnique: vi.fn(),
   },
+  organizationUser: {
+    findFirst: vi.fn(),
+  },
   publicShare: {
     findFirst: vi.fn(),
   },
@@ -246,11 +249,10 @@ describe("Demo Project and Public Sharing Tests", () => {
 
     it("should allow access when user has permission", async () => {
       mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-123",
-          organizationId: "org-123",
-          organization: { members: [{ role: "MEMBER" }] },
-        },
+        team: { id: "team-123", organizationId: "org-123" },
+      });
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        role: "MEMBER",
       });
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.ADMIN, customRoleId: null },
