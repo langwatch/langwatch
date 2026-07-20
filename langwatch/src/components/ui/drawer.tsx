@@ -58,8 +58,8 @@ export const DrawerContent = React.forwardRef<
   // yields, sliding further left to leave the panel its slot plus a strip of
   // space between the two cards. Reactive, so closing the panel mid-drawer
   // returns the drawer to the edge. Spec: specs/langy/langy-panel-layout.feature
-  const langyOpen = useLangyStore((s) => s.isOpen);
-  const langyYieldMarginEnd = langyOpen
+  const isLangyOpen = useLangyStore((s) => s.isOpen);
+  const langyYieldMarginEnd = isLangyOpen
     ? `${8 + SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP}px`
     : undefined;
 

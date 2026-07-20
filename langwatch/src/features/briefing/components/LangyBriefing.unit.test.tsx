@@ -79,6 +79,7 @@ describe("LangyBriefing attention inbox actions", () => {
 
 describe("LangyBriefing without Langy", () => {
   describe("when no Langy handlers are provided", () => {
+    /** @scenario Without Langy the sheet keeps working, quietly */
     it("keeps the row's Trace Explorer evidence link working", () => {
       renderBriefing({});
 
@@ -103,6 +104,7 @@ describe("LangyBriefing without Langy", () => {
   });
 
   describe("when Langy handlers are provided", () => {
+    /** @scenario With Langy the sheet keeps its hand-offs */
     it("renders the ask row and sends the clicked suggestion chip", () => {
       const onAskSubmit = vi.fn();
       renderBriefing({ onAsk: vi.fn(), onAskSubmit });

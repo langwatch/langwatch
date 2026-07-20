@@ -17,6 +17,8 @@
  *   - THE IDENTITY NAMESPACE EXISTS IN BOTH. `langy.*` has no app fallback,
  *     so it must resolve on both grounds, along with the panel's type scale.
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
   createSystem,
   defaultConfig,
@@ -52,6 +54,7 @@ const langyDark = tokenLayer[".dark .langy-root &"] ?? {};
 
 describe("langyTheme token emission", () => {
   describe("given the app system merged with Langy's config", () => {
+    /** @scenario Light mode inherits the app's standard palette */
     it("keeps the app's own bg.surface for the light panel", () => {
       // The app's light value survives the merge untouched...
       const appLight = tokenLayer[":root &, .light &"] ?? {};
@@ -70,6 +73,7 @@ describe("langyTheme token emission", () => {
       expect(overridden).toEqual([]);
     });
 
+    /** @scenario Dark mode keeps the ink palette */
     it("overrides the surface to the ink ground in Langy dark", () => {
       expect(langyDark["--chakra-colors-bg-surface"]).toBe("#141417");
       expect(langyDark["--chakra-colors-border"]).toBe(
@@ -78,6 +82,7 @@ describe("langyTheme token emission", () => {
       expect(langyDark["--chakra-colors-fg"]).toBe("#ffffff");
     });
 
+    /** @scenario The identity tokens exist in both modes */
     it("resolves the langy.* identity namespace on both grounds", () => {
       expect(langyLight["--chakra-colors-langy-ai-blue"]).toBe("#5b8def");
       expect(langyDark["--chakra-colors-langy-ai-blue"]).toBe("#5fa3ff");
@@ -92,6 +97,35 @@ describe("langyTheme token emission", () => {
     it("keeps the panel's type scale on both grounds", () => {
       expect(langyLight["--chakra-font-sizes-sm"]).toBe("0.8125rem");
       expect(langyDark["--chakra-font-sizes-sm"]).toBe("0.8125rem");
+    });
+  });
+
+  describe("given the panel's ambient textures in langyTheme.css", () => {
+    const css = readFileSync(
+      fileURLToPath(new URL("../langyTheme.css", import.meta.url)),
+      "utf8",
+    );
+    // One rule per selector in the sheet, so anchoring on the selector and
+    // reading to the closing brace captures that rule's whole body.
+    const ruleBody = (selector: string) => {
+      const start = css.indexOf(selector);
+      expect(start).toBeGreaterThan(-1);
+      return css.slice(start, css.indexOf("}", start));
+    };
+
+    /** @scenario Ambient textures are a dark-mode treatment */
+    it("hides the wash and signal grid until the dark gate turns them on", () => {
+      // Both textures ship hidden, so the light panel stays the app's clean
+      // surface...
+      expect(ruleBody(".langy-wash {")).toContain("display: none");
+      expect(ruleBody(".langy-signal-grid {")).toContain("display: none");
+      // ...and only the .dark gate reveals them on the ink ground.
+      expect(ruleBody(".dark .langy-root .langy-wash")).toContain(
+        "display: block",
+      );
+      expect(ruleBody(".dark .langy-signal-grid")).toContain("display: block");
+      // The film-grain overlay is gone from both grounds, not merely gated.
+      expect(css).not.toContain(".langy-grain");
     });
   });
 });

@@ -407,7 +407,7 @@ function LangyPanel({
   // move read as the pair travelling together.
   // Spec: specs/langy/langy-panel-layout.feature
   const { currentDrawer } = useDrawer();
-  const drawerCompanion = isOpen && !!currentDrawer;
+  const isDrawerCompanion = isOpen && !!currentDrawer;
   const viewportWidth = useViewportWidth();
   const floatingPanelWidth = resolveFloatingPanelWidth(viewportWidth);
 
@@ -1288,7 +1288,7 @@ function LangyPanel({
         // The dock is deliberately slimmer than the floating card — see
         // SIDEBAR_PANEL_WIDTH. The drawer companion keeps the dock width.
         width={
-          drawerCompanion || !floating
+          isDrawerCompanion || !floating
             ? `${SIDEBAR_PANEL_WIDTH}px`
             : FLOATING_PANEL_CSS_WIDTH
         }
@@ -1296,7 +1296,7 @@ function LangyPanel({
         // Riding beside a drawer, the panel joins the drawer's own layer (the
         // drawer still stacks above it in DOM order, so a stack of nested
         // drawers keeps covering the companion).
-        zIndex={drawerCompanion ? 1400 : 1200}
+        zIndex={isDrawerCompanion ? 1400 : 1200}
         background="bg.surface"
         borderStyle="solid"
         // The brand's workhorse hairline (white/10 on dark, a warm paper line on
@@ -1363,7 +1363,7 @@ function LangyPanel({
               }
             : undefined
         }
-        {...(drawerCompanion
+        {...(isDrawerCompanion
           ? {
               // Riding beside the open drawer: the panel HOLDS the right
               // edge as another floating card and the drawer sits to its

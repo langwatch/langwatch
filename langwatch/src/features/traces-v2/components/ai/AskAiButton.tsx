@@ -22,30 +22,20 @@ import { aiBrandPalette, aiBrandPaletteHot } from "./aiBrandPalette";
 // step blends two of the three palette stops over a 6s cycle. One halo per
 // ground: light runs the hot ramp (orange / pink / violet), dark the langy
 // ramp (blue / purple / amber).
-const aiGlowPulseHot = keyframes`
+const createAiGlowPulse = (palette: readonly string[]) => keyframes`
   0%, 100% {
     box-shadow:
-      0 0 0 0 ${aiBrandPaletteHot[0]}33,
-      0 1px 4px ${aiBrandPaletteHot[2]}55;
+      0 0 0 0 ${palette[0]}33,
+      0 1px 4px ${palette[2]}55;
   }
   50% {
     box-shadow:
-      0 0 14px 2px ${aiBrandPaletteHot[1]}66,
-      0 1px 4px ${aiBrandPaletteHot[2]}55;
+      0 0 14px 2px ${palette[1]}66,
+      0 1px 4px ${palette[2]}55;
   }
 `;
-const aiGlowPulse = keyframes`
-  0%, 100% {
-    box-shadow:
-      0 0 0 0 ${aiBrandPalette[0]}33,
-      0 1px 4px ${aiBrandPalette[2]}55;
-  }
-  50% {
-    box-shadow:
-      0 0 14px 2px ${aiBrandPalette[1]}66,
-      0 1px 4px ${aiBrandPalette[2]}55;
-  }
-`;
+const aiGlowPulseHot = createAiGlowPulse(aiBrandPaletteHot);
+const aiGlowPulse = createAiGlowPulse(aiBrandPalette);
 
 interface AskAiButtonProps {
   onClick: () => void;
