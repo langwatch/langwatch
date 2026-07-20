@@ -1,6 +1,4 @@
 import { create } from "zustand";
-import { LANGY_PAIR_MS } from "~/features/langy/logic/langyPanelLayout";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
 
 export type DrawerViewMode = "trace" | "summary" | "conversation";
 // Flame was retired during the trace-view redesign on the grounds that
@@ -102,15 +100,6 @@ interface DrawerState extends DrawerUrlState {
    */
   pinned: boolean;
   traceId: string | null;
-  /**
-   * True while the just-closed drawer is HELD on stage for the Langy
-   * companion ride's shared exit (spec: specs/langy/langy-panel-layout
-   * .feature): `traceId` stays set so the sliding-out card keeps its real
-   * content, the mounts wrap the shell in `DrawerExitRideProvider`, and
-   * the state clears for real when the beat ends. Closing without the
-   * panel open clears immediately, exactly as before.
-   */
-  closingRide: boolean;
   /**
    * Trace's approximate occurredAt (ms epoch). Threaded into per-trace
    * queries as a partition-pruning hint on `stored_spans`.
@@ -500,13 +489,6 @@ function persistPaneState(value: Record<PaneId, PaneState>) {
   }
 }
 
-/**
- * Pending finalizer for a ride-held close (see `closingRide`). Module
- * scoped, not state: it is an implementation detail of the delay, and a
- * re-open must be able to cancel it without a render.
- */
-let closingRideTimer: ReturnType<typeof setTimeout> | null = null;
-
 export const useDrawerStore = create<DrawerState>((set, get) => ({
   isOpen: initial.isOpen,
   isMaximized: false,
@@ -516,7 +498,6 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   preMaximizeWidthPx: null,
   paneState: readPaneStateFromStorage(),
   traceId: initial.traceId,
-  closingRide: false,
   occurredAtMs: initial.occurredAtMs,
   expectedSpanCount: null,
   selectedSpanId: initial.selectedSpanId,
@@ -529,23 +510,15 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
 
   traceBackStack: [],
 
-  openTrace: (traceId, occurredAtMs, expectedSpanCount) => {
-    // Re-opening cancels a pending ride-held close, or the finalizer
-    // would clear the freshly opened trace out from under the drawer.
-    if (closingRideTimer) {
-      clearTimeout(closingRideTimer);
-      closingRideTimer = null;
-    }
+  openTrace: (traceId, occurredAtMs, expectedSpanCount) =>
     set({
       isOpen: true,
-      closingRide: false,
       traceId,
       occurredAtMs: occurredAtMs ?? null,
       expectedSpanCount: expectedSpanCount ?? null,
       selectedSpanId: null,
       pinnedSpanIds: [],
-    });
-  },
+    }),
 
   backfillOccurredAtMs: (occurredAtMs) =>
     set((s) => {
@@ -554,38 +527,18 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       return { occurredAtMs };
     }),
 
-  closeDrawer: () => {
-    const finalize = () => {
-      closingRideTimer = null;
-      set({
-        isOpen: false,
-        closingRide: false,
-        isMaximized: false,
-        shortcutsOpen: false,
-        traceId: null,
-        occurredAtMs: null,
-        expectedSpanCount: null,
-        selectedSpanId: null,
-        pinnedSpanIds: [],
-        traceBackStack: [],
-      });
-    };
-    if (get().closingRide) return; // already riding out; finalizer is armed
-    // While the Langy panel is open the pair leaves TOGETHER: keep the
-    // trace content on stage for the shared exit beat (the mounts flip to
-    // DrawerExitRideProvider off `closingRide`) and clear for real when
-    // the beat ends. Spec: specs/langy/langy-panel-layout.feature.
-    const ridesWithLangy =
-      useLangyStore.getState().isOpen &&
-      typeof window !== "undefined" &&
-      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!ridesWithLangy) {
-      finalize();
-      return;
-    }
-    set({ isOpen: false, closingRide: true, shortcutsOpen: false });
-    closingRideTimer = setTimeout(finalize, LANGY_PAIR_MS + 60);
-  },
+  closeDrawer: () =>
+    set({
+      isOpen: false,
+      isMaximized: false,
+      shortcutsOpen: false,
+      traceId: null,
+      occurredAtMs: null,
+      expectedSpanCount: null,
+      selectedSpanId: null,
+      pinnedSpanIds: [],
+      traceBackStack: [],
+    }),
 
   selectSpan: (spanId) =>
     set((s) => {

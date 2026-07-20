@@ -9,7 +9,6 @@ import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ExportConfigDialog } from "~/components/messages/ExportConfigDialog";
 import { ExportProgress } from "~/components/messages/ExportProgress";
-import { DrawerExitRideProvider } from "~/components/ui/drawer";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useLensFilterDirtySync } from "../../hooks/useLensFilterDirtySync";
@@ -310,16 +309,8 @@ const PaneFader: React.FC<{
  */
 const TraceDrawerMount: React.FC = () => {
   const hasTrace = useDrawerStore((s) => !!s.traceId);
-  // A ride-held close keeps `traceId` (and so this mount) alive for the
-  // Langy companion's shared exit beat; the provider flips the shell's
-  // DrawerContent into its pointer-inert pair-out. See drawerStore.closeDrawer.
-  const closingRide = useDrawerStore((s) => s.closingRide);
   if (!hasTrace) return null;
-  return (
-    <DrawerExitRideProvider value={closingRide}>
-      <TraceV2DrawerShell />
-    </DrawerExitRideProvider>
-  );
+  return <TraceV2DrawerShell />;
 };
 
 const FilterAside: React.FC<{

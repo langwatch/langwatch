@@ -66,45 +66,22 @@ Feature: Langy panel layout modes
   Scenario: An open drawer turns Langy into its floating companion
     Given the Langy panel is open
     When a right-anchored drawer opens
-    Then the panel holds the right edge as a floating card
-    And the drawer slides in to the panel's LEFT, yielding the edge
+    Then the panel MORPHS in place to the right edge as a floating card: it grows taller and lifts above all content, it does not slide off-screen and back
     And the companion card wears exactly the drawer's chrome: height, radius, hairline, material and shadow
+    And the drawer keeps its own slide-in but starts from BEHIND the companion card, which sits above it
     And a strip of space separates the two cards, both above all content
     And the page content reclaims the dock's reserved width underneath
-
-  @unit
-  Scenario: The companion ride is choreographed, not a teleport
-    Given the Langy panel is docked
-    When a drawer opens
-    Then the panel first slides off the right edge, exactly like a closing dock
-    And the drawer and the companion then slide in from the right as one unit, holding their gap
-    When the drawer closes
-    Then the pair slides out to the right as one unit
-    And the panel then slides back into its dock from the right, exactly like an opening dock
-
-  @unit
-  Scenario: Reduced motion re-seats the companion without the ride
-    Given the reader prefers reduced motion
-    When a drawer opens or closes beside the open panel
-    Then the panel re-seats between dock and companion directly, with no travelling beats
-
-  @unit
-  Scenario: Opening Langy beside an already open drawer slides it in solo
-    Given a drawer is open and the Langy panel is closed
-    When the panel opens
-    Then the companion slides in from the right edge on its own
-    And the drawer eases left to yield the edge
 
   Scenario: Closing the drawer sends Langy back to its dock
     Given the Langy panel is riding beside an open drawer
     When the drawer closes
-    Then the panel returns to where it was before the drawer opened
+    Then the panel morphs back to where it was before the drawer opened
     And the dock's room is reserved again
 
   Scenario: Closing Langy mid-ride returns the drawer to the edge
     Given the Langy panel is riding beside an open drawer
     When the panel closes
-    Then the drawer slides back to the viewport's right edge
+    Then the drawer returns to the viewport's right edge
 
   @integration
   Scenario: The companion offers a single close affordance

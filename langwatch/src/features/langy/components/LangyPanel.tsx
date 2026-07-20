@@ -26,7 +26,6 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import {
   Profiler,
-  type AnimationEvent as ReactAnimationEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -57,11 +56,6 @@ import type { LangyMessageDto } from "../data/langy.dtos";
 import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
 import { useLangyConversationList } from "../data/useLangyConversationList";
 import { useLangyMessages } from "../data/useLangyMessages";
-import {
-  type CompanionPhase,
-  isCompanionPlacement,
-  useDrawerCompanionChoreography,
-} from "../hooks/useDrawerCompanionChoreography";
 import { useGlobalLangyShortcut } from "../hooks/useGlobalLangyShortcut";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
 import { useLangyFreshness } from "../hooks/useLangyFreshness";
@@ -90,10 +84,6 @@ import { shouldAskFeedback } from "../logic/langyFeedbackDirective";
 import {
   APP_HEADER_HEIGHT,
   FLOATING_PANEL_CSS_WIDTH,
-  LANGY_DOCK_RETURN_MS,
-  LANGY_EASE,
-  LANGY_RIDE_IN_MS,
-  LANGY_RIDE_OUT_MS,
   resolveFloatingPanelWidth,
   SIDEBAR_PANEL_WIDTH,
 } from "../logic/langyPanelLayout";
@@ -184,20 +174,6 @@ const PANEL_LAYOUT_TRANSITION = {
   damping: 34,
   mass: 0.82,
 } as const;
-
-// The drawer-companion ride, one composite CSS animation per phase (the
-// beats are keyframe segments — see langyTheme.css for why one animation
-// per element per ride is what keeps the pair rigid). The keyframes animate
-// the standalone `translate` property so they compose with motion's inline
-// `transform` instead of clobbering it. Easing lives per-keyframe, so no
-// timing function here.
-const RIDE_ANIMATIONS: Record<CompanionPhase, string | undefined> = {
-  idle: undefined,
-  ridingIn: `langy-companion-ride-in ${LANGY_RIDE_IN_MS}ms linear both`,
-  ridingSolo: `langy-slide-in-right ${LANGY_DOCK_RETURN_MS}ms ${LANGY_EASE} backwards`,
-  riding: undefined,
-  ridingOut: `langy-companion-ride-out ${LANGY_RIDE_OUT_MS}ms linear both`,
-};
 
 /**
  * The viewport's width, kept current across resizes.
@@ -426,24 +402,13 @@ function LangyPanel({
   // companion card (the drawer's own chrome: height, radius, material) and
   // the drawer yields, sliding further left to leave the panel its slot (see
   // DrawerContent in components/ui/drawer.tsx). The dock's page reservation
-  // releases for the ride (see LangyShiftedRoot).
-  //
-  // The move is CHOREOGRAPHED, not a teleport: the dock first slides off the
-  // right edge, then the drawer and the companion slide in from the right as
-  // one unit (the shared beat travels the same fixed distance on both, so
-  // neither crosses the other), and on close they leave together before the
-  // panel slides back into its dock. The phase machine owns the beats; each
-  // phase drives one entry of RIDE_ANIMATIONS below, and phases advance on
-  // the animation's own end event.
-  // Spec: specs/langy/langy-panel-layout.feature
+  // releases while it rides (see LangyShiftedRoot). The panel MORPHS to the
+  // companion placement via framer-motion's `layout` prop below: it grows
+  // taller and lifts above all content, rather than sliding off-screen and
+  // back. The drawer slides in from behind the panel's card (Langy sits at a
+  // higher z-index, see the placement block). Spec: specs/langy/langy-panel-layout.feature
   const { currentDrawer } = useDrawer();
-  const { phase: companionPhase, onRideAnimationEnd } =
-    useDrawerCompanionChoreography({
-      isPanelOpen: isOpen,
-      hasDrawer: !!currentDrawer,
-      reduceMotion,
-    });
-  const isDrawerCompanion = isCompanionPlacement(companionPhase);
+  const isDrawerCompanion = isOpen && !!currentDrawer;
   const viewportWidth = useViewportWidth();
   const floatingPanelWidth = resolveFloatingPanelWidth(viewportWidth);
 
@@ -1315,11 +1280,11 @@ function LangyPanel({
       <MotionBox
         ref={panelRef}
         className="langy-root"
-        // `layout` turns the same mounted surface from a full-height dock into a
-        // floating card (and back) without a teleport. During the drawer-
-        // companion ride it stands down: the ride's CSS beats own the motion,
-        // and every geometry switch between beats happens off-screen.
-        layout={companionPhase === "idle"}
+        // `layout` morphs the same mounted surface between placements without a
+        // teleport: dock to floating card, and dock/floating to the drawer
+        // companion. The panel grows taller and lifts above content in place,
+        // rather than sliding off-screen and back.
+        layout
         position="fixed"
         // The dock is deliberately slimmer than the floating card — see
         // SIDEBAR_PANEL_WIDTH. The drawer companion keeps the dock width.
@@ -1329,10 +1294,10 @@ function LangyPanel({
             : FLOATING_PANEL_CSS_WIDTH
         }
         // Dialogs, drawers, and command surfaces must be able to cover Langy.
-        // Riding beside a drawer, the panel joins the drawer's own layer (the
-        // drawer still stacks above it in DOM order, so a stack of nested
-        // drawers keeps covering the companion).
-        zIndex={isDrawerCompanion ? 1400 : 1200}
+        // Riding beside a drawer, the panel sits ABOVE the drawer's layer
+        // (Chakra's modal z-index is 1400) so the drawer slides IN from behind
+        // the companion card rather than over the whole screen.
+        zIndex={isDrawerCompanion ? 1500 : 1200}
         background="bg.surface"
         borderStyle="solid"
         // The brand's workhorse hairline (white/10 on dark, a warm paper line on
@@ -1358,12 +1323,6 @@ function LangyPanel({
         aria-hidden={!isOpen}
         role="complementary"
         aria-label="Langy assistant"
-        // Ride phases rest when their composite animation finishes. The
-        // handler matches by name, so children's animationend bubbles are
-        // inert.
-        onAnimationEnd={(event: ReactAnimationEvent) =>
-          onRideAnimationEnd(event.animationName)
-        }
         // Floating unfolds from the launcher's corner; sidebar slides from the
         // edge it docks to.
         transformOrigin={floating ? "bottom right" : "right center"}
@@ -1384,8 +1343,8 @@ function LangyPanel({
         // open/close is motion's own inline transform;
         // this CSS transition names only the size floor/cap, so the two never
         // fight. Off under reduced motion.
-        css={{
-          ...(floating
+        css={
+          floating
             ? {
                 ...(reduceMotion
                   ? {}
@@ -1403,13 +1362,8 @@ function LangyPanel({
                   maxHeight: "calc(100dvh - 24px)",
                 },
               }
-            : {}),
-          // The ride's current beat. Under reduced motion the phases resolve
-          // to direct re-seats, so no beat ever renders.
-          ...(reduceMotion || !RIDE_ANIMATIONS[companionPhase]
-            ? {}
-            : { animation: RIDE_ANIMATIONS[companionPhase] }),
-        }}
+            : undefined
+        }
         {...(isDrawerCompanion
           ? {
               // Riding beside the open drawer: the panel HOLDS the right
