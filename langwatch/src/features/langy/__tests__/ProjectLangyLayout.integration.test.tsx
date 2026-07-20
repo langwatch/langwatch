@@ -18,6 +18,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Controllable gate state (flipped per-test to exercise the visibility gate).
+// The layout keys Langy by the AMBIENT project this hook resolves, so the
+// mock must be SUBSCRIBABLE: in production a project change re-renders the
+// layout through the hook's own router/query subscriptions, and a static mock
+// would silently skip exactly the re-render under test. `setGateProject`
+// notifies like the real resolver does.
 // ---------------------------------------------------------------------------
 const gate = {
   flagEnabled: true,
@@ -28,6 +33,11 @@ const gate = {
   } | null,
   demoSlug: "not-this-project",
 };
+const gateListeners = new Set<() => void>();
+const setGateProject = (project: typeof gate.project) => {
+  gate.project = project;
+  for (const notify of gateListeners) notify();
+};
 
 vi.mock("~/hooks/useRequiredSession", () => ({
   useRequiredSession: () => ({
@@ -35,19 +45,32 @@ vi.mock("~/hooks/useRequiredSession", () => ({
   }),
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: gate.project,
-    team: {
-      isPersonal: false,
-      ownerUserId: "someone-else",
-      members: [{ userId: "user-1" }],
+vi.mock("~/hooks/useOrganizationTeamProject", async () => {
+  const { useSyncExternalStore } = await import("react");
+  return {
+    useOrganizationTeamProject: () => {
+      const project = useSyncExternalStore(
+        (onChange) => {
+          gateListeners.add(onChange);
+          return () => gateListeners.delete(onChange);
+        },
+        () => gate.project,
+      );
+      return {
+        project,
+        team: {
+          isPersonal: false,
+          ownerUserId: "someone-else",
+          members: [{ userId: "user-1" }],
+        },
+        organization: { id: "org-1" },
+        organizationRole: "MEMBER",
+        hasPermission: (permission: string) =>
+          gate.permissions.includes(permission),
+      };
     },
-    organization: { id: "org-1" },
-    organizationRole: "MEMBER",
-    hasPermission: (permission: string) => gate.permissions.includes(permission),
-  }),
-}));
+  };
+});
 
 vi.mock("~/hooks/usePublicEnv", () => ({
   // Defaults to a demo slug that does NOT match the active project, so the
@@ -97,6 +120,7 @@ const renderAt = (initialPath: string) => {
         children: [
           { path: "/:project/traces", element: <div>traces page</div> },
           { path: "/:project/prompts", element: <div>prompts page</div> },
+          { path: "/settings", element: <div>settings page</div> },
         ],
       },
     ],
@@ -156,20 +180,40 @@ describe("ProjectLangyLayout", () => {
 
   describe("given Langy is open in one project", () => {
     /** @scenario "Switching projects resets Langy" */
-    it("remounts the Langy tree when switching to a different project", async () => {
+    it("remounts the Langy tree when the ambient project changes", async () => {
       const router = renderAt("/demo/traces");
       await openLangy();
       expect(drawer()?.getAttribute("data-open")).toBe("true");
       const mountsBefore = sidecarMounts.count;
 
+      // The reset boundary is the AMBIENT project (what
+      // useOrganizationTeamProject resolves), not the URL segment.
       await act(async () => {
+        setGateProject({ id: "project-acme", slug: "acme" });
         await router.navigate("/acme/traces");
       });
 
-      // key={:project} changed → the whole Langy tree (provider + panel)
+      // key={project.id} changed → the whole Langy tree (provider + panel)
       // remounted — the trigger for the panel's per-project reset, which
       // clears the conversation so nothing from "demo" carries into "acme".
       expect(sidecarMounts.count).toBeGreaterThan(mountsBefore);
+    });
+
+    /** @scenario "Langy travels into settings and back" */
+    it("stays mounted on settings while the ambient project holds", async () => {
+      const router = renderAt("/demo/traces");
+      await openLangy();
+      const mountsBefore = sidecarMounts.count;
+
+      await act(async () => {
+        await router.navigate("/settings");
+      });
+
+      // Settings has no :project segment, but the ambient project is
+      // unchanged, so the panel neither unmounts nor resets.
+      expect(screen.getByText("settings page")).toBeTruthy();
+      expect(drawer()?.getAttribute("data-open")).toBe("true");
+      expect(sidecarMounts.count).toBe(mountsBefore);
     });
   });
 

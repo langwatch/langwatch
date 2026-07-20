@@ -51,7 +51,17 @@ export interface LangyStickToBottom {
   jumpToLatest: () => void;
 }
 
-export function useLangyStickToBottom(): LangyStickToBottom {
+export function useLangyStickToBottom({
+  enabled = true,
+}: {
+  /**
+   * False when the column is a DOCUMENT rather than a stream (the inline
+   * model setup, the card gallery): reading starts at the TOP, so auto-follow
+   * must not drag the heading off-screen as the content mounts and grows.
+   * Manual scrolling still works; the pin simply never pulls.
+   */
+  enabled?: boolean;
+} = {}): LangyStickToBottom {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -64,6 +74,8 @@ export function useLangyStickToBottom(): LangyStickToBottom {
   // and must see the CURRENT value, not one closed over at subscribe time); the
   // state is what the UI renders. They are kept in lockstep by `setPinned`.
   const pinnedRef = useRef(true);
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
   const [isPinned, setIsPinned] = useState(true);
   const [canScroll, setCanScroll] = useState(false);
 
@@ -187,7 +199,7 @@ export function useLangyStickToBottom(): LangyStickToBottom {
 
     const observer = new ResizeObserver(() => {
       setCanScroll(measure(el).overflows);
-      if (!pinnedRef.current) return;
+      if (!enabledRef.current || !pinnedRef.current) return;
       scrollToEnd(reduceMotion ? "auto" : "smooth");
     });
     observer.observe(content);

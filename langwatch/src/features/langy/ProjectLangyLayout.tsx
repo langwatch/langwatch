@@ -1,6 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import { type ReactNode, useEffect } from "react";
-import { Outlet, useParams } from "react-router";
+import { Outlet } from "react-router";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { LangySidecar } from "./components/LangyPanel";
 import { useShowLangy } from "./hooks/useShowLangy";
 import { LangyProvider, useLangy } from "./LangyContext";
@@ -18,19 +19,24 @@ import { useLangyStore } from "./stores/langyStore";
  * navigation between pages of the same project: React Router keeps this layout
  * route mounted and only swaps the <Outlet/> beneath it.
  *
- * The provider is keyed by the :project URL segment, so Langy resets cleanly
- * when the user switches projects (its conversations and memory are
- * project-scoped). Visibility itself is unchanged from the previous
- * DashboardLayout gate — see useShowLangy.
+ * The provider is keyed by the AMBIENT project (not the URL segment): settings
+ * pages carry no :project param but still resolve the project the user is
+ * working in, so the panel survives hopping between a project page and its
+ * settings, and resets cleanly when the resolved project actually changes
+ * (conversations and memory are project-scoped). Visibility itself is
+ * unchanged from the previous DashboardLayout gate — see useShowLangy.
  *
  * Spec: specs/langy/langy-navigation-persistence.feature
  */
 export default function ProjectLangyLayout() {
-  const { project: projectSlug } = useParams();
   const showLangy = useShowLangy();
+  const { project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
 
   return (
-    <LangyProvider key={projectSlug}>
+    <LangyProvider key={project?.id ?? "no-project"}>
       <LangyShiftedRoot showLangy={showLangy}>
         <Outlet />
       </LangyShiftedRoot>

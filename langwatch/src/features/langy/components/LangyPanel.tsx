@@ -421,13 +421,6 @@ function LangyPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Follow-the-stream scrolling, driven by a ResizeObserver on the content
-  // rather than a dep list — Stream B's optimistic tokens and the turn signals
-  // never pass through `messages`, so the old `[messages, status]` effect never
-  // fired for them and the answer streamed off the bottom of the panel.
-  const { scrollRef, contentRef, endRef, isPinned, canScroll, jumpToLatest } =
-    useLangyStickToBottom();
-
   // The turn's request inputs, read at SEND time from a ref the render keeps
   // fresh (populated below, once the chips are resolved). The transport owns
   // these — which is what makes `regenerate()` (no per-send body) carry the
@@ -785,6 +778,16 @@ function LangyPanel({
   // conversation. Guarded on devMode as well as the flag so it can never
   // survive a dev-mode toggle-off (the store clears it too; belt and braces).
   const showCardGallery = devMode && cardGalleryOpen;
+
+  // Follow-the-stream scrolling, driven by a ResizeObserver on the content
+  // rather than a dep list — Stream B's optimistic tokens and the turn signals
+  // never pass through `messages`, so the old `[messages, status]` effect never
+  // fired for them and the answer streamed off the bottom of the panel.
+  // Disabled while the column is a top-down DOCUMENT (the inline model setup,
+  // the card gallery): auto-follow there scrolled the heading straight out of
+  // view as the form mounted.
+  const { scrollRef, contentRef, endRef, isPinned, canScroll, jumpToLatest } =
+    useLangyStickToBottom({ enabled: !langyNeedsModel && !showCardGallery });
 
   // Page context (task #14): the experiment / trace / dataset / project the
   // user is viewing, surfaced as removable composer chips and forwarded with
@@ -1351,14 +1354,19 @@ function LangyPanel({
               maxHeight: "calc(80dvh - 12px)",
               // Floating reads as glass: a touch translucent over a blur of the
               // page behind it. (Sidebar stays fully opaque — it's docked, not
-              // floating over content.)
-              background: "bg.surface/88",
-              backdropFilter: "blur(16px) saturate(1.1)",
+              // floating over content.) Light uses the platform's standard
+              // glass recipe (surface at alpha over an 8px blur); dark keeps
+              // the heavier ink glass, whose ground needs the stronger blur
+              // to stay legible.
+              background: "bg.surface/85",
+              backdropFilter: "blur(8px)",
               borderWidth: "1px",
               borderRadius: "20px",
               boxShadow:
                 "0 1px 2px rgba(20,20,23,0.04), 0 12px 28px rgba(20,20,23,0.10), 0 32px 64px rgba(20,20,23,0.10)",
               _dark: {
+                background: "bg.surface/88",
+                backdropFilter: "blur(16px) saturate(1.1)",
                 // The stacked drop shadows give depth from OUTSIDE; the inset
                 // hairline gives the top edge a lit rim from INSIDE, so the panel
                 // reads as a raised object catching light rather than a flat cut-
@@ -1819,6 +1827,8 @@ function PanelHeader({
   onForkConversation: (id: string) => Promise<void>;
   onRenameConversation: (id: string, title: string) => Promise<void>;
 }) {
+  const panelMode = useLangyStore((s) => s.panelMode);
+  const setPanelMode = useLangyStore((s) => s.setPanelMode);
   return (
     <>
       {/* ONE line, at the trace explorer search bar's height, a chat app's
@@ -1884,6 +1894,26 @@ function PanelHeader({
           />
 
           <LangyFoundryMenu />
+
+          {/* Floating only: one click back to the dock. The docked rail has no
+              twin control on purpose (the rail stays lean; layout switching
+              lives in the overflow menu). */}
+          {panelMode === "floating" ? (
+            <Tooltip
+              content="Dock to side"
+              positioning={{ placement: "bottom" }}
+            >
+              <IconButton
+                size="xs"
+                variant="ghost"
+                aria-label="Dock to the side"
+                color="fg.muted"
+                onClick={() => setPanelMode("sidebar")}
+              >
+                <PanelRight size={15} />
+              </IconButton>
+            </Tooltip>
+          ) : null}
 
           <LangyOverflowMenu />
 
