@@ -403,6 +403,29 @@ export class LangyCredentialService {
   }
 
   /**
+   * `getModelsAllowed` keyed on the project alone, resolving the organization
+   * server-side so a caller can neither supply nor mismatch it.
+   *
+   * This is what the composer's model picker reads. It used to pull the whole
+   * customer-facing virtual-key listing and pick the Langy row out of it —
+   * which stopped working, by design, once product-managed keys were dropped
+   * from that listing. Returning just the allowlist also means the UI never
+   * receives the rest of the VK row to begin with.
+   */
+  async getModelsAllowedForProject(
+    projectId: string,
+  ): Promise<string[] | null> {
+    const project = await new ProjectRepository(
+      this.prisma,
+    ).findForLangyCredentials(projectId);
+    if (!project) return null;
+    return this.getModelsAllowed({
+      projectId,
+      organizationId: project.organizationId,
+    });
+  }
+
+  /**
    * Returns the `modelsAllowed` array on the project's Langy VK. Null means
    * "no allowlist set" — every eligible model is allowed (the gateway is the
    * final allowlist in that case). Used by the Langy turn path to validate the

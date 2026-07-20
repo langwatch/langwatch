@@ -143,6 +143,19 @@ export function createAgentTurnLivenessSubscriber(
           : null;
 
       if (stalledMs > MAX_STALL_MS || !handoff) {
+        // This is the branch that kills a user's turn — it must never be
+        // silent. `reason` says which guard tripped: too stale to revive, or
+        // nothing to revive with.
+        logger.warn(
+          {
+            projectId,
+            conversationId,
+            turnId,
+            stalledMs,
+            reason: stalledMs > MAX_STALL_MS ? "stall_expired" : "no_handoff",
+          },
+          "failing a stalled langy turn",
+        );
         const error = serializeLangyTurnError(new LangyWorkerStoppedError());
         await deps.buffer
           .markError({ conversationId, turnId, error })

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/langwatch/langwatch/pkg/retry"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 )
@@ -37,7 +39,12 @@ func NewFinalizer(internalSecret string, timeout time.Duration) *Finalizer {
 		timeout = 5 * time.Second
 	}
 	return &Finalizer{
-		client:         &http.Client{Timeout: timeout},
+		// otelhttp injects traceparent (and opens a CLIENT span), so the
+		// durable result ingest on the control plane joins the turn's trace.
+		client: &http.Client{
+			Timeout:   timeout,
+			Transport: otelhttp.NewTransport(nil),
+		},
 		internalSecret: internalSecret,
 	}
 }

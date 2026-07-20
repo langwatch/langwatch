@@ -102,6 +102,20 @@ export const Resources = {
   //   - aiTools:manage → org ADMIN only. Catalog editor surface at
   //     /settings/governance/tool-catalog (CRUD + reorder + enable).
   AI_TOOLS: "aiTools",
+  // The Langy in-product assistant. Its own resource rather than riding on
+  // `evaluations:view`, because starting a turn is not a read: it provisions
+  // credentials, spawns an OpenCode worker and spends the project's model
+  // budget. `langy:view` reads conversations; `langy:create` starts or
+  // continues a turn (and forks, which creates one); `langy:update` renames;
+  // `langy:delete` archives. Project-scoped, since conversations belong to a
+  // project — except `langy:manage`, which also appears in the ORG role bag
+  // to gate the org-wide GitHub App connection.
+  //
+  // Granted from MEMBER upward, and to org admins; VIEWER and EXTERNAL get
+  // nothing. The permission grain is not what keeps Langy scarce — the
+  // `release_langy_enabled` flag is — so it draws the line at "can this person
+  // act on the project at all" rather than trying to be finer than that.
+  LANGY: "langy",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
@@ -189,6 +203,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Evaluations
     "evaluations:view",
     "evaluations:manage",
+    // Langy (manage implies create/update/delete via the hierarchy rule)
+    "langy:view",
+    "langy:manage",
     // Workflows
     "workflows:view",
     "workflows:manage",
@@ -269,6 +286,11 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Evaluations
     "evaluations:view",
     "evaluations:manage",
+    // Langy — may run the assistant, not administer it
+    "langy:view",
+    "langy:create",
+    "langy:update",
+    "langy:delete",
     // Workflows
     "workflows:view",
     "workflows:manage",
@@ -392,6 +414,12 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     "organization:view",
     "organization:manage",
     "organization:delete",
+    // Org admins get Langy at member level, and `langy:manage` additionally
+    // gates connecting the org-wide GitHub App, which grants Langy repository
+    // access for every project underneath. Manage implies the rest via the
+    // hierarchy rule.
+    "langy:view",
+    "langy:manage",
     // AI Governance — org-level permissions for the governance offering
     // (anomaly rules, ingestion sources, OCSF SIEM export, activity
     // monitor, top-level Govern section). Default-attached to ADMIN so

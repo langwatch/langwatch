@@ -993,8 +993,10 @@ export function initializeDefaultApp(options?: {
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     mintSessionKey: ({ session, projectId, organizationId }) =>
       mintLangySessionApiKey({ prisma, session, projectId, organizationId }),
-    revokeSessionKey: ({ apiKeyId }) =>
-      revokeLangySessionApiKey({ prisma, apiKeyId }).then(() => undefined),
+    revokeSessionKey: ({ apiKeyId, projectId }) =>
+      revokeLangySessionApiKey({ prisma, apiKeyId, projectId }).then(
+        () => undefined,
+      ),
     admission: langyTurnAdmission,
     accessStore: redis ? createLangyTurnAccessStore({ redis }) : null,
     handoffStore: redis ? langyHandoffStore : null,
@@ -1182,11 +1184,21 @@ export function initializeDefaultApp(options?: {
       ),
       topics,
     },
+    // traced() gives every service call a `ClassName.method` span, same as
+    // the rest of the app bag. Per-method, not per-frame: the streaming hot
+    // paths (token buffer, relay frames) stay span-free by design.
     langy: {
-      conversations: langyConversations,
-      turns: langyTurns,
-      messages: langyMessages,
-      githubInstallations: langyGithubInstallations,
+      conversations: traced(langyConversations, "LangyConversationService"),
+      turns: traced(langyTurns, "LangyTurnService"),
+      messages: traced(langyMessages, "LangyMessageService"),
+      githubInstallations: traced(
+        langyGithubInstallations,
+        "LangyGithubInstallationsService",
+      ),
+      credentials: traced(
+        LangyCredentialService.create(prisma),
+        "LangyCredentialService",
+      ),
     },
     organizations,
     projects,
@@ -1413,6 +1425,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         new NullLangyGithubInstallationsRepository(),
         new LangyGithubAppTokenService("", "", null),
       ),
+      credentials: LangyCredentialService.create(testPrisma),
     },
     organizations: nullOrganizations,
     projects: nullProjects,

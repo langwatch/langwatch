@@ -22,9 +22,10 @@ import { createLangyFrameDedup } from "~/server/app-layer/langy/streaming/langyF
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { LangyTurnRelay } from "~/server/app-layer/langy/streaming/langyTurnRelay";
 import { createLogger } from "@langwatch/observability";
+import { getLangyRelayFramesCounter } from "~/server/metrics";
 import { verifyLangyInternalSecret } from "./langy-internal";
 
-const logger = createLogger("langwatch:langy-relay");
+const logger = createLogger("langwatch:langy:relay");
 
 const secured = createServiceApp({
   basePath: "/api/internal/langy",
@@ -94,10 +95,25 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
     if (tail) await applyLine(relay, tail, tally);
   } catch (error) {
     logger.warn(
-      { error: error instanceof Error ? error.message : String(error) },
+      {
+        error: error instanceof Error ? error.message : String(error),
+        ...(relay.pinnedTurn ?? {}),
+      },
       "relay stream read error — connection closed mid-turn",
     );
   }
+
+  // One summary per stream, not one log per frame: the tally is the useful
+  // shape (throughput + duplicate/rejection rates) and the pinned ids make it
+  // attributable. The counters make the same rates graphable fleet-wide.
+  getLangyRelayFramesCounter("applied").inc(tally.applied);
+  getLangyRelayFramesCounter("duplicate").inc(tally.duplicate);
+  getLangyRelayFramesCounter("rejected").inc(tally.rejected);
+  if (tally.terminal) getLangyRelayFramesCounter("terminal").inc();
+  logger.info(
+    { ...tally, ...(relay.pinnedTurn ?? {}) },
+    "langy relay stream closed",
+  );
 
   return c.json(tally, 200);
 });

@@ -19,6 +19,8 @@ function mapApiKeyHandledError(error: unknown): never {
         throw new TRPCError({ code: "FORBIDDEN", message: error.message, cause: error });
       case "api_key_already_revoked":
         throw new TRPCError({ code: "CONFLICT", message: error.message, cause: error });
+      case "api_key_reserved_name":
+        throw new TRPCError({ code: "BAD_REQUEST", message: error.message, cause: error });
       default:
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message, cause: error });
     }

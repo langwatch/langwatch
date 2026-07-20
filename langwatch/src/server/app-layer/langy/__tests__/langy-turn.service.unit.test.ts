@@ -349,7 +349,10 @@ describe("LangyTurnService.startConversationTurn", () => {
     ).rejects.toThrow();
 
     expect(mocks.dispatch).not.toHaveBeenCalled();
-    expect(mocks.revokeSessionKey).toHaveBeenCalledWith({ apiKeyId: "k" });
+    expect(mocks.revokeSessionKey).toHaveBeenCalledWith({
+      apiKeyId: "k",
+      projectId: "p1",
+    });
     expect(mocks.releasePermit).toHaveBeenCalledWith({ userId: "user-1" });
     expect(mocks.abort).toHaveBeenCalledOnce();
   });

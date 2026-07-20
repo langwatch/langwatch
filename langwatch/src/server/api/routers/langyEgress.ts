@@ -4,7 +4,7 @@
  *   get — the current allow-list for the settings editor. `null` means the
  *         project is in monitor-only mode (watch, never block).
  *   set — replaces the allow-list. An empty array clears it back to
- *         monitor-only. Gated on `project:update` — this is a project network
+ *         monitor-only. Gated on `langy:manage` — this is a project network
  *         policy, not per-user state.
  *
  * The enforcement path is the credentials envelope + the agent's egress
@@ -15,8 +15,15 @@
  * changes).
  *
  * Both procedures sit behind the authoritative Langy internal-only gate
- * (`enforceLangyAccess`) as well as their `project:*` permission — this is Langy
+ * (`enforceLangyAccess`) as well as their `langy:*` permission — this is Langy
  * config, so it stays dark for accounts that don't have Langy.
+ *
+ * They also refuse the demo project, mirroring `langy.ts`. These used to read
+ * `project:view` / `project:update`, and `project:view` is granted to EVERY
+ * authenticated user on the demo project (DEMO_VIEW_PERMISSIONS), so `get` was
+ * exposing the demo project's egress allow-list — the set of hosts Langy's
+ * sandbox may reach — to anyone with an account. `langy:*` is not demo-granted,
+ * and the explicit refusal keeps it that way if that ever changes.
  */
 
 import { z } from "zod";
@@ -27,12 +34,16 @@ import {
   LangyCredentialService,
 } from "~/server/app-layer/langy/LangyCredentialService";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { enforceLangyAccess } from "./langyAccessMiddleware";
+import {
+  enforceLangyAccess,
+  refuseDemoProject,
+} from "./langyAccessMiddleware";
 
 export const langyEgressRouter = createTRPCRouter({
   get: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("project:view"))
+    .use(checkProjectPermission("langy:view"))
+    .use(refuseDemoProject)
     .use(enforceLangyAccess)
     .query(async ({ ctx, input }) => {
       const service = LangyCredentialService.create(ctx.prisma);
@@ -51,7 +62,8 @@ export const langyEgressRouter = createTRPCRouter({
         allowlist: langyEgressAllowlistSchema,
       }),
     )
-    .use(checkProjectPermission("project:update"))
+    .use(checkProjectPermission("langy:manage"))
+    .use(refuseDemoProject)
     .use(enforceLangyAccess)
     .mutation(async ({ ctx, input }) => {
       const service = LangyCredentialService.create(ctx.prisma);

@@ -31,10 +31,12 @@ import {
   handlerManagedAuth,
   publicEndpoint,
 } from "~/server/api/security";
+import { hasOrganizationPermission } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer";
 import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
+import { prisma } from "~/server/db";
 import {
   consumeGithubInstallNonce,
   registerGithubInstallNonce,
@@ -207,6 +209,19 @@ secured
         { status: 403 },
       );
     }
+    // Same permission the tRPC surface demands: connecting the App grants
+    // Langy repository access for every project underneath, so membership
+    // alone is not enough. Still ahead of the rollout gate, matching the
+    // probe-resistant ordering documented in langyGithub.ts.
+    if (
+      !(await hasOrganizationPermission(
+        { prisma, session },
+        organizationId,
+        "langy:manage",
+      ))
+    ) {
+      return c.json({ error: "Forbidden" }, { status: 403 });
+    }
     // Same authoritative gate as Langy's tRPC surface so the GitHub install
     // cannot become a rollout bypass. Forward organizationId so an org-scoped
     // rollout rule resolves the same way it does on the tRPC surface.
@@ -279,6 +294,19 @@ secured
       }))
     ) {
       return setupError(c, state, "Not a member of this organization", 403);
+    }
+
+    // Re-check the connect permission too: the caller's role may have been
+    // lowered between /install and GitHub's redirect back here, and recording
+    // the installation is the write the permission exists to gate.
+    if (
+      !(await hasOrganizationPermission(
+        { prisma, session },
+        state.organizationId,
+        "langy:manage",
+      ))
+    ) {
+      return setupError(c, state, "Forbidden", 403);
     }
 
     // Re-check the Langy gate before persisting anything. The install may have

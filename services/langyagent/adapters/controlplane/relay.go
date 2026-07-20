@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frameauth"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
@@ -43,7 +45,13 @@ type RelayClient struct {
 // cancel or a client disconnect aborts the push).
 func NewRelayClient(internalSecret string) *RelayClient {
 	return &RelayClient{
-		client:         &http.Client{},
+		// otelhttp injects traceparent on the stream-open request, so the
+		// control plane's connection-lifetime relay span joins the turn's
+		// trace. The CLIENT span it opens spans the whole stream — same
+		// shape as the server side.
+		client: &http.Client{
+			Transport: otelhttp.NewTransport(nil),
+		},
 		internalSecret: internalSecret,
 	}
 }

@@ -1,7 +1,27 @@
 import { TRPCError } from "@trpc/server";
 
-import type { PermissionMiddleware } from "~/server/api/rbac";
+import { isDemoProjectId, type PermissionMiddleware } from "~/server/api/rbac";
 import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
+
+/**
+ * Refuses the demo project outright. `DEMO_VIEW_PERMISSIONS` grants Langy's
+ * read permission to every authenticated user on the demo project, so a
+ * permission check alone would expose it there; the server never runs Langy on
+ * the demo project, so the refusal is explicit. One definition, chained by
+ * every customer-facing Langy procedure (`langy`, `langyEgress`) between the
+ * permission check and `enforceLangyAccess`, so the three routers cannot drift.
+ */
+export const refuseDemoProject: PermissionMiddleware<{
+  projectId: string;
+}> = async ({ input, next }) => {
+  if (isDemoProjectId(input.projectId)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Langy is not available on the demo project.",
+    });
+  }
+  return next();
+};
 
 /**
  * tRPC adapter for the authoritative Langy access decision (`hasLangyAccess`).

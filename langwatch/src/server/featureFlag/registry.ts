@@ -195,7 +195,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Opens the Langy in-product assistant. Default off: only LangWatch staff (isLangwatchStaff() — @langwatch.ai email) get Langy out of the box. To open it for a specific project/org/user, flip the flag on via a PostHog rule, an operator-store row via /ops/feature-flags, or RELEASE_LANGY_ENABLED=true for a blanket on. Staff always bypass the flag so a global kill switch still leaves us able to debug.",
+      "Opens the Langy in-product assistant, and is the only lever that does — there is no staff or other identity bypass, so this is a true kill switch. Default off, so Langy is dark until someone is explicitly opted in. To open it for a project or organization, add an operator-store row via /ops/feature-flags; to open it for one user, use a PostHog rule keyed on the user id (the operator store matches only projectId/organizationId, never a user). RELEASE_LANGY_ENABLED=1 is a blanket on — the env override parses ONLY 1 or 0, so RELEASE_LANGY_ENABLED=true is silently ignored. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_langy_enabled.",
   },
   {
     key: "release_langy_promo_enabled",
