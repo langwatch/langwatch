@@ -6,13 +6,12 @@ the drawer (`<CurrentDrawer />`, mounted once near the app root) keys
 off that param and resolves the component via `drawerRegistry`.
 
 Always render through the shared `Drawer.Root` wrapper
-(`components/ui/drawer.tsx`), never raw Chakra. Besides the nested-drawer
-defaults, the wrapper owns SIDE RESOLUTION: while the Langy panel is open,
-every right-anchored (`end`) drawer resolves to the LEFT (`start`), Langy
-holds the right edge, and a drawer sliding over it would hide exactly the
-conversation you opened the drawer to talk about. Don't hand-roll placement
-logic per drawer; declare `placement="end"` (or omit it) and let the wrapper
-decide.
+(`components/ui/drawer.tsx`), never raw Chakra. Drawers anchor to the right
+(`end`) as usual even while the Langy panel is open: the panel notices the
+open drawer and re-seats ITSELF as a floating companion card beside the
+drawer (same height, same radius, a strip of space between the two), then
+returns to its dock when the drawer closes. Nothing to do per drawer; the
+panel owns that dance. Spec: specs/langy/langy-panel-layout.feature.
 
 This is the only pattern. Don't reach for `useState`-driven open/close
 on a new drawer — the URL form gives you:

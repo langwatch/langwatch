@@ -1,7 +1,6 @@
 // eslint-disable-next-line no-restricted-imports
 import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
 import * as React from "react";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { CloseButton } from "./close-button";
 import { IsolatedErrorBoundary } from "./IsolatedErrorBoundary";
 
@@ -103,31 +102,15 @@ export const DrawerCloseTrigger = React.forwardRef<
  *   interacting with a child drawer.
  * - `preventScroll={false}`: Default to allowing background scrolling.
  *
- * All defaults can be overridden by passing props explicitly, except that a
- * right-anchored drawer yields the right edge while the Langy panel is open:
- * Langy lives on the right, and a drawer sliding over it hides exactly the
- * conversation you opened the drawer to talk about. Every `end` placement
- * (explicit or defaulted) resolves to `start` for as long as the panel is
- * open; top/bottom/start placements are untouched.
- * Spec: specs/langy/langy-panel-layout.feature
+ * All defaults can be overridden by passing props explicitly.
  */
-export function resolveDrawerPlacement(
-  langyOpen: boolean,
-  placement: ChakraDrawer.RootProps["placement"],
-): ChakraDrawer.RootProps["placement"] {
-  const requested = placement ?? "end";
-  return langyOpen && requested === "end" ? "start" : requested;
-}
-
 export const DrawerRoot = function DrawerRoot(props: ChakraDrawer.RootProps) {
-  const langyOpen = useLangyStore((s) => s.isOpen);
   return (
     <ChakraDrawer.Root
       modal={false}
       closeOnInteractOutside={false}
       preventScroll={false}
       {...props}
-      placement={resolveDrawerPlacement(langyOpen, props.placement)}
     />
   );
 };

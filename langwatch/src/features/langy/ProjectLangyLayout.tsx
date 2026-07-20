@@ -1,6 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import { type ReactNode, useEffect } from "react";
 import { Outlet } from "react-router";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { LangySidecar } from "./components/LangyPanel";
 import { useShowLangy } from "./hooks/useShowLangy";
@@ -67,9 +68,14 @@ function LangyShiftedRoot({
   const panelMode = useLangyStore((s) => s.panelMode);
   const shellClaimed = useLangyStore((s) => s.dockShellClaims > 0);
   const setDockShifted = useLangyStore((s) => s.setDockShifted);
+  // While a drawer is open the panel rides beside it as a floating companion
+  // (see LangyPanel), so the dock's reservation releases and the page gets
+  // its width back underneath the overlay pair.
+  const { currentDrawer } = useDrawer();
   // Only Sidebar mode reserves room (pushes content left). Floating mode
   // overlays the page — content stays full width and the card floats over it.
-  const shifted = showLangy && isOpen && panelMode === "sidebar";
+  const shifted =
+    showLangy && isOpen && panelMode === "sidebar" && !currentDrawer;
   // Publish the reservation truth for a claiming shell (see the store): this
   // wrapper owns the visibility gate, the shell only consumes the result.
   useEffect(() => {

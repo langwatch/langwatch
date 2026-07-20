@@ -63,10 +63,17 @@ Feature: Langy panel layout modes
     Then page content reclaims the full viewport width
     And the content card extends back to the viewport edge without right rounding
 
-  Scenario: Drawers yield the right edge while Langy is open
-    Given the Langy panel is open in either layout
-    When any right-anchored drawer opens
-    Then the drawer slides in from the LEFT side instead
-    And the panel does not move out of its place
-    When the panel is closed
-    Then drawers anchor to the right edge as usual
+  Scenario: An open drawer turns Langy into its floating companion
+    Given the Langy panel is open
+    When a right-anchored drawer opens
+    Then the drawer slides in from the right as usual
+    And the panel re-seats itself as a floating card beside the drawer
+    And the companion card matches the drawer's height and corner radius
+    And a strip of space separates the two cards, both above all content
+    And the page content reclaims the dock's reserved width underneath
+
+  Scenario: Closing the drawer sends Langy back to its dock
+    Given the Langy panel is riding beside an open drawer
+    When the drawer closes
+    Then the panel returns to where it was before the drawer opened
+    And the dock's room is reserved again

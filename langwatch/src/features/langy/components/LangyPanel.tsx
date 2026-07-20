@@ -39,6 +39,7 @@ import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 // ONE definition of the wire shape, server-side, imported by both ends, the
@@ -191,6 +192,55 @@ function useViewportWidth(): number {
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, []);
+  return width;
+}
+
+/**
+ * The layout width of the widest open drawer, live while `active`.
+ *
+ * Read off the DOM on purpose: drawers vary in width, render from a registry
+ * this panel has no business reaching into, and their width is a layout fact
+ * (`offsetWidth` is transform-independent, so the measurement is stable even
+ * while the drawer's enter animation is still translating it). A rAF retry
+ * covers the mount gap between the drawer state flipping and its portal
+ * appearing; a ResizeObserver keeps the number honest across viewport
+ * resizes. The WIDEST content wins so the companion clears a nested drawer
+ * stack, not just the topmost card.
+ */
+function useOpenDrawerWidth(active: boolean): number | null {
+  const [width, setWidth] = useState<number | null>(null);
+  useEffect(() => {
+    if (!active) {
+      setWidth(null);
+      return;
+    }
+    let observer: ResizeObserver | null = null;
+    let raf = 0;
+    let cancelled = false;
+    const attach = () => {
+      if (cancelled) return;
+      const contents = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[data-scope="drawer"][data-part="content"], .chakra-drawer__content',
+        ),
+      );
+      if (contents.length === 0) {
+        raf = requestAnimationFrame(attach);
+        return;
+      }
+      const update = () =>
+        setWidth(Math.max(...contents.map((el) => el.offsetWidth)));
+      update();
+      observer = new ResizeObserver(update);
+      for (const el of contents) observer.observe(el);
+    };
+    attach();
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      observer?.disconnect();
+    };
+  }, [active]);
   return width;
 }
 
@@ -397,12 +447,26 @@ function LangyPanel({
   const [devMode] = useLangyDevMode();
   const cardGalleryOpen = useLangyStore((s) => s.cardGalleryOpen);
 
-  // Langy owns the RIGHT edge. Drawers yield it while the panel is open,
-  // every right-anchored drawer resolves to the LEFT side instead (see
-  // DrawerRoot in components/ui/drawer.tsx), so the panel never needs to
-  // dodge them, in either layout.
+  // ── Riding beside an open drawer ──────────────────────────────────────────
+  // Drawers keep the right edge. While one is open, the panel re-seats ITSELF
+  // as a floating companion card beside it: same height, same radius, a strip
+  // of space between the two, above all content. The dock's page reservation
+  // releases for the ride (see LangyShiftedRoot) and the panel returns to its
+  // place when the drawer closes. The `layout` morph below is what makes the
+  // move read as the panel being pulled along with the drawer.
+  // Spec: specs/langy/langy-panel-layout.feature
+  const { currentDrawer } = useDrawer();
+  const drawerCompanion = isOpen && !!currentDrawer;
+  const drawerWidth = useOpenDrawerWidth(drawerCompanion);
   const viewportWidth = useViewportWidth();
   const floatingPanelWidth = resolveFloatingPanelWidth(viewportWidth);
+  // The drawer card sits 8px off the viewport edge; leave a 12px strip
+  // between the two cards. Clamped so a wide drawer on a narrow viewport
+  // squeezes the companion against the left edge instead of off-screen.
+  const companionRight = Math.min(
+    (drawerWidth ?? 480) + 20,
+    Math.max(12, viewportWidth - SIDEBAR_PANEL_WIDTH - 12),
+  );
 
   const variants = useMemo(
     () => ({
@@ -1270,10 +1334,17 @@ function LangyPanel({
         layout
         position="fixed"
         // The dock is deliberately slimmer than the floating card — see
-        // SIDEBAR_PANEL_WIDTH.
-        width={floating ? FLOATING_PANEL_CSS_WIDTH : `${SIDEBAR_PANEL_WIDTH}px`}
+        // SIDEBAR_PANEL_WIDTH. The drawer companion keeps the dock width.
+        width={
+          drawerCompanion || !floating
+            ? `${SIDEBAR_PANEL_WIDTH}px`
+            : FLOATING_PANEL_CSS_WIDTH
+        }
         // Dialogs, drawers, and command surfaces must be able to cover Langy.
-        zIndex={1200}
+        // Riding beside a drawer, the panel joins the drawer's own layer (the
+        // drawer still stacks above it in DOM order, so a stack of nested
+        // drawers keeps covering the companion).
+        zIndex={drawerCompanion ? 1400 : 1200}
         background="bg.surface"
         borderStyle="solid"
         // The brand's workhorse hairline (white/10 on dark, a warm paper line on
@@ -1340,73 +1411,95 @@ function LangyPanel({
               }
             : undefined
         }
-        {...(floating
+        {...(drawerCompanion
           ? {
-              // Anchored bottom-right, growing UPWARD. The 80vh cap (never cover
-              // the top fifth of the page) is the rule. The resting floor is
-              // deliberately short — a compact card at rest that GROWS with its
-              // conversation up to the cap, rather than opening as a tall stub over
-              // an empty thread. (Dynamic content-driven sizing is the next step.)
-              right: `${PANEL_INSET}px`,
-              bottom: `${PANEL_INSET}px`,
-              height: "auto",
-              minHeight: floatingMinHeight,
-              maxHeight: "calc(80dvh - 12px)",
-              // Floating reads as glass: a touch translucent over a blur of the
-              // page behind it. (Sidebar stays fully opaque — it's docked, not
-              // floating over content.) Light uses the platform's standard
-              // glass recipe (surface at alpha over an 8px blur); dark keeps
-              // the heavier ink glass, whose ground needs the stronger blur
-              // to stay legible.
-              background: "bg.surface/85",
-              backdropFilter: "blur(8px)",
+              // Riding beside the open drawer: the panel becomes another
+              // floating card at the drawer's own height and radius, a strip
+              // of space between the two, above all content. Same material as
+              // the drawer card (surface at alpha over the drawer's blur) so
+              // the pair reads as two of the same thing.
+              top: "8px",
+              right: `${companionRight}px`,
+              bottom: "8px",
+              background: "bg.surface/80",
+              backdropFilter: "blur(25px)",
               borderWidth: "1px",
-              borderRadius: "20px",
+              borderColor: "border.muted",
+              borderRadius: "lg",
               boxShadow:
-                "0 1px 2px rgba(20,20,23,0.04), 0 12px 28px rgba(20,20,23,0.10), 0 32px 64px rgba(20,20,23,0.10)",
+                "0 1px 2px rgba(20,20,23,0.04), 0 12px 28px rgba(20,20,23,0.10)",
               _dark: {
-                background: "bg.surface/88",
-                backdropFilter: "blur(16px) saturate(1.1)",
-                // The stacked drop shadows give depth from OUTSIDE; the inset
-                // hairline gives the top edge a lit rim from INSIDE, so the panel
-                // reads as a raised object catching light rather than a flat cut-
-                // out. white/12 — one notch above the border's white/10.
                 boxShadow:
-                  "0 1px 2px rgba(0,0,0,0.4), 0 12px 28px rgba(0,0,0,0.5), 0 32px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
+                  "0 1px 2px rgba(0,0,0,0.4), 0 12px 28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
               },
             }
-          : dockShellClaimed
+          : floating
             ? {
-                // An app shell is mounted: the dock joins it as a SECOND
-                // content card. It starts below the full-width header,
-                // aligned with the content card's top edge, and wears the
-                // card's own language: the same top-left radius, the same
-                // muted hairline on the two edges that meet the page ground,
-                // and (dark) the same faint lit top rim. The strip of page
-                // ground between the two cards is reserved by the shell, see
-                // DashboardLayout. Spec: specs/langy/langy-panel-layout.feature
-                top: `${APP_HEADER_HEIGHT}px`,
-                right: 0,
-                bottom: 0,
-                borderTopWidth: "1px",
-                borderLeftWidth: "1px",
-                borderColor: "border.muted",
-                borderTopLeftRadius: "xl",
-                borderBottomLeftRadius: 0,
-                boxShadow: "none",
-                _dark: { boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" },
+                // Anchored bottom-right, growing UPWARD. The 80vh cap (never cover
+                // the top fifth of the page) is the rule. The resting floor is
+                // deliberately short — a compact card at rest that GROWS with its
+                // conversation up to the cap, rather than opening as a tall stub over
+                // an empty thread. (Dynamic content-driven sizing is the next step.)
+                right: `${PANEL_INSET}px`,
+                bottom: `${PANEL_INSET}px`,
+                height: "auto",
+                minHeight: floatingMinHeight,
+                maxHeight: "calc(80dvh - 12px)",
+                // Floating reads as glass: a touch translucent over a blur of the
+                // page behind it. (Sidebar stays fully opaque — it's docked, not
+                // floating over content.) Light uses the platform's standard
+                // glass recipe (surface at alpha over an 8px blur); dark keeps
+                // the heavier ink glass, whose ground needs the stronger blur
+                // to stay legible.
+                background: "bg.surface/85",
+                backdropFilter: "blur(8px)",
+                borderWidth: "1px",
+                borderRadius: "20px",
+                boxShadow:
+                  "0 1px 2px rgba(20,20,23,0.04), 0 12px 28px rgba(20,20,23,0.10), 0 32px 64px rgba(20,20,23,0.10)",
+                _dark: {
+                  background: "bg.surface/88",
+                  backdropFilter: "blur(16px) saturate(1.1)",
+                  // The stacked drop shadows give depth from OUTSIDE; the inset
+                  // hairline gives the top edge a lit rim from INSIDE, so the panel
+                  // reads as a raised object catching light rather than a flat cut-
+                  // out. white/12 — one notch above the border's white/10.
+                  boxShadow:
+                    "0 1px 2px rgba(0,0,0,0.4), 0 12px 28px rgba(0,0,0,0.5), 0 32px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
+                },
               }
-            : {
-                // No shell on this page (a full-screen tool like the studio):
-                // the dock stays a flush full-height pane on the viewport edge.
-                top: 0,
-                right: 0,
-                bottom: 0,
-                borderLeftWidth: "1px",
-                borderTopLeftRadius: 0,
-                borderBottomLeftRadius: 0,
-                boxShadow: "none",
-              })}
+            : dockShellClaimed
+              ? {
+                  // An app shell is mounted: the dock joins it as a SECOND
+                  // content card. It starts below the full-width header,
+                  // aligned with the content card's top edge, and wears the
+                  // card's own language: the same top-left radius, the same
+                  // muted hairline on the two edges that meet the page ground,
+                  // and (dark) the same faint lit top rim. The strip of page
+                  // ground between the two cards is reserved by the shell, see
+                  // DashboardLayout. Spec: specs/langy/langy-panel-layout.feature
+                  top: `${APP_HEADER_HEIGHT}px`,
+                  right: 0,
+                  bottom: 0,
+                  borderTopWidth: "1px",
+                  borderLeftWidth: "1px",
+                  borderColor: "border.muted",
+                  borderTopLeftRadius: "xl",
+                  borderBottomLeftRadius: 0,
+                  boxShadow: "none",
+                  _dark: { boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" },
+                }
+              : {
+                  // No shell on this page (a full-screen tool like the studio):
+                  // the dock stays a flush full-height pane on the viewport edge.
+                  top: 0,
+                  right: 0,
+                  bottom: 0,
+                  borderLeftWidth: "1px",
+                  borderTopLeftRadius: 0,
+                  borderBottomLeftRadius: 0,
+                  boxShadow: "none",
+                })}
       >
         {/* Texture, under the content (which stacks at zIndex 1) and inert to
           the pointer. Dark only, the light panel is the app's own clean

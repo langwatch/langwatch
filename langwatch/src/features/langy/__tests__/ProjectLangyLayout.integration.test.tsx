@@ -83,6 +83,13 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: () => ({ enabled: gate.flagEnabled }),
 }));
 
+// The wrapper releases the dock reservation while a drawer is open (the panel
+// rides beside the drawer instead). Controlled per-test; null = no drawer.
+const drawerState = { current: null as string | null };
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({ currentDrawer: drawerState.current }),
+}));
+
 // Stub the heavy chat surface. Open state genuinely lives in the zustand
 // store nowadays, so the stub reads the REAL store and exposes a button that
 // opens Langy through it. It also counts its own mounts: the layout's whole
@@ -143,6 +150,7 @@ beforeEach(() => {
   gate.permissions = ["langy:view"];
   gate.project = { id: "project-demo", slug: "demo" };
   gate.demoSlug = "not-this-project";
+  drawerState.current = null;
   // The store is a module singleton — start every test closed and uncounted.
   useLangyStore.setState({
     isOpen: false,
@@ -324,6 +332,19 @@ describe("ProjectLangyLayout", () => {
         useLangyStore.setState({ panelMode: "floating" });
       });
       expect(useLangyStore.getState().dockShifted).toBe(false);
+    });
+
+    /** @scenario "An open drawer turns Langy into its floating companion" */
+    it("releases the reservation while a drawer is open", async () => {
+      drawerState.current = "traceV2Details";
+      renderAt("/demo/traces");
+      act(() => {
+        useLangyStore.setState({ panelMode: "sidebar" });
+      });
+      await openLangy();
+      // The panel rides beside the drawer as an overlay; the page keeps its
+      // full width underneath the pair.
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("none");
     });
 
     /** @scenario "Closing the dock returns the page to full width" */
