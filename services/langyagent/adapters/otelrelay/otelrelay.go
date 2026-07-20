@@ -59,6 +59,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
@@ -311,6 +312,67 @@ func (r *Relay) Unregister(token string) {
 	r.mu.Lock()
 	delete(r.workers, token)
 	r.mu.Unlock()
+}
+
+// ForwardTurnSpan emits the platform-owned TURN span into the customer's
+// project: the real root every re-parented worker span and every
+// gateway-retold LLM span already names as parent. Without it the customer
+// trace hangs off a span id that exists only in LangWatch's internal store.
+// The span id is the internal langy.turn span's — the SAME id in both
+// stores is the deliberate cross-store correlation key.
+//
+// Detached and best-effort like every other telemetry leg: a failed forward
+// warns and bumps the same counter, never the turn.
+func (r *Relay) ForwardTurnSpan(token string, sc trace.SpanContext, start, end time.Time) {
+	entry := r.lookup(token)
+	if entry == nil || !sc.IsValid() {
+		return
+	}
+
+	td := ptrace.NewTraces()
+	rs := td.ResourceSpans().AppendEmpty()
+	// The customer-facing identity of the turn itself. service.name names the
+	// product surface (the worker's own spans show up as "opencode"); the
+	// policy pass below stamps origin and enforces the same allowlist as
+	// every other customer-bound resource.
+	rs.Resource().Attributes().PutStr("service.name", "langy")
+	stampResource(rs.Resource().Attributes(), entry.info.ConversationID, entry.info.ActorUserID)
+	ss := rs.ScopeSpans().AppendEmpty()
+	// The instrumentation scope names WHO produced this span — the agent
+	// manager, not the worker (whose own scope rides its re-parented spans).
+	ss.Scope().SetName("langy-agent")
+	if info := contexts.GetServiceInfo(r.baseCtx); info != nil {
+		ss.Scope().SetVersion(info.Version)
+	}
+	span := ss.Spans().AppendEmpty()
+	span.SetName("langy.turn")
+	span.SetKind(ptrace.SpanKindServer)
+	// Span-level origin is the strongest signal the product's trace-origin
+	// resolution accepts — the root span carrying it makes the whole trace
+	// resolve to Langy deterministically.
+	span.Attributes().PutStr(otelsetup.AttrLangWatchOrigin, originLangy)
+	span.SetTraceID(pcommon.TraceID(sc.TraceID()))
+	span.SetSpanID(pcommon.SpanID(sc.SpanID()))
+	span.SetStartTimestamp(pcommon.NewTimestampFromTime(start))
+	span.SetEndTimestamp(pcommon.NewTimestampFromTime(end))
+	applyCustomerTracePolicy(td, customerTracePolicy)
+
+	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
+	if err != nil {
+		return
+	}
+	info := entry.info
+	go func() {
+		defer clog.HandlePanic(r.baseCtx, false)
+		ctx, cancel := context.WithTimeout(r.baseCtx, 10*time.Second)
+		defer cancel()
+		if err := r.forwardTraces(ctx, info, payload); err != nil && r.baseCtx.Err() == nil {
+			r.forwardFailures.Add(r.baseCtx, 1)
+			clog.Get(r.baseCtx).Warn("otelrelay turn span forward failed",
+				zap.String("conversation", info.ConversationID),
+				zap.Error(err))
+		}
+	}()
 }
 
 // SetTurnContext records the conversation's current turn trace context —

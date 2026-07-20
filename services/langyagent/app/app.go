@@ -206,10 +206,14 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	// and every mediated LLM call it makes — is stitched under this turn's trace.
 	// With telemetry off this is the remote (control-plane) span context; still
 	// valid, still the right parent.
+	start := time.Now()
 	if sc := turnSpan.SpanContext(); sc.IsValid() {
 		worker.SetTurnTraceContext(sc)
+		// The customer's copy of the turn span, emitted when the turn ends —
+		// the real root under which the worker's re-parented spans and the
+		// gateway's retold LLM spans already sit.
+		defer func() { worker.ForwardTurnSpan(sc, start, time.Now()) }()
 	}
-	start := time.Now()
 
 	// The per-turn relay push. Disabled (no runToken/endpoint/secret) ⇒ nil stream:
 	// the turn still runs + finalizes, it just has no live edge.

@@ -250,3 +250,64 @@ func TestRelayTraces_JSONEncodedExport(t *testing.T) {
 		t.Errorf("forwarded origin = %v, want langy", origin.Str())
 	}
 }
+
+// The turn span is the platform-owned ROOT the customer's trace hangs off —
+// same span id as the internal langy.turn (the cross-store correlation key),
+// agent-scoped, origin-stamped at both span and resource level.
+func TestForwardTurnSpan(t *testing.T) {
+	relay := startRelay(t)
+	ingest := startIngest(t)
+	token, err := relay.Register(WorkerInfo{
+		ConversationID:    "conv-root",
+		ActorUserID:       "user-a",
+		LangwatchEndpoint: ingest.srv.URL,
+		LangwatchAPIKey:   "sk-session",
+	})
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	turn := turnContext()
+	relay.SetTurnContext(token, turn)
+
+	start := time.Now().Add(-3 * time.Second)
+	relay.ForwardTurnSpan(token, turn, start, time.Now())
+
+	deadline := time.Now().Add(3 * time.Second)
+	for len(ingest.body) == 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	forwarded, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(ingest.body)
+	if err != nil {
+		t.Fatalf("forwarded turn span is not OTLP protobuf: %v", err)
+	}
+
+	rs := forwarded.ResourceSpans().At(0)
+	ss := rs.ScopeSpans().At(0)
+	span := ss.Spans().At(0)
+
+	if got := span.Name(); got != "langy.turn" {
+		t.Fatalf("span name = %q", got)
+	}
+	if span.TraceID() != pcommon.TraceID(turn.TraceID()) || span.SpanID() != pcommon.SpanID(turn.SpanID()) {
+		t.Fatal("turn span must carry the internal langy.turn identity — that id is what every child already parents on")
+	}
+	if !span.ParentSpanID().IsEmpty() {
+		t.Fatalf("turn span must be a root, got parent %s", span.ParentSpanID())
+	}
+	if got := ss.Scope().Name(); got != "langy-agent" {
+		t.Fatalf("instrumentation scope = %q, want langy-agent", got)
+	}
+	if v, ok := span.Attributes().Get("langwatch.origin"); !ok || v.Str() != "langy" {
+		t.Fatalf("span-level origin = %v", v.Str())
+	}
+	attrs := rs.Resource().Attributes()
+	if v, ok := attrs.Get("langwatch.origin"); !ok || v.Str() != "langy" {
+		t.Fatalf("resource origin = %v", v.Str())
+	}
+	if v, ok := attrs.Get("langwatch.thread.id"); !ok || v.Str() != "conv-root" {
+		t.Fatalf("thread id = %v", v.Str())
+	}
+	if v, ok := attrs.Get("service.name"); !ok || v.Str() != "langy" {
+		t.Fatalf("service.name = %v", v.Str())
+	}
+}
