@@ -5,19 +5,19 @@ import {
   handleClusteringRunFailed,
   INITIAL_TOPIC_CLUSTERING_STATE,
   topicClusteringWake,
-} from "~/server/app-layer/topic-clustering/process-manager/topicClustering.process";
+} from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClustering.process";
 import {
   createTopicClusteringRunHandler,
   TOPIC_CLUSTERING_MAX_ATTEMPTS,
   TOPIC_CLUSTERING_OUTBOX_BATCH_SIZE,
   TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
   type TopicClusteringDispatchDeps,
-} from "~/server/app-layer/topic-clustering/process-manager/topicClusteringIntentHandlers";
+} from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringIntentHandlers";
 import {
   TOPIC_CLUSTERING_PROCESS_INTENT_TYPES,
   TOPIC_CLUSTERING_PROCESS_NAME,
   topicClusteringRunIntentSchema,
-} from "~/server/app-layer/topic-clustering/process-manager/topicClusteringProcess.types";
+} from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringProcess.types";
 
 import { definePipeline } from "../../";
 import type { ProcessManagerApplier } from "../../pipeline/processBuilder";

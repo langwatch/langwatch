@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
-import { TOPIC_CLUSTERING_PROCESS_NAME } from "../process-manager/topicClusteringProcess.types";
+import { TOPIC_CLUSTERING_PROCESS_NAME } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringProcess.types";
 
 export type TopicClusteringRunProjectionRow =
   Prisma.TopicClusteringRunProjectionGetPayload<object>;

@@ -10,7 +10,7 @@ import type {
   IntentExecutor,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { ClusteringPageOutcome } from "~/server/app-layer/topic-clustering/clustering";
-import { classifyClusteringError } from "../clustering-error";
+import { classifyClusteringError } from "~/server/app-layer/topic-clustering/clustering-error";
 
 import type { TopicClusteringRunIntent } from "./topicClusteringProcess.types";
 

@@ -114,7 +114,7 @@ import {
   mintLangySessionApiKeyForUser,
   revokeLangySessionApiKey,
 } from "../app-layer/langy/langyApiKey";
-import { createLangyEffectPorts } from "../app-layer/langy/process-manager/langyEffectPorts";
+import { createLangyEffectPorts } from "../event-sourcing/pipelines/langy-conversation-processing/process-manager/langyEffectPorts";
 import type { LangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
 import {
@@ -126,7 +126,7 @@ import type { LangyTurnAdmissionRepository } from "../app-layer/langy/repositori
 import {
   type TopicClusteringOutcomeCommands,
   type TopicClusteringRunPort,
-} from "../app-layer/topic-clustering/process-manager";
+} from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
 import {
   OutboxDispatcherService,
   ProcessManagerService,

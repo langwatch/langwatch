@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { TOPIC_CLUSTERING_STALE_RUN_MS } from "../process-manager/topicClustering.process";
+import { TOPIC_CLUSTERING_STALE_RUN_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClustering.process";
 import type {
   TopicClusteringRunProjectionRow,
   TopicClusteringStatusRecord,

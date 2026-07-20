@@ -5,8 +5,8 @@ import type { EventSubscriberDefinition } from "../../subscribers/eventSubscribe
 import {
   langyConversationProcess,
   LANGY_CONVERSATION_PROCESS_NAME,
-} from "~/server/app-layer/langy/process-manager";
-import type { LangyEffectPorts } from "~/server/app-layer/langy/process-manager";
+} from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
+import type { LangyEffectPorts } from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
 import {
   ArchiveConversationCommand,
   ConsumeTurnHandoffCommand,

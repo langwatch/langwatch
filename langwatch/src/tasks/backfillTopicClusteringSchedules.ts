@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 
 import { getApp } from "~/server/app-layer/app";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
-import { TOPIC_CLUSTERING_PROCESS_NAME } from "~/server/app-layer/topic-clustering/process-manager/topicClusteringProcess.types";
+import { TOPIC_CLUSTERING_PROCESS_NAME } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringProcess.types";
 import { prisma } from "../server/db";
 
 const logger = createLogger("langwatch:tasks:backfillTopicClusteringSchedules");

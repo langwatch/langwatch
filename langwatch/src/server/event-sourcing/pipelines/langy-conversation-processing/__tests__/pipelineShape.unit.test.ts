@@ -4,13 +4,13 @@ import type { AppendStore } from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type { StateProjectionStore } from "../../../projections/stateProjection.types";
 import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
-import { createStubLangyEffectPorts } from "~/server/app-layer/langy/process-manager";
-import { LANGY_CONVERSATION_PROCESS_NAME } from "~/server/app-layer/langy/process-manager";
+import { createStubLangyEffectPorts } from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
 import {
   agentRespondedEvent,
   CONVERSATION_ID,
   PROJECT_ID,
-} from "../../../../app-layer/langy/process-manager/__tests__/helpers/langyEventFixtures";
+} from "../../../../event-sourcing/pipelines/langy-conversation-processing/process-manager/__tests__/helpers/langyEventFixtures";
 import {
   createLangyConversationProcessingPipeline,
   type LangyConversationProcessingPipelineDeps,

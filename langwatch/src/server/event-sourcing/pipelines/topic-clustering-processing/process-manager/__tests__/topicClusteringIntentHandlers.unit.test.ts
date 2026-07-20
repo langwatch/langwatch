@@ -21,7 +21,7 @@ import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfigu
 import {
   CLUSTERING_ERROR_CODES,
   ClusteringError,
-} from "../../clustering-error";
+} from "~/server/app-layer/topic-clustering/clustering-error";
 import type { TopicClusteringRunIntent } from "../topicClusteringProcess.types";
 import { createTopicClusteringRunHandler } from "../topicClusteringIntentHandlers";
 
