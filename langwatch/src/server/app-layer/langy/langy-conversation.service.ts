@@ -723,6 +723,28 @@ export class LangyConversationService {
    * place, so the durable body is identical to the relay's and never carries raw
    * agent prose (`LastError` is a vetted domain error, rendered on history load).
    */
+  /**
+   * True when the (projectId, conversationId, turnId) triple names a turn that
+   * was really accepted under this conversation in this project. The durable
+   * result-ingest route checks this before writing: unlike the relay (which
+   * verifies an HMAC over the conversation's runToken), that route has only
+   * the shared bearer, so without this cross-check a caller who holds the
+   * secret could forge a result into any tenant's conversation, and a benign
+   * projectId/conversationId mix-up in the multiplexing manager would write
+   * one tenant's output into another's with nothing to catch it.
+   */
+  async turnExists({
+    projectId,
+    conversationId,
+    turnId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean> {
+    return this.repository.turnExists({ projectId, conversationId, turnId });
+  }
+
   async ingestAgentTurnResult({
     projectId,
     conversationId,
