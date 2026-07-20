@@ -2,6 +2,7 @@ package gatewaytracer
 
 import (
 	"context"
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -112,11 +113,11 @@ func TestStampInternalGenAI_KeepsOperationalMetadata(t *testing.T) {
 	assert.Equal(t, "openai", got[AttrGenAISystem])
 	assert.Equal(t, "gpt-5-mini", got[AttrGenAIRequestModel])
 	assert.NotContains(t, got, AttrGenAIResponseModel)
-	assert.Equal(t, "120", got[AttrGenAIUsageIn])
+	assert.Equal(t, "120", got[customertracebridge.AttrGenAIUsageIn])
 	assert.Equal(t, "34", got[AttrGenAIUsageOut])
 	assert.Equal(t, "154", got[AttrGenAIUsageTotal])
-	assert.Equal(t, "vk-1", got[AttrVirtualKeyID])
-	assert.Equal(t, "req-1", got[AttrGatewayReqID])
+	assert.Equal(t, "vk-1", got[customertracebridge.AttrVirtualKeyID])
+	assert.Equal(t, "req-1", got[customertracebridge.AttrGatewayReqID])
 }
 
 func TestStampInternalGenAI_OmitsUntrustedModelMetadata(t *testing.T) {
@@ -186,9 +187,9 @@ func TestStampInternalGenAI_StampsOnlyTheAllowedKeySet(t *testing.T) {
 	}
 	assert.ElementsMatch(t, []string{
 		AttrGenAIOperationName, AttrGenAISystem, AttrGenAIRequestModel,
-		AttrGenAIUsageIn, AttrGenAIUsageOut, AttrGenAIUsageTotal,
-		AttrGenAIUsageCacheRead, AttrGenAIUsageCacheCreate, AttrCostUSD,
-		AttrVirtualKeyID, AttrGatewayReqID,
+		customertracebridge.AttrGenAIUsageIn, AttrGenAIUsageOut, AttrGenAIUsageTotal,
+		customertracebridge.AttrGenAIUsageCacheRead, customertracebridge.AttrGenAIUsageCacheCreate, AttrCostUSD,
+		customertracebridge.AttrVirtualKeyID, customertracebridge.AttrGatewayReqID,
 		AttrErrorType, AttrUpstreamStatusCode,
 	}, got, "the internal span's key set changed — review whether the new key can carry content before extending this list")
 }
@@ -211,8 +212,8 @@ func TestPackageDeclaresNoContentAttributeConstants(t *testing.T) {
 		AttrGenAIRequestTemp, AttrGenAIRequestMaxTokens, AttrGenAIRequestTopP,
 		AttrGenAIRequestFreqPen, AttrGenAIRequestPresPen, AttrGenAIRequestStopSeqs,
 		AttrGenAIResponseID, AttrGenAIResponseModel, AttrGenAIResponseFinish,
-		AttrGenAIUsageIn, AttrGenAIUsageOut, AttrGenAIUsageTotal,
-		AttrGenAIUsageCacheRead, AttrGenAIUsageCacheCreate, AttrGenAIConversationID,
+		customertracebridge.AttrGenAIUsageIn, AttrGenAIUsageOut, AttrGenAIUsageTotal,
+		customertracebridge.AttrGenAIUsageCacheRead, customertracebridge.AttrGenAIUsageCacheCreate, customertracebridge.AttrGenAIConversationID,
 	}
 	for _, key := range declared {
 		assert.NotContains(t, ForbiddenInternalSpanAttrs, key,

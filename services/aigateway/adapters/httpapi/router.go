@@ -23,7 +23,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/customertracebridge"
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
 	"github.com/langwatch/langwatch/services/aigateway/app"

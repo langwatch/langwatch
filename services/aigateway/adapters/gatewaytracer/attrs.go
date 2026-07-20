@@ -1,14 +1,10 @@
 package gatewaytracer
 
 const (
-	AttrOrigin                    = "langwatch.origin"
-	OriginGateway                 = "gateway"
-	AttrVirtualKeyID              = "langwatch.virtual_key_id"
 	AttrProjectID                 = "langwatch.project_id"
 	AttrTeamID                    = "langwatch.team_id"
 	AttrOrgID                     = "langwatch.organization_id"
 	AttrPrincipalID               = "langwatch.principal_id"
-	AttrGatewayReqID              = "langwatch.gateway_request_id"
 	AttrModel                     = "langwatch.model"
 	AttrProvider                  = "langwatch.provider"
 	AttrModelSource               = "langwatch.model_source"

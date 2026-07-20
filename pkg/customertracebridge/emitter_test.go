@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/langwatch/langwatch/pkg/contexts"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
+	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -146,7 +146,6 @@ func hexEncode(b []byte) string {
 	return string(out)
 }
 
-
 // What leaves the process is the contract: every customer-retold span must
 // carry a resource of exactly the langwatch.origin marker — never the
 // gateway's own identity. The pod environment is set to the production shape
@@ -205,7 +204,7 @@ func TestEmitter_WireResourceIsOriginMarkerOnly(t *testing.T) {
 		attrs := rs.GetResource().GetAttributes()
 		require.Len(t, attrs, 1,
 			"customer-visible resource must carry ONLY the origin marker, got: %v", attrs)
-		assert.Equal(t, gatewaytracer.AttrOrigin, attrs[0].GetKey())
-		assert.Equal(t, gatewaytracer.OriginGateway, attrs[0].GetValue().GetStringValue())
+		assert.Equal(t, otelsetup.AttrLangWatchOrigin, attrs[0].GetKey())
+		assert.Equal(t, OriginGateway, attrs[0].GetValue().GetStringValue())
 	}
 }

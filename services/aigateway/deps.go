@@ -21,7 +21,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/adapters/budget"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/cacherules"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/controlplane"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/customertracebridge"
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/modelresolver"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/policy"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/providers"

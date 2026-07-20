@@ -20,7 +20,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/langwatch/langwatch/pkg/contexts"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
+	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -81,20 +81,9 @@ func (d dropFilterExporter) Shutdown(ctx context.Context) error {
 	return d.inner.Shutdown(ctx)
 }
 
-// customerResource is the ONLY resource customers ever see on a retold span:
-// the origin marker (the control plane's trace-origin resolution treats a
-// resource-level langwatch.origin as authoritative — this is what makes
-// gateway-retold traces carry Origin=Gateway in the product) and nothing else.
-// The gateway's own identity — service name/version, k8s topology, cloud
-// region — is LangWatch infrastructure detail and must never ride on
-// customer data.
-var customerResource = resource.NewSchemaless(
-	attribute.String(gatewaytracer.AttrOrigin, gatewaytracer.OriginGateway),
-)
-
-// resourceScrubExporter rebuilds every span with customerResource before it
-// reaches the wire. The provider's own resource cannot be trusted:
-// sdktrace.WithResource silently merges the configured resource over
+// resourceScrubExporter rebuilds every span's resource under the service's
+// Policy before it reaches the wire. The provider's own resource cannot be
+// trusted: sdktrace.WithResource silently merges the configured resource over
 // resource.Environment() (OTEL_RESOURCE_ATTRIBUTES / OTEL_SERVICE_NAME) with
 // no opt-out, which is exactly how the pod's k8s topology leaked onto
 // customer spans in production. Scrubbing at the export boundary holds
@@ -104,14 +93,15 @@ var customerResource = resource.NewSchemaless(
 // sealed interface, and SpanStub is the SDK's only public way to reconstruct
 // one with a chosen resource.
 type resourceScrubExporter struct {
-	inner sdktrace.SpanExporter
+	inner  sdktrace.SpanExporter
+	policy Policy
 }
 
 func (r resourceScrubExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
 	scrubbed := make([]sdktrace.ReadOnlySpan, 0, len(spans))
 	for _, s := range spans {
 		stub := tracetest.SpanStubFromReadOnlySpan(s)
-		stub.Resource = customerResource
+		stub.Resource = r.policy.ApplyResource(s.Resource())
 		scrubbed = append(scrubbed, stub.Snapshot())
 	}
 	return r.inner.ExportSpans(ctx, scrubbed)
@@ -126,6 +116,10 @@ type EmitterOptions struct {
 	Registry     *Registry
 	BatchTimeout time.Duration
 	MaxQueueSize int
+	// Policy governs the customer-visible resource. Zero value: allow
+	// nothing, stamp the gateway origin marker — the emitter is the
+	// gateway's retell engine, so its identity marker is the default.
+	Policy *Policy
 }
 
 // NewEmitter creates a customer trace bridge backed by a private TracerProvider.
@@ -134,8 +128,14 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 		opts.Registry = NewRegistry()
 	}
 
+	policy := Policy{Stamp: []attribute.KeyValue{
+		attribute.String(otelsetup.AttrLangWatchOrigin, OriginGateway),
+	}}
+	if opts.Policy != nil {
+		policy = *opts.Policy
+	}
 	router := dropFilterExporter{
-		inner: resourceScrubExporter{inner: newRouterExporter(ctx, opts.Registry)},
+		inner: resourceScrubExporter{inner: newRouterExporter(ctx, opts.Registry), policy: policy},
 	}
 
 	batchTimeout := opts.BatchTimeout
@@ -228,24 +228,24 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		attrCost.Int64(params.Usage.CostMicroUSD),
 	}
 	if params.Usage.CacheReadTokens > 0 {
-		attrs = append(attrs, attribute.Int(gatewaytracer.AttrGenAIUsageCacheRead, params.Usage.CacheReadTokens))
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheRead, params.Usage.CacheReadTokens))
 	}
 	if params.Usage.CacheCreationTokens > 0 {
-		attrs = append(attrs, attribute.Int(gatewaytracer.AttrGenAIUsageCacheCreate, params.Usage.CacheCreationTokens))
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate, params.Usage.CacheCreationTokens))
 	}
 	// VK id + request id let the control plane's trace-processing pipeline
 	// identify gateway traces and fold idempotent budget debits into ClickHouse.
 	// See specs/ai-gateway/_shared/contract.md §4.5.
 	if params.VirtualKeyID != "" {
-		attrs = append(attrs, attribute.String(gatewaytracer.AttrVirtualKeyID, params.VirtualKeyID))
+		attrs = append(attrs, attribute.String(AttrVirtualKeyID, params.VirtualKeyID))
 	}
 	if params.GatewayRequestID != "" {
-		attrs = append(attrs, attribute.String(gatewaytracer.AttrGatewayReqID, params.GatewayRequestID))
+		attrs = append(attrs, attribute.String(AttrGatewayReqID, params.GatewayRequestID))
 	}
 	// The wrapped tool's own session / conversation id, so multi-turn gateway
 	// traces group under a stable thread instead of having no thread id at all.
 	if sessionID := clientSessionID(ctx, params); sessionID != "" {
-		attrs = append(attrs, attribute.String(gatewaytracer.AttrGenAIConversationID, sessionID))
+		attrs = append(attrs, attribute.String(AttrGenAIConversationID, sessionID))
 	}
 
 	// When the request failed upstream, stamp the provider's HTTP status +

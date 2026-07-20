@@ -49,6 +49,7 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -58,7 +59,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/pkg/otelsetup"
 	langyotel "github.com/langwatch/langwatch/services/langyagent/otel"
 )
 
@@ -400,6 +403,7 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 	r.exportInternal(conversationID, entry.info.Model, turn, body)
 
 	ReparentTraces(td, conversationID, entry.info.ActorUserID, turn)
+	applyCustomerTracePolicy(td, customerTracePolicy)
 	out, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
 	if err != nil {
 		http.Error(w, "invalid OTLP payload", http.StatusBadRequest)
@@ -600,4 +604,41 @@ func (r *Relay) forwardTraces(ctx context.Context, info WorkerInfo, payload []by
 		return fmt.Errorf("ingest answered %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// customerTracePolicy is the allowlist for resource attributes on worker
+// telemetry bound for the customer's project. It runs AFTER ReparentTraces,
+// so the allowed keys are the ones that carry customer meaning: the relay's
+// own stamps (thread, acting user, tags) and the worker's telemetry identity
+// (service.name). Everything else — sdk metadata, environment identity, and
+// whatever a future opencode version starts emitting — fails closed. The
+// origin stamp replaces any worker-supplied value: the worker is a
+// model-driven, prompt-injectable process and must not brand its spans with
+// LangWatch's provenance marker; the platform says these spans are Langy's.
+var customerTracePolicy = customertracebridge.Policy{
+	Allow: []attribute.Key{
+		attrThreadID,
+		attrUserID,
+		attrTags,
+		"service.name",
+	},
+	Stamp: []attribute.KeyValue{
+		attribute.String(otelsetup.AttrLangWatchOrigin, customertracebridge.OriginLangy),
+	},
+}
+
+// applyCustomerTracePolicy applies the allowlist to every resource in the
+// batch — the pdata twin of the policy's SDK-level ApplyResource, living here
+// because this module already carries the collector pdata dependency.
+func applyCustomerTracePolicy(td ptrace.Traces, p customertracebridge.Policy) {
+	for i := 0; i < td.ResourceSpans().Len(); i++ {
+		attrs := td.ResourceSpans().At(i).Resource().Attributes()
+		attrs.RemoveIf(func(k string, _ pcommon.Value) bool {
+			key := attribute.Key(k)
+			return !p.Allows(key) || p.Stamps(key)
+		})
+		for _, kv := range p.Stamp {
+			attrs.PutStr(string(kv.Key), kv.Value.AsString())
+		}
+	}
 }

@@ -9,7 +9,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/customertracebridge"
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/services/aigateway/app"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )

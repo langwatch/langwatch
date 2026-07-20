@@ -245,12 +245,63 @@ func TestCustomerForwardStripsForgedOriginMarker(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, forwarded.ResourceSpans().Len())
 	attrs := forwarded.ResourceSpans().At(0).Resource().Attributes()
-	if _, found := attrs.Get("langwatch.origin"); found {
-		t.Fatal("a worker-forged langwatch.origin survived onto the customer forward")
-	}
+	origin, found := attrs.Get("langwatch.origin")
+	require.True(t, found, "the platform origin stamp must be present")
+	assert.Equal(t, "langy", origin.Str(),
+		"a worker-forged langwatch.origin must be replaced by the platform's stamp, never forwarded")
 	serviceName, ok := attrs.Get("service.name")
 	require.True(t, ok)
 	assert.Equal(t, "opencode", serviceName.Str(), "legitimate worker resource attributes must survive the strip")
+}
+
+// The customer-forward allowlist fails closed: a resource attribute outside
+// the policy — sdk metadata, pod identity, anything a future worker build
+// starts emitting — never reaches the customer's project.
+func TestCustomerForwardDropsUnlistedResourceAttributes(t *testing.T) {
+	customer := startSignallingIngest(t)
+	relay := relayWithInternal(t, "")
+
+	token, err := relay.Register(WorkerInfo{
+		ConversationID:    "conv-allow",
+		LangwatchEndpoint: customer.srv.URL,
+		LangwatchAPIKey:   "sk-session",
+		Model:             "gpt-5-mini",
+	})
+	require.NoError(t, err)
+
+	td := ptrace.NewTraces()
+	rs := td.ResourceSpans().AppendEmpty()
+	rs.Resource().Attributes().PutStr("service.name", "opencode")
+	rs.Resource().Attributes().PutStr("k8s.pod.name", "worker-pod-7")
+	rs.Resource().Attributes().PutStr("telemetry.sdk.name", "opentelemetry")
+	span := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span.SetName("step")
+	span.SetTraceID(pcommon.TraceID{9})
+	span.SetSpanID(pcommon.SpanID{3})
+	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
+	require.NoError(t, err)
+
+	resp, err := http.Post(
+		relay.OTLPEndpointFor(token)+"/v1/traces",
+		"application/x-protobuf",
+		bytes.NewReader(payload),
+	)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	forwarded, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(customer.await(t))
+	require.NoError(t, err)
+	attrs := forwarded.ResourceSpans().At(0).Resource().Attributes()
+	if _, found := attrs.Get("k8s.pod.name"); found {
+		t.Fatal("an unlisted resource attribute reached the customer forward")
+	}
+	if _, found := attrs.Get("telemetry.sdk.name"); found {
+		t.Fatal("sdk metadata reached the customer forward")
+	}
+	serviceName, ok := attrs.Get("service.name")
+	require.True(t, ok)
+	assert.Equal(t, "opencode", serviceName.Str())
 }
 
 func TestInternalExportIsBoundedDuringCollectorOutage(t *testing.T) {
