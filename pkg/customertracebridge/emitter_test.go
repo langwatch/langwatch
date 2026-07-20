@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/protobuf/proto"
 
@@ -216,4 +217,43 @@ func TestEmitter_WireResourceIsOriginMarkerOnly(t *testing.T) {
 		assert.Equal(t, otelsetup.AttrLangWatchOrigin, attrs[0].GetKey())
 		assert.Equal(t, "gateway", attrs[0].GetValue().GetStringValue())
 	}
+}
+
+// The bridge builds customer spans from a CLEAN context plus the captured
+// customer traceparent — never from the request context. These pin the
+// isolation in both directions: an ambient internal span (the gateway's own
+// tracing) must never become the customer span's trace, and a customer
+// traceparent must be continued exactly.
+func TestEmitter_CustomerTraceNeverAdoptsInternalTrace(t *testing.T) {
+	ctx := contexts.SetServiceInfo(context.Background(), contexts.ServiceInfo{
+		Service: "langwatch-service-aigateway",
+		Version: "test",
+	})
+	e, err := NewEmitter(ctx, EmitterOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
+
+	// An internal ops span is active on the request context — the exact shape
+	// of a bridge call made inside the gateway's own instrumented handler.
+	internalTP := sdktrace.NewTracerProvider()
+	t.Cleanup(func() { _ = internalTP.Shutdown(context.Background()) })
+	internalCtx, internalSpan := internalTP.Tracer("gateway-internal").Start(ctx, "lw_gateway.chat_completions")
+	defer internalSpan.End()
+	internalTraceID := internalSpan.SpanContext().TraceID().String()
+
+	t.Run("without a customer traceparent the span is a new root", func(t *testing.T) {
+		_, traceparent := e.BeginSpan(internalCtx, "proj-1", domain.RequestTypeChat)
+		require.NotContains(t, traceparent, internalTraceID,
+			"the customer span adopted the gateway's internal trace id")
+	})
+
+	t.Run("with a customer traceparent the span continues it exactly", func(t *testing.T) {
+		customerTrace := "4bf92f3577b34da6a3ce929d0e0e4736"
+		ctxWithTP := WithTraceParent(internalCtx,
+			"00-"+customerTrace+"-00f067aa0ba902b7-01")
+		_, traceparent := e.BeginSpan(ctxWithTP, "proj-1", domain.RequestTypeChat)
+		require.Contains(t, traceparent, customerTrace,
+			"the customer span must continue the customer's own trace")
+		require.NotContains(t, traceparent, internalTraceID)
+	})
 }

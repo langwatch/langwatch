@@ -719,9 +719,18 @@ var customerTracePolicy = customertracebridge.Policy{
 func applyCustomerTracePolicy(td ptrace.Traces, p customertracebridge.Policy) {
 	for i := 0; i < td.ResourceSpans().Len(); i++ {
 		attrs := td.ResourceSpans().At(i).Resource().Attributes()
-		attrs.RemoveIf(func(k string, _ pcommon.Value) bool {
+		attrs.RemoveIf(func(k string, v pcommon.Value) bool {
 			key := attribute.Key(k)
-			return !p.Allows(key) || p.Stamps(key)
+			if !p.Allows(key) || p.Stamps(key) {
+				return true
+			}
+			// service.name passes the allowlist so the customer can tell the
+			// worker's telemetry apart — but its VALUE is worker-supplied, and
+			// a prompt-injectable process must not impersonate the platform.
+			if key == "service.name" && strings.HasPrefix(v.Str(), "langwatch-") {
+				return true
+			}
+			return false
 		})
 		for _, kv := range p.Stamp {
 			attrs.PutStr(string(kv.Key), kv.Value.AsString())

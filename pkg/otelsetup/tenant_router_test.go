@@ -316,3 +316,29 @@ func TestTenantRouter_OpsFallback(t *testing.T) {
 		span.End() // must not panic; historical drop behavior preserved
 	})
 }
+
+func TestTenantRouter_TenantSpansNeverGainInternalIdentity(t *testing.T) {
+	ops := &recordingProcessor{}
+	tenant := &recordingProcessor{}
+	router := NewTenantRouter("http://collector:4318").WithOpsFallback(ops, resource.NewSchemaless(
+		attribute.String(AttrLangWatchOrigin, "platform_internal"),
+	))
+	router.newProcessor = func(string, string) (sdktrace.SpanProcessor, error) {
+		return tenant, nil
+	}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(router))
+	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+
+	ctx := context.WithValue(context.Background(), APIKeyContextKey{}, "sk-tenant-1")
+	_, span := tp.Tracer("test").Start(ctx, "customer-work")
+	span.End()
+
+	if len(tenant.spans) != 1 {
+		t.Fatalf("tenant spans = %d, want 1", len(tenant.spans))
+	}
+	for _, kv := range tenant.spans[0].Resource().Attributes() {
+		if string(kv.Key) == AttrLangWatchOrigin && kv.Value.AsString() == "platform_internal" {
+			t.Fatal("the internal-origin marker crossed onto a customer-bound span")
+		}
+	}
+}

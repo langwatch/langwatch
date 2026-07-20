@@ -362,3 +362,60 @@ func TestInternalExportIsBoundedDuringCollectorOutage(t *testing.T) {
 	assert.LessOrEqual(t, len(relay.internalJobs), internalExportQueueSize)
 	close(release)
 }
+
+// The reverse of the content-isolation guarantee: LangWatch's INTERNAL
+// identity must never ride the customer forward, even when the worker itself
+// claims it — a prompt-injectable process asserting platform identity on its
+// resource is exactly the forgery the allowlist exists for.
+func TestCustomerForwardCarriesNoInternalIdentity(t *testing.T) {
+	customer := startSignallingIngest(t)
+	relay := relayWithInternal(t, "")
+
+	token, err := relay.Register(WorkerInfo{
+		ConversationID:    "conv-ident",
+		LangwatchEndpoint: customer.srv.URL,
+		LangwatchAPIKey:   "sk-session",
+		Model:             "gpt-5-mini",
+	})
+	require.NoError(t, err)
+
+	td := ptrace.NewTraces()
+	rs := td.ResourceSpans().AppendEmpty()
+	rs.Resource().Attributes().PutStr("langwatch.origin", "platform_internal")
+	rs.Resource().Attributes().PutStr("service.name", "langwatch-service-langyagent")
+	rs.Resource().Attributes().PutStr("deployment.environment.name", "lw-prod")
+	span := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span.SetName("step")
+	span.SetTraceID(pcommon.TraceID{5})
+	span.SetSpanID(pcommon.SpanID{6})
+	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
+	require.NoError(t, err)
+
+	resp, err := http.Post(
+		relay.OTLPEndpointFor(token)+"/v1/traces",
+		"application/x-protobuf",
+		bytes.NewReader(payload),
+	)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	body := customer.await(t)
+	if bytes.Contains(body, []byte("platform_internal")) {
+		t.Fatal("the internal-origin marker reached the customer forward")
+	}
+	if bytes.Contains(body, []byte("lw-prod")) {
+		t.Fatal("platform environment identity reached the customer forward")
+	}
+	if bytes.Contains(body, []byte("langwatch-service-langyagent")) {
+		t.Fatal("a worker-forged platform service identity reached the customer forward")
+	}
+
+	forwarded, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(body)
+	require.NoError(t, err)
+	attrs := forwarded.ResourceSpans().At(0).Resource().Attributes()
+	origin, ok := attrs.Get("langwatch.origin")
+	require.True(t, ok)
+	assert.Equal(t, "langy", origin.Str(),
+		"the platform's own origin stamp must replace the forged one")
+}
