@@ -76,6 +76,7 @@ import { useLangyConversationCommands } from "../data/useLangyConversationComman
 import { useLangyMessages } from "../data/useLangyMessages";
 import type { LangyMessageDto } from "../data/langy.dtos";
 import { useLangyFreshness } from "../hooks/useLangyFreshness";
+import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydration";
 import {
   createLangyChatTransport,
   type LangyTurnRequestContext,
@@ -756,6 +757,45 @@ function LangyPanel({
       applyHistoryToEngine([]);
     }
   }, [activeConversationId, applyHistoryToEngine]);
+
+  // Foreign-turn re-hydration. A turn this client did NOT drive (another tab, a
+  // recovered/again-driven turn, a programmatic caller) grows the open
+  // conversation's durable history; `useLangyFreshness` invalidates the
+  // `langy.messages` query on the id-only signal. Reflect that growth in the
+  // engine so the open thread updates without a manual refresh — the engine is
+  // what renders, and the user-selection gate above only re-hydrates on an
+  // explicit open. Three guards keep it from clobbering the live path:
+  //   - a pending user selection owns the engine — let that effect apply it;
+  //   - a live self-driven turn (submitted/streaming) owns the engine;
+  //   - apply ONLY when durable is AHEAD of the engine, never shrinking it, so a
+  //     momentarily-stale refetch at a turn's settle boundary can't flash the
+  //     pre-answer history.
+  useEffect(() => {
+    const durableCount = historyMessages.filter(
+      (m) => m.role === "user" || m.role === "assistant",
+    ).length;
+    if (
+      !shouldRehydrateEngineFromDurable({
+        historyLoadPending: historyLoadConversationId !== null,
+        isStreaming: status === "submitted" || status === "streaming",
+        isFetchingHistory,
+        hasActiveConversation: activeConversationId !== null,
+        durableMessageCount: durableCount,
+        engineMessageCount: messages.length,
+      })
+    ) {
+      return;
+    }
+    applyHistoryToEngine(historyMessages);
+  }, [
+    historyLoadConversationId,
+    status,
+    isFetchingHistory,
+    activeConversationId,
+    historyMessages,
+    messages.length,
+    applyHistoryToEngine,
+  ]);
 
   // A failed recents list surfaces INSIDE the panel as a dismissable Langy
   // domain-error card — never a toast: the panel is open (a closed panel
