@@ -713,7 +713,7 @@ function LangyPanel({
     messages: historyMessages,
     lastError: historyLastError,
     isTurnInFlight: foldTurnInFlight,
-    askFeedback,
+    shouldAskFeedback,
     isFetching: isFetchingHistory,
   } = useLangyMessages(activeConversationId);
 
@@ -728,6 +728,17 @@ function LangyPanel({
   const serverTurnInFlight =
     foldTurnInFlight &&
     !(activeTurnId !== null && settledTurnId === activeTurnId);
+
+  // The marker's job ends the moment the fold agrees the turn settled. Without
+  // this, a LATER turn this tab did not start (another tab, a programmatic
+  // caller — no local onIds to re-key the marker) would be suppressed by the
+  // stale marker forever: no working indicator, and the feedback ask free to
+  // render mid-turn.
+  useEffect(() => {
+    if (!foldTurnInFlight && settledTurnId !== null) {
+      useLangyStore.getState().markTurnSettled(null);
+    }
+  }, [foldTurnInFlight, settledTurnId]);
 
   // Push a settled server history into the chat engine. Gated on a USER
   // selection (`historyLoadConversationId`) so a background refetch — or the
@@ -957,14 +968,14 @@ function LangyPanel({
     if (!text.trim() || !projectId || isBusy) return;
     // `/feedback` is a client command, not a message: it summons the rating
     // card under the latest answer (bypassing the backend cadence — the user
-    // asking to rate is never nagging) and sends nothing to Langy.
+    // asking to rate is never nagging) and sends nothing to Langy. This
+    // closure is reassigned every render and only runs after it, so reading
+    // `latestAssistantMessage` (declared below) is safe — one derivation, not
+    // two.
     if (text.trim().toLowerCase() === "/feedback") {
       setDraft("");
-      const lastAssistant = [...messages]
-        .reverse()
-        .find((message) => message.role === "assistant");
-      if (lastAssistant) {
-        useLangyStore.getState().pinFeedback(lastAssistant.id);
+      if (latestAssistantMessage) {
+        useLangyStore.getState().pinFeedback(latestAssistantMessage.id);
       }
       return;
     }
@@ -1732,7 +1743,7 @@ function LangyPanel({
                         // `!turnError` covers the failure; `!recovery.isRecovering`
                         // covers the turn that is still being re-driven and might
                         // yet succeed. This is only the position + settled gate:
-                        // whether a card actually shows is `askFeedback` (the
+                        // whether a card actually shows is `shouldAskFeedback` (the
                         // backend cadence), the directive, or the pin.
                         showFeedback={
                           !isBusy &&
@@ -1744,8 +1755,8 @@ function LangyPanel({
                           message.role === "assistant" &&
                           index === messages.length - 1
                         }
-                        askFeedback={askFeedback}
-                        forceFeedback={pinnedFeedbackMessageId === message.id}
+                        shouldAskFeedback={shouldAskFeedback}
+                        isFeedbackPinned={pinnedFeedbackMessageId === message.id}
                         // (No connect-card prop: MessageContent no longer sniffs
                         // the prose for `[langy:connect-github]`. The connect card
                         // is driven by the structured `langy_github_not_connected`

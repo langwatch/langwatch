@@ -3,7 +3,7 @@
  * (specs/langy/langy-feedback.feature, "Backend-driven cadence").
  *
  * The client never decides the moment on its own: `langy.messages` carries an
- * `askFeedback` flag computed here, and the panel reports the card being SHOWN
+ * `shouldAskFeedback` flag computed here, and the panel reports the card being SHOWN
  * back through `markShown`. Showing counts as asking — an ignored card starts
  * the quiet period exactly like a rated one, which is what stops the card from
  * re-appearing under every answer. Keyed per user (not per project): nagging is

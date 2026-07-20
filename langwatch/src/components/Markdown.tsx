@@ -170,7 +170,7 @@ function MarkdownLink({
   // link treatment (new tab, `rel="noopener noreferrer"`) instead of
   // navigating the SPA away mid-read. In-app paths SPA-navigate through the
   // router so the surrounding page (and an open Langy panel) stays mounted.
-  const external = /^https?:\/\//i.test(href);
+  const isExternal = /^https?:\/\//i.test(href);
 
   /** SPA-navigate an in-app path; anything else gets a real navigation. */
   const navigate = () => {
@@ -187,7 +187,9 @@ function MarkdownLink({
     background: mismatched ? "orange.subtle" : undefined,
     borderRadius: mismatched ? "sm" : undefined,
     paddingX: mismatched ? "2px" : undefined,
-    title: mismatched ? `Displayed URL differs from ${href}` : undefined,
+    // Keep a markdown-authored title (`[text](url "title")`) unless the
+    // mismatch warning needs the slot.
+    title: mismatched ? `Displayed URL differs from ${href}` : rest.title,
     "data-mismatched-url": mismatched ? "true" : undefined,
     onClick: (event: React.MouseEvent<HTMLAnchorElement>) => {
       rest.onClick?.(event);
@@ -216,7 +218,7 @@ function MarkdownLink({
 
   return (
     <>
-      {external ? (
+      {isExternal ? (
         <UiLink {...rest} {...styleProps} href={href} isExternal>
           {children}
         </UiLink>
@@ -235,7 +237,7 @@ function MarkdownLink({
           tone="warning"
           onConfirm={() => {
             setWarningOpen(false);
-            if (external) {
+            if (isExternal) {
               window.open(href, "_blank", "noopener,noreferrer");
             } else {
               navigate();

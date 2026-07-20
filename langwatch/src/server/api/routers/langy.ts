@@ -351,7 +351,7 @@ export const langyRouter = createTRPCRouter({
          * specs/langy/langy-feedback.feature). False while a turn is in
          * flight: the answer being rated must exist first.
          */
-        askFeedback: boolean;
+        shouldAskFeedback: boolean;
       }> => {
         // Both reads go through user-scoped application services. The message
         // service performs its own visibility check; this detail read is also
@@ -377,7 +377,7 @@ export const langyRouter = createTRPCRouter({
         const isTurnInFlight =
           conversation.status === LANGY_CONVERSATION_STATUS.ACTIVE ||
           conversation.status === LANGY_CONVERSATION_STATUS.RUNNING;
-        const askFeedback = isTurnInFlight
+        const shouldAskFeedback = isTurnInFlight
           ? false
           : await getApp().langy.feedbackPrompt.shouldAsk({
               userId: ctx.session.user.id,
@@ -393,7 +393,7 @@ export const langyRouter = createTRPCRouter({
               ? conversation.lastError
               : null,
           isTurnInFlight,
-          askFeedback,
+          shouldAskFeedback,
         };
       },
     ),

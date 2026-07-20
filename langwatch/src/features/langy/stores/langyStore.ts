@@ -242,7 +242,7 @@ interface LangyState {
   // Feedback cards the user waved away, keyed by the assistant message they sat
   // under. Conversation-scoped (see emptyConversationState) — a dismissal means
   // "not for this answer", not "never again"; the cross-session quiet period is
-  // the backend's job (langy.messages `askFeedback` + langy.feedbackPromptShown).
+  // the backend's job (langy.messages `shouldAskFeedback` + langy.feedbackPromptShown).
   dismissedFeedbackMessageIds: Set<string>;
   dismissFeedback: (messageId: string) => void;
   /**

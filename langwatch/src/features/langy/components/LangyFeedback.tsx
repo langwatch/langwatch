@@ -2,7 +2,7 @@ import { chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { ArrowRight, X } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ACCENT, CARD } from "~/features/asaplangy/tokens";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
@@ -94,11 +94,13 @@ export function LangyFeedback({
   sentiment?: LangyFeedbackSentiment;
   /**
    * How this card came to be: the backend cadence asked ("asked"), the agent's
-   * in-stream directive asked ("directive"), or the user summoned it with
-   * `/feedback` ("requested"). Only the first two count against the quiet
-   * period — a user asking to rate is not us nagging them.
+   * in-stream directive asked ("directive"), the user summoned it with
+   * `/feedback` ("requested"), or the dev card gallery is rendering a fixture
+   * ("preview" — fully inert: no pin, no marks, no cadence). Only "asked" and
+   * "directive" count a SHOW against the quiet period — a user asking to rate
+   * is not us nagging them — but a RATING counts for every live origin.
    */
-  origin?: "asked" | "directive" | "requested";
+  origin?: "asked" | "directive" | "requested" | "preview";
 }) {
   const { submit } = useLangyFeedback();
   const { project } = useOrganizationTeamProject();
@@ -110,22 +112,37 @@ export function LangyFeedback({
   const dismissFeedback = useLangyStore((s) => s.dismissFeedback);
   const [locallyDismissed, setLocallyDismissed] = useState(false);
 
-  // Showing IS asking. On first render: pin the card (so the refetch that
-  // follows the shown-mark can't flip the server flag and unmount it mid-look)
-  // and start the server-side quiet period — an ignored card must not re-ask
-  // under the next answer. `/feedback` pins without marking. Mount-only on
-  // purpose: this card renders once per answer. A card the user already waved
-  // away must stay away — pinning un-dismisses, so a remount (say, a history
-  // reload) would otherwise resurrect it.
+  // Pin on first render, so the refetch that follows the shown-mark can't flip
+  // the server flag and unmount the card mid-look. A card the user already
+  // waved away must stay away — pinning un-dismisses, so a remount (say, a
+  // history reload) would otherwise resurrect it.
   useEffect(() => {
+    if (origin === "preview" || !messageId) return;
     const store = useLangyStore.getState();
-    if (messageId && store.dismissedFeedbackMessageIds.has(messageId)) return;
-    if (messageId) store.pinFeedback(messageId);
-    if (origin !== "requested" && conversationId && project?.id) {
-      promptShown.mutate({ projectId: project.id, conversationId });
-    }
+    if (store.dismissedFeedbackMessageIds.has(messageId)) return;
+    store.pinFeedback(messageId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Showing IS asking: start the server-side quiet period — an ignored card
+  // must not re-ask under the next answer. Keyed on the project id (not
+  // mount-only) because the card can render a beat before the project query
+  // resolves; a mount-only effect would then silently never mark, and the
+  // cadence would nag under every answer. The ref makes it exactly-once.
+  const markedShownRef = useRef(false);
+  useEffect(() => {
+    if (origin === "preview" || origin === "requested") return;
+    if (markedShownRef.current || !conversationId || !project?.id) return;
+    if (
+      messageId &&
+      useLangyStore.getState().dismissedFeedbackMessageIds.has(messageId)
+    ) {
+      return;
+    }
+    markedShownRef.current = true;
+    promptShown.mutate({ projectId: project.id, conversationId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id]);
 
   /** Persist one rating, then collapse the card. */
   const record = ({
@@ -145,6 +162,20 @@ export function LangyFeedback({
       sentiment: tone,
       ...(comment ? { comment } : {}),
     });
+    if (origin !== "preview") {
+      // A rating is a stronger signal than a show: it starts the quiet period
+      // for EVERY live origin — including `/feedback`, whose show deliberately
+      // doesn't count — so the cadence can't ask again right after the user
+      // just rated.
+      if (conversationId && project?.id) {
+        promptShown.mutate({ projectId: project.id, conversationId });
+      }
+      // And remember this answer as handled, so a remount (history reload,
+      // panel round-trip) can't resurrect a rated card as a fresh ask. The
+      // dismissal set is the durable memory; `done` is only this render's
+      // "Thanks, noted."
+      if (messageId) dismissFeedback(messageId);
+    }
     setDone(true);
   };
 
@@ -183,12 +214,9 @@ export function LangyFeedback({
     setLocallyDismissed(true);
   };
 
-  // `messageId` is optional in the contract, so keep a local flag too — the
-  // card must be dismissible even when it has nothing to key the memory on.
-  if (locallyDismissed || (messageId && dismissedIds.has(messageId))) {
-    return null;
-  }
-
+  // "Thanks, noted." wins over the dismissal memory: rating ALSO records the
+  // message as handled (see record()), and checking dismissal first would
+  // swallow the acknowledgement in the same breath.
   if (done) {
     return (
       <Text
@@ -200,6 +228,12 @@ export function LangyFeedback({
         Thanks, noted.
       </Text>
     );
+  }
+
+  // `messageId` is optional in the contract, so keep a local flag too — the
+  // card must be dismissible even when it has nothing to key the memory on.
+  if (locallyDismissed || (messageId && dismissedIds.has(messageId))) {
+    return null;
   }
 
   return (

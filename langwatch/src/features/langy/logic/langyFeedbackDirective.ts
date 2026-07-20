@@ -9,7 +9,7 @@
  * great answer, or an obviously rough one) instead of nagging under every reply.
  *
  * WHEN to ask on the default (non-directive) path is the backend's call: the
- * `langy.messages` read carries an `askFeedback` flag computed by
+ * `langy.messages` read carries an `shouldAskFeedback` flag computed by
  * `LangyFeedbackPromptService` (conversation depth + a per-user quiet period),
  * and the panel reports the card being shown back through
  * `langy.feedbackPromptShown` so the cadence holds across tabs and devices.

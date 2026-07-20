@@ -63,7 +63,7 @@ describe("LangyFeedbackPromptService", () => {
     });
   });
 
-  describe("when the card was shown and then ignored", () => {
+  describe("given the card was shown and then ignored", () => {
     it("does not ask again inside the quiet period", async () => {
       const redis = memoryRedis();
       await service(redis).markShown({ userId: "u1", conversationId: "c1" });
@@ -89,7 +89,7 @@ describe("LangyFeedbackPromptService", () => {
     });
   });
 
-  describe("when a conversation grows well past a few answers", () => {
+  describe("given a conversation grown well past a few answers", () => {
     it("may ask once despite a recent ask in another conversation", async () => {
       const redis = memoryRedis();
       await service(redis).markShown({ userId: "u1", conversationId: "c1" });
@@ -115,7 +115,7 @@ describe("LangyFeedbackPromptService", () => {
     });
   });
 
-  describe("when Redis is unavailable", () => {
+  describe("given Redis is unavailable", () => {
     it("fails closed — a missed ask is free, a nag is not", async () => {
       await expect(
         service(null).shouldAsk({
@@ -149,7 +149,7 @@ describe("LangyFeedbackPromptService", () => {
     });
   });
 
-  describe("when the stored record is corrupt", () => {
+  describe("given a corrupt stored record", () => {
     it("treats it as no record and asks", async () => {
       const redis = memoryRedis();
       redis.store.set("langy:feedback:last-asked:u1", "not-json{");

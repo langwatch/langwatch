@@ -52,8 +52,8 @@ function MessageContentImpl({
   isStreaming = false,
   conversationId,
   showFeedback = false,
-  askFeedback = false,
-  forceFeedback = false,
+  shouldAskFeedback = false,
+  isFeedbackPinned = false,
 }: {
   message: UIMessage;
   organizationId?: string | null;
@@ -72,13 +72,13 @@ function MessageContentImpl({
   /**
    * Position + settled gate: this is the latest assistant reply and nothing is
    * in flight, so a feedback card MAY sit here. Whether one does is decided by
-   * `askFeedback` / the directive / `forceFeedback`.
+   * `shouldAskFeedback` / the directive / `isFeedbackPinned`.
    */
   showFeedback?: boolean;
   /** The backend cadence's verdict: ask under this settled answer. */
-  askFeedback?: boolean;
+  shouldAskFeedback?: boolean;
   /** Pinned open — a shown card riding out refetches, or `/feedback`. */
-  forceFeedback?: boolean;
+  isFeedbackPinned?: boolean;
 }) {
   const isUser = message.role === "user";
   const rawText = message.parts
@@ -264,20 +264,20 @@ function MessageContentImpl({
               </Markdown>
             </Box>
           ))}
-        {/* WHEN to ask is the backend's call (langy.messages `askFeedback` —
+        {/* WHEN to ask is the backend's call (langy.messages `shouldAskFeedback` —
             conversation depth + a per-user quiet period), or the agent's own
             [langy:feedback] directive at a high-signal moment, or the user
             typing /feedback. `showFeedback` is only the position + settled
             gate; the substance floor still stops the default path from rating
-            a bare one-word ack. `forceFeedback` (a pin) keeps a shown card
+            a bare one-word ack. `isFeedbackPinned` (a pin) keeps a shown card
             mounted across the refetch that follows the shown-mark, and powers
             /feedback. Never renders mid-stream. */}
         {showFeedback &&
         !isStreaming &&
         text &&
-        (forceFeedback ||
+        (isFeedbackPinned ||
           feedbackDirective.requested ||
-          (askFeedback && isSubstantiveLangyAnswer(text))) ? (
+          (shouldAskFeedback && isSubstantiveLangyAnswer(text))) ? (
           <LangyFeedback
             conversationId={conversationId ?? undefined}
             messageId={message.id}
@@ -285,7 +285,7 @@ function MessageContentImpl({
             origin={
               feedbackDirective.requested
                 ? "directive"
-                : askFeedback
+                : shouldAskFeedback
                   ? "asked"
                   : "requested"
             }

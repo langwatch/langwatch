@@ -32,7 +32,7 @@ export interface LangyMessagesResult {
    * do?" under the latest answer? Computed server-side (conversation depth +
    * per-user quiet period) so it holds across tabs and devices.
    */
-  askFeedback: boolean;
+  shouldAskFeedback: boolean;
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
@@ -83,7 +83,7 @@ export function useLangyMessages(
     messages: (query.data?.messages ?? []) as LangyMessageDto[],
     lastError: query.data?.lastError ?? null,
     isTurnInFlight: query.data?.isTurnInFlight ?? false,
-    askFeedback: query.data?.askFeedback ?? false,
+    shouldAskFeedback: query.data?.shouldAskFeedback ?? false,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,

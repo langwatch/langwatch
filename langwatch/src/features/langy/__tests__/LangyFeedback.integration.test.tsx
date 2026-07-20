@@ -134,8 +134,38 @@ describe("given the Langy feedback card", () => {
   });
 
   describe("when the card is summoned via /feedback", () => {
-    it("does not count against the quiet period", () => {
+    it("does not count against the quiet period just for showing", () => {
       renderFeedback({ origin: "requested" });
+      expect(promptShownMock).not.toHaveBeenCalled();
+    });
+
+    it("counts a rating against the quiet period — a rating beats a show", () => {
+      renderFeedback({ origin: "requested" });
+      fireEvent.click(screen.getByText("Good"));
+      expect(promptShownMock).toHaveBeenCalledWith({
+        projectId: "proj-1",
+        conversationId: "conv-1",
+      });
+    });
+  });
+
+  describe("when a rating is recorded", () => {
+    it("remembers the answer as handled so a remount cannot re-ask", () => {
+      renderFeedback({ origin: "asked" });
+      fireEvent.click(screen.getByText("Great"));
+      expect(
+        useLangyStore.getState().dismissedFeedbackMessageIds.has("msg-1"),
+      ).toBe(true);
+      // The acknowledgement still shows despite the handled-mark.
+      expect(screen.getByText("Thanks, noted.")).toBeTruthy();
+    });
+  });
+
+  describe("when rendered as a gallery preview", () => {
+    it("stays fully inert — no pin, no shown-mark", () => {
+      useLangyStore.setState({ pinnedFeedbackMessageId: "live-msg" });
+      renderFeedback({ origin: "preview", messageId: "gallery-feedback" });
+      expect(useLangyStore.getState().pinnedFeedbackMessageId).toBe("live-msg");
       expect(promptShownMock).not.toHaveBeenCalled();
     });
   });
