@@ -107,6 +107,43 @@ export function measureAnchor(anchor: string): AnchorRect | null {
   };
 }
 
+/**
+ * True when an anchor's left edge sits at or beyond the right viewport edge,
+ * i.e. it is still parked off-screen by an entrance animation (the drawer, or
+ * Langy's companion ride, slides in from the right). A zero-rect (jsdom) reads
+ * as on-screen. `left` carries `scrollX`, so subtract it back for the check.
+ */
+export function isAnchorParkedOffscreen(
+  rect: AnchorRect,
+  viewportWidth: number,
+  scrollX: number,
+): boolean {
+  return rect.left - scrollX >= viewportWidth;
+}
+
+/**
+ * The spotlight ring may only be PLACED once its anchor has settled: on
+ * screen (not parked off the right by an entrance ride) and holding the same
+ * rect as the previous frame. Placing on a transient off-screen rect would
+ * strand the fixed ring and its full-viewport scrim off the visible screen.
+ * Spec: the drawer companion ride, specs/langy/langy-panel-layout.feature.
+ */
+export function isAnchorSettled(
+  next: AnchorRect | null,
+  previous: AnchorRect | null,
+  viewportWidth: number,
+  scrollX: number,
+): boolean {
+  if (next === null || previous === null) return false;
+  if (isAnchorParkedOffscreen(next, viewportWidth, scrollX)) return false;
+  return (
+    next.top === previous.top &&
+    next.left === previous.left &&
+    next.width === previous.width &&
+    next.height === previous.height
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Walk helpers
 // ---------------------------------------------------------------------------

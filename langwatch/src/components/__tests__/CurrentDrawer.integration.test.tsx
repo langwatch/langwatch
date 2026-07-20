@@ -73,6 +73,9 @@ vi.mock("../ui/drawer", () => ({
   DrawerOffsetProvider: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
+  DrawerExitRideProvider: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
