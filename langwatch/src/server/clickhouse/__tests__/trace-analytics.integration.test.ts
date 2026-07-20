@@ -46,7 +46,11 @@ let ch: ClickHouseClient;
 let analyticsRepo: TraceAnalyticsClickHouseRepository;
 let summaryRepo: TraceSummaryClickHouseRepository;
 
-const baseMs = new Date("2026-06-15T12:00:00.000Z").getTime();
+// Minute-aligned "yesterday", never a fixed calendar date: inserts are stamped
+// with PLATFORM_DEFAULT_RETENTION_DAYS (49) and the table TTL-deletes rows
+// `_retention_days` after OccurredAt, so a fixed date eventually ages past the
+// horizon and the fixtures silently vanish before the reads.
+const baseMs = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 60_000) * 60_000;
 
 function makeAnalyticsRow(
   overrides: Partial<TraceAnalyticsRow> = {},
