@@ -65,16 +65,19 @@ type Worker struct {
 	// worker rather than continue with stale env.
 	credSig domain.CredentialSignature
 
-	// apiKeyID + langwatchEndpoint are the two things needed to revoke this
+	// apiKeyID + projectID + langwatchEndpoint are what is needed to revoke this
 	// worker's session key when it dies, and nothing else. They are recorded at
 	// spawn because that is the only moment we have them: the key itself goes into
 	// the subprocess env and is never readable again, and later turns on a reused
-	// worker deliberately arrive with no credentials at all.
+	// worker deliberately arrive with no credentials at all. projectID scopes the
+	// revoke to the key's own tenant (the control plane refuses a cross-project
+	// revoke).
 	//
 	// The key's lifetime IS this worker's lifetime — it was injected at spawn and
 	// a reused worker keeps it — so the worker is the right thing to hang the
 	// revocation handle off.
 	apiKeyID          string
+	projectID         string
 	langwatchEndpoint string
 
 	mu sync.Mutex

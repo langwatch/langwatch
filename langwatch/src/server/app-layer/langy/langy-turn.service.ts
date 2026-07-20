@@ -104,7 +104,10 @@ export interface LangyTurnServiceDeps {
     projectId: string;
     organizationId: string;
   }) => Promise<{ token: string; apiKeyId: string }>;
-  revokeSessionKey: (args: { apiKeyId: string }) => Promise<void>;
+  revokeSessionKey: (args: {
+    apiKeyId: string;
+    projectId: string;
+  }) => Promise<void>;
   admission: LangyTurnAdmissionRepository;
   accessStore: LangyTurnAccessStore | null;
   handoffStore: LangyTurnHandoffStore | null;

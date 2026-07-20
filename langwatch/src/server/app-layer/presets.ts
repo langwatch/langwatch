@@ -993,8 +993,10 @@ export function initializeDefaultApp(options?: {
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     mintSessionKey: ({ session, projectId, organizationId }) =>
       mintLangySessionApiKey({ prisma, session, projectId, organizationId }),
-    revokeSessionKey: ({ apiKeyId }) =>
-      revokeLangySessionApiKey({ prisma, apiKeyId }).then(() => undefined),
+    revokeSessionKey: ({ apiKeyId, projectId }) =>
+      revokeLangySessionApiKey({ prisma, apiKeyId, projectId }).then(
+        () => undefined,
+      ),
     admission: langyTurnAdmission,
     accessStore: redis ? createLangyTurnAccessStore({ redis }) : null,
     handoffStore: redis ? langyHandoffStore : null,

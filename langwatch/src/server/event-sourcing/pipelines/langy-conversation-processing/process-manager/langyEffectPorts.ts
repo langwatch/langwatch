@@ -195,7 +195,7 @@ export function createLangyEffectPorts(
             await deps.handoffStore.stash(dispatchHandoff);
           } catch (error) {
             await deps
-              .revokeSessionKey({ apiKeyId: minted.apiKeyId })
+              .revokeSessionKey({ apiKeyId: minted.apiKeyId, projectId })
               .catch((revokeError) => {
                 logger.warn(
                   { revokeError, projectId, conversationId, turnId },

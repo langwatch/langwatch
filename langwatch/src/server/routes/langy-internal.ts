@@ -136,6 +136,31 @@ secured.access(langyInternalPolicy()).post("/turn/:turnId/result", async (c) => 
   }
   const body = parsed.data;
 
+  // Cross-check the triple before writing. `projectId`/`conversationId` are
+  // body fields the bearer alone would otherwise let through unverified — the
+  // sibling relay proves the same thing with an HMAC over the runToken, but
+  // this durable path has only the shared secret. A turn row exists only if
+  // the turn was really accepted under this conversation in this project, so
+  // this rejects a forged triple and a benign cross-tenant mix-up alike.
+  // 404 (not 4xx-with-detail) so a probe never confirms a cross-tenant id;
+  // the manager treats 4xx as terminal, so it will not retry-loop.
+  const turnExists = await getApp().langy.conversations.turnExists({
+    projectId: body.projectId,
+    conversationId: body.conversationId,
+    turnId,
+  });
+  if (!turnExists) {
+    logger.warn(
+      {
+        projectId: body.projectId,
+        conversationId: body.conversationId,
+        turnId,
+      },
+      "refusing a turn-result ingest for an unknown (project, conversation, turn) triple",
+    );
+    return c.json({ error: "turn not found" }, 404);
+  }
+
   await getApp().langy.conversations.ingestAgentTurnResult({
     projectId: body.projectId,
     conversationId: body.conversationId,
@@ -167,6 +192,10 @@ secured.access(langyInternalPolicy()).post("/turn/:turnId/result", async (c) => 
 
 const revokeCredentialsSchema = z.object({
   apiKeyId: z.string().min(1).max(128),
+  // The tenant the key belongs to. Required so the revoke is scoped to one
+  // project — without it a bearer-secret holder could revoke any tenant's live
+  // session key by id alone.
+  projectId: z.string().min(1).max(128),
 });
 
 /**
@@ -186,6 +215,7 @@ secured.access(langyInternalPolicy()).post("/credentials/revoke", async (c) => {
   const outcome = await revokeLangySessionApiKey({
     prisma,
     apiKeyId: parsed.data.apiKeyId,
+    projectId: parsed.data.projectId,
   });
 
   switch (outcome) {

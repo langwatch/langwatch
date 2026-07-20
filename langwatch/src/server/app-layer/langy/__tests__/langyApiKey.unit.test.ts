@@ -235,10 +235,12 @@ describe("revokeLangySessionApiKey", () => {
           id: "k1",
           name: "Langy session",
           revokedAt: null,
+          // The PROJECT-scoped binding the mint gave it — the tenant anchor.
+          roleBindings: [{ id: "rb1" }],
         });
 
         await expect(
-          revokeLangySessionApiKey({ prisma: p, apiKeyId: "k1" }),
+          revokeLangySessionApiKey({ prisma: p, apiKeyId: "k1", projectId: "p1" }),
         ).resolves.toBe("revoked");
 
         expect(p.apiKey.update).toHaveBeenCalledWith({
@@ -258,11 +260,37 @@ describe("revokeLangySessionApiKey", () => {
           id: "k2",
           name: "Production ingestion key",
           revokedAt: null,
+          roleBindings: [{ id: "rb2" }],
         });
 
         await expect(
-          revokeLangySessionApiKey({ prisma: p, apiKeyId: "k2" }),
+          revokeLangySessionApiKey({ prisma: p, apiKeyId: "k2", projectId: "p1" }),
         ).resolves.toBe("refused");
+
+        expect(p.apiKey.update).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a Langy session key scoped to a DIFFERENT project", () => {
+    describe("when a caller holding the internal secret targets it by id", () => {
+      it("refuses as not-found so a cross-tenant id is never confirmed", async () => {
+        // The Prisma binding filter finds no PROJECT-scoped binding for this
+        // project, so the select returns an empty roleBindings array.
+        const p = keyPrisma({
+          id: "k5",
+          name: "Langy session",
+          revokedAt: null,
+          roleBindings: [],
+        });
+
+        await expect(
+          revokeLangySessionApiKey({
+            prisma: p,
+            apiKeyId: "k5",
+            projectId: "other-project",
+          }),
+        ).resolves.toBe("not_found");
 
         expect(p.apiKey.update).not.toHaveBeenCalled();
       });
@@ -276,15 +304,24 @@ describe("revokeLangySessionApiKey", () => {
           id: "k3",
           name: "Langy session",
           revokedAt: new Date(),
+          roleBindings: [{ id: "rb3" }],
         });
         await expect(
-          revokeLangySessionApiKey({ prisma: already, apiKeyId: "k3" }),
+          revokeLangySessionApiKey({
+            prisma: already,
+            apiKeyId: "k3",
+            projectId: "p1",
+          }),
         ).resolves.toBe("already_revoked");
         expect(already.apiKey.update).not.toHaveBeenCalled();
 
         const gone = keyPrisma(null);
         await expect(
-          revokeLangySessionApiKey({ prisma: gone, apiKeyId: "k4" }),
+          revokeLangySessionApiKey({
+            prisma: gone,
+            apiKeyId: "k4",
+            projectId: "p1",
+          }),
         ).resolves.toBe("not_found");
         expect(gone.apiKey.update).not.toHaveBeenCalled();
       });

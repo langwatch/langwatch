@@ -126,6 +126,14 @@ export type LangySessionKeyRevocation =
  *     REFUSED, even with a valid internal secret and a real key id. A manager
  *     that is compromised, confused, or fed a bad id cannot use this to take a
  *     customer's API keys offline.
+ *   - It is TENANT-SCOPED: the key must belong to `projectId` (the tenant the
+ *     turn ran for, which the manager holds on the worker's credentials). The
+ *     session key is minted with a PROJECT-scoped role binding, so this is the
+ *     project it was scoped to. Without it, a bearer-secret holder could look a
+ *     key up by id alone and revoke ANY tenant's live session key — the id is
+ *     the only thing gating it otherwise. `not_found` when the key exists but
+ *     under a different project, so the response never confirms a cross-tenant
+ *     id.
  *   - It can only revoke. There is no minting counterpart, by design: revocation
  *     is fail-closed (the worst outcome is the manager destroying its own
  *     access), whereas a mint endpoint would let whoever holds the internal
@@ -138,13 +146,27 @@ export type LangySessionKeyRevocation =
 export async function revokeLangySessionApiKey({
   prisma,
   apiKeyId,
+  projectId,
 }: {
   prisma: PrismaClient;
   apiKeyId: string;
+  projectId: string;
 }): Promise<LangySessionKeyRevocation> {
   const key = await prisma.apiKey.findUnique({
     where: { id: apiKeyId },
-    select: { id: true, name: true, revokedAt: true },
+    select: {
+      id: true,
+      name: true,
+      revokedAt: true,
+      // The PROJECT-scoped binding the session key is minted with is the
+      // tenant anchor: a match proves this key belongs to the calling turn's
+      // project, not some other tenant's.
+      roleBindings: {
+        where: { scopeType: "PROJECT", scopeId: projectId },
+        select: { id: true },
+        take: 1,
+      },
+    },
   });
   if (!key) return "not_found";
 
@@ -155,6 +177,16 @@ export async function revokeLangySessionApiKey({
       "refusing to revoke a key that is not a Langy session key",
     );
     return "refused";
+  }
+
+  // Tenant scope: the key exists and is a session key, but it is not this
+  // project's. Report not-found so a cross-tenant id is never confirmed.
+  if (key.roleBindings.length === 0) {
+    logger.warn(
+      { apiKeyId, projectId },
+      "refusing to revoke a langy session key that is not scoped to this project",
+    );
+    return "not_found";
   }
 
   if (key.revokedAt) return "already_revoked";
