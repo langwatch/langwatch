@@ -16,6 +16,7 @@ test("automation pages separate alerts, schedules, and activity", async ({
   await expect(
     page.getByRole("button", { name: "New automation" }).first(),
   ).toBeVisible();
+  await expect(page.getByText("Popular uses")).toBeVisible();
   await page.getByRole("button", { name: "Expand Library" }).click();
   await expect(page.locator(`a[href="${basePath}"]`)).toHaveCount(2);
   await page.screenshot({ path: testInfo.outputPath("automations.png") });
