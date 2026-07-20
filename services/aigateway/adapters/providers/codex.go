@@ -22,7 +22,7 @@ import (
 
 // The Codex provider: the user's own ChatGPT subscription, reached through
 // OpenAI's codex backend with an OAuth access token. Facts that shape this
-// file (all verified against the codex CLI's behaviour):
+// file (all verified against the codex CLI's behavior):
 //
 //   - The backend speaks the RESPONSES API only, over SSE only, and is
 //     stateless: `store` must be false, `stream` must be true, and clients
@@ -278,7 +278,7 @@ func codexRequestBody(raw []byte, model string) ([]byte, error) {
 	} {
 		body, err = sjson.SetBytes(body, set.path, set.value)
 		if err != nil {
-			return nil, fmt.Errorf("rewrite %s on codex body: %v", set.path, err)
+			return nil, fmt.Errorf("rewrite %s on codex body: %w", set.path, err)
 		}
 	}
 	return body, nil
