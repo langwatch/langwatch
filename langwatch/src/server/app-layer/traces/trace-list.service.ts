@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
-import type { TopicService } from "~/server/app-layer/topics/topic.service";
+import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
 import {
   deriveTraceOrigin,
@@ -490,7 +490,7 @@ export class TraceListService {
   ): Promise<CategoricalFacetResult> {
     const ids = result.values.map((v) => v.value).filter(Boolean);
     if (ids.length === 0) return result;
-    const names = await this.topicService.getNamesByIds(projectId, ids);
+    const names = await this.topicService.getNamesByIds({ projectId, ids });
     return {
       ...result,
       values: result.values.map((v) => {

@@ -163,7 +163,25 @@ export type LangyRelayOutcome =
  */
 export class LangyTurnRelay {
   private runToken: string | null | undefined; // undefined = not yet loaded
-  private pinned: { conversationId: string; turnId: string } | null = null;
+  private pinned: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  } | null = null;
+
+  /**
+   * The project+conversation+turn this connection authenticated and pinned
+   * to, or null before the first verified frame. Read by the relay route for
+   * its end-of-stream summary — the ids here are MAC-verified, unlike the
+   * claimed ids on a rejection.
+   */
+  get pinnedTurn(): {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  } | null {
+    return this.pinned;
+  }
   /**
    * Re-types a `bash("langwatch …")` tool frame as the capability it invoked —
    * BEFORE anything is recorded, so the live buffer, the durable milestone
@@ -177,7 +195,7 @@ export class LangyTurnRelay {
   async handle(raw: unknown): Promise<LangyRelayOutcome> {
     const envelopeParse = langyFrameEnvelopeSchema.safeParse(raw);
     if (!envelopeParse.success) {
-      return this.reject("malformed-envelope");
+      return this.reject({ reason: "malformed-envelope" });
     }
     const envelope = envelopeParse.data;
 
@@ -185,13 +203,19 @@ export class LangyTurnRelay {
     // runToken is looked up by the (as-yet-unverified) conversationId; a wrong
     // conversationId simply yields a token the MAC won't match against.
     const runToken = await this.loadRunToken(envelope.conversationId, envelope.projectId);
-    if (runToken === null) return this.reject("no-run-token");
-    if (!verifyFrame(runToken, envelope)) return this.reject("bad-signature");
+    if (runToken === null) {
+      return this.reject({ reason: "no-run-token", envelope });
+    }
+    if (!verifyFrame(runToken, envelope)) {
+      return this.reject({ reason: "bad-signature", envelope });
+    }
 
     // Pin to THIS connection's conversation+turn (turnId is now authenticated).
     // The first verified frame pins; any later frame from a different turn is a
     // cross-turn replay and is refused.
-    if (!this.checkTurn(envelope)) return this.reject("wrong-turn");
+    if (!this.checkTurn(envelope)) {
+      return this.reject({ reason: "wrong-turn", envelope });
+    }
 
     // Intra-turn replay: a redelivered/duplicated frameNonce is dropped.
     const fresh = await this.deps.reserveFrameNonce({
@@ -202,7 +226,9 @@ export class LangyTurnRelay {
     if (!fresh) return { status: "duplicate" };
 
     const frameParse = langyRelayFrameSchema.safeParse(safeJson(envelope.payload));
-    if (!frameParse.success) return this.reject("invalid-payload");
+    if (!frameParse.success) {
+      return this.reject({ reason: "invalid-payload", envelope });
+    }
 
     return this.apply(envelope, frameParse.data);
   }
@@ -223,12 +249,20 @@ export class LangyTurnRelay {
   private checkTurn(envelope: LangyFrameEnvelope): boolean {
     if (this.pinned === null) {
       this.pinned = {
+        projectId: envelope.projectId,
         conversationId: envelope.conversationId,
         turnId: envelope.turnId,
       };
       return true;
     }
+    // projectId is pinned too: the runToken is cached after frame 1 while
+    // apply() reads projectId off each envelope, so without this a caller
+    // holding a valid token could switch projectId on later frames and sign
+    // them with the token they already have — writing this conversation's
+    // frames under another tenant's id. Signing projectId only means
+    // something if every frame is held to the pinned value.
     return (
+      this.pinned.projectId === envelope.projectId &&
       this.pinned.conversationId === envelope.conversationId &&
       this.pinned.turnId === envelope.turnId
     );
@@ -436,8 +470,33 @@ export class LangyTurnRelay {
     return { status: "applied" };
   }
 
-  private reject(reason: LangyRelayRejection): LangyRelayOutcome {
-    this.deps.logger?.warn({ reason }, "langy relay dropped a frame");
+  private reject({
+    reason,
+    envelope,
+  }: {
+    reason: LangyRelayRejection;
+    envelope?: Pick<
+      LangyFrameEnvelope,
+      "conversationId" | "turnId" | "projectId"
+    >;
+  }): LangyRelayOutcome {
+    // The envelope ids are CLAIMED, not verified, for every reason that fires
+    // before the MAC check — but a flood of bad-signature frames is exactly
+    // when an operator needs to know which conversation is being replayed at,
+    // so the claim is worth logging as long as it's labelled as one.
+    this.deps.logger?.warn(
+      {
+        reason,
+        ...(envelope
+          ? {
+              claimedProjectId: envelope.projectId,
+              claimedConversationId: envelope.conversationId,
+              claimedTurnId: envelope.turnId,
+            }
+          : {}),
+      },
+      "langy relay dropped a frame",
+    );
     return { status: "rejected", reason };
   }
 }

@@ -1,5 +1,5 @@
-import type { TraceListItem } from "../types/trace";
 import type { TraceListCursor } from "../stores/filterStore";
+import type { TraceListItem } from "../types/trace";
 import { useNewlyArrivedTraceIds } from "./useNewlyArrivedTraceIds";
 import { useTraceListQuery } from "./useTraceListQuery";
 import { useViewSwitchingDim } from "./useViewSwitchingDim";

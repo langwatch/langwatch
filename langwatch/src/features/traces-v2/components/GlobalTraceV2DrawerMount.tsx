@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { useRouter } from "~/utils/compat/next-router";
 import { useTraceDrawerUrlHydrator } from "../hooks/useTraceDrawerUrlHydrator";
 import { useDrawerStore } from "../stores/drawerStore";

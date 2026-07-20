@@ -15,6 +15,7 @@ const (
 	attrTags     = "tag.tags"
 	attrThreadID = "langwatch.thread.id"
 	attrOrigin   = "langwatch.origin"
+	attrUserID   = "langwatch.user.id"
 	langyTag     = "langy"
 )
 
@@ -29,8 +30,10 @@ const (
 //     non-root spans keep their span ids and parent links, so the worker's own
 //     internal hierarchy survives intact;
 //   - the resource is stamped with the reserved LangWatch keys (tag.tags=langy,
-//     langwatch.thread.id=<conversation>) so the trace is labeled and grouped
-//     regardless of what the worker set.
+//     langwatch.thread.id=<conversation>, langwatch.user.id=<acting user>) so
+//     the trace is labeled, grouped, and attributed to the acting user
+//     regardless of what the worker set. actorUserID is the manager-held
+//     identity, not a worker-supplied attribute.
 //
 // When turn is not (yet) valid — a span batch racing the first turn, or
 // telemetry disabled upstream — the batch is forwarded UNMODIFIED apart from
@@ -39,25 +42,25 @@ const (
 //
 // Protobuf only: the worker env pins OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,
 // so that is the one wire shape this relay speaks (in and out).
-func ReparentOTLP(payload []byte, conversationID string, turn trace.SpanContext) ([]byte, error) {
+func ReparentOTLP(payload []byte, conversationID, actorUserID string, turn trace.SpanContext) ([]byte, error) {
 	td, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(payload)
 	if err != nil {
 		return nil, err
 	}
-	ReparentTraces(td, conversationID, turn)
+	ReparentTraces(td, conversationID, actorUserID, turn)
 	return (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
 }
 
 // ReparentTraces applies the rewrite in place. Split from ReparentOTLP so the
 // id-rewriting logic unit-tests against pdata values without codec round-trips.
-func ReparentTraces(td ptrace.Traces, conversationID string, turn trace.SpanContext) {
+func ReparentTraces(td ptrace.Traces, conversationID, actorUserID string, turn trace.SpanContext) {
 	rss := td.ResourceSpans()
 	isTurnValid := turn.IsValid()
 	turnTraceID := pcommon.TraceID(turn.TraceID())
 	turnSpanID := pcommon.SpanID(turn.SpanID())
 	for i := 0; i < rss.Len(); i++ {
 		rs := rss.At(i)
-		stampResource(rs.Resource().Attributes(), conversationID)
+		stampResource(rs.Resource().Attributes(), conversationID, actorUserID)
 		sss := rs.ScopeSpans()
 		for j := 0; j < sss.Len(); j++ {
 			ss := sss.At(j)
@@ -99,12 +102,19 @@ func ReparentTraces(td ptrace.Traces, conversationID string, turn trace.SpanCont
 // present twice survives a first-match Remove, and Get/PutStr would read and
 // overwrite only the leading copy while the worker's twin rode through
 // untouched.
-func stampResource(attrs pcommon.Map, conversationID string) {
+func stampResource(attrs pcommon.Map, conversationID, actorUserID string) {
 	removeAll(attrs, attrOrigin)
 
 	tags := firstValue(attrs, attrTags)
 	removeAll(attrs, attrThreadID)
 	removeAll(attrs, attrTags)
+	// Overwrite, never merge: the acting user is the manager's, and a worker
+	// value here would be a spend-attribution forgery. Empty only in partial
+	// wiring / tests, where we leave the key unset rather than stamp "".
+	removeAll(attrs, attrUserID)
+	if actorUserID != "" {
+		attrs.PutStr(attrUserID, actorUserID)
+	}
 
 	attrs.PutStr(attrThreadID, conversationID)
 	switch {

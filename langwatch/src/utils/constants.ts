@@ -15,6 +15,14 @@ export const KEY_CHECK = ["KEY", "GOOGLE_APPLICATION_CREDENTIALS"];
 
 export const MASKED_KEY_PLACEHOLDER = "HAS_KEY••••••••••••••••••••••••";
 
+/**
+ * Hard cap on a single translate-to-English request, enforced by the
+ * router's input schema and pre-applied by clients (slice before send).
+ * Keeps a multi-MB trace payload from becoming one prompt — context-limit
+ * failure or a surprise bill.
+ */
+export const TRANSLATE_TEXT_MAX_CHARS = 100_000;
+
 export const DEFAULT_MAX_TOKENS = 64_000;
 
 export const MIN_MAX_TOKENS = 256;
@@ -52,4 +60,7 @@ export const KSUID_RESOURCES = {
   API_KEY_ROLE: "apikeyrole",
   LANGY_CONVERSATION: "langyconv",
   LANGY_MESSAGE: "langymsg",
+  TOPIC_CLUSTERING_RUN: "topicrun",
+  TOPIC_CLUSTERING_RUN_HISTORY: "topicrunhist",
+  TOPIC_MODEL_PROJECTION: "topicmodel",
 } as const;

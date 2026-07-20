@@ -22,15 +22,17 @@ func sigOf(creds domain.Credentials) domain.CredentialSignature {
 }
 
 type recordingRevoker struct {
-	mu    sync.Mutex
-	calls []string // apiKeyIDs
-	err   error
+	mu       sync.Mutex
+	calls    []string // apiKeyIDs
+	projects []string // projectIDs, parallel to calls
+	err      error
 }
 
-func (r *recordingRevoker) Revoke(_ context.Context, _ string, apiKeyID string) error {
+func (r *recordingRevoker) Revoke(_ context.Context, _ string, projectID, apiKeyID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.calls = append(r.calls, apiKeyID)
+	r.projects = append(r.projects, projectID)
 	return r.err
 }
 

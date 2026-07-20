@@ -90,9 +90,7 @@ describe("rankedErrorSpans", () => {
             name: "orphan",
           }),
         ];
-        expect(rankedErrorSpans(spans)).toEqual([
-          { span: spans[0], depth: 0 },
-        ]);
+        expect(rankedErrorSpans(spans)).toEqual([{ span: spans[0], depth: 0 }]);
       });
     });
   });

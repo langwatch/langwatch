@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // Revoker asks the control plane to revoke a Langy session key.
@@ -37,7 +39,13 @@ func NewRevoker(internalSecret string, timeout time.Duration) *Revoker {
 		timeout = 5 * time.Second
 	}
 	return &Revoker{
-		client:         &http.Client{Timeout: timeout},
+		// otelhttp injects traceparent (and opens a CLIENT span), so the
+		// control plane's ingest joins the turn's trace instead of starting
+		// a fresh one.
+		client: &http.Client{
+			Timeout:   timeout,
+			Transport: otelhttp.NewTransport(nil),
+		},
 		internalSecret: internalSecret,
 	}
 }
@@ -48,21 +56,28 @@ func NewRevoker(internalSecret string, timeout time.Duration) *Revoker {
 // Credentials — so we revoke against the same control plane that minted the key,
 // with no separate configuration to drift out of sync.
 //
+// `projectID` scopes the revoke to the key's own tenant: the control plane
+// refuses a key that is not bound to this project, so a leaked internal secret
+// cannot revoke another tenant's live session key by id alone.
+//
 // Revocation is BEST-EFFORT by design and callers treat a failure as non-fatal:
 // a worker is already dead by the time we get here, so failing loudly would turn
 // "we could not tidy up" into "the user's turn broke". The key still expires, and
 // the control plane's reaper is the guarantee — this call only shortens the
 // window. That is also why there is no retry loop here: a key we fail to revoke
 // is a key the reaper will get.
-func (r *Revoker) Revoke(ctx context.Context, endpoint, apiKeyID string) error {
+func (r *Revoker) Revoke(ctx context.Context, endpoint, projectID, apiKeyID string) error {
 	if r == nil || r.internalSecret == "" {
 		return nil
 	}
-	if endpoint == "" || apiKeyID == "" {
+	if endpoint == "" || apiKeyID == "" || projectID == "" {
 		return nil
 	}
 
-	body, err := json.Marshal(map[string]string{"apiKeyId": apiKeyID})
+	body, err := json.Marshal(map[string]string{
+		"apiKeyId":  apiKeyID,
+		"projectId": projectID,
+	})
 	if err != nil {
 		return fmt.Errorf("marshal revoke request: %w", err)
 	}

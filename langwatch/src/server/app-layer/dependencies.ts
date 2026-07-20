@@ -29,10 +29,13 @@ import type { SimulationRunService } from "./simulations/simulation-run.service"
 import type { LangyConversationService } from "./langy/langy-conversation.service";
 import type { LangyTurnService } from "./langy/langy-turn.service";
 import type { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
+import type { LangyCredentialService } from "./langy/LangyCredentialService";
 import type { LangyMessageService } from "./langy/langy-message.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
+import type { TopicService } from "./topic-clustering/topic.service";
+import type { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
@@ -92,12 +95,22 @@ export interface AppDependencies {
   suiteRuns: {
     runs: SuiteRunService;
   };
+  /**
+   * ADR-051 §7: read side of topic clustering. The commands live on
+   * `commands.topicClustering` and are merged onto the same `app.topicClustering`
+   * facade, so callers get status reads and clustering requests from one place.
+   */
+  topicClustering: {
+    status: TopicClusteringStatusService;
+    topics: TopicService;
+  };
   /** ADR-046: Langy conversations as an event-sourced projection. */
   langy: {
     conversations: LangyConversationService;
     turns: LangyTurnService;
     messages: LangyMessageService;
     githubInstallations: LangyGithubInstallationsService;
+    credentials: LangyCredentialService;
   };
   experiments: ExperimentService;
   triggers: TriggerService;

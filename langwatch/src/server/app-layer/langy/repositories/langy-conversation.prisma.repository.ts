@@ -169,4 +169,20 @@ export class PrismaLangyConversationRepository
     });
     return row?.RunToken ?? null;
   }
+
+  async turnExists({
+    projectId,
+    conversationId: ConversationId,
+    turnId: TurnId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean> {
+    const row = await this.prisma.langyConversationTurnProjection.findFirst({
+      where: { projectId, ConversationId, TurnId },
+      select: { id: true },
+    });
+    return row !== null;
+  }
 }

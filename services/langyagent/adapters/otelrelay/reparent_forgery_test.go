@@ -44,7 +44,7 @@ func wirePayload(t *testing.T, resourceAttrs, spanAttrs []*commonpb.KeyValue) []
 
 func forward(t *testing.T, wire []byte) ptrace.Traces {
 	t.Helper()
-	out, err := ReparentOTLP(wire, "conv-1", trace.SpanContext{})
+	out, err := ReparentOTLP(wire, "conv-1", "user-1", trace.SpanContext{})
 	if err != nil {
 		t.Fatalf("ReparentOTLP: %v", err)
 	}

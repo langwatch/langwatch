@@ -23,10 +23,26 @@ import {
   ApiKeyAlreadyRevokedError,
   ApiKeyNotFoundError,
   ApiKeyNotOwnedError,
+  ApiKeyReservedNameError,
   ApiKeyScopeViolationError,
 } from "./errors";
+import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 
 const logger = createLogger("langwatch:api-key:service");
+
+/**
+ * Keys the product mints and retires on its own — today the ephemeral
+ * "Langy session" key, one per chat session with a 6h TTL.
+ *
+ * They are already absent from every listing (the repository filters
+ * HIDDEN_SYSTEM_KEY_NAMES), but absence is not immutability: a caller who
+ * learned an id could still rename or revoke one, and revoking it breaks the
+ * Langy turn currently authenticating with it. The by-id mutations refuse them
+ * for the same reason the listings hide them.
+ */
+function isSystemManaged(apiKey: { name: string }): boolean {
+  return HIDDEN_SYSTEM_KEY_NAMES.includes(apiKey.name);
+}
 
 type RoleBindingBase = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
@@ -99,6 +115,7 @@ export class ApiKeyService {
     ingestSourceType,
     ingestionTemplateId,
     createdByDeviceLabel,
+    isSystemManaged = false,
   }: {
     name: string;
     description?: string | null;
@@ -112,7 +129,19 @@ export class ApiKeyService {
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
+    /**
+     * Only the product's own minting paths (e.g. the Langy session key) may
+     * claim a HIDDEN_SYSTEM_KEY_NAMES name. Customer entry points leave this
+     * unset: a customer-created key with a reserved name would vanish from
+     * every listing and the system-managed guard would refuse to ever rename
+     * or revoke it — a stealth, permanent credential.
+     */
+    isSystemManaged?: boolean;
   }): Promise<{ token: string; apiKey: ApiKey }> {
+    if (!isSystemManaged && HIDDEN_SYSTEM_KEY_NAMES.includes(name)) {
+      throw new ApiKeyReservedNameError(name);
+    }
+
     const hasCustomBinding = bindings.some((b) => b.role === TeamUserRole.CUSTOM);
     const hasPermissions = !!permissions && permissions.length > 0;
     const isRestricted = permissionMode === "restricted";
@@ -262,6 +291,15 @@ export class ApiKeyService {
     if (!existing) throw new ApiKeyNotFoundError(id);
     if (existing.organizationId !== organizationId) {
       throw new ApiKeyNotFoundError(id);
+    }
+    // Reported as not-found, like the tenancy mismatch above, so the response
+    // doesn't confirm the id exists.
+    if (isSystemManaged(existing)) throw new ApiKeyNotFoundError(id);
+    // Renaming a customer key TO a reserved name is the same squat as
+    // creating one: the key would drop out of every listing and this very
+    // guard would then refuse to rename or revoke it.
+    if (name !== undefined && HIDDEN_SYSTEM_KEY_NAMES.includes(name)) {
+      throw new ApiKeyReservedNameError(name);
     }
 
     if (!callerIsAdmin) {
@@ -755,6 +793,7 @@ export class ApiKeyService {
     if (apiKey.organizationId !== organizationId) {
       throw new ApiKeyNotFoundError(id);
     }
+    if (isSystemManaged(apiKey)) throw new ApiKeyNotFoundError(id);
     if (!callerIsAdmin) {
       if (!apiKey.userId || apiKey.userId !== callerUserId) {
         throw new ApiKeyNotOwnedError(id);

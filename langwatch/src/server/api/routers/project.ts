@@ -27,7 +27,6 @@ import {
   createLicenseEnforcementService,
   LimitExceededError,
 } from "../../license-enforcement";
-import { scheduleTopicClusteringForProject } from "../../topicClustering/topicClusteringQueue";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,
@@ -472,19 +471,40 @@ export const projectRouter = createTRPCRouter({
   triggerTopicClustering: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:update"))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       try {
-        await scheduleTopicClusteringForProject(input.projectId, true);
-        return {
-          success: true,
-          message: "Topic clustering job queued successfully",
-        };
+        const app = getApp();
+        // A request made while a run is already underway is declined by the
+        // scheduler, not queued behind it, so an unconditional success would
+        // tell the user a run started when nothing did. The read model is the
+        // only place that answer is visible before the scheduler makes it, so
+        // ask it first and report which of the two the click actually did.
+        // Best effort by nature: the scheduler, not this check, is what keeps
+        // two runs off one project.
+        if (await app.topicClustering.status.isRunInFlight(input)) {
+          return {
+            started: false as const,
+            reason: "already_running" as const,
+          };
+        }
+        await app.topicClustering.requestClustering({
+          tenantId: input.projectId,
+          occurredAt: Date.now(),
+          trigger: "manual",
+          requestedByUserId: ctx.session.user.id,
+        });
+        return { started: true as const };
       } catch (error) {
+        captureException(toError(error), {
+          extra: { projectId: input.projectId },
+        });
+        // The UI toasts this message verbatim, and the failures behind it are
+        // event-store/projection internals (Prisma detail, hostnames) — the
+        // same class of text the status read deliberately never exposes.
+        // Detail goes to the log above; the customer gets a fixed sentence.
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `Failed to trigger topic clustering: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
+          message: "Failed to trigger topic clustering",
         });
       }
     }),

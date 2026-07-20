@@ -265,71 +265,6 @@ export const getPiiChecksCounter = (method: string) =>
   piiChecksCounter.labels(method);
 
 // ============================================================================
-// BullMQ Queue Metrics
-// ============================================================================
-
-export type BullMQQueueState =
-  | "waiting"
-  | "active"
-  | "completed"
-  | "failed"
-  | "delayed"
-  | "paused"
-  | "prioritized"
-  | "waiting-children";
-
-// Gauge for BullMQ job counts by state (from getJobCounts())
-register.removeSingleMetric("bullmq_job_total");
-const bullmqJobTotal = new Gauge({
-  name: "bullmq_job_total",
-  help: "Total number of jobs in the queue by state",
-  labelNames: ["queue_name", "state"] as const,
-});
-
-export const setBullMQJobCount = (
-  queueName: string,
-  state: BullMQQueueState,
-  count: number,
-) => bullmqJobTotal.labels(queueName, state).set(count);
-
-// Histogram for job wait time (time from enqueue to processing start)
-register.removeSingleMetric("bullmq_job_wait_duration_milliseconds");
-export const bullmqJobWaitDurationHistogram = new Histogram({
-  name: "bullmq_job_wait_duration_milliseconds",
-  help: "Time jobs spend waiting in queue before processing starts",
-  labelNames: ["queue_name"] as const,
-  buckets: [
-    10, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 120000,
-    300000,
-  ],
-});
-
-export const getBullMQJobWaitDurationHistogram = (queueName: string) =>
-  bullmqJobWaitDurationHistogram.labels(queueName);
-
-export function recordJobWaitDuration(
-  job: { timestamp?: number },
-  queueName: string,
-): void {
-  if (job.timestamp) {
-    getBullMQJobWaitDurationHistogram(queueName).observe(
-      Date.now() - job.timestamp,
-    );
-  }
-}
-
-// Counter for stalled jobs
-register.removeSingleMetric("bullmq_job_stalled_total");
-const bullmqJobStalledTotal = new Counter({
-  name: "bullmq_job_stalled_total",
-  help: "Total number of jobs that have stalled",
-  labelNames: ["queue_name"] as const,
-});
-
-export const getBullMQJobStalledCounter = (queueName: string) =>
-  bullmqJobStalledTotal.labels(queueName);
-
-// ============================================================================
 // Event Sourcing Metrics
 // ============================================================================
 
@@ -730,6 +665,139 @@ export const observeEsProcessOutboxDuration = ({
 }) =>
   esProcessOutboxDuration.labels(processName, intentType).observe(durationMs);
 
+// How late a wake fires relative to the instant it was scheduled for
+// (ADR-054): the direct answer to "is the scheduler stalling". Buckets run
+// to hours because a wake surviving a fleet outage legitimately fires very
+// late once — the ALERT is on sustained lag, not a single spike.
+register.removeSingleMetric("es_process_wake_lag_milliseconds");
+const esProcessWakeLag = new Histogram({
+  name: "es_process_wake_lag_milliseconds",
+  help: "Delay between a process wake's scheduled instant and it being handled",
+  labelNames: ["process_name"] as const,
+  buckets: [
+    100, 1000, 5000, 15000, 60000, 300000, 900000, 1800000, 3600000, 21600000,
+    86400000,
+  ],
+});
+
+export const observeEsProcessWakeLag = ({
+  processName,
+  lagMs,
+}: {
+  processName: string;
+  lagMs: number;
+}) => esProcessWakeLag.labels(processName).observe(Math.max(0, lagMs));
+
+// How long a committed intent sat in the outbox before its dispatch began
+// (ADR-054): the direct answer to "is the outbox draining". Excludes retry
+// waits by design — attempt > 1 rows re-enter with backoff, so only the
+// first attempt measures pure queueing delay.
+register.removeSingleMetric("es_process_outbox_dispatch_lag_milliseconds");
+const esProcessOutboxDispatchLag = new Histogram({
+  name: "es_process_outbox_dispatch_lag_milliseconds",
+  help: "Delay between an intent being committed and its first dispatch starting",
+  labelNames: ["process_name"] as const,
+  buckets: [
+    50, 250, 1000, 5000, 15000, 60000, 300000, 900000, 1800000, 3600000,
+  ],
+});
+
+export const observeEsProcessOutboxDispatchLag = ({
+  processName,
+  lagMs,
+}: {
+  processName: string;
+  lagMs: number;
+}) => esProcessOutboxDispatchLag.labels(processName).observe(Math.max(0, lagMs));
+
+// Commits whose intents were dropped as already-dispatched (ADR-054).
+// Legitimate on event redelivery — but a sustained per-process rate is
+// exactly how the ADR-051 lost-day scheduling bug hid, so it is measured,
+// logged AND alertable rather than only logged.
+register.removeSingleMetric("es_process_intents_suppressed_total");
+const esProcessIntentsSuppressed = new Counter({
+  name: "es_process_intents_suppressed_total",
+  help: "Process-manager commits whose intents were suppressed as already-dispatched",
+  labelNames: ["process_name"] as const,
+});
+
+export const incrementEsProcessIntentsSuppressed = ({
+  processName,
+  count,
+}: {
+  processName: string;
+  count: number;
+}) => esProcessIntentsSuppressed.labels(processName).inc(count);
+
+// --- Topic clustering domain metrics (ADR-051/ADR-054) ---
+// Run-page outcomes as the domain sees them, not just generic es_* counters:
+// `failed_final` is the alertable one (retries exhausted, run_failed
+// recorded); `failed_retryable` is expected noise under provider hiccups.
+register.removeSingleMetric("topic_clustering_page_total");
+const topicClusteringPageTotal = new Counter({
+  name: "topic_clustering_page_total",
+  help: "Topic clustering page executions by outcome",
+  labelNames: ["outcome"] as const,
+});
+
+export const incrementTopicClusteringPageTotal = ({
+  outcome,
+}: {
+  outcome: "completed" | "skipped" | "failed_retryable" | "failed_final";
+}) => topicClusteringPageTotal.labels(outcome).inc();
+
+register.removeSingleMetric("topic_clustering_page_duration_milliseconds");
+const topicClusteringPageDuration = new Histogram({
+  name: "topic_clustering_page_duration_milliseconds",
+  help: "Duration of one topic clustering page (langevals call included)",
+  labelNames: ["mode"] as const,
+  // A page is embeddings + LLM naming over up to 2000 traces — minutes are
+  // normal, and the outbox lease caps everything at 20.
+  buckets: [1000, 5000, 15000, 30000, 60000, 120000, 300000, 600000, 1200000],
+});
+
+export const observeTopicClusteringPageDuration = ({
+  mode,
+  durationMs,
+}: {
+  mode: "batch" | "incremental";
+  durationMs: number;
+}) => topicClusteringPageDuration.labels(mode).observe(durationMs);
+
+// --- Governance ingestion-pull domain metrics (ADR-054) ---
+// Pull-run outcomes as the domain sees them, not just generic es_* counters:
+// `failed_final` is the alertable one (retries exhausted, run_failed
+// recorded); `failed_retryable` is expected noise under provider hiccups.
+register.removeSingleMetric("ingestion_pull_total");
+const ingestionPullTotal = new Counter({
+  name: "ingestion_pull_total",
+  help: "Governance ingestion pull executions by outcome",
+  labelNames: ["outcome"] as const,
+});
+
+export const incrementIngestionPullTotal = ({
+  outcome,
+}: {
+  outcome: "completed" | "failed_retryable" | "failed_final";
+}) => ingestionPullTotal.labels(outcome).inc();
+
+register.removeSingleMetric("ingestion_pull_duration_milliseconds");
+const ingestionPullDuration = new Histogram({
+  name: "ingestion_pull_duration_milliseconds",
+  help: "Duration of one governance ingestion pull (adapter poll and OCSF sink writes)",
+  // Unlabelled on purpose: the executor only knows the sourceId, and the
+  // adapter kind lives behind the run port — no cheap low-cardinality label.
+  // A pull is a network poll plus row inserts, capped by the worker's
+  // 5-minute soft deadline, so buckets run 100ms to 5min.
+  buckets: [100, 250, 500, 1000, 2500, 5000, 15000, 30000, 60000, 120000, 300000],
+});
+
+export const observeIngestionPullDuration = ({
+  durationMs,
+}: {
+  durationMs: number;
+}) => ingestionPullDuration.observe(durationMs);
+
 // --- Fold cache metrics ---
 register.removeSingleMetric("es_fold_cache_total");
 const esFoldCacheTotal = new Counter({
@@ -781,6 +849,87 @@ export const incrementEsFoldCacheRedisError = (
   projectionName: string,
   operation: "get" | "set",
 ) => esFoldCacheRedisErrorTotal.labels(projectionName, operation).inc();
+
+// ============================================================================
+// Langy Metrics
+// ============================================================================
+//
+// Operational counters for the Langy turn flow. Per-tenant / per-conversation
+// attribution deliberately lives in the structured log lines next to each
+// increment, never as labels (see the cardinality doctrine above) — these
+// series answer "is Langy healthy fleet-wide?", the logs answer "which
+// tenant?".
+
+// One increment per turn-acceptance attempt at the admission boundary.
+register.removeSingleMetric("langwatch_langy_turns_total");
+const langyTurnsTotal = new Counter({
+  name: "langwatch_langy_turns_total",
+  help: "Langy turn-acceptance attempts by outcome at the admission boundary",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyTurnsCounter = (
+  outcome: "accepted" | "replay" | "busy" | "rejected" | "error",
+) => langyTurnsTotal.labels(outcome);
+
+// One increment per dispatch attempt to the agent manager.
+register.removeSingleMetric("langwatch_langy_dispatch_total");
+const langyDispatchTotal = new Counter({
+  name: "langwatch_langy_dispatch_total",
+  help: "Langy turn dispatches to the agent manager by outcome",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyDispatchCounter = (
+  outcome:
+    | "accepted"
+    | "busy"
+    | "credentials_required"
+    | "unavailable"
+    | "error",
+) => langyDispatchTotal.labels(outcome);
+
+// One increment per durable turn-result ingested on /api/internal/langy.
+register.removeSingleMetric("langwatch_langy_turn_results_total");
+const langyTurnResultsTotal = new Counter({
+  name: "langwatch_langy_turn_results_total",
+  help: "Durable Langy turn results ingested from the agent manager by outcome",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyTurnResultsCounter = (outcome: "completed" | "failed") =>
+  langyTurnResultsTotal.labels(outcome);
+
+// Incremented from the relay's per-connection tally when a frame stream ends.
+register.removeSingleMetric("langwatch_langy_relay_frames_total");
+const langyRelayFramesTotal = new Counter({
+  name: "langwatch_langy_relay_frames_total",
+  help: "Langy relay frames by processing result, summed per stream at close",
+  labelNames: ["result"] as const,
+});
+export const getLangyRelayFramesCounter = (
+  result: "applied" | "duplicate" | "rejected" | "terminal",
+) => langyRelayFramesTotal.labels(result);
+
+// Session-key lifecycle: minted per turn (when no live worker holds one),
+// revoked on turn end, reaped when the 6h TTL lapses.
+register.removeSingleMetric("langwatch_langy_session_keys_total");
+const langySessionKeysTotal = new Counter({
+  name: "langwatch_langy_session_keys_total",
+  help: "Langy session API keys by lifecycle operation",
+  labelNames: ["op"] as const,
+});
+export const getLangySessionKeysCounter = (
+  op: "minted" | "revoked" | "revoke_refused" | "reaped",
+) => langySessionKeysTotal.labels(op);
+
+// The message rate limit fails open on Redis trouble by design; a sustained
+// fail_open rate is a Redis outage worth alerting on without log grepping.
+register.removeSingleMetric("langwatch_langy_rate_limit_total");
+const langyRateLimitTotal = new Counter({
+  name: "langwatch_langy_rate_limit_total",
+  help: "Langy message rate-limit decisions that were not plain allows",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyRateLimitCounter = (outcome: "rejected" | "fail_open") =>
+  langyRateLimitTotal.labels(outcome);
 
 // ============================================================================
 // Stored Objects Metrics

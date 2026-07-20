@@ -32,8 +32,7 @@ process.env.LW_GATEWAY_INTERNAL_SECRET =
   process.env.LW_GATEWAY_INTERNAL_SECRET ??
   "unit-test-gateway-internal-secret-32b!";
 process.env.LW_GATEWAY_JWT_SECRET =
-  process.env.LW_GATEWAY_JWT_SECRET ??
-  "unit-test-gateway-jwt-secret-32-bytes!";
+  process.env.LW_GATEWAY_JWT_SECRET ?? "unit-test-gateway-jwt-secret-32-bytes!";
 // Disable the per-IP receiver rate-limit globally for integration tests.
 // Tests that fire many POSTs from one IP (volume regression, dogfood
 // smoke, auth-contract suite) would otherwise shed at the rate-limiter
@@ -43,6 +42,15 @@ process.env.LW_GATEWAY_JWT_SECRET =
 // specs/ai-gateway/governance/receiver-auth-rate-limit.feature.
 process.env.LW_INGEST_RATE_LIMIT_DISABLED =
   process.env.LW_INGEST_RATE_LIMIT_DISABLED ?? "1";
+
+// Deterministic encryption key so suites that store model-provider
+// credentials (encrypted at rest) can run in CI. Must be a 32-byte hex
+// string — the NEXTAUTH_SECRET fallback in utils/encryption.ts is not
+// hex in CI, so without this the encrypt() call throws. Honors an
+// existing value so localdev keeps its real secret.
+process.env.CREDENTIALS_SECRET =
+  process.env.CREDENTIALS_SECRET ??
+  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 if (process.env.CI && process.env.CI_REDIS_URL) {
   process.env.REDIS_URL = process.env.CI_REDIS_URL;

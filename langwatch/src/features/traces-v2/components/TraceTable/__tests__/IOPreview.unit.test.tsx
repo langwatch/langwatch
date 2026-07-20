@@ -45,7 +45,7 @@ describe("IOPreview newline marker", () => {
       /** @scenario The newline marker sits at the end of the line that was broken */
       it("emits a zero-width, non-selectable marker span between the two lines", () => {
         const { container } = renderPreview("first line\nsecond line", null);
-        const marker = container.querySelector('[data-newline-marker]');
+        const marker = container.querySelector("[data-newline-marker]");
         expect(marker).not.toBeNull();
         // user-select:none belt over the pseudo-element suspenders.
         expect(getComputedStyle(marker!).userSelect).toBe("none");
@@ -58,9 +58,7 @@ describe("IOPreview newline marker", () => {
       /** @scenario A single-line preview renders no newline marker */
       it("emits no marker span", () => {
         const { container } = renderPreview("just one line", null);
-        expect(
-          container.querySelector('[data-newline-marker]'),
-        ).toBeNull();
+        expect(container.querySelector("[data-newline-marker]")).toBeNull();
       });
     });
   });
@@ -75,7 +73,11 @@ describe("shouldHideBreakMarker", () => {
     describe("when a marker sits on any line", () => {
       it("keeps the marker visible", () => {
         expect(
-          shouldHideBreakMarker({ truncated: false, markerTop: 0, clampHeight }),
+          shouldHideBreakMarker({
+            truncated: false,
+            markerTop: 0,
+            clampHeight,
+          }),
         ).toBe(false);
         expect(
           shouldHideBreakMarker({

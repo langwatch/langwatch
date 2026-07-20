@@ -226,11 +226,8 @@ export const tracesRouter = createTRPCRouter({
 
       const topicsMap = Object.fromEntries(
         (
-          await ctx.prisma.topic.findMany({
-            where: {
-              projectId: input.projectId,
-            },
-            select: { id: true, name: true, parentId: true },
+          await getApp().topicClustering.topics.getAll({
+            projectId: input.projectId,
           })
         ).map((topic) => [topic.id, topic]),
       );

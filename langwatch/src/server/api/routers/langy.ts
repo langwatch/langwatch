@@ -1,5 +1,6 @@
 import { on } from "node:events";
 import { TRPCError } from "@trpc/server";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
@@ -16,13 +17,17 @@ import {
 } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
+
 import type { Session } from "~/server/auth";
 import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
 import { connection } from "~/server/redis";
-import { checkProjectPermission, isDemoProjectId } from "../rbac";
-import { enforceLangyAccess } from "./langyAccessMiddleware";
+import { checkProjectPermission, type Permission } from "../rbac";
+import {
+  enforceLangyAccess,
+  refuseDemoProject,
+} from "./langyAccessMiddleware";
 import {
   type LangyConversationDetailDto,
   type LangyConversationListCursorDto,
@@ -35,6 +40,8 @@ import {
   langyMessageRoleSchema,
   langyMessageSchema,
 } from "./langy.schemas";
+
+const logger = createLogger("langwatch:langy:router");
 
 /**
  * Read-side tRPC router for Langy conversations (ADR-046 frontend).
@@ -49,50 +56,51 @@ import {
  * the whole Langy surface is this tRPC router plus the live `onTurnStream`
  * subscription — the old Hono `/api/langy/chat` fallback has been removed.
  *
- * Every procedure derives from `langyReadProcedure` (or `langyTurnProcedure`),
- * so they all share the project read permission (`evaluations:view`), the demo
- * refusal, and the authoritative internal-only gate (`enforceLangyAccess`).
+ * Every procedure derives from one of the `langy*Procedure` bases below, so
+ * they all share the demo refusal and the authoritative internal-only gate
+ * (`enforceLangyAccess`), and differ only in which `langy:*` permission they
+ * demand.
  */
 
-const LANGY_READ_PERMISSION = "evaluations:view" as const;
-
 /**
- * Every Langy read/command procedure shares one base with three gates, in
- * order:
- *  1. `checkProjectPermission(evaluations:view)` — can the caller read the
- *     project at all?
- *  2. demo refusal — the demo project grants `evaluations:view` to every
- *     authenticated user, so the permission check alone would expose the
- *     per-user Langy chat that belongs to whoever used Langy there; refuse it
- *     explicitly.
- *  3. `enforceLangyAccess` — the authoritative internal-only rollout gate
- *     (staff bypass, else `release_langy_enabled`), the SAME decision the
- *     `langyGithub` / `langyEgress` routers and the GitHub install route use.
+ * Builds a Langy procedure gated on one `langy:*` permission, with three
+ * gates in order:
+ *  1. `checkProjectPermission(permission)` — may the caller do THIS to the
+ *     project? Reads want `langy:view`; starting a turn wants `langy:create`,
+ *     because it provisions credentials, spawns a worker and spends the
+ *     project's model budget — not something a read grant should buy.
+ *  2. demo refusal — `project:view` is granted to every authenticated user on
+ *     the demo project, so a permission check alone would expose whatever
+ *     Langy chat someone left there; refuse it explicitly.
+ *  3. `enforceLangyAccess` — the authoritative rollout gate, the SAME decision
+ *     the `langyGithub` / `langyEgress` routers and the GitHub install route
+ *     use. Last, so membership is always proven before the flag is read.
+ *
+ * The permission check must be the FIRST `.use()`: `permissionProcedureBuilder`
+ * treats that slot specially and injects `enforcePermissionCheck` after it.
  *
  * `projectId` lives on the base so procedures declare only their own inputs.
  */
-const langyReadProcedure = protectedProcedure
-  .input(z.object({ projectId: z.string() }))
-  .use(checkProjectPermission(LANGY_READ_PERMISSION))
-  .use(async ({ input, next }) => {
-    if (isDemoProjectId(input.projectId)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Langy is not available on the demo project.",
-      });
-    }
-    return next();
-  })
-  .use(enforceLangyAccess);
+const langyProcedure = (permission: Permission) =>
+  protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission(permission))
+    .use(refuseDemoProject)
+    .use(enforceLangyAccess);
+
+const langyReadProcedure = langyProcedure("langy:view");
+const langyCreateProcedure = langyProcedure("langy:create");
+const langyUpdateProcedure = langyProcedure("langy:update");
+const langyDeleteProcedure = langyProcedure("langy:delete");
 
 /**
- * The turn-start procedure: the read gate PLUS the Phase-1 per-user message
+ * The turn-start procedure: `langy:create` PLUS the Phase-1 per-user message
  * rate limit that used to live in the Hono `/langy/chat` handler. Redis-backed;
  * fails open when Redis is down (dev/test stay usable). A limited caller is
  * refused BEFORE reaching the app layer, so it never mints keys or dispatches a
  * turn — exactly the precedence the route enforced.
  */
-const langyTurnProcedure = langyReadProcedure.use(
+const langyTurnProcedure = langyCreateProcedure.use(
   async ({ ctx, input, next }) => {
     const rl = await checkLangyMessageRateLimit({
       userId: ctx.session.user.id,
@@ -383,7 +391,7 @@ export const langyRouter = createTRPCRouter({
    * non-owner (shared) conversation is visible but not deletable and reports
    * `success: false`; the client invalidates the list either way.
    */
-  deleteConversation: langyReadProcedure
+  deleteConversation: langyDeleteProcedure
     .input(z.object({ conversationId: z.string() }))
     .mutation(async ({ input, ctx }): Promise<{ success: boolean }> => {
       const success = await getApp().langy.conversations.deleteById({
@@ -395,7 +403,7 @@ export const langyRouter = createTRPCRouter({
     }),
 
   /** Rename a conversation the caller owns through the event-sourced service. */
-  renameConversation: langyReadProcedure
+  renameConversation: langyUpdateProcedure
     .input(
       z.object({
         conversationId: z.string().min(1),
@@ -414,7 +422,7 @@ export const langyRouter = createTRPCRouter({
     }),
 
   /** Branch a visible conversation into a private, independently editable one. */
-  forkConversation: langyReadProcedure
+  forkConversation: langyCreateProcedure
     .input(z.object({ conversationId: z.string().min(1) }))
     .mutation(async ({ input, ctx }): Promise<LangyConversationDetailDto> => {
       const { conversation } = await getApp().langy.conversations.forkById({
@@ -431,7 +439,7 @@ export const langyRouter = createTRPCRouter({
    * turn. Returns the ids the client subscribes to `onTurnStream` with.
    *
    * This is the tRPC replacement for `POST /api/langy/chat` on the create path.
-   * The Phase-1 gate (session + demo refusal + `evaluations:view` + rate limit)
+   * The Phase-1 gate (session + demo refusal + `langy:create` + rate limit)
    * is the `langyTurnProcedure`; the turn service throws DomainErrors that the
    * shared middleware maps to coded TRPCErrors.
    */
@@ -481,6 +489,25 @@ export const langyRouter = createTRPCRouter({
     ),
 
   /**
+   * The model allowlist the composer's picker narrows to, or null when the
+   * project's Langy VK sets none (every eligible model is allowed).
+   *
+   * Served here rather than read off `virtualKeys.list`: that listing no
+   * longer returns product-managed keys, and the picker only ever wanted this
+   * one field — so the client has no reason to receive a virtual-key row at
+   * all.
+   */
+  modelsAllowed: langyReadProcedure.query(
+    async ({ input }): Promise<{ modelsAllowed: string[] | null }> => {
+      const modelsAllowed =
+        await getApp().langy.credentials.getModelsAllowedForProject(
+          input.projectId,
+        );
+      return { modelsAllowed };
+    },
+  ),
+
+  /**
    * Count of conversations touched since a timestamp — the "N new" pill. The
    * client only polls this when the freshness SSE is disconnected (adaptive
    * backoff), mirroring `tracesV2.newCount`. The count derivation lives in the
@@ -515,7 +542,11 @@ export const langyRouter = createTRPCRouter({
    * granted permission to inspect the full conversation for debugging — the
    * consent flag only; acting on it is a separate, gated flow.
    */
-  recordFeedback: langyReadProcedure
+  // A write (it captures analytics and — per the documented follow-up — is
+  // meant to write a feedback event onto the conversation's trace), so it
+  // wants `langy:create`, not the read grant, matching the "reads want view,
+  // writes want create" doctrine the router documents.
+  recordFeedback: langyCreateProcedure
     .input(
       z.object({
         conversationId: z.string().optional(),
@@ -529,14 +560,45 @@ export const langyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }): Promise<void> => {
+      // Only attach ids the caller actually owns. An unverified conversationId
+      // /traceId would fabricate attribution today, and once the trace-event
+      // follow-up lands it would let a caller write forged feedback onto any
+      // trace. A conversationId the caller cannot see is dropped (not
+      // rejected) so a genuine feedback ping still records its rating — it
+      // just carries no cross-user attribution.
+      let conversationId = input.conversationId;
+      if (conversationId) {
+        const conv = await getApp().langy.conversations.findByIdVisible({
+          id: conversationId,
+          projectId: input.projectId,
+          userId: ctx.session.user.id,
+        });
+        if (!conv) {
+          logger.warn(
+            {
+              projectId: input.projectId,
+              conversationId,
+              userId: ctx.session.user.id,
+            },
+            "dropping langy feedback ids for a conversation the caller cannot see",
+          );
+          conversationId = undefined;
+        }
+      }
+      // traceId is only trustworthy insofar as it belongs to a conversation
+      // the caller owns; without a verified conversation it is dropped too, so
+      // feedback can never be pinned to an arbitrary trace.
+      const traceId = conversationId ? input.traceId : undefined;
+      const messageId = conversationId ? input.messageId : undefined;
+
       trackServerEvent({
         userId: ctx.session.user.id,
         event: "langy_feedback",
         projectId: input.projectId,
         properties: {
-          conversationId: input.conversationId,
-          messageId: input.messageId,
-          traceId: input.traceId,
+          conversationId,
+          messageId,
+          traceId,
           rating: input.rating,
           sentiment: input.sentiment,
           comment: input.comment,
@@ -606,10 +668,16 @@ export const langyRouter = createTRPCRouter({
       const userId = opts.ctx.session.user.id;
 
       // Same gate the deleted `/stream` route used. Reported as not-found so it
-      // can't be used to probe another user's private conversation.
+      // can't be used to probe another user's private conversation. Logged
+      // because subscriptions are span- and log-silenced (SILENCED_LOG_TYPES),
+      // so without this line a denied attach leaves no operator trace at all.
       if (
         !(await canWatchTurn({ projectId, conversationId, turnId, userId }))
       ) {
+        logger.warn(
+          { projectId, conversationId, turnId, userId },
+          "denied a langy turn-stream attach",
+        );
         throw new TRPCError({ code: "NOT_FOUND", message: "Turn not found." });
       }
       // No Redis ⇒ no live buffer; the client falls back to the Postgres

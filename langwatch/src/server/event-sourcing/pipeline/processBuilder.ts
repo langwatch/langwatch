@@ -1,6 +1,7 @@
 import type { ZodTypeAny } from "zod";
 
 import type { Event } from "../domain/types";
+import type { ProcessEventEnvelope } from "../process-manager/processManager.types";
 import { ConfigurationError } from "../services/errorHandling";
 import {
   defineProcessManager,
@@ -80,6 +81,9 @@ export interface ProcessManagerIntentStage<
     everyMs: number;
   }): ProcessManagerIntentStage<E, State, Intents>;
   outbox(options: OutboxOptions): ProcessManagerIntentStage<E, State, Intents>;
+  toPayload(
+    map: (event: E) => ProcessEventEnvelope["payload"],
+  ): ProcessManagerIntentStage<E, State, Intents>;
 }
 
 export interface ProcessManagerHandledStage<
@@ -98,6 +102,9 @@ export interface ProcessManagerHandledStage<
     everyMs: number;
   }): ProcessManagerHandledStage<E, State, Intents>;
   outbox(options: OutboxOptions): ProcessManagerHandledStage<E, State, Intents>;
+  toPayload(
+    map: (event: E) => ProcessEventEnvelope["payload"],
+  ): ProcessManagerHandledStage<E, State, Intents>;
 }
 
 export type ProcessManagerBuildableStage =
@@ -115,6 +122,9 @@ class ProcessManagerBuilder<E extends Event> {
   private wakeHandler: WakeHandler<any, any> | undefined;
   private outboxOptions: OutboxOptions | undefined;
   private scheduleOptions: { everyMs: number } | undefined;
+  private payloadMapper:
+    | ((event: E) => ProcessEventEnvelope["payload"])
+    | undefined;
 
   constructor(private readonly name: string) {}
 
@@ -168,6 +178,24 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
+  /**
+   * The content boundary (ADR-052): narrows a committed event to the payload
+   * the process may see. The payload is persisted verbatim into process
+   * state and outbox rows, so any domain whose events carry customer
+   * content MUST declare one.
+   */
+  toPayload(map: (event: E) => ProcessEventEnvelope["payload"]): this {
+    if (this.payloadMapper) {
+      throw new ConfigurationError(
+        "ProcessManagerBuilder",
+        `Process manager "${this.name}" already declares toPayload`,
+        { name: this.name },
+      );
+    }
+    this.payloadMapper = map;
+    return this;
+  }
+
   schedule(options: { everyMs: number }): this {
     if (!Number.isFinite(options.everyMs) || options.everyMs <= 0) {
       throw new ConfigurationError(
@@ -194,6 +222,9 @@ class ProcessManagerBuilder<E extends Event> {
       handlers: this.handlers,
       eventTypes: Object.keys(this.handlers),
       onWake: this.wakeHandler,
+      toPayload: this.payloadMapper as
+        | ((event: Event) => ProcessEventEnvelope["payload"])
+        | undefined,
       intents: this.intents,
       outbox: this.outboxOptions,
       schedule: this.scheduleOptions,

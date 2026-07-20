@@ -13,9 +13,18 @@ const SCROLL_THRESHOLD_PX = 80;
 // stays put until clicked.
 const ARRIVE_KEYFRAMES = {
   "@keyframes tracesV2NewPillArrive": {
-    "0%": { transform: "translateX(-50%) translateY(-8px) scale(0.92)", opacity: 0 },
-    "60%": { transform: "translateX(-50%) translateY(0) scale(1.02)", opacity: 1 },
-    "100%": { transform: "translateX(-50%) translateY(0) scale(1)", opacity: 1 },
+    "0%": {
+      transform: "translateX(-50%) translateY(-8px) scale(0.92)",
+      opacity: 0,
+    },
+    "60%": {
+      transform: "translateX(-50%) translateY(0) scale(1.02)",
+      opacity: 1,
+    },
+    "100%": {
+      transform: "translateX(-50%) translateY(0) scale(1)",
+      opacity: 1,
+    },
   },
 } as const;
 

@@ -130,6 +130,13 @@ vi.mock("~/utils/api", () => ({
           isError: false,
         }),
       },
+      modelsAllowed: {
+        useQuery: () => ({
+          data: { modelsAllowed: null },
+          isLoading: false,
+          isError: false,
+        }),
+      },
       onConversationUpdate: {
         useSubscription: () => undefined,
       },

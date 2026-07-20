@@ -49,7 +49,7 @@ func TestReparentTraces(t *testing.T) {
 	t.Run("when a turn trace context is known", func(t *testing.T) {
 		td, rootID, childID := workerBatch()
 
-		ReparentTraces(td, "conv-123", turnContext())
+		ReparentTraces(td, "conv-123", "user-1", turnContext())
 
 		spans := td.ResourceSpans().At(0).ScopeSpans().At(0).Spans()
 		root, child := spans.At(0), spans.At(1)
@@ -85,7 +85,7 @@ func TestReparentTraces(t *testing.T) {
 		td, rootID, _ := workerBatch()
 		originalTrace := td.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0).TraceID()
 
-		ReparentTraces(td, "conv-123", trace.SpanContext{})
+		ReparentTraces(td, "conv-123", "user-1", trace.SpanContext{})
 
 		spans := td.ResourceSpans().At(0).ScopeSpans().At(0).Spans()
 		if spans.At(0).TraceID() != originalTrace {
@@ -108,7 +108,7 @@ func TestReparentTraces(t *testing.T) {
 		td, _, _ := workerBatch()
 		td.ResourceSpans().At(0).Resource().Attributes().PutStr("tag.tags", "custom")
 
-		ReparentTraces(td, "conv-123", turnContext())
+		ReparentTraces(td, "conv-123", "user-1", turnContext())
 
 		attrs := td.ResourceSpans().At(0).Resource().Attributes()
 		if v, _ := attrs.Get("tag.tags"); v.AsString() != "custom,langy" {
@@ -124,7 +124,7 @@ func TestReparentOTLP_RoundTripsProtobuf(t *testing.T) {
 		t.Fatalf("marshal fixture: %v", err)
 	}
 
-	out, err := ReparentOTLP(payload, "conv-9", turnContext())
+	out, err := ReparentOTLP(payload, "conv-9", "user-1", turnContext())
 	if err != nil {
 		t.Fatalf("ReparentOTLP: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestReparentOTLP_RoundTripsProtobuf(t *testing.T) {
 		t.Errorf("round-tripped trace id = %v, want the turn's", span.TraceID())
 	}
 
-	if _, err := ReparentOTLP([]byte("not-protobuf"), "conv-9", turnContext()); err == nil {
+	if _, err := ReparentOTLP([]byte("not-protobuf"), "conv-9", "user-1", turnContext()); err == nil {
 		t.Errorf("garbage payload must error, not forward")
 	}
 }

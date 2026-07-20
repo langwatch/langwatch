@@ -62,7 +62,10 @@ export class LangyTurnAttempt {
     }
     if (this.mintedApiKeyId) {
       cleanups.push(
-        this.deps.revokeSessionKey({ apiKeyId: this.mintedApiKeyId }),
+        this.deps.revokeSessionKey({
+          apiKeyId: this.mintedApiKeyId,
+          projectId: this.identity.projectId,
+        }),
       );
     }
     const results = await Promise.allSettled(cleanups);
