@@ -32,10 +32,14 @@ func TestResolveSampler_HonoursExplicitPartialLegacyRatio(t *testing.T) {
 	assert.InDelta(t, 0.25, got.Ratio, 0)
 }
 
-func TestResolveSampler_DefaultsOutsideLocal(t *testing.T) {
+// No environment lowers the default: a backend service that says nothing
+// about sampling exports everything, in production too. A lowered default
+// reads as a broken exporter on quiet services, and would silently drop
+// customer data on the multi-tenant path.
+func TestResolveSampler_DefaultsToFullEverywhere(t *testing.T) {
 	got := mustResolveSampler(t, OTel{SampleRatio: UnsetSampleRatio}, "production")
 
-	assert.InDelta(t, DefaultNonLocalSampleRatio, got.Ratio, 0)
+	assert.InDelta(t, 1.0, got.Ratio, 0)
 	assert.True(t, got.ParentBased)
 }
 
