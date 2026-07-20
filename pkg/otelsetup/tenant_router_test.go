@@ -7,6 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/sdk/resource"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -247,4 +250,102 @@ func TestNewSyncTenantProcessor_BuildsSimpleProcessor(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	assert.NoError(t, proc.Shutdown(ctx))
+}
+
+// recordingProcessor captures spans for ops-fallback assertions.
+type recordingProcessor struct{ spans []sdktrace.ReadOnlySpan }
+
+func (p *recordingProcessor) OnStart(context.Context, sdktrace.ReadWriteSpan) {}
+func (p *recordingProcessor) OnEnd(s sdktrace.ReadOnlySpan)                   { p.spans = append(p.spans, s) }
+func (p *recordingProcessor) Shutdown(context.Context) error                  { return nil }
+func (p *recordingProcessor) ForceFlush(context.Context) error                { return nil }
+
+func TestTenantRouter_OpsFallback(t *testing.T) {
+	t.Run("an untenanted span reaches the ops pipeline with the internal resource", func(t *testing.T) {
+		ops := &recordingProcessor{}
+		opsRes := resource.NewSchemaless(
+			attribute.String("service.name", "langwatch-nlp"),
+			attribute.String(AttrLangWatchOrigin, "platform_internal"),
+		)
+		router := NewTenantRouter("http://collector:4318").WithOpsFallback(ops, opsRes)
+		tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(router))
+		t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+
+		// No api_key anywhere in context: a background/ops span — carrying an
+		// attribute that must NOT survive, since a key-less span might be a
+		// customer-path span that lost its context.
+		_, span := tp.Tracer("test").Start(context.Background(), "startup-work")
+		span.SetAttributes(attribute.String("workflow.input", "customer data"))
+		span.End()
+
+		if len(ops.spans) != 1 {
+			t.Fatalf("ops pipeline received %d spans, want 1", len(ops.spans))
+		}
+		got := ops.spans[0].Resource().Attributes()
+		found := false
+		for _, kv := range got {
+			if string(kv.Key) == AttrLangWatchOrigin && kv.Value.AsString() == "platform_internal" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("ops span resource lacks the internal-origin marker: %v", got)
+		}
+		if n := len(ops.spans[0].Attributes()); n != 0 {
+			t.Fatalf("ops copy must be the operational skeleton only, got %d span attributes", n)
+		}
+	})
+
+	t.Run("a tenanted span never touches the ops pipeline", func(t *testing.T) {
+		ops := &recordingProcessor{}
+		tenant := &recordingProcessor{}
+		router := NewTenantRouter("http://collector:4318").WithOpsFallback(ops, resource.Empty())
+		router.newProcessor = func(string, string) (sdktrace.SpanProcessor, error) {
+			return tenant, nil
+		}
+		tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(router))
+		t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+
+		ctx := context.WithValue(context.Background(), APIKeyContextKey{}, "sk-tenant-1")
+		_, span := tp.Tracer("test").Start(ctx, "customer-work")
+		span.End()
+
+		if len(tenant.spans) != 1 || len(ops.spans) != 0 {
+			t.Fatalf("routing wrong: tenant=%d ops=%d, want 1/0", len(tenant.spans), len(ops.spans))
+		}
+	})
+
+	t.Run("without an ops fallback untenanted spans still drop", func(t *testing.T) {
+		router := NewTenantRouter("http://collector:4318")
+		tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(router))
+		t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+		_, span := tp.Tracer("test").Start(context.Background(), "orphan")
+		span.End() // must not panic; historical drop behavior preserved
+	})
+}
+
+func TestTenantRouter_TenantSpansNeverGainInternalIdentity(t *testing.T) {
+	ops := &recordingProcessor{}
+	tenant := &recordingProcessor{}
+	router := NewTenantRouter("http://collector:4318").WithOpsFallback(ops, resource.NewSchemaless(
+		attribute.String(AttrLangWatchOrigin, "platform_internal"),
+	))
+	router.newProcessor = func(string, string) (sdktrace.SpanProcessor, error) {
+		return tenant, nil
+	}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(router))
+	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+
+	ctx := context.WithValue(context.Background(), APIKeyContextKey{}, "sk-tenant-1")
+	_, span := tp.Tracer("test").Start(ctx, "customer-work")
+	span.End()
+
+	if len(tenant.spans) != 1 {
+		t.Fatalf("tenant spans = %d, want 1", len(tenant.spans))
+	}
+	for _, kv := range tenant.spans[0].Resource().Attributes() {
+		if string(kv.Key) == AttrLangWatchOrigin && kv.Value.AsString() == "platform_internal" {
+			t.Fatal("the internal-origin marker crossed onto a customer-bound span")
+		}
+	}
 }

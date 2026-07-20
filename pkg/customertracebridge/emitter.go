@@ -15,11 +15,11 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/langwatch/langwatch/pkg/contexts"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -35,8 +35,9 @@ const (
 )
 
 // Emitter uses a private (non-global) OTel TracerProvider to construct spans
-// and export them to the customer's OTLP endpoint. The TP has an empty Resource
-// so customers only see the instrumentation scope, not the gateway's service identity.
+// and export them to the customer's OTLP endpoint. The TP's resource carries
+// ONLY the langwatch.origin marker, so customers see the instrumentation scope
+// and the trace's origin — never the gateway's service identity or topology.
 type Emitter struct {
 	tp         *sdktrace.TracerProvider
 	tracer     trace.Tracer
@@ -79,11 +80,46 @@ func (d dropFilterExporter) Shutdown(ctx context.Context) error {
 	return d.inner.Shutdown(ctx)
 }
 
+// resourceScrubExporter rebuilds every span's resource under the service's
+// Policy before it reaches the wire. The provider's own resource cannot be
+// trusted: sdktrace.WithResource silently merges the configured resource over
+// resource.Environment() (OTEL_RESOURCE_ATTRIBUTES / OTEL_SERVICE_NAME) with
+// no opt-out, which is exactly how the pod's k8s topology leaked onto
+// customer spans in production. Scrubbing at the export boundary holds
+// regardless of how the provider was built.
+//
+// tracetest is imported in production code deliberately: ReadOnlySpan is a
+// sealed interface, and SpanStub is the SDK's only public way to reconstruct
+// one with a chosen resource.
+type resourceScrubExporter struct {
+	inner  sdktrace.SpanExporter
+	policy Policy
+}
+
+func (r resourceScrubExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
+	scrubbed := make([]sdktrace.ReadOnlySpan, 0, len(spans))
+	for _, s := range spans {
+		stub := tracetest.SpanStubFromReadOnlySpan(s)
+		stub.Resource = r.policy.ApplyResource(s.Resource())
+		scrubbed = append(scrubbed, stub.Snapshot())
+	}
+	return r.inner.ExportSpans(ctx, scrubbed)
+}
+
+func (r resourceScrubExporter) Shutdown(ctx context.Context) error {
+	return r.inner.Shutdown(ctx)
+}
+
 // EmitterOptions configures the Emitter.
 type EmitterOptions struct {
 	Registry     *Registry
 	BatchTimeout time.Duration
 	MaxQueueSize int
+	// Policy governs the customer-visible resource. The service supplies its
+	// own — including its langwatch.origin stamp, which is service identity
+	// this package must not decide. The zero value allows nothing and stamps
+	// nothing (fail closed).
+	Policy Policy
 }
 
 // NewEmitter creates a customer trace bridge backed by a private TracerProvider.
@@ -92,7 +128,9 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 		opts.Registry = NewRegistry()
 	}
 
-	router := dropFilterExporter{inner: newRouterExporter(ctx, opts.Registry)}
+	router := dropFilterExporter{
+		inner: resourceScrubExporter{inner: newRouterExporter(ctx, opts.Registry), policy: opts.Policy},
+	}
 
 	batchTimeout := opts.BatchTimeout
 	if batchTimeout == 0 {
@@ -103,7 +141,13 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 		queueSize = 8192
 	}
 
-	// Empty resource — customers see instrumentation scope only.
+	// The provider resource is irrelevant to what customers see: every span is
+	// rebuilt with customerResource by resourceScrubExporter on its way out.
+	// otel-go's WithResource silently merges the given resource OVER
+	// resource.Environment() (OTEL_RESOURCE_ATTRIBUTES / OTEL_SERVICE_NAME)
+	// with no opt-out, so scrubbing at the export boundary — the last hop
+	// before customer data leaves the process — is the only construction that
+	// cannot leak, no matter what the pod environment holds.
 	// AlwaysSample: the gateway never drops customer spans regardless of
 	// the gateway's own sample ratio setting.
 	tp := sdktrace.NewTracerProvider(
@@ -178,24 +222,24 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		attrCost.Int64(params.Usage.CostMicroUSD),
 	}
 	if params.Usage.CacheReadTokens > 0 {
-		attrs = append(attrs, attribute.Int(gatewaytracer.AttrGenAIUsageCacheRead, params.Usage.CacheReadTokens))
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheRead, params.Usage.CacheReadTokens))
 	}
 	if params.Usage.CacheCreationTokens > 0 {
-		attrs = append(attrs, attribute.Int(gatewaytracer.AttrGenAIUsageCacheCreate, params.Usage.CacheCreationTokens))
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate, params.Usage.CacheCreationTokens))
 	}
 	// VK id + request id let the control plane's trace-processing pipeline
 	// identify gateway traces and fold idempotent budget debits into ClickHouse.
 	// See specs/ai-gateway/_shared/contract.md §4.5.
 	if params.VirtualKeyID != "" {
-		attrs = append(attrs, attribute.String(gatewaytracer.AttrVirtualKeyID, params.VirtualKeyID))
+		attrs = append(attrs, attribute.String(AttrVirtualKeyID, params.VirtualKeyID))
 	}
 	if params.GatewayRequestID != "" {
-		attrs = append(attrs, attribute.String(gatewaytracer.AttrGatewayReqID, params.GatewayRequestID))
+		attrs = append(attrs, attribute.String(AttrGatewayReqID, params.GatewayRequestID))
 	}
 	// The wrapped tool's own session / conversation id, so multi-turn gateway
 	// traces group under a stable thread instead of having no thread id at all.
 	if sessionID := clientSessionID(ctx, params); sessionID != "" {
-		attrs = append(attrs, attribute.String(gatewaytracer.AttrGenAIConversationID, sessionID))
+		attrs = append(attrs, attribute.String(AttrGenAIConversationID, sessionID))
 	}
 
 	// When the request failed upstream, stamp the provider's HTTP status +

@@ -24,9 +24,19 @@ func NewRegistry() *Registry {
 	return NewRegistryWithSize(defaultRegistrySize)
 }
 
-// NewRegistryWithSize creates a registry with a custom capacity.
+// NewRegistryWithSize creates a registry with a custom capacity. A
+// non-positive size falls back to the default: lru.New errors (returning a
+// nil cache) for size <= 0, and a silently-nil cache would panic on the
+// first Set/Lookup instead of failing loudly here.
 func NewRegistryWithSize(size int) *Registry {
-	c, _ := lru.New[string, registryEntry](size)
+	if size <= 0 {
+		size = defaultRegistrySize
+	}
+	c, err := lru.New[string, registryEntry](size)
+	if err != nil {
+		// Unreachable with a positive size; loud beats a deferred nil panic.
+		panic(err)
+	}
 	return &Registry{cache: c}
 }
 
