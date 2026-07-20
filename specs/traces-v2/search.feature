@@ -155,6 +155,18 @@ Rule: Search bar keyboard shortcuts
     When the user presses Tab
     Then the highlighted suggestion is inserted into the search bar
 
+  # The search bar used to carry a lightbulb button whose popover listed
+  # these tips. That was one more button crowding the bar; the tips now live
+  # in the single keyboard-shortcuts dialog (opened with "?") alongside every
+  # other shortcut, so there is one place to look.
+  Scenario: Search tips live in the keyboard shortcuts dialog
+    Given the search bar is shown
+    Then there is no lightbulb "Search shortcuts" button next to it
+    When the user opens the keyboard shortcuts dialog with "?"
+    Then a "Search" section lists: Ask AI to build a query (⌘/Ctrl I),
+      combine a facet with OR (Shift or ⌘/Ctrl click), and flip an operator
+      by clicking AND / OR in the query
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # QUERY SYNTAX

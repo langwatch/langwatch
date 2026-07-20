@@ -35,7 +35,6 @@ import {
   statusBackgroundColor,
   statusBorderColor,
 } from "./SearchBarIndicators";
-import { SearchTipsPopover } from "./SearchTipsPopover";
 import { SyntaxHelpDrawerHost } from "./SyntaxHelpDrawer";
 import {
   TokenValuePicker,
@@ -402,7 +401,6 @@ export const SearchBar: React.FC = () => {
                 looking. Showing the badge *and* the banner would be
                 redundant and noisy. */}
             {status.kind !== "error" && <StatusBadge status={status} />}
-            <SearchTipsPopover />
             {hasContent ? (
               <ClearButton onClear={handleClear} />
             ) : (

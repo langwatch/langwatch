@@ -1,3 +1,4 @@
+import { LuSearch } from "react-icons/lu";
 import { useUIStore } from "../../stores/uiStore";
 import {
   KeyboardShortcutsHelp,
@@ -15,6 +16,29 @@ const PAGE_GROUPS: ShortcutGroup[] = [
     ],
   },
   {
+    // Was a separate lightbulb popover next to the search bar; folded in
+    // here so search tips live with every other shortcut.
+    title: "Search",
+    icon: LuSearch,
+    accent: "purple",
+    items: [
+      {
+        keys: ["⌘ / Ctrl", "I"],
+        label: "Ask AI to build a query",
+        detail: "Describe what you want in plain English",
+      },
+      {
+        keys: ["Shift", "click"],
+        label: "Add a facet to the query with OR instead of AND",
+        detail: "⌘ / Ctrl + click a facet does the same",
+      },
+      {
+        keys: ["AND / OR"],
+        label: "Click an operator in the query to flip it in place",
+      },
+    ],
+  },
+  {
     title: "View",
     items: [
       {
@@ -28,7 +52,6 @@ const PAGE_GROUPS: ShortcutGroup[] = [
     title: "Filter sidebar",
     items: [
       { keys: ["C"], label: "Configure which facets show" },
-      { keys: ["F"], label: "Find a facet" },
       { keys: ["E"], label: "Expand or collapse all sections" },
       { keys: ["X"], label: "Clear all filters" },
       { keys: ["R"], label: "Reset to the current lens" },
