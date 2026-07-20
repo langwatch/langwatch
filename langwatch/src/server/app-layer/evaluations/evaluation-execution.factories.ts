@@ -117,14 +117,21 @@ export async function setupModelEnv(
     // that serves this model: with multi-instance providers the model may
     // come from a wider-scope row's custom catalog, and
     // prepareLitellmParams below swaps to that row. Only reject when no
-    // accessible enabled row serves the model at all.
-    const servingRow = await ModelProviderService.create(
-      prisma,
-    ).findRowServingModel({
-      projectId,
-      provider,
-      bareModel: modelName,
-    });
+    // accessible enabled row serves the model at all. The lookup is a
+    // rescue attempt — if it fails, reject with the config error rather
+    // than masking it behind an infrastructure error.
+    let servingRow = null;
+    try {
+      servingRow = await ModelProviderService.create(
+        prisma,
+      ).findRowServingModel({
+        projectId,
+        provider,
+        bareModel: modelName,
+      });
+    } catch {
+      // fall through to the config error below
+    }
     if (!servingRow) {
       throw new EvaluatorConfigError(
         `Model ${modelName} is not in the ${
