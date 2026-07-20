@@ -251,7 +251,7 @@ export function TraceSummaryAccordions({
                     )}
                     <SummaryMediaStrip
                       refsJson={
-                        (trace.attributes ?? {})[RESERVED_INPUT_MEDIA_REFS]
+                        trace.attributes?.[RESERVED_INPUT_MEDIA_REFS]
                       }
                     />
                   </RedactedField>
@@ -272,7 +272,7 @@ export function TraceSummaryAccordions({
                     )}
                     <SummaryMediaStrip
                       refsJson={
-                        (trace.attributes ?? {})[RESERVED_OUTPUT_MEDIA_REFS]
+                        trace.attributes?.[RESERVED_OUTPUT_MEDIA_REFS]
                       }
                     />
                   </RedactedField>
