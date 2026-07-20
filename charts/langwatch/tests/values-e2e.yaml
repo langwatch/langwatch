@@ -58,6 +58,15 @@ workers:
 datasetS3Migration:
   enabled: false
 
+# Same reasoning for the ADR-051 topic-clustering backfill hook: it is
+# enabled by default in the chart, and any suite that does NOT kind-load the
+# app image would fail the whole install with ErrImageNeverPull under
+# pullPolicy: Never (the overlays suite is exactly that case). tests/e2e.sh
+# re-enables it explicitly for the chart-install suite, which does load the
+# image and is where the hook's real behaviour is covered.
+topicClusteringBackfill:
+  enabled: false
+
 langwatch_nlp:
   replicaCount: 0
 

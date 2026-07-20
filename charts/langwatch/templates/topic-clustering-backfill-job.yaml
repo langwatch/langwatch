@@ -46,9 +46,11 @@
   in this chart run on APP BOOT (`start:prepare:db`), not as a Helm hook, so
   `hook-weight` cannot order this Job after them — post-upgrade hooks fire once
   resources are SUBMITTED, not once the Deployment has rolled out. The TASK
-  ITSELF closes the race: before walking any projects it waits up to 10
-  minutes for its tables to exist, so winning the race against a
-  not-yet-migrated database means a quiet poll, not a crash. Relying on
+  ITSELF closes the race: before walking any projects it waits for its tables
+  to exist, so winning the race against a not-yet-migrated database means a
+  quiet poll, not a crash. That wait is deliberately SHORTER than Helm's hook
+  timeout — a longer one can never complete, because Helm fails the release
+  first and the task never reaches its own give-up path. Relying on
   `backoffLimit` for this was disproven in chart e2e — on a fresh cluster the
   app's image pull + first boot outlasts all three retries' backoff, and the
   hook failed the whole `helm install` with BackoffLimitExceeded. Retries

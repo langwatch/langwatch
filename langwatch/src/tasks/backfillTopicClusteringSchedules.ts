@@ -14,11 +14,23 @@ const DEFAULT_PAGE_SIZE = 500;
  * How long the task waits for the database schema before giving up. The app's
  * FIRST boot applies migrations, and on a fresh install that boot races this
  * hook — image pulls and rollout in a new cluster take minutes, while the
- * hook Job's three retries burn out in under a minute of crash-loops. Well
- * under the chart's activeDeadlineSeconds (3600, shared across retries) so a
- * timeout still leaves the Job budget to retry.
+ * hook Job's three retries burn out in under a minute of crash-loops.
+ *
+ * THIS MUST STAY BELOW THE HELM HOOK TIMEOUT. Helm waits a bounded time for a
+ * post-install hook and then fails the whole release; the chart e2e uses 480s.
+ * A wait longer than that can never finish — Helm gives up first and the
+ * task's own give-up path is unreachable, which is exactly how a 10-minute
+ * wait turned a fresh-cluster race into a failed install. Giving up early is
+ * free in the case that actually triggers it: a FRESH install has no
+ * pre-existing projects to backfill, and on an upgrade the schema already
+ * exists so the probe returns on the first attempt.
+ *
+ * Override with BACKFILL_SCHEMA_WAIT_TIMEOUT_MS when the deploy allows longer.
  */
-const DEFAULT_SCHEMA_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
+const DEFAULT_SCHEMA_WAIT_TIMEOUT_MS = (() => {
+  const override = Number(process.env.BACKFILL_SCHEMA_WAIT_TIMEOUT_MS);
+  return Number.isFinite(override) && override > 0 ? override : 4 * 60 * 1000;
+})();
 const DEFAULT_SCHEMA_POLL_INTERVAL_MS = 5_000;
 
 export interface SchemaWaitDeps {
