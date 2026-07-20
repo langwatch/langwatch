@@ -18,6 +18,8 @@ interface SelectableIconCardProps {
   selected: boolean;
   onClick: () => void;
   ariaLabel: string;
+  /** A small chip riding the card's top edge (e.g. "Recommended"). */
+  badge?: string;
 }
 
 export function SelectableIconCard(
@@ -31,6 +33,7 @@ export function SelectableIconCard(
     selected,
     onClick,
     ariaLabel,
+    badge,
   } = props;
 
   const actualIcon = icon?.type === "with-label" ? icon.icon : icon;
@@ -73,6 +76,7 @@ export function SelectableIconCard(
           }
         }}
         cursor="pointer"
+        position="relative"
         w={cardSize}
         h={cardSize}
         flexShrink={0}
@@ -107,6 +111,27 @@ export function SelectableIconCard(
           transform: "translateY(-1px)",
         }}
       >
+        {badge ? (
+          <Text
+            position="absolute"
+            top="-8px"
+            left="50%"
+            transform="translateX(-50%)"
+            fontSize="9px"
+            fontWeight="600"
+            letterSpacing="0.02em"
+            lineHeight="1"
+            paddingX={1.5}
+            paddingY="3px"
+            borderRadius="full"
+            background="orange.solid"
+            color="white"
+            whiteSpace="nowrap"
+            pointerEvents="none"
+          >
+            {badge}
+          </Text>
+        ) : null}
         <VStack
           gap={iconLabel ? 1 : 0}
           align="center"

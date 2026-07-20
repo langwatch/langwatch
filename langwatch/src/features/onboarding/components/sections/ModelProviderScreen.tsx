@@ -1,12 +1,15 @@
 import { Box, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useCallback, useRef, useState } from "react";
-import type { ModelProviderKey } from "../../regions/model-providers/types";
+import type {
+  ModelProviderKey,
+  ModelProviderSurface,
+} from "../../regions/model-providers/types";
 import { ModelProviderGrid } from "./model-provider/ModelProviderGrid";
 import { ModelProviderSetup } from "./model-provider/ModelProviderSetup";
 
 interface ModelProviderScreenProps {
-  variant: "evaluations" | "prompts" | "langy";
+  variant: ModelProviderSurface;
   /**
    * Called after the provider is saved, instead of the default
    * redirect-to-feature behavior. Used when the screen is embedded in a
