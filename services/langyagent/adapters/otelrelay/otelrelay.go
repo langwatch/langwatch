@@ -83,7 +83,13 @@ const (
 // and LLM traffic. Captured at spawn (the only moment the manager sees the
 // credentials) and dropped at Unregister.
 type WorkerInfo struct {
-	ConversationID    string
+	ConversationID string
+	// ActorUserID is the user the turn runs for. The manager holds it
+	// authoritatively (a worker is bound to one (project, actor) pair for its
+	// whole life), so the relay stamps it onto forwarded traces as trusted
+	// truth — never read from the worker's own OTLP, which is prompt-injectable.
+	// This is what attributes Langy spend to the acting user.
+	ActorUserID       string
 	LangwatchEndpoint string
 	// Model comes from manager-owned worker configuration. The relay uses this
 	// trusted value in LangWatch's internal trace instead of the worker-supplied
@@ -393,7 +399,7 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 	// observability must never delay or fail the customer's telemetry.
 	r.exportInternal(conversationID, entry.info.Model, turn, body)
 
-	ReparentTraces(td, conversationID, turn)
+	ReparentTraces(td, conversationID, entry.info.ActorUserID, turn)
 	out, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
 	if err != nil {
 		http.Error(w, "invalid OTLP payload", http.StatusBadRequest)
