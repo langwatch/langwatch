@@ -19,8 +19,7 @@ import {
   abbreviateModel,
   formatCost,
   formatDuration,
-  formatRelativeTime,
-  formatTokens,
+  formatRelativeTimeAgo,
 } from "../../../utils/formatters";
 import {
   Bubble,
@@ -34,7 +33,6 @@ import { useConversationExpand } from "./expandContext";
 import { MessageExpandToggle } from "./MessageExpandToggle";
 import { TurnActionRow, TurnAnnotationBadges } from "./TurnAnnotations";
 import type { TurnLayout } from "./types";
-import { formatGap } from "./utils";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
 const EMPTY_ANNOTATIONS: AnnotationItem[] = [];
@@ -44,8 +42,6 @@ interface ChatTurnRowProps {
   userText: string;
   assistantText: string;
   assistantReasoning: string;
-  gapSecs: number;
-  showGap: boolean;
   index: number;
   isCurrent: boolean;
   onSelect: (traceId: string) => void;
@@ -64,8 +60,6 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   userText: originalUserText,
   assistantText: originalAssistantText,
   assistantReasoning,
-  gapSecs,
-  showGap,
   index,
   isCurrent,
   onSelect,
@@ -125,16 +119,6 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
 
   return (
     <VStack align="stretch" gap={layout === "thread" ? 1 : 2}>
-      {showGap && (
-        <Flex align="center" gap={2}>
-          <Box height="1px" flex={1} bg="border.muted" />
-          <Text textStyle="2xs" color="fg.subtle">
-            {formatGap(gapSecs)}
-          </Text>
-          <Box height="1px" flex={1} bg="border.muted" />
-        </Flex>
-      )}
-
       <TurnSeparator
         index={index}
         turn={turn}
@@ -495,13 +479,11 @@ const TurnSeparator: React.FC<{
   annotationItems,
   translation,
 }) => {
-  // Pick the bits worth showing per turn — model, duration, latency, token
-  // load, cost, error state — so the separator reads as a per-turn ledger
-  // rather than just "Turn N · Xs". Skips fields that don't apply (no cost
-  // → no `$0` chip; ok status → no error chip) to stay scannable.
-  const model = turn.models[0] ? abbreviateModel(turn.models[0]) : null;
+  // Keep the separator to a scannable few fields: duration, latency, cost,
+  // relative time, error state. The model abbreviation and the raw
+  // input→output token count read as cryptic here (they live in the trace
+  // header / metrics), so they're intentionally left off.
   const hasCost = (turn.totalCost ?? 0) > 0;
-  const hasTokens = turn.totalTokens > 0;
   const isError = turn.status === "error";
 
   const Sep = () => (
@@ -538,14 +520,6 @@ const TurnSeparator: React.FC<{
         >
           Turn {index}
         </Text>
-        {model && (
-          <>
-            <Sep />
-            <Text textStyle="2xs" color="fg.muted">
-              {model}
-            </Text>
-          </>
-        )}
         <Sep />
         <Text textStyle="2xs" color="fg.subtle">
           {formatDuration(turn.durationMs)}
@@ -555,17 +529,6 @@ const TurnSeparator: React.FC<{
             <Sep />
             <Text textStyle="2xs" color="fg.subtle">
               ttft {formatDuration(turn.ttft)}
-            </Text>
-          </>
-        )}
-        {hasTokens && (
-          <>
-            <Sep />
-            <Text textStyle="2xs" color="fg.subtle">
-              {turn.inputTokens != null && turn.outputTokens != null
-                ? `${formatTokens(turn.inputTokens)}→${formatTokens(turn.outputTokens)}`
-                : `${formatTokens(turn.totalTokens)} tok`}
-              {turn.tokensEstimated ? "*" : ""}
             </Text>
           </>
         )}
@@ -579,7 +542,7 @@ const TurnSeparator: React.FC<{
         )}
         <Sep />
         <Text textStyle="2xs" color="fg.subtle">
-          {formatRelativeTime(turn.timestamp)}
+          {formatRelativeTimeAgo(turn.timestamp)}
         </Text>
         {isError && (
           <>

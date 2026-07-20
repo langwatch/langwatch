@@ -1,10 +1,10 @@
 /**
  * @vitest-environment jsdom
  *
- * A conversation-view turn whose content was hidden by a privacy rule renders
- * the shared "Redacted" marker on the affected side instead of silently
- * dropping the bubble — so a hidden turn is never mistaken for a turn where the
- * user said nothing / the assistant produced no response.
+ * The per-turn separator ledger was decluttered: the cryptic model
+ * abbreviation and the raw input→output token count are gone, the relative
+ * time carries an explicit "ago", and the "Xs gap" divider between turns is
+ * removed. See specs/traces-v2/conversation-turn-ledger.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -28,8 +28,6 @@ vi.mock("../expandContext", () => ({
   },
 }));
 
-// The per-turn translate hook dispatches through tRPC; these tests pin
-// redaction rendering, so stub it to the identity passthrough.
 vi.mock("../../../../hooks/useTextTranslation", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
@@ -39,7 +37,6 @@ vi.mock("../../../../hooks/useTextTranslation", () => ({
   }),
 }));
 
-// The turn separator pulls annotation data via tRPC; stub the leaf components.
 vi.mock("../TurnAnnotations", () => ({
   TurnActionRow: () => null,
   TurnAnnotationBadges: () => null,
@@ -49,7 +46,6 @@ vi.mock("~/components/Markdown", () => ({
   Markdown: ({ children }: { children: string }) => <span>{children}</span>,
 }));
 
-// RedactedInline looks up org permissions for the settings link.
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
@@ -59,6 +55,8 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 import type { TraceListItem } from "../../../../types/trace";
 import { ChatTurnRow } from "../ChatTurnRow";
+
+const ONE_HOUR_MS = 60 * 60 * 1000;
 
 function turn(over: Partial<TraceListItem>): TraceListItem {
   return {
@@ -84,19 +82,23 @@ function turn(over: Partial<TraceListItem>): TraceListItem {
   };
 }
 
-function renderRow(
-  over: Partial<TraceListItem>,
-  texts?: { user?: string; assistant?: string },
-) {
+function renderRow() {
   return render(
     <ChakraProvider value={defaultSystem}>
       <ChatTurnRow
         layout="thread"
-        turn={turn(over)}
-        userText={texts?.user ?? ""}
-        assistantText={texts?.assistant ?? ""}
+        turn={turn({
+          durationMs: 20900,
+          totalTokens: 5038,
+          inputTokens: 4500,
+          outputTokens: 538,
+          models: ["openai/gpt-4o"],
+          timestamp: Date.now() - ONE_HOUR_MS,
+        })}
+        userText="a question"
+        assistantText="an answer"
         assistantReasoning=""
-        index={1}
+        index={3}
         isCurrent={false}
         onSelect={() => undefined}
       />
@@ -104,37 +106,41 @@ function renderRow(
   );
 }
 
+/** The ledger row is the group wrapping the "Turn N" label. */
+function separatorText(): string {
+  const label = screen.getByText("Turn 3");
+  const group = label.closest('[role="group"]');
+  return group?.textContent ?? "";
+}
+
 afterEach(cleanup);
 
-describe("ChatTurnRow redaction", () => {
-  describe("given the assistant output was redacted", () => {
-    it("renders the Redacted marker on the assistant side", () => {
-      renderRow(
-        { outputRedacted: true, outputVisibleTo: "Admins" },
-        { user: "what is the funnel rate?" },
-      );
-      expect(screen.getByText("Redacted")).toBeInTheDocument();
-      expect(screen.getByText(/visible to Admins/i)).toBeInTheDocument();
+describe("ChatTurnRow separator ledger", () => {
+  describe("given a turn with a model, tokens and an hour-old timestamp", () => {
+    it("keeps duration and shows relative time with an ago suffix", () => {
+      renderRow();
+      const text = separatorText();
+      expect(text).toContain("20.9s");
+      expect(text).toContain("1h ago");
+    });
+
+    it("drops the model abbreviation from the ledger", () => {
+      renderRow();
+      expect(separatorText()).not.toMatch(/gpt/i);
+    });
+
+    it("drops the input→output token count", () => {
+      renderRow();
+      const text = separatorText();
+      expect(text).not.toContain("→");
+      expect(text).not.toContain("4.5K");
     });
   });
 
-  describe("given the user input was redacted", () => {
-    it("renders the Redacted marker on the user side", () => {
-      renderRow(
-        { inputRedacted: true, inputVisibleTo: "no one" },
-        { assistant: "the answer" },
-      );
-      expect(screen.getByText("Redacted")).toBeInTheDocument();
-      expect(
-        screen.getByText(/hidden by privacy settings/i),
-      ).toBeInTheDocument();
-    });
-  });
-
-  describe("given a turn with genuinely no assistant output and no redaction", () => {
-    it("does not render a Redacted marker", () => {
-      renderRow({ outputRedacted: false }, { user: "hi" });
-      expect(screen.queryByText("Redacted")).not.toBeInTheDocument();
+  describe("given consecutive turns", () => {
+    it("never renders an inter-turn gap divider", () => {
+      const { container } = renderRow();
+      expect(container.textContent ?? "").not.toMatch(/gap/i);
     });
   });
 });

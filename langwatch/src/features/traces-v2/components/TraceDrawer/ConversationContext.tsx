@@ -14,14 +14,20 @@ import {
   LuChevronDown,
   LuCircleDashed,
   LuFlag,
+  LuLanguages,
   LuMessageCircle,
 } from "react-icons/lu";
 import { RedactedInline } from "~/components/ui/RedactedField";
 import { Tooltip } from "~/components/ui/tooltip";
+import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
 import {
   type ConversationTurn,
   useConversationContext,
 } from "../../hooks/useConversationContext";
+import {
+  type UseTextTranslationResult,
+  useTextTranslation,
+} from "../../hooks/useTextTranslation";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
 import {
   getDrawerDensityTokens,
@@ -44,12 +50,12 @@ interface ConversationContextProps {
    */
   contentRef?: RefObject<HTMLDivElement | null>;
   /**
-   * Optional ref attached to the header button. PaneLayout reads
+   * Optional ref attached to the header row. PaneLayout reads
    * `offsetHeight` from this to set the collapsed Panel size pixel-
    * accurately — no trailing band between the chevron strip and the
    * viz tabs.
    */
-  headerRef?: RefObject<HTMLButtonElement | null>;
+  headerRef?: RefObject<HTMLDivElement | null>;
 }
 
 /**
@@ -236,6 +242,49 @@ export const ConversationContext = memo(function ConversationContext({
     [ctx.previous, current, ctx.next],
   );
 
+  // Translate-to-English for the whole context strip (matching the IOViewer
+  // and per-turn actions): collect every real row's preview text, translate
+  // them as one batch, and swap them in when active. Placeholders
+  // ("Start of conversation") carry no user content, so they're skipped.
+  const translatableTexts = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const row of rows) {
+      if (row.isPlaceholder) continue;
+      if (row.userText) {
+        out[`${row.key}:user`] = row.userText.slice(
+          0,
+          TRANSLATE_TEXT_MAX_CHARS,
+        );
+      }
+      if (row.assistantText) {
+        out[`${row.key}:assistant`] = row.assistantText.slice(
+          0,
+          TRANSLATE_TEXT_MAX_CHARS,
+        );
+      }
+    }
+    return out;
+  }, [rows]);
+  const translation = useTextTranslation({ texts: translatableTexts });
+  const hasTranslatable = Object.keys(translatableTexts).length > 0;
+  const displayRows = useMemo(() => {
+    if (!translation.isActive) return rows;
+    return rows.map((row) =>
+      row.isPlaceholder
+        ? row
+        : {
+            ...row,
+            userText: row.userText
+              ? (translation.displayTexts[`${row.key}:user`] ?? row.userText)
+              : row.userText,
+            assistantText: row.assistantText
+              ? (translation.displayTexts[`${row.key}:assistant`] ??
+                row.assistantText)
+              : row.assistantText,
+          },
+    );
+  }, [rows, translation.isActive, translation.displayTexts]);
+
   const navigate = useCallback(
     (id: string) => {
       if (id === traceId) return;
@@ -293,7 +342,9 @@ export const ConversationContext = memo(function ConversationContext({
         collapsed={collapsed}
         onToggleCollapsed={onToggleCollapsed}
         densityPaddingY={densityTokens.sectionTriggerY}
-        buttonRef={headerRef}
+        headerRef={headerRef}
+        translation={translation}
+        showTranslate={hasTranslatable && !collapsed}
       />
       {collapsed ? null : (
         // Two-level structure on purpose:
@@ -312,7 +363,7 @@ export const ConversationContext = memo(function ConversationContext({
           <Box ref={contentRef}>
             <ContextBody
               ctx={ctx}
-              rows={rows}
+              rows={displayRows}
               traceId={traceId}
               onSelect={navigate}
             />
@@ -337,7 +388,9 @@ function ContextHeader({
   collapsed,
   onToggleCollapsed,
   densityPaddingY,
-  buttonRef,
+  headerRef,
+  translation,
+  showTranslate,
 }: {
   position: number;
   total: number;
@@ -346,66 +399,133 @@ function ContextHeader({
   onToggleCollapsed: () => void;
   /** Chakra spacing unit matching AccordionShell's section triggers. */
   densityPaddingY: number;
-  buttonRef?: RefObject<HTMLButtonElement | null>;
+  headerRef?: RefObject<HTMLDivElement | null>;
+  translation: UseTextTranslationResult;
+  showTranslate: boolean;
 }) {
+  // The strip carries two actions — toggle collapse and translate — which
+  // can't both live in one button. It's an HStack: one full-width toggle
+  // button (title + chevron) plus the Translate control pinned to the right,
+  // whose click is stopped from bubbling into the toggle.
   return (
-    <chakra.button
-      ref={buttonRef}
-      type="button"
-      onClick={onToggleCollapsed}
-      aria-expanded={!collapsed}
-      display="flex"
-      alignItems="center"
+    <HStack
+      ref={headerRef}
       gap={2}
       width="100%"
       paddingX={4}
       // Match the accordion section triggers below so all the strips in
       // the drawer body share one rhythm. The accordion's `<HStack>` row
-      // adds a touch more visual height than `chakra.button` alone, so
-      // we bump paddingY by half a density step to keep the visible
-      // strip on the same beat.
+      // adds a touch more visual height than a bare button alone, so we
+      // bump paddingY by half a density step to keep the visible strip on
+      // the same beat.
       paddingY={densityPaddingY + 0.5}
       bg="bg.surface"
-      borderTopWidth="0"
       borderBottomWidth="1px"
       borderColor={{ base: "gray.200", _dark: "border.muted" }}
       color="fg.muted"
-      cursor="pointer"
-      textAlign="left"
       transition="background 120ms ease, color 120ms ease"
       _hover={{ bg: "bg.softHover", color: "fg" }}
       flexShrink={0}
     >
-      <Icon as={LuMessageCircle} boxSize={3} color="inherit" />
-      <Text
-        textStyle="2xs"
-        fontWeight="semibold"
+      <chakra.button
+        type="button"
+        onClick={onToggleCollapsed}
+        aria-expanded={!collapsed}
+        display="flex"
+        alignItems="center"
+        gap={2}
+        flex={1}
+        minWidth={0}
+        bg="transparent"
         color="inherit"
-        textTransform="uppercase"
-        letterSpacing="wider"
+        cursor="pointer"
+        textAlign="left"
       >
-        Conversation Context
-      </Text>
-      {isLoading ? (
-        <Text textStyle="2xs" color="fg.subtle">
-          loading…
+        <Icon as={LuMessageCircle} boxSize={3} color="inherit" />
+        <Text
+          textStyle="2xs"
+          fontWeight="semibold"
+          color="inherit"
+          textTransform="uppercase"
+          letterSpacing="wider"
+        >
+          Conversation Context
         </Text>
-      ) : total > 0 ? (
-        <Text textStyle="2xs" color="fg.subtle">
-          turn {position} of {total}
-        </Text>
+        {isLoading ? (
+          <Text textStyle="2xs" color="fg.subtle">
+            loading…
+          </Text>
+        ) : total > 0 ? (
+          <Text textStyle="2xs" color="fg.subtle">
+            turn {position} of {total}
+          </Text>
+        ) : null}
+        <Box flex={1} />
+        <Icon
+          as={LuChevronDown}
+          boxSize={3}
+          color="inherit"
+          transition="transform 120ms ease"
+          // Collapsed = chevron points down (closed); expanded = points
+          // up (rotated 180). Matches the accordion sections below.
+          transform={collapsed ? "rotate(0deg)" : "rotate(180deg)"}
+        />
+      </chakra.button>
+      {showTranslate ? (
+        <ContextTranslateButton translation={translation} />
       ) : null}
-      <Box flex={1} />
-      <Icon
-        as={LuChevronDown}
-        boxSize={3}
-        color="inherit"
-        transition="transform 120ms ease"
-        // Collapsed = chevron points down (closed); expanded = points
-        // up (rotated 180). Matches the accordion sections below.
-        transform={collapsed ? "rotate(0deg)" : "rotate(180deg)"}
-      />
-    </chakra.button>
+    </HStack>
+  );
+}
+
+/** Translate-to-English toggle for the whole context strip. */
+function ContextTranslateButton({
+  translation,
+}: {
+  translation: UseTextTranslationResult;
+}) {
+  const label = translation.isLoading
+    ? "Translating…"
+    : translation.isActive
+      ? "Show original"
+      : "Translate";
+  return (
+    <Tooltip
+      content={
+        translation.isActive
+          ? "Show the original text"
+          : "Translate these turns to English"
+      }
+      positioning={{ placement: "top" }}
+    >
+      <chakra.button
+        type="button"
+        aria-pressed={translation.isActive}
+        disabled={translation.isLoading}
+        onClick={(e) => {
+          e.stopPropagation();
+          translation.toggle();
+        }}
+        display="inline-flex"
+        alignItems="center"
+        gap={1}
+        flexShrink={0}
+        paddingX={1.5}
+        paddingY={0.5}
+        borderRadius="sm"
+        textStyle="2xs"
+        color={translation.isActive ? "blue.fg" : "fg.muted"}
+        cursor="pointer"
+        _hover={{
+          bg: "bg.muted",
+          color: translation.isActive ? "blue.fg" : "fg",
+        }}
+        _disabled={{ opacity: 0.6, cursor: "default" }}
+      >
+        <Icon as={LuLanguages} boxSize={3} />
+        {label}
+      </chakra.button>
+    </Tooltip>
   );
 }
 

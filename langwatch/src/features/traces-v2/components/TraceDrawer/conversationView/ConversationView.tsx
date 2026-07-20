@@ -109,17 +109,13 @@ export const ConversationView = memo(function ConversationView({
     return map;
   }, [annotationsQuery.data]);
 
-  // Single pass over `turns`: pre-parse the latest user message and the
-  // wall-clock gap to the previous turn. Without this, every ChatTurnRow
-  // re-render would re-JSON.parse the entire input payload on its own.
+  // Single pass over `turns`: pre-parse the latest user message so every
+  // ChatTurnRow re-render doesn't re-JSON.parse the entire input payload
+  // on its own.
   const parsedTurns = useMemo<ParsedTurn[]>(() => {
     const out: ParsedTurn[] = new Array(turns.length);
     for (let i = 0; i < turns.length; i++) {
       const t = turns[i]!;
-      const prev = i > 0 ? turns[i - 1]! : undefined;
-      const gapSecs = prev
-        ? (t.timestamp - (prev.timestamp + prev.durationMs)) / 1000
-        : 0;
       out[i] = {
         turn: t,
         // Use the shared Transcript helper so we handle the same shapes
@@ -128,8 +124,6 @@ export const ConversationView = memo(function ConversationView({
         userText: extractReadableText(t.input, "user"),
         assistantText: extractReadableText(t.output, "assistant"),
         assistantReasoning: extractReasoningText(t.output),
-        gapSecs,
-        showGap: gapSecs > 5,
       };
     }
     return out;
@@ -486,8 +480,6 @@ const TurnsView: React.FC<{
                 userText={p.userText}
                 assistantText={p.assistantText}
                 assistantReasoning={p.assistantReasoning}
-                gapSecs={p.gapSecs}
-                showGap={p.showGap}
                 index={i + 1}
                 isCurrent={isCurrent}
                 onSelect={onSelectTurn}
@@ -609,8 +601,6 @@ const VirtualizedTurnsView: React.FC<{
                   userText={p.userText}
                   assistantText={p.assistantText}
                   assistantReasoning={p.assistantReasoning}
-                  gapSecs={p.gapSecs}
-                  showGap={p.showGap}
                   index={row.index + 1}
                   isCurrent={p.turn.traceId === currentTraceId}
                   onSelect={onSelectTurn}
