@@ -101,10 +101,13 @@ export class IngestionPullRunStatusFoldProjection
    * Equal `scheduledFor` is accepted: it is the same run reporting, which
    * replay must fold identically.
    */
-  private isSuperseded(
-    state: IngestionPullRunStatusData,
-    scheduledFor: number,
-  ): boolean {
+  private isSuperseded({
+    state,
+    scheduledFor,
+  }: {
+    state: IngestionPullRunStatusData;
+    scheduledFor: number;
+  }): boolean {
     return (
       state.LastRunScheduledFor !== null &&
       scheduledFor < state.LastRunScheduledFor
@@ -148,7 +151,8 @@ export class IngestionPullRunStatusFoldProjection
     event: IngestionPullRunCompletedEvent,
     state: IngestionPullRunStatusData,
   ): IngestionPullRunStatusData {
-    if (this.isSuperseded(state, event.data.scheduledFor)) return state;
+    if (this.isSuperseded({ state, scheduledFor: event.data.scheduledFor }))
+      return state;
     return {
       ...state,
       SourceId: event.data.sourceId,
@@ -167,7 +171,8 @@ export class IngestionPullRunStatusFoldProjection
     event: IngestionPullRunFailedEvent,
     state: IngestionPullRunStatusData,
   ): IngestionPullRunStatusData {
-    if (this.isSuperseded(state, event.data.scheduledFor)) return state;
+    if (this.isSuperseded({ state, scheduledFor: event.data.scheduledFor }))
+      return state;
     return {
       ...state,
       SourceId: event.data.sourceId,

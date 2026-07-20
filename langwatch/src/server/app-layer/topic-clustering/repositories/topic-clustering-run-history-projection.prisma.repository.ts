@@ -2,9 +2,10 @@ import { generate } from "@langwatch/ksuid";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 
-import type {
-  TopicClusteringRunHistoryData,
-  TopicClusteringRunHistoryEntry,
+import {
+  topicClusteringRunHistoryEntrySchema,
+  type TopicClusteringRunHistoryData,
+  type TopicClusteringRunHistoryEntry,
 } from "~/server/event-sourcing/pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
@@ -26,28 +27,11 @@ type RunHistoryPrismaClient = {
   };
 };
 
-/**
- * The persisted shape of one history entry. Validated on read so a corrupted
- * or hand-edited JSON column degrades to an empty history (which a replay
- * rebuilds) instead of poisoning the fold.
- */
-const runHistoryEntrySchema = z.object({
-  runId: z.string(),
-  trigger: z.string(),
-  startedAt: z.number(),
-  finishedAt: z.number().nullable(),
-  outcome: z.string(),
-  mode: z.string().nullable(),
-  skippedReason: z.string().nullable(),
-  errorCode: z.string().nullable(),
-  isErrorUserActionable: z.boolean(),
-  tracesProcessed: z.number(),
-  topicsCount: z.number(),
-  subtopicsCount: z.number(),
-  pages: z.number(),
-}) satisfies z.ZodType<TopicClusteringRunHistoryEntry>;
-
-const runsSchema = z.array(runHistoryEntrySchema);
+// The persisted shape of one history entry is the fold projection's own
+// schema (single source of truth; the type is z.infer'd from it there).
+// Validated on read so a corrupted or hand-edited JSON column degrades to
+// an empty history (which a replay rebuilds) instead of poisoning the fold.
+const runsSchema = z.array(topicClusteringRunHistoryEntrySchema);
 
 export function parseRunHistoryRuns(
   value: unknown,
@@ -74,9 +58,7 @@ function fromRow(row: Row): StoredProjection<TopicClusteringRunHistoryData> {
 }
 
 /** Postgres row I/O for the topic clustering run-history projection. */
-export class PrismaTopicClusteringRunHistoryProjectionRepository
-  implements StateProjectionStore<TopicClusteringRunHistoryData>
-{
+export class PrismaTopicClusteringRunHistoryProjectionRepository implements StateProjectionStore<TopicClusteringRunHistoryData> {
   constructor(private readonly prisma: RunHistoryPrismaClient) {}
 
   async load(
@@ -84,9 +66,10 @@ export class PrismaTopicClusteringRunHistoryProjectionRepository
     context: ProjectionStoreContext,
   ): Promise<StoredProjection<TopicClusteringRunHistoryData> | null> {
     const projectId = String(context.tenantId);
-    const row = await this.prisma.topicClusteringRunHistoryProjection.findUnique(
-      { where: { projectId } },
-    );
+    const row =
+      await this.prisma.topicClusteringRunHistoryProjection.findUnique({
+        where: { projectId },
+      });
     return row ? fromRow(row) : null;
   }
 

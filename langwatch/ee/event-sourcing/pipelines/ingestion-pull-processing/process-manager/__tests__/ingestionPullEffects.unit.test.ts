@@ -9,10 +9,13 @@ import {
 } from "../ingestionPullEffects";
 import { INGESTION_PULL_PROCESS_NAME } from "../ingestionPullProcess.types";
 
-async function metricValue(
-  name: string,
-  labels: Record<string, string>,
-): Promise<number> {
+async function metricValue({
+  name,
+  labels,
+}: {
+  name: string;
+  labels: Record<string, string>;
+}): Promise<number> {
   const metric = register.getSingleMetric(name);
   if (!metric) return 0;
   const { values } = await metric.get();
@@ -94,6 +97,10 @@ describe("ingestion pull outbox effect", () => {
         sourceId: "source-1",
         runId: "run-1",
         error: "provider down",
+        errorCode: "pull_failed",
+        // The final failure must not claim a retry is coming — retries are
+        // exhausted; only the next scheduled run follows.
+        retryable: false,
       }),
     );
   });
@@ -123,8 +130,11 @@ describe("ingestion pull outbox effect", () => {
 describe("pull outcome metrics (ADR-054)", () => {
   describe("when the final attempt fails", () => {
     it("counts a failed_final pull so the alert rule has a signal", async () => {
-      const before = await metricValue("ingestion_pull_total", {
-        outcome: "failed_final",
+      const before = await metricValue({
+        name: "ingestion_pull_total",
+        labels: {
+          outcome: "failed_final",
+        },
       });
       const handler = createIngestionPullRunHandler({
         runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
@@ -134,8 +144,11 @@ describe("pull outcome metrics (ADR-054)", () => {
 
       await handler(intent, context(3));
 
-      const after = await metricValue("ingestion_pull_total", {
-        outcome: "failed_final",
+      const after = await metricValue({
+        name: "ingestion_pull_total",
+        labels: {
+          outcome: "failed_final",
+        },
       });
       expect(after).toBe(before + 1);
     });
@@ -143,11 +156,17 @@ describe("pull outcome metrics (ADR-054)", () => {
 
   describe("when an attempt below the cap fails", () => {
     it("counts it as failed_retryable, never as a final failure", async () => {
-      const beforeRetryable = await metricValue("ingestion_pull_total", {
-        outcome: "failed_retryable",
+      const beforeRetryable = await metricValue({
+        name: "ingestion_pull_total",
+        labels: {
+          outcome: "failed_retryable",
+        },
       });
-      const beforeFinal = await metricValue("ingestion_pull_total", {
-        outcome: "failed_final",
+      const beforeFinal = await metricValue({
+        name: "ingestion_pull_total",
+        labels: {
+          outcome: "failed_final",
+        },
       });
       const handler = createIngestionPullRunHandler({
         runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
@@ -160,13 +179,19 @@ describe("pull outcome metrics (ADR-054)", () => {
       );
 
       expect(
-        await metricValue("ingestion_pull_total", {
-          outcome: "failed_retryable",
+        await metricValue({
+          name: "ingestion_pull_total",
+          labels: {
+            outcome: "failed_retryable",
+          },
         }),
       ).toBe(beforeRetryable + 1);
       expect(
-        await metricValue("ingestion_pull_total", {
-          outcome: "failed_final",
+        await metricValue({
+          name: "ingestion_pull_total",
+          labels: {
+            outcome: "failed_final",
+          },
         }),
       ).toBe(beforeFinal);
     });

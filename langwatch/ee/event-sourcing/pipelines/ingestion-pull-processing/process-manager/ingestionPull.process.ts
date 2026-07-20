@@ -6,7 +6,10 @@ import type {
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { ProcessIntent } from "~/server/event-sourcing/process-manager";
 
-import type { IngestionPullProcessingEvent } from "../schemas/events";
+import {
+  type IngestionPullProcessingEvent,
+  isValidPullSchedule,
+} from "../schemas/events";
 import {
   type IngestionPullIntents,
   type IngestionPullProcessEventView,
@@ -21,23 +24,7 @@ import {
  */
 export const INGESTION_PULL_STALE_RUN_MS = 30 * 60 * 1000;
 
-export function assertValidPullSchedule(cron: string): void {
-  if (cron.trim().split(/\s+/).length !== 5) {
-    throw new Error("pull schedule must be a five-field cron expression");
-  }
-  computeNextRunAt({ cron, timezone: "UTC", after: new Date() });
-}
-
-export function isValidPullSchedule(cron: string): boolean {
-  try {
-    assertValidPullSchedule(cron);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function nextWake(cron: string, after: number): number {
+function nextWake({ cron, after }: { cron: string; after: number }): number {
   return computeNextRunAt({
     cron,
     timezone: "UTC",
@@ -84,15 +71,21 @@ function schedulingRef(ctx: Ctx): number {
   return Math.max(ctx.at, ctx.now);
 }
 
-function settle(
-  state: IngestionPullProcessState,
-  after: number,
-  intents: ProcessIntent[] = [],
-) {
+function settle({
+  state,
+  after,
+  intents = [],
+}: {
+  state: IngestionPullProcessState;
+  after: number;
+  intents?: ProcessIntent[];
+}) {
   return {
     state,
     nextWakeAt:
-      state.enabled && state.cron ? nextWake(state.cron, after) : null,
+      state.enabled && state.cron
+        ? nextWake({ cron: state.cron, after })
+        : null,
     intents,
   };
 }
@@ -111,16 +104,16 @@ export const handlePullConfigured: EventHandler<
   if (view.cron === null || !isValidPullSchedule(view.cron)) {
     return { state, nextWakeAt: null, intents: [] };
   }
-  return settle(
-    {
+  return settle({
+    state: {
       ...state,
       sourceId: view.sourceId,
       enabled: true,
       cron: view.cron,
       cursor: state.sourceId ? state.cursor : view.cursor,
     },
-    schedulingRef(ctx),
-  );
+    after: schedulingRef(ctx),
+  });
 };
 
 export const handlePullDisabled: EventHandler<
@@ -152,14 +145,14 @@ export const handlePullRunCompleted: EventHandler<
   // cursor. A late completion from a superseded run would otherwise regress
   // the live cursor and re-ingest its window.
   const isCurrentRun = state.currentRun?.runId === view.runId;
-  return settle(
-    {
+  return settle({
+    state: {
       ...state,
       cursor: isCurrentRun ? view.cursor : state.cursor,
       currentRun: isCurrentRun ? null : state.currentRun,
     },
-    schedulingRef(ctx),
-  );
+    after: schedulingRef(ctx),
+  });
 };
 
 export const handlePullRunFailed: EventHandler<
@@ -168,14 +161,14 @@ export const handlePullRunFailed: EventHandler<
   IngestionPullIntents
 > = (state, payload, ctx) => {
   const view = ingestionPullProcessEventViewSchema.parse(payload);
-  return settle(
-    {
+  return settle({
+    state: {
       ...state,
       currentRun:
         state.currentRun?.runId === view.runId ? null : state.currentRun,
     },
-    schedulingRef(ctx),
-  );
+    after: schedulingRef(ctx),
+  });
 };
 
 export const ingestionPullWake: WakeHandler<
@@ -189,19 +182,19 @@ export const ingestionPullWake: WakeHandler<
   const active =
     state.currentRun !== null &&
     ctx.now - state.currentRun.startedAt < INGESTION_PULL_STALE_RUN_MS;
-  if (active) return settle(state, ctx.now);
+  if (active) return settle({ state, after: ctx.now });
 
   // Identity comes from the slot the wake was scheduled for (`ctx.at`), never
   // the handling instant: a redelivered wake must mint the same runId, or it
   // would start a second pull over the same window.
   const runId = String(ctx.at);
-  return settle(
-    {
+  return settle({
+    state: {
       ...state,
       currentRun: { runId, scheduledFor: ctx.at, startedAt: ctx.now },
     },
-    ctx.now,
-    [
+    after: ctx.now,
+    intents: [
       ctx.intents.run(`pull:${runId}`, {
         sourceId: state.sourceId,
         runId,
@@ -209,5 +202,5 @@ export const ingestionPullWake: WakeHandler<
         cursor: state.cursor,
       }),
     ],
-  );
+  });
 };

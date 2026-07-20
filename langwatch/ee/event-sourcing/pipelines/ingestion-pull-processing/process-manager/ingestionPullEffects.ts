@@ -125,7 +125,9 @@ export function createIngestionPullRunHandler(
         scheduledFor: payload.scheduledFor,
         error: detail,
         errorCode: "pull_failed",
-        retryable: true,
+        // Retries are exhausted — nothing will retry THIS run. The next
+        // scheduled wake starts a fresh run from the durable cursor.
+        retryable: false,
       });
       return;
     }

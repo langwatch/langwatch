@@ -31,7 +31,7 @@ import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
-import { assertValidPullSchedule } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPull.process";
+import { assertValidPullSchedule } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
 import { syncIngestionPullSource } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import { encryptParserConfigCredentials } from "./ingestionCredentials";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "./ingestionSource.constants";
@@ -99,10 +99,13 @@ export interface CreatedIngestionSource {
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 const logger = createLogger("langwatch:governance:ingestion-source");
 
-async function syncPullProcessBestEffort(
-  prisma: PrismaClient,
-  source: IngestionSource,
-): Promise<void> {
+async function syncPullProcessBestEffort({
+  prisma,
+  source,
+}: {
+  prisma: PrismaClient;
+  source: IngestionSource;
+}): Promise<void> {
   try {
     await syncIngestionPullSource({
       prisma,
@@ -266,7 +269,7 @@ export class IngestionSourceService {
       },
     });
     if (source.pullSchedule) {
-      await syncPullProcessBestEffort(this.prisma, source);
+      await syncPullProcessBestEffort({ prisma: this.prisma, source });
     }
     return { source, ingestSecret };
   }
@@ -304,7 +307,7 @@ export class IngestionSourceService {
       data,
     });
     if (existing.pullSchedule !== null || source.pullSchedule !== null) {
-      await syncPullProcessBestEffort(this.prisma, source);
+      await syncPullProcessBestEffort({ prisma: this.prisma, source });
     }
     return source;
   }
@@ -357,7 +360,7 @@ export class IngestionSourceService {
       data: { archivedAt: new Date(), status: "disabled" },
     });
     if (source.pullSchedule) {
-      await syncPullProcessBestEffort(this.prisma, source);
+      await syncPullProcessBestEffort({ prisma: this.prisma, source });
     }
     return source;
   }

@@ -7,11 +7,11 @@ import type { TopicRepository } from "./repositories/topic.repository";
 export class TopicService {
   constructor(private readonly repository: TopicRepository) {}
 
-  async getNamesByIds(
-    projectId: string,
-    ids: readonly string[],
-  ): Promise<Map<string, string>> {
-    return this.repository.findNamesByIds(projectId, ids);
+  async getNamesByIds(params: {
+    projectId: string;
+    ids: readonly string[];
+  }): Promise<Map<string, string>> {
+    return this.repository.findNamesByIds(params);
   }
 
   async getAll(params: { projectId: string }) {

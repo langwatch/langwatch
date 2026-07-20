@@ -1,8 +1,11 @@
+import { createLogger } from "@langwatch/observability";
 import type { IngestionSource, PrismaClient } from "@prisma/client";
 import {
   ensureHiddenGovernanceProject,
   PROJECT_KIND,
 } from "../governanceProject.service";
+
+const logger = createLogger("langwatch:governance:ingestion-pull-lifecycle");
 
 export interface IngestionPullLifecycleCommands {
   configure(args: {
@@ -101,8 +104,17 @@ export async function reconcileIngestionPullProcesses(params: {
     try {
       await syncIngestionPullSource({ ...params, source });
       reconciled += 1;
-    } catch {
+    } catch (error) {
       failed += 1;
+      // The aggregate count alone strands an operator: name the source and
+      // the reason so a nonzero `failed` is actionable.
+      logger.warn(
+        {
+          sourceId: source.id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Reconciling this ingestion source's pull process failed; the next boot retries it",
+      );
     }
   }
   return { reconciled, failed };

@@ -5,10 +5,10 @@
  */
 export interface TopicRepository {
   /** Returns a map of topicId -> name. Missing IDs are simply absent. */
-  findNamesByIds(
-    projectId: string,
-    ids: readonly string[],
-  ): Promise<Map<string, string>>;
+  findNamesByIds(params: {
+    projectId: string;
+    ids: readonly string[];
+  }): Promise<Map<string, string>>;
   findAll(params: { projectId: string }): Promise<
     Array<{
       id: string;

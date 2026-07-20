@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
@@ -28,25 +30,29 @@ import {
  * the whole contract with the UI, and the raw text stays in the run-status
  * projection for operators.
  */
-export interface TopicClusteringRunHistoryEntry {
-  runId: string;
+export const topicClusteringRunHistoryEntrySchema = z.object({
+  runId: z.string(),
   /** manual | bootstrap-scheduled runs both read as "scheduled" here. */
-  trigger: string;
+  trigger: z.string(),
   /** Business time of the run's first observed event. */
-  startedAt: number;
+  startedAt: z.number(),
   /** Business time of the terminal event; null while running/abandoned. */
-  finishedAt: number | null;
+  finishedAt: z.number().nullable(),
   /** running | completed | skipped | failed | abandoned */
-  outcome: string;
-  mode: string | null;
-  skippedReason: string | null;
-  errorCode: string | null;
-  isErrorUserActionable: boolean;
-  tracesProcessed: number;
-  topicsCount: number;
-  subtopicsCount: number;
-  pages: number;
-}
+  outcome: z.string(),
+  mode: z.string().nullable(),
+  skippedReason: z.string().nullable(),
+  errorCode: z.string().nullable(),
+  isErrorUserActionable: z.boolean(),
+  tracesProcessed: z.number(),
+  topicsCount: z.number(),
+  subtopicsCount: z.number(),
+  pages: z.number(),
+});
+
+export type TopicClusteringRunHistoryEntry = z.infer<
+  typeof topicClusteringRunHistoryEntrySchema
+>;
 
 /**
  * Per-project run history (audit read model): the recent runs, newest first,

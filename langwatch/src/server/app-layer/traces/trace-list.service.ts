@@ -490,7 +490,7 @@ export class TraceListService {
   ): Promise<CategoricalFacetResult> {
     const ids = result.values.map((v) => v.value).filter(Boolean);
     if (ids.length === 0) return result;
-    const names = await this.topicService.getNamesByIds(projectId, ids);
+    const names = await this.topicService.getNamesByIds({ projectId, ids });
     return {
       ...result,
       values: result.values.map((v) => {

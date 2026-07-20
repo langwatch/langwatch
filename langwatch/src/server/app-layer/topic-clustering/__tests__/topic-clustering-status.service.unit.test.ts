@@ -110,7 +110,10 @@ describe("TopicClusteringStatusService", () => {
      */
     it("reports the run as in flight", async () => {
       const status = await serviceReading({
-        projection: projectionRow({ LastRequestedAt: NOW - 5_000, LastRequestTrigger: "manual" }),
+        projection: projectionRow({
+          LastRequestedAt: NOW - 5_000,
+          LastRequestTrigger: "manual",
+        }),
       }).getByProjectId({ projectId: PROJECT_ID });
 
       expect(status.isRunInFlight).toBe(true);
@@ -317,7 +320,10 @@ describe("TopicClusteringStatusService", () => {
   describe("when the manual trigger asks whether a run is already underway", () => {
     it("answers yes while a request is outstanding", async () => {
       const service = serviceReading({
-        projection: projectionRow({ LastRequestedAt: NOW - 5_000, LastRequestTrigger: "manual" }),
+        projection: projectionRow({
+          LastRequestedAt: NOW - 5_000,
+          LastRequestTrigger: "manual",
+        }),
       });
 
       await expect(
@@ -360,43 +366,56 @@ describe("TopicClusteringStatusService run history", () => {
   };
 
   describe("given recorded runs", () => {
-    it("returns them unchanged, newest first", async () => {
-      const runs = await serviceWithHistory([finishedRun]).getRunHistoryByProjectId(
-        { projectId: PROJECT_ID },
-      );
-      expect(runs).toEqual([finishedRun]);
+    describe("when the history is read", () => {
+      it("returns them in the stored order, newest first", async () => {
+        const olderRun = {
+          ...finishedRun,
+          runId: "20260719T093000",
+          startedAt: finishedRun.startedAt - 86_400_000,
+          finishedAt: (finishedRun.finishedAt ?? 0) - 86_400_000,
+        };
+        const runs = await serviceWithHistory([
+          finishedRun,
+          olderRun,
+        ]).getRunHistoryByProjectId({ projectId: PROJECT_ID });
+        expect(runs).toEqual([finishedRun, olderRun]);
+      });
     });
   });
 
   describe("given a run still reading as running inside the stale window", () => {
-    it("keeps presenting it as running", async () => {
-      const running = {
-        ...finishedRun,
-        runId: "run-live",
-        outcome: "running",
-        finishedAt: null,
-        startedAt: NOW - 60_000,
-      };
-      const runs = await serviceWithHistory([running]).getRunHistoryByProjectId(
-        { projectId: PROJECT_ID },
-      );
-      expect(runs[0]?.outcome).toBe("running");
+    describe("when the history is read", () => {
+      it("keeps presenting it as running", async () => {
+        const running = {
+          ...finishedRun,
+          runId: "run-live",
+          outcome: "running",
+          finishedAt: null,
+          startedAt: NOW - 60_000,
+        };
+        const runs = await serviceWithHistory([
+          running,
+        ]).getRunHistoryByProjectId({ projectId: PROJECT_ID });
+        expect(runs[0]?.outcome).toBe("running");
+      });
     });
   });
 
   describe("given a running entry older than the stale-run window", () => {
-    it("presents it as abandoned so the UI never shows it working forever", async () => {
-      const wedged = {
-        ...finishedRun,
-        runId: "run-wedged",
-        outcome: "running",
-        finishedAt: null,
-        startedAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS - 1,
-      };
-      const runs = await serviceWithHistory([wedged]).getRunHistoryByProjectId({
-        projectId: PROJECT_ID,
+    describe("when the history is read", () => {
+      it("presents it as abandoned so the UI never shows it working forever", async () => {
+        const wedged = {
+          ...finishedRun,
+          runId: "run-wedged",
+          outcome: "running",
+          finishedAt: null,
+          startedAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS - 1,
+        };
+        const runs = await serviceWithHistory([
+          wedged,
+        ]).getRunHistoryByProjectId({ projectId: PROJECT_ID });
+        expect(runs[0]?.outcome).toBe("abandoned");
       });
-      expect(runs[0]?.outcome).toBe("abandoned");
     });
   });
 });

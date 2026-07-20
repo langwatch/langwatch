@@ -35,6 +35,18 @@ export const pullScheduleSchema = z
     }
   });
 
+/** The imperative faces of pullScheduleSchema — one validator, three shapes. */
+export function assertValidPullSchedule(cron: string): void {
+  const parsed = pullScheduleSchema.safeParse(cron);
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "invalid pull schedule");
+  }
+}
+
+export function isValidPullSchedule(cron: string): boolean {
+  return pullScheduleSchema.safeParse(cron).success;
+}
+
 export const ingestionPullConfiguredEventDataSchema = sourceEnvelope.extend({
   // Deliberately permissive on the read path: a cron that slipped into the
   // log before write-side validation existed must still parse so replays

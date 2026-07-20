@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { IntentSpec } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 
-export const INGESTION_PULL_PROCESS_NAME = "ingestionPull" as const;
+export const INGESTION_PULL_PROCESS_NAME = "ingestionPull";
 
 export const INGESTION_PULL_PROCESS_INTENT_TYPES = {
   /**

@@ -11,7 +11,7 @@ import {
   ingestionPullRunFailedEventDataSchema,
 } from "./schemas/events";
 
-const identity = (sourceId: string, suffix: string) =>
+const identity = ({ sourceId, suffix }: { sourceId: string; suffix: string }) =>
   `${sourceId}:ingestion_pull:${suffix}`;
 
 export const ConfigureIngestionPullCommand = defineCommand({
@@ -22,12 +22,18 @@ export const ConfigureIngestionPullCommand = defineCommand({
   schema: ingestionPullConfiguredCommandDataSchema,
   aggregateId: (data) => data.sourceId,
   idempotencyKey: (data) =>
-    identity(data.sourceId, `configure:${data.configVersion}`),
+    identity({
+      sourceId: data.sourceId,
+      suffix: `configure:${data.configVersion}`,
+    }),
   spanAttributes: (data) => ({
     "payload.source_id": data.sourceId,
   }),
   makeJobId: (data) =>
-    identity(data.sourceId, `configure:${data.configVersion}`),
+    identity({
+      sourceId: data.sourceId,
+      suffix: `configure:${data.configVersion}`,
+    }),
 });
 
 export const DisableIngestionPullCommand = defineCommand({
@@ -38,11 +44,18 @@ export const DisableIngestionPullCommand = defineCommand({
   schema: ingestionPullDisabledEventDataSchema,
   aggregateId: (data) => data.sourceId,
   idempotencyKey: (data) =>
-    identity(data.sourceId, `disable:${data.configVersion}`),
+    identity({
+      sourceId: data.sourceId,
+      suffix: `disable:${data.configVersion}`,
+    }),
   spanAttributes: (data) => ({
     "payload.source_id": data.sourceId,
   }),
-  makeJobId: (data) => identity(data.sourceId, `disable:${data.configVersion}`),
+  makeJobId: (data) =>
+    identity({
+      sourceId: data.sourceId,
+      suffix: `disable:${data.configVersion}`,
+    }),
 });
 
 export const RecordIngestionPullRunCompletedCommand = defineCommand({
@@ -52,13 +65,15 @@ export const RecordIngestionPullRunCompletedCommand = defineCommand({
   aggregateType: "ingestion_pull",
   schema: ingestionPullRunCompletedEventDataSchema,
   aggregateId: (data) => data.sourceId,
-  idempotencyKey: (data) => identity(data.sourceId, `${data.runId}:completed`),
+  idempotencyKey: (data) =>
+    identity({ sourceId: data.sourceId, suffix: `${data.runId}:completed` }),
   spanAttributes: (data) => ({
     "payload.source_id": data.sourceId,
     "payload.run_id": data.runId,
     "payload.event_count": data.eventCount,
   }),
-  makeJobId: (data) => identity(data.sourceId, `${data.runId}:completed`),
+  makeJobId: (data) =>
+    identity({ sourceId: data.sourceId, suffix: `${data.runId}:completed` }),
 });
 
 export const RecordIngestionPullRunFailedCommand = defineCommand({
@@ -68,10 +83,12 @@ export const RecordIngestionPullRunFailedCommand = defineCommand({
   aggregateType: "ingestion_pull",
   schema: ingestionPullRunFailedEventDataSchema,
   aggregateId: (data) => data.sourceId,
-  idempotencyKey: (data) => identity(data.sourceId, `${data.runId}:failed`),
+  idempotencyKey: (data) =>
+    identity({ sourceId: data.sourceId, suffix: `${data.runId}:failed` }),
   spanAttributes: (data) => ({
     "payload.source_id": data.sourceId,
     "payload.run_id": data.runId,
   }),
-  makeJobId: (data) => identity(data.sourceId, `${data.runId}:failed`),
+  makeJobId: (data) =>
+    identity({ sourceId: data.sourceId, suffix: `${data.runId}:failed` }),
 });
