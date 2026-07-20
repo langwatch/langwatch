@@ -165,6 +165,10 @@ const DRAFTS_KEY = "langwatch:traces-v2:drafts:v1";
 // restores the last-used view instead of snapping back to All.
 export const ACTIVE_LENS_KEY = "langwatch:traces-v2:active-lens:v1";
 
+/**
+ * The last-used lens id from the global cross-project key, or `null` when it
+ * is unset, on the server, or when storage is unavailable.
+ */
 export function getPersistedActiveLensId(): string | null {
   if (typeof window === "undefined") return null;
   try {
@@ -174,6 +178,10 @@ export function getPersistedActiveLensId(): string | null {
   }
 }
 
+/**
+ * Records the last-used lens id in the global cross-project key. A no-op on the
+ * server or when storage is full/disabled, so callers never need to guard.
+ */
 function persistActiveLensId(id: string): void {
   if (typeof window === "undefined") return;
   try {
