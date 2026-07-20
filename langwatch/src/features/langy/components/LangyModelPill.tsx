@@ -1,7 +1,7 @@
 import {
   Box,
-  chakra,
   Combobox,
+  chakra,
   createListCollection,
   HStack,
   Portal,
@@ -22,6 +22,7 @@ import {
 import { useMemo, useState } from "react";
 import { useModelSelectionOptions } from "~/components/ModelSelector";
 import { Tooltip } from "~/components/ui/tooltip";
+import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import {
   modelProviderIcons,
   ProviderIconGlyph,
@@ -117,10 +118,13 @@ export function LangyModelPill({
   /** Lock the picker (e.g. while a turn is in flight) — greyed, can't open. */
   disabled?: boolean;
 }) {
+  // Langy is a licensed codex surface: declaring `langy.chat` re-admits
+  // codex models the shared hook fail-closes everywhere else.
   const { selectOptions, modelOption } = useModelSelectionOptions(
     options,
     model,
     "chat",
+    { featureKey: LANGY_CHAT_FEATURE_KEY },
   );
   const currentProvider = model.split("/")[0] ?? "";
   const hasCurrentProvider = currentProvider in modelProviderIcons;

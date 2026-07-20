@@ -26,23 +26,25 @@
 
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { Tooltip } from "~/components/ui/tooltip";
 import { useCallback, useEffect, useMemo, useState } from "react";
-
 import { modelSelectorOptions } from "~/components/ModelSelector";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
-import { api, type RouterOutputs } from "~/utils/api";
-
+import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+  isModelAllowedAsRoleDefault,
+  isModelAllowedForFeature,
+} from "~/server/modelProviders/codexRestrictions";
 import { buildCustomModelDisplayNames } from "~/server/modelProviders/customModelDisplayNames";
 import { LATEST_ALIAS_PROVIDERS } from "~/server/modelProviders/latestAliases";
-import { INHERIT_SENTINEL, ProviderModelSelector } from "./ProviderModelSelector";
+import { api, type RouterOutputs } from "~/utils/api";
 import {
-  ScopeChipPicker,
-  type ScopeTriadEntry,
-} from "./ScopeChipPicker";
+  INHERIT_SENTINEL,
+  ProviderModelSelector,
+} from "./ProviderModelSelector";
+import { ScopeChipPicker, type ScopeTriadEntry } from "./ScopeChipPicker";
 
 type Payload = RouterOutputs["modelProvider"]["getDefaultModelsForProject"];
 type ConfigRow = Payload["configs"][number];
@@ -64,6 +66,27 @@ const ROLE_BLURB: Record<ModelRoleKey, string> = {
   FAST: "Background and assistive surfaces like search, autocomplete, commit messages, topic clustering.",
   EMBEDDINGS: "Semantic vectors used by topic clustering and similar features.",
 };
+
+/**
+ * Restricted-provider gating for the drawer's pickers (codex is the only
+ * restricted provider today). A role-level default applies across every
+ * feature in the role, so restricted models are never offered there; a
+ * feature-override row re-admits them only when its own feature key is
+ * licensed to run them. Exported for tests.
+ */
+export function roleSelectModelOptions(options: string[]): string[] {
+  return options.filter((model) => isModelAllowedAsRoleDefault(model));
+}
+
+export function featureRowModelOptions({
+  options,
+  featureKey,
+}: {
+  options: string[];
+  featureKey: string;
+}): string[] {
+  return options.filter((model) => isModelAllowedForFeature(model, featureKey));
+}
 
 interface Props {
   /** Config id when editing an existing policy; absent = create. The
@@ -156,22 +179,21 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     setExpanded({ DEFAULT: false, FAST: false, EMBEDDINGS: false });
   }, [open, editing]);
 
-  const inheritedQuery =
-    api.modelProvider.getInheritedValuesForScopes.useQuery(
-      {
-        projectId: project?.id ?? "",
-        scopes: scopes.map((s) => ({
-          scopeType: s.scopeType,
-          scopeId: s.scopeId,
-        })),
-        excludeConfigId: editing?.id,
-      },
-      {
-        // Need at least one picked scope to anchor the cascade walk
-        // and the editing target should be settled.
-        enabled: !!project?.id && scopes.length > 0 && open,
-      },
-    );
+  const inheritedQuery = api.modelProvider.getInheritedValuesForScopes.useQuery(
+    {
+      projectId: project?.id ?? "",
+      scopes: scopes.map((s) => ({
+        scopeType: s.scopeType,
+        scopeId: s.scopeId,
+      })),
+      excludeConfigId: editing?.id,
+    },
+    {
+      // Need at least one picked scope to anchor the cascade walk
+      // and the editing target should be settled.
+      enabled: !!project?.id && scopes.length > 0 && open,
+    },
+  );
   const inherited = inheritedQuery.data?.inherited ?? {};
 
   const featuresByRole = useMemo(() => {
@@ -203,11 +225,8 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     const isLoading = projectProviders.isLoading;
     const hasProviderLoadError = projectProviders.isError;
     const providers = projectProviders.data?.providers ?? [];
-    const enabledEntries: Array<
-      [string, (typeof providers)[number]]
-    > = providers
-      .filter((p) => p.enabled === true)
-      .map((p) => [p.provider, p]);
+    const enabledEntries: Array<[string, (typeof providers)[number]]> =
+      providers.filter((p) => p.enabled === true).map((p) => [p.provider, p]);
     const enabledKeys = new Set(enabledEntries.map(([k]) => k));
     // Build the alias entries for enabled providers that support them.
     // Aliases sit at the TOP of the chat list (DEFAULT + FAST) so the
@@ -252,8 +271,8 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
         if (!providerData) continue;
         const customList =
           mode === "embedding"
-            ? providerData.customEmbeddingsModels ?? []
-            : providerData.customModels ?? [];
+            ? (providerData.customEmbeddingsModels ?? [])
+            : (providerData.customModels ?? []);
         for (const m of customList) {
           if (m?.modelId) customModels.push(`${providerKey}/${m.modelId}`);
         }
@@ -485,7 +504,7 @@ function RoleRow({
         <Box width="240px" flexShrink={0}>
           <ProviderModelSelector
             model={current}
-            options={modelOptions}
+            options={roleSelectModelOptions(modelOptions)}
             onChange={(m) => onSetOverride(role, m)}
             inheritOption={inheritOption}
             disabled={unsupportedAtScope}
@@ -516,9 +535,9 @@ function RoleRow({
           paddingBottom={1}
           data-testid="role-row-embeddings-unsupported-hint"
         >
-          No provider configured at this scope ships an embedding API.
-          Add an embedding-capable provider (OpenAI, Voyage, Cohere) to
-          unlock topic clustering and semantic search.
+          No provider configured at this scope ships an embedding API. Add an
+          embedding-capable provider (OpenAI, Voyage, Cohere) to unlock topic
+          clustering and semantic search.
         </Text>
       )}
       {canExpand && expanded && (
@@ -604,11 +623,7 @@ function FeatureRow({
         : undefined);
   }
   return (
-    <HStack
-      gap={2}
-      align="center"
-      data-testid={`feature-row-${feature.key}`}
-    >
+    <HStack gap={2} align="center" data-testid={`feature-row-${feature.key}`}>
       {/* Feature description tooltip lives on the label. Layout
           mirrors the parent role row: label left, big spacer, selector
           right-aligned, expand-slot reserved for alignment with the
@@ -622,7 +637,10 @@ function FeatureRow({
       <Box width="240px" flexShrink={0}>
         <ProviderModelSelector
           model={override}
-          options={modelOptions}
+          options={featureRowModelOptions({
+            options: modelOptions,
+            featureKey: feature.key,
+          })}
           onChange={(m) => onSetOverride(feature.key, m)}
           inheritOption={inheritOption ?? undefined}
           displayNames={displayNames}
