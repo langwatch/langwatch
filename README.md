@@ -75,6 +75,9 @@ Run LangWatch on your own infrastructure:
 - [Docker Compose](https://docs.langwatch.ai/self-hosting/open-source#docker-compose) - Run LangWatch on your own machine.
 - [Kubernetes (Helm)](https://docs.langwatch.ai/self-hosting/open-source#helm-chart-for-langwatch) - Run LangWatch on a Kubernetes cluster using Helm.
 - [OnPrem](https://docs.langwatch.ai/self-hosting/onprem) - Cloud-specific setups for AWS, Google Cloud, and Azure.
+- [Railway](https://railway.com/deploy/langwatch-ai-observability) - One-click deploy of the full stack (app, workers, ClickHouse, Postgres, Redis) on Railway.
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/langwatch-ai-observability)
 
 <details>
 <summary>Hybrid (OnPrem data) 🔀</summary>
