@@ -26,30 +26,24 @@
  * and the explicit refusal keeps it that way if that ever changes.
  */
 
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { checkProjectPermission, isDemoProjectId } from "~/server/api/rbac";
+import { checkProjectPermission } from "~/server/api/rbac";
 import { auditLog } from "~/server/auditLog";
 import {
   langyEgressAllowlistSchema,
   LangyCredentialService,
 } from "~/server/app-layer/langy/LangyCredentialService";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { enforceLangyAccess } from "./langyAccessMiddleware";
+import {
+  enforceLangyAccess,
+  refuseDemoProject,
+} from "./langyAccessMiddleware";
 
 export const langyEgressRouter = createTRPCRouter({
   get: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("langy:view"))
-    .use(async ({ input, next }) => {
-      if (isDemoProjectId(input.projectId)) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Langy is not available on the demo project.",
-        });
-      }
-      return next();
-    })
+    .use(refuseDemoProject)
     .use(enforceLangyAccess)
     .query(async ({ ctx, input }) => {
       const service = LangyCredentialService.create(ctx.prisma);
@@ -69,15 +63,7 @@ export const langyEgressRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("langy:manage"))
-    .use(async ({ input, next }) => {
-      if (isDemoProjectId(input.projectId)) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Langy is not available on the demo project.",
-        });
-      }
-      return next();
-    })
+    .use(refuseDemoProject)
     .use(enforceLangyAccess)
     .mutation(async ({ ctx, input }) => {
       const service = LangyCredentialService.create(ctx.prisma);

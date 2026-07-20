@@ -23,8 +23,11 @@ import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/lan
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
 import { connection } from "~/server/redis";
-import { checkProjectPermission, isDemoProjectId, type Permission } from "../rbac";
-import { enforceLangyAccess } from "./langyAccessMiddleware";
+import { checkProjectPermission, type Permission } from "../rbac";
+import {
+  enforceLangyAccess,
+  refuseDemoProject,
+} from "./langyAccessMiddleware";
 import {
   type LangyConversationDetailDto,
   type LangyConversationListCursorDto,
@@ -82,15 +85,7 @@ const langyProcedure = (permission: Permission) =>
   protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission(permission))
-    .use(async ({ input, next }) => {
-      if (isDemoProjectId(input.projectId)) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Langy is not available on the demo project.",
-        });
-      }
-      return next();
-    })
+    .use(refuseDemoProject)
     .use(enforceLangyAccess);
 
 const langyReadProcedure = langyProcedure("langy:view");
@@ -547,7 +542,11 @@ export const langyRouter = createTRPCRouter({
    * granted permission to inspect the full conversation for debugging — the
    * consent flag only; acting on it is a separate, gated flow.
    */
-  recordFeedback: langyReadProcedure
+  // A write (it captures analytics and — per the documented follow-up — is
+  // meant to write a feedback event onto the conversation's trace), so it
+  // wants `langy:create`, not the read grant, matching the "reads want view,
+  // writes want create" doctrine the router documents.
+  recordFeedback: langyCreateProcedure
     .input(
       z.object({
         conversationId: z.string().optional(),
@@ -561,14 +560,45 @@ export const langyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }): Promise<void> => {
+      // Only attach ids the caller actually owns. An unverified conversationId
+      // /traceId would fabricate attribution today, and once the trace-event
+      // follow-up lands it would let a caller write forged feedback onto any
+      // trace. A conversationId the caller cannot see is dropped (not
+      // rejected) so a genuine feedback ping still records its rating — it
+      // just carries no cross-user attribution.
+      let conversationId = input.conversationId;
+      if (conversationId) {
+        const conv = await getApp().langy.conversations.findByIdVisible({
+          id: conversationId,
+          projectId: input.projectId,
+          userId: ctx.session.user.id,
+        });
+        if (!conv) {
+          logger.warn(
+            {
+              projectId: input.projectId,
+              conversationId,
+              userId: ctx.session.user.id,
+            },
+            "dropping langy feedback ids for a conversation the caller cannot see",
+          );
+          conversationId = undefined;
+        }
+      }
+      // traceId is only trustworthy insofar as it belongs to a conversation
+      // the caller owns; without a verified conversation it is dropped too, so
+      // feedback can never be pinned to an arbitrary trace.
+      const traceId = conversationId ? input.traceId : undefined;
+      const messageId = conversationId ? input.messageId : undefined;
+
       trackServerEvent({
         userId: ctx.session.user.id,
         event: "langy_feedback",
         projectId: input.projectId,
         properties: {
-          conversationId: input.conversationId,
-          messageId: input.messageId,
-          traceId: input.traceId,
+          conversationId,
+          messageId,
+          traceId,
           rating: input.rating,
           sentiment: input.sentiment,
           comment: input.comment,
