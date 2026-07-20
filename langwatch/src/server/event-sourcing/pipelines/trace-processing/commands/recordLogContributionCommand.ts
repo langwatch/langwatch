@@ -48,6 +48,12 @@ export class RecordLogContributionCommand
           input: data.input,
           output: data.output,
           liftedAttributes: data.liftedAttributes,
+          ...(data.codingAgentAttributes !== undefined
+            ? { codingAgentAttributes: data.codingAgentAttributes }
+            : {}),
+          ...(data.sessionTitle !== undefined
+            ? { sessionTitle: data.sessionTitle }
+            : {}),
           nonBillable: data.nonBillable,
           piiRedactionLevel: data.piiRedactionLevel,
         },
