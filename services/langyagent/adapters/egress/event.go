@@ -1,6 +1,14 @@
 package egress
 
-import "go.uber.org/zap"
+import (
+	"context"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
+	"go.uber.org/zap"
+)
 
 // egressDecision is the verb attached to every observed outbound flow. Rung 0
 // (ADR-043) makes every enforcement action ALSO a monitored event, so a
@@ -64,24 +72,52 @@ type egressMonitor interface {
 }
 
 // logEgressMonitor is the default monitor: it emits every decision to the pod
-// log, so "every enforcement action is a monitored event" holds out of the box.
+// log AND bumps the langy.egress.decisions counter, so "every enforcement
+// action is a monitored event" holds out of the box and allow/deny/throttle
+// rates are graphable without log scraping.
 type logEgressMonitor struct {
-	log *zap.Logger
+	log       *zap.Logger
+	decisions metric.Int64Counter
 }
 
 // newLogEgressMonitor returns the default egress monitor, which reports each
 // decision to the service log. It is the fallback when no richer sink is wired.
 func newLogEgressMonitor(log *zap.Logger) *logEgressMonitor {
-	return &logEgressMonitor{log: log}
+	return &logEgressMonitor{log: log, decisions: newEgressDecisionCounter()}
+}
+
+// newEgressDecisionCounter builds the decision counter on the same global
+// meter as internal/telemetry's instruments (ADR-047: egress monitoring hangs
+// off the manager's one meter). The noop fallback mirrors the relay's
+// drop counter: telemetry must never be the reason egress breaks.
+func newEgressDecisionCounter() metric.Int64Counter {
+	const name = "langy.egress.decisions"
+	counter, err := otel.Meter("langwatch-langyagent").Int64Counter(
+		name,
+		metric.WithDescription("Count of worker egress decisions, tagged by the decision verb (allowed_floor / allowed_monitor / allowed_listed / throttled / denied*)."),
+	)
+	if err == nil {
+		return counter
+	}
+	fallback, _ := noop.NewMeterProvider().Meter("langwatch-langyagent").Int64Counter(name)
+	return fallback
 }
 
 // record emits one structured line per egress decision — allowed or refused —
 // so a tenant's outbound attempts stay auditable. Host and port are recorded;
 // request contents and credentials deliberately are not. A nil monitor or nil
 // logger is a no-op so callers never have to guard the call site.
+//
+// The metric carries only the bounded decision verb: host and conversation id
+// are unbounded attribute values that belong in the log line, not a counter.
 func (m *logEgressMonitor) record(e egressEvent) {
 	if m == nil || m.log == nil {
 		return
+	}
+	if m.decisions != nil {
+		m.decisions.Add(context.Background(), 1, metric.WithAttributes(
+			attribute.String("decision", string(e.Decision)),
+		))
 	}
 	m.log.Info("langy egress",
 		zap.String("conversation", e.ConversationID),

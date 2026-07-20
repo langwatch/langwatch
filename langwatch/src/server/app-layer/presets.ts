@@ -1182,12 +1182,21 @@ export function initializeDefaultApp(options?: {
       ),
       topics,
     },
+    // traced() gives every service call a `ClassName.method` span, same as
+    // the rest of the app bag. Per-method, not per-frame: the streaming hot
+    // paths (token buffer, relay frames) stay span-free by design.
     langy: {
-      conversations: langyConversations,
-      turns: langyTurns,
-      messages: langyMessages,
-      githubInstallations: langyGithubInstallations,
-      credentials: LangyCredentialService.create(prisma),
+      conversations: traced(langyConversations, "LangyConversationService"),
+      turns: traced(langyTurns, "LangyTurnService"),
+      messages: traced(langyMessages, "LangyMessageService"),
+      githubInstallations: traced(
+        langyGithubInstallations,
+        "LangyGithubInstallationsService",
+      ),
+      credentials: traced(
+        LangyCredentialService.create(prisma),
+        "LangyCredentialService",
+      ),
     },
     organizations,
     projects,

@@ -851,6 +851,87 @@ export const incrementEsFoldCacheRedisError = (
 ) => esFoldCacheRedisErrorTotal.labels(projectionName, operation).inc();
 
 // ============================================================================
+// Langy Metrics
+// ============================================================================
+//
+// Operational counters for the Langy turn flow. Per-tenant / per-conversation
+// attribution deliberately lives in the structured log lines next to each
+// increment, never as labels (see the cardinality doctrine above) — these
+// series answer "is Langy healthy fleet-wide?", the logs answer "which
+// tenant?".
+
+// One increment per turn-acceptance attempt at the admission boundary.
+register.removeSingleMetric("langwatch_langy_turns_total");
+const langyTurnsTotal = new Counter({
+  name: "langwatch_langy_turns_total",
+  help: "Langy turn-acceptance attempts by outcome at the admission boundary",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyTurnsCounter = (
+  outcome: "accepted" | "replay" | "busy" | "rejected" | "error",
+) => langyTurnsTotal.labels(outcome);
+
+// One increment per dispatch attempt to the agent manager.
+register.removeSingleMetric("langwatch_langy_dispatch_total");
+const langyDispatchTotal = new Counter({
+  name: "langwatch_langy_dispatch_total",
+  help: "Langy turn dispatches to the agent manager by outcome",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyDispatchCounter = (
+  outcome:
+    | "accepted"
+    | "busy"
+    | "credentials_required"
+    | "unavailable"
+    | "error",
+) => langyDispatchTotal.labels(outcome);
+
+// One increment per durable turn-result ingested on /api/internal/langy.
+register.removeSingleMetric("langwatch_langy_turn_results_total");
+const langyTurnResultsTotal = new Counter({
+  name: "langwatch_langy_turn_results_total",
+  help: "Durable Langy turn results ingested from the agent manager by outcome",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyTurnResultsCounter = (outcome: "completed" | "failed") =>
+  langyTurnResultsTotal.labels(outcome);
+
+// Incremented from the relay's per-connection tally when a frame stream ends.
+register.removeSingleMetric("langwatch_langy_relay_frames_total");
+const langyRelayFramesTotal = new Counter({
+  name: "langwatch_langy_relay_frames_total",
+  help: "Langy relay frames by processing result, summed per stream at close",
+  labelNames: ["result"] as const,
+});
+export const getLangyRelayFramesCounter = (
+  result: "applied" | "duplicate" | "rejected" | "terminal",
+) => langyRelayFramesTotal.labels(result);
+
+// Session-key lifecycle: minted per turn (when no live worker holds one),
+// revoked on turn end, reaped when the 6h TTL lapses.
+register.removeSingleMetric("langwatch_langy_session_keys_total");
+const langySessionKeysTotal = new Counter({
+  name: "langwatch_langy_session_keys_total",
+  help: "Langy session API keys by lifecycle operation",
+  labelNames: ["op"] as const,
+});
+export const getLangySessionKeysCounter = (
+  op: "minted" | "revoked" | "revoke_refused" | "reaped",
+) => langySessionKeysTotal.labels(op);
+
+// The message rate limit fails open on Redis trouble by design; a sustained
+// fail_open rate is a Redis outage worth alerting on without log grepping.
+register.removeSingleMetric("langwatch_langy_rate_limit_total");
+const langyRateLimitTotal = new Counter({
+  name: "langwatch_langy_rate_limit_total",
+  help: "Langy message rate-limit decisions that were not plain allows",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyRateLimitCounter = (outcome: "rejected" | "fail_open") =>
+  langyRateLimitTotal.labels(outcome);
+
+// ============================================================================
 // Stored Objects Metrics
 // ============================================================================
 

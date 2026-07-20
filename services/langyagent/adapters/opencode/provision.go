@@ -265,12 +265,12 @@ func (a *Agent) Spawn(ctx context.Context, in SpawnInput) (*exec.Cmd, error) {
 	cmd.Dir = in.Home
 	// Discard opencode's stdout/stderr. opencode emits LLM completions, tool
 	// outputs (env dumps, file contents), and the raw user prompt — all of which
-	// are the highest-density PII/secret surface in the worker. The OpenCode
-	// OTel plugin already exports structured spans (gen_ai.usage, tool spans)
-	// into the user's LangWatch project — that's the auditable telemetry
-	// channel. Pod stdout/stderr lands in cluster log storage with no
-	// per-conversation TTL and no redaction, so piping the same bytes there
-	// would re-leak everything OTel already structures.
+	// are the highest-density PII/secret surface in the worker. The auditable
+	// telemetry channel is the loopback OTel relay (adapters/otelrelay): the
+	// worker's OTLP spans are reparented onto the turn's trace and forwarded
+	// to the user's LangWatch project. Pod stdout/stderr lands in cluster log
+	// storage with no per-conversation TTL and no redaction, so piping the
+	// same bytes there would re-leak everything OTel already structures.
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 	cmd.SysProcAttr = in.Runner.SysProcAttr(in.UID)

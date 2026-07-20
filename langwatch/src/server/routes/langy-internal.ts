@@ -26,10 +26,14 @@ import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { ValidationError } from "@langwatch/handled-error";
 import { prisma } from "~/server/db";
+import {
+  getLangySessionKeysCounter,
+  getLangyTurnResultsCounter,
+} from "~/server/metrics";
 import { revokeLangySessionApiKey } from "~/server/app-layer/langy/langyApiKey";
 import { createLogger } from "@langwatch/observability";
 
-const logger = createLogger("langwatch:langy-internal");
+const logger = createLogger("langwatch:langy:internal");
 
 /**
  * Constant-time bearer check against the shared manager secret, applied as the
@@ -142,6 +146,20 @@ secured.access(langyInternalPolicy()).post("/turn/:turnId/result", async (c) => 
     errorCode: body.errorCode,
   });
 
+  // The durable completion of a turn — the one line that says a turn ended
+  // and how, attributable by ids and graphable by outcome.
+  getLangyTurnResultsCounter(body.status).inc();
+  logger.info(
+    {
+      projectId: body.projectId,
+      conversationId: body.conversationId,
+      turnId,
+      status: body.status,
+      ...(body.errorCode ? { errorCode: body.errorCode } : {}),
+    },
+    "langy turn result ingested",
+  );
+
   return c.json({ status: "accepted" }, 202);
 });
 
@@ -181,7 +199,10 @@ secured.access(langyInternalPolicy()).post("/credentials/revoke", async (c) => {
       return c.json({ outcome }, 404);
     case "refused":
       // The id resolved to a key that is not ours. Refused, and loud: this
-      // should never happen in normal operation.
+      // should never happen in normal operation. (The warn with the key id
+      // fires inside revokeLangySessionApiKey; the counter makes a sustained
+      // rate alertable.)
+      getLangySessionKeysCounter("revoke_refused").inc();
       return c.json({ error: "Not a Langy session key" }, 403);
   }
 });

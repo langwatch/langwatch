@@ -21,6 +21,8 @@
  */
 import type { Session } from "~/server/auth";
 import { createLogger } from "@langwatch/observability";
+import { trace } from "@opentelemetry/api";
+import { getLangyTurnsCounter } from "~/server/metrics";
 import { LangySessionKeyScopeError } from "~/server/app-layer/langy/langyApiKey";
 import type { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
 import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
@@ -168,19 +170,33 @@ export class LangyTurnService {
       turnId: turnIdForRequest(requestId),
     });
     if (admission.kind === "replay") {
+      getLangyTurnsCounter("replay").inc();
       return {
         conversationId: admission.conversationId,
         turnId: admission.turnId,
       };
     }
     if (admission.kind === "pending") {
+      getLangyTurnsCounter("rejected").inc();
       throw new LangyAgentUnavailableError(
         "This turn is already being prepared. Please retry shortly.",
       );
     }
     if (admission.kind === "busy") {
+      getLangyTurnsCounter("busy").inc();
       throw new LangyTurnInProgressError();
     }
+
+    // Enrich the ACTIVE span (the tRPC procedure span on the fast path, the
+    // outbox consumer span on recovery) rather than opening a new one: the ids
+    // are what make a turn findable in the trace store, and one enriched span
+    // beats another layer of nesting on an already-deep trace.
+    trace.getActiveSpan()?.setAttributes({
+      "tenant.id": projectId,
+      "langy.conversation.id": admission.conversationId,
+      "langy.turn.id": admission.turnId,
+      "user.id": userId,
+    });
 
     const conversation = {
       id: admission.conversationId,
@@ -374,7 +390,10 @@ export class LangyTurnService {
           }),
         ]);
       } catch (error) {
-        logger.error({ error }, "failed to prepare the langy turn");
+        logger.error(
+          { error, projectId, conversationId: conversation.id, turnId },
+          "failed to prepare the langy turn",
+        );
         throw new LangyAgentUnavailableError("Agent request failed");
       }
 
@@ -409,7 +428,10 @@ export class LangyTurnService {
             : {}),
         });
       } catch (error) {
-        logger.error({ error }, "failed to commit langy AcceptAgentTurn");
+        logger.error(
+          { error, projectId, conversationId: conversation.id, turnId },
+          "failed to commit langy AcceptAgentTurn",
+        );
         throw new LangyAgentUnavailableError("Agent request failed");
       }
 
@@ -456,8 +478,16 @@ export class LangyTurnService {
           });
       }
 
+      getLangyTurnsCounter("accepted").inc();
       return { conversationId: conversation.id, turnId };
     } catch (error) {
+      getLangyTurnsCounter(
+        error instanceof LangyTurnInProgressError
+          ? "busy"
+          : error instanceof LangyAgentUnavailableError
+            ? "rejected"
+            : "error",
+      ).inc();
       await attempt.abort();
       if (error instanceof LangySessionKeyScopeError) {
         throw new LangyInsufficientScopeError(error.message);

@@ -5,6 +5,7 @@ import { batchProjectPermissions, type Permission } from "~/server/api/rbac";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { getLangWatchTracer } from "langwatch";
+import { getLangySessionKeysCounter } from "~/server/metrics";
 
 const logger = createLogger("langwatch:langy:api-key");
 const tracer = getLangWatchTracer("langwatch.langy.api-key");
@@ -162,6 +163,7 @@ export async function revokeLangySessionApiKey({
     where: { id: apiKeyId },
     data: { revokedAt: new Date() },
   });
+  getLangySessionKeysCounter("revoked").inc();
   return "revoked";
 }
 
@@ -198,6 +200,12 @@ export async function reapExpiredLangySessionApiKeys({
     },
     data: { revokedAt: now },
   });
+  if (count > 0) {
+    // Reaped keys mean revoke-on-worker-death missed — a small steady rate is
+    // normal (SIGKILLed managers), a jump means the fast path is broken.
+    getLangySessionKeysCounter("reaped").inc(count);
+    logger.info({ count }, "reaped expired langy session keys");
+  }
   return count;
 }
 
@@ -365,5 +373,6 @@ export async function mintLangySessionApiKey({
       }),
   );
 
+  getLangySessionKeysCounter("minted").inc();
   return { token, apiKeyId: apiKey.id };
 }

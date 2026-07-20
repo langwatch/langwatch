@@ -130,6 +130,27 @@ function turnMessageId(turnId: string): string {
 }
 
 /**
+ * Module-level (not a method) so the traced() proxy in presets.ts never wraps
+ * it: it is sync and its results are spread/mapped — an async wrapper would
+ * silently turn them into Promises.
+ */
+function toListItem(
+  row: LangyConversationRow,
+  userId: string,
+): ConversationListItem {
+  return {
+    id: row.id,
+    title: row.title,
+    isShared: row.isShared,
+    isOwn: row.userId === userId,
+    lastActivityAt: new Date(
+      row.lastActivityAtMs > 0 ? row.lastActivityAtMs : row.createdAtMs,
+    ),
+    messageCount: row.messageCount,
+  };
+}
+
+/**
  * Langy application service. Reads come from the Postgres operational
  * projection; writes remain event-sourcing commands.
  */
@@ -139,22 +160,6 @@ export class LangyConversationService {
     private readonly commands: LangyConversationCommands,
     private readonly messages: LangyMessageRepository = new NullLangyMessageRepository(),
   ) {}
-
-  private toListItem(
-    row: LangyConversationRow,
-    userId: string,
-  ): ConversationListItem {
-    return {
-      id: row.id,
-      title: row.title,
-      isShared: row.isShared,
-      isOwn: row.userId === userId,
-      lastActivityAt: new Date(
-        row.lastActivityAtMs > 0 ? row.lastActivityAtMs : row.createdAtMs,
-      ),
-      messageCount: row.messageCount,
-    };
-  }
 
   /**
    * A conversation the caller may see.
@@ -193,7 +198,7 @@ export class LangyConversationService {
     });
     if (!row) throw new LangyConversationNotFoundError(id);
     return {
-      ...this.toListItem(row, userId),
+      ...toListItem(row, userId),
       status: row.status,
       lastError: row.lastError,
     };
@@ -238,7 +243,7 @@ export class LangyConversationService {
       userId,
       limit,
     });
-    return rows.map((r) => this.toListItem(r, userId));
+    return rows.map((r) => toListItem(r, userId));
   }
 
   /**
@@ -276,7 +281,7 @@ export class LangyConversationService {
         : last.cursorActivityAtMs;
 
     return {
-      items: pageRows.map((row) => this.toListItem(row, userId)),
+      items: pageRows.map((row) => toListItem(row, userId)),
       nextCursor:
         hasMore && last
           ? { lastActivityAtMs: rawCursorActivity, id: last.id }

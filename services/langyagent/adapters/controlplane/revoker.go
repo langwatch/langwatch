@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // Revoker asks the control plane to revoke a Langy session key.
@@ -37,7 +39,13 @@ func NewRevoker(internalSecret string, timeout time.Duration) *Revoker {
 		timeout = 5 * time.Second
 	}
 	return &Revoker{
-		client:         &http.Client{Timeout: timeout},
+		// otelhttp injects traceparent (and opens a CLIENT span), so the
+		// control plane's ingest joins the turn's trace instead of starting
+		// a fresh one.
+		client: &http.Client{
+			Timeout:   timeout,
+			Transport: otelhttp.NewTransport(nil),
+		},
 		internalSecret: internalSecret,
 	}
 }

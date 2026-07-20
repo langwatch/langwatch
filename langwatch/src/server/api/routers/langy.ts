@@ -1,5 +1,6 @@
 import { on } from "node:events";
 import { TRPCError } from "@trpc/server";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
@@ -16,6 +17,7 @@ import {
 } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
+
 import type { Session } from "~/server/auth";
 import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
@@ -35,6 +37,8 @@ import {
   langyMessageRoleSchema,
   langyMessageSchema,
 } from "./langy.schemas";
+
+const logger = createLogger("langwatch:langy:router");
 
 /**
  * Read-side tRPC router for Langy conversations (ADR-046 frontend).
@@ -634,10 +638,16 @@ export const langyRouter = createTRPCRouter({
       const userId = opts.ctx.session.user.id;
 
       // Same gate the deleted `/stream` route used. Reported as not-found so it
-      // can't be used to probe another user's private conversation.
+      // can't be used to probe another user's private conversation. Logged
+      // because subscriptions are span- and log-silenced (SILENCED_LOG_TYPES),
+      // so without this line a denied attach leaves no operator trace at all.
       if (
         !(await canWatchTurn({ projectId, conversationId, turnId, userId }))
       ) {
+        logger.warn(
+          { projectId, conversationId, turnId, userId },
+          "denied a langy turn-stream attach",
+        );
         throw new TRPCError({ code: "NOT_FOUND", message: "Turn not found." });
       }
       // No Redis ⇒ no live buffer; the client falls back to the Postgres

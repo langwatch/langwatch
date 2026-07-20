@@ -14,7 +14,7 @@ import {
 } from "./projection-cursor";
 
 const logger = createLogger(
-  "langwatch:langy-conversation-update-broadcast-subscriber",
+  "langwatch:langy:conversation-update-broadcast-subscriber",
 );
 
 export interface LangyConversationFreshnessRecord {

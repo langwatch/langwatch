@@ -168,6 +168,7 @@ type Relay struct {
 	internalJobs     chan internalExportJob
 	internalWG       sync.WaitGroup
 	internalDropped  metric.Int64Counter
+	forwardFailures  metric.Int64Counter
 
 	mu      sync.Mutex
 	workers map[string]*workerEntry
@@ -211,6 +212,7 @@ func New(ctx context.Context, opts Options) (*Relay, error) {
 			},
 		},
 	}
+	r.forwardFailures = newForwardFailureCounter()
 	if r.internalEndpoint != "" {
 		// The cancel function is invoked by Shutdown after the workers stop.
 		r.internalCtx, r.internalCancel = context.WithCancel(ctx) //nolint:gosec // lifecycle-owned by Relay.Shutdown
@@ -401,6 +403,9 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 	if err := r.forwardTraces(req.Context(), entry.info, out); err != nil {
 		// Telemetry is best-effort, but be honest with the worker-side exporter:
 		// a 502 lets its standard retry/backoff handle a transient ingest outage.
+		// The counter is what makes a broken customer-ingest path visible on a
+		// dashboard — the internal drop counter only covers the platform copy.
+		r.forwardFailures.Add(r.baseCtx, 1)
 		clog.Get(r.baseCtx).Warn("otelrelay trace forward failed",
 			zap.String("conversation", entry.info.ConversationID),
 			zap.Error(err),
@@ -512,6 +517,23 @@ func (r *Relay) processInternalJob(job internalExportJob) {
 		clog.Get(r.baseCtx).Warn("otelrelay internal trace forward failed",
 			zap.String("conversation", job.conversationID), zap.Error(err))
 	}
+}
+
+// newForwardFailureCounter counts failed forwards of worker trace batches to
+// the CUSTOMER ingest (the reparented, customer-visible copy). Same noop
+// fallback as the internal drop counter: telemetry must never take the relay
+// down.
+func newForwardFailureCounter() metric.Int64Counter {
+	const name = "langwatch.langy.customer_trace.forward_failures"
+	counter, err := otel.Meter("langwatch-langyagent").Int64Counter(
+		name,
+		metric.WithDescription("Worker trace batches that failed to forward to the customer ingest (worker exporter got a 502 and will retry)."),
+	)
+	if err == nil {
+		return counter
+	}
+	fallback, _ := noop.NewMeterProvider().Meter("langwatch-langyagent").Int64Counter(name)
+	return fallback
 }
 
 func newInternalDropCounter() metric.Int64Counter {
