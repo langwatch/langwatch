@@ -5,7 +5,10 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"time"
 )
+
+var durationType = reflect.TypeOf(time.Duration(0))
 
 // Hydrate populates cfg (a pointer to a struct) from environment variables.
 // Fields are tagged with `env:"VAR_NAME"`. Nested structs chain prefixes with "_".
@@ -52,6 +55,20 @@ func hydrateStruct(v reflect.Value, t reflect.Type, prefix string) error {
 }
 
 func setField(field reflect.Value, tag, value string) error {
+	// time.Duration is a defined int64 (reflect.Kind() == Int64), so without
+	// this check it would silently fall into the generic int branch below
+	// and parse as a raw nanosecond count — meaning a documented value like
+	// "5m" fails to parse, and the only way to actually set the field is an
+	// undocumented, unreadable nanosecond integer. Checked by exact type,
+	// not Kind, so plain int64 fields are unaffected.
+	if field.Type() == durationType {
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("config: failed to parse %s as duration: %w", tag, err)
+		}
+		field.SetInt(int64(d))
+		return nil
+	}
 	switch field.Kind() {
 	case reflect.String:
 		field.SetString(value)

@@ -3,6 +3,7 @@ package aigateway
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 // LoadConfig with only the two required secrets set should yield in-process defaults.
@@ -182,6 +183,50 @@ func TestLoadConfig_RefusesConflictingOTelEndpointNames(t *testing.T) {
 	}
 }
 
+// @scenario "the documented AuthCache duration format actually parses now"
+func TestLoadConfig_AuthCacheDurationsParseDocumentedFormat(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+	// Exactly the format .env.example documents (and, before this fix,
+	// the format that silently could never have worked — every
+	// time.Duration field went through the same raw-nanosecond int64
+	// path regardless of which struct it lived on).
+	t.Setenv("LW_GATEWAY_AUTH_CACHE_SOFT_BUMP", "5m")
+	t.Setenv("LW_GATEWAY_AUTH_CACHE_HARD_GRACE", "6h")
+	t.Setenv("LW_GATEWAY_AUTH_CACHE_CONFIG_TTL", "90s")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.AuthCache.SoftBump != 5*time.Minute {
+		t.Errorf("AuthCache.SoftBump = %v, want 5m", cfg.AuthCache.SoftBump)
+	}
+	if cfg.AuthCache.HardGrace != 6*time.Hour {
+		t.Errorf("AuthCache.HardGrace = %v, want 6h", cfg.AuthCache.HardGrace)
+	}
+	if cfg.AuthCache.ConfigTTL != 90*time.Second {
+		t.Errorf("AuthCache.ConfigTTL = %v, want 90s", cfg.AuthCache.ConfigTTL)
+	}
+}
+
+// @scenario "SERVER_DRAIN_DELAY_SECONDS reaches Server.DrainDelaySeconds"
+func TestLoadConfig_DrainDelaySeconds(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+	t.Setenv("SERVER_DRAIN_DELAY_SECONDS", "7")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Server.DrainDelaySeconds != 7 {
+		t.Errorf("Server.DrainDelaySeconds = %d, want 7", cfg.Server.DrainDelaySeconds)
+	}
+}
+
 // clearGatewayEnv unsets every env var the alias layer or Hydrate inspects,
 // so each test starts from a clean slate. t.Setenv handles per-test scope on
 // what we explicitly set; this clears the bleed-through from the harness env.
@@ -190,6 +235,7 @@ func clearGatewayEnv(t *testing.T) {
 	for _, k := range []string{
 		"SERVER_ADDR",
 		"SERVER_GRACEFUL_SECONDS",
+		"SERVER_DRAIN_DELAY_SECONDS",
 		"SERVER_MAX_REQUEST_BODY_BYTES",
 		"LOG_LEVEL",
 		"LW_GATEWAY_BASE_URL",
@@ -198,6 +244,7 @@ func clearGatewayEnv(t *testing.T) {
 		"LW_GATEWAY_JWT_SECRET_PREVIOUS",
 		"LW_GATEWAY_AUTH_CACHE_SOFT_BUMP",
 		"LW_GATEWAY_AUTH_CACHE_HARD_GRACE",
+		"LW_GATEWAY_AUTH_CACHE_CONFIG_TTL",
 		"CUSTOMER_TRACE_BRIDGE_BASE_URL",
 		"OTEL_OTLP_ENDPOINT",
 		"OTEL_OTLP_HEADERS",
