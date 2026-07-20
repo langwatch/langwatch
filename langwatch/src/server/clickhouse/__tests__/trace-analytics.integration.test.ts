@@ -46,10 +46,11 @@ let ch: ClickHouseClient;
 let analyticsRepo: TraceAnalyticsClickHouseRepository;
 let summaryRepo: TraceSummaryClickHouseRepository;
 
-// Anchor on the current hour: these tables TTL rows `_retention_days`
-// (default 49) days after their timestamp, so a fixed calendar date makes
-// every row born-expired once the date ages past the horizon.
-const baseMs = Math.floor(Date.now() / 3_600_000) * 3_600_000;
+// Minute-aligned "yesterday", never a fixed calendar date: inserts are stamped
+// with PLATFORM_DEFAULT_RETENTION_DAYS (49) and the table TTL-deletes rows
+// `_retention_days` after OccurredAt, so a fixed date eventually ages past the
+// horizon and the fixtures silently vanish before the reads.
+const baseMs = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 60_000) * 60_000;
 
 function makeAnalyticsRow(
   overrides: Partial<TraceAnalyticsRow> = {},
