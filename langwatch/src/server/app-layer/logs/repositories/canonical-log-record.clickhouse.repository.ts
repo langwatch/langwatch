@@ -229,8 +229,11 @@ export class CanonicalLogRecordClickHouseRepository
         FROM log_records FINAL
         WHERE TenantId = {tenantId:String}
           AND CorrelationTraceId = {traceId:String}
-          AND TimeUnixMs >= {from:DateTime64(3)}
-          AND TimeUnixMs <= {to:DateTime64(3)}
+          -- Table-qualified: the SELECT aliases toUnixTimestamp64Milli(...) AS
+          -- TimeUnixMs, and a bare TimeUnixMs in WHERE resolves to that alias
+          -- (epoch millis), never matching a DateTime64 bound.
+          AND log_records.TimeUnixMs >= {from:DateTime64(3)}
+          AND log_records.TimeUnixMs <= {to:DateTime64(3)}
           AND ProviderKind = 'claude_code'
           AND ProviderEventKind != ''
         ORDER BY TimeUnixNano ASC, ProviderEventSequence ASC, RecordId ASC

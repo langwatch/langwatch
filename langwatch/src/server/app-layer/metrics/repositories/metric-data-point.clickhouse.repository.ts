@@ -235,19 +235,23 @@ export class MetricDataPointClickHouseRepository implements MetricDataPointRepos
     // optimize_read_in_order is syntactic and cannot infer that, so ordering on
     // TimeUnixNano alone made ClickHouse materialise and sort every point in
     // the series (each carrying a ZSTD CanonicalPayload) to return one row.
+    // TimeUnixMs is table-qualified throughout: RAW_SELECT aliases
+    // toUnixTimestamp64Milli(...) AS TimeUnixMs, and a bare TimeUnixMs
+    // resolves to that alias (epoch millis), never matching a DateTime64
+    // bound — the same pitfall log-record-storage documents.
     const result = await client.query({
       query: `
         (SELECT ${RAW_SELECT}
          FROM metric_data_points FINAL
          WHERE TenantId = {tenantId:String} AND SeriesId = {seriesId:String}
-           AND (TimeUnixMs < {time:DateTime64(3)} OR (TimeUnixMs = {time:DateTime64(3)} AND (TimeUnixNano < {timeNano:UInt64} OR (TimeUnixNano = {timeNano:UInt64} AND PointId < {pointId:String}))))
-         ORDER BY TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)
+           AND (metric_data_points.TimeUnixMs < {time:DateTime64(3)} OR (metric_data_points.TimeUnixMs = {time:DateTime64(3)} AND (TimeUnixNano < {timeNano:UInt64} OR (TimeUnixNano = {timeNano:UInt64} AND PointId < {pointId:String}))))
+         ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)
         UNION ALL
         (SELECT ${RAW_SELECT}
          FROM metric_data_points FINAL
          WHERE TenantId = {tenantId:String} AND SeriesId = {seriesId:String}
-           AND (TimeUnixMs > {time:DateTime64(3)} OR (TimeUnixMs = {time:DateTime64(3)} AND (TimeUnixNano > {timeNano:UInt64} OR (TimeUnixNano = {timeNano:UInt64} AND PointId >= {pointId:String}))))
-         ORDER BY TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC LIMIT 2)
+           AND (metric_data_points.TimeUnixMs > {time:DateTime64(3)} OR (metric_data_points.TimeUnixMs = {time:DateTime64(3)} AND (TimeUnixNano > {timeNano:UInt64} OR (TimeUnixNano = {timeNano:UInt64} AND PointId >= {pointId:String}))))
+         ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC LIMIT 2)
       `,
       query_params: {
         tenantId: point.tenantId,
@@ -286,14 +290,14 @@ export class MetricDataPointClickHouseRepository implements MetricDataPointRepos
         `(SELECT ${RAW_SELECT}
           FROM metric_data_points FINAL
           WHERE TenantId = {tenantId:String} AND SeriesId = {seriesId:String}
-            AND TimeUnixMs < {from${index}:DateTime64(3)}
-          ORDER BY TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`,
+            AND metric_data_points.TimeUnixMs < {from${index}:DateTime64(3)}
+          ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`,
         `(SELECT ${RAW_SELECT}
           FROM metric_data_points FINAL
           WHERE TenantId = {tenantId:String} AND SeriesId = {seriesId:String}
-            AND TimeUnixMs >= {from${index}:DateTime64(3)}
-            AND TimeUnixMs < {to${index}:DateTime64(3)}
-          ORDER BY TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC)`,
+            AND metric_data_points.TimeUnixMs >= {from${index}:DateTime64(3)}
+            AND metric_data_points.TimeUnixMs < {to${index}:DateTime64(3)}
+          ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC)`,
       ];
     });
     const client = await this.resolveClient(point.tenantId);
