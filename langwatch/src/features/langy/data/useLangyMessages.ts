@@ -75,7 +75,11 @@ export function useLangyMessages(
       staleTime: 30_000,
       refetchOnWindowFocus: false,
       keepPreviousData: true,
-      refetchInterval: langyMessagesPollInterval,
+      // Wrapped, not passed by reference: handing the helper straight to
+      // react-query lets its narrow `{ isTurnInFlight }` param type win the
+      // inference for the query's TData, collapsing `query.data` to that shape
+      // (CI typecheck caught it). The arrow keeps `data` contextually typed.
+      refetchInterval: (data) => langyMessagesPollInterval(data),
     },
   );
 
