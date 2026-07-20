@@ -3,8 +3,8 @@ import {
   CODEX_OAUTH_CLIENT_ID,
   CODEX_OAUTH_ISSUER,
   CODEX_VERIFICATION_URL,
-  codexTokenKeysSchema,
   type CodexTokenKeys,
+  codexTokenKeysSchema,
 } from "./codexAccount.schema";
 
 /**
@@ -287,7 +287,9 @@ export class CodexGatewayRefreshService {
     private readonly engine: CodexAccountService = new CodexAccountService(),
   ) {}
 
-  async refreshForGateway(providerRowId: string): Promise<
+  async refreshForGateway(
+    providerRowId: string,
+  ): Promise<
     | { status: "refreshed"; accessToken: string; accountId: string }
     | { status: "not_connected" }
     | { status: "session_expired" }
@@ -365,7 +367,9 @@ export function decodeCodexClaims(idToken: string): CodexClaims {
           : "",
       email: typeof json.email === "string" ? json.email : "",
       plan:
-        typeof auth.chatgpt_plan_type === "string" ? auth.chatgpt_plan_type : "",
+        typeof auth.chatgpt_plan_type === "string"
+          ? auth.chatgpt_plan_type
+          : "",
     };
   } catch {
     return { accountId: "", email: "", plan: "" };

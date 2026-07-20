@@ -63,8 +63,7 @@ const REGISTRY: FeatureDescriptor[] = [
     key: "scenarios.user_simulator",
     role: "DEFAULT",
     displayName: "Scenario user simulator",
-    description:
-      "Model that role-plays the user in scenario simulations.",
+    description: "Model that role-plays the user in scenario simulations.",
   },
   {
     key: "scenarios.judge",
@@ -143,8 +142,7 @@ const REGISTRY: FeatureDescriptor[] = [
     // EMBEDDINGS column / row header tells the user what kind of model
     // this is without parenthetical clutter.
     displayName: "Topic clustering",
-    description:
-      "Vectors used to group similar traces in Analytics → Topics.",
+    description: "Vectors used to group similar traces in Analytics → Topics.",
   },
 ];
 

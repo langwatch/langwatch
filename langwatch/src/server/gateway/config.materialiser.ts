@@ -23,7 +23,7 @@ import {
   type LangyMirrorTier,
 } from "../app-layer/langy/LangyCredentialService";
 import { modelProviders } from "../modelProviders/registry";
-import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
+import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { GatewayCacheRuleService } from "./cacheRule.service";
 import {
   eligibleModelProvidersForVk,
@@ -229,7 +229,9 @@ export class GatewayConfigMaterialiser {
   private async applicableCacheRules(
     organizationId: string,
   ): Promise<GatewayCacheRule[]> {
-    return GatewayCacheRuleService.create(this.prisma).bundleFor(organizationId);
+    return GatewayCacheRuleService.create(this.prisma).bundleFor(
+      organizationId,
+    );
   }
 
   /**
@@ -372,7 +374,10 @@ function decryptCustomKeys(raw: unknown): Record<string, unknown> {
 // resolver gets a stable structure (ariana R-lane CR pin from step (i)).
 type BundlePolicyRules = GatewayConfigPayload["policy_rules"];
 
-const EMPTY_POLICY_RULE_DIM = { deny: [] as string[], allow: null as string[] | null };
+const EMPTY_POLICY_RULE_DIM = {
+  deny: [] as string[],
+  allow: null as string[] | null,
+};
 
 function emptyPolicyRules(): BundlePolicyRules {
   return {
@@ -383,12 +388,15 @@ function emptyPolicyRules(): BundlePolicyRules {
   };
 }
 
-function mergePolicyDim(
-  raw: unknown,
-): { deny: string[]; allow: string[] | null } {
+function mergePolicyDim(raw: unknown): {
+  deny: string[];
+  allow: string[] | null;
+} {
   if (!raw || typeof raw !== "object") return { ...EMPTY_POLICY_RULE_DIM };
   const r = raw as { deny?: unknown; allow?: unknown };
-  const deny = Array.isArray(r.deny) ? r.deny.filter((x): x is string => typeof x === "string") : [];
+  const deny = Array.isArray(r.deny)
+    ? r.deny.filter((x): x is string => typeof x === "string")
+    : [];
   const allow =
     r.allow === null || r.allow === undefined
       ? null
@@ -450,11 +458,9 @@ function buildCredentials(mp: ModelProvider): Record<string, unknown> {
       return {
         api_key: pick("AZURE_OPENAI_API_KEY") || pick("api-key"),
         endpoint:
-          pick("AZURE_OPENAI_ENDPOINT") ||
-          pick("AZURE_API_GATEWAY_BASE_URL"),
+          pick("AZURE_OPENAI_ENDPOINT") || pick("AZURE_API_GATEWAY_BASE_URL"),
         api_version:
-          pick("AZURE_OPENAI_API_VERSION") ||
-          pick("AZURE_API_GATEWAY_VERSION"),
+          pick("AZURE_OPENAI_API_VERSION") || pick("AZURE_API_GATEWAY_VERSION"),
       };
     }
     case "bedrock": {
@@ -581,12 +587,7 @@ function buildProviderConfig(mp: ModelProvider): Record<string, unknown> {
 }
 
 function scopeToWire(
-  scope:
-    | "ORGANIZATION"
-    | "TEAM"
-    | "PROJECT"
-    | "VIRTUAL_KEY"
-    | "PRINCIPAL",
+  scope: "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL",
 ): "organization" | "team" | "project" | "virtual_key" | "principal" {
   switch (scope) {
     case "ORGANIZATION":

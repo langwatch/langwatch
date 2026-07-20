@@ -3,8 +3,8 @@ import { z } from "zod";
 import { codexTokenKeysSchema } from "./codexAccount.schema";
 import { CODEX_ALLOWED_FEATURE_KEYS } from "./codexRestrictions";
 import type { CustomModelEntry } from "./customModel.schema";
-import { llmModels } from "./loadModelCatalog";
 import type { LLMModelEntry } from "./llmModels.types";
+import { llmModels } from "./loadModelCatalog";
 
 // ============================================================================
 // Parameter Constraint Types

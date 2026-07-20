@@ -1,14 +1,12 @@
-import {
-  Box,
-  type IconProps,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, type IconProps, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useColorModeValue } from "../../../../../components/ui/color-mode";
 import { Tooltip } from "../../../../../components/ui/tooltip";
+import {
+  type IconSizeKey,
+  iconSizeToPixels,
+} from "../../../../../utils/iconSize";
 import type { IconData } from "../../../regions/shared/types";
-import { iconSizeToPixels, type IconSizeKey } from "../../../../../utils/iconSize";
 
 interface SelectableIconCardProps {
   label: string;
@@ -136,7 +134,10 @@ export function SelectableIconCard(
           gap={iconLabel ? 1 : 0}
           align="center"
           justify="center"
-          style={{ filter: selected ? "grayscale(0%)" : "grayscale(100%)", transition: "filter 0.2s ease" }}
+          style={{
+            filter: selected ? "grayscale(0%)" : "grayscale(100%)",
+            transition: "filter 0.2s ease",
+          }}
         >
           {icon ? (
             <>
@@ -145,7 +146,12 @@ export function SelectableIconCard(
                 <img
                   src={iconSrc}
                   alt={iconAlt}
-                  style={{ width: resolvedSize, height: resolvedSize, objectFit: "contain", display: "block" }}
+                  style={{
+                    width: resolvedSize,
+                    height: resolvedSize,
+                    objectFit: "contain",
+                    display: "block",
+                  }}
                 />
               ) : (
                 <Box w={resolvedSize} h={resolvedSize} aria-hidden />

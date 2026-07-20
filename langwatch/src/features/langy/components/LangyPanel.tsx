@@ -1574,7 +1574,9 @@ function LangyPanel({
   const [reconnectCodex, setReconnectCodex] = useState(false);
 
   const onErrorAction = useCallback(
-    (kind: "connect-github" | "configure-model" | "reconnect-codex" | "retry") => {
+    (
+      kind: "connect-github" | "configure-model" | "reconnect-codex" | "retry",
+    ) => {
       if (kind === "reconnect-codex") {
         setReconnectCodex(true);
         return;

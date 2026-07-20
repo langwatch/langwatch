@@ -17,8 +17,8 @@ import {
   type ModelRole,
 } from "./featureRegistry";
 import {
-  ModelDefaultsRepository,
   type ModelDefaultsPrisma,
+  ModelDefaultsRepository,
   type ScopeAttachment,
 } from "./modelDefaults.repository";
 
@@ -187,7 +187,8 @@ export async function updateConfig(
   },
 ): Promise<void> {
   const repo = repoFor(ctx);
-  const data: { config?: Record<string, string>; authorId?: string | null } = {};
+  const data: { config?: Record<string, string>; authorId?: string | null } =
+    {};
   if (params.config !== undefined) {
     const clean = sanitizeConfig(params.config);
     if (Object.keys(clean).length === 0) {
@@ -241,10 +242,7 @@ export async function updateConfig(
 /**
  * Delete a config. Scope attachments cascade via the FK.
  */
-export async function deleteConfig(
-  ctx: Ctx,
-  configId: string,
-): Promise<void> {
+export async function deleteConfig(ctx: Ctx, configId: string): Promise<void> {
   await repoFor(ctx).delete(configId);
 }
 

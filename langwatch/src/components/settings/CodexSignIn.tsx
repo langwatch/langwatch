@@ -1,11 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Check, ExternalLink, LogOut, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CODEX_SIGN_IN_TTL_MS } from "~/server/modelProviders/codexAccount.schema";
@@ -263,8 +256,8 @@ export function CodexSignIn({
         </Text>
       ) : (
         <Text fontSize="xs" color="fg.muted">
-          Sign in with your OpenAI account and Codex runs on your ChatGPT
-          plan. No API key needed.
+          Sign in with your OpenAI account and Codex runs on your ChatGPT plan.
+          No API key needed.
         </Text>
       )}
       <Box>

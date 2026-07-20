@@ -1,8 +1,12 @@
-import type { ModelProvider, ModelProviderScope, PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
+import type {
+  ModelProvider,
+  ModelProviderScope,
+  PrismaClient,
+} from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { KSUID_RESOURCES } from "../../utils/constants";
-import { encrypt, decrypt } from "../../utils/encryption";
+import { decrypt, encrypt } from "../../utils/encryption";
 import { resolveSingleOrganizationForScopes } from "../scopes/resolveOrganizationForScope";
 import { resolveScopeChain } from "../scopes/resolveScopeChain";
 import type { CustomModelsInput } from "./customModel.schema";
@@ -127,7 +131,11 @@ export class ModelProviderRepository {
     const client = tx ?? this.prisma;
     const project = await client.project.findUnique({
       where: { id: projectId },
-      select: { id: true, teamId: true, team: { select: { organizationId: true } } },
+      select: {
+        id: true,
+        teamId: true,
+        team: { select: { organizationId: true } },
+      },
     });
     if (!project) return [];
     const results = await client.modelProvider.findMany({
@@ -177,7 +185,12 @@ export class ModelProviderRepository {
                 ? [{ scopeType: "TEAM" as const, scopeId: { in: teamIds } }]
                 : []),
               ...(projectIds.length > 0
-                ? [{ scopeType: "PROJECT" as const, scopeId: { in: projectIds } }]
+                ? [
+                    {
+                      scopeType: "PROJECT" as const,
+                      scopeId: { in: projectIds },
+                    },
+                  ]
                 : []),
             ],
           },
@@ -422,7 +435,9 @@ export class ModelProviderRepository {
     // narrows the helper's wider nullable signature for Prisma's Json input.
     await this.prisma.modelProvider.update({
       where: { id: args.id },
-      data: { customKeys: this.encryptCustomKeys(args.customKeys) ?? undefined },
+      data: {
+        customKeys: this.encryptCustomKeys(args.customKeys) ?? undefined,
+      },
     });
   }
 
@@ -488,9 +503,9 @@ export class ModelProviderRepository {
   ): ModelProviderWithScopes {
     return {
       ...provider,
-      customKeys: this.decryptCustomKeys(provider.customKeys) as
-        | Prisma.JsonValue
-        | null,
+      customKeys: this.decryptCustomKeys(
+        provider.customKeys,
+      ) as Prisma.JsonValue | null,
     };
   }
 }

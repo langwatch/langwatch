@@ -3,6 +3,7 @@ import {
   SCOPE_TIERS,
   scopeAssignmentSchema,
 } from "~/server/scopes/scope.types";
+import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
 import { CodexAccountService } from "../../modelProviders/codexAccount.service";
 import {
   CODEX_ALLOWED_FEATURE_KEYS,
@@ -35,23 +36,22 @@ import {
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
+  getProjectModelProviders,
+  getProjectModelProvidersForFrontend,
+  listOrgModelProvidersForFrontend,
+  listProjectModelProvidersForFrontend,
+} from "./modelProviders.utils";
+import {
   validateKeyWithCustomUrl,
   validateProviderApiKey,
 } from "./providerValidation";
-import {
-  getProjectModelProviders,
-  getProjectModelProvidersForFrontend,
-  listProjectModelProvidersForFrontend,
-  listOrgModelProvidersForFrontend,
-} from "./modelProviders.utils";
-import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
 
 export type { ModelMetadataForFrontend } from "./modelProviders.utils";
 export {
-  getProjectModelProviders,
   getModelMetadataForFrontend,
-  mergeCustomModelMetadata,
+  getProjectModelProviders,
   getProjectModelProvidersForFrontend,
+  mergeCustomModelMetadata,
   prepareEnvKeys,
   prepareLitellmParams,
 } from "./modelProviders.utils";
@@ -339,9 +339,7 @@ export const modelProviderRouter = createTRPCRouter({
       const providers = await getProjectModelProviders(input.projectId);
       const row = providers.openai_codex;
       if (!row?.enabled) return { connected: false as const };
-      const keys = (row.customKeys ?? {}) as Partial<
-        Record<string, string>
-      >;
+      const keys = (row.customKeys ?? {}) as Partial<Record<string, string>>;
       return {
         connected: true as const,
         providerId: row.id,

@@ -38,9 +38,7 @@ export const ModelProviderScreen: React.FC<ModelProviderScreenProps> = ({
   const [modelProviderKey, setSelectedModelProviderKey] =
     useState<ModelProviderKey>(
       () =>
-        initialProviderKey ??
-        providersForSurface(variant)[0]?.key ??
-        "open_ai",
+        initialProviderKey ?? providersForSurface(variant)[0]?.key ?? "open_ai",
     );
 
   // In the Langy panel the screen lives in a narrow scrolling column, and the

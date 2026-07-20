@@ -4,12 +4,12 @@
  * the network boundary; everything inside the service is real.
  */
 import { describe, expect, it } from "vitest";
+import type { CodexTokenKeys } from "../codexAccount.schema";
 import {
   CodexAccountService,
   CodexAuthError,
   decodeCodexClaims,
 } from "../codexAccount.service";
-import type { CodexTokenKeys } from "../codexAccount.schema";
 
 /** A minimal unsigned JWT with the OpenAI auth claim, base64url-encoded. */
 function fakeIdToken(payload: Record<string, unknown>): string {
@@ -55,7 +55,11 @@ describe("CodexAccountService", () => {
       const { impl, calls } = scriptedFetch({
         "/api/accounts/deviceauth/usercode": () => ({
           status: 200,
-          json: { device_auth_id: "dev-1", user_code: "ABCD-1234", interval: 3 },
+          json: {
+            device_auth_id: "dev-1",
+            user_code: "ABCD-1234",
+            interval: 3,
+          },
         }),
       });
       const service = new CodexAccountService(impl, "https://issuer.test");

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  KNOWN_LANGY_ERROR_KINDS,
   explainLangyError,
-  readLangyStreamError,
+  KNOWN_LANGY_ERROR_KINDS,
   type LangyDomainError,
+  readLangyStreamError,
 } from "../logic/langyErrorExplainer";
 
 /**
@@ -222,7 +222,10 @@ describe("explainLangyError", () => {
       expect(presentation.title).toBe("Langy's worker stopped");
       expect(presentation.description).toContain("safe");
       expect(presentation.render).toBe("card");
-      expect(presentation.action).toEqual({ label: "Try again", kind: "retry" });
+      expect(presentation.action).toEqual({
+        label: "Try again",
+        kind: "retry",
+      });
     });
   });
 
