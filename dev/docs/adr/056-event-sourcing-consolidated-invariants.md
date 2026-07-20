@@ -1,4 +1,4 @@
-# ADR-053: Consolidated event-sourcing invariants
+# ADR-056: Consolidated event-sourcing invariants
 
 **Date:** 2026-07-18
 

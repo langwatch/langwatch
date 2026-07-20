@@ -96,7 +96,7 @@ any of these, link the path. 14 numbers are reused:
 | 049 | [Langy pilots Postgres operational state and projection-independent reactions](./049-langy-projection-independent-reactions.md) | Accepted |
 | 050 | [Langy's prompts in the versioned prompt registry + dogfood scenarios/evals](./050-langy-versioned-prompts-and-dogfood-evals.md) | Proposed |
 | 052 | [Automations on a dedicated process-manager pipeline](./052-automations-on-process-manager-substrate.md) | Accepted |
-| 053 | [Consolidated event-sourcing invariants](./053-event-sourcing-consolidated-invariants.md) | Draft |
+| 056 | [Consolidated event-sourcing invariants](./056-event-sourcing-consolidated-invariants.md) | Draft |
 
 ---
 
