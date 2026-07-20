@@ -486,6 +486,25 @@ export const langyRouter = createTRPCRouter({
    * backoff), mirroring `tracesV2.newCount`. The count derivation lives in the
    * service (`countSince`), not here — transport only shapes input/output.
    */
+  /**
+   * The model allowlist the composer's picker narrows to, or null when the
+   * project's Langy VK sets none (every eligible model is allowed).
+   *
+   * Served here rather than read off `virtualKeys.list`: that listing no
+   * longer returns product-managed keys, and the picker only ever wanted this
+   * one field — so the client has no reason to receive a virtual-key row at
+   * all.
+   */
+  modelsAllowed: langyReadProcedure.query(
+    async ({ input }): Promise<{ modelsAllowed: string[] | null }> => {
+      const modelsAllowed =
+        await getApp().langy.credentials.getModelsAllowedForProject(
+          input.projectId,
+        );
+      return { modelsAllowed };
+    },
+  ),
+
   newCount: langyReadProcedure
     .input(z.object({ since: z.number() }))
     .query(async ({ input, ctx }): Promise<{ count: number }> => {

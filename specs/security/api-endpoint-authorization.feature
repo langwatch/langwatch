@@ -142,3 +142,48 @@ Feature: Hono API endpoint authorization and tenant isolation
       Given the built-in team roles
       Then every role that can view workflows also has experiments:view
       And only roles that can manage workflows have experiments:manage
+
+  # ============================================================================
+  Rule: Product-managed credentials are not the customer's to read or change
+
+    Some credentials are provisioned and retired by the product rather than by
+    a human: the Langy virtual key, its stored secret, and the ephemeral
+    per-chat Langy session API key. The settings UI badged and locked them, but
+    that is presentation — the API is the boundary. Rotating a Langy virtual
+    key was the sharp edge: it returns a fresh plaintext secret AND breaks
+    Langy, because the gateway keeps authenticating against the secret Langy
+    still holds. Denials report not-found rather than forbidden, so a response
+    never confirms the credential exists.
+
+    @unit
+    Scenario: Product-managed virtual keys are absent from customer listings
+      Given a project whose organization has an auto-provisioned Langy virtual key
+      When a member lists the organization's virtual keys
+      Then the Langy virtual key is not among them
+
+    @unit
+    Scenario Outline: Product-managed virtual keys refuse customer mutations
+      Given a member holding the id of the auto-provisioned Langy virtual key
+      When they call <operation> on it
+      Then the request is rejected as not found
+      And the key is left untouched
+
+      Examples:
+        | operation |
+        | update    |
+        | rotate    |
+        | revoke    |
+
+    @unit
+    Scenario: The ephemeral Langy session key cannot be renamed or revoked
+      Given a member holding the id of a live Langy session API key
+      When they try to rename or revoke it
+      Then the request is rejected as not found
+      And the turn authenticating with that key keeps working
+
+    @unit
+    Scenario: The stored Langy virtual-key secret is hidden and immutable
+      Given a project with an auto-provisioned Langy virtual key
+      When a member lists the project's secrets
+      Then the Langy virtual-key secret is not among them
+      And deleting or overwriting it by id is rejected as not found

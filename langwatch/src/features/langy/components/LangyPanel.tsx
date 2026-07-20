@@ -34,7 +34,6 @@ import {
   useState,
 } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { isLangyManagedVk } from "~/components/gateway/langyVk";
 import { allModelOptions } from "~/components/ModelSelector";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { toaster } from "~/components/ui/toaster";
@@ -610,27 +609,18 @@ function LangyPanel({
 
   // The project's Langy VK carries an optional `modelsAllowed` allowlist. When
   // set, the composer's picker is narrowed to exactly those models; when
-  // null/empty it falls back to all of the project's provider models.
-  const virtualKeysQuery = api.virtualKeys.list.useQuery(
-    { organizationId: organizationId ?? "" },
+  // null/empty it falls back to all of the project's provider models. Served
+  // as its own field — the VK itself is product-managed and no longer reaches
+  // the client.
+  const modelsAllowedQuery = api.langy.modelsAllowed.useQuery(
+    { projectId: projectId ?? "" },
     {
-      enabled: !!organizationId,
+      enabled: !!projectId,
       staleTime: 300_000,
       refetchOnWindowFocus: false,
     },
   );
-  const langyModelsAllowed = useMemo<string[] | null>(() => {
-    const langyVk = virtualKeysQuery.data?.find(
-      (vk) =>
-        isLangyManagedVk(vk) &&
-        vk.scopes.some(
-          (s) => s.scopeType === "PROJECT" && s.scopeId === projectId,
-        ),
-    );
-    const allowed = (langyVk?.config as { modelsAllowed?: string[] | null })
-      ?.modelsAllowed;
-    return allowed && allowed.length > 0 ? allowed : null;
-  }, [virtualKeysQuery.data, projectId]);
+  const langyModelsAllowed = modelsAllowedQuery.data?.modelsAllowed ?? null;
 
   const modelOptions = useMemo(
     () => langyModelsAllowed ?? allModelOptions,

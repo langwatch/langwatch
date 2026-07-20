@@ -25,8 +25,23 @@ import {
   ApiKeyNotOwnedError,
   ApiKeyScopeViolationError,
 } from "./errors";
+import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 
 const logger = createLogger("langwatch:api-key:service");
+
+/**
+ * Keys the product mints and retires on its own — today the ephemeral
+ * "Langy session" key, one per chat session with a 6h TTL.
+ *
+ * They are already absent from every listing (the repository filters
+ * HIDDEN_SYSTEM_KEY_NAMES), but absence is not immutability: a caller who
+ * learned an id could still rename or revoke one, and revoking it breaks the
+ * Langy turn currently authenticating with it. The by-id mutations refuse them
+ * for the same reason the listings hide them.
+ */
+function isSystemManaged(apiKey: { name: string }): boolean {
+  return HIDDEN_SYSTEM_KEY_NAMES.includes(apiKey.name);
+}
 
 type RoleBindingBase = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
@@ -263,6 +278,9 @@ export class ApiKeyService {
     if (existing.organizationId !== organizationId) {
       throw new ApiKeyNotFoundError(id);
     }
+    // Reported as not-found, like the tenancy mismatch above, so the response
+    // doesn't confirm the id exists.
+    if (isSystemManaged(existing)) throw new ApiKeyNotFoundError(id);
 
     if (!callerIsAdmin) {
       if (!existing.userId || existing.userId !== callerUserId) {
@@ -755,6 +773,7 @@ export class ApiKeyService {
     if (apiKey.organizationId !== organizationId) {
       throw new ApiKeyNotFoundError(id);
     }
+    if (isSystemManaged(apiKey)) throw new ApiKeyNotFoundError(id);
     if (!callerIsAdmin) {
       if (!apiKey.userId || apiKey.userId !== callerUserId) {
         throw new ApiKeyNotOwnedError(id);

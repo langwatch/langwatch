@@ -2,20 +2,11 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { LANGY_VK_SECRET_NAME } from "~/server/projects/reserved-secret-names";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { resolveAttributionUserId } from "./langyAttribution";
 
 const logger = createLogger("langwatch:langy:virtual-key");
-
-/**
- * Name under which the auto-provisioned Langy VK secret is stored in
- * ProjectSecret. One row per project.
- *
- * Exported so callers that surface "this is the Langy VK" UI (e.g. the
- * gateway/virtual-keys page) and the backfill reconciler can detect the
- * auto-provisioned key without reinventing the name string.
- */
-export const LANGY_VK_SECRET_NAME = "langy_vk_secret";
 
 /**
  * Display name the VK row carries in the gateway/virtual-keys list. Exported

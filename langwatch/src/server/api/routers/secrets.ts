@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { encrypt } from "~/utils/encryption";
+import { RESERVED_PROJECT_SECRET_NAMES } from "~/server/projects/reserved-secret-names";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -44,13 +45,20 @@ export const secretsRouter = createTRPCRouter({
   /**
    * List all secrets for a project (masked values).
    * Returns metadata only -- never the encrypted value.
+   *
+   * Product-owned rows (RESERVED_PROJECT_SECRET_NAMES) are excluded: the
+   * customer did not create them and cannot safely change them, so listing
+   * them only offers a way to break the feature that owns them.
    */
   list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("secrets:view"))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.projectSecret.findMany({
-        where: { projectId: input.projectId },
+        where: {
+          projectId: input.projectId,
+          name: { notIn: RESERVED_PROJECT_SECRET_NAMES },
+        },
         select: secretSelectWithoutValue,
         orderBy: { name: "asc" },
       });
@@ -125,10 +133,12 @@ export const secretsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.prisma.projectSecret.findFirst({
         where: { id: input.secretId, projectId: input.projectId },
-        select: { id: true },
+        select: { id: true, name: true },
       });
 
-      if (!existing) {
+      // Reported as not-found rather than forbidden, so the response doesn't
+      // confirm the reserved row exists.
+      if (!existing || RESERVED_PROJECT_SECRET_NAMES.includes(existing.name)) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Secret not found",
@@ -164,10 +174,12 @@ export const secretsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.prisma.projectSecret.findFirst({
         where: { id: input.secretId, projectId: input.projectId },
-        select: { id: true },
+        select: { id: true, name: true },
       });
 
-      if (!existing) {
+      // Reported as not-found rather than forbidden, so the response doesn't
+      // confirm the reserved row exists.
+      if (!existing || RESERVED_PROJECT_SECRET_NAMES.includes(existing.name)) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Secret not found",
