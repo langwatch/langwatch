@@ -10,7 +10,7 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 import {
-  PROMPT_ANALYTICS,
+  PROMPT_AGENT_PERFORMANCE,
   PROMPT_EVALUATIONS,
   PROMPT_LEVEL_UP,
   PROMPT_PROMPTS,
@@ -69,11 +69,11 @@ const SKILLS: SkillItem[] = [
     slashCommand: "/prompts",
   },
   {
-    id: "analytics",
-    label: "Analyze agent performance with LangWatch",
-    prompt: PROMPT_ANALYTICS,
-    installCommand: "npx skills add langwatch/skills/analytics",
-    slashCommand: "/analytics",
+    id: "agent-performance",
+    label: "Diagnose your agent's production behavior",
+    prompt: PROMPT_AGENT_PERFORMANCE,
+    installCommand: "npx skills add langwatch/skills/agent-performance",
+    slashCommand: "/agent-performance",
   },
   {
     id: "level-up",

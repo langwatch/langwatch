@@ -7,7 +7,7 @@ set -e
 COMPILER="npx tsx skills/_compiler/compile.ts"
 OUT_DIR="skills/_compiled"
 
-SKILLS="tracing evaluations scenarios prompts analytics level-up datasets"
+SKILLS="tracing evaluations scenarios prompts agent-performance agent-improve level-up datasets"
 
 for skill in $SKILLS; do
   echo "Compiling $skill..."
@@ -15,7 +15,7 @@ for skill in $SKILLS; do
   $COMPILER --skills "$skill" --mode docs > "$OUT_DIR/$skill.docs.txt"
 done
 
-RECIPES="debug-instrumentation improve-setup evaluate-multimodal generate-rag-dataset test-compliance test-cli-usability"
+RECIPES="debug-instrumentation agent-best-practices evaluate-multimodal generate-rag-dataset test-compliance test-cli-usability"
 
 for recipe in $RECIPES; do
   echo "Compiling recipe $recipe..."
