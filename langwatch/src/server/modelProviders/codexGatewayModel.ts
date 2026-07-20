@@ -1,5 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { env } from "../../env.mjs";
+import { ensureGatewayV1BaseUrl } from "../app-layer/langy/LangyCredentialService";
 import { provisionLangyVirtualKey } from "../app-layer/langy/langyVirtualKey";
 import { prisma } from "../db";
 import { isModelAllowedForFeature } from "./codexRestrictions";
@@ -61,14 +62,23 @@ export async function getCodexVercelAIModel({
   return gateway.responses(model);
 }
 
-/** The same gateway origin the Langy worker dials, normalised to /v1. */
+/**
+ * The gateway data plane as reached FROM the control plane, normalised to
+ * /v1. `LW_GATEWAY_INTERNAL_URL` is the dedicated control-plane → gateway
+ * var; the public URL and the legacy shared var are the documented
+ * fallbacks (see env-create.mjs). `LW_GATEWAY_BASE_URL` alone would be
+ * wrong-by-default: the Go gateway hijacks that name for the OPPOSITE
+ * direction, so in dev it points at the app itself.
+ */
 function codexGatewayV1BaseUrl(): string {
-  const base = env.LW_GATEWAY_BASE_URL;
+  const base =
+    env.LW_GATEWAY_INTERNAL_URL ??
+    env.LW_GATEWAY_PUBLIC_URL ??
+    env.LW_GATEWAY_BASE_URL;
   if (!base) {
     throw new Error(
-      "LW_GATEWAY_BASE_URL is not configured on the control plane; the AI gateway is required for Codex models.",
+      "The AI gateway URL is not configured on the control plane (LW_GATEWAY_INTERNAL_URL / LW_GATEWAY_PUBLIC_URL); it is required for Codex models.",
     );
   }
-  const trimmed = base.replace(/\/+$/, "");
-  return trimmed.endsWith("/v1") ? trimmed : `${trimmed}/v1`;
+  return ensureGatewayV1BaseUrl(base);
 }
