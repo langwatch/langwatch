@@ -126,7 +126,7 @@ type resolvedOTel struct {
 const UnsetSampleRatio = 0
 
 // Resolve reconciles the official OpenTelemetry environment variables with
-// the deprecated LangWatch names and the environment-aware defaults, then
+// the deprecated LangWatch names and the service defaults, then
 // validates the result. Call exactly once from LoadConfig, after Hydrate and
 // after SampleRatioSet is stamped; every telemetry accessor below requires it.
 //
@@ -134,7 +134,7 @@ const UnsetSampleRatio = 0
 // span: a conflicting or out-of-range value is not discoverable from inside
 // the running service, so the only place it can be caught is the place it is
 // read.
-func (o *OTel) Resolve(environment string) error {
+func (o *OTel) Resolve() error {
 	baseEndpoint, err := o.resolveBaseEndpoint()
 	if err != nil {
 		return err
@@ -143,7 +143,7 @@ func (o *OTel) Resolve(environment string) error {
 	if err != nil {
 		return err
 	}
-	sampler, err := o.resolveSampler(environment)
+	sampler, err := o.resolveSampler()
 	if err != nil {
 		return err
 	}
@@ -250,8 +250,8 @@ var officialSamplerKinds = map[string]struct {
 }
 
 // resolveSampler reconciles OTEL_TRACES_SAMPLER(+ARG) with the deprecated
-// OTEL_SAMPLE_RATIO and the environment-aware default.
-func (o *OTel) resolveSampler(environment string) (otelsetup.SamplerChoice, error) {
+// OTEL_SAMPLE_RATIO and the full-sampling default.
+func (o *OTel) resolveSampler() (otelsetup.SamplerChoice, error) {
 	legacySet := o.SampleRatioSet || o.SampleRatio != UnsetSampleRatio
 	if kind := strings.ToLower(strings.TrimSpace(o.TracesSampler)); kind != "" {
 		if legacySet {

@@ -9,9 +9,9 @@ import (
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 )
 
-func mustResolveSampler(t *testing.T, o OTel, environment string) otelsetup.SamplerChoice {
+func mustResolveSampler(t *testing.T, o OTel) otelsetup.SamplerChoice {
 	t.Helper()
-	require.NoError(t, o.Resolve(environment))
+	require.NoError(t, o.Resolve())
 	return o.SamplerChoice()
 }
 
@@ -20,37 +20,32 @@ func mustResolveSampler(t *testing.T, o OTel, environment string) otelsetup.Samp
 // asked for full sampling in production got 10% and no warning — the setting
 // was silently unusable at its most important value.
 func TestResolveSampler_HonoursExplicitFullLegacyRatio(t *testing.T) {
-	got := mustResolveSampler(t, OTel{SampleRatio: 1.0}, "production")
+	got := mustResolveSampler(t, OTel{SampleRatio: 1.0})
 
 	assert.InDelta(t, 1.0, got.Ratio, 0, "an explicit 100% must survive in production")
 	assert.True(t, got.ParentBased)
 }
 
 func TestResolveSampler_HonoursExplicitPartialLegacyRatio(t *testing.T) {
-	got := mustResolveSampler(t, OTel{SampleRatio: 0.25}, "production")
+	got := mustResolveSampler(t, OTel{SampleRatio: 0.25})
 
 	assert.InDelta(t, 0.25, got.Ratio, 0)
 }
 
-// No environment lowers the default: a backend service that says nothing
-// about sampling exports everything, in production too. A lowered default
-// reads as a broken exporter on quiet services, and would silently drop
-// customer data on the multi-tenant path.
-func TestResolveSampler_DefaultsToFullEverywhere(t *testing.T) {
-	got := mustResolveSampler(t, OTel{SampleRatio: UnsetSampleRatio}, "production")
+// Nothing lowers the default: a backend service that says nothing about
+// sampling exports everything, in production too. A lowered default reads
+// as a broken exporter on quiet services, and would silently drop customer
+// data on the multi-tenant path. The environment no longer even reaches the
+// sampler — Resolve takes no environment argument.
+func TestResolveSampler_DefaultsToFullSampling(t *testing.T) {
+	got := mustResolveSampler(t, OTel{SampleRatio: UnsetSampleRatio})
 
 	assert.InDelta(t, 1.0, got.Ratio, 0)
 	assert.True(t, got.ParentBased)
 }
 
-func TestResolveSampler_DefaultsToFullLocally(t *testing.T) {
-	got := mustResolveSampler(t, OTel{SampleRatio: UnsetSampleRatio}, "local")
-
-	assert.InDelta(t, 1.0, got.Ratio, 0, "local development traces everything")
-}
-
 func TestResolveSampler_HonoursExplicitZeroLegacyRatio(t *testing.T) {
-	got := mustResolveSampler(t, OTel{SampleRatioSet: true, SampleRatio: 0}, "production")
+	got := mustResolveSampler(t, OTel{SampleRatioSet: true, SampleRatio: 0})
 
 	assert.Zero(t, got.Ratio, "an explicit 0% must not become the default")
 }
@@ -72,7 +67,7 @@ func TestResolveSampler_MapsTheOfficialVocabulary(t *testing.T) {
 		{sampler: "parentbased_traceidratio", arg: "0.25", ratio: 0.25, parentBased: true},
 	} {
 		t.Run(tt.sampler, func(t *testing.T) {
-			got := mustResolveSampler(t, OTel{TracesSampler: tt.sampler, TracesSamplerArg: tt.arg}, "production")
+			got := mustResolveSampler(t, OTel{TracesSampler: tt.sampler, TracesSamplerArg: tt.arg})
 
 			assert.InDelta(t, tt.ratio, got.Ratio, 0)
 			assert.Equal(t, tt.parentBased, got.ParentBased)
@@ -81,7 +76,7 @@ func TestResolveSampler_MapsTheOfficialVocabulary(t *testing.T) {
 }
 
 func TestResolveSampler_AcceptsMixedCaseKind(t *testing.T) {
-	got := mustResolveSampler(t, OTel{TracesSampler: "Parentbased_TraceIdRatio", TracesSamplerArg: "0.3"}, "production")
+	got := mustResolveSampler(t, OTel{TracesSampler: "Parentbased_TraceIdRatio", TracesSamplerArg: "0.3"})
 
 	assert.InDelta(t, 0.3, got.Ratio, 0)
 	assert.True(t, got.ParentBased)
@@ -92,20 +87,20 @@ func TestResolveSampler_AcceptsMixedCaseKind(t *testing.T) {
 func TestResolveSampler_RequiresTheArgForRatioKinds(t *testing.T) {
 	o := OTel{TracesSampler: "parentbased_traceidratio"}
 
-	assert.Error(t, o.Resolve("production"))
+	assert.Error(t, o.Resolve())
 }
 
 func TestResolveSampler_RejectsBadSamplerArgs(t *testing.T) {
 	for _, arg := range []string{"NaN", "-1", "2", "abc", "0.5.1"} {
 		o := OTel{TracesSampler: "traceidratio", TracesSamplerArg: arg}
-		assert.Error(t, o.Resolve("production"), "arg %q must be refused at boot", arg)
+		assert.Error(t, o.Resolve(), "arg %q must be refused at boot", arg)
 	}
 }
 
 func TestResolveSampler_RejectsUnknownKinds(t *testing.T) {
 	o := OTel{TracesSampler: "jaeger_remote"}
 
-	assert.Error(t, o.Resolve("production"))
+	assert.Error(t, o.Resolve())
 }
 
 // Two live sampling instructions with different vocabularies is ambiguity,
@@ -113,5 +108,5 @@ func TestResolveSampler_RejectsUnknownKinds(t *testing.T) {
 func TestResolveSampler_RefusesOfficialAndLegacyTogether(t *testing.T) {
 	o := OTel{TracesSampler: "always_on", SampleRatioSet: true, SampleRatio: 0.1}
 
-	assert.Error(t, o.Resolve("production"))
+	assert.Error(t, o.Resolve())
 }
