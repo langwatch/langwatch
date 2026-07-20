@@ -154,6 +154,40 @@ export function setLensSyncBridge(bridge: LensSyncBridge | null): void {
 
 const DISMISSED_BUILTINS_KEY = "langwatch:traces-v2:dismissed-builtins:v1";
 const DRAFTS_KEY = "langwatch:traces-v2:drafts:v1";
+// Last-used lens id. Deliberately NOT project-scoped: built-in lens ids
+// (all-traces / simplified / conversations / …) are identical across every
+// project, so a single global key restores the user's preferred view
+// cross-project. A custom lens id only exists in its own project, so on a
+// different project it simply won't be found and the store falls back to
+// the default — the desired behaviour.
+const ACTIVE_LENS_KEY = "langwatch:traces-v2:active-lens:v1";
+
+function loadActiveLensId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(ACTIVE_LENS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function persistActiveLensId(id: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(ACTIVE_LENS_KEY, id);
+  } catch {
+    // storage may be full / disabled
+  }
+}
+
+// One-shot latch for restoring a persisted CUSTOM lens. Built-in lenses
+// restore synchronously at store init (their ids exist before hydration);
+// custom lenses only appear once `setUserLenses` runs, so we re-apply the
+// persisted id on that first server hydration — but only if the user hasn't
+// already picked a lens this session (so an explicit choice never gets
+// clobbered by late-arriving hydration).
+let customLensHydrationDone = false;
+let userPickedLensThisSession = false;
 
 const DEFAULT_SORT: SortConfig = { columnId: "time", direction: "desc" };
 
@@ -560,9 +594,14 @@ const initialDismissedBuiltIns = loadDismissedBuiltInIds();
 const initialLenses: LensConfig[] = builtInLenses.filter(
   (l) => !initialDismissedBuiltIns.has(l.id),
 );
+const persistedActiveLensId = loadActiveLensId();
 const initialActiveLensId =
-  initialLenses.find((l) => l.id === "all-traces")?.id ??
-  initialLenses[0]?.id ??
+  // Restore the persisted lens when it's already known (a built-in, present
+  // at init). Custom lenses hydrate later and are restored in setUserLenses.
+  (persistedActiveLensId &&
+    initialLenses.find((l) => l.id === persistedActiveLensId)?.id) ||
+  initialLenses.find((l) => l.id === "all-traces")?.id ||
+  initialLenses[0]?.id ||
   "all-traces";
 const initialDrafts = loadDrafts();
 const initialActiveLens = initialLenses.find(
@@ -586,6 +625,10 @@ export const useViewStore = create<ViewState>((set, get) => ({
     set((s) => {
       const lens = s.allLenses.find((l) => l.id === id);
       if (!lens) return s;
+      // A deliberate pick — remember it (cross-navigation, cross-project for
+      // built-ins) and stop late hydration from overriding this choice.
+      userPickedLensThisSession = true;
+      persistActiveLensId(id);
       const draft = s.draftState.get(id);
       // Apply the lens's filter (or its draft override) to filterStore via
       // the silent setter — `applyQueryText` would loop back through
@@ -849,6 +892,34 @@ export const useViewStore = create<ViewState>((set, get) => ({
       const builtIns = s.allLenses.filter((l) => l.isBuiltIn);
       const userLenses = lenses.map((l) => ({ ...l, isBuiltIn: false }));
       const allLenses = [...builtIns, ...userLenses];
+
+      // First server hydration: the persisted last-used lens may be a CUSTOM
+      // lens that only becomes available now. Restore it once, unless the
+      // user already picked a lens this session (never clobber an explicit
+      // choice with late-arriving hydration).
+      if (!customLensHydrationDone) {
+        customLensHydrationDone = true;
+        const persisted = loadActiveLensId();
+        if (
+          !userPickedLensThisSession &&
+          persisted &&
+          persisted !== s.activeLensId
+        ) {
+          const target = allLenses.find((l) => l.id === persisted);
+          if (target) {
+            const draft = s.draftState.get(persisted);
+            applyFilterTextFromLens(draft?.filter ?? target.filterText);
+            return {
+              allLenses,
+              activeLensId: persisted,
+              sort: draft?.sort ?? target.sort,
+              grouping: draft?.grouping ?? target.grouping,
+              columnOrder: draft?.columns ?? target.columns,
+            };
+          }
+        }
+      }
+
       // Mirror to localStorage so a refresh has instant data before
       // the tRPC query resolves — keeps the lens strip from flashing
       // empty between mount and hydration.
