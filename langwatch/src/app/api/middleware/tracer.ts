@@ -7,6 +7,8 @@ import {
 } from "@opentelemetry/api";
 import type { Context, Next } from "hono";
 
+import { claimOncePerRequest } from "./request-once";
+
 type TracerOptions = {
   name?: string;
 };
@@ -19,6 +21,11 @@ const headersGetter = {
 
 export const tracerMiddleware = (options?: TracerOptions) => {
   return async (c: Context, next: Next): Promise<any> => {
+    // Every SecuredApp registers this and the families sharing basePath "/api"
+    // all match the same request — without this a request gets one nested
+    // server span per family instead of one span for the request.
+    if (!claimOncePerRequest(c.req.raw, "tracer")) return next();
+
     const tracer = trace.getTracer("langwatch:api:hono");
 
     const incomingHeaders = c.req.raw.headers;

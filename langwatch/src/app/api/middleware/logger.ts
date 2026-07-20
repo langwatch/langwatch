@@ -8,11 +8,16 @@ import {
   createContextFromHono,
   runWithContext,
 } from "../../../server/context/asyncContext";
+import { claimOncePerRequest } from "./request-once";
 
 const logger = createLogger("langwatch:api:hono");
 
 export const loggerMiddleware = () => {
   return async (c: Context, next: Next): Promise<any> => {
+    // Every SecuredApp registers this and the families sharing basePath "/api"
+    // all match the same request — log it for the outermost one only.
+    if (!claimOncePerRequest(c.req.raw, "logger")) return next();
+
     // Create context from Hono context and run within it
     const ctx = createContextFromHono(c);
 
