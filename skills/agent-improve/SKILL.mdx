@@ -49,9 +49,9 @@ For each significant finding, build an explicit hypothesis chain and present it 
 - **Proposed fix if confirmed**: the prompt, code, or configuration change
 - **Expected effect**: which metric should move, by roughly how much
 
-Present 2-4 hypotheses ranked by expected impact over effort. Ask which to pursue: the user must understand and agree with the reasoning before anything is created. If the user pushes back, refine the hypothesis with them; they know their domain.
+Present 2-4 hypotheses ranked by expected impact over effort, then stop and ask which to pursue: end your turn with that question and execute nothing until the user answers. Permission to act autonomously does not waive this gate; it exists so the user understands and agrees with the reasoning before anything is created, and an unrequested change is worth less than an understood one. If the user pushes back, refine the hypothesis with them; they know their domain.
 
-When you operate under a contract that forbids asking the user questions (for example an in-product agent with act-immediately rules), do not stall on the gate: present the ranked hypotheses, state which one you are executing and why in one line, and proceed with the top-ranked one. The explanation duty stays either way.
+The only exception is an environment where asking is truly impossible (for example an in-product agent whose platform rules forbid ending on a question). There, and only there, present the ranked hypotheses, state in one line which one you are executing and why, and proceed with the top-ranked one. The explanation duty stays either way.
 
 ## Step 4: Execute the Chosen Hypotheses
 
