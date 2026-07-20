@@ -56,7 +56,12 @@ export const GovernSection = React.memo(function GovernSection({
     router.pathname.startsWith("/settings/governance/");
 
   return (
-    <SidebarSection id="govern" label="Govern" showExpanded={showExpanded}>
+    <SidebarSection
+      id="govern"
+      label="Govern"
+      showExpanded={showExpanded}
+      defaultExpanded={false}
+    >
       {showGatewayEntry && (
         <SideMenuLink
           icon={featureIcons.gateway.icon}

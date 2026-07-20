@@ -15,7 +15,7 @@ Feature: Separate experiments from online evaluations
     And "Test" contains "Simulations", "Experiments", and "Annotations" in that order
     And the existing "Build" section is named "Library"
     And "Library" contains "Prompts", "Agents", "Workflows", "Evaluators", "Datasets", and "Automations" in that order
-    And "Observe" contains its existing destinations followed by the menu label "Online evals" after "Traces"
+    And "Observe" contains its existing destinations followed by the menu label "Online Evals" after "Traces"
     And the destination page and product copy keep the full name "Online Evaluations"
     And "Automations" is not listed in "Observe"
     And the remaining destinations keep their current section, name, and order
@@ -38,8 +38,8 @@ Feature: Separate experiments from online evaluations
   Scenario: Use sensible section defaults without a saved preference
     Given I have no saved primary navigation preferences
     When I open a project
-    Then "Observe", "Test", and "Govern" are expanded
-    And "Library" is collapsed
+    Then "Observe" and "Test" are expanded
+    And "Library" and "Govern" are collapsed
 
   Scenario: Discover experiments as a distinct testing workflow
     Given I want to test or compare an application before deployment
@@ -51,7 +51,7 @@ Feature: Separate experiments from online evaluations
   Scenario: Discover online evaluations as a distinct observation workflow
     Given I want to monitor application quality in production
     When I scan the "Observe" section
-    Then I can open an "Online evals" destination without opening an experiments screen
+    Then I can open an "Online Evals" destination without opening an experiments screen
     And its page heading uses the full name "Online Evaluations"
     And the page explains that configured evaluations run on live traces or threads
     And the page does not list experiments

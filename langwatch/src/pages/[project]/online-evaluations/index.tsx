@@ -171,7 +171,8 @@ function OnlineEvaluationsPage() {
                 <Text>
                   Learn more in the{" "}
                   <Link
-                    color="teal.500"
+                    color="inherit"
+                    textDecoration="underline"
                     href="https://langwatch.ai/docs/evaluations/online-evaluation/overview"
                     isExternal
                   >

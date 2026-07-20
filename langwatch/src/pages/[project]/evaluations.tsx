@@ -156,7 +156,8 @@ export function ExperimentsPage() {
                 <Text>
                   To learn more about experiments, visit the{" "}
                   <Link
-                    color="green.500"
+                    color="inherit"
+                    textDecoration="underline"
                     href="https://langwatch.ai/docs/evaluations/experiments/overview"
                     isExternal
                   >

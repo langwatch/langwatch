@@ -150,7 +150,7 @@ export const MainMenu = React.memo(function MainMenu({
               <PageMenuLink
                 path={projectRoutes.online_evaluations.path}
                 icon={featureIcons.online_evaluations.icon}
-                label="Online evals"
+                label="Online Evals"
                 project={project}
                 isActive={isOnlineEvaluationsActivePath(router.pathname)}
                 showLabel={showExpanded}

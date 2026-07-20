@@ -1,5 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import type React from "react";
 
 import { useSidebarSectionState } from "./useSidebarSectionState";
@@ -88,10 +88,10 @@ const SidebarSectionToggle = ({
             {label}
           </Text>
         )}
-        {isExpanded ? (
-          <ChevronDown size={13} aria-hidden="true" />
-        ) : (
-          <ChevronRight size={13} aria-hidden="true" />
+        {!isExpanded && (
+          <Box opacity={0.5} display="flex">
+            <ChevronRight size={13} aria-hidden="true" />
+          </Box>
         )}
       </HStack>
     </button>

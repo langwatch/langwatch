@@ -107,7 +107,7 @@ describe("<MainMenu /> navigation", () => {
       "Collapse Observe",
       "Collapse Test",
       "Expand Library",
-      "Collapse Govern",
+      "Expand Govern",
     ]);
 
     expect(visibleLinkLabels()).toEqual([
@@ -115,12 +115,10 @@ describe("<MainMenu /> navigation", () => {
       "Analytics",
       "Trace Explorer",
       "Traces",
-      "Online evals",
+      "Online Evals",
       "Simulations",
       "Experiments",
       "Annotations",
-      "AI Gateway",
-      "AI Governance",
       "Settings",
     ]);
   });
