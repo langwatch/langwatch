@@ -170,6 +170,23 @@ Current sweeps under this carve-out, both on worker boot:
 
 Anything else that wants to skip the filter should be a repository method taking a `tenantId`, not a sweep.
 
+### Carve-out: organization-scoped billing ledgers
+
+A table whose whole purpose is to total usage *across* an organization's projects cannot lead with `TenantId` — the aggregate it exists to answer has no single tenant. One table qualifies today:
+
+- `metric_usage_estimates` (`queryMetricUsageEstimates`, `metric-data-point.usage.ts`) — ORDER BY `(OrganizationId, TenantId, PointId)`.
+
+It is allowed to lead with `OrganizationId` **only** because all of these hold:
+
+1. The `OrganizationId = {organizationId:String}` predicate **is** the isolation boundary here, exactly as `TenantId` is elsewhere. Do not mistake client selection for that boundary: `getClickHouseClientForOrganization` returns a private instance only when a `CLICKHOUSE_URL__<org>` entry exists and otherwise falls back to the **shared** client, which is the common case — so on a shared instance every organization's rows live in one `metric_usage_estimates` table and the predicate is the only thing separating them. Never relax it, and never widen it to a table holding customer data on the theory that instances are per-organization. The repository still takes the organization resolver as a **required** constructor argument, so which client is used stays an explicit decision rather than a default inherited from the project resolver.
+2. `OrganizationId` leads the table's sort key, so the predicate order matches the index. A `TenantId`-first predicate would be both wrong for the aggregate and worse for the scan.
+3. `TenantId` is still ANDed in whenever the caller supplies one, and remains a selected grouping dimension.
+4. The table holds identifiers and byte counts only — never attributes, values, buckets or payloads — so a scoping mistake cannot leak customer data.
+5. A test pins that the organization-wide path uses the organization-resolved client and filters on `OrganizationId`.
+6. The caller has already proven the requesting user belongs to `organizationId`. The repository asserts only that the string is non-empty — it authenticates nothing. `queryMetricUsageEstimates` has no callers yet, so this costs nothing today; whoever wires the first route owns the membership check, because with condition 1 the predicate is the boundary and an unchecked `organizationId` from a request hands the caller someone else's ledger.
+
+A new table wanting this carve-out needs all six, plus a line here. Anything that merely *finds it convenient* to skip `TenantId` does not qualify.
+
 ## Code Review Checklist
 
 When reviewing a PR that touches a `*.clickhouse.repository.ts` or any service hitting ClickHouse, scan for:

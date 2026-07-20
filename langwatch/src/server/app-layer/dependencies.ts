@@ -36,7 +36,6 @@ import type { SuiteRunService } from "./suites/suite-run.service";
 import type { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
-import type { MetricRecordStorageService } from "./traces/metric-record-storage.service";
 import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
@@ -77,7 +76,6 @@ export interface AppDependencies {
     list: TraceListService;
     spans: SpanStorageService;
     logRecords: LogRecordStorageService;
-    metricRecords: MetricRecordStorageService;
     collection: TraceRequestCollectionService;
     logCollection: LogRequestCollectionService;
     metricCollection: MetricRequestCollectionService;

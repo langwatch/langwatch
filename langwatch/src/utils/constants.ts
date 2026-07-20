@@ -42,7 +42,6 @@ export const KSUID_RESOURCES = {
   TEAM: "team",
   TRIGGER: "trigger",
   LOG_RECORD: "logrecord",
-  METRIC_RECORD: "metricrecord",
   TRACE_SUMMARY: "tracesummary",
   TRACKED_EVENT: "trackedevent",
   USER: "user",
