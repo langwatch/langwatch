@@ -1,8 +1,22 @@
 [
   {
-    "id": "analytics",
-    "label": "Analytics",
-    "description": "Analyze your AI agent's performance using LangWatch analytics. Use when the user wants to understand costs, latency, error rates, usage trends, or debug specific traces. Works with any LangWatch-instrumented agent.",
+    "id": "agent-best-practices",
+    "label": "Agent best practices",
+    "description": "Expert AI engineering consultant for your agent development practices. Audits your codebase, traces, evaluations, and scenarios against best practices, then guides you to close the gaps, starting from low-hanging fruit and going deeper. Use when you want to level up your agent's engineering quality.",
+    "category": "recipe",
+    "userPrompt": "Where can I improve our agent development best practices?"
+  },
+  {
+    "id": "agent-improve",
+    "label": "Agent improve",
+    "description": "Turns production evidence into tested improvements for your AI agent. Forms hypotheses from real traces and analytics, explains the reasoning behind each one, then executes with the user: scenario tests that reproduce production failures, prompt and code changes as reviewable PRs, new evaluators and monitors that capture production signals, and experiments that settle open questions. Use when you want to know what to do next to improve your agent.",
+    "category": "skill",
+    "userPrompt": "What should I do next to improve my agent?"
+  },
+  {
+    "id": "agent-performance",
+    "label": "Agent performance",
+    "description": "Deep-dive diagnosis of how your AI agent behaves in production. Explores LangWatch analytics and traces end to end to map failure patterns, dissatisfied users, token cost hotspots, edge cases, behavior changes, and outliers, then delivers an HTML report where every finding links to real example traces. Use when you want to truly understand what your agent is doing in production.",
     "category": "skill",
     "userPrompt": "How is my agent performing?"
   },
@@ -42,12 +56,6 @@
     "label": "GitHub",
     "description": "Open a real pull request — clone a repo, branch, commit, push, and open a PR authored by the LangWatch app on behalf of the requesting user. Use when the user asks to open a PR, fix something in a repo and submit it, send a patch, raise a pull request, or otherwise land a code change on GitHub.",
     "category": "skill"
-  },
-  {
-    "id": "improve-setup",
-    "label": "Improve setup",
-    "description": "Expert AI engineering consultant for your LangWatch setup. Audits your codebase, traces, evaluations, and scenarios, then guides you to improve — starting from low-hanging fruit and going deeper. Use when you want to level up your agent's engineering quality.",
-    "category": "recipe"
   },
   {
     "id": "level-up",

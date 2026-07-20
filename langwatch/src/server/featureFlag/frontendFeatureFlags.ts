@@ -60,6 +60,10 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_ai_governance_enabled",
   "release_langy_enabled",
   "release_langy_promo_enabled",
+  // The signal-focused home composition (briefing sheet leads). Decides
+  // the homepage's layout ONLY — Langy access separately gates the
+  // sheet's hand-to-Langy affordances. See useShowSignalFocusedHome.
+  "release_ui_home_signal_focused_enabled",
   "release_webhook_automations",
 ] as const;
 

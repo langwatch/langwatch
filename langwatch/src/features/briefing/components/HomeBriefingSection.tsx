@@ -1,5 +1,6 @@
 import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { LangyPanelSurface } from "~/features/asaplangy";
+import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { HomeOverviewCard } from "./HomeOverviewCard";
@@ -27,6 +28,11 @@ export function HomeBriefingSection() {
   const { data, statusCells, isLoading, isAnalyticsLoading, isRefreshing } =
     useLangyBriefing();
   const { project } = useOrganizationTeamProject();
+  // The sheet renders wherever the signal-focused home is rolled out — with
+  // or without Langy (spec: specs/home/signal-focused-home-rollout.feature).
+  // Without Langy, every hand-to-Langy handler stays undefined so the sheet
+  // offers only its own evidence links, never a panel that won't mount.
+  const showLangy = useShowLangy();
   const openPanel = useLangyStore((s) => s.openPanel);
   const askLangy = useLangyStore((s) => s.askLangy);
   const attachContext = useLangyStore((s) => s.attachContext);
@@ -92,10 +98,10 @@ export function HomeBriefingSection() {
   return (
     <LangyBriefing
       data={data}
-      onAsk={openPanel}
-      onAskSubmit={handleAskSubmit}
-      onFeedback={handleSignalFeedback}
-      onInvestigateReceipt={handleInvestigateReceipt}
+      onAsk={showLangy ? openPanel : undefined}
+      onAskSubmit={showLangy ? handleAskSubmit : undefined}
+      onFeedback={showLangy ? handleSignalFeedback : undefined}
+      onInvestigateReceipt={showLangy ? handleInvestigateReceipt : undefined}
       status={
         <HomeOverviewCard
           bare

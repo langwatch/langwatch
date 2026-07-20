@@ -36,6 +36,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Check,
   CopyPlus,
@@ -45,12 +46,11 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { Tooltip } from "~/components/ui/tooltip";
 import { Menu } from "~/components/ui/menu";
+import { Tooltip } from "~/components/ui/tooltip";
 import type { LangyConversationListItemDto } from "../data/langy.dtos";
 import { useLangyConversationListQuery } from "../data/useLangyConversationListQuery";
 import { formatLangyConversationDate } from "../logic/langyConversationDate";
@@ -219,8 +219,15 @@ export function RecentChatsMenu({
       minWidth={trigger ? 0 : undefined}
     >
       {/* Ark anchors the listbox to the Control. Without it the popover lands in
-          the viewport's top-left corner. */}
-      <Combobox.Control display="flex" flex={1} minWidth={0}>
+          the viewport's top-left corner. Stretch ONLY when hosted on a caller's
+          title trigger (so the title can ellipsis-truncate); the bare icon case
+          stays intrinsic, or a stretched control would push its "bottom-end"
+          popover off the right edge of a right-docked panel. */}
+      <Combobox.Control
+        display="flex"
+        flex={trigger ? 1 : undefined}
+        minWidth={trigger ? 0 : undefined}
+      >
         {trigger ? (
           <Combobox.Trigger asChild>{trigger}</Combobox.Trigger>
         ) : (
@@ -254,6 +261,19 @@ export function RecentChatsMenu({
             borderColor="border.muted"
             boxShadow="lg"
             css={{
+              // Ark's Combobox positioner start-aligns even on a "bottom-end"
+              // placement, so from the icon at the panel's right edge the 340px
+              // popover ran off the viewport. Right-align the content to the
+              // trigger ourselves: shift it left by its own width less the
+              // trigger's (`--reference-width`, exposed by the positioner), on
+              // the standalone `translate` so it composes with the open/close
+              // scale on `transform`. Only the bare icon form needs it; a
+              // caller trigger positions itself.
+              ...(trigger
+                ? {}
+                : {
+                    translate: "calc(-100% + var(--reference-width, 24px)) 0",
+                  }),
               backdropFilter: "blur(18px) saturate(0.5)",
               WebkitBackdropFilter: "blur(18px) saturate(0.5)",
             }}

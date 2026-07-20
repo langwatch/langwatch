@@ -224,24 +224,29 @@ First, try to install the LangWatch MCP server for access to documentation and p
 - Do NOT manually edit \`prompts.json\` — use the CLI commands (\`langwatch prompt init\`, \`langwatch prompt create\`, \`langwatch prompt sync\`)
 - Do NOT skip \`langwatch prompt sync\` — prompts must be synced to the platform after creation`;
 
-export const PROMPT_ANALYTICS = `Analyze Agent Performance with LangWatch
+export const PROMPT_AGENT_PERFORMANCE = `Diagnose Your Agent's Production Behavior
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
-First, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it, they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, use that endpoint instead of app.langwatch.ai.
+Use the \`langwatch\` CLI for everything: install it with \`npm install -g langwatch\` (or run any command via \`npx langwatch\`).
 
-# Analyze Agent Performance with LangWatch
+# Diagnose Your Agent's Production Behavior
 
-This skill uses LangWatch MCP tools to query and present analytics. It does NOT write code.
+This skill reads production traffic and answers: what is my agent doing, where is it failing, who is it annoying, and where is the money going. Read-only, plus one report file.
+
+1. Baseline the vital signs with \`langwatch analytics query\` presets (trace-count, total-cost, avg-latency, p95-latency, total-tokens, eval-pass-rate), then slice with \`--group-by\` to find where the numbers come from.
+2. Export evidence with \`langwatch trace export --format jsonl --limit 1000\` and mine it locally: failure patterns, dissatisfied users, token cost hotspots, edge cases, behavior changes between time windows, outliers.
+3. Read representative traces in full with \`langwatch trace get <traceId>\` and keep 2-3 example trace IDs per finding.
+4. Write a self-contained agent-performance-report.html where every finding links to real example traces, then summarize the top findings with numbers in the conversation.
+5. Close by recommending the agent-improve skill to turn findings into tested changes (\`npx skills add langwatch/skills/agent-improve\`).
 
 ## Common Mistakes
 
-- Do NOT skip \`discover_schema\` -- always call it first to understand available metrics before querying
-- Do NOT try to write code -- this skill uses MCP tools only, no SDK installation or code changes
-- Do NOT hardcode metric names -- discover them dynamically so they stay correct as the platform evolves
-- Do NOT use \`platform_\` MCP tools for creating resources -- this skill is read-only analytics
-- Do NOT present raw JSON to the user -- summarize the data in a clear, human-readable format`;
+- Do NOT modify code, prompts, or platform resources, this skill is read-only plus the report file
+- Do NOT report a pattern without linked example traces
+- Do NOT rely on aggregates alone, always read full traces per finding
+- Do NOT present raw JSON to the user, deliver the diagnosis in plain language with numbers`;
 
 export const PROMPT_LEVEL_UP = `${PROMPT_TRACING}
 

@@ -3326,23 +3326,23 @@ Common recipes for improving your agent, your coding agent can execute these dir
     <div className="lw-accordion-commands">
       <div className="lw-accordion-cmd-col">
         <div className="lw-accordion-cmd-label">Install via CLI</div>
-        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/improve-setup"} data-track="docs_copy_skill_install" data-track-title={"What should I do next to improve my agent?"} data-track-skill={"langwatch/skills/recipes/improve-setup"}>
-          <code>npx skills add langwatch/skills/recipes/improve-setup</code>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/agent-improve"} data-track="docs_copy_skill_install" data-track-title={"What should I do next to improve my agent?"} data-track-skill={"langwatch/skills/agent-improve"}>
+          <code>npx skills add langwatch/skills/agent-improve</code>
           <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
           <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
         </div>
       </div>
       <div className="lw-accordion-cmd-col">
         <div className="lw-accordion-cmd-label">Skill Usage</div>
-        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/improve-setup"} data-track="docs_copy_slash_command" data-track-title={"What should I do next to improve my agent?"} data-track-command={"/improve-setup"}>
-          <code><span className="lw-slash-command">/improve-setup</span></code>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/agent-improve"} data-track="docs_copy_slash_command" data-track-title={"What should I do next to improve my agent?"} data-track-command={"/agent-improve"}>
+          <code><span className="lw-slash-command">/agent-improve</span></code>
           <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
           <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
         </div>
       </div>
     </div>
     <div className="lw-accordion-actions">
-      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"What should I do next to improve my agent?"} data-track-skill={"langwatch/skills/recipes/improve-setup"}>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"What should I do next to improve my agent?"} data-track-skill={"langwatch/skills/agent-improve"}>
         <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
         <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
         <span className="lw-accordion-action-text">
@@ -3352,145 +3352,16 @@ Common recipes for improving your agent, your coding agent can execute these dir
         <div className="lw-prompt-source">
 
 ````text
-You are using LangWatch for your AI agent project. Follow these instructions.
-
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
-Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
-
-# Improve Your LangWatch Setup
-
-This recipe acts as your expert AI engineering consultant. It audits everything, delivers quick fixes, then guides you deeper.
-
-## Phase 1: Full Audit
-
-Before suggesting anything, read EVERYTHING:
-
-### Code Audit
-
-1. Read the full codebase — every file, every function, every system prompt
-2. Study `git log --oneline -50` — read commit messages for WHY things changed. Bug fixes reveal edge cases. Refactors reveal design decisions. These are goldmines for what to test and evaluate.
-3. Read README, docs, comments for domain context
-
-### LangWatch Audit (via CLI)
-
-4. `langwatch trace search --limit 25 --format json` — check trace quality (inputs/outputs populated? spans connected? labels present?)
-5. `langwatch scenario list --format json` — what scenarios exist? Are they comprehensive or shallow?
-6. `langwatch suite list --format json` — what suites (run plans) exist?
-7. `langwatch evaluator list --format json` — what evaluators are configured?
-8. `langwatch monitor list --format json` — any online evaluation monitors set up?
-9. `langwatch prompt list --format json` — are prompts versioned (or are they all hardcoded in code)?
-10. `langwatch analytics query --metric trace-count` and `--metric total-cost`, `--metric avg-latency`, `--metric eval-pass-rate` — what's the current cost, latency, error/pass rate?
-
-### Gap Analysis
-
-Based on the audit, identify:
-
-- What's missing entirely (no scenarios? no evaluations? no prompt versioning?)
-- What exists but is weak (generic datasets? shallow scenarios? broken traces?)
-- What's working well (keep and build on)
-
-## Phase 2: Low-Hanging Fruit
-
-Fix the easiest, highest-impact issues first:
-
-- Broken instrumentation → fix traces (see `debug-instrumentation` recipe)
-- Hardcoded prompts → set up prompt versioning (`langwatch prompt init`, see the `prompts` skill)
-- No tests at all → create initial scenario tests (see the `scenarios` skill)
-- Generic datasets → generate domain-specific ones (see the `datasets` skill)
-
-Deliver working results. Show the user what improved. This is the a-ha moment.
-
-## Phase 3: Guide Deeper
-
-After Phase 2, DON'T STOP. Suggest 2-3 specific improvements based on what you learned:
-
-1. **Domain-specific improvements**: Based on the codebase domain, suggest targeted scenarios or evaluations. "I noticed your agent handles \[X] — should I add edge case tests for \[Y]?"
-
-2. **Expert involvement**: If the domain is specialized (medical, financial, legal), suggest involving domain experts. "For healthcare scenarios, you'd benefit from a medical professional reviewing the compliance criteria — want me to draft scenarios they can review?"
-
-3. **Data quality**: If using synthetic data, suggest real data. "Do you have real customer queries or support tickets? Those would make much better evaluation datasets."
-
-4. **CI/CD integration**: If no CI pipeline, suggest adding experiments. "Want me to set up experiments that run in CI to catch regressions?"
-
-5. **Production monitoring**: If no online evaluation, suggest monitors. "Your traces show no quality monitoring — want me to set up faithfulness checks on production traffic with `langwatch monitor create`?"
-
-Ask light questions with options. Don't overwhelm — pick the top 2-3 most impactful.
-
-## Phase 4: Keep Iterating
-
-After each improvement:
-
-1. Show what was accomplished
-2. Run any tests / re-query analytics to verify (`langwatch trace search`, `langwatch suite run --wait`, etc.)
-3. Ask what to tackle next
-4. Stop when the user says "that's enough"
-
-## Common Mistakes
-
-- Do NOT skip the audit — you can't suggest improvements without understanding the current state
-- Do NOT give generic advice — every suggestion must be specific to this codebase
-- Do NOT overwhelm with 10 suggestions — pick the top 2-3
-- Do NOT skip running/verifying improvements
-````
-
-        </div>
-      </div>
-      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/improve-setup/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"What should I do next to improve my agent?"} data-track-skill={"langwatch/skills/recipes/improve-setup"}>
-        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
-        <span className="lw-accordion-action-text">
-          <span className="lw-accordion-action-title">Download SKILL.md</span>
-          <span className="lw-accordion-action-subtitle">Manual installation</span>
-        </span>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div className="lw-accordion">
-  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
-    <span className="lw-accordion-title">How is my agent performing?</span>
-    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
-  </div>
-  <div className="lw-accordion-body">
-    <div className="lw-accordion-commands">
-      <div className="lw-accordion-cmd-col">
-        <div className="lw-accordion-cmd-label">Install via CLI</div>
-        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/analytics"} data-track="docs_copy_skill_install" data-track-title={"How is my agent performing?"} data-track-skill={"langwatch/skills/analytics"}>
-          <code>npx skills add langwatch/skills/analytics</code>
-          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
-          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
-        </div>
-      </div>
-      <div className="lw-accordion-cmd-col">
-        <div className="lw-accordion-cmd-label">Skill Usage</div>
-        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/analytics"} data-track="docs_copy_slash_command" data-track-title={"How is my agent performing?"} data-track-command={"/analytics"}>
-          <code><span className="lw-slash-command">/analytics</span></code>
-          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
-          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
-        </div>
-      </div>
-    </div>
-    <div className="lw-accordion-actions">
-      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"How is my agent performing?"} data-track-skill={"langwatch/skills/analytics"}>
-        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
-        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
-        <span className="lw-accordion-action-text">
-          <span className="lw-accordion-action-title">Copy Full Prompt</span>
-          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
-        </span>
-        <div className="lw-prompt-source">
-
-````text
-How is my agent performing?
+What should I do next to improve my agent?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
 IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
-# Analyze Agent Performance with LangWatch
+# Improve Your Agent, Hypothesis by Hypothesis
 
-This skill queries and presents analytics. It does NOT write code.
+This skill is an improvement engine with a teaching stance: every proposal is a hypothesis backed by production evidence, explained until the user understands WHY it is worth testing. Nothing gets built on a hunch.
 
 ## Step 1: Set up the LangWatch CLI
 
@@ -3522,80 +3393,411 @@ And two ways to authenticate:
 
 So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
-## Step 2: Get a Project Overview
+## Step 2: Gather Evidence Before Proposing Anything
+
+Improvements start from evidence, never from generic advice.
+
+1. **Use an existing diagnosis when there is one.** Look for `agent-performance-report.html` (or ask if a recent diagnosis exists). If present, read it and extract the findings and their example trace IDs.
+2. **No diagnosis available?** Run a focused evidence sweep yourself:
 
 ```bash
-langwatch status
+langwatch analytics query --metric trace-count --format json     # Volume and trend
+langwatch analytics query --metric eval-pass-rate --format json  # Quality trend, if evaluators exist
+langwatch analytics query --metric total-cost --group-by metadata.model --format json
+langwatch trace export --format jsonl --limit 500 -o evidence.jsonl
+langwatch trace search -q "error" --limit 10 --format json
 ```
 
-This shows resource counts (traces, evaluators, scenarios, datasets, etc.) and reminds you which subcommands are available.
+Mine the export for failure clusters, dissatisfied users, cost concentration, and odd behavior, and keep 2-3 example trace IDs per issue. For the full treatment, suggest running `/agent-performance` first (install with `npx skills add langwatch/skills/agent-performance`).
 
-## Step 3: Query Trends and Aggregations
+3. **Read the codebase too.** The fix for a production pattern usually lives in a prompt or a code path: read the system prompts, the tool definitions, and `git log --oneline -30` so proposals name the exact file and line to change.
 
-Use `langwatch analytics query` for time-series data and aggregate metrics. Start with the presets:
+## Step 3: Form Hypotheses and Explain Them
+
+For each significant finding, build an explicit hypothesis chain and present it to the user:
+
+- **Observation**: what the traces show, with linked examples ("11% of conversations rephrase the same question twice, examples: trace A, trace B")
+- **Hypothesis**: the suspected cause ("the retrieval step returns stale documents for date-sensitive questions")
+- **Proposed test**: how to prove or disprove it cheaply (a scenario test, an experiment, an evaluator watching prod)
+- **Proposed fix if confirmed**: the prompt, code, or configuration change
+- **Expected effect**: which metric should move, by roughly how much
+
+Present 2-4 hypotheses ranked by expected impact over effort, then stop and ask which to pursue: end your turn with that question and execute nothing until the user answers. Permission to act autonomously does not waive this gate; it exists so the user understands and agrees with the reasoning before anything is created, and an unrequested change is worth less than an understood one. If the user pushes back, refine the hypothesis with them; they know their domain.
+
+The only exception is an environment where asking is truly impossible (for example an in-product agent whose platform rules forbid ending on a question). There, and only there, present the ranked hypotheses, state in one line which one you are executing and why, and proceed with the top-ranked one. The explanation duty stays either way.
+
+## Step 4: Execute the Chosen Hypotheses
+
+Each hypothesis becomes real artifacts. Pick the right tool per case:
+
+### Reproduce failures as scenario tests
+
+Turn real failing traces into scenario tests that fail today and pass once fixed. Fetch the exact inputs with `langwatch trace get <traceId> -f json`, then follow the `scenarios` skill (`langwatch scenario-docs getting-started`) to write them. Real production inputs beat invented ones.
+
+Sanitize before you commit: production traces can carry names, emails, account data, or secrets. Reproduce the STRUCTURE of the failing input (length, language, format, the property that triggers the failure) with the sensitive values replaced by realistic stand-ins, and reference the original as a trace link in the test's comment instead of pasting it. Never commit raw customer content into tests, fixtures, or PR descriptions.
+
+### Change prompts and code as a reviewable PR
+
+Make the fix on a branch: prompt edits (versioned through the `prompts` skill when prompts are managed in LangWatch), retrieval or tool-code changes, guardrails. The PR description must tell the whole story: observation, hypothesis, evidence links, what changed, and which scenario test proves it. The user reviews and merges; you never push to main.
+
+### Capture production signals with evaluators and monitors
+
+When a hypothesis needs more production data, or a fixed issue must stay fixed, add detection:
 
 ```bash
-langwatch analytics query --metric trace-count        # Total traces over the last 7 days
-langwatch analytics query --metric total-cost         # Total LLM cost
-langwatch analytics query --metric avg-latency        # Average completion latency
-langwatch analytics query --metric p95-latency        # P95 completion latency
-langwatch analytics query --metric eval-pass-rate     # Evaluation pass rate
+langwatch evaluator list --format json        # What exists already
+langwatch monitor create ...                  # Watch the signal on live traffic
 ```
 
-Refine with `--start-date`, `--end-date`, `--group-by`, `--time-scale`, and `--aggregation`. Use `langwatch analytics query --help` to see every flag and `--format json` to feed the output to other tools.
+Examples: an LLM-judge evaluator flagging stale-data answers, a monitor on refusal rate, a check for the specific failure mode you just fixed. These turn one-off findings into permanent signals for the next exploration.
 
-If you don't know which preset names exist or want a non-preset metric path:
+### Settle open questions with experiments
 
-```bash
-langwatch analytics query --help                       # Lists presets and flags
-langwatch docs analytics/custom-metrics                # Background on the metric model
-```
+When two approaches compete (two prompts, two models, two retrieval settings), run an experiment instead of arguing: build a dataset from real traces (`datasets` skill), then `langwatch experiment run` both variants and compare. Numbers close debates.
 
-## Step 4: Find Specific Traces
+LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments, and datasets. When you hit a limit, the API returns `"Free plan limit of N reached..."` with an upgrade link.
 
-```bash
-langwatch trace search -q "error" --limit 10           # Find error traces by keyword
-langwatch trace search --start-date 2026-01-01         # Custom date range
-langwatch trace search --format json                   # Machine-readable output
-```
+How to handle:
 
-## Step 5: Inspect Individual Traces
+- Work within the limits — if 3 scenarios are allowed, create 3 meaningful ones, not 10.
+- Make every creation count: each one should demonstrate clear value.
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
+- Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
 
-```bash
-langwatch trace get <traceId>                          # Human-readable digest (default)
-langwatch trace get <traceId> -f json                  # Raw JSON for full detail
-langwatch trace export --format csv -o traces.csv      # Bulk export as CSV
-langwatch trace export --format jsonl --limit 500      # Bulk export as JSONL
-```
+If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
 
-For each interesting trace, look at:
+## Step 5: Close the Loop
 
-- The full request/response
-- Token counts and costs per span
-- Error messages and stack traces
-- Individual LLM calls within a multi-step agent
+After executing:
 
-## Step 6: Present Findings
-
-Summarize the data clearly for the user:
-
-- Lead with the key numbers they asked about
-- Highlight anomalies or concerning trends (cost spikes, latency increases, error rate changes)
-- Provide context by comparing to previous periods when relevant
-- Suggest next steps if issues are found (e.g., "The p95 latency spiked on Tuesday — here are the slowest traces from that day")
+1. Run the new scenario tests and show the results honestly, including failures
+2. Summarize: hypothesis, what was built, what it proved, links to everything created
+3. Point at the metric to watch and offer to re-check after the fix ships ("once merged, run `/agent-performance` again next week and compare")
+4. Ask which hypothesis to tackle next, and stop cleanly when the user says enough
 
 ## Common Mistakes
 
-- Do NOT try to write code — this skill queries existing data, no SDK installation or code changes
-- Use the preset names with `langwatch analytics query --metric ...` (trace-count, total-cost, avg-latency, etc.); do NOT hardcode raw metric paths unless the preset list doesn't cover what you need
-- Do NOT use `langwatch evaluator create` / `langwatch monitor create` here — this skill is read-only analytics
-- Do NOT present raw JSON to the user — summarize the data in a clear, human-readable format
-- If the CLI returns an error, surface the exact message in your reply rather than paraphrasing — the user often needs the raw error to debug API key, project, or date-range issues
+- Do NOT propose changes without production evidence behind them; "best practice says so" is not a hypothesis
+- Do NOT skip the explanation; if the user cannot restate why the hypothesis is plausible, you explained it badly
+- Do NOT build all hypotheses at once; execute the agreed ones, show results, then continue
+- Do NOT invent test inputs when real failing traces exist; reproduce their structure, with sensitive values swapped for stand-ins
+- Do NOT paste raw customer content from traces into committed tests or PR text; link the trace instead
+- Do NOT merge or push anything yourself; changes ship as PRs the user reviews
+- Do NOT create evaluators or monitors for signals nobody will act on; every artifact needs an owner and a purpose
 ````
 
         </div>
       </div>
-      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/analytics/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"How is my agent performing?"} data-track-skill={"langwatch/skills/analytics"}>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/agent-improve/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"What should I do next to improve my agent?"} data-track-skill={"langwatch/skills/agent-improve"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">How is my agent performing?</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/agent-performance"} data-track="docs_copy_skill_install" data-track-title={"How is my agent performing?"} data-track-skill={"langwatch/skills/agent-performance"}>
+          <code>npx skills add langwatch/skills/agent-performance</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/agent-performance"} data-track="docs_copy_slash_command" data-track-title={"How is my agent performing?"} data-track-command={"/agent-performance"}>
+          <code><span className="lw-slash-command">/agent-performance</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"How is my agent performing?"} data-track-skill={"langwatch/skills/agent-performance"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+How is my agent performing?
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+
+# Diagnose Your Agent's Production Behavior
+
+This skill is a production diagnostician. It reads the real traffic, not the code, and answers: what is my agent actually doing out there, where is it failing, who is it annoying, and where is the money going. It is read-only on the platform: the only thing it writes is a report file.
+
+## Step 1: Set up the LangWatch CLI
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+**Projects and API keys: target a real project, not a personal one.**
+
+LangWatch has two kinds of project:
+
+- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
+
+And two ways to authenticate:
+
+- **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
+- **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
+
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+
+## Step 2: Baseline the Vital Signs
+
+Establish the macro picture first, always comparing against the previous period (the analytics API returns both periods for every query):
+
+```bash
+langwatch status                                                  # Resource counts and project overview
+langwatch analytics query --metric trace-count --format json      # Volume trend, last 7 days
+langwatch analytics query --metric total-cost --format json       # Spend trend
+langwatch analytics query --metric avg-latency --format json      # Latency trend
+langwatch analytics query --metric p95-latency --format json      # Tail latency
+langwatch analytics query --metric total-tokens --format json     # Token consumption
+langwatch analytics query --metric eval-pass-rate --format json   # Quality trend, if evaluators exist
+```
+
+Then slice the same metrics to find WHERE the numbers come from:
+
+```bash
+langwatch analytics query --metric total-cost --group-by metadata.model --format json
+langwatch analytics query --metric trace-count --group-by metadata.labels --format json
+langwatch analytics query --metric p95-latency --group-by metadata.model --format json
+```
+
+Widen with `--start-date` (ISO) to 30 days when trends look suspicious: a gradual drift only shows on longer windows. Run `langwatch analytics query --help` for every preset and flag.
+
+## Step 3: Export the Evidence and Mine It
+
+Aggregates say WHAT changed; only the traces say WHY. Export a large sample and analyze it locally:
+
+```bash
+langwatch trace export --format jsonl --limit 1000 -o traces.jsonl
+langwatch trace export --format jsonl --limit 1000 --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
+```
+
+Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
+
+1. **Failure patterns**: cluster error traces by error message and by input shape. Which user intents fail most?
+2. **Dissatisfied users**: traces with negative feedback or angry language in inputs ("this is wrong", "that's not what I asked", repeated rephrasing of the same question in a thread). Check annotations on candidate traces too: thumbs down and reviewer comments are gold.
+3. **Token and cost hotspots**: distribution of tokens per trace; the p99 tail; which metadata slice (model, label, user) concentrates the spend; prompts that balloon context.
+4. **Edge cases**: inputs far from the common distribution (very long, empty, non-primary language, unusual formats) and how the agent handled them.
+5. **Behavior changes**: compare the recent window against the older export: output length, tool usage mix, model mix, refusal rate, latency. Anything that moved, find the first day it moved.
+6. **Outliers**: the single weirdest traces by duration, cost, span count, and output size. Read them individually.
+
+```bash
+langwatch trace search -q "<keyword from a pattern>" --limit 10 --format json   # Chase a specific pattern
+langwatch trace get <traceId>                                                   # Read a representative trace in full
+langwatch trace get <traceId> -f json                                           # Every span, token count, and timing
+```
+
+For every pattern you claim, keep 2-3 example trace IDs as evidence. Never report a pattern without example traces behind it.
+
+## Step 4: Build the Report
+
+Write a single self-contained `agent-performance-report.html` in the project root (inline CSS, no external assets) with:
+
+- **Executive summary**: the 3-5 findings that matter, each one sentence with its magnitude ("34% of errors come from date parsing on non-English inputs")
+- One section per finding: the metric evidence (small tables, before/after numbers), what it means, and **links to example traces** so every claim is verifiable in one click
+- A cost breakdown section, a reliability section, and a user-satisfaction section, even when healthy: say what was checked and that it looks fine
+- A closing "recommended next steps" section ranked by impact
+
+Trace links: `langwatch trace get` returns the platform URL for each trace; use those URLs directly. Anyone on the project team can open them.
+
+Open the report path for the user and also summarize the top findings directly in the conversation, leading with the numbers.
+
+## Step 5: Hand Off to Improvement
+
+Diagnosis without treatment is just bad news. Close by proposing the next step:
+
+- If the `agent-improve` skill is installed, offer to run `/agent-improve` on the findings right away: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes.
+- If it is not installed, tell the user to install it: `npx skills add langwatch/skills/agent-improve`
+
+Pass along the report: agent-improve uses these findings and trace examples as its evidence base.
+
+## Common Mistakes
+
+- Do NOT modify the agent's code, prompts, or any platform resource; this skill is read-only plus one report file
+- Do NOT report a pattern without linked example traces; unverifiable claims are worthless
+- Do NOT rely on aggregates alone; always read at least a handful of full traces per finding, the surprise is always in the details
+- Do NOT analyze only the happy window; without a before/after comparison you cannot see behavior change
+- Do NOT dump raw JSON at the user; the deliverable is the diagnosis and the report, written in plain language with numbers
+- If the CLI returns an error, surface the exact message in your reply rather than paraphrasing; the user often needs the raw error to debug API key, project, or date-range issues
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/agent-performance/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"How is my agent performing?"} data-track-skill={"langwatch/skills/agent-performance"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Where can I improve our agent development best practices?</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/agent-best-practices"} data-track="docs_copy_skill_install" data-track-title={"Where can I improve our agent development best practices?"} data-track-skill={"langwatch/skills/recipes/agent-best-practices"}>
+          <code>npx skills add langwatch/skills/recipes/agent-best-practices</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/agent-best-practices"} data-track="docs_copy_slash_command" data-track-title={"Where can I improve our agent development best practices?"} data-track-command={"/agent-best-practices"}>
+          <code><span className="lw-slash-command">/agent-best-practices</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Where can I improve our agent development best practices?"} data-track-skill={"langwatch/skills/recipes/agent-best-practices"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+Where can I improve our agent development best practices?
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+
+# Improve Your Agent Development Best Practices
+
+This recipe acts as your expert AI engineering consultant. It audits how your team builds and operates the agent, compares it against best practices, delivers quick fixes, then guides you deeper.
+
+## Phase 1: Full Audit
+
+Before suggesting anything, read EVERYTHING:
+
+### Code Audit
+
+1. Read the full codebase: every file, every function, every system prompt
+2. Study `git log --oneline -50` and read commit messages for WHY things changed. Bug fixes reveal edge cases. Refactors reveal design decisions. These are goldmines for what to test and evaluate.
+3. Read README, docs, comments for domain context
+
+### LangWatch Audit (via CLI)
+
+4. `langwatch trace search --limit 25 --format json` to check trace quality (inputs/outputs populated? spans connected? labels present?)
+5. `langwatch scenario list --format json` to see what scenarios exist. Are they comprehensive or shallow?
+6. `langwatch suite list --format json` to see what suites (run plans) exist
+7. `langwatch evaluator list --format json` to see what evaluators are configured
+8. `langwatch monitor list --format json` to check for online evaluation monitors
+9. `langwatch prompt list --format json` to check whether prompts are versioned (or all hardcoded in code)
+10. `langwatch analytics query --metric trace-count` and `--metric total-cost`, `--metric avg-latency`, `--metric eval-pass-rate` for the current cost, latency, and error/pass rate baseline
+
+### Gap Analysis
+
+Score the setup against the best-practices checklist:
+
+- **Observability**: traces flowing, inputs/outputs populated, spans connected, metadata and labels present
+- **Prompt management**: prompts versioned and reviewable, not hardcoded strings scattered in code
+- **Testing**: scenario tests exist, cover the agent's real jobs and edge cases, run in CI
+- **Evaluation**: evaluators measure the qualities that matter for the domain, datasets are domain-specific, not generic
+- **Production monitoring**: online monitors watch quality signals on live traffic
+- **Iteration loop**: experiments compare changes before they ship
+
+Identify what's missing entirely, what exists but is weak, and what's working well (keep and build on).
+
+## Phase 2: Low-Hanging Fruit
+
+Fix the easiest, highest-impact gaps first:
+
+- Broken instrumentation: fix traces (see the `debug-instrumentation` recipe)
+- Hardcoded prompts: set up prompt versioning (`langwatch prompt init`, see the `prompts` skill)
+- No tests at all: create initial scenario tests (see the `scenarios` skill)
+- Generic datasets: generate domain-specific ones (see the `datasets` skill)
+
+Deliver working results. Show the user what improved. This is the a-ha moment.
+
+## Phase 3: Guide Deeper
+
+After Phase 2, DON'T STOP. Suggest 2-3 specific improvements based on what you learned:
+
+1. **Domain-specific improvements**: Based on the codebase domain, suggest targeted scenarios or evaluations. "I noticed your agent handles \[X], should I add edge case tests for \[Y]?"
+
+2. **Expert involvement**: If the domain is specialized (medical, financial, legal), suggest involving domain experts. "For healthcare scenarios, you'd benefit from a medical professional reviewing the compliance criteria, want me to draft scenarios they can review?"
+
+3. **Data quality**: If using synthetic data, suggest real data. "Do you have real customer queries or support tickets? Those would make much better evaluation datasets."
+
+4. **CI/CD integration**: If no CI pipeline, suggest adding experiments. "Want me to set up experiments that run in CI to catch regressions?"
+
+5. **Production monitoring**: If no online evaluation, suggest monitors. "Your traces show no quality monitoring, want me to set up faithfulness checks on production traffic with `langwatch monitor create`?"
+
+6. **Learn from production**: If traces show real traffic, hand over to the production-insight skills: run `/agent-performance` for a full diagnosis of how the agent behaves in production, and `/agent-improve` to turn those findings into tested changes.
+
+Ask light questions with options. Don't overwhelm: pick the top 2-3 most impactful.
+
+## Phase 4: Keep Iterating
+
+After each improvement:
+
+1. Show what was accomplished
+2. Run any tests / re-query analytics to verify (`langwatch trace search`, `langwatch suite run --wait`, etc.)
+3. Ask what to tackle next
+4. Stop when the user says "that's enough"
+
+## Common Mistakes
+
+- Do NOT skip the audit; you can't suggest improvements without understanding the current state
+- Do NOT give generic advice; every suggestion must be specific to this codebase
+- Do NOT overwhelm with 10 suggestions; pick the top 2-3
+- Do NOT skip running/verifying improvements
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/agent-best-practices/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Where can I improve our agent development best practices?"} data-track-skill={"langwatch/skills/recipes/agent-best-practices"}>
         <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
         <span className="lw-accordion-action-text">
           <span className="lw-accordion-action-title">Download SKILL.md</span>

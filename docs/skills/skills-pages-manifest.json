@@ -43,15 +43,21 @@
       {
         "boldPrefix": "⭐",
         "title": "What should I do next to improve my agent?",
-        "skill": "langwatch/skills/recipes/improve-setup",
-        "slashCommand": "/improve-setup",
-        "promptFile": "recipes-improve-setup.docs.txt"
+        "skill": "langwatch/skills/agent-improve",
+        "slashCommand": "/agent-improve",
+        "promptFile": "agent-improve.docs.txt"
       },
       {
         "title": "How is my agent performing?",
-        "skill": "langwatch/skills/analytics",
-        "slashCommand": "/analytics",
-        "promptFile": "analytics.docs.txt"
+        "skill": "langwatch/skills/agent-performance",
+        "slashCommand": "/agent-performance",
+        "promptFile": "agent-performance.docs.txt"
+      },
+      {
+        "title": "Where can I improve our agent development best practices?",
+        "skill": "langwatch/skills/recipes/agent-best-practices",
+        "slashCommand": "/agent-best-practices",
+        "promptFile": "recipes-agent-best-practices.docs.txt"
       },
       {
         "title": "Debug and improve my agent instrumentation",
@@ -89,7 +95,7 @@
     "platform": [
       {
         "title": "How is my agent performing?",
-        "promptFile": "analytics.platform.txt"
+        "promptFile": "agent-performance.platform.txt"
       },
       {
         "title": "Create scenario tests for my agent",
