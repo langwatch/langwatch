@@ -535,13 +535,14 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 
 ### Ingress
 
-| Name                  | Description                                | Value   |
-| --------------------- | ------------------------------------------ | ------- |
-| `ingress.enabled`     | Enable ingress.                            | `false` |
-| `ingress.className`   | Ingress class name (e.g., nginx, traefik). | `""`    |
-| `ingress.annotations` | Additional ingress annotations.            | `{}`    |
-| `ingress.hosts`       | Ingress hosts and paths.                   | `[]`    |
-| `ingress.tls`         | TLS configuration for HTTPS.               | `[]`    |
+| Name                    | Description                                                                                                                                          | Value              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| `ingress.enabled`       | Enable ingress.                                                                                                                                      | `false`            |
+| `ingress.className`     | Ingress class name (e.g., nginx, traefik).                                                                                                           | `""`               |
+| `ingress.annotations`   | Additional ingress annotations.                                                                                                                      | `{}`               |
+| `ingress.blockedPaths`  | Path prefixes the ingress hard-blocks (routes to a no-endpoints blackhole Service). Defaults to the private `/api/internal` control-plane surface. Set to `[]` to disable. | `["/api/internal"]` |
+| `ingress.hosts`         | Ingress hosts and paths.                                                                                                                             | `[]`               |
+| `ingress.tls`           | TLS configuration for HTTPS.                                                                                                                         | `[]`               |
 
 ### Prometheus
 

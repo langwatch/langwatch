@@ -1,0 +1,36 @@
+{{- /*
+Blackhole Service — the hard-block target for ingress.blockedPaths.
+
+A ClusterIP Service with NO selector never gets Endpoints, so a spec-conformant
+ingress controller returns 502/503 for any request routed to it. The ingress
+(templates/ingress.yaml) points a higher-priority `pathType: Prefix` path at
+this Service for every prefix in `.Values.ingress.blockedPaths` (default
+`/api/internal`), turning "never expose publicly" from a code comment into an
+enforced dead end at the edge.
+
+Rendered only when the ingress is enabled AND there is at least one blocked
+prefix — so `ingress.blockedPaths: []` cleanly drops both the paths and this
+Service.
+*/ -}}
+{{- if and .Values.ingress.enabled .Values.ingress.blockedPaths }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-blackhole
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-blackhole
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: ingress-blackhole
+  {{- if .Values.ingress.labels }}
+    {{- .Values.ingress.labels | toYaml | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  # No selector on purpose: this Service intentionally has no Endpoints, so the
+  # ingress controller cannot forward blocked requests anywhere (returns 502/503).
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+{{- end }}

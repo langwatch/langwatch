@@ -177,6 +177,44 @@ test_access_ingress() {
 
   # Service type = ClusterIP (default, not NodePort)
   assert_not_contains "No NodePort" "$out" "type: NodePort"
+
+  # /api/internal is hard-blocked at the edge by default: the ingress renders a
+  # higher-priority Prefix path for it, routing to a no-endpoints blackhole
+  # Service so the private control-plane surface (langy-internal / langy-relay /
+  # gateway-internal) is never internet-reachable. Regression for the
+  # "internal routes reachable via default ingress" finding.
+  local ingress_only
+  ingress_only=$(tmpl_only "templates/ingress.yaml" --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-prod.yaml" \
+    -f "${OVERLAYS}/access-ingress.yaml")
+  assert_contains "Ingress blocks /api/internal path" "$ingress_only" "path: /api/internal"
+  assert_contains "Blocked path → blackhole Service" "$ingress_only" "name: ${RELEASE}-blackhole"
+  # Longest-prefix wins on conformant controllers, but we also emit the blocked
+  # path before the app catch-all for order-sensitive controllers (e.g. nginx).
+  local api_internal_line app_line
+  api_internal_line=$(grep -n "path: /api/internal" <<< "$ingress_only" | head -1 | cut -d: -f1)
+  app_line=$(grep -nE "path: /$" <<< "$ingress_only" | head -1 | cut -d: -f1)
+  if [[ -n "$api_internal_line" && -n "$app_line" && "$api_internal_line" -lt "$app_line" ]]; then
+    pass "Blocked path listed before app catch-all"
+  else
+    fail "Blocked path should precede app catch-all (/api/internal@${api_internal_line:-?}, /@${app_line:-?})"
+  fi
+
+  # The blackhole Service renders with no selector (no Endpoints => 502/503).
+  local blackhole_svc
+  blackhole_svc=$(tmpl_only "templates/blackhole-service.yaml" --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-prod.yaml" \
+    -f "${OVERLAYS}/access-ingress.yaml")
+  assert_contains "Blackhole Service rendered" "$blackhole_svc" "name: ${RELEASE}-blackhole"
+  assert_not_contains "Blackhole Service has no selector" "$blackhole_svc" "selector:"
+
+  # Operators can disable the block by emptying blockedPaths.
+  local no_block
+  no_block=$(tmpl --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-prod.yaml" \
+    -f "${OVERLAYS}/access-ingress.yaml" \
+    --set 'ingress.blockedPaths=[]')
+  assert_not_contains "blockedPaths=[] drops the block" "$no_block" "${RELEASE}-blackhole"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

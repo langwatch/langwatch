@@ -30,6 +30,23 @@ spec:
     - host: {{ .host | quote }}
       http:
         paths:
+          {{- /*
+            Blocked prefixes come FIRST and route to the no-endpoints blackhole
+            Service (see templates/blackhole-service.yaml). With `pathType: Prefix`
+            longest-prefix wins on conformant controllers, so `/api/internal` beats
+            the app's catch-all `/` regardless of ordering — but we emit them first
+            anyway for controllers (e.g. nginx) that also honour list order.
+            See ingress.blockedPaths in values.yaml for the WHY.
+          */}}
+          {{- range $.Values.ingress.blockedPaths }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Release.Name }}-blackhole
+                port:
+                  number: 80
+          {{- end }}
           {{- range .http.paths }}
           - path: {{ .path }}
             pathType: {{ .pathType }}

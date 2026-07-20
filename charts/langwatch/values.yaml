@@ -1221,6 +1221,37 @@ ingress:
   ## @param ingress.annotations [object] Additional ingress annotations.
   annotations: {}
 
+  # Path prefixes the ingress must NEVER route to the app — a hard, on-by-default
+  # block at the edge.
+  #
+  # WHY: everything under `/api/internal/*` is the app's private control-plane
+  # surface (the Langy agent manager's callbacks in langy-internal.ts /
+  # langy-relay.ts, and the AI-gateway's usage callbacks in gateway-internal.ts).
+  # Each route's header says "Never expose publicly" and each is gated only by a
+  # single shared bearer secret (LANGY_INTERNAL_SECRET / the gateway secret) — a
+  # last line of defence, not a reason to publish the surface. In-cluster callers
+  # (the agent manager, the gateway, the chart's own CronJobs) reach the app via
+  # the internal Service `{{ .Release.Name }}-app`, NOT via this ingress, so
+  # blocking these prefixes at the edge breaks nothing legitimate.
+  #
+  # HOW: for each prefix the chart renders a higher-priority Ingress path (with
+  # `pathType: Prefix`) that points at a dedicated no-endpoints Service
+  # (`{{ .Release.Name }}-blackhole`). A spec-conformant controller returns
+  # 502/503 for a Service with no endpoints, so the block is a genuine dead end
+  # rather than a soft redirect. For `pathType: Prefix`, longest-prefix wins on
+  # conformant controllers, so `/api/internal` beats the app's catch-all `/`
+  # regardless of the order paths are listed.
+  #
+  # Operators can extend this list, or set it to `[]` to (explicitly, knowingly)
+  # disable the block. NOTE: `/api/cron/*` and `/metrics` are also internal-only
+  # in the default topology but are intentionally NOT blocked here — some
+  # operators drive cron from an external scheduler, and `/metrics` (bearer-token
+  # gated) may be federated externally. Add them to this list if your install
+  # keeps them in-cluster.
+  ## @param ingress.blockedPaths [array] Path prefixes the ingress hard-blocks (routes to a no-endpoints blackhole Service). Defaults to the private `/api/internal` control-plane surface. Set to [] to disable.
+  blockedPaths:
+    - /api/internal
+
   # Host configurations for routing
   # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#spec.rules
   ## @param ingress.hosts [array] Ingress hosts and paths.
