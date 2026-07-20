@@ -4,7 +4,6 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { EventUtils } from "../../../";
 import type {
   LogRecordReceivedEvent,
-  MetricRecordReceivedEvent,
   SpanReceivedEvent,
 } from "../schemas/events";
 import { TraceRequestUtils } from "./traceRequest.utils";
@@ -137,34 +136,10 @@ function generateDeterministicLogRecordId(
   });
 }
 
-function generateDeterministicMetricRecordId(
-  event: MetricRecordReceivedEvent,
-): string {
-  EventUtils.validateTenantId(
-    { tenantId: event.tenantId },
-    "generateDeterministicMetricRecordId",
-  );
-
-  const attributesHash = createHash("sha256")
-    .update(JSON.stringify(Object.entries(event.data.attributes).sort()))
-    .update(
-      JSON.stringify(Object.entries(event.data.resourceAttributes).sort()),
-    )
-    .digest("hex")
-    .slice(0, 8);
-
-  return makeDeterministicKsuid({
-    hashKey: `${event.tenantId}:${event.data.traceId}:${event.data.spanId}:${event.data.metricName}:${event.data.metricType}:${attributesHash}`,
-    resource: KSUID_RESOURCES.METRIC_RECORD,
-    timestampMs: event.data.timeUnixMs,
-  });
-}
-
 export const IdUtils = {
   generateDeterministicSpanRecordId,
   generateDeterministicSpanRecordIdFromData,
   generateDeterministicTraceSummaryId,
   generateDeterministicTraceSummaryIdFromData,
   generateDeterministicLogRecordId,
-  generateDeterministicMetricRecordId,
 } as const;

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { RecordLogCommand } from "../commands/recordLogCommand";
 import { MAX_LOG_SHARD_COUNT } from "../commands/logCommandGroupKey";
+import { RecordLogCommand } from "../commands/recordLogCommand";
 import {
   createTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,
@@ -48,11 +48,10 @@ function buildTraceDeps(
   const store = {} as any;
   return {
     spanAppendStore: store,
-    logRecordAppendStore: store,
-    metricRecordAppendStore: store,
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,
+    logRecordAppendStore: store,
     originGateReactor: reactorStub("originGate"),
     evaluationTriggerReactor: reactorStub("evaluationTrigger"),
     customEvaluationSyncReactor: reactorStub("customEvaluationSync"),
@@ -104,7 +103,9 @@ describe("trace-processing pipeline log-command sharding", () => {
       const getGroupKey = shardedGroupKey({ logCommandShardCount: 8 });
       const groups = new Set(
         Array.from({ length: 64 }, (_, i) =>
-          getGroupKey(payload(TRACE_ID, (i + 1).toString(16).padStart(16, "0"))),
+          getGroupKey(
+            payload(TRACE_ID, (i + 1).toString(16).padStart(16, "0")),
+          ),
         ),
       );
       expect(groups.size).toBeGreaterThan(1);

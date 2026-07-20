@@ -36,7 +36,11 @@ import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/
 const tenantId = `test-rollup-${generate("tenant").toString()}`;
 // All spans below land in one minute bucket so the rollup collapses to a
 // single (TenantId, BucketStart, Model, SpanType) group per distinct dim pair.
-const baseMs = new Date("2026-06-01T12:00:00.000Z").getTime();
+// Minute-aligned "yesterday", never a fixed calendar date: inserts are stamped
+// with PLATFORM_DEFAULT_RETENTION_DAYS (49) and the table TTL-deletes rows
+// `_retention_days` after BucketStart, so a fixed date eventually ages past
+// the horizon and the fixtures silently vanish before the reads.
+const baseMs = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 60_000) * 60_000;
 const bucketStart = new Date(baseMs);
 
 let ch: ClickHouseClient;

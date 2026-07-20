@@ -1,6 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import type { Event } from "../domain/types";
-import type { MapProjectionDefinition } from "./mapProjection.types";
+import type {
+  BulkAppendContext,
+  MapProjectionDefinition,
+} from "./mapProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:map-executor");
@@ -47,6 +50,63 @@ export class MapProjectionExecutor {
     await projection.store.append(record, context);
 
     return record;
+  }
+
+  /**
+   * Maps a same-tenant queue batch and persists it with one store operation
+   * when the projection exposes `bulkAppend`.
+   */
+  async executeBatch<Record, E extends Event>(
+    projection: MapProjectionDefinition<Record, E>,
+    events: readonly E[],
+    contexts: readonly ProjectionStoreContext[],
+  ): Promise<Array<{ event: E; record: Record }>> {
+    if (events.length !== contexts.length) {
+      throw new Error("Map projection batch events and contexts must align");
+    }
+
+    const mapped: Array<{
+      event: E;
+      record: Record;
+      context: ProjectionStoreContext;
+    }> = [];
+    for (let index = 0; index < events.length; index++) {
+      const event = events[index]!;
+      const context = contexts[index]!;
+      if (
+        projection.options?.dedupeByIdempotencyKey &&
+        (await this.isDuplicateDelivery(projection, event, context))
+      ) {
+        continue;
+      }
+      const record = projection.map(event);
+      if (record !== null) mapped.push({ event, record, context });
+    }
+
+    if (mapped.length === 0) return [];
+
+    if (projection.store.bulkAppend) {
+      const first = mapped[0]!.context;
+      const bulkContext: BulkAppendContext = {
+        tenantId: first.tenantId,
+        retentionPolicy: first.retentionPolicy,
+      };
+      for (const item of mapped) {
+        if (item.context.tenantId !== bulkContext.tenantId) {
+          throw new Error("Map projection batches cannot cross tenants");
+        }
+      }
+      await projection.store.bulkAppend(
+        mapped.map(({ record }) => record),
+        bulkContext,
+      );
+    } else {
+      for (const { record, context } of mapped) {
+        await projection.store.append(record, context);
+      }
+    }
+
+    return mapped.map(({ event, record }) => ({ event, record }));
   }
 
   /**

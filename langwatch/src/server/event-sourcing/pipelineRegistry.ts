@@ -40,11 +40,15 @@ import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-in
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
+import type { CanonicalLogRecordRepository } from "../app-layer/logs/repositories/canonical-log-record.repository";
+import type { MetricDataPointRepository } from "../app-layer/metrics/repositories/metric-data-point.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
-import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
-import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
+import type {
+  LogRecordStorageRepository,
+  StoredLogRecordRow,
+} from "../app-layer/traces/repositories/log-record-storage.repository";
 import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
 import type { TraceAnalyticsRollupRepository } from "../app-layer/traces/repositories/trace-analytics-rollup.repository";
 import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
@@ -84,6 +88,16 @@ import type { ExperimentRunStateData } from "./pipelines/experiment-run-processi
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
+import { resolveLogCommandShardCount as resolveCanonicalLogCommandShardCount } from "./pipelines/log-processing/canonicalLog";
+import { createLogProcessingPipeline } from "./pipelines/log-processing/pipeline";
+import { CanonicalLogAppendStore } from "./pipelines/log-processing/projections/stores";
+import { resolveMetricCommandShardCount } from "./pipelines/metric-processing/canonical/shards";
+import { createMetricProcessingPipeline } from "./pipelines/metric-processing/pipeline";
+import {
+  MetricDataPointAppendStore,
+  MetricSeriesCatalogAppendStore,
+  MetricTimeRollupAppendStore,
+} from "./pipelines/metric-processing/projections/stores";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -144,9 +158,8 @@ import {
   createTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,
 } from "./pipelines/trace-processing/pipeline";
-import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
-import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
+import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
@@ -181,6 +194,32 @@ import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
 import { AutomationAuditAppendStore } from "./pipelines/automations/projections/automationAudit.store";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
+
+function mergeClaudeLogRows(
+  rows: StoredLogRecordRow[],
+  limit?: number,
+): StoredLogRecordRow[] {
+  const deduped = new Map<string, StoredLogRecordRow>();
+  for (const row of rows) {
+    // Legacy rows preserve OTLP insertion order while canonical rows are
+    // key-sorted (stableStringify), so sort keys before serialising or the
+    // same record can produce two different keys and slip past dedup.
+    const key = [
+      row.traceId,
+      row.spanId,
+      row.timeUnixMs,
+      row.scopeName,
+      JSON.stringify(Object.fromEntries(Object.entries(row.attributes).sort())),
+    ].join("\0");
+    deduped.set(key, row);
+  }
+  const sorted = [...deduped.values()].sort(
+    (left, right) => left.timeUnixMs - right.timeUnixMs,
+  );
+  return typeof limit === "number" && limit > 0
+    ? sorted.slice(0, limit)
+    : sorted;
+}
 
 /**
  * Creates an in-memory setTimeout-based fallback for deferred job processing.
@@ -240,7 +279,8 @@ export interface PipelineRepositories {
   /** Primary replica for read-after-write consistency. */
   traceSummaryFold: TraceSummaryRepository;
   logRecordStorage: LogRecordStorageRepository;
-  metricRecordStorage: MetricRecordStorageRepository;
+  canonicalLogStorage: CanonicalLogRecordRepository;
+  metricDataPointStorage: MetricDataPointRepository;
   /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
   traceAnalyticsRollup: TraceAnalyticsRollupRepository;
   /** ADR-034 Phase 2: slim per-trace analytics repository (dual-tap). */
@@ -379,6 +419,8 @@ export class PipelineRegistry {
         graphActivityHandler,
       },
     });
+    const metricPipeline = this.registerMetricPipeline();
+    const logPipeline = this.registerLogPipeline();
     const {
       pipeline: tracePipeline,
       simComputeRunMetrics,
@@ -415,6 +457,8 @@ export class PipelineRegistry {
 
     return {
       traces: mapCommands(tracePipeline.commands),
+      metrics: mapCommands(metricPipeline.commands),
+      logs: mapCommands(logPipeline.commands),
       evaluations: mapCommands(evalPipeline.commands),
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
@@ -581,6 +625,37 @@ export class PipelineRegistry {
     return { pipeline, processOutboxWorker };
   }
 
+  private registerMetricPipeline() {
+    const repository = this.deps.repositories.metricDataPointStorage;
+    return this.deps.eventSourcing.register(
+      createMetricProcessingPipeline({
+        metricDataPointAppendStore: new MetricDataPointAppendStore(repository),
+        metricSeriesCatalogAppendStore: new MetricSeriesCatalogAppendStore(
+          repository,
+        ),
+        metricTimeRollupAppendStore: new MetricTimeRollupAppendStore(
+          repository,
+        ),
+        metricCommandShardCount: resolveMetricCommandShardCount(
+          process.env.METRIC_PROCESSING_SHARDS,
+        ),
+      }),
+    );
+  }
+
+  private registerLogPipeline() {
+    return this.deps.eventSourcing.register(
+      createLogProcessingPipeline({
+        canonicalLogAppendStore: new CanonicalLogAppendStore(
+          this.deps.repositories.canonicalLogStorage,
+        ),
+        logCommandShardCount: resolveCanonicalLogCommandShardCount(
+          process.env.LOG_PROCESSING_SHARDS,
+        ),
+      }),
+    );
+  }
+
   private registerEvaluationPipeline({
     automations,
   }: {
@@ -714,19 +789,38 @@ export class PipelineRegistry {
     });
 
     const claudeCodeSpanSyncReactor = createClaudeCodeSpanSyncReactor({
-      getMarkedClaudeCodeLogs: (tenantId, traceId, occurredAtMs, limit) =>
-        this.deps.repositories.logRecordStorage.getMarkedClaudeCodeLogsByTrace(
-          tenantId,
-          traceId,
-          occurredAtMs,
-          limit,
-        ),
-      countMarkedClaudeCodeLogs: (tenantId, traceId, occurredAtMs) =>
-        this.deps.repositories.logRecordStorage.countMarkedClaudeCodeLogsByTrace(
-          tenantId,
-          traceId,
-          occurredAtMs,
-        ),
+      getMarkedClaudeCodeLogs: async (
+        tenantId,
+        traceId,
+        occurredAtMs,
+        limit,
+      ) => {
+        const [canonical, legacy] = await Promise.all([
+          this.deps.repositories.canonicalLogStorage.getMarkedClaudeCodeLogsByTrace(
+            { tenantId, traceId, occurredAtMs, limit },
+          ),
+          this.deps.repositories.logRecordStorage.getMarkedClaudeCodeLogsByTrace(
+            tenantId,
+            traceId,
+            occurredAtMs,
+            limit,
+          ),
+        ]);
+        return mergeClaudeLogRows([...canonical, ...legacy], limit);
+      },
+      countMarkedClaudeCodeLogs: async (tenantId, traceId, occurredAtMs) => {
+        const [canonical, legacy] = await Promise.all([
+          this.deps.repositories.canonicalLogStorage.countMarkedClaudeCodeLogsByTrace(
+            { tenantId, traceId, occurredAtMs },
+          ),
+          this.deps.repositories.logRecordStorage.countMarkedClaudeCodeLogsByTrace(
+            tenantId,
+            traceId,
+            occurredAtMs,
+          ),
+        ]);
+        return canonical + legacy;
+      },
       // Per-turn conversion cap (env LANGWATCH_CLAUDE_TURN_LOG_CAP, default
       // CLAUDE_TURN_LOG_CAP). Bounds how many of a pathological turn's marked
       // logs the span-sync reactor folds in one pass so a runaway turn can't
@@ -796,6 +890,10 @@ export class PipelineRegistry {
         traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
           this.deps.repositories.traceAnalyticsRollup,
         ),
+        // CUTOVER ONLY — see TraceProcessingPipelineDeps.logRecordAppendStore.
+        logRecordAppendStore: new LogRecordAppendStore(
+          this.deps.repositories.logRecordStorage,
+        ),
         // Redis cache is the slim fold's ONLY warm read path — its store's
         // get() returns null by design (lossy row, no read-back), and on a
         // cache miss the fold's refoldOnStoreMiss option rebuilds state from
@@ -804,12 +902,6 @@ export class PipelineRegistry {
         traceAnalyticsStore: this.cached<TraceAnalyticsData>(
           new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
           "trace_analytics",
-        ),
-        logRecordAppendStore: new LogRecordAppendStore(
-          this.deps.repositories.logRecordStorage,
-        ),
-        metricRecordAppendStore: new MetricRecordAppendStore(
-          this.deps.repositories.metricRecordStorage,
         ),
         traceSummaryStore,
         originGateReactor,

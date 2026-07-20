@@ -16,6 +16,7 @@ import {
   updateCurrentContext,
 } from "@langwatch/observability/context";
 
+import { RESOLVED_ERROR, type ResolvedError } from "./errors.js";
 import { getSSECompletion } from "./sse.js";
 
 // ---------------------------------------------------------------------------
@@ -160,12 +161,19 @@ export function loggerMiddleware(options?: { name?: string }) {
         throw err;
       } finally {
         const logRequest = () => {
-          const requestError = error || c.error;
           const duration = Date.now() - start;
-          const statusCode = requestError
-            ? getStatusCodeFromError(requestError)
-            : c.res.status;
+          // Prefer what the error handler resolved. Re-deriving the error and
+          // its status here disagrees with the response whenever the handler
+          // promoted the throw -- a ZodError has no `httpStatus`, so we derived
+          // 500 for an error the caller received as a 422 ValidationError.
+          const resolved = c.get(RESOLVED_ERROR) as ResolvedError | undefined;
+          const requestError = resolved ? resolved.error : error || c.error;
+          const statusCode =
+            resolved?.status ??
+            (requestError ? getStatusCodeFromError(requestError) : c.res.status);
 
+          // This is the only error record written per failed request. The
+          // error handler deliberately does not log its own copy.
           logHttpRequest(logger, {
             method: c.req.method,
             url: c.req.path,
@@ -173,6 +181,7 @@ export function loggerMiddleware(options?: { name?: string }) {
             duration,
             userAgent: c.req.header("user-agent") ?? null,
             error: requestError,
+            ...(resolved?.traceId ? { extra: { traceId: resolved.traceId } } : {}),
           });
         };
 
