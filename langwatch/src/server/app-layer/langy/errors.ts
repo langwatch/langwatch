@@ -178,6 +178,26 @@ export class LangyTurnInProgressError extends HandledError {
   }
 }
 
+/**
+ * The agent answered a dispatch with a permanent 4xx: the request itself is
+ * invalid and no retry can change that. Terminal for the turn — the poison
+ * alternative was an outbox retrying the same rejection forever.
+ */
+export class LangyDispatchRejectedError extends HandledError {
+  declare readonly code: "langy_dispatch_rejected";
+  constructor() {
+    super(
+      "langy_dispatch_rejected",
+      "The agent rejected this turn's request as invalid.",
+      {
+        httpStatus: 422,
+        ...remediation("langy_dispatch_rejected"),
+      },
+    );
+    this.name = "LangyDispatchRejectedError";
+  }
+}
+
 /** The agent/transport is temporarily unavailable (HTTP 503). */
 export class LangyAgentUnavailableError extends HandledError {
   declare readonly code: "langy_agent_unavailable";

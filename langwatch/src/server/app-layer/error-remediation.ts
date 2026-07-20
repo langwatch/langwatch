@@ -184,6 +184,11 @@ const registry = {
   langy_empty_message: {
     tips: ["Send a message with actual text content"],
   },
+  langy_dispatch_rejected: {
+    tips: [
+      "The agent rejected this turn's request as invalid — it will not be retried; send a new message",
+    ],
+  },
   langy_agent_unavailable: {
     tips: [
       "Retry in a few seconds — the agent is down, mid-deploy, or restarting",
