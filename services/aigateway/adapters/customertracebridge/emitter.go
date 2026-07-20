@@ -35,8 +35,9 @@ const (
 )
 
 // Emitter uses a private (non-global) OTel TracerProvider to construct spans
-// and export them to the customer's OTLP endpoint. The TP has an empty Resource
-// so customers only see the instrumentation scope, not the gateway's service identity.
+// and export them to the customer's OTLP endpoint. The TP's resource carries
+// ONLY the langwatch.origin marker, so customers see the instrumentation scope
+// and the trace's origin — never the gateway's service identity or topology.
 type Emitter struct {
 	tp         *sdktrace.TracerProvider
 	tracer     trace.Tracer
@@ -103,11 +104,19 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 		queueSize = 8192
 	}
 
-	// Empty resource — customers see instrumentation scope only.
+	// Near-empty resource — customers see the instrumentation scope plus the
+	// origin marker only. Never the gateway's own resource (service identity,
+	// k8s topology, cloud region): that is LangWatch infrastructure detail and
+	// must not ride on customer data. The origin marker IS wanted: the control
+	// plane's trace-origin resolution treats a resource-level langwatch.origin
+	// as authoritative, so this is what makes gateway-retold traces carry
+	// Origin=Gateway in the product.
 	// AlwaysSample: the gateway never drops customer spans regardless of
 	// the gateway's own sample ratio setting.
 	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithResource(resource.Empty()),
+		sdktrace.WithResource(resource.NewSchemaless(
+			attribute.String(gatewaytracer.AttrOrigin, gatewaytracer.OriginGateway),
+		)),
 		sdktrace.WithBatcher(router,
 			sdktrace.WithBatchTimeout(batchTimeout),
 			sdktrace.WithMaxQueueSize(queueSize),

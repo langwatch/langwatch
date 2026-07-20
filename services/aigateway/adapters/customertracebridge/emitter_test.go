@@ -1,10 +1,17 @@
 package customertracebridge
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/langwatch/langwatch/pkg/contexts"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
+	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 func TestParseTraceparent_valid(t *testing.T) {
@@ -134,3 +141,50 @@ func hexEncode(b []byte) string {
 	}
 	return string(out)
 }
+
+
+// The bridge's TracerProvider resource is the customer-visible resource on
+// every retold span. It must carry the origin marker (the control plane's
+// trace-origin resolution treats resource-level langwatch.origin as
+// authoritative) and NOTHING else — no service identity, k8s topology, or
+// cloud attributes: that is LangWatch infrastructure detail and must never
+// ride on customer data.
+func TestEmitter_CustomerSpanResourceIsOriginMarkerOnly(t *testing.T) {
+	ctx := contexts.SetServiceInfo(context.Background(), contexts.ServiceInfo{
+		Service: "langwatch-service-aigateway",
+		Version: "test",
+	})
+
+	e, err := NewEmitter(ctx, EmitterOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
+
+	captured := make(chan sdktrace.ReadOnlySpan, 1)
+	e.tp.RegisterSpanProcessor(captureProcessor{spans: captured})
+
+	spanCtx, _ := e.BeginSpan(ctx, "proj-1", domain.RequestTypeChat)
+	e.EndSpan(spanCtx, domain.AITraceParams{})
+
+	select {
+	case span := <-captured:
+		kvs := span.Resource().Attributes()
+		require.Len(t, kvs, 1,
+			"customer-visible resource must carry ONLY the origin marker, got: %v", kvs)
+		assert.Equal(t, gatewaytracer.AttrOrigin, string(kvs[0].Key))
+		assert.Equal(t, gatewaytracer.OriginGateway, kvs[0].Value.AsString())
+	case <-time.After(2 * time.Second):
+		t.Fatal("no span captured")
+	}
+}
+
+type captureProcessor struct{ spans chan sdktrace.ReadOnlySpan }
+
+func (p captureProcessor) OnStart(context.Context, sdktrace.ReadWriteSpan) {}
+func (p captureProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
+	select {
+	case p.spans <- s:
+	default:
+	}
+}
+func (p captureProcessor) Shutdown(context.Context) error   { return nil }
+func (p captureProcessor) ForceFlush(context.Context) error { return nil }
