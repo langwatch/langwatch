@@ -1,4 +1,3 @@
-import { openai } from "@ai-sdk/openai";
 import dotenv from "dotenv";
 import fs from "node:fs";
 import path from "node:path";
@@ -10,13 +9,14 @@ import {
 	installSkillToWorkDir,
 	removeSkillTestWorkDir,
 } from "./claude-code-adapter";
+import { createSkillJudgeModel } from "./judge-model";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 export const isCI = !!process.env.CI;
-export const experimentsJudgeModel = openai("gpt-5-mini");
+export const experimentsJudgeModel = createSkillJudgeModel();
 
 interface ExperimentSummary {
 	id: string;

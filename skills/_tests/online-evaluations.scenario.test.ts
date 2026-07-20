@@ -1,4 +1,3 @@
-import { openai } from "@ai-sdk/openai";
 import scenario, { type ScenarioExecutionStateLike } from "@langwatch/scenario";
 import dotenv from "dotenv";
 import path from "path";
@@ -13,6 +12,7 @@ import {
 	SKILL_TESTS_SET_ID,
 	toolCallFix,
 } from "./helpers/claude-code-adapter";
+import { createSkillJudgeModel } from "./helpers/judge-model";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,7 +20,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
-const judgeModel = openai("gpt-5-mini");
+const judgeModel = createSkillJudgeModel();
 
 interface Monitor {
 	id: string;

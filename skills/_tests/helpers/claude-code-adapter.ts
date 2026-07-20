@@ -35,6 +35,10 @@ export function removeSkillTestWorkDir(workingDirectory: string): void {
 	if (!resolvedDirectory.startsWith(`${skillTestWorkRoot}${path.sep}`)) {
 		throw new Error(`Test workspace must stay inside ${skillTestWorkRoot}`);
 	}
+	if (process.env.KEEP_SKILL_TEST_WORKDIR === "1") {
+		console.log(`[skill dogfood] preserved workdir: ${resolvedDirectory}`);
+		return;
+	}
 
 	fs.rmSync(resolvedDirectory, { recursive: true, force: true });
 }

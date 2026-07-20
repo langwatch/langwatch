@@ -46,4 +46,25 @@ describe("Claude Code skill discovery", () => {
 			removeSkillTestWorkDir(workingDirectory);
 		}
 	});
+
+	describe("given dogfood artifact preservation is enabled", () => {
+		it("keeps the generated workspace available for inspection", () => {
+			const workingDirectory = createSkillTestWorkDir(
+				"claude-skill-preservation-",
+			);
+			const previousValue = process.env.KEEP_SKILL_TEST_WORKDIR;
+			try {
+				process.env.KEEP_SKILL_TEST_WORKDIR = "1";
+				removeSkillTestWorkDir(workingDirectory);
+				expect(fs.existsSync(workingDirectory)).toBe(true);
+			} finally {
+				if (previousValue === undefined) {
+					delete process.env.KEEP_SKILL_TEST_WORKDIR;
+				} else {
+					process.env.KEEP_SKILL_TEST_WORKDIR = previousValue;
+				}
+				fs.rmSync(workingDirectory, { recursive: true, force: true });
+			}
+		});
+	});
 });
