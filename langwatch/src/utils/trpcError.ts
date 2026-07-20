@@ -1,4 +1,5 @@
 import { TRPCClientError, type TRPCClientErrorLike } from "@trpc/client";
+import type { AppRouter } from "../server/api/root";
 import type { LimitType } from "../server/license-enforcement";
 
 /**
@@ -35,7 +36,7 @@ export function errorDisplayMessage(error: unknown): string {
     : "An unknown error occurred";
 }
 
-export const isNotFound = (error: TRPCClientErrorLike<any> | null) => {
+export const isNotFound = (error: TRPCClientErrorLike<AppRouter> | null) => {
   if (
     error &&
     error instanceof TRPCClientError &&
