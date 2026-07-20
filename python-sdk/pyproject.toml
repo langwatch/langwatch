@@ -91,12 +91,12 @@ examples = [
     "openinference-instrumentation-dspy>=0.1.23,<0.2.0",
     "opentelemetry-instrumentation-fastapi>=0.53b1",
     "langgraph>=1.0.0,<2.0.0",
-    "openai>=1.68.2,<2.45.0", # cap re-verified against openai 2.43.0 (2.8+ historically called model_dump(by_alias=None) which pydantic-core rejected)
+    "openai>=1.68.2,<2.46.0", # cap re-verified against openai 2.43.0 (2.8+ historically called model_dump(by_alias=None) which pydantic-core rejected)
     "pydantic>=2.11.0", # chainlit <2.11.1 was broken with pydantic >=2.10.2; fixed in chainlit 2.11.1
     "pytest>=7.4.2,<10.0.0",
     "python-dotenv==1.2.2",
     "streamlit>=1.37.1,<2.0.0",
-    "uvicorn>=0.38.0,<0.51.0",
+    "uvicorn>=0.38.0,<0.52.0",
     "json-repair>=0.42.0",
     "openinference-instrumentation-openai>=0.1.30",
     "opentelemetry-instrumentation-langchain>=0.40.4",
