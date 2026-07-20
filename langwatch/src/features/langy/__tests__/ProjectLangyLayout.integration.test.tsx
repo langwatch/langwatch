@@ -6,7 +6,7 @@
  *
  * Spec: specs/langy/langy-navigation-persistence.feature
  *
- * Boundary mocks: the gate-input hooks (session / project / flag / staff) and
+ * Boundary mocks: the gate-input hooks (session / project / flag) and
  * the heavy LangyDrawer chat surface. LangyContext is REAL, so the open/closed
  * state is genuine — its survival across navigation is exactly what we assert.
  */
@@ -20,7 +20,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Controllable gate state (flipped per-test to exercise the visibility gate).
 // ---------------------------------------------------------------------------
 const gate = {
-  staff: true,
   flagEnabled: true,
   project: { id: "project-demo", slug: "demo" } as {
     id: string;
@@ -56,14 +55,6 @@ vi.mock("~/hooks/usePublicEnv", () => ({
 vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: () => ({ enabled: gate.flagEnabled }),
 }));
-
-vi.mock("~/utils/isLangwatchStaff", async (importOriginal) => {
-  // Keep the real LANGY_RELEASE_FLAG constant (useShowLangy reads it); only the
-  // staff predicate is driven by the test's gate.
-  const actual =
-    await importOriginal<typeof import("~/utils/isLangwatchStaff")>();
-  return { ...actual, isLangwatchStaff: () => gate.staff };
-});
 
 // Stub the heavy chat surface. Open state genuinely lives in the zustand
 // store nowadays, so the stub reads the REAL store and exposes a button that
@@ -122,7 +113,6 @@ const openLangy = () =>
   userEvent.click(screen.getByRole("button", { name: "open-langy" }));
 
 beforeEach(() => {
-  gate.staff = true;
   gate.flagEnabled = true;
   gate.project = { id: "project-demo", slug: "demo" };
   // The store is a module singleton — start every test closed and uncounted.
@@ -174,32 +164,30 @@ describe("ProjectLangyLayout", () => {
     });
   });
 
-  // Visibility gate (re-instated for PR #4913, mirrors the server-side gate in
-  // routes/langy.ts). Staff bypass the rollout flag; for everyone else the
-  // flag must resolve true. The registry default is off, so non-staff are
-  // dark by default and the panel must not render.
-  describe("given the staff + rollout-flag visibility gate", () => {
-    it("renders Langy for staff even when the rollout flag is off", () => {
-      gate.staff = true;
-      gate.flagEnabled = false;
-      renderAt("/demo/traces");
-      expect(screen.getByText("traces page")).toBeTruthy();
-      expect(drawer()).not.toBeNull();
-    });
-
-    it("renders Langy for a non-staff team member when the rollout flag is on", () => {
-      gate.staff = false;
+  // Visibility gate (mirrors the server-side gate in langyAccessGate.ts). The
+  // rollout flag is the only lever — there is no staff bypass — and the
+  // registry default is off, so the panel is dark until a user is opted in.
+  describe("given the rollout-flag visibility gate", () => {
+    it("renders Langy for a team member when the rollout flag is on", () => {
       gate.flagEnabled = true;
       renderAt("/demo/traces");
       expect(drawer()).not.toBeNull();
     });
 
     /** @scenario "The visibility gate is not widened" */
-    it("hides Langy for a non-staff team member when the rollout flag is off", () => {
-      gate.staff = false;
+    it("hides Langy for a team member when the rollout flag is off", () => {
       gate.flagEnabled = false;
       renderAt("/demo/traces");
       expect(screen.getByText("traces page")).toBeTruthy();
+      expect(drawer()).toBeNull();
+    });
+
+    /** @scenario "A LangWatch address gets no bypass" */
+    it("hides Langy for a @langwatch.ai session when the rollout flag is off", () => {
+      // The mocked session is staff@langwatch.ai. Before the flag-only rework
+      // that address bypassed the flag outright; pin that it no longer does.
+      gate.flagEnabled = false;
+      renderAt("/demo/traces");
       expect(drawer()).toBeNull();
     });
   });

@@ -70,8 +70,8 @@ Feature: Langy persists across in-project navigation
   @integration
   Scenario: The visibility gate is not widened
     # Persistence must not change *who* sees Langy. The existing gate still
-    # applies (staff + release_langy_enabled, on project routes the user
-    # belongs to) — it has only moved up a level, not loosened.
+    # applies (release_langy_enabled, on project routes the user belongs to)
+    # — it has only moved up a level, not loosened.
     Given a user for whom Langy was not previously visible
     When they navigate within a project
     Then Langy remains hidden for them

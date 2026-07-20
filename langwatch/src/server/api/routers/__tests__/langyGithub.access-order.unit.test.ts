@@ -6,13 +6,13 @@ import { createInnerTRPCContext } from "../../trpc";
 // before the org-scoped rollout flag, so a non-member's response can't leak an
 // arbitrary org's Langy rollout state (FORBIDDEN-when-enabled vs
 // NOT_FOUND-when-disabled would be a cross-tenant probe).
-const { isOrganizationMember, getAllForOrganization, isEnabled, isLangwatchStaff } =
-  vi.hoisted(() => ({
+const { isOrganizationMember, getAllForOrganization, isEnabled } = vi.hoisted(
+  () => ({
     isOrganizationMember: vi.fn(),
     getAllForOrganization: vi.fn(),
     isEnabled: vi.fn(),
-    isLangwatchStaff: vi.fn(),
-  }));
+  }),
+);
 
 vi.mock("~/server/app-layer", () => ({
   getApp: () => ({
@@ -28,12 +28,6 @@ vi.mock("~/server/app-layer", () => ({
 vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled },
 }));
-vi.mock("~/utils/isLangwatchStaff", async (importOriginal) => {
-  // Keep the real LANGY_RELEASE_FLAG constant; only drive the staff predicate.
-  const actual =
-    await importOriginal<typeof import("~/utils/isLangwatchStaff")>();
-  return { ...actual, isLangwatchStaff };
-});
 vi.mock("~/server/auditLog", () => ({ auditLog: vi.fn() }));
 
 import { langyGithubRouter } from "../langyGithub";
@@ -53,9 +47,6 @@ describe("langyGithubRouter membership-before-rollout gate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getAllForOrganization.mockResolvedValue([]);
-    // Non-staff by default; the whole point is the rollout flag / membership
-    // interplay, which staff would short-circuit.
-    isLangwatchStaff.mockReturnValue(false);
   });
 
   describe("when a non-member probes an org with the rollout enabled", () => {
