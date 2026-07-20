@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { LangyTurnDispatchRetry } from "~/server/app-layer/langy/langy-turn-retry.error";
 import type { LangyTurnHandoff } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { LANGY_LIVENESS } from "~/server/app-layer/langy/streaming/langy.streaming.constants";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
@@ -133,7 +134,9 @@ describe("agent turn liveness subscriber", () => {
       aggregateId: "conv_2",
     });
 
-    await subscriber.handle(event, context);
+    await expect(subscriber.handle(event, context)).rejects.toBeInstanceOf(
+      DispatchError,
+    );
 
     expect(deps.conversations.read).toHaveBeenCalledWith({
       projectId: "project_2",
@@ -161,14 +164,22 @@ describe("agent turn liveness subscriber", () => {
     expect(deps.buffer.liveness).not.toHaveBeenCalled();
   });
 
-  it("does nothing when the current heartbeat is healthy", async () => {
+  it("re-arms another check instead of going quiet when the heartbeat is healthy", async () => {
     const deps = makeDeps({
       liveness: { present: true, stale: false, lastBeatAt: NOW },
     });
     const subscriber = createAgentTurnLivenessSubscriber(deps);
 
-    await subscriber.handle(makeEvent(), context);
+    const error = await subscriber
+      .handle(makeEvent(), context)
+      .then(() => null)
+      .catch((e: unknown) => e);
 
+    expect(error).toBeInstanceOf(DispatchError);
+    expect((error as DispatchError).retryable).toBe(true);
+    expect((error as DispatchError).retryAfterMs).toBe(
+      LANGY_LIVENESS.HEARTBEAT_GRACE_MS,
+    );
     expect(deps.handoffStore.read).not.toHaveBeenCalled();
     expect(deps.worker.dispatch).not.toHaveBeenCalled();
     expect(deps.failTurn.failTurn).not.toHaveBeenCalled();

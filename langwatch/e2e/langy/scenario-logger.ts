@@ -29,6 +29,13 @@ export type BrowserQAOptions = Partial<BrowserQACheck>;
  * Neither the browser-QA pass nor the log write can crash the scenario
  * result itself — the judge verdict is what the suite asserts on, and a
  * verification aid or a disk write should never mask a real pass/fail.
+ *
+ * `config` stays a single positional argument (not `{ config, ... }`) by
+ * design — this wraps `scenario.run(config)`, an external library call that
+ * itself takes one positional config object, and every one of this
+ * function's 50+ existing call sites already passes `config` as an inline
+ * object literal. `browserQAOptions` is the one true second argument, and it
+ * was already an options object, not a bag of positional values.
  */
 export async function runScenarioAndLog(
   config: RunConfig,
@@ -103,7 +110,7 @@ function formatAsMarkdown(
   out.push("## Browser QA");
   out.push("");
   if (qa) {
-    out.push(`**Verdict:** ${qa.ok ? "PASS" : "FAIL"}`);
+    out.push(`**Verdict:** ${qa.passed ? "PASS" : "FAIL"}`);
     out.push(`**Notes:** ${qa.notes}`);
     out.push(`**Screenshot:** ${qa.screenshotPath}`);
   } else {

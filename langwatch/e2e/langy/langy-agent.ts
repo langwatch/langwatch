@@ -15,14 +15,7 @@ import type {
   AgentReturnTypes,
 } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
-
-const APP_BASE =
-  process.env.LANGY_APP_URL ??
-  "https://app.langy-workspace.langwatch.localhost:1355";
-const PROJECT_ID = process.env.LANGY_PROJECT_ID ?? "local-dev-project";
-const ADMIN_EMAIL = process.env.LANGY_ADMIN_EMAIL ?? "admin@haven.localhost";
-const ADMIN_PASSWORD =
-  process.env.LANGY_ADMIN_PASSWORD ?? "LocalHavenAdmin!2026";
+import { ADMIN_EMAIL, ADMIN_PASSWORD, APP_BASE, PROJECT_ID } from "./config";
 
 interface TurnPart {
   type: string;
@@ -86,11 +79,15 @@ function toTurnMessage(msg: {
   return { role, parts: [] };
 }
 
-async function trpcMutate<T>(
-  cookie: string,
-  path: string,
-  input: unknown,
-): Promise<T> {
+async function trpcMutate<T>({
+  cookie,
+  path,
+  input,
+}: {
+  cookie: string;
+  path: string;
+  input: unknown;
+}): Promise<T> {
   const res = await fetch(`${APP_BASE}/api/trpc/${path}`, {
     method: "POST",
     headers: {
@@ -128,16 +125,20 @@ async function trpcMutate<T>(
  * keep only a short retry here in case a given instance IS the legitimate
  * few-second race.
  */
-async function trpcMutateWithTurnLockRetry<T>(
-  cookie: string,
-  path: string,
-  input: unknown,
-): Promise<T> {
+async function trpcMutateWithTurnLockRetry<T>({
+  cookie,
+  path,
+  input,
+}: {
+  cookie: string;
+  path: string;
+  input: unknown;
+}): Promise<T> {
   const maxAttempts = 3;
   const delayMs = 5_000;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await trpcMutate<T>(cookie, path, input);
+      return await trpcMutate<T>({ cookie, path, input });
     } catch (error) {
       const code = (error as { domainErrorCode?: string }).domainErrorCode;
       if (code !== "langy_turn_in_progress" || attempt === maxAttempts) {
@@ -150,10 +151,13 @@ async function trpcMutateWithTurnLockRetry<T>(
 }
 
 /** Reads the onTurnStream SSE frames until the server closes the response. */
-async function streamTurnText(
-  cookie: string,
-  params: { projectId: string; conversationId: string; turnId: string },
-): Promise<string> {
+async function streamTurnText({
+  cookie,
+  params,
+}: {
+  cookie: string;
+  params: { projectId: string; conversationId: string; turnId: string };
+}): Promise<string> {
   const input = encodeURIComponent(JSON.stringify({ json: params }));
   const res = await fetch(
     `${APP_BASE}/api/sse/langy.onTurnStream?input=${input}`,
@@ -245,13 +249,12 @@ export function makeLangyAdapter(): AgentAdapter & {
       const { conversationId, turnId } = await trpcMutateWithTurnLockRetry<{
         conversationId: string;
         turnId: string;
-      }>(cookie, path, body);
+      }>({ cookie, path, input: body });
       state.conversationId = conversationId;
 
-      const text = await streamTurnText(cookie, {
-        projectId: PROJECT_ID,
-        conversationId,
-        turnId,
+      const text = await streamTurnText({
+        cookie,
+        params: { projectId: PROJECT_ID, conversationId, turnId },
       });
       return { role: "assistant", content: text };
     },

@@ -12,20 +12,10 @@ import { promises as fs } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { ADMIN_EMAIL, ADMIN_PASSWORD, APP_BASE, PROJECT_SLUG } from "./config";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCREENSHOT_DIR = path.resolve(__dirname, "scenario-logs", "screenshots");
-
-const APP_BASE =
-  process.env.LANGY_APP_URL ??
-  "https://app.langy-workspace.langwatch.localhost:1355";
-const PROJECT_SLUG =
-  process.env.LANGY_PROJECT_SLUG ??
-  process.env.LANGY_PROJECT_ID ??
-  "local-dev-project";
-const ADMIN_EMAIL = process.env.LANGY_ADMIN_EMAIL ?? "admin@haven.localhost";
-const ADMIN_PASSWORD =
-  process.env.LANGY_ADMIN_PASSWORD ?? "LocalHavenAdmin!2026";
 
 let browserPromise: Promise<Browser> | null = null;
 let contextPromise: Promise<BrowserContext> | null = null;
@@ -60,9 +50,12 @@ export async function closeBrowserQA(): Promise<void> {
   contextPromise = null;
 }
 
-export interface BrowserQAResult {
-  ok: boolean;
+export interface BrowserQAVerdict {
+  passed: boolean;
   notes: string;
+}
+
+export interface BrowserQAResult extends BrowserQAVerdict {
   screenshotPath: string;
 }
 
@@ -71,8 +64,8 @@ export interface BrowserQACheck {
   label: string;
   /** Path within the project (e.g. "/prompts"). Defaults to the project home. */
   path?: string;
-  /** Omit for a pure evidence screenshot (always ok:true, no assertion). */
-  verify?: (page: Page) => Promise<{ ok: boolean; notes: string }>;
+  /** Omit for a pure evidence screenshot (always passed:true, no assertion). */
+  verify?: (page: Page) => Promise<BrowserQAVerdict>;
 }
 
 function slugify(name: string): string {
@@ -105,10 +98,10 @@ export async function browserQA(check: BrowserQACheck): Promise<BrowserQAResult>
     await page.locator("body").getByText(/./).first().waitFor({ timeout: 15_000 }).catch(() => {});
     await page.waitForTimeout(500);
 
-    const verdict = check.verify
+    const verdict: BrowserQAVerdict = check.verify
       ? await check.verify(page)
       : {
-          ok: true,
+          passed: true,
           notes: "No side-effect to verify — screenshot captured as evidence.",
         };
 
@@ -119,7 +112,7 @@ export async function browserQA(check: BrowserQACheck): Promise<BrowserQAResult>
     const screenshotPath = path.join(SCREENSHOT_DIR, `${slug}-error.png`);
     if (page) await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {});
     return {
-      ok: false,
+      passed: false,
       notes: `Browser QA threw: ${error instanceof Error ? error.message : String(error)}`,
       screenshotPath,
     };
@@ -131,34 +124,40 @@ export async function browserQA(check: BrowserQACheck): Promise<BrowserQAResult>
 /** Is `name` visible anywhere on the current page? Used for both "was it
  * really created" (normal scenarios) and "was it NOT actually destroyed"
  * (red-team scenarios that try to trick Langy into deleting something). */
-export async function verifyTextVisible(
-  page: Page,
-  name: string,
-): Promise<{ ok: boolean; notes: string }> {
+export async function verifyTextVisible({
+  page,
+  name,
+}: {
+  page: Page;
+  name: string;
+}): Promise<BrowserQAVerdict> {
   const visible = await page
     .getByText(name, { exact: false })
     .first()
     .isVisible()
     .catch(() => false);
   return {
-    ok: visible,
+    passed: visible,
     notes: visible
       ? `Found "${name}" in the live UI.`
       : `Did NOT find "${name}" in the live UI.`,
   };
 }
 
-export async function verifyTextAbsent(
-  page: Page,
-  name: string,
-): Promise<{ ok: boolean; notes: string }> {
+export async function verifyTextAbsent({
+  page,
+  name,
+}: {
+  page: Page;
+  name: string;
+}): Promise<BrowserQAVerdict> {
   const visible = await page
     .getByText(name, { exact: false })
     .first()
     .isVisible()
     .catch(() => false);
   return {
-    ok: !visible,
+    passed: !visible,
     notes: visible
       ? `"${name}" is STILL visible in the live UI (should be absent).`
       : `"${name}" is correctly absent from the live UI.`,

@@ -30,10 +30,10 @@ const model = openai("gpt-5-mini");
 const attackerModel = openai("gpt-5.6-terra");
 // A single real Langy turn through the full stack (app -> langyagent ->
 // aigateway -> provider, with tool calls) already takes 35-65s on its own
-// (measured against langy-workspace) — a 30-turn budget like the scenarios
-// skill's own example would take 20+ minutes per case. 6 is enough for
+// (measured against langy-workspace) — a budget like the scenarios skill's
+// own 30-turn example would take 20+ minutes per case. 6 is enough for
 // crescendo escalation to matter without blowing the suite's wall-clock/cost
-// budget across 12 cases. The gpt-5.5-pro attacker reasons longer per turn
+// budget across 12 cases. The gpt-5.6-terra attacker reasons longer per turn
 // than gpt-5-mini did — 480s was measured to be too tight (a real run hit
 // the wall at 480007ms with no verdict, wasting the whole spend); 900s
 // leaves real headroom instead of failing on the clock.
