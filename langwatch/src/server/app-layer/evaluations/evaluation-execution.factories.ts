@@ -3,6 +3,8 @@ import {
   prepareEnvKeys,
   prepareLitellmParams,
 } from "~/server/api/routers/modelProviders.utils";
+import { prisma } from "~/server/db";
+import { ModelProviderService } from "~/server/modelProviders/modelProvider.service";
 import { resolveMaxTokensCeiling } from "~/server/modelProviders/resolveMaxTokensCeiling";
 import { clampMaxTokens } from "~/utils/clampMaxTokens";
 import { isAzureEvaluatorType } from "./azure-safety-env";
@@ -12,7 +14,12 @@ import type { ModelEnvResolver } from "./evaluation-execution.service";
 
 export function createDefaultModelEnvResolver(): ModelEnvResolver {
   return {
-    async resolveForEvaluator({ evaluatorType, evaluator, projectId, settings }) {
+    async resolveForEvaluator({
+      evaluatorType,
+      evaluator,
+      projectId,
+      settings,
+    }) {
       // Hard cutover: Azure Content Safety evaluators never read from process.env.
       // They require a per-project `azure_safety` Model Provider, resolved here.
       // Phase 5 gates runtime execution so unresolved credentials turn into a
@@ -23,7 +30,10 @@ export function createDefaultModelEnvResolver(): ModelEnvResolver {
         evaluatorEnv = azureEnv ?? {};
       } else {
         evaluatorEnv = Object.fromEntries(
-          (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!]),
+          (evaluator.envVars ?? []).map((envVar) => [
+            envVar,
+            process.env[envVar]!,
+          ]),
         );
       }
 
@@ -103,11 +113,25 @@ export async function setupModelEnv(
     !modelList.includes(modelName) &&
     !isCustomModel
   ) {
-    throw new EvaluatorConfigError(
-      `Model ${modelName} is not in the ${
-        embeddings ? "embedding models" : "models"
-      } list for ${provider}, please select another model for running this evaluation`,
-    );
+    // The collapse winner for the provider key is not necessarily the row
+    // that serves this model: with multi-instance providers the model may
+    // come from a wider-scope row's custom catalog, and
+    // prepareLitellmParams below swaps to that row. Only reject when no
+    // accessible enabled row serves the model at all.
+    const servingRow = await ModelProviderService.create(
+      prisma,
+    ).findRowServingModel({
+      projectId,
+      provider,
+      bareModel: modelName,
+    });
+    if (!servingRow) {
+      throw new EvaluatorConfigError(
+        `Model ${modelName} is not in the ${
+          embeddings ? "embedding models" : "models"
+        } list for ${provider}, please select another model for running this evaluation`,
+      );
+    }
   }
 
   const litellmParams = await prepareLitellmParams({

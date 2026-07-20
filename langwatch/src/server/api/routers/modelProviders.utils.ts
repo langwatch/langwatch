@@ -284,6 +284,12 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
  */
 export const DEFAULT_AZURE_API_VERSION = "2025-04-01-preview";
 
+/**
+ * NOTE: the swapped-in row is loaded with real (decrypted) credentials,
+ * so this function must only feed provider-execution paths. A caller
+ * holding a key-stripped row (frontend-facing shape) must not route
+ * through here — the swap would silently re-inject credentials.
+ */
 async function resolveServingRow({
   model,
   modelProvider,

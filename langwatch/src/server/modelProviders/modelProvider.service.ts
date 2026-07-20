@@ -100,25 +100,38 @@ function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
 }
 
 /**
- * Whether this provider row's custom catalog (chat or embeddings) lists
- * `bareModel`. Accepts both the raw DB shape (legacy string[] or new
- * object[]) and the normalized `MaybeStoredModelProvider` lists. A row
- * with no custom catalog serves only registry models — it never "lists"
- * anything here.
+ * Whether this provider row serves `bareModel` through its effective
+ * catalog: the provider's registry lists (`models` / `embeddingsModels` —
+ * every row of a provider serves its registry models) plus the row's own
+ * custom catalog (chat or embeddings). Registry models short-circuit to
+ * true, so a collapse winner with no custom catalog is never mistaken
+ * for "doesn't serve this model" and swapped away from the project's own
+ * credentials. Accepts both the raw DB shape (legacy string[] or new
+ * object[]) and the normalized `MaybeStoredModelProvider` lists; raw DB
+ * rows carry no registry lists, so for them only the custom catalog
+ * decides — the right question to ask of a candidate row for a
+ * non-registry model.
  */
 export function providerRowServesModel({
   row,
   bareModel,
 }: {
-  row: { customModels?: unknown; customEmbeddingsModels?: unknown };
+  row: {
+    models?: string[] | null;
+    embeddingsModels?: string[] | null;
+    customModels?: unknown;
+    customEmbeddingsModels?: unknown;
+  };
   bareModel: string;
 }): boolean {
+  if ((row.models ?? []).includes(bareModel)) return true;
+  if ((row.embeddingsModels ?? []).includes(bareModel)) return true;
   const chat = toLegacyCompatibleCustomModels(row.customModels ?? null, "chat");
   const embeddings = toLegacyCompatibleCustomModels(
     row.customEmbeddingsModels ?? null,
     "embedding",
   );
-  return chat.concat(embeddings).some((m) => m.modelId === bareModel);
+  return chat.concat(embeddings).some((m) => m?.modelId === bareModel);
 }
 
 /**

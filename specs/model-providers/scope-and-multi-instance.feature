@@ -460,6 +460,16 @@ Feature: Model Provider Scope and Multi-Instance
     Then the call uses the PROJECT row's credentials (narrowest enabled row)
 
   @integration
+  Scenario: A wider row listing a registry model custom does not steal it
+    Given a PROJECT-scoped "openai" row for "web-app" with the project's own key and no custom catalog
+    And an ORGANIZATION-scoped "openai" row whose custom catalog also lists a registry model
+    And both rows are enabled
+    When the runtime prepares a call for that registry model in project "web-app"
+    Then the call uses the PROJECT row's credentials
+    # Every row of a provider serves its registry models, so the collapse
+    # winner is already correct — only custom-catalog models may swap rows.
+
+  @integration
   Scenario: Disabled rows never serve a model even when their catalog lists it
     Given an ORGANIZATION-scoped "azure" row whose catalog lists "gpt-5.4-mini" but is disabled
     And a PROJECT-scoped enabled "azure" row for "web-app" whose catalog lists only "gpt-4o"
@@ -472,6 +482,15 @@ Feature: Model Provider Scope and Multi-Instance
     And a PROJECT-scoped enabled "azure" row for "web-app" whose embeddings catalog lists only "text-embedding-ada-002"
     When the runtime prepares a call for model "azure/text-embedding-3-small" in project "web-app"
     Then the call uses the ORGANIZATION row's credentials
+
+  @integration
+  Scenario: Evaluations accept a model served only by a wider-scope row
+    Given a PROJECT-scoped "gemini" row for "web-app" with no custom catalog
+    And an ORGANIZATION-scoped "gemini" row whose custom catalog lists "my-tuned-model"
+    And both rows are enabled
+    When an evaluation validates model "gemini/my-tuned-model" for project "web-app"
+    Then the evaluator env is built with the ORGANIZATION row's credentials
+    And a model no accessible row serves is still rejected
 
   @integration
   Scenario: A row's unrelated project scope does not inflate its specificity

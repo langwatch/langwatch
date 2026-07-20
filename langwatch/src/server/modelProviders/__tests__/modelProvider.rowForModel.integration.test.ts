@@ -22,6 +22,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prepareLitellmParams } from "../../api/routers/modelProviders.utils";
+import { setupModelEnv } from "../../app-layer/evaluations/evaluation-execution.factories";
 import { prisma } from "../../db";
 import { ModelProviderService } from "../modelProvider.service";
 
@@ -422,7 +423,7 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
     });
   });
 
-  describe("when no row lists the model (registry-model providers)", () => {
+  describe("when the resolved model is a registry model", () => {
     beforeAll(async () => {
       await service().updateModelProvider(
         {
@@ -455,6 +456,102 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
         projectId,
       });
       expect(params.api_key).toBe(`sk-openai-project-${ns}`);
+    });
+
+    /** @scenario A wider row listing a registry model custom does not steal it */
+    it("keeps the winner's credentials when a wider row lists the model in its custom catalog", async () => {
+      const providers = await service().getProjectModelProviders(projectId);
+      const registryModel = providers.openai!.models![0]!;
+      // An admin pinning a registry model in the org row's custom catalog
+      // (e.g. for a display name) must not reroute the project's calls:
+      // every row of a provider serves its registry models, so the
+      // collapse winner already holds the right credentials.
+      const orgRowId = (
+        await prisma.modelProvider.findMany({
+          where: {
+            provider: "openai",
+            scopes: {
+              some: { scopeType: "ORGANIZATION", scopeId: organizationId },
+            },
+          },
+          select: { id: true },
+        })
+      )[0]!.id;
+      await prisma.modelProvider.update({
+        where: { id: orgRowId },
+        data: {
+          customModels: [
+            {
+              modelId: registryModel,
+              displayName: registryModel,
+              mode: "chat",
+            },
+          ],
+        },
+      });
+      try {
+        const params = await prepareLitellmParams({
+          model: `openai/${registryModel}`,
+          modelProvider: providers.openai!,
+          projectId,
+        });
+        expect(params.api_key).toBe(`sk-openai-project-${ns}`);
+      } finally {
+        await prisma.modelProvider.update({
+          where: { id: orgRowId },
+          data: { customModels: [] },
+        });
+      }
+    });
+  });
+
+  describe("when an evaluation validates a model served only by a wider-scope row", () => {
+    beforeAll(async () => {
+      // Winner: project row with its own key and no custom catalog.
+      await service().updateModelProvider(
+        {
+          projectId,
+          provider: "gemini",
+          enabled: true,
+          customKeys: { GEMINI_API_KEY: `sk-gemini-project-${ns}` },
+          scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+        },
+        ctx(),
+      );
+      // The custom model lives only in the org row's catalog.
+      await service().updateModelProvider(
+        {
+          projectId,
+          provider: "gemini",
+          enabled: true,
+          customKeys: { GEMINI_API_KEY: `sk-gemini-org-${ns}` },
+          customModels: [
+            {
+              modelId: `eval-custom-${ns}`,
+              displayName: `eval-custom-${ns}`,
+              mode: "chat",
+            },
+          ],
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+        },
+        ctx(),
+      );
+    });
+
+    /** @scenario Evaluations accept a model served only by a wider-scope row */
+    it("builds the evaluator env with the serving row's credentials instead of rejecting", async () => {
+      const env = await setupModelEnv(
+        `gemini/eval-custom-${ns}`,
+        false,
+        projectId,
+      );
+      expect(env.X_LITELLM_api_key).toBe(`sk-gemini-org-${ns}`);
+    });
+
+    it("still rejects a model no accessible row serves", async () => {
+      await expect(
+        setupModelEnv(`gemini/nonexistent-${ns}`, false, projectId),
+      ).rejects.toThrow(/not in the models list/);
     });
   });
 });
