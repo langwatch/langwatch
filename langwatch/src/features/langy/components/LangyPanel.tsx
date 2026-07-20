@@ -165,7 +165,7 @@ import "../langyTheme.css";
 // composer's model picker with whatever's actually resolving today — opening
 // Langy on a project that already has a configured default model lands on
 // THAT model, not on an unrelated branch-primary pick.
-const LANGY_GATE_FEATURE_KEY = "prompt.create_default";
+const LANGY_GATE_FEATURE_KEY = "langy.chat";
 
 // The floating card's symmetric viewport inset: a rounded card with a small,
 // SYMMETRIC inset on every side (a soft brand glow + shadow behind it).

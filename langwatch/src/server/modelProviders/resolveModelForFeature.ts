@@ -1,5 +1,9 @@
 import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
 
+import {
+  isModelAllowedForFeature,
+  LANGY_CHAT_FEATURE_KEY,
+} from "./codexRestrictions";
 import { type FeatureDescriptor, featureByKey } from "./featureRegistry";
 import { expandLatestAlias, isLatestAlias } from "./latestAliases";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
@@ -221,6 +225,12 @@ export async function resolveModelForFeature(
         // than leak a virtual id downstream.
         const expanded = expandLatestAlias(value);
         if (isLatestAlias(value) && expanded === value) continue;
+        // A restricted model (codex) resolving for a feature outside its
+        // allowed set is treated as not-set so the cascade keeps walking —
+        // the write paths reject saving these, but an older config or a
+        // wider-scope value must not leak a terms-restricted model into
+        // an ordinary feature.
+        if (!isModelAllowedForFeature(expanded, feature.key)) continue;
         return {
           model: expanded,
           source: "feature_override",
@@ -235,6 +245,7 @@ export async function resolveModelForFeature(
       if (value) {
         const expanded = expandLatestAlias(value);
         if (isLatestAlias(value) && expanded === value) continue;
+        if (!isModelAllowedForFeature(expanded, feature.key)) continue;
         return {
           model: expanded,
           source: "role_default",
@@ -243,6 +254,15 @@ export async function resolveModelForFeature(
         };
       }
     }
+  }
+
+  // Setups older than the langy.chat key configured Langy through
+  // prompt.create_default (the original gate key). Honour them before
+  // concluding "not configured", so the panel doesn't re-prompt working
+  // projects for setup. The returned Resolution carries the fallback
+  // feature's descriptor; callers read `.model`.
+  if (featureKey === LANGY_CHAT_FEATURE_KEY) {
+    return resolveModelForFeature("prompt.create_default", ctx);
   }
 
   // 2. Nothing in the cascade. AI features for this role are disabled

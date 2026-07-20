@@ -7,6 +7,10 @@ import {
   hasTeamPermission,
 } from "../api/rbac";
 import {
+  isModelAllowedAsRoleDefault,
+  isModelAllowedForFeature,
+} from "./codexRestrictions";
+import {
   allFeatures,
   featureByKey,
   MODEL_ROLES,
@@ -104,11 +108,22 @@ function validKeySet(): Set<string> {
 
 function sanitizeConfig(raw: Record<string, unknown>): Record<string, string> {
   const valid = validKeySet();
+  const roleKeys = new Set<string>(MODEL_ROLES);
   const clean: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (!valid.has(key)) continue;
     if (typeof value !== "string") continue;
     if (value.length === 0) continue;
+    // Restricted models (codex) are rejected loudly, not dropped: a save
+    // that silently loses a key would read as "worked" in the drawer.
+    const allowed = roleKeys.has(key)
+      ? isModelAllowedAsRoleDefault(value)
+      : isModelAllowedForFeature(value, key);
+    if (!allowed) {
+      throw new Error(
+        `"${value}" serves the coding-assistant surfaces only and cannot be set for "${key}".`,
+      );
+    }
     clean[key] = value;
   }
   return clean;
@@ -254,6 +269,11 @@ export async function setRoleAtScope(
   if (!valid.has(params.role)) {
     throw new Error(`Unknown role: "${params.role}".`);
   }
+  if (params.model !== null && !isModelAllowedAsRoleDefault(params.model)) {
+    throw new Error(
+      `"${params.model}" serves the coding-assistant surfaces only and cannot be a ${params.role} role default.`,
+    );
+  }
   await upsertKeyAtScope(ctx, {
     scopeType: params.scopeType,
     scopeId: params.scopeId,
@@ -279,6 +299,14 @@ export async function setFeatureAtScope(
 ): Promise<void> {
   if (!featureByKey(params.featureKey)) {
     throw new Error(`Unknown feature key: "${params.featureKey}".`);
+  }
+  if (
+    params.model !== null &&
+    !isModelAllowedForFeature(params.model, params.featureKey)
+  ) {
+    throw new Error(
+      `"${params.model}" serves the coding-assistant surfaces only and cannot be the model for "${params.featureKey}".`,
+    );
   }
   await upsertKeyAtScope(ctx, {
     scopeType: params.scopeType,

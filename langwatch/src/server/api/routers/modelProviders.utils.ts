@@ -1,5 +1,6 @@
 import { buildManagedBedrockLitellmParams } from "../../../../ee/managed-providers/managedBedrockConfig";
 import { prisma } from "../../db";
+import { isCodexModel } from "../../modelProviders/codexRestrictions";
 import type {
   LLMModelEntry,
   ReasoningConfig,
@@ -325,6 +326,19 @@ export const prepareLitellmParams = async ({
   modelProvider: MaybeStoredModelProvider;
   projectId: string;
 }) => {
+  // Execution backstop for the terms-restricted provider: every general
+  // inference path (workflows, evaluations, playground, optimization
+  // studio) funnels through here on its way to litellm/nlpgo, and codex
+  // must never ride it — its only road is the AI gateway's Responses
+  // endpoint (see codexGatewayModel.ts), reserved for the coding-assistant
+  // surfaces. Pickers already hide codex models on these surfaces; this
+  // guard is what makes the restriction hold against a handcrafted request.
+  if (isCodexModel(model)) {
+    throw new Error(
+      `"${model}" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.`,
+    );
+  }
+
   const params: Record<string, string> = {};
 
   // Multi-instance correction: the caller hands us the scope-collapse

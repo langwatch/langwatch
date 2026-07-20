@@ -45,3 +45,25 @@ export function isCodexModel(modelId: string): boolean {
 
 /** The model a fresh Codex connection defaults the allowed surfaces to. */
 export const CODEX_DEFAULT_MODEL = "openai_codex/gpt-5.6-terra";
+
+/**
+ * The one model-vs-feature gate every enforcement point calls: the cascade
+ * resolver (skips disallowed values), the defaults write paths (reject
+ * saving them), the litellm-params builder (rejects execution), and the
+ * pickers (hide the options). Codex is the only restricted provider today;
+ * kept here (not derived from the registry) so this module stays
+ * import-cycle-free and client-safe.
+ */
+export function isModelAllowedForFeature(
+  modelId: string,
+  featureKey: string,
+): boolean {
+  if (!isCodexModel(modelId)) return true;
+  return isCodexAllowedFeature(featureKey);
+}
+
+/** Roles apply across many features at once, so a restricted model can
+ *  never be a role-level default. */
+export function isModelAllowedAsRoleDefault(modelId: string): boolean {
+  return !isCodexModel(modelId);
+}

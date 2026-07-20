@@ -6,6 +6,8 @@ import {
 } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 import { nlpgoProxyBaseURL } from "../nlpgo/nlpgoFetch";
+import { getCodexVercelAIModel } from "./codexGatewayModel";
+import { isCodexModel } from "./codexRestrictions";
 import { featureByKey } from "./featureRegistry";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
 import { ModelProviderDisabledError } from "./modelProviderDisabledError";
@@ -51,6 +53,13 @@ export const getVercelAIModel = async ({
     featureKey,
     modelProviders,
   });
+
+  // Codex never goes through the nlpgo chat-completions proxy: the codex
+  // backend is Responses-only and its OAuth session lives at the AI
+  // gateway, so the handle comes from there instead.
+  if (isCodexModel(model_)) {
+    return getCodexVercelAIModel({ projectId, model: model_, featureKey });
+  }
 
   const providerKey = model_.split("/")[0] as keyof typeof modelProviders;
   const modelProvider = modelProviders[providerKey];

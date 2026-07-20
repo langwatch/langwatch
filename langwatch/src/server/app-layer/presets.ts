@@ -78,6 +78,7 @@ import { LangyConversationService } from "./langy/langy-conversation.service";
 import { LangyTurnService } from "./langy/langy-turn.service";
 import { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
+import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import {
   mintLangySessionApiKey,
@@ -1015,7 +1016,11 @@ export function initializeDefaultApp(options?: {
   const langyTurns = LangyTurnService.create({
     conversations: langyConversations,
     credentials: LangyCredentialService.create(prisma),
-    resolveModel: getVercelAIModel,
+    // Langy resolves through its own feature key (falling back to the
+    // original prompt.create_default gate inside the resolver), so a codex
+    // default set for Langy never leaks into new-prompt creation.
+    resolveModel: ({ projectId }) =>
+      getVercelAIModel({ projectId, featureKey: LANGY_CHAT_FEATURE_KEY }),
     worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,
     // The durable buffer backs a user Stop: reconstruct the partial answer and
     // end the live stream (ADR-058). Null without Redis, like the stores below.

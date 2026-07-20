@@ -93,6 +93,12 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     And the tiny assists default to it as well
     And evaluations, playground and workflows keep their existing defaults
 
+  Scenario: Langy resolves its own feature key without breaking older setups
+    Given Langy resolves its model through the langy.chat feature key
+    When a project configured Langy before that key existed
+    Then the resolver falls back to the original gate key
+    And the project keeps working without re-setup
+
   # ── Placement per surface ──────────────────────────────────────────────────
 
   Scenario: Codex leads the Langy setup with a recommendation
