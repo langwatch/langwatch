@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { InMemoryLogRecordExporter, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
+import { InMemoryLogRecordExporter, LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { getLangWatchLogger, getLangWatchLoggerFromProvider } from "../..";
 import { NoOpLogger } from "../../../../logger";
 import { setupObservability } from "../../../setup/node";
@@ -42,10 +42,50 @@ const TEST_GEN_AI_ATTRIBUTES = {
   "gen_ai.usage.total_tokens": 40,
 } as const;
 
+type SetupObservabilityOptions = NonNullable<Parameters<typeof setupObservability>[0]>;
+
 describe("Logger Integration Tests", () => {
-  const logRecordExporter = new InMemoryLogRecordExporter();
-  const logRecordProcessor = new SimpleLogRecordProcessor(logRecordExporter);
+  let logRecordExporter: InMemoryLogRecordExporter;
+  let logRecordProcessor: SimpleLogRecordProcessor;
   let observabilityHandle: ReturnType<typeof setupObservability>;
+
+  /**
+   * Starts observability against a fresh in-memory exporter.
+   *
+   * `langwatch: "disabled"` keeps the real LangWatch exporter out of the test:
+   * otherwise setup attaches a BatchLogRecordProcessor to the live endpoint
+   * alongside the in-memory one, which times out and drops records in CI.
+   *
+   * Each start also gets its own exporter and processor, because shutting a
+   * handle down shuts down its processors too. A processor shared across tests
+   * would stop recording for every test after the first shutdown.
+   *
+   * `disableAutoShutdown` keeps setup from registering beforeExit/SIGINT/SIGTERM
+   * handlers on every start. Those are never removed, not even by shutdown, so
+   * without this each start leaks three process listeners and the suite trips
+   * Node's MaxListeners warning. `afterEach` owns teardown here.
+   */
+  function startObservability({
+    dataCapture,
+  }: { dataCapture?: SetupObservabilityOptions["dataCapture"] } = {}): ReturnType<
+    typeof setupObservability
+  > {
+    logRecordExporter = new InMemoryLogRecordExporter();
+    logRecordProcessor = new SimpleLogRecordProcessor(logRecordExporter);
+
+    return setupObservability({
+      serviceName: "logger-integration-test",
+      langwatch: "disabled",
+      logRecordProcessors: [logRecordProcessor],
+      debug: { logger: new NoOpLogger() },
+      advanced: { throwOnSetupError: true, disableAutoShutdown: true },
+      ...(dataCapture ? { dataCapture } : {}),
+      attributes: {
+        "test.suite": "logger-integration",
+        "test.environment": "vitest"
+      },
+    });
+  }
 
   beforeEach(() => {
     // Reset OpenTelemetry global state
@@ -53,22 +93,34 @@ describe("Logger Integration Tests", () => {
     resetObservabilitySdkConfig();
 
     // Setup observability with real OpenTelemetry SDK
-    observabilityHandle = setupObservability({
-      serviceName: "logger-integration-test",
-      logRecordProcessors: [logRecordProcessor],
-      debug: { logger: new NoOpLogger() },
-      advanced: { throwOnSetupError: true },
-      attributes: {
-        "test.suite": "logger-integration",
-        "test.environment": "vitest"
-      },
-    });
+    observabilityHandle = startObservability();
   });
 
   afterEach(async () => {
-    await logRecordProcessor.forceFlush();
-    logRecordExporter.reset();
+    await observabilityHandle.shutdown();
     resetObservabilitySdkConfig();
+  });
+
+  describe("when observability is started repeatedly", () => {
+    const countShutdownListeners = () =>
+      process.listenerCount("beforeExit") +
+      process.listenerCount("SIGINT") +
+      process.listenerCount("SIGTERM");
+
+    it("leaves the process shutdown listener count unchanged", async () => {
+      // Setup registers beforeExit/SIGINT/SIGTERM handlers unless
+      // disableAutoShutdown is set, and never removes them again. This suite
+      // starts observability once per test, so a leak here accumulates across
+      // the whole file and can outlive it.
+      const before = countShutdownListeners();
+
+      for (let i = 0; i < 3; i++) {
+        const handle = startObservability();
+        await handle.shutdown();
+      }
+
+      expect(countShutdownListeners()).toBe(before);
+    });
   });
 
   describe("log record creation and data flow", () => {
@@ -219,17 +271,7 @@ describe("Logger Integration Tests", () => {
       // Setup with explicit 'all' data capture
       await observabilityHandle.shutdown();
 
-      observabilityHandle = setupObservability({
-        serviceName: "logger-integration-test",
-        logRecordProcessors: [logRecordProcessor],
-        debug: { logger: new NoOpLogger() },
-        advanced: { throwOnSetupError: true },
-        dataCapture: "all",
-        attributes: {
-          "test.suite": "logger-integration",
-          "test.environment": "vitest"
-        },
-      });
+      observabilityHandle = startObservability({ dataCapture: "all" });
 
       const logger = getLangWatchLogger("data-capture-all-test-logger-5");
 
@@ -259,17 +301,7 @@ describe("Logger Integration Tests", () => {
       // Setup with 'output' data capture
       await observabilityHandle.shutdown();
 
-      observabilityHandle = setupObservability({
-        serviceName: "logger-integration-test",
-        logRecordProcessors: [logRecordProcessor],
-        debug: { logger: new NoOpLogger() },
-        advanced: { throwOnSetupError: true },
-        dataCapture: "output",
-        attributes: {
-          "test.suite": "logger-integration",
-          "test.environment": "vitest"
-        },
-      });
+      observabilityHandle = startObservability({ dataCapture: "output" });
 
       const logger = getLangWatchLogger("data-capture-output-test-logger-6");
 
@@ -299,17 +331,7 @@ describe("Logger Integration Tests", () => {
       // Setup with 'input' data capture
       await observabilityHandle.shutdown();
 
-      observabilityHandle = setupObservability({
-        serviceName: "logger-integration-test",
-        logRecordProcessors: [logRecordProcessor],
-        debug: { logger: new NoOpLogger() },
-        advanced: { throwOnSetupError: true },
-        dataCapture: "input",
-        attributes: {
-          "test.suite": "logger-integration",
-          "test.environment": "vitest"
-        },
-      });
+      observabilityHandle = startObservability({ dataCapture: "input" });
 
       const logger = getLangWatchLogger("data-capture-input-test-logger-7");
 
@@ -339,17 +361,7 @@ describe("Logger Integration Tests", () => {
       // Setup with 'none' data capture
       await observabilityHandle.shutdown();
 
-      observabilityHandle = setupObservability({
-        serviceName: "logger-integration-test",
-        logRecordProcessors: [logRecordProcessor],
-        debug: { logger: new NoOpLogger() },
-        advanced: { throwOnSetupError: true },
-        dataCapture: "none",
-        attributes: {
-          "test.suite": "logger-integration",
-          "test.environment": "vitest"
-        },
-      });
+      observabilityHandle = startObservability({ dataCapture: "none" });
 
       const logger = getLangWatchLogger("data-capture-none-test-logger-8");
 
@@ -376,17 +388,9 @@ describe("Logger Integration Tests", () => {
     });
 
     it("should preserve other log record properties when output capture is disabled", async () => {
-      observabilityHandle = setupObservability({
-        serviceName: "logger-integration-test",
-        logRecordProcessors: [logRecordProcessor],
-        debug: { logger: new NoOpLogger() },
-        advanced: { throwOnSetupError: true },
-        dataCapture: "input",
-        attributes: {
-          "test.suite": "logger-integration",
-          "test.environment": "vitest"
-        },
-      });
+      await observabilityHandle.shutdown();
+
+      observabilityHandle = startObservability({ dataCapture: "input" });
 
       const logger = getLangWatchLogger("data-capture-properties-test-logger-9");
 
@@ -419,19 +423,9 @@ describe("Logger Integration Tests", () => {
     });
 
     it("should handle log records without body when output capture is disabled", async () => {
+      await observabilityHandle.shutdown();
 
-
-      observabilityHandle = setupObservability({
-        serviceName: "logger-integration-test",
-        logRecordProcessors: [logRecordProcessor],
-        debug: { logger: new NoOpLogger() },
-        advanced: { throwOnSetupError: true },
-        dataCapture: "input",
-        attributes: {
-          "test.suite": "logger-integration",
-          "test.environment": "vitest"
-        },
-      });
+      observabilityHandle = startObservability({ dataCapture: "input" });
 
       const logger = getLangWatchLogger("data-capture-no-body-test-logger-10");
 
@@ -868,9 +862,11 @@ describe("Logger Integration Tests", () => {
 
   describe("custom logger provider integration", () => {
     it("should work with custom logger providers", async () => {
-      // Create a custom logger provider for testing
-      const { logs } = await import("@opentelemetry/api-logs");
-      const customProvider = logs.getLoggerProvider();
+      // A provider owned by the caller, not the one setupObservability registers
+      const customExporter = new InMemoryLogRecordExporter();
+      const customProvider = new LoggerProvider({
+        processors: [new SimpleLogRecordProcessor(customExporter)],
+      });
 
       const logger = getLangWatchLoggerFromProvider(
         customProvider,
@@ -890,8 +886,8 @@ describe("Logger Integration Tests", () => {
 
       logger.emit(customProviderLogRecord);
 
-      await logRecordProcessor.forceFlush();
-      const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
+      await customProvider.forceFlush();
+      const exportedLogRecords = customExporter.getFinishedLogRecords();
 
       expect(exportedLogRecords).toHaveLength(1);
       const exportedLogRecord = exportedLogRecords[0];
@@ -902,6 +898,8 @@ describe("Logger Integration Tests", () => {
       expect(exportedLogRecord.body).toBe("Custom provider test message");
       expect(exportedLogRecord.attributes?.["custom.provider"]).toBe(true);
       expect(exportedLogRecord.attributes?.["logger.version"]).toBe("1.0.0");
+
+      await customProvider.shutdown();
     });
   });
 });
