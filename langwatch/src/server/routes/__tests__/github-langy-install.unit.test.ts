@@ -2,8 +2,8 @@
  * @vitest-environment node
  *
  * Locks the security-critical bits of the GitHub App install routes:
- *   /install — session-gated, org-membership checked, redirects to GitHub with a
- *              signed state.
+ *   /install — session-gated, org-membership + langy:manage checked, redirects
+ *              to GitHub with a signed state.
  *   /setup   — verifies the signed state + session rebind before recording the
  *              installation; rejects tampered/expired state and a session change.
  *   /webhook — verifies the X-Hub-Signature-256 HMAC before touching anything;
@@ -24,6 +24,7 @@ process.env.GITHUB_LANGY_WEBHOOK_SECRET = "whsecret";
 
 const getServerAuthSession = vi.fn();
 const isOrganizationMember = vi.fn();
+const hasOrganizationPermission = vi.fn();
 const recordInstallation = vi.fn();
 const handleWebhookEvent = vi.fn();
 const auditLog = vi.fn();
@@ -49,6 +50,14 @@ vi.mock("~/server/auditLog", () => ({
 vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: (...args: unknown[]) => isEnabled(...args) },
 }));
+// Partial mock: the route uses only this helper, but other modules in the
+// import graph read further rbac exports (Resources etc.).
+vi.mock(import("~/server/api/rbac"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  hasOrganizationPermission: ((...args: unknown[]) =>
+    hasOrganizationPermission(...args)) as never,
+}));
+vi.mock("~/server/db", () => ({ prisma: {} }));
 
 async function request(path: string, init?: RequestInit) {
   const { app } = await import("../github-langy");
@@ -85,6 +94,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   getServerAuthSession.mockResolvedValue({ user: { id: "u1" } });
   isOrganizationMember.mockResolvedValue(true);
+  hasOrganizationPermission.mockResolvedValue(true);
   recordInstallation.mockResolvedValue({ accountLogin: "acme" });
   isEnabled.mockResolvedValue(true);
 });
@@ -111,6 +121,20 @@ describe("GET /api/github-langy/install", () => {
         "http://localhost/api/github-langy/install?organizationId=other",
       );
       expect(res.status).toBe(403);
+    });
+  });
+
+  describe("when a member lacks langy:manage", () => {
+    it("rejects with 403 without ever evaluating the flag", async () => {
+      // Connecting the App grants Langy repository access for every project
+      // underneath — membership alone must not be enough on the REST twin
+      // either.
+      hasOrganizationPermission.mockResolvedValue(false);
+      const res = await request(
+        "http://localhost/api/github-langy/install?organizationId=org1",
+      );
+      expect(res.status).toBe(403);
+      expect(isEnabled).not.toHaveBeenCalled();
     });
   });
 
@@ -247,6 +271,20 @@ describe("GET /api/github-langy/setup", () => {
         `http://localhost/api/github-langy/setup?installation_id=555&state=${encodeURIComponent(state)}`,
       );
       expect(res.status).toBe(401);
+      expect(recordInstallation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the connect permission was lowered mid-flow", () => {
+    it("re-checks langy:manage and refuses to persist the installation", async () => {
+      hasOrganizationPermission.mockResolvedValue(false);
+      const state = await makeState({ mode: "popup" });
+
+      const res = await request(
+        `http://localhost/api/github-langy/setup?installation_id=555&state=${encodeURIComponent(state)}`,
+      );
+
+      expect(res.status).toBe(403);
       expect(recordInstallation).not.toHaveBeenCalled();
     });
   });
