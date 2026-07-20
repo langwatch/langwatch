@@ -70,7 +70,7 @@ describe("Agent Improvement Skill", () => {
             assertSkillWasRead(state, "agent-improvement");
           },
           scenario.user(
-            "the first hypothesis makes sense to me, go ahead and set it up as you proposed"
+            "the first hypothesis makes sense to me, go ahead and set it up as you proposed. Keep it minimal: create the artifact and show it to me, no need to run the app or install anything heavy"
           ),
           scenario.agent(),
           (state) => {
@@ -82,6 +82,8 @@ describe("Agent Improvement Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    // Two full agent turns: evidence sweep + hypothesis execution. Each turn
+    // is a long autonomous run, so this needs more than the single-turn 15m.
+    1_800_000
   );
 });
