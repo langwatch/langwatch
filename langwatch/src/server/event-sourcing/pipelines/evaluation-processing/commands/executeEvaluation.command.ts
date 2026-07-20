@@ -352,20 +352,8 @@ export class ExecuteEvaluationCommand implements CommandHandler<
         this.deps.offloadInputs,
       );
     } catch (error) {
-      // A misconfigured evaluator (provider disabled, provider absent, model
-      // not set) is an expected state of the product, not a platform fault:
-      // the customer can fix it themselves from Settings → Model Providers.
-      // Treat it like the pre-execution config gates above — emit "skipped"
-      // with the message as `details` so the UI tells them what to change,
-      // and log at info so error telemetry only carries real faults. The
-      // stable `code` is what customer-health rules key off, so nothing has
-      // to pattern-match log message strings to find affected projects.
-      //
-      // This is an explicit allowlist, NOT `HandledError.isHandled(error)`:
-      // `HandledError` is a broad base class, and downgrading all of it would
-      // silently swallow real outages. `EvaluatorExecutionError` in particular
-      // is a HandledError raised when langevals times out, is unreachable, or
-      // returns 5xx — exactly the faults that must keep paging us.
+      // Customer-fixable errors (see isCustomerFixable above) are skipped,
+      // not errored — mirrors the pre-execution config gates above.
       if (isCustomerFixable(error)) {
         logger.info(
           {
