@@ -26,10 +26,17 @@ import {
   Plus,
 } from "lucide-react";
 import numeral from "numeral";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { useLocalStorage } from "usehooks-ts";
 import { NotFoundScene } from "~/components/NotFoundScene";
+import {
+  APP_HEADER_HEIGHT,
+  LANGY_DOCK_GAP,
+  LANGY_DOCKED_OFFSET,
+  LANGY_TRANSITION,
+} from "~/features/langy/logic/langyPanelLayout";
+import { useLangyStore } from "~/features/langy/stores/langyStore";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
 import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
@@ -468,6 +475,23 @@ export const DashboardLayout = ({
     planType: usage.data?.activePlan?.type,
   });
 
+  // Langy's docked panel joins this shell as a second content card. Claim the
+  // dock while the shell is mounted so the page-level wrapper stands down
+  // (LangyShiftedRoot), then reserve the panel's room inside the content row
+  // only — the header keeps the full viewport width above both cards. The
+  // reservation truth (`dockShifted`) is computed by the wrapper, which owns
+  // Langy's visibility gate. Spec: specs/langy/langy-panel-layout.feature
+  const langyDockShifted = useLangyStore((s) => s.dockShifted);
+  const claimDockShell = useLangyStore((s) => s.claimDockShell);
+  const releaseDockShell = useLangyStore((s) => s.releaseDockShell);
+  useLayoutEffect(() => {
+    claimDockShell();
+    return releaseDockShell;
+  }, [claimDockShell, releaseDockShell]);
+  const langyDockInset = langyDockShifted
+    ? LANGY_DOCKED_OFFSET + LANGY_DOCK_GAP
+    : 0;
+
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <NotFoundScene />;
   }
@@ -608,10 +632,14 @@ export const DashboardLayout = ({
         </title>
       </Head>
 
-      {/* Header bar - spans full width with gray background */}
+      {/* Header bar - spans full width with gray background. Pinned to the
+          shared APP_HEADER_HEIGHT: the viewport math below and the docked
+          Langy card's top edge both derive from it, so the cards start exactly
+          where the header ends. */}
       <HStack
         position="relative"
         width="full"
+        height={`${APP_HEADER_HEIGHT}px`}
         paddingX={4}
         paddingY={3}
         background="bg.page"
@@ -816,7 +844,7 @@ export const DashboardLayout = ({
         width="full"
         alignItems="stretch"
         gap={0}
-        minHeight="calc(100vh - 56px)"
+        minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
       >
         {isPersonalScopeRoute ? (
           <PersonalSidebar isCompact={compactMenu} />
@@ -828,9 +856,15 @@ export const DashboardLayout = ({
           width="full"
           height="full"
           background="bg.page"
-          minHeight="calc(100vh - 56px)"
-          maxHeight="calc(100vh - 56px)"
+          minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+          maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
           maxWidth={`calc(100vw - ${menuWidth})`}
+          // While Langy is docked, this gray ground keeps the viewport edge and
+          // the content card pulls in: the reserved strip is where the docked
+          // panel sits as a second card, with a gap of page ground between the
+          // two. Spec: specs/langy/langy-panel-layout.feature
+          paddingRight={`${langyDockInset}px`}
+          transition={`padding-right ${LANGY_TRANSITION}`}
         >
           <Box
             width="full"
@@ -846,11 +880,16 @@ export const DashboardLayout = ({
             borderLeftWidth="1px"
             borderStyle="solid"
             borderColor="border.muted"
+            // With Langy docked the card no longer meets the viewport edge, so
+            // its right side joins the page-chrome language too: the same
+            // radius and muted hairline as its top-left corner.
+            borderTopRightRadius={langyDockInset > 0 ? "xl" : 0}
+            borderRightWidth={langyDockInset > 0 ? "1px" : 0}
             _dark={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" }}
             overflow="auto"
             display="flex"
-            minHeight="calc(100vh - 56px)"
-            maxHeight="calc(100vh - 56px)"
+            minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+            maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
             position="relative"
           >
             <VStack width="full" gap={0} {...props}>

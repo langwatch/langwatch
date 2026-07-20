@@ -1,3 +1,36 @@
+/**
+ * The docked sidebar's width.
+ *
+ * A lean default: slim enough to read as a quiet companion rather than a
+ * second pane, still wide enough that a trace table, a diff or a capability
+ * card can breathe (380px forces everything into a column of two-word lines,
+ * so we stay clear of that floor). The dock runs narrower than the floating
+ * card: floating OVERLAYS the page, so its width is free; the dock takes its
+ * width FROM the page for as long as it is open.
+ * Spec: specs/langy/langy-panel-layout.feature
+ */
+export const SIDEBAR_PANEL_WIDTH = 392;
+
+/** What the page reserves for the flush full-height dock (no-shell pages). */
+export const LANGY_DOCKED_OFFSET = SIDEBAR_PANEL_WIDTH;
+
+/**
+ * The strip of page ground between the content card and the docked panel when
+ * an app shell claims the dock — the gray breathing room that makes the panel
+ * read as a second card rather than a pane glued to the first.
+ */
+export const LANGY_DOCK_GAP = 12;
+
+/**
+ * The app shell's header-bar height. The shell's content cards — and the
+ * docked panel, which joins them as a second card — start below this line.
+ * DashboardLayout derives its own viewport math from the same constant, so
+ * the two cannot drift apart.
+ */
+export const APP_HEADER_HEIGHT = 56;
+
+export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
+
 /** Desktop ceiling for the floating companion. */
 export const FLOATING_PANEL_MAX_WIDTH = 432;
 

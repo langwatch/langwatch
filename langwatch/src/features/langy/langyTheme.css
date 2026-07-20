@@ -5,8 +5,8 @@
  * theme — see `langyTheme.ts`, which declares the `_langy` / `_langyDark`
  * conditions and hangs Langy's palette off the app's own semantic tokens. What
  * lives here is the handful of things Chakra has no token for: an @font-face, a
- * few @keyframes, and four painted textures (grain, signal grid, wash, sheen)
- * whose gradients are built from `var(--chakra-colors-langy-*)`.
+ * few @keyframes, and the painted textures (signal grid, wash, sheen) whose
+ * gradients are built from `var(--chakra-colors-langy-*)`.
  *
  * The split is the point. Colours belong to the design system, where they are
  * typed, mergeable and shared. A masked fractal-noise overlay does not.
@@ -99,36 +99,19 @@
   --langy-bar-fill-p3: color(display-p3 1 0.702 0.502 / 0.7);
 }
 
-/* ── Texture: paper gets grain, ink gets the signal grid ──────────────────
-   The two grounds want opposite textures, so they get one each rather than
-   both stacked.
-
-   LIGHT — paper grain. A fractal-noise tile that MULTIPLIES (the site's
-   setting): the noise darkens the cream just enough to kill the flat-digital
-   look.
-
-   DARK — the signal grid, lifted from the marketing site's `.dark-signal-grid`
-   (72px cells, 1px lines, and a `to right` mask that fades it out by 82%). It
-   is the faint technical texture under the homepage's dark sections, and it is
-   what makes an ink ground read as a wireframe rather than as a hole. Grain is
-   switched OFF on ink: multiply against near-black is a no-op anyway, and grain
-   plus grid is two textures fighting.
+/* ── Texture: the ink ground's signal grid (dark only) ────────────────────
+   Light mode is the app's own surface and carries no texture at all — see
+   langyTheme.ts. The ink ground gets the signal grid, lifted from the
+   marketing site's `.dark-signal-grid` (72px cells, 1px lines, and a
+   `to right` mask that fades it out by 82%). It is the faint technical
+   texture under the homepage's dark sections, and it is what makes an ink
+   ground read as a wireframe rather than as a hole.
 
    The site masks the grid on one axis only. In a 468px column that would leave
    it running under the message text, so a second mask is intersected in: it also
    fades out vertically before the composer. The grid ends up reading exactly
    where it should — the empty upper-left field of the panel — and nowhere near
    the thing you are trying to read. */
-.langy-grain {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.022;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-}
-
 .langy-signal-grid {
   position: absolute;
   inset: 0;
@@ -149,10 +132,6 @@
   mask-composite: intersect;
 }
 
-.dark .langy-grain,
-:root.dark .langy-grain {
-  display: none;
-}
 .dark .langy-signal-grid,
 :root.dark .langy-signal-grid {
   display: block;
@@ -277,8 +256,13 @@
    turn is in flight, faded out once a conversation is under way. It lives
    BEHIND the scroller and outside it, so it never scrolls and never repaints on
    scroll. The user has rejected a loud wash twice; this one is deliberately at
-   the edge of perceptible. */
+   the edge of perceptible.
+
+   DARK ONLY: the light panel is the app's own clean surface (see
+   langyTheme.ts) — the mesh impression belongs to the ink ground it was
+   sampled from. */
 .langy-wash {
+  display: none;
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -316,6 +300,10 @@
   );
   animation: langy-mesh-drift 26s ease-in-out infinite;
   background-size: 180% 180%;
+}
+.dark .langy-root .langy-wash,
+:root.dark .langy-root .langy-wash {
+  display: block;
 }
 
 /* ── Panel surface glow (dark only) ─────────────────────────
@@ -382,7 +370,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .langy-root .langy-mesh,
-  .langy-root .langy-grain,
   .langy-wash {
     animation: none !important;
   }

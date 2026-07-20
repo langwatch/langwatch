@@ -1,14 +1,14 @@
 import { Box } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Outlet, useParams } from "react-router";
 
 import { LangyProvider, useLangy } from "./LangyContext";
 import { useShowLangy } from "./hooks/useShowLangy";
+import { LangySidecar } from "./components/LangyPanel";
 import {
   LANGY_DOCKED_OFFSET,
   LANGY_TRANSITION,
-  LangySidecar,
-} from "./components/LangyPanel";
+} from "./logic/langyPanelLayout";
 import { useLangyStore } from "./stores/langyStore";
 
 /**
@@ -44,6 +44,12 @@ export default function ProjectLangyLayout() {
  * docked panel is open (so content slides over instead of hiding under it),
  * and renders the panel itself as a sibling. The page-chrome box (background,
  * min-height) stays in DashboardLayout so non-project routes are unaffected.
+ *
+ * When the page renders an app shell (DashboardLayout), the SHELL claims the
+ * dock instead: it keeps its header full-width and reserves the room inside
+ * its own content row, so the docked panel can sit as a second content card
+ * below the header. This wrapper then stands down — padding here too would
+ * reserve the width twice. Spec: specs/langy/langy-panel-layout.feature
  */
 function LangyShiftedRoot({
   showLangy,
@@ -54,14 +60,22 @@ function LangyShiftedRoot({
 }) {
   const isOpen = useLangyStore((s) => s.isOpen);
   const panelMode = useLangyStore((s) => s.panelMode);
+  const shellClaimed = useLangyStore((s) => s.dockShellClaims > 0);
+  const setDockShifted = useLangyStore((s) => s.setDockShifted);
   // Only Sidebar mode reserves room (pushes content left). Floating mode
   // overlays the page — content stays full width and the card floats over it.
   const shifted = showLangy && isOpen && panelMode === "sidebar";
+  // Publish the reservation truth for a claiming shell (see the store): this
+  // wrapper owns the visibility gate, the shell only consumes the result.
+  useEffect(() => {
+    setDockShifted(shifted);
+    return () => setDockShifted(false);
+  }, [shifted, setDockShifted]);
   return (
     <>
       <Box
         width="full"
-        paddingRight={shifted ? `${LANGY_DOCKED_OFFSET}px` : 0}
+        paddingRight={shifted && !shellClaimed ? `${LANGY_DOCKED_OFFSET}px` : 0}
         transition={`padding-right ${LANGY_TRANSITION}`}
       >
         {children}

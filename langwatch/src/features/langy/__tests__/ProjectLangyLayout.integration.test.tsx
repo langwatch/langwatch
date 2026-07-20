@@ -68,8 +68,6 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
 const sidecarMounts = { count: 0 };
 vi.mock("../components/LangyPanel", () => ({
   LangySidecar: () => <LangySidecarStub />,
-  LANGY_DOCKED_OFFSET: 400,
-  LANGY_TRANSITION: "200ms",
 }));
 
 import { useEffect } from "react";
@@ -122,7 +120,12 @@ beforeEach(() => {
   gate.project = { id: "project-demo", slug: "demo" };
   gate.demoSlug = "not-this-project";
   // The store is a module singleton — start every test closed and uncounted.
-  useLangyStore.setState({ isOpen: false });
+  useLangyStore.setState({
+    isOpen: false,
+    panelMode: "floating",
+    dockShellClaims: 0,
+    dockShifted: false,
+  });
   sidecarMounts.count = 0;
 });
 

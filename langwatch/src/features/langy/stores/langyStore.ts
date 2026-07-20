@@ -167,6 +167,34 @@ interface LangyState {
   panelEffect: LangyPanelEffect;
   setPanelEffect: (effect: LangyPanelEffect) => void;
 
+  /**
+   * How many mounted app shells have claimed the docked panel's placement.
+   *
+   * The app shell (DashboardLayout) draws the page as a rounded content card
+   * on the gray page ground. When such a shell is mounted it CLAIMS the dock:
+   * it reserves the panel's room inside its own content row (keeping the
+   * header full-width) and the docked panel renders as a second rounded card
+   * below the header. Pages without a shell (full-screen tools like the
+   * studio) leave the count at zero and keep the flush full-height dock with
+   * the page-level width reservation. A count — not a boolean — so nested or
+   * twin mounts (StrictMode) stay correct. Never persisted: it mirrors what
+   * is mounted right now. Spec: specs/langy/langy-panel-layout.feature
+   */
+  dockShellClaims: number;
+  claimDockShell: () => void;
+  releaseDockShell: () => void;
+
+  /**
+   * The docked panel is open and reserving room right now — the one truth the
+   * page wrapper computes (visibility gate + open + sidebar mode, see
+   * LangyShiftedRoot) and the app shell consumes to reserve the dock's room
+   * inside its content row. Kept in the store so the shell never re-derives
+   * Langy's visibility gating (which needs session hooks a public shell must
+   * not run). Never persisted.
+   */
+  dockShifted: boolean;
+  setDockShifted: (shifted: boolean) => void;
+
   // Active conversation (a pointer into React Query server state)
   activeConversationId: string | null;
   /**
@@ -348,6 +376,17 @@ export const useLangyStore = create<LangyState>()(
       setPanelMode: (panelMode) => set({ panelMode }),
       panelEffect: "plain",
       setPanelEffect: (panelEffect) => set({ panelEffect }),
+
+      dockShellClaims: 0,
+      claimDockShell: () =>
+        set((state) => ({ dockShellClaims: state.dockShellClaims + 1 })),
+      releaseDockShell: () =>
+        set((state) => ({
+          dockShellClaims: Math.max(0, state.dockShellClaims - 1),
+        })),
+
+      dockShifted: false,
+      setDockShifted: (dockShifted) => set({ dockShifted }),
 
       activeConversationId: null,
       historyLoadConversationId: null,

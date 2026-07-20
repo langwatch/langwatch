@@ -110,8 +110,10 @@ import { StreamingStatusLine } from "./StreamingStatusLine";
 import { toPendingCapabilities } from "./LangyToolActivity";
 import { resolveLangyActivityOwnership } from "../logic/langyActivityOwnership";
 import {
+  APP_HEADER_HEIGHT,
   FLOATING_PANEL_CSS_WIDTH,
   resolveFloatingPanelWidth,
+  SIDEBAR_PANEL_WIDTH,
 } from "../logic/langyPanelLayout";
 import {
   explainLangyError,
@@ -133,55 +135,9 @@ import "../langyTheme.css";
 // THAT model, not on an unrelated branch-primary pick.
 const LANGY_GATE_FEATURE_KEY = "prompt.create_default";
 
-// A lean default: slim enough to read as a quiet companion rather than a second
-// pane, still wide enough that a trace table, a diff or a capability card can
-// breathe (the 380px sidecar forced everything into a column of two-word lines,
-// so we stay clear of that floor). Still a sidecar, not a split view: the page
-// keeps the majority of the viewport. The panel is expected to GROW with its
-// content later (a wide card can widen the card); this is the resting width.
-// The docked sidebar runs narrower than the floating card: floating OVERLAYS
-// the page, so its width is free; the dock takes its width FROM the page for
-// as long as it is open, and at 432px a 13" laptop (~1280–1440px viewport)
-// loses a big slice of its working room. 392px keeps cards readable (still clear
-// of the 380px two-word-lines floor) while giving the page back 40px.
-// Spec: specs/langy/langy-panel-layout.feature
-const SIDEBAR_PANEL_WIDTH = 392;
-
-// The sidecar FLOATS: a rounded card with a small, SYMMETRIC inset on every
-// side (a soft brand glow + shadow behind it). Page content reserves exactly
-// the card + one inset of breathing room — NOT an extra handle-width band,
-// which is what left the awful always-there gutter. The collapse handle rides
-// on the card's left edge (a tab) rather than in a reserved gutter.
-//
-// NOTE: the whole open/close/dock model is under review (a Notion-AI-style
-// bottom-right launcher that pins to the side, and how it coexists with the app
-// drawer) — see LANGY_UI_STREAMING_PLAN.md. This is the interim.
+// The floating card's symmetric viewport inset: a rounded card with a small,
+// SYMMETRIC inset on every side (a soft brand glow + shadow behind it).
 const PANEL_INSET = 12;
-
-/** The docked panel's rounded left edge. */
-const DOCK_RADIUS = 0;
-
-/**
- * How far the docked panel OVERLAPS the page content.
- *
- * The dock is full-height with a rounded left edge, so its corners curve away
- * from the content. Reserve exactly `PANEL_WIDTH` and those two arcs expose a
- * sliver of bare page between the content's edge and the panel — a gap that
- * reads as a rendering glitch.
- *
- * Overlapping by precisely the corner radius closes it: the curve now sits ON
- * TOP of content rather than over a void, so there is nothing to see through.
- * It is deliberately no larger than the radius — an overlap is a clip, and 18px
- * of a page's right margin is a price worth paying where 40px of live content
- * would not be.
- */
-const DOCK_OVERLAP = 0;
-
-// Sidebar mode pushes page content left by the dock width MINUS the overlap
-// above; Floating mode overlays and reserves nothing (see LangyShiftedRoot,
-// which pads only in sidebar mode).
-export const LANGY_DOCKED_OFFSET = SIDEBAR_PANEL_WIDTH - DOCK_OVERLAP;
-export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 
 // A Chakra Box that also takes framer-motion props — used for the thinking
 // line's blur-crossfade when its text changes. `css` still routes through
@@ -446,6 +402,9 @@ function LangyPanel({
   const detachContext = useLangyStore((s) => s.detachContext);
   const panelMode = useLangyStore((s) => s.panelMode);
   const floating = panelMode === "floating";
+  // An app shell (DashboardLayout) is mounted and places the dock as a second
+  // content card; zero claims means a full-screen page and the flush dock.
+  const dockShellClaimed = useLangyStore((s) => s.dockShellClaims > 0);
   const panelEffect = useLangyStore((s) => s.panelEffect);
   const reduceMotion = useReducedMotion();
   // The panel's own DOM node. The "fold" wave (<LangyWave>) reads its size off
@@ -1456,20 +1415,42 @@ function LangyPanel({
                   "0 1px 2px rgba(0,0,0,0.4), 0 12px 28px rgba(0,0,0,0.5), 0 32px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
               },
             }
-          : {
-              top: 0,
-              right: 0,
-              bottom: 0,
-              borderLeftWidth: "1px",
-              borderTopLeftRadius: 0,
-              borderBottomLeftRadius: 0,
-              boxShadow: "none",
-            })}
+          : dockShellClaimed
+            ? {
+                // An app shell is mounted: the dock joins it as a SECOND
+                // content card. It starts below the full-width header —
+                // aligned with the content card's top edge — and wears the
+                // card's own language: the same top-left radius, the same
+                // muted hairline on the two edges that meet the page ground,
+                // and (dark) the same faint lit top rim. The strip of page
+                // ground between the two cards is reserved by the shell — see
+                // DashboardLayout. Spec: specs/langy/langy-panel-layout.feature
+                top: `${APP_HEADER_HEIGHT}px`,
+                right: 0,
+                bottom: 0,
+                borderTopWidth: "1px",
+                borderLeftWidth: "1px",
+                borderColor: "border.muted",
+                borderTopLeftRadius: "xl",
+                borderBottomLeftRadius: 0,
+                boxShadow: "none",
+                _dark: { boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" },
+              }
+            : {
+                // No shell on this page (a full-screen tool like the studio):
+                // the dock stays a flush full-height pane on the viewport edge.
+                top: 0,
+                right: 0,
+                bottom: 0,
+                borderLeftWidth: "1px",
+                borderTopLeftRadius: 0,
+                borderBottomLeftRadius: 0,
+                boxShadow: "none",
+              })}
       >
-        {/* Texture, under the content (which stacks at zIndex 1) and inert to the
-          pointer. Exactly one of these is ever visible: grain on paper, the
-          site's signal grid on ink. CSS does the switch — see langyTheme.css. */}
-        {floating ? <Box className="langy-grain" aria-hidden /> : null}
+        {/* Texture, under the content (which stacks at zIndex 1) and inert to
+          the pointer. Dark only — the light panel is the app's own clean
+          surface. CSS does the gating — see langyTheme.css. */}
         {floating ? <Box className="langy-signal-grid" aria-hidden /> : null}
         {/* A whisper of the brand rising from the top of the panel, so the ink
           ground has depth and a hint of identity instead of reading flat. Dark

@@ -11,8 +11,9 @@ const MotionBox = motion.create(Box);
  *
  * The briefing panels on the home are meant to read as genuine Langy surfaces,
  * not generic cards — so they reuse the panel's own skin and texture stack
- * exactly (`langy-root` + grain on paper / signal grid on ink + the top brand
- * glow), theme-aware, with content stacked above the texture. The one thing it
+ * exactly (`langy-root` + the ink ground's signal grid and top brand glow;
+ * light is the app's own clean surface), theme-aware, with content stacked
+ * above the texture. The one thing it
  * leaves out is the animated fold: that seam is driven by Langy's live activity
  * (a turn in flight), which a static home panel doesn't have, so faking it here
  * would be motion with nothing behind it.
@@ -62,10 +63,9 @@ export function LangyPanelSurface({
         {...fillColumn}
         {...rest}
       >
-        {/* Texture, under the content and inert to the pointer. Exactly one is
-            visible per theme: grain on paper, the signal grid on ink. The glow
-            is the dark ground's faint top-of-panel brand lift. */}
-        <Box className="langy-grain" aria-hidden />
+        {/* Texture, under the content and inert to the pointer. Dark only —
+            the light surface is the app's own clean panel. The glow is the ink
+            ground's faint top-of-panel brand lift. */}
         <Box className="langy-signal-grid" aria-hidden />
         <Box className="langy-panel-glow" aria-hidden />
 
