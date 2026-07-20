@@ -96,16 +96,18 @@ Feature: Event-sourced topic clustering scheduling
 
   Scenario: Existing projects are backfilled once
     Given eligible projects that predate process-managed scheduling
-    When the backfill task runs
+    When a worker boots
     Then each project gets a clustering process with a scheduled wake
-    And re-running the backfill task changes nothing
+    And re-running the seed on a later boot changes nothing
+    And this runs in the background on worker start, never a deploy-time job
 
-  Scenario: The backfill tolerates starting before the app's first boot
-    Given a fresh install whose database schema has not been created yet
-    When the backfill task starts before the app has applied migrations
-    Then it waits for the schema instead of failing the install
-    And once the schema appears the backfill proceeds normally
-    And if the schema never appears the task fails visibly rather than hanging forever
+  Scenario: The schedule seed coordinates across replicas without a deploy-time job
+    Given several worker replicas starting at once
+    When the schedule seed runs on service start
+    Then replicas coordinate through Redis when it is available
+    And without Redis the seed still runs safely because it is idempotent
+    And a fresh install with no eligible projects marks itself done
+    And a project that failed to schedule is retried on the next boot
 
   Scenario: The settings page shows the schedule state
     When the user opens the topic clustering settings page

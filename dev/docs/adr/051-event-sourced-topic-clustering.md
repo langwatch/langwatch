@@ -209,20 +209,19 @@ without new infrastructure.
   project's hash slot, not relative to now), and affordable because the
   injected implementation is rate-limited per project
   (`createRateLimitedBootstrap`, one commit per project per claim window).
-- A task (`backfillTopicClusteringSchedules`) seeds processes for
-  existing eligible projects (`firstMessage: true`). Safe to re-run:
-  bootstrap is idempotent.
-- **The task covers dormant projects only.** Any project that ingests
-  re-asserts its own schedule, so the task's remaining job is projects that
-  have ingested nothing since the upgrade. The chart still ships it as a
-  `post-install,post-upgrade` hook Job
-  (`templates/topic-clustering-backfill-job.yaml`, toggled by
-  `topicClusteringBackfill.enabled`) so a deploy seeds itself, but it is no
-  longer load-bearing and **must never fail the deploy**: migrations run on
-  app boot rather than as a hook, so on a fresh cluster the Job can outlive
-  its own schema wait, and it exits 0 in that case rather than failing
-  `helm install`. Whatever it skips is picked up by the next upgrade, a
-  manual run, or the project's own next trace.
+- `seedClusteringSchedules` (`app-layer/topic-clustering/
+  seedClusteringSchedules.ts`) seeds processes for existing eligible
+  projects (`firstMessage: true`). Safe to re-run: bootstrap is idempotent.
+- **It covers dormant projects only.** Any project that ingests re-asserts
+  its own schedule, so its remaining job is projects that have ingested
+  nothing since the upgrade. It runs as a one-time pass on worker boot —
+  not a Helm hook Job — Redis-elected across replicas when available and
+  idempotent regardless, with a permanent done-marker once a pass finds
+  nothing left to schedule so a signup after the cutover never pays for a
+  scan. A worker boot never races app migrations the way a Helm hook did
+  (workers only start after boot), so no schema wait is needed. Whatever
+  it skips is picked up by the next boot, a manual run, or the project's
+  own next trace.
 - Only a `manual` request can be reported as "in flight". A bootstrap
   request starts no run, so counting one would render "Running" for a
   project where nothing runs — and, being re-asserted on ingest, would

@@ -808,51 +808,6 @@ datasetS3Migration:
 # post-install/post-upgrade hook Job. Disabling it on an upgrade means topic
 # clustering never runs again for existing projects until the task is run by
 # hand (`pnpm run task backfillTopicClusteringSchedules`).
-topicClusteringBackfill:
-  ## @param topicClusteringBackfill.enabled [default: true] Render the post-install/post-upgrade Job that seeds per-project topic clustering schedules (ADR-051). Disabling it on an upgrade stops topic clustering for pre-existing projects.
-  enabled: true
-  ## @param topicClusteringBackfill.backoffLimit [default: 3] Job backoffLimit — retries on transient failure; the task is idempotent. The migration race is NOT what retries are for: the task itself waits up to 10 minutes for the app's first boot to apply the schema before walking, so a fresh install does not burn its retries crash-looping on a database that has no tables yet.
-  backoffLimit: 3
-  # activeDeadlineSeconds is the budget for the JOB AS A WHOLE, not per attempt,
-  # and it takes precedence over backoffLimit: once the deadline passes the Job
-  # is failed and no further retries happen, however many of the backoffLimit
-  # attempts are left. So this value is shared across every retry — size it as
-  # (worst-case single run x attempts), not as one run.
-  ## @param topicClusteringBackfill.activeDeadlineSeconds [default: 3600] Hard runtime limit (s) for the whole Job, shared across ALL backoffLimit retries — it overrides backoffLimit, so when it expires the Job fails outright with no further attempts. A backstop so a hung backfill can't run forever. The task is idempotent, so a re-run is safe; raise for installs with very many projects or set null to disable.
-  activeDeadlineSeconds: 3600
-  # ServiceAccount for the Job. Leave empty to use the namespace default
-  # (matching the app/workers).
-  ## @param topicClusteringBackfill.serviceAccountName [string, default: ""] ServiceAccount for the Job.
-  serviceAccountName: ""
-  ## @param topicClusteringBackfill.ttlSecondsAfterFinished [default: 600] Clean up the finished Job after this many seconds.
-  ttlSecondsAfterFinished: 600
-  ## @extra topicClusteringBackfill.resources Resource requests and limits for the backfill Job.
-  ## @param topicClusteringBackfill.resources.requests.cpu [string, default: 100m] Requested CPU.
-  ## @param topicClusteringBackfill.resources.requests.memory [string, default: 512Mi] Requested memory.
-  ## @param topicClusteringBackfill.resources.limits.cpu [string, default: 1000m] CPU limit.
-  ## @param topicClusteringBackfill.resources.limits.memory [string, default: 2Gi] Memory limit.
-  resources:
-    requests: { cpu: 100m, memory: 512Mi }
-    limits: { cpu: 1000m, memory: 2Gi }
-  # Per-hook overrides; empty defaults fall through to global.* via the
-  # coalesce chain in the template (same convention as datasetS3Migration).
-  ## @param topicClusteringBackfill.podSecurityContext [object] Pod security context override.
-  podSecurityContext: {}
-  ## @param topicClusteringBackfill.containerSecurityContext [object] Container security context override.
-  containerSecurityContext: {}
-  ## @param topicClusteringBackfill.nodeSelector [object] Node selector override.
-  nodeSelector: {}
-  ## @param topicClusteringBackfill.tolerations [array] Tolerations override.
-  tolerations: []
-  ## @param topicClusteringBackfill.affinity [object] Affinity override.
-  affinity: {}
-  ## @param topicClusteringBackfill.extraEnvs [array] Additional environment variables for the backfill Job.
-  extraEnvs: []
-  ## @param topicClusteringBackfill.extraVolumes [array] Additional pod volumes.
-  extraVolumes: []
-  ## @param topicClusteringBackfill.extraVolumeMounts [array] Additional volume mounts.
-  extraVolumeMounts: []
-
 # =============================================================================
 # LangWatch NLP Service Configuration
 # =============================================================================
@@ -1155,7 +1110,8 @@ cronjobs:
   jobs: {}
   # Topic clustering scheduling moved into the app's event-sourcing
   # runtime (ADR-051: per-project process wakes) — no CronJob needed.
-  # Existing projects are seeded by the topicClusteringBackfill hook Job.
+  # Existing projects are seeded by a background pass on worker boot, not a
+  # deploy-time hook Job (topic-clustering-processing ADR-051).
 
   # NOTE: the automation CronJobs are gone. The alertTriggers CronJob
   # (`/api/cron/triggers`) was removed — custom-graph threshold alerts now

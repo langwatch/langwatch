@@ -1,39 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-// Boundary stubs for the `execute()` entrypoint: the app-layer bootstrap and
-// the Prisma client. `vi.mock` factories are hoisted above every other
-// statement, so anything they reference must be hoisted with them.
-const { requestClusteringMock } = vi.hoisted(() => ({
-  requestClusteringMock: vi.fn(),
-}));
-vi.mock("~/server/app-layer/presets", () => ({
-  initializeDefaultApp: vi.fn().mockResolvedValue(undefined),
-}));
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({
-    topicClustering: { requestClustering: requestClusteringMock },
-  }),
-}));
-vi.mock("../../server/db", () => ({
-  prisma: {
-    $queryRaw: vi.fn(),
-    project: { findMany: vi.fn() },
-    processManagerInstance: { findMany: vi.fn() },
-  },
-}));
-
-import { prisma as mockedPrisma } from "../../server/db";
-import execute, {
-  type BackfillDeps,
+import {
   backfillTopicClusteringSchedules,
-  waitForBackfillSchema,
-} from "../backfillTopicClusteringSchedules";
+  seedClusteringSchedules,
+  type BackfillDeps,
+} from "../seedClusteringSchedules";
 
 /**
- * Unit tests for the ADR-051 backfill walk. Only the boundaries are mocked —
- * the Prisma paging query, the already-scheduled lookup, and the bootstrap
- * command. The paging loop, the outcome counters, and the skip/failure
- * bookkeeping under test stay real.
+ * Unit tests for the ADR-051 legacy-project schedule seed. Only the
+ * boundaries are mocked — the Prisma paging query, the already-scheduled
+ * lookup, and the bootstrap command. The paging loop, the outcome counters,
+ * and the skip/failure bookkeeping under test stay real.
  */
 
 /** A fake project page source that serves `pages` in order, then empties. */
@@ -277,171 +254,129 @@ describe("backfillTopicClusteringSchedules", () => {
   });
 });
 
-describe("waitForBackfillSchema", () => {
-  /** Deterministic clock: `sleep` advances `now` by the requested delay. */
-  const fakeClock = (startMs = 0) => {
-    let currentMs = startMs;
-    const sleeps: number[] = [];
-    return {
-      now: () => currentMs,
-      sleep: async (ms: number) => {
-        sleeps.push(ms);
-        currentMs += ms;
-      },
-      sleeps,
-    };
+function fakeRedis() {
+  const store = new Map<string, string>();
+  return {
+    set: vi.fn(async (key: string, value: string, ...rest: unknown[]) => {
+      const nx = rest.includes("NX");
+      if (nx && store.has(key)) return null;
+      store.set(key, value);
+      return "OK";
+    }),
+    get: vi.fn(async (key: string) => store.get(key) ?? null),
+    del: vi.fn(async (key: string) => {
+      store.delete(key);
+    }),
   };
+}
 
-  describe("given the schema already exists", () => {
-    describe("when the wait runs", () => {
-      it("returns after one probe without sleeping", async () => {
-        const clock = fakeClock();
-        const probeSchema = vi.fn().mockResolvedValue(undefined);
+describe("seedClusteringSchedules", () => {
+  const oneProjectDeps = (requestClustering = vi.fn().mockResolvedValue(undefined)) => ({
+    ...pagerOver([["p1"]]),
+    findAlreadyScheduledProjectIds: noneScheduled,
+    requestClustering,
+    pageSize: 10,
+  });
 
-        await waitForBackfillSchema({
-          probeSchema,
-          timeoutMs: 60_000,
-          pollIntervalMs: 5_000,
-          sleep: clock.sleep,
-          now: clock.now,
-        });
-
-        expect(probeSchema).toHaveBeenCalledTimes(1);
-        expect(clock.sleeps).toEqual([]);
+  describe("given no Redis", () => {
+    it("runs the walk on every call", async () => {
+      const requestClustering = vi.fn().mockResolvedValue(undefined);
+      await seedClusteringSchedules({
+        ...oneProjectDeps(requestClustering),
+        redis: null,
       });
+      await seedClusteringSchedules({
+        ...oneProjectDeps(requestClustering),
+        redis: null,
+      });
+      expect(requestClustering).toHaveBeenCalledTimes(2);
     });
   });
 
-  describe("given the app's first boot applies migrations mid-wait", () => {
-    describe("when the wait runs", () => {
-      it("polls until the schema appears, then proceeds", async () => {
-        const clock = fakeClock();
-        const probeSchema = vi
-          .fn()
-          .mockRejectedValueOnce(new Error("Project does not exist"))
-          .mockRejectedValueOnce(new Error("Project does not exist"))
-          .mockResolvedValue(undefined);
-
-        await waitForBackfillSchema({
-          probeSchema,
-          timeoutMs: 60_000,
-          pollIntervalMs: 5_000,
-          sleep: clock.sleep,
-          now: clock.now,
-        });
-
-        expect(probeSchema).toHaveBeenCalledTimes(3);
-        expect(clock.sleeps).toEqual([5_000, 5_000]);
+  describe("given a fresh install with no eligible projects", () => {
+    it("marks the seed done so later boots skip the scan", async () => {
+      const redis = fakeRedis();
+      const requestClustering = vi.fn();
+      await seedClusteringSchedules({
+        ...pagerOver([[]]),
+        findAlreadyScheduledProjectIds: noneScheduled,
+        requestClustering,
+        redis: redis as any,
       });
+
+      const requestClusteringAgain = vi.fn();
+      await seedClusteringSchedules({
+        ...pagerOver([["p1"]]),
+        findAlreadyScheduledProjectIds: noneScheduled,
+        requestClustering: requestClusteringAgain,
+        redis: redis as any,
+      });
+
+      expect(requestClusteringAgain).not.toHaveBeenCalled();
     });
   });
 
-  describe("given the schema never appears", () => {
-    describe("when the deadline passes", () => {
-      it("throws instead of hanging, keeping the failure visible", async () => {
-        // A silent hang would sit inside the hook Job until
-        // activeDeadlineSeconds kills the whole Job with no cause attached;
-        // a throw crash-loops with the real error in the pod log.
-        const clock = fakeClock();
-        const probeSchema = vi
-          .fn()
-          .mockRejectedValue(new Error("Project does not exist"));
-
-        await expect(
-          waitForBackfillSchema({
-            probeSchema,
-            timeoutMs: 20_000,
-            pollIntervalMs: 5_000,
-            sleep: clock.sleep,
-            now: clock.now,
-          }),
-        ).rejects.toThrow(/schema.*not ready/i);
-
-        // 5 probes: t=0, 5s, 10s, 15s, 20s — the deadline probe still runs.
-        expect(probeSchema).toHaveBeenCalledTimes(5);
+  describe("given a project failed to schedule", () => {
+    it("does not mark the seed done, so the next boot retries", async () => {
+      const redis = fakeRedis();
+      await seedClusteringSchedules({
+        ...pagerOver([["p1"]]),
+        findAlreadyScheduledProjectIds: noneScheduled,
+        requestClustering: vi.fn().mockRejectedValue(new Error("boom")),
+        redis: redis as any,
       });
+
+      const requestClusteringRetry = vi.fn().mockResolvedValue(undefined);
+      await seedClusteringSchedules({
+        ...pagerOver([["p1"]]),
+        findAlreadyScheduledProjectIds: noneScheduled,
+        requestClustering: requestClusteringRetry,
+        redis: redis as any,
+      });
+
+      expect(requestClusteringRetry).toHaveBeenCalledWith({ projectId: "p1" });
     });
-  });
-});
 
-describe("execute", () => {
-  const projectFindMany = vi.mocked(mockedPrisma.project.findMany);
-  const instanceFindMany = vi.mocked(
-    mockedPrisma.processManagerInstance.findMany,
-  );
-  const queryRaw = vi.mocked(mockedPrisma.$queryRaw);
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    queryRaw.mockResolvedValue([] as never);
-    instanceFindMany.mockResolvedValue([] as never);
-    requestClusteringMock.mockResolvedValue(undefined);
-  });
-
-  describe("given every project bootstraps cleanly", () => {
-    describe("when the task runs", () => {
-      it("resolves so the Helm hook reports success", async () => {
-        projectFindMany
-          .mockResolvedValueOnce([{ id: "p1" }] as never)
-          .mockResolvedValue([] as never);
-
-        await expect(execute()).resolves.toBeUndefined();
-        expect(requestClusteringMock).toHaveBeenCalledWith(
-          expect.objectContaining({ tenantId: "p1", trigger: "bootstrap" }),
-        );
+    it("releases the claim so another replica is not blocked", async () => {
+      const redis = fakeRedis();
+      await seedClusteringSchedules({
+        ...pagerOver([["p1"]]),
+        findAlreadyScheduledProjectIds: noneScheduled,
+        requestClustering: vi.fn().mockRejectedValue(new Error("boom")),
+        redis: redis as any,
       });
 
-      it("probes the schema before walking any projects", async () => {
-        // The hook can fire before the app's first boot has applied
-        // migrations; walking first is exactly the crash that failed
-        // `helm install` with BackoffLimitExceeded.
-        projectFindMany.mockResolvedValue([] as never);
-
-        await execute();
-
-        const probeOrder = queryRaw.mock.invocationCallOrder[0]!;
-        const walkOrder = projectFindMany.mock.invocationCallOrder[0]!;
-        expect(probeOrder).toBeLessThan(walkOrder);
-      });
+      expect(redis.del).toHaveBeenCalledWith(
+        "topic-clustering:schedule-seed:v1",
+      );
     });
   });
 
-  describe("given at least one project failed to schedule", () => {
-    describe("when the task runs", () => {
-      it("throws so the process exits non-zero on a partial backfill", async () => {
-        projectFindMany
-          .mockResolvedValueOnce([{ id: "p1" }, { id: "p2" }] as never)
-          .mockResolvedValue([] as never);
-        requestClusteringMock.mockImplementation(
-          async ({ tenantId }: { tenantId: string }) => {
-            if (tenantId === "p2") throw new Error("boom");
-          },
-        );
+  describe("given another replica holds the claim", () => {
+    it("skips the walk without touching the bootstrap command", async () => {
+      const redis = fakeRedis();
+      await redis.set(
+        "topic-clustering:schedule-seed:v1",
+        "1",
+        "EX",
+        3600,
+        "NX",
+      );
 
-        await expect(execute()).rejects.toThrow(
-          /backfill incomplete: 1 of 2 projects failed/i,
-        );
+      const requestClustering = vi.fn();
+      const summary = await seedClusteringSchedules({
+        ...pagerOver([["p1"]]),
+        findAlreadyScheduledProjectIds: noneScheduled,
+        requestClustering,
+        redis: redis as any,
       });
-    });
-  });
 
-  describe("given the project table is paged", () => {
-    describe("when the task runs", () => {
-      it("scopes the already-scheduled lookup by projectId and the process name", async () => {
-        projectFindMany
-          .mockResolvedValueOnce([{ id: "p1" }] as never)
-          .mockResolvedValue([] as never);
-
-        await execute();
-
-        expect(instanceFindMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              projectId: { in: ["p1"] },
-              processName: "topicClustering",
-            }),
-          }),
-        );
+      expect(requestClustering).not.toHaveBeenCalled();
+      expect(summary).toEqual({
+        succeeded: 0,
+        failed: 0,
+        skipped: 0,
+        scanned: 0,
       });
     });
   });

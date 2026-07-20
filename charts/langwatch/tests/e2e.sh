@@ -43,12 +43,7 @@ pg_query() {
 test_install() {
   sep; info "Suite: chart install"
 
-  # values-e2e.yaml disables the topic-clustering backfill hook for suites
-  # that never load the app image. This one does load it, so re-enable it —
-  # this is where the hook is actually exercised (it is how the missing
-  # @langwatch/handled-error in the runtime image was caught).
-  helm_install -f "$CHART_DIR/tests/values-e2e.yaml" \
-    --set topicClusteringBackfill.enabled=true
+  helm_install -f "$CHART_DIR/tests/values-e2e.yaml"
   pass "helm install"
 }
 
