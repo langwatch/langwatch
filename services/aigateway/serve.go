@@ -36,7 +36,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		OTTLServer:            ottlSrv,
 		InternalSecret:        cfg.ControlPlane.InternalSecret,
 		MaxRequestBodyBytes:   cfg.Server.MaxRequestBodyBytes,
-		HeartbeatInterval:     cfg.Server.NonStreamingHeartbeatInterval,
+		HeartbeatInterval:     time.Duration(cfg.Server.NonStreamingHeartbeatIntervalSeconds) * time.Second,
 	})
 
 	srv := &http.Server{Handler: handler, Addr: cfg.Server.Addr, ReadHeaderTimeout: 10 * time.Second}

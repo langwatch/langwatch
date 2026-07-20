@@ -591,3 +591,54 @@ func TestRouter_NonStreaming_ConcurrentSlowRequestsDoNotInterfere(t *testing.T) 
 	assert.Contains(t, recA.Body.String(), "choices")
 	assert.Contains(t, recB.Body.String(), "choices")
 }
+
+// TestRouter_NonStreaming_PanicInDispatchDoesNotCrashProcess is the
+// regression test for a bug caught in review of the heartbeat fix itself:
+// dispatch runs on a background goroutine (withHeartbeat) so the heartbeat
+// loop can keep writing to the client while it's in flight. That goroutine
+// sits outside httpmiddleware.Recover()'s reach — Recover's defer/recover
+// is scoped to the goroutine that calls ServeHTTP, not one spawned inside a
+// handler — so an unrecovered panic there would take down the whole
+// process instead of producing a 500 for the one bad request. If this test
+// method itself doesn't complete (the test binary crashes instead of
+// reporting pass/fail), that IS the regression.
+func TestRouter_NonStreaming_PanicInDispatchDoesNotCrashProcess(t *testing.T) {
+	auth := &mockAuth{
+		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+			return testBundle(), nil
+		},
+	}
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+			panic("simulated panic deep in dispatch")
+		},
+	}
+
+	router := buildRouter(
+		app.WithAuth(auth),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
+	rec := httptest.NewRecorder()
+
+	done := make(chan struct{})
+	go func() {
+		router.ServeHTTP(rec, req)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("handler never completed — a panic in the background dispatch goroutine likely hung resultCh instead of surfacing an error")
+	}
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+
+	var errResp herr.ErrorResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
+	assert.Equal(t, "internal_error", errResp.Error.Type)
+}

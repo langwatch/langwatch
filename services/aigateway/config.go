@@ -64,10 +64,10 @@ func defaultConfig() Config {
 	return Config{
 		Environment: "local",
 		Server: config.Server{
-			Addr:                          ":5563",
-			GracefulSeconds:               10,
-			MaxRequestBodyBytes:           config.DefaultMaxRequestBodyBytes,
-			NonStreamingHeartbeatInterval: config.DefaultNonStreamingHeartbeatInterval,
+			Addr:                                 ":5563",
+			GracefulSeconds:                      10,
+			MaxRequestBodyBytes:                  config.DefaultMaxRequestBodyBytes,
+			NonStreamingHeartbeatIntervalSeconds: int64(config.DefaultNonStreamingHeartbeatInterval / time.Second),
 		},
 		ControlPlane: ControlPlaneConfig{
 			BaseURL: "http://localhost:5560",

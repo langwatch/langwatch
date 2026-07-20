@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -158,7 +159,7 @@ func chatHandler(deps RouterDeps) http.HandlerFunc {
 			setMetaHeaders(w, result.Meta)
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
-			result, hw, err := withHeartbeat(w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
 				return deps.App.HandleChat(r.Context(), bundle, bytes.NewReader(body), model)
 			})
 			if err != nil {
@@ -207,7 +208,7 @@ func messagesHandler(deps RouterDeps) http.HandlerFunc {
 			setMetaHeaders(w, result.Meta)
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
-			result, hw, err := withHeartbeat(w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
 				return deps.App.HandleMessages(r.Context(), bundle, bytes.NewReader(body), model)
 			})
 			if err != nil {
@@ -266,7 +267,7 @@ func responsesHandler(deps RouterDeps) http.HandlerFunc {
 			setMetaHeaders(w, result.Meta)
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
-			result, hw, err := withHeartbeat(w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
 				return deps.App.HandleResponses(r.Context(), bundle, bytes.NewReader(body), model)
 			})
 			if err != nil {
@@ -292,7 +293,7 @@ func embeddingsHandler(deps RouterDeps) http.HandlerFunc {
 		}
 		defer release()
 
-		result, hw, err := withHeartbeat(w, deps.HeartbeatInterval, func() (*app.EmbeddingResult, error) {
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.EmbeddingResult, error) {
 			return deps.App.HandleEmbeddings(r.Context(), bundle, body, app.PeekModel(peek))
 		})
 		if err != nil {
@@ -358,7 +359,7 @@ func geminiPassthroughHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		result, hw, err := withHeartbeat(w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
 			return deps.App.HandlePassthrough(r.Context(), bundle, body, model, meta)
 		})
 		if err != nil {
@@ -625,7 +626,15 @@ func (h *heartbeatWriter) Unwrap() http.ResponseWriter {
 // checks the response body (not just the status) still gets the accurate
 // error. interval of zero resolves to config.DefaultNonStreamingHeartbeatInterval;
 // negative disables heartbeating entirely.
-func withHeartbeat[T any](w http.ResponseWriter, interval time.Duration, dispatch func() (T, error)) (T, http.ResponseWriter, error) {
+//
+// dispatch runs on a background goroutine so the select loop below stays
+// free to write heartbeats while it's in flight. That goroutine is outside
+// httpmiddleware.Recover()'s reach — Recover's defer/recover only guards
+// the goroutine that calls ServeHTTP, not one spawned from inside a
+// handler — so a panic in dispatch is recovered here explicitly and turned
+// into the same internal_error 500 Recover() would have produced for a
+// synchronous panic, instead of crashing the whole process.
+func withHeartbeat[T any](ctx context.Context, w http.ResponseWriter, interval time.Duration, dispatch func() (T, error)) (T, http.ResponseWriter, error) {
 	hw := &heartbeatWriter{ResponseWriter: w}
 
 	type outcome struct {
@@ -634,6 +643,13 @@ func withHeartbeat[T any](w http.ResponseWriter, interval time.Duration, dispatc
 	}
 	resultCh := make(chan outcome, 1)
 	go func() {
+		defer func() {
+			if v := recover(); v != nil {
+				clog.LogPanic(ctx, v)
+				var zero T
+				resultCh <- outcome{val: zero, err: herr.New(ctx, domain.ErrInternal, nil)}
+			}
+		}()
 		val, err := dispatch()
 		resultCh <- outcome{val, err}
 	}()
