@@ -241,9 +241,12 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     backendModelProviderKey: "openai_codex",
     label: "Codex (OpenAI account)",
     defaultModel: "gpt-5.6-terra",
+    // A distinct terminal-prompt glyph, NOT OpenAI's logo: it must not read as
+    // the plain OpenAI card sitting right next to it, and it mirrors the
+    // settings icon (src/components/icons/Codex.tsx).
     icon: themedIcon(
-      "/images/external-icons/openai-lighttheme.svg",
-      "/images/external-icons/openai-darktheme.svg",
+      "/images/external-icons/codex-lighttheme.svg",
+      "/images/external-icons/codex-darktheme.svg",
       "Codex",
     ),
     externalDocsUrl: "https://chatgpt.com/codex",
