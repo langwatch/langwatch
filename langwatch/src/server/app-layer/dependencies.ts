@@ -35,7 +35,6 @@ import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
-import type { MetricRecordStorageService } from "./traces/metric-record-storage.service";
 import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import type { CodingAgentSessionService } from "./traces/coding-agent-session.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
@@ -78,7 +77,6 @@ export interface AppDependencies {
     spans: SpanStorageService;
     codingAgentSessions: CodingAgentSessionService;
     logRecords: LogRecordStorageService;
-    metricRecords: MetricRecordStorageService;
     collection: TraceRequestCollectionService;
     logCollection: LogRequestCollectionService;
     metricCollection: MetricRequestCollectionService;

@@ -1,683 +1,209 @@
 import { describe, expect, it, vi } from "vitest";
+import type {
+  CanonicalLogRecord,
+  LogTraceContribution,
+} from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
+import { IO_PREVIEW_BYTES } from "../lean-for-projection";
+import {
+  type LogRequestCollectionResult,
+  LogRequestCollectionService,
+} from "../log-request-collection.service";
 
-import type { RecordLogCommandData } from "../../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import { LogRequestCollectionService } from "../log-request-collection.service";
+/** Narrows the result union so a test can assert on the collected counters. */
+function expectCollected(
+  result: LogRequestCollectionResult,
+): Extract<LogRequestCollectionResult, { outcome: "collected" }> {
+  if (result.outcome !== "collected") {
+    throw new Error(`expected a collected result, got "${result.outcome}"`);
+  }
+  return result;
+}
 
-function makeService() {
-  const recordLog = vi.fn<(data: RecordLogCommandData) => Promise<void>>(() =>
-    Promise.resolve(),
+function makeService(args?: {
+  storageFails?: boolean;
+  contributionFails?: boolean;
+}) {
+  const records: CanonicalLogRecord[] = [];
+  const contributions: LogTraceContribution[] = [];
+  const recordLogRecords = vi.fn(async (batch: CanonicalLogRecord[]) => {
+    if (args?.storageFails) throw new Error("storage unavailable");
+    records.push(...batch);
+  });
+  const recordLogContributions = vi.fn(
+    async (batch: LogTraceContribution[]) => {
+      if (args?.contributionFails) throw new Error("trace unavailable");
+      contributions.push(...batch);
+    },
   );
-  const service = new LogRequestCollectionService({ recordLog });
-  return { service, recordLog };
+  const service = new LogRequestCollectionService({
+    recordLogRecords,
+    recordLogContributions,
+    piiRedactionService: { redactLog: async () => undefined },
+  });
+  return {
+    service,
+    records,
+    contributions,
+    recordLogRecords,
+    recordLogContributions,
+  };
+}
+
+const args = {
+  tenantId: "project_test",
+  organizationId: "organization_test",
+  piiRedactionLevel: "DISABLED",
+};
+
+function logRequest() {
+  return {
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            {
+              key: "langwatch.cost.non_billable",
+              value: { stringValue: "true" },
+            },
+          ],
+        },
+        scopeLogs: [
+          {
+            scope: { name: "com.anthropic.claude_code.events" },
+            logRecords: [
+              {
+                timeUnixNano: "1700000000000000000",
+                severityNumber: 9,
+                severityText: "INFO",
+                body: { stringValue: "claude_code.user_prompt" },
+                attributes: [
+                  { key: "event.name", value: { stringValue: "user_prompt" } },
+                  { key: "event.sequence", value: { stringValue: "1" } },
+                  { key: "session.id", value: { stringValue: "session-1" } },
+                  { key: "prompt.id", value: { stringValue: "prompt-1" } },
+                  { key: "prompt", value: { stringValue: "hello" } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  } as any;
 }
 
 describe("LogRequestCollectionService", () => {
-  describe("when a LogRecord has neither traceId nor spanId", () => {
-    /**
-     * OTLP logs.proto v1.0.0 marks trace_id and span_id OPTIONAL on
-     * LogRecord, and exporters that emit logs outside an active span
-     * (Claude Code's OTEL_LOGS_EXPORTER without a traces exporter is the
-     * canonical caller) leave both unset. The handler previously
-     * silently dropped these — receiver returned 200 OK, on-call had no
-     * signal, customer saw nothing arrive. The record is now stored
-     * with empty TraceId/SpanId.
-     */
-    it("records the log with empty trace and span ids", async () => {
-      const { service, recordLog } = makeService();
+  it("stores the canonical record then emits a compact trace contribution", async () => {
+    const { service, records, contributions } = makeService();
+    const result = await service.handleOtlpLogRequest({
+      ...args,
+      logRequest: logRequest(),
+    });
 
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test_tenant",
-        logRequest: {
-          resourceLogs: [
-            {
-              resource: {
-                attributes: [
-                  {
-                    key: "service.name",
-                    value: { stringValue: "standalone-log-emitter" },
-                  },
-                ],
-              },
-              scopeLogs: [
-                {
-                  scope: { name: "test", version: "1.0.0" },
-                  logRecords: [
-                    {
-                      timeUnixNano: "1700000000000000000",
-                      body: { stringValue: "hello from a context-less log" },
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-        piiRedactionLevel: "ESSENTIAL",
+    expect(result).toEqual({
+      outcome: "collected",
+      acceptedLogRecords: 1,
+      rejectedLogRecords: 0,
+    });
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({
+      organizationId: args.organizationId,
+      correlationSource: "claude_synthesized",
+      providerKind: "claude_code",
+    });
+    expect(contributions).toHaveLength(1);
+    expect(contributions[0]).toMatchObject({
+      recordId: records[0]!.recordId,
+      input: "hello",
+      nonBillable: true,
+      occurredAt: records[0]!.acceptedAt,
+    });
+    expect(JSON.stringify(contributions[0]).length).toBeLessThan(
+      records[0]!.canonicalSizeBytes,
+    );
+  });
+
+  it("keeps a correlated log accepted when its trace contribution cannot be queued", async () => {
+    const { service } = makeService({ contributionFails: true });
+
+    const result = await service.handleOtlpLogRequest({
+      ...args,
+      logRequest: logRequest(),
+    });
+
+    // The canonical record is already durably enqueued and is the source of
+    // truth; the contribution is best-effort correlation, as in the metric
+    // pipeline. Rejecting here would tell the sender to discard a log we
+    // have in fact accepted, and a retry would re-ingest it.
+    const collected = expectCollected(result);
+    expect(collected.acceptedLogRecords).toBe(1);
+    expect(collected.rejectedLogRecords).toBe(0);
+  });
+
+  it("bounds duplicated trace I/O while retaining the full canonical log", async () => {
+    const request = logRequest();
+    const prompt = "é".repeat(IO_PREVIEW_BYTES);
+    request.resourceLogs[0].scopeLogs[0].logRecords[0].attributes.find(
+      (attribute: { key: string }) => attribute.key === "prompt",
+    ).value.stringValue = prompt;
+    const { service, records, contributions } = makeService();
+
+    await service.handleOtlpLogRequest({ ...args, logRequest: request });
+
+    expect(records[0]!.canonicalPayload).toContain(prompt);
+    expect(
+      Buffer.byteLength(contributions[0]!.input!, "utf8"),
+    ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 3);
+    expect(
+      contributions[0]!.liftedAttributes["langwatch.reserved.log_io_truncated"],
+    ).toBe(true);
+  });
+
+  describe("when the canonical batch cannot be persisted", () => {
+    it("reports the batch as unavailable rather than rejected", async () => {
+      const { service, recordLogContributions } = makeService({
+        storageFails: true,
       });
 
-      expect(recordLog).toHaveBeenCalledTimes(1);
-      const [call] = recordLog.mock.calls;
-      expect(call?.[0]).toMatchObject({
-        tenantId: "project_test_tenant",
-        traceId: "",
-        spanId: "",
-        body: "hello from a context-less log",
+      const result = await service.handleOtlpLogRequest({
+        ...args,
+        logRequest: logRequest(),
       });
+
+      // A persistence failure is ours, so the records must stay retryable. If
+      // this ever reports `collected` with a non-zero `rejectedLogRecords`,
+      // the route answers 200 + partialSuccess and every collector in the
+      // fleet drops the batch it could have re-sent.
+      expect(result.outcome).toBe("unavailable");
+      expect(result).not.toHaveProperty("rejectedLogRecords");
+      expect(recordLogContributions).not.toHaveBeenCalled();
+    });
+
+    it("does not echo storage internals back to the sender", async () => {
+      const { service } = makeService({ storageFails: true });
+
+      const result = await service.handleOtlpLogRequest({
+        ...args,
+        logRequest: logRequest(),
+      });
+
+      expect(result.errorMessage).toBe("failed to record log record");
+      expect(result.errorMessage).not.toContain("storage unavailable");
     });
   });
 
-  describe("when a LogRecord carries trace context", () => {
-    it("forwards the normalized trace and span ids", async () => {
-      const { service, recordLog } = makeService();
+  it("enqueues each accepted request as one canonical and one contribution batch", async () => {
+    const request = logRequest();
+    request.resourceLogs[0].scopeLogs[0].logRecords.push(
+      structuredClone(request.resourceLogs[0].scopeLogs[0].logRecords[0]),
+    );
+    const { service, recordLogRecords, recordLogContributions } = makeService();
 
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test_tenant",
-        logRequest: {
-          resourceLogs: [
-            {
-              resource: { attributes: [] },
-              scopeLogs: [
-                {
-                  scope: { name: "test", version: undefined },
-                  logRecords: [
-                    {
-                      timeUnixNano: "1700000000000000000",
-                      traceId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
-                      spanId: "1122334455667788",
-                      body: { stringValue: "in-span log" },
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-        piiRedactionLevel: "ESSENTIAL",
-      });
+    await service.handleOtlpLogRequest({ ...args, logRequest: request });
 
-      expect(recordLog).toHaveBeenCalledTimes(1);
-      const [call] = recordLog.mock.calls;
-      expect(call?.[0]).toMatchObject({
-        traceId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
-        spanId: "1122334455667788",
-        body: "in-span log",
-      });
-      // Real wire context is never marked synthetic.
-      expect(
-        call?.[0]?.attributes["langwatch.trace.synthetic"],
-      ).toBeUndefined();
-      expect(
-        call?.[0]?.attributes["langwatch.trace.derived_from"],
-      ).toBeUndefined();
-    });
-  });
-
-  describe("claude_code log records — trace_id / span_id synthesis", () => {
-    /**
-     * Claude Code 2.1.x emits its events outside any active span, so the
-     * OTLP exporter sends them with empty trace_id / span_id. Without the
-     * synthesizer the fold projection skips the records and /me/traces
-     * shows nothing. The synthesizer derives stable ids from (session.id,
-     * prompt.id, event.name, event.sequence) at receive time.
-     *
-     * These cases exercise the synthesis through `user_prompt`, which stays
-     * on the log path (only the model-call triplet is converted to spans —
-     * see the conversion describe block below).
-     */
-    const claudeBatch = (records: Array<Record<string, any>>) => ({
-      resourceLogs: [
-        {
-          resource: {
-            attributes: [
-              { key: "service.name", value: { stringValue: "claude-code" } },
-            ],
-          },
-          scopeLogs: [
-            {
-              scope: {
-                name: "com.anthropic.claude_code.events",
-                version: "2.1.162",
-              },
-              logRecords: records,
-            },
-          ],
-        },
-      ],
-    });
-
-    const userPrompt = (
-      sessionId: string,
-      promptId: string,
-      seq: string,
-      extra: Record<string, any>[] = [],
-    ) => ({
-      timeUnixNano: "1700000000000000000",
-      body: { stringValue: "claude_code.user_prompt" },
-      attributes: [
-        { key: "event.name", value: { stringValue: "user_prompt" } },
-        { key: "session.id", value: { stringValue: sessionId } },
-        { key: "prompt.id", value: { stringValue: promptId } },
-        { key: "event.sequence", value: { stringValue: seq } },
-        ...extra,
-      ],
-    });
-
-    it("synthesizes a stable traceId from session.id and a stable spanId per event", async () => {
-      const { service, recordLog } = makeService();
-
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: claudeBatch([
-          userPrompt("sess_42", "p_1", "1", [
-            { key: "prompt", value: { stringValue: "What is 2+2?" } },
-          ]),
-          {
-            timeUnixNano: "1700000001000000000",
-            body: { stringValue: "claude_code.hook_registered" },
-            attributes: [
-              { key: "event.name", value: { stringValue: "hook_registered" } },
-              { key: "session.id", value: { stringValue: "sess_42" } },
-              { key: "prompt.id", value: { stringValue: "p_1" } },
-              { key: "event.sequence", value: { stringValue: "2" } },
-            ],
-          },
-        ]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-
-      expect(recordLog).toHaveBeenCalledTimes(2);
-      const [c1, c2] = recordLog.mock.calls;
-      const r1 = c1![0]!;
-      const r2 = c2![0]!;
-      expect(r1.traceId).toMatch(/^[0-9a-f]{32}$/);
-      expect(r1.spanId).toMatch(/^[0-9a-f]{16}$/);
-      // Same turn (session + prompt.id) ⇒ same trace, different events ⇒
-      // different spans.
-      expect(r2.traceId).toBe(r1.traceId);
-      expect(r2.spanId).not.toBe(r1.spanId);
-      // A synthesized record is marked so downstream consumers can tell a
-      // LangWatch-minted id apart from a real OTLP one.
-      expect(r1.attributes["langwatch.trace.synthetic"]).toBe("true");
-      expect(r1.attributes["langwatch.trace.derived_from"]).toBe("session.id");
-    });
-
-    it("returns a DIFFERENT traceId per turn (prompt.id) within one session", async () => {
-      const { service, recordLog } = makeService();
-
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: claudeBatch([
-          userPrompt("sess_multiturn", "p_1", "1"),
-          userPrompt("sess_multiturn", "p_2", "3"),
-        ]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-      const traceIds = new Set(recordLog.mock.calls.map((c) => c[0]!.traceId));
-      // One trace per turn: each prompt.id is its own trace. The turns stay
-      // grouped into a conversation downstream by gen_ai.conversation.id =
-      // session.id, not by sharing a trace id. Validated against a real
-      // 2-turn claude-code session (prompt.ids 47fcab35 / 5fc69a28).
-      expect(traceIds.size).toBe(2);
-    });
-
-    it("returns DIFFERENT traceIds across different sessions", async () => {
-      const { service, recordLog } = makeService();
-
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: claudeBatch([
-          userPrompt("sess_A", "p_1", "1"),
-          userPrompt("sess_B", "p_1", "1"),
-        ]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-      const [c1, c2] = recordLog.mock.calls;
-      expect(c1![0]!.traceId).not.toBe(c2![0]!.traceId);
-    });
-
-    /**
-     * Idempotency guard: re-running the same OTLP batch (network
-     * retry, receiver restart) must produce the same trace+span ids
-     * so the stored_log_records ReplacingMergeTree dedups.
-     */
-    it("derives the same ids when re-ingesting the same record", async () => {
-      const { service, recordLog } = makeService();
-      const rec = userPrompt("s", "p", "1");
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: claudeBatch([rec]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: claudeBatch([rec]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-      const [c1, c2] = recordLog.mock.calls;
-      expect(c1![0]!.traceId).toBe(c2![0]!.traceId);
-      expect(c1![0]!.spanId).toBe(c2![0]!.spanId);
-    });
-
-    it("leaves a record uncorrelated when it matches no documented coding-agent shape", async () => {
-      // A `codex.*` event WITHOUT its documented conversation.id key does not
-      // get grouped by whatever other key happens to be present (session.id
-      // here): synthesis is only for the documented shapes, and guessing from
-      // generic keys would fuse unrelated standalone logs into one synthetic
-      // trace and route them all to one command shard.
-      const { service, recordLog } = makeService();
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: {
-          resourceLogs: [
-            {
-              resource: { attributes: [] },
-              scopeLogs: [
-                {
-                  scope: {
-                    name: "com.openai.codex.events",
-                    version: "0.134",
-                  },
-                  logRecords: [
-                    {
-                      timeUnixNano: "1700000000000000000",
-                      body: { stringValue: "codex event" },
-                      attributes: [
-                        {
-                          key: "event.name",
-                          value: { stringValue: "codex.api_request" },
-                        },
-                        { key: "session.id", value: { stringValue: "s" } },
-                        { key: "prompt.id", value: { stringValue: "p" } },
-                      ],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-        piiRedactionLevel: "ESSENTIAL",
-      });
-      const r = recordLog.mock.calls[0]![0]!;
-      expect(r.traceId).toBe("");
-      expect(r.spanId).toBe("");
-      expect(r.attributes["langwatch.trace.synthetic"]).toBeUndefined();
-      expect(r.attributes["langwatch.trace.derived_from"]).toBeUndefined();
-    });
-
-    it("preserves the wire ids when the LogRecord already carries trace context", async () => {
-      const { service, recordLog } = makeService();
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: claudeBatch([
-          {
-            timeUnixNano: "1700000000000000000",
-            traceId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
-            spanId: "1122334455667788",
-            body: { stringValue: "claude_code.user_prompt" },
-            attributes: [
-              { key: "event.name", value: { stringValue: "user_prompt" } },
-              { key: "session.id", value: { stringValue: "s" } },
-            ],
-          },
-        ]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-      const r = recordLog.mock.calls[0]![0]!;
-      expect(r.traceId).toBe("a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6");
-      expect(r.spanId).toBe("1122334455667788");
-    });
-
-    it("keeps a real trace_id and marks only the span synthetic when span_id is missing", async () => {
-      // A real trace can legitimately hold a context-less record: the
-      // trace grouping stays real (no trace.synthetic, no derived_from),
-      // and only the invented span_id is badged span.synthetic.
-      const { service, recordLog } = makeService();
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: claudeBatch([
-          {
-            timeUnixNano: "1700000000000000000",
-            traceId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
-            // no spanId on the wire
-            body: { stringValue: "claude_code.user_prompt" },
-            attributes: [
-              { key: "event.name", value: { stringValue: "user_prompt" } },
-              { key: "session.id", value: { stringValue: "s" } },
-              { key: "prompt.id", value: { stringValue: "p_1" } },
-              { key: "event.sequence", value: { stringValue: "1" } },
-            ],
-          },
-        ]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-      const r = recordLog.mock.calls[0]![0]!;
-      expect(r.traceId).toBe("a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6");
-      expect(r.spanId).toMatch(/^[0-9a-f]{16}$/);
-      expect(r.attributes["langwatch.trace.synthetic"]).toBeUndefined();
-      expect(r.attributes["langwatch.trace.derived_from"]).toBeUndefined();
-      expect(r.attributes["langwatch.span.synthetic"]).toBe("true");
-    });
-
-    it("leaves ids empty when session.id is missing (no useful key to hash)", async () => {
-      const { service, recordLog } = makeService();
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: claudeBatch([
-          {
-            timeUnixNano: "1700000000000000000",
-            body: { stringValue: "claude_code.user_prompt" },
-            attributes: [
-              { key: "event.name", value: { stringValue: "user_prompt" } },
-              // no session.id
-            ],
-          },
-        ]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-      const r = recordLog.mock.calls[0]![0]!;
-      expect(r.traceId).toBe("");
-      expect(r.spanId).toBe("");
-    });
-  });
-
-  describe("when claude_code content events are ingested", () => {
-    /**
-     * Claude Code emits its model calls (api_request / api_request_body /
-     * api_response_body), tool events (tool_decision / tool_result), and the
-     * user_prompt as OTLP log records. The receiver stores them verbatim — it
-     * does not classify or mark them (the old synthesis marking + fold are
-     * gone). trace/span ids are still synthesized so the records correlate;
-     * the only attributes the receiver adds are the synthetic-id markers.
-     * These cases assert the service-level routing.
-     */
-    // The legacy marker keys the receiver used to stamp — now stamped by no
-    // one. Asserted here only to pin their absence.
-    const LEGACY_KIND_ATTR = "langwatch.claude_code.kind";
-    const LEGACY_PII_ATTR = "langwatch.claude_code.pii";
-
-    const scopeLogs = (records: Array<Record<string, any>>) => ({
-      resourceLogs: [
-        {
-          resource: { attributes: [] },
-          scopeLogs: [
-            {
-              scope: {
-                name: "com.anthropic.claude_code.events",
-                version: "2.1.162",
-              },
-              logRecords: records,
-            },
-          ],
-        },
-      ],
-    });
-
-    const apiRequest = (seq: string, requestId: string) => ({
-      timeUnixNano: "1700000001000000000",
-      body: { stringValue: "claude_code.api_request" },
-      attributes: [
-        { key: "event.name", value: { stringValue: "api_request" } },
-        { key: "session.id", value: { stringValue: "sess_conv" } },
-        { key: "prompt.id", value: { stringValue: "p_1" } },
-        { key: "event.sequence", value: { stringValue: seq } },
-        { key: "model", value: { stringValue: "claude-opus-4-7" } },
-        { key: "input_tokens", value: { stringValue: "120" } },
-        { key: "cost_usd", value: { stringValue: "0.0875" } },
-        { key: "request_id", value: { stringValue: requestId } },
-        { key: "query_source", value: { stringValue: "repl_main_thread" } },
-      ],
-    });
-
-    it("stores a model-call event as a plain log with its event attributes", async () => {
-      const { service, recordLog } = makeService();
-
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: scopeLogs([apiRequest("1", "req_a")]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-
-      expect(recordLog).toHaveBeenCalledTimes(1);
-      const data = recordLog.mock.calls[0]![0]!;
-      expect(data.traceId).toMatch(/^[0-9a-f]{32}$/);
-      expect(data.attributes.model).toBe("claude-opus-4-7");
-      // No synthesis markers are added — the receiver only records logs.
-      expect(data.attributes[LEGACY_KIND_ATTR]).toBeUndefined();
-      expect(data.attributes[LEGACY_PII_ATTR]).toBeUndefined();
-    });
-
-    it("stores user_prompt and tool_result as plain, unmarked logs", async () => {
-      const { service, recordLog } = makeService();
-
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: scopeLogs([
-          {
-            timeUnixNano: "1700000000000000000",
-            body: { stringValue: "claude_code.user_prompt" },
-            attributes: [
-              { key: "event.name", value: { stringValue: "user_prompt" } },
-              { key: "session.id", value: { stringValue: "sess_conv" } },
-              { key: "prompt", value: { stringValue: "hello" } },
-            ],
-          },
-          {
-            timeUnixNano: "1700000002000000000",
-            body: { stringValue: "claude_code.tool_result" },
-            attributes: [
-              { key: "event.name", value: { stringValue: "tool_result" } },
-              { key: "session.id", value: { stringValue: "sess_conv" } },
-              { key: "tool_name", value: { stringValue: "Bash" } },
-              { key: "tool_use_id", value: { stringValue: "toolu_x" } },
-            ],
-          },
-        ]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-
-      expect(recordLog).toHaveBeenCalledTimes(2);
-      for (const [call] of recordLog.mock.calls) {
-        expect(call!.attributes[LEGACY_KIND_ATTR]).toBeUndefined();
-        expect(call!.attributes[LEGACY_PII_ATTR]).toBeUndefined();
-      }
-    });
-
-    it("stores lifecycle events (hooks, plugins, mcp) as plain logs", async () => {
-      const { service, recordLog } = makeService();
-
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: scopeLogs([
-          {
-            timeUnixNano: "1700000000000000000",
-            body: { stringValue: "claude_code.hook_registered" },
-            attributes: [
-              { key: "event.name", value: { stringValue: "hook_registered" } },
-              { key: "session.id", value: { stringValue: "sess_conv" } },
-            ],
-          },
-          apiRequest("2", "req_b"),
-        ]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-
-      expect(recordLog).toHaveBeenCalledTimes(2);
-      const hook = recordLog.mock.calls.find(
-        (c) => c[0]!.attributes["event.name"] === "hook_registered",
-      )![0]!;
-      expect(hook.attributes[LEGACY_KIND_ATTR]).toBeUndefined();
-    });
-
-    it("is idempotent: the same log yields the same ids on re-ingest", async () => {
-      const { service, recordLog } = makeService();
-      const batch = scopeLogs([apiRequest("1", "req_c")]);
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: batch,
-        piiRedactionLevel: "ESSENTIAL",
-      });
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: batch,
-        piiRedactionLevel: "ESSENTIAL",
-      });
-      const [c1, c2] = recordLog.mock.calls;
-      expect(c1![0]!.spanId).toBe(c2![0]!.spanId);
-      expect(c1![0]!.traceId).toBe(c2![0]!.traceId);
-    });
-  });
-
-  describe("codex log records — trace_id / span_id synthesis", () => {
-    /**
-     * Codex emits its events (codex.user_prompt, codex.sse_event,
-     * codex.conversation_starts) without trace context. The
-     * synthesizer derives trace_id from conversation.id (groups
-     * multi-turn into one trace) and span_id from
-     * (conversation.id:event.name:event.sequence). Scope-name is
-     * agnostic — codex's scope varies (`codex_exec` in 0.131,
-     * `codex` in 0.13x) so the synth gates on the `codex.*`
-     * event.name prefix instead.
-     */
-    const codexBatch = (
-      records: Array<Record<string, any>>,
-      scopeName = "codex_exec",
-    ) => ({
-      resourceLogs: [
-        {
-          resource: {
-            attributes: [
-              { key: "service.name", value: { stringValue: "codex_exec" } },
-            ],
-          },
-          scopeLogs: [
-            {
-              scope: { name: scopeName, version: "0.134" },
-              logRecords: records,
-            },
-          ],
-        },
-      ],
-    });
-
-    it("synthesizes trace_id from conversation.id + span_id per event", async () => {
-      const { service, recordLog } = makeService();
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: codexBatch([
-          {
-            timeUnixNano: "1700000000000000000",
-            body: { stringValue: "codex.user_prompt" },
-            attributes: [
-              {
-                key: "event.name",
-                value: { stringValue: "codex.user_prompt" },
-              },
-              { key: "conversation.id", value: { stringValue: "conv_42" } },
-              { key: "event.sequence", value: { stringValue: "1" } },
-              { key: "prompt", value: { stringValue: "Hello" } },
-            ],
-          },
-          {
-            timeUnixNano: "1700000001000000000",
-            body: { stringValue: "codex.sse_event" },
-            attributes: [
-              { key: "event.name", value: { stringValue: "codex.sse_event" } },
-              { key: "conversation.id", value: { stringValue: "conv_42" } },
-              { key: "event.sequence", value: { stringValue: "2" } },
-              { key: "model", value: { stringValue: "gpt-5.5" } },
-            ],
-          },
-        ]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-      expect(recordLog).toHaveBeenCalledTimes(2);
-      const [c1, c2] = recordLog.mock.calls;
-      expect(c1![0]!.traceId).toMatch(/^[0-9a-f]{32}$/);
-      expect(c1![0]!.spanId).toMatch(/^[0-9a-f]{16}$/);
-      expect(c2![0]!.traceId).toBe(c1![0]!.traceId); // same conversation = same trace
-      expect(c2![0]!.spanId).not.toBe(c1![0]!.spanId);
-    });
-
-    it("works with the bare `codex` scope name (0.13x)", async () => {
-      const { service, recordLog } = makeService();
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: codexBatch(
-          [
-            {
-              timeUnixNano: "1700000000000000000",
-              body: { stringValue: "codex.sse_event" },
-              attributes: [
-                {
-                  key: "event.name",
-                  value: { stringValue: "codex.sse_event" },
-                },
-                { key: "conversation.id", value: { stringValue: "c" } },
-                { key: "event.sequence", value: { stringValue: "1" } },
-              ],
-            },
-          ],
-          "codex",
-        ),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-      const r = recordLog.mock.calls[0]![0]!;
-      expect(r.traceId).toMatch(/^[0-9a-f]{32}$/);
-      expect(r.spanId).toMatch(/^[0-9a-f]{16}$/);
-    });
-
-    it("leaves ids empty when conversation.id is missing", async () => {
-      const { service, recordLog } = makeService();
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test",
-        logRequest: codexBatch([
-          {
-            timeUnixNano: "1700000000000000000",
-            body: { stringValue: "codex.sse_event" },
-            attributes: [
-              { key: "event.name", value: { stringValue: "codex.sse_event" } },
-              // no conversation.id
-              { key: "event.sequence", value: { stringValue: "1" } },
-            ],
-          },
-        ]),
-        piiRedactionLevel: "ESSENTIAL",
-      });
-      const r = recordLog.mock.calls[0]![0]!;
-      expect(r.traceId).toBe("");
-      expect(r.spanId).toBe("");
-    });
-  });
-
-  describe("when a LogRecord body is missing", () => {
-    it("drops the record (no body, nothing meaningful to store)", async () => {
-      const { service, recordLog } = makeService();
-
-      await service.handleOtlpLogRequest({
-        tenantId: "project_test_tenant",
-        logRequest: {
-          resourceLogs: [
-            {
-              resource: { attributes: [] },
-              scopeLogs: [
-                {
-                  scope: { name: "test", version: undefined },
-                  logRecords: [
-                    {
-                      timeUnixNano: "1700000000000000000",
-                      // No body — drop path still applies.
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-        piiRedactionLevel: "ESSENTIAL",
-      });
-
-      expect(recordLog).not.toHaveBeenCalled();
-    });
+    expect(recordLogRecords).toHaveBeenCalledTimes(1);
+    expect(recordLogRecords.mock.calls[0]![0]).toHaveLength(2);
+    expect(recordLogContributions).toHaveBeenCalledTimes(1);
+    expect(recordLogContributions.mock.calls[0]![0]).toHaveLength(2);
   });
 });

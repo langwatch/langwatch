@@ -65,12 +65,13 @@ import {
   createLangyConversationUpdateBroadcastSubscriber,
   createLangyTurnAdmissionLifecycleSubscriber,
 } from "../app-layer/langy/subscribers";
+import type { CanonicalLogRecordRepository } from "../app-layer/logs/repositories/canonical-log-record.repository";
+import type { MetricDataPointRepository } from "../app-layer/metrics/repositories/metric-data-point.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
 import type { CodingAgentSessionRepository } from "../app-layer/traces/repositories/coding-agent-session.repository";
 import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
-import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
 import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
 import type { TraceAnalyticsRollupRepository } from "../app-layer/traces/repositories/trace-analytics-rollup.repository";
 import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
@@ -116,6 +117,16 @@ import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conv
 import type { LangyConversationStateData } from "./pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
 import type { LangyConversationTurnData } from "./pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
 import type { LangyMessageProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyMessageOperational.mapProjection";
+import { resolveLogCommandShardCount as resolveCanonicalLogCommandShardCount } from "./pipelines/log-processing/canonicalLog";
+import { createLogProcessingPipeline } from "./pipelines/log-processing/pipeline";
+import { CanonicalLogAppendStore } from "./pipelines/log-processing/projections/stores";
+import { resolveMetricCommandShardCount } from "./pipelines/metric-processing/canonical/shards";
+import { createMetricProcessingPipeline } from "./pipelines/metric-processing/pipeline";
+import {
+  MetricDataPointAppendStore,
+  MetricSeriesCatalogAppendStore,
+  MetricTimeRollupAppendStore,
+} from "./pipelines/metric-processing/projections/stores";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -143,9 +154,8 @@ import {
 } from "./pipelines/trace-processing/pipeline";
 import type { CodingAgentSessionState } from "./pipelines/trace-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "./pipelines/trace-processing/projections/codingAgentSession.store";
-import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
-import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
+import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
@@ -238,7 +248,8 @@ export interface PipelineRepositories {
   /** Primary replica for read-after-write consistency. */
   traceSummaryFold: TraceSummaryRepository;
   logRecordStorage: LogRecordStorageRepository;
-  metricRecordStorage: MetricRecordStorageRepository;
+  canonicalLogStorage: CanonicalLogRecordRepository;
+  metricDataPointStorage: MetricDataPointRepository;
   /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
   traceAnalyticsRollup: TraceAnalyticsRollupRepository;
   /** ADR-034 Phase 2: slim per-trace analytics repository (dual-tap). */
@@ -379,6 +390,8 @@ export class PipelineRegistry {
         graphActivityHandler,
       },
     });
+    const metricPipeline = this.registerMetricPipeline();
+    const logPipeline = this.registerLogPipeline();
     const {
       pipeline: tracePipeline,
       simComputeRunMetrics,
@@ -415,6 +428,8 @@ export class PipelineRegistry {
 
     return {
       traces: mapCommands(tracePipeline.commands),
+      metrics: mapCommands(metricPipeline.commands),
+      logs: mapCommands(logPipeline.commands),
       evaluations: mapCommands(evalPipeline.commands),
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
@@ -579,6 +594,37 @@ export class PipelineRegistry {
       processOutboxWorker.start();
     }
     return { pipeline, processOutboxWorker };
+  }
+
+  private registerMetricPipeline() {
+    const repository = this.deps.repositories.metricDataPointStorage;
+    return this.deps.eventSourcing.register(
+      createMetricProcessingPipeline({
+        metricDataPointAppendStore: new MetricDataPointAppendStore(repository),
+        metricSeriesCatalogAppendStore: new MetricSeriesCatalogAppendStore(
+          repository,
+        ),
+        metricTimeRollupAppendStore: new MetricTimeRollupAppendStore(
+          repository,
+        ),
+        metricCommandShardCount: resolveMetricCommandShardCount(
+          process.env.METRIC_PROCESSING_SHARDS,
+        ),
+      }),
+    );
+  }
+
+  private registerLogPipeline() {
+    return this.deps.eventSourcing.register(
+      createLogProcessingPipeline({
+        canonicalLogAppendStore: new CanonicalLogAppendStore(
+          this.deps.repositories.canonicalLogStorage,
+        ),
+        logCommandShardCount: resolveCanonicalLogCommandShardCount(
+          process.env.LOG_PROCESSING_SHARDS,
+        ),
+      }),
+    );
   }
 
   private registerEvaluationPipeline({
@@ -767,6 +813,10 @@ export class PipelineRegistry {
         traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
           this.deps.repositories.traceAnalyticsRollup,
         ),
+        // CUTOVER ONLY — see TraceProcessingPipelineDeps.logRecordAppendStore.
+        logRecordAppendStore: new LogRecordAppendStore(
+          this.deps.repositories.logRecordStorage,
+        ),
         // Redis cache is the slim fold's ONLY warm read path — its store's
         // get() returns null by design (lossy row, no read-back), and on a
         // cache miss the fold's refoldOnStoreMiss option rebuilds state from
@@ -786,12 +836,6 @@ export class PipelineRegistry {
             this.deps.repositories.codingAgentSession,
           ),
           "coding_agent_sessions",
-        ),
-        logRecordAppendStore: new LogRecordAppendStore(
-          this.deps.repositories.logRecordStorage,
-        ),
-        metricRecordAppendStore: new MetricRecordAppendStore(
-          this.deps.repositories.metricRecordStorage,
         ),
         traceSummaryStore,
         originGateReactor,

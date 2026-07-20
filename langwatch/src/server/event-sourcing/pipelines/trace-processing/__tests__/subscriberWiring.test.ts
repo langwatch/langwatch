@@ -28,12 +28,11 @@ function buildTraceDeps(
   const store = {} as any;
   return {
     spanAppendStore: store,
-    logRecordAppendStore: store,
-    metricRecordAppendStore: store,
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,
     codingAgentSessionStore: store,
+    logRecordAppendStore: store,
     originGateReactor: reactorStub("originGate"),
     evaluationTriggerReactor: reactorStub("evaluationTrigger"),
     customEvaluationSyncReactor: reactorStub("customEvaluationSync"),

@@ -4,271 +4,272 @@ import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer"
 import { getLangWatchTracer } from "langwatch";
 import type { DeepPartial } from "~/utils/types";
 import {
-  piiRedactionLevelSchema,
-  type RecordLogCommandData,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import type { OtlpAnyValue } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+  type LogRedactionService,
+  prepareCanonicalLogRecords,
+} from "../../event-sourcing/pipelines/log-processing/canonicalLog";
+import type {
+  CanonicalLogRecord,
+  LogTraceContribution,
+} from "../../event-sourcing/pipelines/log-processing/schemas/logRecord";
 import {
-  normalizeOtlpAttributeMap,
-  TraceRequestUtils,
-} from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
-import { deriveLogContentAttributes } from "./log-content-derivation";
-import { synthesizeTraceContext } from "./synthesize-trace-context";
-
-/**
- * Attribute keys stamped on a recorded log whose trace context was
- * synthesized by LangWatch (see `synthesizeTraceContext`), so
- * downstream consumers can tell an id we minted apart from a real
- * OTLP id that arrived on the wire. `langwatch.trace.synthetic` marks
- * a trace_id we minted (the whole grouping is ours);
- * `langwatch.span.synthetic` marks the narrower case where the
- * trace_id is real but only the span_id was invented.
- */
-const SYNTHETIC_TRACE_ATTR = "langwatch.trace.synthetic";
-const SYNTHETIC_TRACE_DERIVED_FROM_ATTR = "langwatch.trace.derived_from";
-const SYNTHETIC_SPAN_ATTR = "langwatch.span.synthetic";
+  extractIOFromLogRecord,
+  liftCanonicalAttributesFromLogRecord,
+  NON_BILLABLE_ATTR,
+} from "../../event-sourcing/pipelines/trace-processing/projections/services";
+import { piiRedactionLevelSchema } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { LogRecordReceivedEventData } from "../../event-sourcing/pipelines/trace-processing/schemas/events";
+import { IO_PREVIEW_BYTES, utf8Preview } from "./lean-for-projection";
+import { OtlpSpanPiiRedactionService } from "./span-pii-redaction.service";
 
 export interface LogRequestCollectionDeps {
-  recordLog: (data: RecordLogCommandData) => Promise<void>;
+  recordLogRecords: (data: CanonicalLogRecord[]) => Promise<void>;
+  recordLogContributions: (data: LogTraceContribution[]) => Promise<void>;
+  piiRedactionService?: LogRedactionService;
 }
+
+/**
+ * The outcome of an OTLP log request.
+ *
+ * The two cases are deliberately separate shapes rather than a counter pair.
+ * An OTLP `partialSuccess` body means the server rejected those records
+ * *permanently* and the client must not re-send them, so folding a failure
+ * that is ours — a queue outage, say — into `rejectedLogRecords` tells every
+ * collector in the fleet to drop data it would otherwise have retried. As a
+ * counter pair the two are one indistinguishable `+= n`; as a discriminated
+ * union, conflating them is a type error at the call site.
+ */
+export type LogRequestCollectionResult =
+  | {
+      outcome: "collected";
+      acceptedLogRecords: number;
+      /** Rejected for good — the caller must NOT retry these. */
+      rejectedLogRecords: number;
+      errorMessage?: string;
+    }
+  | {
+      /**
+       * Nothing was durably accepted. `recordLogRecords` enqueues the batch in
+       * one call, so this is all-or-nothing: the caller must retry the whole
+       * request, and the route must answer with a retryable status.
+       */
+      outcome: "unavailable";
+      errorMessage: string;
+    };
+
+/** Returned in place of a persistence exception, which may name internals. */
+const PERSISTENCE_ERROR_MESSAGE = "failed to record log record";
 
 export class LogRequestCollectionService {
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.log-ingestion",
+    "langwatch.log-processing.log-ingestion",
   );
   private readonly logger = createLogger(
-    "langwatch:trace-processing:log-ingestion",
+    "langwatch:log-processing:log-ingestion",
   );
+  private readonly piiRedactionService: LogRedactionService;
 
-  constructor(private readonly deps: LogRequestCollectionDeps) {}
+  constructor(private readonly deps: LogRequestCollectionDeps) {
+    this.piiRedactionService =
+      deps.piiRedactionService ?? new OtlpSpanPiiRedactionService();
+  }
 
   async handleOtlpLogRequest({
     tenantId,
+    organizationId,
     logRequest,
     piiRedactionLevel,
   }: {
     tenantId: string;
+    organizationId: string;
     logRequest: DeepPartial<IExportLogsServiceRequest>;
     piiRedactionLevel: string;
-  }): Promise<void> {
+  }): Promise<LogRequestCollectionResult> {
     return await this.tracer.withActiveSpan(
       "LogRequestCollectionService.handleOtlpLogRequest",
       {
         kind: ApiSpanKind.PRODUCER,
         attributes: {
           "tenant.id": tenantId,
+          "organization.id": organizationId,
           resource_log_count: logRequest.resourceLogs?.length ?? 0,
         },
       },
-      async (span) => {
-        let collectedCount = 0;
-        let droppedCount = 0;
-        let failedCount = 0;
+      async (span): Promise<LogRequestCollectionResult> => {
+        const preparation = await prepareCanonicalLogRecords({
+          tenantId,
+          organizationId,
+          request: logRequest,
+          piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
+          redactionService: this.piiRedactionService,
+          acceptedAt: Date.now(),
+        });
+        // Only preparation can reject: it is the sole stage that judges the
+        // sender's payload. Everything after it either persists the record or
+        // fails on our side, and neither may be reported as a rejection.
+        const acceptedLogRecords = preparation.accepted.length;
+        const rejectedLogRecords = preparation.rejectedLogRecords;
+        const errors = preparation.errors;
 
-        const redaction = piiRedactionLevelSchema.parse(piiRedactionLevel);
+        if (preparation.accepted.length > 0) {
+          try {
+            await this.deps.recordLogRecords(
+              preparation.accepted.map(({ record }) => record),
+            );
+          } catch (error) {
+            // Preparation errors describe the caller's own payload and are
+            // safe to return. A persistence failure is ours: its message can
+            // name internal hosts, tables and queries, so the sender gets a
+            // stable string and the detail goes to the log only.
+            this.logger.error(
+              {
+                error,
+                tenantId,
+                recordCount: preparation.accepted.length,
+                recordIds: preparation.accepted
+                  .slice(0, 10)
+                  .map(({ record }) => record.recordId),
+              },
+              "Failed to enqueue canonical log record batch",
+            );
+            span.setAttribute(
+              "logs.ingestion.unavailable",
+              preparation.accepted.length,
+            );
+            return {
+              outcome: "unavailable",
+              errorMessage: PERSISTENCE_ERROR_MESSAGE,
+            };
+          }
+        }
 
-        for (const resourceLog of logRequest.resourceLogs ?? []) {
-          if (!resourceLog?.scopeLogs) continue;
-
-          const resourceAttrs = normalizeOtlpAttributeMap(
-            resourceLog.resource?.attributes,
-          );
-
-          for (const scopeLog of resourceLog.scopeLogs) {
-            if (!scopeLog?.logRecords) continue;
-
-            const scopeName =
-              (scopeLog.scope?.name as string | undefined) ?? "";
-            const scopeVersion =
-              (scopeLog.scope?.version as string | undefined) ?? null;
-
-            for (const logRecord of scopeLog.logRecords) {
-              if (!logRecord) {
-                droppedCount++;
-                continue;
-              }
-
-              try {
-                const body = extractBody(logRecord.body);
-                if (body == null) {
-                  droppedCount++;
-                  continue;
-                }
-
-                // OTLP `LogRecord.trace_id` and `LogRecord.span_id` are
-                // OPTIONAL per opentelemetry-proto v1.0.0 logs.proto — a
-                // LogRecord emitted outside an active span has neither.
-                // Dropping in that case silently eats every standalone log
-                // (Claude Code's OTEL_LOGS_EXPORTER without a traces
-                // exporter is the canonical caller). Store an empty
-                // string instead; downstream join-to-span queries simply
-                // find no correlation, which is the correct semantics.
-                const wireTraceId = logRecord.traceId
-                  ? (TraceRequestUtils.normalizeOtlpId(
-                      logRecord.traceId as string | Uint8Array,
-                    ) ?? "")
-                  : "";
-                const wireSpanId = logRecord.spanId
-                  ? (TraceRequestUtils.normalizeOtlpId(
-                      logRecord.spanId as string | Uint8Array,
-                    ) ?? "")
-                  : "";
-
-                const logAttrs = normalizeOtlpAttributeMap(
-                  logRecord.attributes,
-                );
-                const {
-                  traceId,
-                  spanId,
-                  syntheticTraceId,
-                  syntheticSpanId,
-                  derivedFrom,
-                } = synthesizeTraceContext({
-                  scopeName,
-                  wireTraceId,
-                  wireSpanId,
-                  attrs: logAttrs,
-                });
-
-                const timeUnixMs = logRecord.timeUnixNano
-                  ? TraceRequestUtils.convertUnixNanoToUnixMs(
-                      TraceRequestUtils.normalizeOtlpUnixNano(
-                        logRecord.timeUnixNano as
-                          | string
-                          | number
-                          | { low: number; high: number },
-                      ),
-                    )
-                  : Date.now();
-
-                // Every log record is recorded as-is; the event payload rides
-                // the `body` attribute, already in logAttrs. The receiver adds
-                // the synthetic-id markers below, plus the content derived from
-                // any raw API body — parsed ONCE here rather than by every
-                // consumer on every read (see `deriveLogContentAttributes`).
-                const attributes: Record<string, string> = {
-                  ...logAttrs,
-                  ...deriveLogContentAttributes({
-                    scopeName,
-                    attributes: logAttrs,
-                  }),
-                };
-                // A minted trace_id badges the whole trace synthetic (and
-                // records which correlation key grouped it). A real trace_id
-                // with only an invented span_id badges just the span — never
-                // the trace, since a real trace can hold a context-less record.
-                if (syntheticTraceId) {
-                  attributes[SYNTHETIC_TRACE_ATTR] = "true";
-                  attributes[SYNTHETIC_TRACE_DERIVED_FROM_ATTR] =
-                    derivedFrom ?? "";
-                } else if (syntheticSpanId) {
-                  attributes[SYNTHETIC_SPAN_ATTR] = "true";
-                }
-
-                await this.deps.recordLog({
+        const contributions: LogTraceContribution[] = [];
+        if (acceptedLogRecords > 0) {
+          for (const prepared of preparation.accepted) {
+            const { record } = prepared;
+            if (
+              record.correlationSource === "none" ||
+              !record.correlationTraceId ||
+              !record.correlationSpanId
+            ) {
+              continue;
+            }
+            try {
+              contributions.push(makeTraceContribution(prepared));
+            } catch (error) {
+              // Best-effort, for the same reason the enqueue failure below is:
+              // the canonical record is already durably enqueued, so failing to
+              // derive its trace contribution must not tell the sender to
+              // discard a log we hold. Log only — do not touch the counters.
+              this.logger.error(
+                {
+                  error,
                   tenantId,
-                  traceId,
-                  spanId,
-                  timeUnixMs,
-                  severityNumber: (logRecord.severityNumber as number) ?? 0,
-                  severityText: (logRecord.severityText as string) ?? "",
-                  body,
-                  attributes,
-                  resourceAttributes: resourceAttrs,
-                  scopeName,
-                  scopeVersion,
-                  piiRedactionLevel: redaction,
-                  occurredAt: Date.now(),
-                });
-
-                collectedCount++;
-              } catch (error) {
-                failedCount++;
-                this.logger.error(
-                  {
-                    error,
-                    tenantId,
-                  },
-                  "Error processing log record",
-                );
-              }
+                  recordId: record.recordId,
+                  traceId: record.correlationTraceId,
+                },
+                "Failed to build log trace contribution",
+              );
             }
           }
         }
 
-        // The receiver only appends log records, holding no cross-batch state.
-        span.setAttribute("logs.ingestion.successes", collectedCount);
-        span.setAttribute("logs.ingestion.drops", droppedCount);
-        span.setAttribute("logs.ingestion.failures", failedCount);
+        if (contributions.length > 0) {
+          try {
+            await this.deps.recordLogContributions(contributions);
+          } catch (error) {
+            // Correlation is deliberately best-effort and separate from log
+            // acceptance, matching the metric pipeline: the canonical record
+            // is already durably enqueued above, and it — not the trace
+            // contribution — is the source of truth. Counting these as
+            // rejections would tell the sender to discard logs we have in
+            // fact accepted.
+            this.logger.error(
+              {
+                error,
+                tenantId,
+                contributionCount: contributions.length,
+                recordIds: contributions
+                  .slice(0, 10)
+                  .map(({ recordId }) => recordId),
+              },
+              "Failed to enqueue log trace contribution batch",
+            );
+          }
+        }
+
+        span.setAttribute("logs.ingestion.successes", acceptedLogRecords);
+        span.setAttribute("logs.ingestion.failures", rejectedLogRecords);
+        const errorMessage = errors.length
+          ? errors.join("; ").slice(0, 1024)
+          : undefined;
+        return {
+          outcome: "collected",
+          acceptedLogRecords,
+          rejectedLogRecords,
+          ...(errorMessage ? { errorMessage } : {}),
+        };
       },
     );
   }
 }
 
-/**
- * Extracts the body string from an OTLP AnyValue.
- * Defined as a module-level function (not a class method) to avoid
- * being wrapped by the `traced()` proxy, which would turn this
- * synchronous function into an async one.
- */
-function extractBody(body: unknown): string | null {
-  if (body === null || body === undefined) return null;
-
-  const anyValue = body as OtlpAnyValue;
-
-  if (
-    "stringValue" in anyValue &&
-    anyValue.stringValue !== null &&
-    anyValue.stringValue !== undefined
-  ) {
-    return anyValue.stringValue;
-  }
-  if (
-    "boolValue" in anyValue &&
-    anyValue.boolValue !== null &&
-    anyValue.boolValue !== undefined
-  ) {
-    return String(anyValue.boolValue);
-  }
-  if (
-    "intValue" in anyValue &&
-    anyValue.intValue !== null &&
-    anyValue.intValue !== undefined
-  ) {
-    const v = anyValue.intValue;
-    if (typeof v === "object" && v !== null && "low" in v && "high" in v) {
-      const raw = (BigInt(v.high) << 32n) | (BigInt(v.low) & 0xffffffffn);
-      return BigInt.asIntN(64, raw).toString();
+function makeTraceContribution(
+  prepared: Awaited<
+    ReturnType<typeof prepareCanonicalLogRecords>
+  >["accepted"][number],
+): LogTraceContribution {
+  const { record, normalized } = prepared;
+  const legacyView: LogRecordReceivedEventData = {
+    traceId: record.correlationTraceId,
+    spanId: record.correlationSpanId,
+    timeUnixMs: record.timeUnixMs,
+    severityNumber: record.severityNumber,
+    severityText: record.severityText,
+    body: normalized.body,
+    attributes: normalized.attributes,
+    resourceAttributes: normalized.resourceAttributes,
+    scopeName: normalized.scopeName,
+    scopeVersion: normalized.scopeVersion,
+    piiRedactionLevel: record.piiRedactionLevel,
+  };
+  const lifted = liftCanonicalAttributesFromLogRecord(legacyView);
+  const liftedAttributes: LogTraceContribution["liftedAttributes"] = {};
+  for (const [key, value] of Object.entries(lifted)) {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      liftedAttributes[key] = value;
     }
-    return String(v);
   }
-  if (
-    "doubleValue" in anyValue &&
-    anyValue.doubleValue !== null &&
-    anyValue.doubleValue !== undefined
-  ) {
-    return String(anyValue.doubleValue);
+  const io = extractIOFromLogRecord(legacyView);
+  const input =
+    io.input === null ? null : utf8Preview(io.input, IO_PREVIEW_BYTES);
+  const output =
+    io.output === null ? null : utf8Preview(io.output, IO_PREVIEW_BYTES);
+  if (input !== io.input || output !== io.output) {
+    liftedAttributes["langwatch.reserved.log_io_truncated"] = true;
   }
-  if (
-    "bytesValue" in anyValue &&
-    anyValue.bytesValue !== null &&
-    anyValue.bytesValue !== undefined
-  ) {
-    return typeof anyValue.bytesValue === "string"
-      ? anyValue.bytesValue
-      : Buffer.from(anyValue.bytesValue).toString("base64");
-  }
-  if ("arrayValue" in anyValue && anyValue.arrayValue?.values) {
-    const values = anyValue.arrayValue.values.map((v) => extractBody(v));
-    return JSON.stringify(values);
-  }
-  if ("kvlistValue" in anyValue && anyValue.kvlistValue?.values) {
-    const obj: Record<string, string | null> = {};
-    for (const kv of anyValue.kvlistValue.values) {
-      obj[kv.key] = extractBody(kv.value);
-    }
-    return JSON.stringify(obj);
-  }
-
-  return null;
+  return {
+    tenantId: record.tenantId,
+    recordId: record.recordId,
+    traceId: record.correlationTraceId,
+    spanId: record.correlationSpanId,
+    timeUnixMs: record.timeUnixMs,
+    severityNumber: record.severityNumber,
+    severityText: record.severityText,
+    providerKind: record.providerKind,
+    scopeName: record.scopeName,
+    correlationSource: record.correlationSource as Exclude<
+      typeof record.correlationSource,
+      "none"
+    >,
+    input,
+    output,
+    liftedAttributes,
+    nonBillable: normalized.resourceAttributes[NON_BILLABLE_ATTR] === "true",
+    piiRedactionLevel: record.piiRedactionLevel,
+    occurredAt: record.acceptedAt,
+  };
 }

@@ -57,6 +57,36 @@ export interface LogRecordStorageRepository {
   ): Promise<StoredLogRecordRow[]>;
 }
 
+/**
+ * Dedup + time-order rows read from BOTH log stores during the canonical
+ * cutover. Legacy rows preserve OTLP insertion order while canonical rows
+ * are key-sorted (stableStringify), so attribute keys are sorted before
+ * serialising or the same record could produce two different identities and
+ * slip past the dedup.
+ */
+export function mergeStoredLogRows(
+  rows: StoredLogRecordRow[],
+  limit?: number,
+): StoredLogRecordRow[] {
+  const deduped = new Map<string, StoredLogRecordRow>();
+  for (const row of rows) {
+    const key = [
+      row.traceId,
+      row.spanId,
+      row.timeUnixMs,
+      row.scopeName,
+      JSON.stringify(Object.fromEntries(Object.entries(row.attributes).sort())),
+    ].join("\0");
+    deduped.set(key, row);
+  }
+  const sorted = [...deduped.values()].sort(
+    (left, right) => left.timeUnixMs - right.timeUnixMs,
+  );
+  return typeof limit === "number" && limit > 0
+    ? sorted.slice(0, limit)
+    : sorted;
+}
+
 export class NullLogRecordStorageRepository
   implements LogRecordStorageRepository
 {

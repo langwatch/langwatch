@@ -111,4 +111,84 @@ describe("CodingAgentSessionService.getByTraceId", () => {
       expect(merged).toBeNull();
     });
   });
+
+  describe("given session-keyed metric totals exist", () => {
+    it("fills the metric-only fields, and never overwrites what the fold saw", async () => {
+      const rows = new Map([
+        [
+          "trace-a",
+          sessionRow({
+            traceId: "trace-a",
+            sessionId: "sess-1",
+            modelCalls: 5,
+            // The fold already counted commits from somewhere; the metric
+            // overlay must not stomp it.
+            commits: 2,
+          }),
+        ],
+      ]);
+      const { repository } = repoWith(rows);
+      const service = new CodingAgentSessionService(repository, {
+        listConversationTraces: async () => [
+          { traceId: "trace-a", startedAtMs: 1_000 },
+        ],
+        getSessionMetricTotals: async () => [
+          {
+            metricName: "claude_code.lines_of_code.count",
+            total: 120,
+            pointAttributes: { "session.id": "sess-1", type: "added" },
+          },
+          {
+            metricName: "claude_code.lines_of_code.count",
+            total: 30,
+            pointAttributes: { "session.id": "sess-1", type: "removed" },
+          },
+          {
+            metricName: "claude_code.commit.count",
+            total: 7,
+            pointAttributes: { "session.id": "sess-1" },
+          },
+          {
+            metricName: "claude_code.active_time.total",
+            total: 300,
+            pointAttributes: { "session.id": "sess-1", type: "user" },
+          },
+        ],
+      });
+
+      const merged = await service.getByTraceId({
+        projectId: "project_1",
+        traceId: "trace-a",
+        conversationId: "conv-1",
+      });
+
+      expect(merged?.linesAdded).toBe(120);
+      expect(merged?.linesRemoved).toBe(30);
+      expect(merged?.activeTimeUserSec).toBe(300);
+      expect(merged?.commits).toBe(2);
+    });
+
+    it("keeps the session when the metric read fails", async () => {
+      const rows = new Map([
+        ["trace-a", sessionRow({ traceId: "trace-a", sessionId: "sess-1" })],
+      ]);
+      const { repository } = repoWith(rows);
+      const service = new CodingAgentSessionService(repository, {
+        listConversationTraces: async () => [
+          { traceId: "trace-a", startedAtMs: 1_000 },
+        ],
+        getSessionMetricTotals: async () => {
+          throw new Error("clickhouse down");
+        },
+      });
+
+      const merged = await service.getByTraceId({
+        projectId: "project_1",
+        traceId: "trace-a",
+        conversationId: "conv-1",
+      });
+
+      expect(merged?.traceId).toBe("trace-a");
+    });
+  });
 });

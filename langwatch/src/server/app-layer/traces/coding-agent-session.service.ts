@@ -1,4 +1,9 @@
+import type { SeriesTotalByPointAttribute } from "~/server/app-layer/metrics/repositories/metric-data-point.repository";
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/codingAgentSession.foldProjection";
+import {
+  applyMetricToCodingAgentSession,
+  createInitCodingAgentSession,
+} from "~/server/event-sourcing/pipelines/trace-processing/projections/services/coding-agent-session.derivation";
 import {
   type CodingAgentSession,
   mergeCodingAgentSessionRows,
@@ -56,6 +61,18 @@ export class CodingAgentSessionService {
          */
         aroundStartedAtMs?: number;
       }) => Promise<ConversationTraceRef[]>;
+      /**
+       * Session-keyed metric totals off the canonical metric tables. A coding
+       * agent's metrics carry no exemplars, so they can never correlate to a
+       * trace — but `session.id` rides the datapoint attributes, which is the
+       * ONLY way lines/commits/PRs/edit-decisions/active-time ever reach a
+       * session view (ADR-041's known gap, closed at read time).
+       */
+      getSessionMetricTotals?: (params: {
+        tenantId: string;
+        sessionId: string;
+        fromMs: number;
+      }) => Promise<SeriesTotalByPointAttribute[]>;
     },
   ) {}
 
@@ -86,7 +103,9 @@ export class CodingAgentSessionService {
         traceId,
         startedAtMs,
       });
-      return own ? mergeCodingAgentSessionRows([own]) : null;
+      return own
+        ? this.withSessionMetrics(projectId, mergeCodingAgentSessionRows([own]))
+        : null;
     }
 
     const siblings = await this.deps.listConversationTraces({
@@ -124,6 +143,74 @@ export class CodingAgentSessionService {
     const found = rows.filter(
       (row): row is CodingAgentSessionRow => row !== null,
     );
-    return found.length > 0 ? mergeCodingAgentSessionRows(found) : null;
+    return found.length > 0
+      ? this.withSessionMetrics(
+          projectId,
+          mergeCodingAgentSessionRows(found),
+        )
+      : null;
+  }
+
+  /**
+   * Overlay the session-keyed metric totals onto the merged view — but only
+   * onto fields NO other signal feeds. Tokens and cost come from spans and
+   * must never be double-counted from the token metric; lines, commits, PRs,
+   * edit decisions and active time exist ONLY as metrics, so zero there means
+   * "the fold could not see them", not "none happened".
+   */
+  private async withSessionMetrics(
+    projectId: string,
+    session: CodingAgentSession,
+  ): Promise<CodingAgentSession> {
+    if (!this.deps?.getSessionMetricTotals || !session.sessionId) {
+      return session;
+    }
+
+    let totals: SeriesTotalByPointAttribute[];
+    try {
+      totals = await this.deps.getSessionMetricTotals({
+        tenantId: projectId,
+        sessionId: session.sessionId,
+        // The metric export lags the session's first span by at most its
+        // export interval; an hour of slack is partition pruning, not logic.
+        fromMs: session.startedAtMs - 60 * 60 * 1000,
+      });
+    } catch {
+      // Metrics are additive garnish on a session already answered from
+      // spans + logs — a failed read must not take the session view down.
+      return session;
+    }
+    if (totals.length === 0) return session;
+
+    // The fold's own metric derivation maps each series total exactly like a
+    // metric record: one vocabulary, whether the numbers arrive as events or
+    // as rollup sums.
+    let folded = createInitCodingAgentSession();
+    for (const series of totals) {
+      folded = applyMetricToCodingAgentSession({
+        state: folded,
+        data: {
+          metricName: series.metricName,
+          value: series.total,
+          attributes: series.pointAttributes,
+        },
+      });
+    }
+
+    return {
+      ...session,
+      linesAdded: session.linesAdded || folded.linesAdded,
+      linesRemoved: session.linesRemoved || folded.linesRemoved,
+      commits: session.commits || folded.commits,
+      pullRequests: session.pullRequests || folded.pullRequests,
+      editsAccepted: session.editsAccepted || folded.editsAccepted,
+      editsRejected: session.editsRejected || folded.editsRejected,
+      languagesEdited:
+        session.languagesEdited.length > 0
+          ? session.languagesEdited
+          : folded.languagesEdited,
+      activeTimeUserSec: session.activeTimeUserSec || folded.activeTimeUserSec,
+      activeTimeCliSec: session.activeTimeCliSec || folded.activeTimeCliSec,
+    };
   }
 }

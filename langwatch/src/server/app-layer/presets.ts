@@ -20,6 +20,7 @@ import {
   type ClickHouseClientResolver,
   clearCustomClientCache,
   getClickHouseClientForProject,
+  getClickHouseClientForOrganization,
   getSharedClickHouseClient,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
@@ -169,6 +170,8 @@ import { NullLangyMessageRepository } from "./langy/repositories/langy-message.r
 import { PrismaLangyMessageProjectionRepository } from "./langy/repositories/langy-message-projection.prisma.repository";
 import { PrismaLangyTurnAdmissionRepository } from "./langy/repositories/langy-turn-admission.prisma.repository";
 import { NullLangyTurnAdmissionRepository } from "./langy/repositories/langy-turn-admission.repository";
+import { CanonicalLogRecordClickHouseRepository } from "./logs/repositories/canonical-log-record.clickhouse.repository";
+import { NullCanonicalLogRecordRepository } from "./logs/repositories/canonical-log-record.repository";
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { EventExplorerService } from "./ops/event-explorer.service";
@@ -215,14 +218,13 @@ import { maybeSpool } from "./traces/edge-spool";
 import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
 import { LogRecordStorageService } from "./traces/log-record-storage.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
-import { MetricRecordStorageService } from "./traces/metric-record-storage.service";
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import { CodingAgentSessionClickHouseRepository } from "./traces/repositories/coding-agent-session.clickhouse.repository";
 import { NullCodingAgentSessionRepository } from "./traces/repositories/coding-agent-session.repository";
 import { LogRecordStorageClickHouseRepository } from "./traces/repositories/log-record-storage.clickhouse.repository";
 import { NullLogRecordStorageRepository } from "./traces/repositories/log-record-storage.repository";
-import { MetricRecordStorageClickHouseRepository } from "./traces/repositories/metric-record-storage.clickhouse.repository";
-import { NullMetricRecordStorageRepository } from "./traces/repositories/metric-record-storage.repository";
+import { MetricDataPointClickHouseRepository } from "./metrics/repositories/metric-data-point.clickhouse.repository";
+import { NullMetricDataPointRepository } from "./metrics/repositories/metric-data-point.repository";
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
 import { TraceAnalyticsClickHouseRepository } from "./traces/repositories/trace-analytics.clickhouse.repository";
@@ -388,18 +390,15 @@ export function initializeDefaultApp(options?: {
       clickhouseEnabled
         ? new LogRecordStorageClickHouseRepository(resolveClickHouseClient)
         : new NullLogRecordStorageRepository(),
+      // The read side spans the cutover: canonical log_records is
+      // authoritative, the legacy table still holds pre-cutover records and
+      // rolling-deploy stragglers, so trace log reads merge both.
+      clickhouseEnabled
+        ? new CanonicalLogRecordClickHouseRepository(resolveClickHouseClient)
+        : new NullCanonicalLogRecordRepository(),
     ),
     "LogRecordStorageService",
   );
-  const metricRecordStorage = traced(
-    new MetricRecordStorageService(
-      clickhouseEnabled
-        ? new MetricRecordStorageClickHouseRepository(resolveClickHouseClient)
-        : new NullMetricRecordStorageRepository(),
-    ),
-    "MetricRecordStorageService",
-  );
-
   const experiments = traced(
     ExperimentService.create(prisma),
     "ExperimentService",
@@ -644,9 +643,15 @@ export function initializeDefaultApp(options?: {
     logRecordStorage: clickhouseEnabled
       ? new LogRecordStorageClickHouseRepository(resolveClickHouseClient)
       : new NullLogRecordStorageRepository(),
-    metricRecordStorage: clickhouseEnabled
-      ? new MetricRecordStorageClickHouseRepository(resolveClickHouseClient)
-      : new NullMetricRecordStorageRepository(),
+    canonicalLogStorage: clickhouseEnabled
+      ? new CanonicalLogRecordClickHouseRepository(resolveClickHouseClient)
+      : new NullCanonicalLogRecordRepository(),
+    metricDataPointStorage: clickhouseEnabled
+      ? new MetricDataPointClickHouseRepository({
+          resolveClient: resolveClickHouseClient,
+          resolveOrganizationClient: getClickHouseClientForOrganization,
+        })
+      : new NullMetricDataPointRepository(),
     traceAnalyticsRollup: clickhouseEnabled
       ? new TraceAnalyticsRollupClickHouseRepository(resolveClickHouseClient)
       : new NullTraceAnalyticsRollupRepository(),
@@ -1027,14 +1032,17 @@ export function initializeDefaultApp(options?: {
 
   const logCollection = traced(
     new LogRequestCollectionService({
-      recordLog: commands.traces.recordLog,
+      recordLogRecords: commands.logs.recordLogRecord.sendBatch!,
+      recordLogContributions: commands.traces.recordLogContribution.sendBatch!,
     }),
     "LogRequestCollectionService",
   );
 
   const metricCollection = traced(
     new MetricRequestCollectionService({
-      recordMetric: commands.traces.recordMetric,
+      recordDataPoints: commands.metrics.recordDataPoint.sendBatch!,
+      recordMetricCorrelations:
+        commands.traces.recordMetricCorrelation.sendBatch!,
     }),
     "MetricRequestCollectionService",
   );
@@ -1051,6 +1059,17 @@ export function initializeDefaultApp(options?: {
     // `traceList` is already built above, in scope in this closure.
     codingAgentSessions: traced(
       new CodingAgentSessionService(repositories.codingAgentSession, {
+        // Session-keyed metric totals: coding-agent metrics carry no
+        // exemplars, so lines/commits/PRs/edits/active-time reach the session
+        // view only through this read (session.id rides the datapoint
+        // attributes).
+        getSessionMetricTotals: ({ tenantId, sessionId, fromMs }) =>
+          repositories.metricDataPointStorage.getSeriesTotalsByPointAttribute({
+            tenantId,
+            attributeKey: "session.id",
+            attributeValue: sessionId,
+            fromMs,
+          }),
         listConversationTraces: async ({
           tenantId,
           conversationId,
@@ -1110,7 +1129,6 @@ export function initializeDefaultApp(options?: {
       "CodingAgentSessionService",
     ),
     logRecords: logRecordStorage,
-    metricRecords: metricRecordStorage,
     collection: traceCollection,
     logCollection,
     metricCollection,
@@ -1324,14 +1342,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           "CodingAgentSessionService",
         ),
         logRecords: traced(
-          new LogRecordStorageService(new NullLogRecordStorageRepository()),
-          "LogRecordStorageService",
-        ),
-        metricRecords: traced(
-          new MetricRecordStorageService(
-            new NullMetricRecordStorageRepository(),
+          new LogRecordStorageService(
+            new NullLogRecordStorageRepository(),
+            new NullCanonicalLogRecordRepository(),
           ),
-          "MetricRecordStorageService",
+          "LogRecordStorageService",
         ),
         collection: traced(
           new TraceRequestCollectionService({
@@ -1342,13 +1357,15 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         ),
         logCollection: traced(
           new LogRequestCollectionService({
-            recordLog: noop,
+            recordLogRecords: noop,
+            recordLogContributions: noop,
           }),
           "LogRequestCollectionService",
         ),
         metricCollection: traced(
           new MetricRequestCollectionService({
-            recordMetric: noop,
+            recordDataPoints: noop,
+            recordMetricCorrelations: noop,
           }),
           "MetricRequestCollectionService",
         ),
@@ -1483,13 +1500,20 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordSpan: noop,
         assignTopic: noop,
         recordLog: noop,
-        recordMetric: noop,
+        recordLogContribution: noop,
+        recordMetricCorrelation: noop,
         resolveOrigin: noop,
         addAnnotation: noop,
         removeAnnotation: noop,
         bulkSyncAnnotations: noop,
         changeTraceName: noop,
       } satisfies AppCommands["traces"],
+      metrics: {
+        recordDataPoint: noop,
+      } satisfies AppCommands["metrics"],
+      logs: {
+        recordLogRecord: noop,
+      } satisfies AppCommands["logs"],
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,
