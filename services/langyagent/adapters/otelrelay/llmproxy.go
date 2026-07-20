@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"go.opentelemetry.io/otel/trace"
@@ -59,20 +58,19 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			// The worker authenticated to US with a placeholder (its env holds no
 			// virtual key). Replace it with the real credential.
 			pr.Out.Header.Set("Authorization", "Bearer "+entry.info.LLMVirtualKey)
-			// Stitch the gateway's customer-facing gen_ai span into the turn's
-			// trace. When the worker's native OTel supplied a traceparent, keep
-			// its SPAN id (the worker span that made this call — preserved
-			// verbatim by ReparentTraces, so it exists in the customer trace)
-			// but ALWAYS replace the trace id with the turn's: the worker's
-			// native trace id is meaningless post-reparent, and the worker — a
-			// model-driven, prompt-injectable process — must never choose which
-			// trace its calls land in. Worst-case forgery is a dangling parent
-			// span id inside its own turn's trace. No (or a malformed) worker
-			// traceparent parents on the turn span itself; no turn context at
-			// all stamps nothing and the gateway roots its own trace.
+			// Stamp the TURN's traceparent so the gateway's customer-facing
+			// gen_ai span joins the turn's trace. The worker's own traceparent
+			// is deliberately NOT continued, for two reasons: its trace id is
+			// worker-chosen (a prompt-injectable process must never pick which
+			// trace its calls land in), and — verified against opencode's real
+			// export set — the span id it stamps on outbound calls belongs to
+			// an internal fetch span it never exports, so continuing it parents
+			// the gateway span under a node that will never exist. The turn
+			// span is the one stable ancestor both the worker's re-parented
+			// roots and this span share. An invalid (not-yet-set) turn context
+			// stamps nothing — the gateway then roots its own trace.
 			if sc := entry.turnContext(); sc.IsValid() {
-				pr.Out.Header.Set("traceparent",
-					stitchedTraceparent(sc, req.Header.Get("traceparent")))
+				pr.Out.Header.Set("traceparent", traceparentHeader(sc))
 			} else {
 				pr.Out.Header.Del("traceparent")
 			}
@@ -155,20 +153,4 @@ func llmTargetURL(gatewayBaseURL, token string, reqURL *url.URL) (*url.URL, erro
 // sampling decision the flag would otherwise carry.
 func traceparentHeader(sc trace.SpanContext) string {
 	return fmt.Sprintf("00-%s-%s-01", sc.TraceID(), sc.SpanID())
-}
-
-// workerTraceparentRe accepts exactly the W3C shape and captures the span id.
-var workerTraceparentRe = regexp.MustCompile(
-	`^00-[0-9a-f]{32}-([0-9a-f]{16})-[0-9a-f]{2}$`,
-)
-
-// stitchedTraceparent is the turn's trace id joined with the worker's calling
-// span id when one was supplied (see the Rewrite comment for the trust
-// analysis); otherwise the turn span context verbatim.
-func stitchedTraceparent(turn trace.SpanContext, workerHeader string) string {
-	m := workerTraceparentRe.FindStringSubmatch(strings.TrimSpace(workerHeader))
-	if m == nil || m[1] == "0000000000000000" {
-		return traceparentHeader(turn)
-	}
-	return fmt.Sprintf("00-%s-%s-01", turn.TraceID(), m[1])
 }

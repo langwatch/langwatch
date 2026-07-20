@@ -3,7 +3,6 @@ package otelrelay
 import (
 	"bufio"
 	"fmt"
-	"go.opentelemetry.io/otel/trace"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -273,42 +272,4 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 			t.Error("a non-herr body must not be captured as a typed cause")
 		}
 	})
-}
-
-func TestStitchedTraceparent(t *testing.T) {
-	turn := trace.NewSpanContext(trace.SpanContextConfig{
-		TraceID: trace.TraceID{0xaa, 0xbb, 1},
-		SpanID:  trace.SpanID{0x11, 0x22},
-	})
-	turnHeader := traceparentHeader(turn)
-
-	t.Run("keeps the worker's calling span id on the turn's trace", func(t *testing.T) {
-		got := stitchedTraceparent(turn, "00-deadbeefdeadbeefdeadbeefdeadbeef-cafebabecafebabe-01")
-		want := "00-" + turn.TraceID().String() + "-cafebabecafebabe-01"
-		if got != want {
-			t.Fatalf("stitched = %q, want %q", got, want)
-		}
-	})
-
-	t.Run("never forwards the worker's own trace id", func(t *testing.T) {
-		got := stitchedTraceparent(turn, "00-deadbeefdeadbeefdeadbeefdeadbeef-cafebabecafebabe-01")
-		if strings.Contains(got, "deadbeef") {
-			t.Fatalf("worker trace id leaked into %q", got)
-		}
-	})
-
-	for name, header := range map[string]string{
-		"empty":          "",
-		"malformed":      "not-a-traceparent",
-		"zero span id":   "00-deadbeefdeadbeefdeadbeefdeadbeef-0000000000000000-01",
-		"uppercase hex":  "00-DEADBEEFDEADBEEFDEADBEEFDEADBEEF-CAFEBABECAFEBABE-01",
-		"wrong version":  "ff-deadbeefdeadbeefdeadbeefdeadbeef-cafebabecafebabe-01",
-		"trailing extra": "00-deadbeefdeadbeefdeadbeefdeadbeef-cafebabecafebabe-01-extra",
-	} {
-		t.Run("falls back to the turn span for "+name, func(t *testing.T) {
-			if got := stitchedTraceparent(turn, header); got != turnHeader {
-				t.Fatalf("stitched(%q) = %q, want turn header %q", header, got, turnHeader)
-			}
-		})
-	}
 }
