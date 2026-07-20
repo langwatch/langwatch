@@ -66,9 +66,9 @@ Feature: Langy panel layout modes
   Scenario: An open drawer turns Langy into its floating companion
     Given the Langy panel is open
     When a right-anchored drawer opens
-    Then the drawer slides in from the right as usual
-    And the panel re-seats itself as a floating card beside the drawer
-    And the companion card matches the drawer's height and corner radius
+    Then the panel holds the right edge as a floating card
+    And the drawer slides in to the panel's LEFT, yielding the edge
+    And the companion card wears exactly the drawer's chrome: height, radius, hairline, material and shadow
     And a strip of space separates the two cards, both above all content
     And the page content reclaims the dock's reserved width underneath
 
@@ -77,3 +77,8 @@ Feature: Langy panel layout modes
     When the drawer closes
     Then the panel returns to where it was before the drawer opened
     And the dock's room is reserved again
+
+  Scenario: Closing Langy mid-ride returns the drawer to the edge
+    Given the Langy panel is riding beside an open drawer
+    When the panel closes
+    Then the drawer slides back to the viewport's right edge

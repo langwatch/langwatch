@@ -195,55 +195,6 @@ function useViewportWidth(): number {
   return width;
 }
 
-/**
- * The layout width of the widest open drawer, live while `active`.
- *
- * Read off the DOM on purpose: drawers vary in width, render from a registry
- * this panel has no business reaching into, and their width is a layout fact
- * (`offsetWidth` is transform-independent, so the measurement is stable even
- * while the drawer's enter animation is still translating it). A rAF retry
- * covers the mount gap between the drawer state flipping and its portal
- * appearing; a ResizeObserver keeps the number honest across viewport
- * resizes. The WIDEST content wins so the companion clears a nested drawer
- * stack, not just the topmost card.
- */
-function useOpenDrawerWidth(active: boolean): number | null {
-  const [width, setWidth] = useState<number | null>(null);
-  useEffect(() => {
-    if (!active) {
-      setWidth(null);
-      return;
-    }
-    let observer: ResizeObserver | null = null;
-    let raf = 0;
-    let cancelled = false;
-    const attach = () => {
-      if (cancelled) return;
-      const contents = Array.from(
-        document.querySelectorAll<HTMLElement>(
-          '[data-scope="drawer"][data-part="content"], .chakra-drawer__content',
-        ),
-      );
-      if (contents.length === 0) {
-        raf = requestAnimationFrame(attach);
-        return;
-      }
-      const update = () =>
-        setWidth(Math.max(...contents.map((el) => el.offsetWidth)));
-      update();
-      observer = new ResizeObserver(update);
-      for (const el of contents) observer.observe(el);
-    };
-    attach();
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(raf);
-      observer?.disconnect();
-    };
-  }, [active]);
-  return width;
-}
-
 function onLangyProfilerRender(
   id: string,
   phase: "mount" | "update" | "nested-update",
@@ -448,25 +399,18 @@ function LangyPanel({
   const cardGalleryOpen = useLangyStore((s) => s.cardGalleryOpen);
 
   // ── Riding beside an open drawer ──────────────────────────────────────────
-  // Drawers keep the right edge. While one is open, the panel re-seats ITSELF
-  // as a floating companion card beside it: same height, same radius, a strip
-  // of space between the two, above all content. The dock's page reservation
+  // While a drawer is open, the panel HOLDS the right edge as a floating
+  // companion card (the drawer's own chrome: height, radius, material) and
+  // the drawer yields, sliding further left to leave the panel its slot (see
+  // DrawerContent in components/ui/drawer.tsx). The dock's page reservation
   // releases for the ride (see LangyShiftedRoot) and the panel returns to its
-  // place when the drawer closes. The `layout` morph below is what makes the
-  // move read as the panel being pulled along with the drawer.
+  // dock when the drawer closes. The `layout` morph below is what makes the
+  // move read as the pair travelling together.
   // Spec: specs/langy/langy-panel-layout.feature
   const { currentDrawer } = useDrawer();
   const drawerCompanion = isOpen && !!currentDrawer;
-  const drawerWidth = useOpenDrawerWidth(drawerCompanion);
   const viewportWidth = useViewportWidth();
   const floatingPanelWidth = resolveFloatingPanelWidth(viewportWidth);
-  // The drawer card sits 8px off the viewport edge; leave a 12px strip
-  // between the two cards. Clamped so a wide drawer on a narrow viewport
-  // squeezes the companion against the left edge instead of off-screen.
-  const companionRight = Math.min(
-    (drawerWidth ?? 480) + 20,
-    Math.max(12, viewportWidth - SIDEBAR_PANEL_WIDTH - 12),
-  );
 
   const variants = useMemo(
     () => ({
@@ -1422,25 +1366,20 @@ function LangyPanel({
         }
         {...(drawerCompanion
           ? {
-              // Riding beside the open drawer: the panel becomes another
-              // floating card at the drawer's own height and radius, a strip
-              // of space between the two, above all content. Same material as
-              // the drawer card (surface at alpha over the drawer's blur) so
-              // the pair reads as two of the same thing.
+              // Riding beside the open drawer: the panel HOLDS the right
+              // edge as another floating card and the drawer sits to its
+              // left. EXACTLY the drawer's chrome (the app drawer recipe:
+              // surface at alpha over the drawer blur, the same hairline,
+              // radius and shadow) so the pair reads as two of one thing.
               top: "8px",
-              right: `${companionRight}px`,
+              right: "8px",
               bottom: "8px",
               background: "bg.surface/80",
               backdropFilter: "blur(25px)",
               borderWidth: "1px",
-              borderColor: "border.muted",
+              borderColor: "border",
               borderRadius: "lg",
-              boxShadow:
-                "0 1px 2px rgba(20,20,23,0.04), 0 12px 28px rgba(20,20,23,0.10)",
-              _dark: {
-                boxShadow:
-                  "0 1px 2px rgba(0,0,0,0.4), 0 12px 28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
-              },
+              boxShadow: "lg",
             }
           : floating
             ? {

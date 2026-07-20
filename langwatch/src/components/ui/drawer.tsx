@@ -1,6 +1,12 @@
 // eslint-disable-next-line no-restricted-imports
 import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
 import * as React from "react";
+import {
+  LANGY_DOCK_GAP,
+  LANGY_TRANSITION,
+  SIDEBAR_PANEL_WIDTH,
+} from "~/features/langy/logic/langyPanelLayout";
+import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { CloseButton } from "./close-button";
 import { IsolatedErrorBoundary } from "./IsolatedErrorBoundary";
 
@@ -47,6 +53,16 @@ export const DrawerContent = React.forwardRef<
   const marginTopProp =
     rest.marginTop ?? (contextMarginTop ? `${contextMarginTop}px` : undefined);
 
+  // While the Langy panel is open it HOLDS the right edge as a floating
+  // companion card (see LangyPanel's drawer-companion mode); every drawer
+  // yields, sliding further left to leave the panel its slot plus a strip of
+  // space between the two cards. Reactive, so closing the panel mid-drawer
+  // returns the drawer to the edge. Spec: specs/langy/langy-panel-layout.feature
+  const langyOpen = useLangyStore((s) => s.isOpen);
+  const langyYieldMarginEnd = langyOpen
+    ? `${8 + SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP}px`
+    : undefined;
+
   // Crash inside the drawer body should NOT close the drawer. Wrap the
   // children so a render error renders an inline error panel within the
   // drawer frame instead.
@@ -68,6 +84,8 @@ export const DrawerContent = React.forwardRef<
           backdropFilter="blur(25px)"
           {...rest}
           marginTop={marginTopProp}
+          marginEnd={langyYieldMarginEnd}
+          transition={`margin ${LANGY_TRANSITION}`}
           asChild={false}
         >
           {safeChildren}
