@@ -21,7 +21,7 @@ import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/lan
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
 import { connection } from "~/server/redis";
-import { checkProjectPermission, isDemoProjectId } from "../rbac";
+import { checkProjectPermission, isDemoProjectId, type Permission } from "../rbac";
 import { enforceLangyAccess } from "./langyAccessMiddleware";
 import {
   type LangyConversationDetailDto,
@@ -49,50 +49,59 @@ import {
  * the whole Langy surface is this tRPC router plus the live `onTurnStream`
  * subscription — the old Hono `/api/langy/chat` fallback has been removed.
  *
- * Every procedure derives from `langyReadProcedure` (or `langyTurnProcedure`),
- * so they all share the project read permission (`evaluations:view`), the demo
- * refusal, and the authoritative internal-only gate (`enforceLangyAccess`).
+ * Every procedure derives from one of the `langy*Procedure` bases below, so
+ * they all share the demo refusal and the authoritative internal-only gate
+ * (`enforceLangyAccess`), and differ only in which `langy:*` permission they
+ * demand.
  */
 
-const LANGY_READ_PERMISSION = "evaluations:view" as const;
-
 /**
- * Every Langy read/command procedure shares one base with three gates, in
- * order:
- *  1. `checkProjectPermission(evaluations:view)` — can the caller read the
- *     project at all?
- *  2. demo refusal — the demo project grants `evaluations:view` to every
- *     authenticated user, so the permission check alone would expose the
- *     per-user Langy chat that belongs to whoever used Langy there; refuse it
- *     explicitly.
- *  3. `enforceLangyAccess` — the authoritative internal-only rollout gate
- *     (staff bypass, else `release_langy_enabled`), the SAME decision the
- *     `langyGithub` / `langyEgress` routers and the GitHub install route use.
+ * Builds a Langy procedure gated on one `langy:*` permission, with three
+ * gates in order:
+ *  1. `checkProjectPermission(permission)` — may the caller do THIS to the
+ *     project? Reads want `langy:view`; starting a turn wants `langy:create`,
+ *     because it provisions credentials, spawns a worker and spends the
+ *     project's model budget — not something a read grant should buy.
+ *  2. demo refusal — `project:view` is granted to every authenticated user on
+ *     the demo project, so a permission check alone would expose whatever
+ *     Langy chat someone left there; refuse it explicitly.
+ *  3. `enforceLangyAccess` — the authoritative rollout gate, the SAME decision
+ *     the `langyGithub` / `langyEgress` routers and the GitHub install route
+ *     use. Last, so membership is always proven before the flag is read.
+ *
+ * The permission check must be the FIRST `.use()`: `permissionProcedureBuilder`
+ * treats that slot specially and injects `enforcePermissionCheck` after it.
  *
  * `projectId` lives on the base so procedures declare only their own inputs.
  */
-const langyReadProcedure = protectedProcedure
-  .input(z.object({ projectId: z.string() }))
-  .use(checkProjectPermission(LANGY_READ_PERMISSION))
-  .use(async ({ input, next }) => {
-    if (isDemoProjectId(input.projectId)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Langy is not available on the demo project.",
-      });
-    }
-    return next();
-  })
-  .use(enforceLangyAccess);
+const langyProcedure = (permission: Permission) =>
+  protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission(permission))
+    .use(async ({ input, next }) => {
+      if (isDemoProjectId(input.projectId)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Langy is not available on the demo project.",
+        });
+      }
+      return next();
+    })
+    .use(enforceLangyAccess);
+
+const langyReadProcedure = langyProcedure("langy:view");
+const langyCreateProcedure = langyProcedure("langy:create");
+const langyUpdateProcedure = langyProcedure("langy:update");
+const langyDeleteProcedure = langyProcedure("langy:delete");
 
 /**
- * The turn-start procedure: the read gate PLUS the Phase-1 per-user message
+ * The turn-start procedure: `langy:create` PLUS the Phase-1 per-user message
  * rate limit that used to live in the Hono `/langy/chat` handler. Redis-backed;
  * fails open when Redis is down (dev/test stay usable). A limited caller is
  * refused BEFORE reaching the app layer, so it never mints keys or dispatches a
  * turn — exactly the precedence the route enforced.
  */
-const langyTurnProcedure = langyReadProcedure.use(
+const langyTurnProcedure = langyCreateProcedure.use(
   async ({ ctx, input, next }) => {
     const rl = await checkLangyMessageRateLimit({
       userId: ctx.session.user.id,
@@ -383,7 +392,7 @@ export const langyRouter = createTRPCRouter({
    * non-owner (shared) conversation is visible but not deletable and reports
    * `success: false`; the client invalidates the list either way.
    */
-  deleteConversation: langyReadProcedure
+  deleteConversation: langyDeleteProcedure
     .input(z.object({ conversationId: z.string() }))
     .mutation(async ({ input, ctx }): Promise<{ success: boolean }> => {
       const success = await getApp().langy.conversations.deleteById({
@@ -395,7 +404,7 @@ export const langyRouter = createTRPCRouter({
     }),
 
   /** Rename a conversation the caller owns through the event-sourced service. */
-  renameConversation: langyReadProcedure
+  renameConversation: langyUpdateProcedure
     .input(
       z.object({
         conversationId: z.string().min(1),
@@ -414,7 +423,7 @@ export const langyRouter = createTRPCRouter({
     }),
 
   /** Branch a visible conversation into a private, independently editable one. */
-  forkConversation: langyReadProcedure
+  forkConversation: langyCreateProcedure
     .input(z.object({ conversationId: z.string().min(1) }))
     .mutation(async ({ input, ctx }): Promise<LangyConversationDetailDto> => {
       const { conversation } = await getApp().langy.conversations.forkById({

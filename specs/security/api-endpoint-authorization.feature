@@ -187,3 +187,43 @@ Feature: Hono API endpoint authorization and tenant isolation
       When a member lists the project's secrets
       Then the Langy virtual-key secret is not among them
       And deleting or overwriting it by id is rejected as not found
+
+  # ============================================================================
+  Rule: Running Langy is a write, not a read
+
+    Langy used to hang off `evaluations:view`, so a read-only viewer could
+    start a turn — which provisions credentials, spawns an OpenCode worker and
+    spends the project's model budget. It now has its own permission family:
+    view to read conversations, create to start or continue a turn, update to
+    rename, delete to archive. Manage is org-tier as well, where it gates the
+    GitHub App connection that grants Langy repository access for every project
+    underneath.
+
+    Granted from MEMBER upward and to org admins; below that, nothing. The
+    permission grain is not what keeps Langy scarce — the rollout flag is — so
+    it draws the line at "can this person act on the project at all".
+
+    @unit
+    Scenario: Below member, Langy is not granted at all
+      Given a project VIEWER
+      Then they hold no Langy permission
+      And the Langy panel does not render for them
+
+    @unit
+    Scenario: A member can run Langy but cannot administer it
+      Given a project MEMBER
+      Then they may start a turn, rename, and archive
+      But they may not administer Langy
+
+    @unit
+    Scenario: Connecting the organization's GitHub App is admin-only
+      Given an organization member who is not an admin
+      When they try to read or change the organization's Langy GitHub connection
+      Then the request is refused
+      And the Langy rollout flag is never evaluated for that organization
+
+    @unit
+    Scenario: The demo project refuses Langy on every surface
+      Given any authenticated user on the demo project
+      When they read the Langy egress allow-list or open the panel
+      Then the request is refused

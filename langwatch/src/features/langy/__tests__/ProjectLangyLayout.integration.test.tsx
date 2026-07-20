@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // ---------------------------------------------------------------------------
 const gate = {
   flagEnabled: true,
+  permissions: ["langy:view"] as string[],
   project: { id: "project-demo", slug: "demo" } as {
     id: string;
     slug: string;
@@ -43,6 +44,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     },
     organization: { id: "org-1" },
     organizationRole: "MEMBER",
+    hasPermission: (permission: string) => gate.permissions.includes(permission),
   }),
 }));
 
@@ -114,6 +116,7 @@ const openLangy = () =>
 
 beforeEach(() => {
   gate.flagEnabled = true;
+  gate.permissions = ["langy:view"];
   gate.project = { id: "project-demo", slug: "demo" };
   // The store is a module singleton — start every test closed and uncounted.
   useLangyStore.setState({ isOpen: false });
@@ -177,6 +180,16 @@ describe("ProjectLangyLayout", () => {
     /** @scenario "The visibility gate is not widened" */
     it("hides Langy for a team member when the rollout flag is off", () => {
       gate.flagEnabled = false;
+      renderAt("/demo/traces");
+      expect(screen.getByText("traces page")).toBeTruthy();
+      expect(drawer()).toBeNull();
+    });
+
+    it("hides Langy for a team member without langy:view", () => {
+      // A custom role can hold project access without the Langy read grant;
+      // rendering the panel would produce a chat whose every call 401s.
+      gate.flagEnabled = true;
+      gate.permissions = [];
       renderAt("/demo/traces");
       expect(screen.getByText("traces page")).toBeTruthy();
       expect(drawer()).toBeNull();
