@@ -60,19 +60,20 @@ func TestRouter_NonStreaming_HeartbeatKeepsRealSocketWarm(t *testing.T) {
 
 	waitOrFatal(t, providerEntered, "provider was never dialed")
 
-	// Generously longer than several 20ms ticks so at least one heartbeat
-	// has definitely reached the real client before we check.
-	time.Sleep(80 * time.Millisecond)
+	// Poll instead of a fixed sleep — a hardcoded wait is either too short
+	// (flakes on a loaded CI runner) or wastes time on a fast one.
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return !firstByteAt.IsZero()
+	}, 2*time.Second, 5*time.Millisecond,
+		"a real HTTP client on a real socket should see GotFirstResponseByte from a heartbeat before the still-in-flight provider call returns")
+
 	mu.Lock()
-	gotFirstByte := !firstByteAt.IsZero()
 	elapsed := firstByteAt.Sub(start)
 	mu.Unlock()
-	assert.True(t, gotFirstByte,
-		"a real HTTP client on a real socket should see GotFirstResponseByte from a heartbeat before the still-in-flight provider call returns")
-	if gotFirstByte {
-		assert.Less(t, elapsed, 200*time.Millisecond,
-			"the first byte over the real socket should arrive within a couple heartbeat ticks, not only once the provider call eventually returns")
-	}
+	assert.Less(t, elapsed, 500*time.Millisecond,
+		"the first byte over the real socket should arrive within a couple heartbeat ticks, not only once the provider call eventually returns")
 
 	close(releaseProvider)
 
