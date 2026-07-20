@@ -247,7 +247,7 @@ func New(ctx context.Context, opts Options) (*Relay, error) {
 	mux.HandleFunc("/w/{token}/llm/", r.handleLLM)
 
 	r.srv = &http.Server{
-		Handler:           mux,
+		Handler:           r.logRequests(ctx, mux),
 		ReadHeaderTimeout: 10 * time.Second,
 		// No WriteTimeout: the LLM proxy streams SSE for as long as the model
 		// generates.
@@ -358,10 +358,72 @@ func (r *Relay) lookup(token string) *workerEntry {
 func (r *Relay) entryFor(w http.ResponseWriter, req *http.Request) *workerEntry {
 	e := r.lookup(req.PathValue("token"))
 	if e == nil {
+		// The one silent failure mode worth a line of its own: a worker (or its
+		// exporter's shutdown flush) submitting after Unregister, or a token
+		// that never matched. Redacted — the token is a routing credential.
+		clog.Get(r.baseCtx).Warn("otelrelay unknown or expired worker token",
+			zap.String("token_prefix", redactToken(req.PathValue("token"))),
+			zap.String("path_suffix", pathSignal(req.URL.Path)))
 		http.Error(w, "unknown telemetry token", http.StatusNotFound)
 		return nil
 	}
 	return e
+}
+
+// redactToken keeps enough of a routing token to correlate log lines without
+// disclosing the credential.
+func redactToken(token string) string {
+	if len(token) <= 6 {
+		return "…"
+	}
+	return token[:6] + "…"
+}
+
+// pathSignal reduces a relay path to its signal suffix (v1/traces, llm/…)
+// so logs never carry the full token-bearing path.
+func pathSignal(p string) string {
+	if i := strings.LastIndex(p, "/v1/"); i >= 0 {
+		return p[i+1:]
+	}
+	if i := strings.Index(p, "/llm/"); i >= 0 {
+		return "llm"
+	}
+	return "?"
+}
+
+// logRequests is the relay's request line — the surface is low-volume
+// (per-worker OTLP batches + LLM calls), and this hop was completely dark:
+// a worker exporting into a 404 was indistinguishable from a worker not
+// exporting at all. Tokens are redacted; paths are reduced to their signal.
+func (r *Relay) logRequests(ctx context.Context, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(sw, req)
+		clog.Get(ctx).Debug("otelrelay request",
+			zap.String("method", req.Method),
+			zap.String("signal", pathSignal(req.URL.Path)),
+			zap.String("token_prefix", redactToken(req.PathValue("token"))),
+			zap.Int("status", sw.status),
+			zap.Int64("bytes_in", req.ContentLength))
+	})
+}
+
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusWriter) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
+}
+
+// Flush keeps SSE streaming working through the wrapper (the LLM proxy
+// streams responses; losing Flusher would buffer them to death).
+func (s *statusWriter) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 // handleDropSignal accepts-and-drops a non-trace OTLP signal (logs, metrics).
