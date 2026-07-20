@@ -21,15 +21,18 @@
  */
 import { createHash, randomBytes } from "crypto";
 
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import type { IngestionSource, PrismaClient } from "@prisma/client";
 
 import { TRPCError } from "@trpc/server";
+import { createLogger } from "@langwatch/observability";
 
 import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
+import { assertValidPullSchedule } from "@ee/governance/services/pullers/process-manager";
+import { syncIngestionPullSource } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import { encryptParserConfigCredentials } from "./ingestionCredentials";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "./ingestionSource.constants";
 
@@ -71,7 +74,7 @@ export interface CreateIngestionSourceInput {
    * the adapter id + credentials reference.
    */
   pullConfig?: Record<string, unknown> | null;
-  /** Cron schedule for the BullMQ puller worker. Null = use adapter default. */
+  /** Five-field UTC cron schedule for the durable pull process. */
   pullSchedule?: string | null;
   actorUserId: string;
 }
@@ -84,6 +87,7 @@ export interface UpdateIngestionSourceInput {
   parserConfig?: Record<string, unknown>;
   status?: "active" | "disabled" | "awaiting_first_event";
   teamId?: string | null;
+  pullSchedule?: string | null;
 }
 
 export interface CreatedIngestionSource {
@@ -93,6 +97,25 @@ export interface CreatedIngestionSource {
 }
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
+const logger = createLogger("langwatch:governance:ingestion-source");
+
+async function syncPullProcessBestEffort(
+  prisma: PrismaClient,
+  source: IngestionSource,
+): Promise<void> {
+  try {
+    await syncIngestionPullSource({
+      prisma,
+      commands: getApp().commands.ingestionPull,
+      source,
+    });
+  } catch (error) {
+    logger.error(
+      { sourceId: source.id, error },
+      "Failed to sync ingestion pull process; boot reconciliation will retry",
+    );
+  }
+}
 
 export class IngestionSourceService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -131,9 +154,7 @@ export class IngestionSourceService {
    * carries the prior hash with `expiresAt > now`, both hashes match
    * the same source.
    */
-  async findByIngestSecret(
-    rawSecret: string,
-  ): Promise<IngestionSource | null> {
+  async findByIngestSecret(rawSecret: string): Promise<IngestionSource | null> {
     const candidateHash = hashIngestSecret(rawSecret);
     const direct = await this.prisma.ingestionSource.findFirst({
       where: { ingestSecretHash: candidateHash, archivedAt: null },
@@ -148,7 +169,10 @@ export class IngestionSourceService {
     const candidates = await this.prisma.ingestionSource.findMany({
       where: {
         archivedAt: null,
-        parserConfig: { path: ["_rotation", "priorHash"], equals: candidateHash },
+        parserConfig: {
+          path: ["_rotation", "priorHash"],
+          equals: candidateHash,
+        },
       },
     });
     const now = Date.now();
@@ -175,6 +199,9 @@ export class IngestionSourceService {
   async createSource(
     input: CreateIngestionSourceInput,
   ): Promise<CreatedIngestionSource> {
+    if (input.pullSchedule !== null && input.pullSchedule !== undefined) {
+      assertValidPullSchedule(input.pullSchedule);
+    }
     // Defense-in-depth plan gate. Non-enterprise orgs can create up to
     // NON_ENTERPRISE_INGESTION_SOURCE_CAP active sources (composer
     // separately restricts source TYPE to otel_generic for them). This
@@ -238,6 +265,9 @@ export class IngestionSourceService {
         createdById: input.actorUserId,
       },
     });
+    if (source.pullSchedule) {
+      await syncPullProcessBestEffort(this.prisma, source);
+    }
     return { source, ingestSecret };
   }
 
@@ -250,6 +280,9 @@ export class IngestionSourceService {
         `IngestionSource ${input.id} not found in org ${input.organizationId}`,
       );
     }
+    if (input.pullSchedule !== null && input.pullSchedule !== undefined) {
+      assertValidPullSchedule(input.pullSchedule);
+    }
     const data: Prisma.IngestionSourceUpdateInput = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.description !== undefined) data.description = input.description;
@@ -259,15 +292,21 @@ export class IngestionSourceService {
       ) as Prisma.InputJsonValue;
     }
     if (input.status !== undefined) data.status = input.status;
+    if (input.pullSchedule !== undefined)
+      data.pullSchedule = input.pullSchedule;
     if (input.teamId !== undefined) {
       data.team = input.teamId
         ? { connect: { id: input.teamId } }
         : { disconnect: true };
     }
-    return this.prisma.ingestionSource.update({
+    const source = await this.prisma.ingestionSource.update({
       where: { id: existing.id },
       data,
     });
+    if (existing.pullSchedule !== null || source.pullSchedule !== null) {
+      await syncPullProcessBestEffort(this.prisma, source);
+    }
+    return source;
   }
 
   /**
@@ -281,11 +320,14 @@ export class IngestionSourceService {
   ): Promise<{ source: IngestionSource; ingestSecret: string }> {
     const existing = await this.findById(id, organizationId);
     if (!existing) {
-      throw new Error(`IngestionSource ${id} not found in org ${organizationId}`);
+      throw new Error(
+        `IngestionSource ${id} not found in org ${organizationId}`,
+      );
     }
     const newSecret = generateIngestSecret();
     const newHash = hashIngestSecret(newSecret);
-    const priorParser = (existing.parserConfig as Record<string, unknown>) ?? {};
+    const priorParser =
+      (existing.parserConfig as Record<string, unknown>) ?? {};
     const merged = encryptParserConfigCredentials({
       ...priorParser,
       _rotation: {
@@ -306,12 +348,18 @@ export class IngestionSourceService {
   async archive(id: string, organizationId: string): Promise<IngestionSource> {
     const existing = await this.findById(id, organizationId);
     if (!existing) {
-      throw new Error(`IngestionSource ${id} not found in org ${organizationId}`);
+      throw new Error(
+        `IngestionSource ${id} not found in org ${organizationId}`,
+      );
     }
-    return this.prisma.ingestionSource.update({
+    const source = await this.prisma.ingestionSource.update({
       where: { id: existing.id },
       data: { archivedAt: new Date(), status: "disabled" },
     });
+    if (source.pullSchedule) {
+      await syncPullProcessBestEffort(this.prisma, source);
+    }
+    return source;
   }
 
   /**

@@ -25,6 +25,7 @@ export class App {
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
   readonly topicClustering: AppDependencies["topicClustering"] &
     AppCommands["topicClustering"];
+  readonly commands: AppCommands;
   readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
   readonly triggers: AppDependencies["triggers"];
@@ -86,6 +87,7 @@ export class App {
       ...deps.topicClustering,
       ...deps.commands.topicClustering,
     };
+    this.commands = deps.commands;
     this.langy = deps.langy;
     this.ops = deps.ops;
     this.retentionPolicyCache = deps.retentionPolicyCache;

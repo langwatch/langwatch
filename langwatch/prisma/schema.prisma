@@ -3176,6 +3176,37 @@ model TopicClusteringRunProjection {
   @@unique([projectId])
 }
 
+/// Rebuildable per-source pull checkpoint and operator-facing run status.
+model IngestionPullRunProjection {
+  id        String @id
+  sourceId  String @unique
+  projectId String
+
+  Enabled           Boolean @default(false) @map("enabled")
+  Cron              String? @map("cron")
+  Cursor            String? @map("cursor")
+  LastRunAt         Float?  @map("lastRunAt")
+  LastRunOutcome    String? @map("lastRunOutcome")
+  LastRunEventCount Int     @default(0) @map("lastRunEventCount")
+  LastRunError      String? @map("lastRunError")
+  LastRunErrorCode  String? @map("lastRunErrorCode")
+  ConsecutiveErrors Int     @default(0) @map("consecutiveErrors")
+
+  /// Identity of the run whose outcome this row reflects. Outcomes from a
+  /// superseded run arrive with a smaller value and are ignored, so a late
+  /// completion cannot regress Cursor or the status fields.
+  LastRunScheduledFor Float? @map("lastRunScheduledFor")
+
+  CreatedAt         Float  @map("createdAt")
+  UpdatedAt         Float  @map("updatedAt")
+  OccurredAt        Float  @map("occurredAt")
+  AcceptedAt        Float  @map("acceptedAt")
+  LastEventId       String @map("lastEventId")
+  ProjectionVersion String @map("projectionVersion")
+
+  @@index([projectId])
+}
+
 // ============================================================================
 // Langy assistant
 // ============================================================================

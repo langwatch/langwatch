@@ -118,6 +118,7 @@ import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering
 import { PrismaTopicClusteringStatusRepository } from "./topic-clustering/repositories/topic-clustering-status.repository";
 import { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
+import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import {
   SimulationRunStateRepositoryClickHouse,
@@ -899,6 +900,10 @@ export function initializeDefaultApp(options?: {
       },
       runsWorkers: roleRunsWorkers(config.processRole),
     },
+    enterprisePipelines: {
+      prisma,
+      runsWorkers: roleRunsWorkers(config.processRole),
+    },
     projects,
     monitors,
     triggers,
@@ -1485,6 +1490,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordClusteringRunCompleted: noop,
         recordClusteringRunFailed: noop,
       } as AppCommands["topicClustering"],
+      ...createNoopEnterprisePipelineCommands(),
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],
@@ -1504,7 +1510,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         },
       },
       processOutboxWorker: {
-        stop: async () => {},
+        stop: async () => {
+          // Test preset has no background process workers.
+        },
       },
     },
     retentionPolicyCache: testRetentionPolicyCache,

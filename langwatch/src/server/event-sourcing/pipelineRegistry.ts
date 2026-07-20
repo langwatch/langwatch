@@ -11,6 +11,10 @@ import {
   createGovernanceOcsfEventsSyncReactor,
   type GovernanceOcsfEventsSyncReactorDeps,
 } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
+import {
+  registerEnterprisePipelineSet,
+  type EnterprisePipelineSetConfig,
+} from "@ee/event-sourcing/pipelineSet";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
@@ -136,6 +140,7 @@ import {
   OutboxDispatcherService,
   ProcessManagerService,
   ProcessOutboxWorker,
+  ProcessWakeWorker,
   type ProcessStore,
 } from "./process-manager";
 import { createTopicClusteringProcessingPipeline } from "./pipelines/topic-clustering-processing/pipeline";
@@ -295,6 +300,7 @@ export interface PipelineRegistryDeps {
     runPort: TopicClusteringRunPort;
     runsWorkers: boolean;
   };
+  enterprisePipelines: EnterprisePipelineSetConfig;
   projects: ProjectService;
   monitors: MonitorService;
   triggers: TriggerService;
@@ -439,6 +445,23 @@ export class PipelineRegistry {
       this.registerLangyConversationPipeline();
     const { pipeline: topicClusteringPipeline } =
       this.registerTopicClusteringPipeline();
+    const enterprisePipelines = registerEnterprisePipelineSet({
+      ...this.deps.enterprisePipelines,
+      eventSourcing: this.deps.eventSourcing,
+      processStore: this.deps.repositories.processStore,
+    });
+    // Topic clustering's wake-ups are runtime-owned (ADR-052); this worker
+    // scans only the enterprise process managers, so the two never
+    // double-claim.
+    const enterpriseWakeWorker = new ProcessWakeWorker({
+      store: this.deps.repositories.processStore,
+      managers: { ...enterprisePipelines.processManagers },
+      logger,
+      notifyOutbox: () => enterprisePipelines.notifyOutbox(),
+    });
+    if (enterprisePipelines.runsWorkers) {
+      enterpriseWakeWorker.start();
+    }
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -451,6 +474,7 @@ export class PipelineRegistry {
       suiteRuns: mapCommands(suiteRunPipeline.commands),
       langy: mapCommands(langyConversationPipeline.commands),
       topicClustering: mapCommands(topicClusteringPipeline.commands),
+      ...enterprisePipelines.commands,
       billing: mapCommands(billingPipeline.commands),
       automations: automationCommands,
       /** Late-bind the execution pool for scenario execution reactor. */
@@ -461,7 +485,11 @@ export class PipelineRegistry {
       // with EventSourcing.stop(); only Langy still hand-rolls its outbox.
       processOutboxWorker: {
         stop: async () => {
-          await processOutboxWorker.stop();
+          await Promise.all([
+            processOutboxWorker.stop(),
+            enterprisePipelines.stop(),
+            enterpriseWakeWorker.stop(),
+          ]);
         },
       },
     };

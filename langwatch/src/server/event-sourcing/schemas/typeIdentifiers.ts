@@ -17,12 +17,15 @@ import {
   EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
 } from "../pipelines/experiment-run-processing/schemas/constants";
 import {
+  ENTERPRISE_AGGREGATE_TYPE_IDENTIFIERS,
+  ENTERPRISE_COMMAND_TYPE_IDENTIFIERS,
+  ENTERPRISE_EVENT_TYPE_IDENTIFIERS,
+} from "@ee/event-sourcing/typeIdentifiers";
+import {
   LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
 } from "../pipelines/langy-conversation-processing/schemas/constants";
-import {
-  BILLING_REPORTING_COMMAND_TYPES,
-} from "../pipelines/billing-reporting/schemas/constants";
+import { BILLING_REPORTING_COMMAND_TYPES } from "../pipelines/billing-reporting/schemas/constants";
 import {
   SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
   SIMULATION_PROCESSING_EVENT_TYPES,
@@ -58,6 +61,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
   ...SUITE_RUN_PROCESSING_EVENT_TYPES,
   ...LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
   ...TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES,
+  ...ENTERPRISE_EVENT_TYPE_IDENTIFIERS,
   ...TEST_EVENT_TYPES,
 ] as const;
 
@@ -73,6 +77,7 @@ export const COMMAND_TYPE_IDENTIFIERS = [
   ...SUITE_RUN_PROCESSING_COMMAND_TYPES,
   ...LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
   ...TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES,
+  ...ENTERPRISE_COMMAND_TYPE_IDENTIFIERS,
   ...BILLING_REPORTING_COMMAND_TYPES,
 ] as const;
 
@@ -97,6 +102,7 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "suite_run",
   "langy_conversation",
   "topic_clustering",
+  ...ENTERPRISE_AGGREGATE_TYPE_IDENTIFIERS,
   "billing_report",
   "global",
   TEST_AGGREGATE_TYPE,
