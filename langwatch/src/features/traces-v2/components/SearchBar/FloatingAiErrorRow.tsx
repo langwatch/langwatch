@@ -1,4 +1,4 @@
-import { Box, HStack, Icon, Link, Text } from "@chakra-ui/react";
+import { Box, chakra, HStack, Icon, Link, Text } from "@chakra-ui/react";
 import { AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
@@ -56,8 +56,7 @@ export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({
           </Link>
         )}
         {expandable && (
-          <Box
-            as="button"
+          <chakra.button
             aria-label={expanded ? "Hide error details" : "Show error details"}
             onClick={() => setExpanded((v) => !v)}
             cursor="pointer"
@@ -68,7 +67,7 @@ export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({
             <Icon boxSize="11px">
               {expanded ? <ChevronUp /> : <ChevronDown />}
             </Icon>
-          </Box>
+          </chakra.button>
         )}
       </HStack>
       {expanded && (

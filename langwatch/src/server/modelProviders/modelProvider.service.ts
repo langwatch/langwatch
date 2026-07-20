@@ -106,10 +106,13 @@ function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
  * with no custom catalog serves only registry models — it never "lists"
  * anything here.
  */
-export function providerRowServesModel(
-  row: { customModels?: unknown; customEmbeddingsModels?: unknown },
-  bareModel: string,
-): boolean {
+export function providerRowServesModel({
+  row,
+  bareModel,
+}: {
+  row: { customModels?: unknown; customEmbeddingsModels?: unknown };
+  bareModel: string;
+}): boolean {
   const chat = toLegacyCompatibleCustomModels(row.customModels ?? null, "chat");
   const embeddings = toLegacyCompatibleCustomModels(
     row.customEmbeddingsModels ?? null,
@@ -941,7 +944,7 @@ export class ModelProviderService {
       (mp) =>
         mp.provider === params.provider &&
         mp.enabled &&
-        providerRowServesModel(mp, params.bareModel),
+        providerRowServesModel({ row: mp, bareModel: params.bareModel }),
     );
     if (candidates.length === 0) return null;
 

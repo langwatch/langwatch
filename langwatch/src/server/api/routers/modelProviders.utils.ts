@@ -297,7 +297,7 @@ async function resolveServingRow({
   if (
     parsedWire.kind !== "legacy" ||
     !modelProvider.id ||
-    providerRowServesModel(modelProvider, parsedWire.model)
+    providerRowServesModel({ row: modelProvider, bareModel: parsedWire.model })
   ) {
     return modelProvider;
   }

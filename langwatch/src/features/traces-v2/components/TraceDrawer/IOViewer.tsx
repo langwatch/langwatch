@@ -554,7 +554,9 @@ export const IOViewer = memo(function IOViewer({
         )}
         {!collapsed && traceId && <AnnotateButton traceId={traceId} />}
         {!collapsed && traceId && mode === "output" && (
-          <SuggestCorrectionButton traceId={traceId} output={content} />
+          // Corrections must be stored against the REAL output — never the
+          // translated variant the viewer happens to be showing.
+          <SuggestCorrectionButton traceId={traceId} output={originalContent} />
         )}
         {!collapsed && spanType === "llm" && spanId && mode === "input" && (
           <PlaygroundButton spanId={spanId} />
