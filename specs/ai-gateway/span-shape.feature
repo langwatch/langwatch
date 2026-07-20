@@ -174,7 +174,27 @@ Feature: Gateway span shape — mandatory attributes per completed request
     And the PR cannot merge to main
 
   # ─────────────────────────────────────────────────────────────────────────
-  # §8. Out of scope (for now)
+  # §8. VK tags land on customer spans as labels
+  # ─────────────────────────────────────────────────────────────────────────
+  # VK tags exist so operators can slice gateway traffic by team / app /
+  # environment. The trace pipeline already ingests the langwatch.labels
+  # span attribute into metadata.labels, which the Trace Explorer filters
+  # as "Label" — stamping tags there makes gateway traffic sliceable with
+  # zero changes on the explorer side.
+
+  Scenario: Virtual-key tags are stamped on the customer span as labels
+    Given the VK carries tags ["app=nexttrace", "team=offsecops"]
+    When a /v1/messages request completes through the gateway
+    Then the exported customer span has attribute langwatch.labels = ["app=nexttrace", "team=offsecops"]
+    And the trace appears in the Trace Explorer under the "Label" filter for either tag
+
+  Scenario: A VK without tags stamps no labels attribute
+    Given the VK carries no tags
+    When a request completes through the gateway
+    Then the exported customer span has no langwatch.labels attribute
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # §9. Out of scope (for now)
   # ─────────────────────────────────────────────────────────────────────────
 
   # - Vendor-specific embedding-token attributes — embeddings is a narrow

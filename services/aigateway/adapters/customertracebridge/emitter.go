@@ -192,6 +192,12 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	if params.GatewayRequestID != "" {
 		attrs = append(attrs, attribute.String(gatewaytracer.AttrGatewayReqID, params.GatewayRequestID))
 	}
+	// VK tags become the trace's labels: the ingestion pipeline maps the
+	// langwatch.labels attribute into metadata.labels, the field the Trace
+	// Explorer filters as "Label".
+	if len(params.VKTags) > 0 {
+		attrs = append(attrs, attribute.StringSlice(gatewaytracer.AttrLabels, params.VKTags))
+	}
 	// The wrapped tool's own session / conversation id, so multi-turn gateway
 	// traces group under a stable thread instead of having no thread id at all.
 	if sessionID := clientSessionID(ctx, params); sessionID != "" {

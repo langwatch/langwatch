@@ -205,3 +205,13 @@ func TestConfigWire_AbsentTraceProjectIDIsEmpty(t *testing.T) {
 
 	assert.Empty(t, cfg.TraceProjectID)
 }
+
+// VK tags ride the bundle so the gateway can stamp them on customer spans
+// (langwatch.labels) and match cache-rule vk_tags. Before this field existed
+// BundleConfig.VKTags was permanently nil and both consumers were dead.
+func TestConfigWire_VKTags(t *testing.T) {
+	var w configWire
+	require.NoError(t, json.Unmarshal([]byte(`{"vk_tags":["app=nexttrace","team=offsecops"]}`), &w))
+	cfg := w.toDomain()
+	assert.Equal(t, []string{"app=nexttrace", "team=offsecops"}, cfg.VKTags)
+}

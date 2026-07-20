@@ -4,6 +4,10 @@ const (
 	AttrOrigin                    = "langwatch.origin"
 	OriginGateway                 = "gateway"
 	AttrVirtualKeyID              = "langwatch.virtual_key_id"
+	// AttrLabels carries the VK's tags; the trace pipeline ingests this
+	// exact key into metadata.labels (otel.traces.ts), which the Trace
+	// Explorer filters as "Label".
+	AttrLabels = "langwatch.labels"
 	AttrProjectID                 = "langwatch.project_id"
 	AttrTeamID                    = "langwatch.team_id"
 	AttrOrgID                     = "langwatch.organization_id"
