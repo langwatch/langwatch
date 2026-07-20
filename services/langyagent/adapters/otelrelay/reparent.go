@@ -51,6 +51,39 @@ func ReparentOTLP(payload []byte, conversationID, actorUserID string, turn trace
 	return (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
 }
 
+// customerSpanNamePrefixes are the worker span families that carry customer
+// meaning — the ai-sdk gen-ai instrumentation the agent runtime emits around
+// model calls and tool executions. Everything else opencode exports (storage
+// plumbing, session bookkeeping) is operational noise a customer cannot act
+// on; it stays out of their project, and — verified live — its dropped
+// ancestors were breaking parentage for the spans that DO matter.
+var customerSpanNamePrefixes = []string{"ai.", "gen_ai."}
+
+func isCustomerSpanName(name string) bool {
+	for _, p := range customerSpanNamePrefixes {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// FilterCustomerSpans drops every span outside the customer-meaningful
+// families, in place. Runs BEFORE ReparentTraces so the batch-local orphan
+// logic sees exactly the set the customer will receive.
+func FilterCustomerSpans(td ptrace.Traces) {
+	rss := td.ResourceSpans()
+	rss.RemoveIf(func(rs ptrace.ResourceSpans) bool {
+		rs.ScopeSpans().RemoveIf(func(ss ptrace.ScopeSpans) bool {
+			ss.Spans().RemoveIf(func(sp ptrace.Span) bool {
+				return !isCustomerSpanName(sp.Name())
+			})
+			return ss.Spans().Len() == 0
+		})
+		return rs.ScopeSpans().Len() == 0
+	})
+}
+
 // ReparentTraces applies the rewrite in place. Split from ReparentOTLP so the
 // id-rewriting logic unit-tests against pdata values without codec round-trips.
 func ReparentTraces(td ptrace.Traces, conversationID, actorUserID string, turn trace.SpanContext) {

@@ -69,7 +69,7 @@ func contentBatch(t *testing.T) []byte {
 	td := ptrace.NewTraces()
 	ss := td.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty()
 	span := ss.Spans().AppendEmpty()
-	span.SetName("llm.call")
+	span.SetName("ai.streamText")
 	span.SetTraceID(pcommon.TraceID{9})
 	span.SetSpanID(pcommon.SpanID{1})
 	span.Attributes().PutStr("gen_ai.request.model", "gpt-5-mini")
@@ -226,7 +226,7 @@ func TestCustomerForwardStripsForgedOriginMarker(t *testing.T) {
 	rs.Resource().Attributes().PutStr("langwatch.origin", "platform_internal")
 	rs.Resource().Attributes().PutStr("service.name", "opencode")
 	span := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
-	span.SetName("forged")
+	span.SetName("ai.streamText")
 	span.SetTraceID(pcommon.TraceID{7})
 	span.SetSpanID(pcommon.SpanID{2})
 	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
@@ -275,7 +275,7 @@ func TestCustomerForwardDropsUnlistedResourceAttributes(t *testing.T) {
 	rs.Resource().Attributes().PutStr("k8s.pod.name", "worker-pod-7")
 	rs.Resource().Attributes().PutStr("telemetry.sdk.name", "opentelemetry")
 	span := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
-	span.SetName("step")
+	span.SetName("ai.toolCall")
 	span.SetTraceID(pcommon.TraceID{9})
 	span.SetSpanID(pcommon.SpanID{3})
 	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
@@ -385,7 +385,7 @@ func TestCustomerForwardCarriesNoInternalIdentity(t *testing.T) {
 	rs.Resource().Attributes().PutStr("service.name", "langwatch-service-langyagent")
 	rs.Resource().Attributes().PutStr("deployment.environment.name", "lw-prod")
 	span := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
-	span.SetName("step")
+	span.SetName("ai.toolCall")
 	span.SetTraceID(pcommon.TraceID{5})
 	span.SetSpanID(pcommon.SpanID{6})
 	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
@@ -418,4 +418,52 @@ func TestCustomerForwardCarriesNoInternalIdentity(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "langy", origin.Str(),
 		"the platform's own origin stamp must replace the forged one")
+}
+
+// Plumbing spans (storage, session bookkeeping) never reach the customer —
+// and because their dropped ancestors were what broke parentage, the
+// surviving ai.* spans attach cleanly to the turn.
+func TestCustomerForwardFiltersPlumbingSpans(t *testing.T) {
+	customer := startSignallingIngest(t)
+	relay := relayWithInternal(t, "")
+	token, err := relay.Register(WorkerInfo{
+		ConversationID:    "conv-filter",
+		LangwatchEndpoint: customer.srv.URL,
+		LangwatchAPIKey:   "sk-session",
+	})
+	require.NoError(t, err)
+	turn := turnContext()
+	relay.SetTurnContext(token, turn)
+
+	td := ptrace.NewTraces()
+	ss := td.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty()
+	session := ss.Spans().AppendEmpty()
+	session.SetName("SessionProcessor.flushV2Fragments")
+	session.SetSpanID(pcommon.SpanID{7})
+	sql := ss.Spans().AppendEmpty()
+	sql.SetName("sql.execute")
+	sql.SetSpanID(pcommon.SpanID{8})
+	llm := ss.Spans().AppendEmpty()
+	llm.SetName("ai.streamText")
+	llm.SetSpanID(pcommon.SpanID{9})
+	llm.SetParentSpanID(pcommon.SpanID{7}) // parent is plumbing → filtered → orphan
+	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
+	require.NoError(t, err)
+
+	resp, err := http.Post(
+		relay.OTLPEndpointFor(token)+"/v1/traces",
+		"application/x-protobuf",
+		bytes.NewReader(payload),
+	)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	forwarded, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(customer.await(t))
+	require.NoError(t, err)
+	require.Equal(t, 1, forwarded.SpanCount(), "only the ai.* span may reach the customer")
+	span := forwarded.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0)
+	assert.Equal(t, "ai.streamText", span.Name())
+	assert.Equal(t, pcommon.SpanID(turn.SpanID()), span.ParentSpanID(),
+		"with its plumbing ancestor filtered, the span must attach to the turn")
 }

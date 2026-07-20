@@ -536,6 +536,14 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 		r.exportInternal(conversationID, entry.info.Model, turn, internalBody)
 	}
 
+	FilterCustomerSpans(td)
+	if td.SpanCount() == 0 {
+		// Nothing customer-meaningful in this batch (pure plumbing). The
+		// internal copy above already took what it wanted.
+		w.Header().Set("Content-Type", "application/x-protobuf")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	ReparentTraces(td, conversationID, entry.info.ActorUserID, turn)
 	applyCustomerTracePolicy(td, customerTracePolicy)
 	out, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
