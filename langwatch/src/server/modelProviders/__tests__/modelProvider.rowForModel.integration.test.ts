@@ -172,6 +172,7 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
       expect(providers.azure?.scopeType).toBe("PROJECT");
     });
 
+    /** @scenario Model served only by a wider-scope row uses that row's credentials */
     it("prepares the call with the org row's credentials for the org-catalog model", async () => {
       const providers = await service().getProjectModelProviders(projectId);
       const params = await prepareLitellmParams({
@@ -183,6 +184,7 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
       expect(params.api_base).toBe("https://org-resource.openai.azure.com");
     });
 
+    /** @scenario Model served by several rows uses the narrowest scope */
     it("keeps the project row's credentials for a model its catalog lists", async () => {
       const providers = await service().getProjectModelProviders(projectId);
       const params = await prepareLitellmParams({
@@ -194,6 +196,7 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
       expect(params.api_base).toBe("https://old-resource.openai.azure.com");
     });
 
+    /** @scenario Embeddings models follow the same row-selection rule */
     it("routes embeddings models to the row whose embeddings catalog lists them", async () => {
       const providers = await service().getProjectModelProviders(projectId);
       const params = await prepareLitellmParams({
@@ -204,6 +207,7 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
       expect(params.api_key).toBe(`sk-org-${ns}`);
     });
 
+    /** @scenario Disabled rows never serve a model even when their catalog lists it */
     it("never swaps to a disabled row even when its catalog lists the model", async () => {
       // Disable the org row; the project row (collapse winner) stays.
       const providers = await service().getProjectModelProviders(projectId);
@@ -262,6 +266,7 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
       );
     });
 
+    /** @scenario Model served by no row keeps the collapse winner */
     it("keeps the collapse winner (narrowest enabled row)", async () => {
       const providers = await service().getProjectModelProviders(projectId);
       const params = await prepareLitellmParams({

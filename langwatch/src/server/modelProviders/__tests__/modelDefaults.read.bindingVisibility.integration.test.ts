@@ -154,6 +154,8 @@ describe("Default Models visibility for role-binding-only members (real DB)", ()
   }
 
   describe("when the member's project access comes from a TEAM-scope binding", () => {
+    /** @scenario Batch project check honours a team-scoped binding */
+    /** @scenario Batch project check still denies projects of other teams */
     it("batch project check matches the per-project check", async () => {
       const perProject = await hasProjectPermission(
         memberCtx(),
@@ -180,6 +182,7 @@ describe("Default Models visibility for role-binding-only members (real DB)", ()
       expect(batch.projects.get(otherTeamProjectId)).toBe(false);
     });
 
+    /** @scenario Default Models list is visible to members whose access comes from role bindings */
     it("lists the project-scoped configs in the Default Models snapshot", async () => {
       const snapshot = await getDefaultModelsSnapshot(memberCtx(), {
         projectId: projectAId,
