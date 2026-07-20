@@ -373,6 +373,22 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/[project]/automations")),
       },
       {
+        path: "/:project/automations/automations",
+        ...page(() => import("./pages/[project]/automations/automations")),
+      },
+      {
+        path: "/:project/automations/alerts",
+        ...page(() => import("./pages/[project]/automations/alerts")),
+      },
+      {
+        path: "/:project/automations/schedules",
+        ...page(() => import("./pages/[project]/automations/schedules")),
+      },
+      {
+        path: "/:project/automations/activity",
+        ...page(() => import("./pages/[project]/automations/activity")),
+      },
+      {
         path: "/:project/datasets",
         ...page(() => import("./pages/[project]/datasets")),
       },
@@ -387,6 +403,10 @@ const routes: RouteObject[] = [
       {
         path: "/:project/evaluations",
         ...page(() => import("./pages/[project]/evaluations")),
+      },
+      {
+        path: "/:project/online-evaluations",
+        ...page(() => import("./pages/[project]/online-evaluations")),
       },
       {
         path: "/:project/evaluations/new",

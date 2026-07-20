@@ -19,16 +19,16 @@ import { Dialog } from "../ui/dialog";
 import { Select } from "../ui/select";
 import { toaster } from "../ui/toaster";
 
-export const CopyEvaluationDialog = ({
+export const CopyExperimentDialog = ({
   open,
   onClose,
   experimentId,
-  evaluationName,
+  experimentName,
 }: {
   open: boolean;
   onClose: () => void;
   experimentId: string;
-  evaluationName: string;
+  experimentName: string;
 }) => {
   const { organizations, project } = useOrganizationTeamProject();
   const session = useRequiredSession();
@@ -103,8 +103,8 @@ export const CopyEvaluationDialog = ({
       await utils.experiments.getAllForEvaluationsList.invalidate();
 
       toaster.create({
-        title: "Evaluation replicated",
-        description: `Evaluation "${evaluationName}" replicated successfully to ${targetProjectPath}.`,
+        title: "Experiment replicated",
+        description: `Experiment "${experimentName}" replicated successfully to ${targetProjectPath}.`,
         type: "success",
       });
 
@@ -113,7 +113,7 @@ export const CopyEvaluationDialog = ({
       // Skip toast if the global license handler already showed the upgrade modal
       if (isHandledByGlobalHandler(error)) return;
       toaster.create({
-        title: "Error replicating evaluation",
+        title: "Error replicating experiment",
         description: error instanceof Error ? error.message : "Unknown error",
         type: "error",
       });
@@ -124,7 +124,7 @@ export const CopyEvaluationDialog = ({
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
       <Dialog.Content bg="bg" onClick={(e) => e.stopPropagation()}>
         <Dialog.Header>
-          <Dialog.Title>Replicate Evaluation</Dialog.Title>
+          <Dialog.Title>Replicate Experiment</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <VStack gap={4} align={"start"}>

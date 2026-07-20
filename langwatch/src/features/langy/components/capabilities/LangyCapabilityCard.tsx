@@ -18,6 +18,7 @@ import {
   Bot,
   Boxes,
   Check,
+  CheckSquare,
   Coins,
   Cpu,
   Database,
@@ -27,8 +28,8 @@ import {
   Key,
   KeyRound,
   LayoutDashboard,
-  MessagesSquare,
   type LucideIcon,
+  MessagesSquare,
   Network,
   RadioTower,
   ShieldCheck,
@@ -57,6 +58,7 @@ const SURFACE_ICON: Record<CapabilitySurface, LucideIcon> = {
   analytics: BarChart3,
   experiments: FlaskConical,
   evaluations: ShieldCheck,
+  evaluators: CheckSquare,
   datasets: Database,
   prompts: FileText,
   dashboards: LayoutDashboard,
@@ -139,6 +141,8 @@ export function LangyCapabilityCard({
   icon?: CapabilityIconName;
 }) {
   const { color, Icon } = toneOverline(tone, surface, icon);
+  const showDeepLink = deepLink ?? true;
+  const hasActions = actions !== undefined && actions !== null;
 
   return (
     <VStack
@@ -184,10 +188,10 @@ export function LangyCapabilityCard({
 
       {children}
 
-      {(deepLink ?? true) || actions ? (
+      {showDeepLink || hasActions ? (
         <HStack gap={2} justify="space-between" align="center" flexWrap="wrap">
           <Box>{actions}</Box>
-          {(deepLink ?? true) ? (
+          {showDeepLink ? (
             <CapabilityDeepLinkChip
               surface={surface}
               projectSlug={projectSlug}
@@ -274,12 +278,13 @@ export function CapabilityRow({
   primary: ReactNode;
   secondary?: ReactNode;
 }) {
+  const hasSecondary = secondary !== undefined && secondary !== null;
   const body = (
     <VStack align="stretch" gap={0} flex={1} minWidth={0}>
       <Text textStyle="xs" color="fg" truncate>
         {primary}
       </Text>
-      {secondary ? (
+      {hasSecondary ? (
         <Text textStyle="2xs" color="fg.muted" truncate>
           {secondary}
         </Text>

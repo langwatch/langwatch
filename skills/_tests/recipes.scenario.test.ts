@@ -7,6 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
 import {
+  copyFixtureToWorkDir,
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
@@ -85,8 +86,9 @@ describe("Recipes", () => {
         path.join(os.tmpdir(), "langwatch-recipe-rag-dataset-")
       );
 
-      fs.cpSync(path.resolve(__dirname, "fixtures/python-rag-agent"), tempFolder, {
-        recursive: true,
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-rag-agent",
+        workingDirectory: tempFolder,
       });
       copyRecipeSkillToWorkDir(tempFolder, "generate-rag-dataset");
 
@@ -184,8 +186,9 @@ describe("Recipes", () => {
         path.join(os.tmpdir(), "langwatch-recipe-compliance-")
       );
 
-      fs.cpSync(path.resolve(__dirname, "fixtures/python-health-agent"), tempFolder, {
-        recursive: true,
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-health-agent",
+        workingDirectory: tempFolder,
       });
       copyRecipeSkillToWorkDir(tempFolder, "test-compliance");
 
@@ -277,8 +280,9 @@ describe("Recipes", () => {
         path.join(os.tmpdir(), "langwatch-recipe-debug-instrumentation-")
       );
 
-      fs.cpSync(path.resolve(__dirname, "fixtures/python-openai"), tempFolder, {
-        recursive: true,
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-openai",
+        workingDirectory: tempFolder,
       });
       copyRecipeSkillToWorkDir(tempFolder, "debug-instrumentation");
 

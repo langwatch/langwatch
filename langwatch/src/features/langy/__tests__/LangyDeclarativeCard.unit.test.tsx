@@ -15,9 +15,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { CliResultDigest } from "@langwatch/cli-cards";
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CapabilityData } from "../hooks/useCapabilityData";
-import { LangyDeclarativeCard } from "../components/capabilities/LangyDeclarativeCard";
 import { resolveCapability } from "../components/capabilities/capabilityRegistry";
+import { LangyDeclarativeCard } from "../components/capabilities/LangyDeclarativeCard";
+import type { CapabilityData } from "../hooks/useCapabilityData";
 
 // The hydration seam is mocked: these tests pin RENDERING per hydration state;
 // the hook's own resolution rules live in useCapabilityData.unit.test.tsx.
@@ -117,7 +117,9 @@ describe("LangyDeclarativeCard", () => {
         renderCard({ name: "langwatch.evaluator.list", output });
 
         const row = screen.getByText("Faithfulness").closest("a");
-        expect(row?.getAttribute("href")).toBe("/acme/evaluations/eval_1");
+        expect(row?.getAttribute("href")).toBe(
+          "/acme/evaluators?drawer.open=evaluatorViewer&drawer.evaluatorId=eval_1",
+        );
       });
     });
   });
@@ -270,7 +272,7 @@ describe("LangyDeclarativeCard", () => {
       it("still offers the way into the surface", () => {
         renderCard({ name: "langwatch.evaluator.list", output: truncated });
 
-        expect(screen.getByText(/Open in Evaluations/)).toBeTruthy();
+        expect(screen.getByText(/Open in Evaluators/)).toBeTruthy();
       });
     });
   });
@@ -284,9 +286,7 @@ describe("LangyDeclarativeCard", () => {
         });
 
         expect(screen.getByText("Governance is set up")).toBeTruthy();
-        expect(
-          screen.getByText("All ingestion sources healthy"),
-        ).toBeTruthy();
+        expect(screen.getByText("All ingestion sources healthy")).toBeTruthy();
       });
     });
   });

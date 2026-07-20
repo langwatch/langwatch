@@ -22,6 +22,7 @@ import { Box, Button, Flex, HStack, Portal, Text } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTraceExplorerTourPreference } from "../hooks/useTraceExplorerTourPreference";
 import { useOnboardingStore } from "../store/onboardingStore";
 import type { Spotlight, SpotlightContext } from "./spotlights";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "./spotlights";
@@ -495,6 +496,7 @@ export function HighlightRing({
  * the filter sidebar's descriptor list.
  */
 export function SpotlightOverlay(): React.ReactElement | null {
+  const { dismiss: persistDismissal } = useTraceExplorerTourPreference();
   const spotlightsActive = useOnboardingStore((s) => s.spotlightsActive);
   const currentSpotlightId = useOnboardingStore((s) => s.currentSpotlightId);
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
@@ -622,11 +624,12 @@ export function SpotlightOverlay(): React.ReactElement | null {
   }, [resolved?.id]);
 
   const handleDismiss = useCallback(() => {
+    persistDismissal();
     setSpotlightsActive(false);
     setCurrentSpotlightId(null);
     writeSpotlightFragment(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [persistDismissal, setCurrentSpotlightId, setSpotlightsActive]);
 
   if (!spotlightsActive || !resolved || !anchorRect) return null;
 

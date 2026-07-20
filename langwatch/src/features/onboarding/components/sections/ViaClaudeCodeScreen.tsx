@@ -11,8 +11,9 @@ import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 import {
   PROMPT_AGENT_PERFORMANCE,
-  PROMPT_EVALUATIONS,
+  PROMPT_EXPERIMENTS,
   PROMPT_LEVEL_UP,
+  PROMPT_ONLINE_EVALUATIONS,
   PROMPT_PROMPTS,
   PROMPT_SCENARIOS,
   PROMPT_TRACING,
@@ -41,11 +42,18 @@ interface SkillItem {
 
 const SKILLS: SkillItem[] = [
   {
-    id: "evaluations",
-    label: "Set up evaluations for your agent",
-    prompt: PROMPT_EVALUATIONS,
-    installCommand: "npx skills add langwatch/skills/evaluations",
-    slashCommand: "/evaluations",
+    id: "experiments",
+    label: "Run experiments for your agent",
+    prompt: PROMPT_EXPERIMENTS,
+    installCommand: "npx skills add langwatch/skills/experiments",
+    slashCommand: "/experiments",
+  },
+  {
+    id: "online-evaluations",
+    label: "Set up online evaluations and guardrails",
+    prompt: PROMPT_ONLINE_EVALUATIONS,
+    installCommand: "npx skills add langwatch/skills/online-evaluations",
+    slashCommand: "/online-evaluations",
   },
   {
     id: "scenarios",

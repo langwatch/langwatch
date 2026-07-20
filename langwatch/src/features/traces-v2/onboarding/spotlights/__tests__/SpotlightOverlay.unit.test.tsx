@@ -26,6 +26,7 @@ const mockSetSpotlightsActive = vi.fn((v: boolean) => {
 const mockSetCurrentSpotlightId = vi.fn((id: string | null) => {
   mockCurrentSpotlightId = id;
 });
+const mockPersistDismissal = vi.fn();
 
 vi.mock("../../store/onboardingStore", () => ({
   useOnboardingStore: (selector: (s: unknown) => unknown) =>
@@ -35,6 +36,14 @@ vi.mock("../../store/onboardingStore", () => ({
       setSpotlightsActive: mockSetSpotlightsActive,
       setCurrentSpotlightId: mockSetCurrentSpotlightId,
     }),
+}));
+
+vi.mock("../../hooks/useTraceExplorerTourPreference", () => ({
+  useTraceExplorerTourPreference: () => ({
+    dismiss: mockPersistDismissal,
+    isDismissed: false,
+    isResolved: true,
+  }),
 }));
 
 // Stub history.replaceState so fragment writes don't throw in jsdom
@@ -188,6 +197,15 @@ describe("<SpotlightOverlay />", () => {
         fireEvent.click(dismissBtn);
         expect(mockSetCurrentSpotlightId).toHaveBeenCalledWith(null);
       });
+
+      it("persists dismissal for the authenticated user", async () => {
+        renderOverlay();
+        const skipButton = await waitFor(() =>
+          screen.getByRole("button", { name: /skip tour/i }),
+        );
+        fireEvent.click(skipButton);
+        expect(mockPersistDismissal).toHaveBeenCalledOnce();
+      });
     });
 
     describe("when on the last spotlight and user clicks Done", () => {
@@ -207,6 +225,7 @@ describe("<SpotlightOverlay />", () => {
         );
         fireEvent.click(doneBtn);
         expect(mockSetSpotlightsActive).toHaveBeenCalledWith(false);
+        expect(mockPersistDismissal).toHaveBeenCalledOnce();
       });
     });
 
@@ -265,6 +284,7 @@ describe("<SpotlightOverlay />", () => {
         );
         fireEvent.keyDown(window, { key: "Escape" });
         expect(mockSetSpotlightsActive).toHaveBeenCalledWith(false);
+        expect(mockPersistDismissal).toHaveBeenCalledOnce();
       });
     });
   });

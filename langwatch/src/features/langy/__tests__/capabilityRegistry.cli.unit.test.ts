@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { FEATURES } from "~/shared/langy/featureMap";
+import { CAPABILITY_CATALOG } from "../components/capabilities/capabilityCatalog";
 import {
   buildResourceHref,
   buildSurfaceHref,
   resolveCapability,
   SURFACE_BY_FEATURE,
 } from "../components/capabilities/capabilityRegistry";
-import { CAPABILITY_CATALOG } from "../components/capabilities/capabilityCatalog";
-import { FEATURES } from "~/shared/langy/featureMap";
 
 describe("resolveCapability, given a LangWatch CLI tool call", () => {
   describe("when the CLI searched traces", () => {
@@ -192,6 +192,32 @@ describe("buildResourceHref, given a row-level deep link", () => {
           resourceId: "trace_1",
         }),
       ).toBe("/acme/messages/trace_1");
+    });
+  });
+
+  describe("when online evaluations and evaluators have distinct destinations", () => {
+    it("opens a monitor from Online Evaluations", () => {
+      expect(
+        buildResourceHref({
+          surface: "evaluations",
+          projectSlug: "acme",
+          resourceId: "monitor_1",
+        }),
+      ).toBe(
+        "/acme/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=monitor_1",
+      );
+    });
+
+    it("opens a reusable evaluator from the Evaluators library", () => {
+      expect(
+        buildResourceHref({
+          surface: "evaluators",
+          projectSlug: "acme",
+          resourceId: "evaluator_1",
+        }),
+      ).toBe(
+        "/acme/evaluators?drawer.open=evaluatorViewer&drawer.evaluatorId=evaluator_1",
+      );
     });
   });
 

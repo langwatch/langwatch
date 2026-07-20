@@ -38,6 +38,7 @@ export const CAPABILITY_SURFACES = [
   "analytics",
   "experiments",
   "evaluations",
+  "evaluators",
   "datasets",
   "prompts",
   "dashboards",
@@ -190,7 +191,7 @@ export const CAPABILITY_CATALOG = {
     noun: { singular: "workflow", plural: "workflows" },
   },
   evaluator: {
-    surface: "evaluations",
+    surface: "evaluators",
     digestStrategy: "id-ref",
     noun: { singular: "evaluator", plural: "evaluators" },
   },

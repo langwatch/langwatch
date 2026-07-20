@@ -7,6 +7,8 @@ import path from "path";
 // too). Recipes are NOT listed here; they are auto-discovered.
 export const FEATURE_SKILLS = [
   "tracing",
+  "experiments",
+  "online-evaluations",
   "evaluations",
   "scenarios",
   "prompts",
@@ -22,43 +24,43 @@ export const FEATURE_SKILLS = [
 export const NATIVE_ONLY_SKILLS = ["github"] as const;
 
 export interface PublishedSkill {
-  slug: string; // unique skill name
-  src: string; // absolute path to the canonical SKILL.mdx
-  isRecipe: boolean; // recipes publish nested under recipes/<slug>; Langy flattens them
+	slug: string; // unique skill name
+	src: string; // absolute path to the canonical SKILL.mdx
+	isRecipe: boolean; // recipes publish nested under recipes/<slug>; Langy flattens them
 }
 
 // The single definition of the public set: curated FEATURE_SKILLS plus every
 // recipe under skills/recipes/. The native set below extends this, so everything
 // published also ships with Langy while product-only capabilities stay private.
 export function listPublishedSkills(skillsRoot: string): PublishedSkill[] {
-  const out: PublishedSkill[] = FEATURE_SKILLS.map((slug) => ({
-    slug,
-    src: path.join(skillsRoot, slug, "SKILL.mdx"),
-    isRecipe: false,
-  }));
+	const out: PublishedSkill[] = FEATURE_SKILLS.map((slug) => ({
+		slug,
+		src: path.join(skillsRoot, slug, "SKILL.mdx"),
+		isRecipe: false,
+	}));
 
-  const recipesDir = path.join(skillsRoot, "recipes");
-  if (fs.existsSync(recipesDir)) {
-    const names = fs
-      .readdirSync(recipesDir, { withFileTypes: true })
-      .filter((e) => e.isDirectory())
-      .map((e) => e.name)
-      .sort(); // deterministic output across machines
-    for (const name of names) {
-      const src = path.join(recipesDir, name, "SKILL.mdx");
-      if (fs.existsSync(src)) out.push({ slug: name, src, isRecipe: true });
-    }
-  }
-  return out;
+	const recipesDir = path.join(skillsRoot, "recipes");
+	if (fs.existsSync(recipesDir)) {
+		const names = fs
+			.readdirSync(recipesDir, { withFileTypes: true })
+			.filter((e) => e.isDirectory())
+			.map((e) => e.name)
+			.sort(); // deterministic output across machines
+		for (const name of names) {
+			const src = path.join(recipesDir, name, "SKILL.mdx");
+			if (fs.existsSync(src)) out.push({ slug: name, src, isRecipe: true });
+		}
+	}
+	return out;
 }
 
 export function listNativeSkills(skillsRoot: string): PublishedSkill[] {
-  return [
-    ...listPublishedSkills(skillsRoot),
-    ...NATIVE_ONLY_SKILLS.map((slug) => ({
-      slug,
-      src: path.join(skillsRoot, slug, "SKILL.mdx"),
-      isRecipe: false,
-    })),
-  ];
+	return [
+		...listPublishedSkills(skillsRoot),
+		...NATIVE_ONLY_SKILLS.map((slug) => ({
+			slug,
+			src: path.join(skillsRoot, slug, "SKILL.mdx"),
+			isRecipe: false,
+		})),
+	];
 }

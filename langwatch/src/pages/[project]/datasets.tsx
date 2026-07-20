@@ -265,9 +265,10 @@ function DatasetsPage() {
                 <Text>
                   To learn more about datasets, please visit our{" "}
                   <Link
-                    color="orange.400"
                     href="https://docs.langwatch.ai/datasets/overview"
+                    color="inherit"
                     isExternal
+                    textDecoration="underline"
                   >
                     documentation
                   </Link>

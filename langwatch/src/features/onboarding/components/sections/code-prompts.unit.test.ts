@@ -4,8 +4,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   PROMPT_AGENT_PERFORMANCE,
-  PROMPT_EVALUATIONS,
+  PROMPT_EXPERIMENTS,
   PROMPT_LEVEL_UP,
+  PROMPT_ONLINE_EVALUATIONS,
   PROMPT_PROMPTS,
   PROMPT_SCENARIOS,
   PROMPT_TRACING,
@@ -68,41 +69,45 @@ function longestAtTokenComponent(text: string): AtTokenProbe {
 describe("code-prompts Gemini CLI compatibility (issue #3104)", () => {
   const prompts: Array<{ name: string; text: string }> = [
     { name: "PROMPT_TRACING", text: PROMPT_TRACING },
-    { name: "PROMPT_EVALUATIONS", text: PROMPT_EVALUATIONS },
+    { name: "PROMPT_EXPERIMENTS", text: PROMPT_EXPERIMENTS },
+    {
+      name: "PROMPT_ONLINE_EVALUATIONS",
+      text: PROMPT_ONLINE_EVALUATIONS,
+    },
     { name: "PROMPT_SCENARIOS", text: PROMPT_SCENARIOS },
     { name: "PROMPT_PROMPTS", text: PROMPT_PROMPTS },
     { name: "PROMPT_AGENT_PERFORMANCE", text: PROMPT_AGENT_PERFORMANCE },
     { name: "PROMPT_LEVEL_UP", text: PROMPT_LEVEL_UP },
   ];
 
-  describe.each(prompts)(
-    "given $name pasted into Gemini CLI",
-    ({ name, text }) => {
-      describe("when Gemini's atCommandProcessor scans the prompt", () => {
-        /** @scenario 'Pasting the tracing setup prompt does not crash Gemini CLI' */
-        /** @scenario 'Pasting the "level up" prompt does not crash Gemini CLI' */
-        it(`extracts no path component longer than ${MAX_COMPONENT_LENGTH} bytes`, () => {
-          const { match, longestComponent } = longestAtTokenComponent(text);
-          expect(
-            longestComponent.length,
-            `${name} would have Gemini CLI lstat a ${longestComponent.length}-byte ` +
-              `component (NAME_MAX=${NAME_MAX}). Full match excerpt: ` +
-              JSON.stringify(match.slice(0, 120)),
-          ).toBeLessThanOrEqual(MAX_COMPONENT_LENGTH);
-        });
-
-        it("does not embed @langwatch/mcp-server inside a JSON string literal", () => {
-          // The crash trigger in issue #3104 is the sequence
-          //   "@langwatch/mcp-server"
-          // inside a JSON block: the closing `"` kicks off Gemini's
-          // `"[^"]*"` alternative, which eats across newlines through the
-          // rest of the JSON. Forbidding the exact pattern makes the regex
-          // match terminate at the next whitespace instead.
-          expect(text).not.toContain('"@langwatch/mcp-server"');
-        });
+  describe.each(prompts)("given $name pasted into Gemini CLI", ({
+    name,
+    text,
+  }) => {
+    describe("when Gemini's atCommandProcessor scans the prompt", () => {
+      /** @scenario 'Pasting the tracing setup prompt does not crash Gemini CLI' */
+      /** @scenario 'Pasting the "level up" prompt does not crash Gemini CLI' */
+      it(`extracts no path component longer than ${MAX_COMPONENT_LENGTH} bytes`, () => {
+        const { match, longestComponent } = longestAtTokenComponent(text);
+        expect(
+          longestComponent.length,
+          `${name} would have Gemini CLI lstat a ${longestComponent.length}-byte ` +
+            `component (NAME_MAX=${NAME_MAX}). Full match excerpt: ` +
+            JSON.stringify(match.slice(0, 120)),
+        ).toBeLessThanOrEqual(MAX_COMPONENT_LENGTH);
       });
-    },
-  );
+
+      it("does not embed @langwatch/mcp-server inside a JSON string literal", () => {
+        // The crash trigger in issue #3104 is the sequence
+        //   "@langwatch/mcp-server"
+        // inside a JSON block: the closing `"` kicks off Gemini's
+        // `"[^"]*"` alternative, which eats across newlines through the
+        // rest of the JSON. Forbidding the exact pattern makes the regex
+        // match terminate at the next whitespace instead.
+        expect(text).not.toContain('"@langwatch/mcp-server"');
+      });
+    });
+  });
 
   describe("given PROMPT_TRACING as the primary regression target", () => {
     describe("when Node.js lstat'es the worst extracted @-token", () => {
