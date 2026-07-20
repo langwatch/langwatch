@@ -97,7 +97,7 @@ export function extractLiteMemberRestrictionInfo(
   if (!(error instanceof TRPCClientError)) return null;
   if (error.data?.code !== "UNAUTHORIZED") return null;
 
-  const handledError = error.data?.domainError as
+  const handledError = error.data?.error as
     | { code?: string; kind?: string; meta?: { resource?: string } }
     | undefined;
 

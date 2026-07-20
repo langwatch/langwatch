@@ -44,11 +44,11 @@ function classifyError(error: unknown, traceId: string | undefined): ErrorKind {
         code?: string;
         // `kind` is the deprecated pre-`HandledError` discriminant, read as a
         // fallback so this resolves across the transition.
-        domainError?: { code?: string; kind?: string };
+        error?: { code?: string; kind?: string };
       };
     }
   )?.data;
-  const domainCode = data?.domainError?.code ?? data?.domainError?.kind;
+  const domainCode = data?.error?.code ?? data?.error?.kind;
   if (domainCode === "trace_not_found") return "not-found";
   if (data?.code === "NOT_FOUND") return "not-found";
   return "load-failed";

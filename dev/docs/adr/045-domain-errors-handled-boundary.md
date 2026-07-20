@@ -29,7 +29,7 @@ abstract `Error` subclass carrying a serialisable `code`, `meta`,
 - **tRPC** (`src/server/api/trpc.ts`): a `handledErrorMiddleware` converts a
   `HandledError` thrown in a procedure into a correctly-coded `TRPCError` (via
   `handledErrorToTRPCCode`), and the `errorFormatter` calls `.serialize()` and
-  attaches the result to the error's `data.domainError`.
+  attaches the result to the error's `data.error`.
 - **Hono** (`src/app/api/middleware/error-handler.ts`, wired by every
   `createServiceApp` at `SecuredApp.onError`): a `HandledError` becomes
   `{ error: code, message, ...meta }` at its `httpStatus`.
@@ -71,10 +71,10 @@ Concretely:
 
 3. **The boundary only serialises handled errors.** The presence of a serialised
    domain payload IS the signal of "handled":
-   - tRPC: `data.domainError` is the `SerializedHandledError`, or `null`.
+   - tRPC: `data.error` is the `SerializedHandledError`, or `null`.
    - Hono: a `HandledError` yields `{ error: code, message, ...meta }`; an
      unhandled error yields a generic internal response.
-   - An unhandled error carries **no** `domainError` payload. Its raw detail is
+   - An unhandled error carries **no** `error` payload. Its raw detail is
      **logged server-side with the trace id**, never presented to the client as
      an actionable error. Clients render it as a single generic "something went
      wrong" plus the trace id for support (`HandledError.toUserMessage` already
@@ -100,7 +100,7 @@ Concretely:
 
 7. **The client is the single place that decides presentation.** A shared reader
    (`readHandledError`, already used by
-   `src/features/automations/logic/errorExplainer.ts`) lifts `data.domainError`;
+   `src/features/automations/logic/errorExplainer.ts`) lifts `data.error`;
    an `explain*`-style mapping keyed on `code` turns it into user-facing copy and
    an optional action/render choice. The server never dictates UI; it emits the
    typed fact, the client renders it. Absence of a domain payload → the generic
@@ -210,7 +210,7 @@ trace-link builder via `src/server/handled-error-wiring.ts`, loaded by
 in tool error text. All remediation copy lives in one registry
 (`src/server/app-layer/error-remediation.ts`), with a CI test asserting every
 docs link resolves to a real page. SSE error frames
-(`server/routes/sse.ts`) carry the serialized `domainError` alongside
+(`server/routes/sse.ts`) carry the serialized handled error alongside
 the message; non-handled stream failures now degrade to the generic unknown
 message instead of leaking raw error text onto an already-200 stream.
 Log levels follow the fault axis on every boundary: tRPC, Hono REST
@@ -218,6 +218,67 @@ Log levels follow the fault axis on every boundary: tRPC, Hono REST
 design: TS defaults `fault` to `"customer"`, while Go `herr` leaves it unset
 (only explicitly annotated codes get one) — an unset Go fault logs at info,
 matching the pre-existing Go behavior for expected control-flow errors.
+
+## Amendment 2026-07-20: the wire message is the code, and one `error` object
+
+The boundary was sanitising the *payload* but not the *message*. A
+`HandledError`'s message was treated as vetted user copy and passed straight
+through, so `langy.createConversation` returned
+`"LW_GATEWAY_BASE_URL is not configured on the control plane."` as the wire
+message next to a perfectly clean serialised payload. That message is written
+for whoever is reading the logs — it names env vars, hostnames and internal
+services — and it was reaching browsers, REST callers and the chat stream.
+
+**A handled error's free-text message never crosses a boundary.** Every
+transport sends the stable `code` where a message is required:
+
+- **tRPC** — `message` is the code; `data.error` is the `SerializedHandledError`
+  (renamed from `data.domainError`), or `null`.
+- **Hono** — `message` is the code; the code, `meta`, `reasons`, `tips`,
+  `docsUrl` and `fault` carry everything a caller needs.
+- **Streams** (`sse.ts`, `scenario-generate.ts`) — the frame's `message` /
+  `error` string is the code, with the serialised payload beside it.
+- **Go `herr`** — already correct: `toErrorBody` defaults `Message` to the code,
+  and free text appears only when a caller explicitly sets `Meta["message"]`.
+
+`SerializedHandledError` has no `message` field, and that is deliberate — the
+structured payload IS the contract, and presentation stays client-side (point 7
+above). Consumers with no explainer (CLI, API, MCP, agents) read `tips` and
+`docsUrl`, which exist precisely to be safe, authored remediation copy. **If an
+error needs prose for those consumers, add tips — never widen the message.**
+
+**`data.zodError` is gone.** A `ZodError` is promoted to the shared
+`ValidationError` (mirroring what Hono already did), so validation travels the
+one handled-error channel and its issues ride in `meta.fieldErrors` /
+`meta.formErrors` like every other domain fact. It had no client consumers.
+
+### Two deliberate asymmetries
+
+Consistency stops where an external contract begins. Both of these are load
+bearing, not oversights:
+
+1. **Go keeps `type`, not `code`.** The AI Gateway's envelope is
+   OpenAI-compatible (`docs/ai-gateway/api/errors.mdx`) so that the `openai` and
+   Anthropic SDKs raise their usual typed exceptions unchanged. `type` is their
+   field name; renaming it breaks every SDK pointed at the gateway.
+2. **Hono stays flat at the root.** Nesting the body under an `error` key would
+   read better, but `error` is already a string there, and the Python SDK
+   (`better_raise_for_status`), the TS SDK's legacy path and `directUpload.ts`
+   all read it as one. Changing it is a breaking change to published SDKs and
+   needs its own migration, not a drive-by.
+
+### Known follow-up
+
+`data.cause` is still a parallel channel for `ModelNotConfiguredError`,
+`AiCallFailedError`, `ModelProviderDisabledError` and limit info, because those
+are plain `Error`s rather than `HandledError`s. Converting them collapses that
+channel into `data.error.meta` and deletes the three special cases in
+`handledErrorMiddleware`. Worth doing; out of scope here.
+
+Roughly 150 UI sites render a tRPC error's `.message` straight into a toast.
+For unhandled errors that is unchanged, but a handled one now shows its code
+slug. Each is a missing explainer entry — the fix is copy at the call site, and
+never re-widening the wire.
 
 ## References
 

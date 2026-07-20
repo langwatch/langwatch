@@ -106,7 +106,11 @@ function handledErrorToResponse({
     isVersioned,
     body: {
       code: serialized.code,
-      message: err.message ?? serialized.code,
+      // The code, never `err.message`. A HandledError's message is server copy
+      // — it can name env vars, hostnames or internal services (ADR-045) — and
+      // this body goes to external API callers. Consumers that need prose read
+      // `tips` / `docsUrl`, which are authored for exactly that.
+      message: serialized.code,
       meta: serialized.meta,
       reasons: serialized.reasons,
       traceId: serialized.traceId,

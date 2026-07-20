@@ -163,17 +163,17 @@ export function readLangyStreamError(
   };
 }
 
-/** Read a Langy domain error off a tRPC client error (`error.data.domainError`). */
+/** Read a Langy domain error off a tRPC client error (`error.data.error`). */
 export function readLangyTrpcError(err: unknown): LangyDomainError | null {
   const domain = readHandledError(err);
   if (!domain) return null;
   const serialized = (
     err as {
       data?: {
-        domainError?: { traceId?: unknown; reasons?: unknown };
+        error?: { traceId?: unknown; reasons?: unknown };
       };
     }
-  )?.data?.domainError;
+  )?.data?.error;
   const traceId = serialized?.traceId;
   return {
     ...domain,

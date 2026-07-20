@@ -12,15 +12,14 @@ export interface HandledErrorShape {
   httpStatus: number;
 }
 
-/** Reads `error.data.domainError` from any tRPC client error, returning null
+/** Reads `error.data.error` from any tRPC client error, returning null
  *  when the cause was not one of our handled errors (e.g. an infrastructure
- *  failure or a Zod parse error). Validates the shape before returning so a
+ *  failure). Validates the shape before returning so a
  *  malformed payload can't crash `explainHandledError` on `domain.meta.*`
  *  access — the helper trusts `unknown` input and a misconfigured server
  *  shouldn't take the UI with it. */
 export function readHandledError(err: unknown): HandledErrorShape | null {
-  const candidate = (err as { data?: { domainError?: unknown } })?.data
-    ?.domainError;
+  const candidate = (err as { data?: { error?: unknown } })?.data?.error;
   if (!candidate || typeof candidate !== "object") return null;
 
   const value = candidate as {
