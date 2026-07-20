@@ -2,6 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { InternalServerError } from "../../shared/errors";
 import { handleError } from "../error-handler";
 
@@ -124,6 +125,29 @@ describe("handleError()", () => {
       expect(body).not.toHaveProperty("tips");
       expect(body).not.toHaveProperty("docsUrl");
       expect(body.fault).toBe("customer");
+    });
+  });
+
+  describe("when error is a ModelNotConfiguredError", () => {
+    it("returns 400 with the missing-model cause instead of a generic 500", async () => {
+      const error = new ModelNotConfiguredError(
+        "evaluator.create_default",
+        "DEFAULT",
+        "Evaluator default model",
+        "project_123",
+      );
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.cause).toBe("MODEL_NOT_CONFIGURED");
+      expect(body.featureKey).toBe("evaluator.create_default");
+      expect(body.role).toBe("DEFAULT");
+      expect(body.featureDisplayName).toBe("Evaluator default model");
+      expect(body.projectId).toBe("project_123");
+      expect(body.message).toContain("No model configured");
     });
   });
 

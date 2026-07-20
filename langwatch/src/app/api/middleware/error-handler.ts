@@ -4,6 +4,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { HandledError } from "@langwatch/handled-error";
 import { NotFoundError as PromptNotFoundError } from "~/server/prompt-config/errors";
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import {
   grafanaConfigFromEnv,
   grafanaLinksForTrace,
@@ -97,6 +98,26 @@ function determineErrorResponse(
         ...(tips?.length ? { tips } : {}),
         ...(docsUrl ? { docsUrl } : {}),
         ...(fault ? { fault } : {}),
+      },
+    };
+  }
+
+  // ModelNotConfiguredError: a project tried an action that needs a resolved
+  // model (e.g. creating an evaluator) with no provider configured at any
+  // scope. This is a real, common first-touch case for a fresh project, not
+  // a server fault — give the caller (UI or an API/MCP client) the same
+  // structured cause the tRPC interceptor already surfaces on the wire
+  // (`utils/trpcError.ts::extractMissingModelInfo`), instead of falling
+  // through to the generic 500 below.
+  if (error instanceof ModelNotConfiguredError) {
+    return {
+      statusCode: 400,
+      response: {
+        ...errorSchema.parse({
+          error: "model_not_configured",
+          message: error.message,
+        }),
+        ...error.toResponseBody(),
       },
     };
   }
