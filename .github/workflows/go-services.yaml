@@ -122,6 +122,20 @@ jobs:
             echo "NetworkPolicy should NOT render by default"; exit 1
           fi
 
+      # Regression guard: shutdown.preDrainWaitSeconds / timeoutSeconds
+      # previously looked configurable in values.yaml but never reached the
+      # container (no env var wiring in configmap.yaml, no
+      # lifecycle.WithDrainDelay call in serve.go) — the values were
+      # fiction. This asserts the ConfigMap actually carries them through.
+      - name: Assert shutdown timing values reach the ConfigMap
+        run: |
+          if ! grep -q 'SERVER_DRAIN_DELAY_SECONDS: "5"' /tmp/defaults.yaml; then
+            echo "SERVER_DRAIN_DELAY_SECONDS missing/wrong in rendered ConfigMap (expected shutdown.preDrainWaitSeconds default of 5)"; exit 1
+          fi
+          if ! grep -q 'SERVER_GRACEFUL_SECONDS: "15"' /tmp/defaults.yaml; then
+            echo "SERVER_GRACEFUL_SECONDS missing/wrong in rendered ConfigMap (expected shutdown.timeoutSeconds default of 15)"; exit 1
+          fi
+
       - name: helm dependency update (umbrella)
         working-directory: charts/langwatch
         run: helm dependency update

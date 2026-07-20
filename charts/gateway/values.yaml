@@ -186,19 +186,25 @@ containerSecurityContext:
 
 # Graceful drain timing. On SIGTERM the pod flips /readyz to 503 so
 # the LB / Service endpoint controller stops routing new traffic, waits
-# preDrainWait for that removal to propagate, then calls server.Shutdown
-# which blocks up to `timeout` for in-flight handlers to finish. Operators
-# watch `gateway_in_flight_requests` to see drain progress.
+# preDrainWaitSeconds for that removal to propagate, then calls
+# server.Shutdown, which blocks up to `timeoutSeconds` for in-flight
+# handlers to finish (pkg/lifecycle.Group.Run — see configmap.yaml for how
+# these two reach the container as SERVER_DRAIN_DELAY_SECONDS /
+# SERVER_GRACEFUL_SECONDS).
 #
-# terminationGracePeriodSeconds (pod spec) MUST exceed preDrainWait +
-# timeout + a few seconds of slack, or the kubelet force-kills the pod
-# mid-drain.
+# Plain integer seconds, not duration strings ("5s"/"15s") — the Go side
+# (pkg/config.Server.DrainDelaySeconds / GracefulSeconds) is a plain int,
+# parsed as a raw number; there's no unit suffix to strip.
+#
+# terminationGracePeriodSeconds (pod spec) MUST exceed preDrainWaitSeconds +
+# timeoutSeconds + a few seconds of slack, or the kubelet force-kills the
+# pod mid-drain.
 shutdown:
-  preDrainWait: 5s
-  timeout: 15s
-# terminationGracePeriodSeconds is computed from preDrainWait + timeout
-# + 5s slack. Operators with slow LB propagation can override this
-# directly AND bump preDrainWait accordingly.
+  preDrainWaitSeconds: 5
+  timeoutSeconds: 15
+# terminationGracePeriodSeconds is computed from preDrainWaitSeconds +
+# timeoutSeconds + 5s slack. Operators with slow LB propagation can
+# override this directly AND bump preDrainWaitSeconds accordingly.
 terminationGracePeriodSeconds: 30
 
 # Edge protection. Caps request body size so a misconfigured (or

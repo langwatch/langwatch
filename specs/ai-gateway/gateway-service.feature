@@ -106,6 +106,66 @@ Feature: Gateway service — public HTTP surface and operational basics
       Then it boots normally
       And a warning is logged
 
+  Rule: Graceful shutdown window is actually configurable, and checked against the heartbeat interval
+
+    # Found during review of #4806's heartbeat fix: charts/gateway/values.yaml
+    # documented shutdown.preDrainWait/timeout with a whole invariant-with-
+    # terminationGracePeriodSeconds comment block, but neither value ever
+    # reached the container (configmap.yaml never set the env vars,
+    # serve.go never called lifecycle.WithDrainDelay at all) — the chart
+    # values were fiction. Distinct from the "Graceful SIGTERM drain (iter
+    # 24)" rule above, which describes a fuller 4-phase mechanism this does
+    # not claim to fully verify.
+    #
+    # shutdown.preDrainWaitSeconds/timeoutSeconds actually reaching the
+    # container (ConfigMap SERVER_DRAIN_DELAY_SECONDS / SERVER_GRACEFUL_SECONDS)
+    # is verified in .github/workflows/go-services.yaml's `helm` job — a
+    # rendered-template grep assertion, the same pattern this file already
+    # uses for NetworkPolicy. Not written as a Scenario here because the
+    # feature-parity checker only scans Go/TS/Python/Bats test files, not
+    # CI YAML steps — there'd be no way to bind it, and @unimplemented would
+    # falsely claim it isn't tested when it is, just not in a format the
+    # checker recognizes.
+
+    @unit @regression
+    Scenario: stock defaults already fail the graceful-vs-heartbeat check
+      Given GracefulSeconds is 10 (the stock default)
+      And the effective non-streaming heartbeat interval is 45s (the stock default)
+      When the gateway starts
+      Then a WARN log "graceful_shutdown_shorter_than_heartbeat_interval" is emitted
+
+    @unit @regression
+    Scenario: graceful window at or above the heartbeat interval does not warn
+      Given GracefulSeconds is at least the effective heartbeat interval
+      When the gateway starts
+      Then no graceful_shutdown_shorter_than_heartbeat_interval warning is emitted
+
+    @unit @regression
+    Scenario: disabled heartbeating skips the check entirely
+      Given the non-streaming heartbeat interval is negative (disabled)
+      And GracefulSeconds is very small
+      When the gateway starts
+      Then no graceful_shutdown_shorter_than_heartbeat_interval warning is emitted
+
+    @unit @regression
+    Scenario: an explicit zero-or-negative graceful window skips the check
+      Given GracefulSeconds is 0 or negative
+      When the gateway starts
+      Then no graceful_shutdown_shorter_than_heartbeat_interval warning is emitted
+
+    @unit @regression
+    Scenario: an unset heartbeat interval resolves to the default before comparing
+      Given the non-streaming heartbeat interval is unset (zero)
+      And GracefulSeconds is below the resolved default heartbeat interval
+      When the gateway starts
+      Then the warning compares against the resolved 45s default, not literal zero
+
+    @unit @regression
+    Scenario: SERVER_DRAIN_DELAY_SECONDS reaches Server.DrainDelaySeconds
+      Given env SERVER_DRAIN_DELAY_SECONDS=7
+      When the gateway loads its configuration
+      Then Server.DrainDelaySeconds is 7
+
   Rule: Request body size cap (iter 23, `79b46bf`)
 
     # The gateway enforces a per-request body size limit BEFORE auth / dispatch
