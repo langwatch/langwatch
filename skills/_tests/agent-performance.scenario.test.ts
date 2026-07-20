@@ -62,7 +62,7 @@ describe("Agent Performance Skill", () => {
               "Agent presented concrete findings with numbers (counts, costs, latencies, or rates), not raw JSON dumps",
               "Agent backed findings with specific example traces (trace IDs or trace links)",
               "Agent produced an HTML report file and told the user where it is",
-              "Agent recommended the agent-improvement skill as the next step (running it or installing it via `npx skills add langwatch/skills/agent-improvement`)",
+              "Agent recommended the agent-improve skill as the next step (running it or installing it via `npx skills add langwatch/skills/agent-improve`)",
               "Agent did NOT modify any code or create any platform resources (read-only diagnosis)",
             ],
           }),

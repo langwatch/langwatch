@@ -239,7 +239,7 @@ This skill reads production traffic and answers: what is my agent doing, where i
 2. Export evidence with \`langwatch trace export --format jsonl --limit 1000\` and mine it locally: failure patterns, dissatisfied users, token cost hotspots, edge cases, behavior changes between time windows, outliers.
 3. Read representative traces in full with \`langwatch trace get <traceId>\` and keep 2-3 example trace IDs per finding.
 4. Write a self-contained agent-performance-report.html where every finding links to real example traces, then summarize the top findings with numbers in the conversation.
-5. Close by recommending the agent-improvement skill to turn findings into tested changes (\`npx skills add langwatch/skills/agent-improvement\`).
+5. Close by recommending the agent-improve skill to turn findings into tested changes (\`npx skills add langwatch/skills/agent-improve\`).
 
 ## Common Mistakes
 

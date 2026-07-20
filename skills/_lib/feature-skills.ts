@@ -11,7 +11,7 @@ export const FEATURE_SKILLS = [
   "scenarios",
   "prompts",
   "agent-performance",
-  "agent-improvement",
+  "agent-improve",
   "level-up",
   "datasets",
 ] as const;

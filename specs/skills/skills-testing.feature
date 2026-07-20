@@ -223,7 +223,7 @@ Feature: Scenario tests for skills quality assurance
     Then the agent runs `langwatch analytics query` with one or more metric presets
     And the agent exports or inspects traces with `langwatch trace export`, `langwatch trace search`, or `langwatch trace get`
     And the agent writes an HTML report whose findings link to example traces
-    And the agent recommends the agent-improvement skill as the next step
+    And the agent recommends the agent-improve skill as the next step
     And the agent does NOT use any MCP tools
 
   # ──────────────────────────────────────────────────

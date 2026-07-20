@@ -27,7 +27,7 @@ describe("Agent Improvement Skill", () => {
     "proposes evidence-backed hypotheses and explains them before building anything",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-agent-improvement-")
+        path.join(os.tmpdir(), "langwatch-skill-agent-improve-")
       );
 
       // A sample agent codebase gives the proposals something concrete to
@@ -40,7 +40,7 @@ describe("Agent Improvement Skill", () => {
 
       installSkillToWorkDir({
         workingDirectory: tempFolder,
-        skillSubpath: "agent-improvement",
+        skillSubpath: "agent-improve",
       });
 
       const result = await scenario.run({
@@ -68,7 +68,7 @@ describe("Agent Improvement Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
-            assertSkillWasRead(state, "agent-improvement");
+            assertSkillWasRead(state, "agent-improve");
           },
           scenario.user(
             "the first hypothesis makes sense to me, go ahead and set it up as you proposed. Keep it minimal: create the artifact and show it to me, no need to run the app or install anything heavy"

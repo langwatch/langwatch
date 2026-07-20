@@ -43,9 +43,9 @@
       {
         "boldPrefix": "⭐",
         "title": "What should I do next to improve my agent?",
-        "skill": "langwatch/skills/agent-improvement",
-        "slashCommand": "/agent-improvement",
-        "promptFile": "agent-improvement.docs.txt"
+        "skill": "langwatch/skills/agent-improve",
+        "slashCommand": "/agent-improve",
+        "promptFile": "agent-improve.docs.txt"
       },
       {
         "title": "How is my agent performing?",

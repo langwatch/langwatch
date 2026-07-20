@@ -7,8 +7,8 @@
     "userPrompt": "Where can I improve our agent development best practices?"
   },
   {
-    "id": "agent-improvement",
-    "label": "Agent improvement",
+    "id": "agent-improve",
+    "label": "Agent improve",
     "description": "Turns production evidence into tested improvements for your AI agent. Forms hypotheses from real traces and analytics, explains the reasoning behind each one, then executes with the user: scenario tests that reproduce production failures, prompt and code changes as reviewable PRs, new evaluators and monitors that capture production signals, and experiments that settle open questions. Use when you want to know what to do next to improve your agent.",
     "category": "skill",
     "userPrompt": "What should I do next to improve my agent?"
