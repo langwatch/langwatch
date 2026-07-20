@@ -36,7 +36,13 @@ export const tracerMiddleware = (options?: TracerOptions) => {
         spanName,
         {
           kind: SpanKind.SERVER,
-          attributes: options?.name ? { "service.name": options.name } : void 0,
+          // `service.name` is a resource attribute, set once at SDK init to
+          // identify the process (`langwatch-app`). Setting it per span
+          // overrode that identity with a route-family label, so the family
+          // gets its own attribute instead.
+          attributes: options?.name
+            ? { "service.family": options.name }
+            : void 0,
         },
         async (span) => {
           try {
