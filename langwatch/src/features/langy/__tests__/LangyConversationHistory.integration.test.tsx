@@ -452,6 +452,13 @@ vi.mock("~/utils/api", async () => {
           return useScenarioInfiniteListQuery(input, enabled);
         },
       },
+      modelsAllowed: {
+        useQuery: () => ({
+          data: { modelsAllowed: null },
+          isLoading: false,
+          isError: false,
+        }),
+      },
       messages: {
         useQuery: (
           input: { projectId: string; conversationId: string },

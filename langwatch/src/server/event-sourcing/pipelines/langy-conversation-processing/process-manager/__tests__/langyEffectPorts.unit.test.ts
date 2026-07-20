@@ -205,6 +205,7 @@ describe("createLangyEffectPorts", () => {
     ).rejects.toThrow("redis down");
     expect(deps.revokeSessionKey).toHaveBeenCalledWith({
       apiKeyId: "key-recovered",
+      projectId: PROJECT,
     });
   });
 

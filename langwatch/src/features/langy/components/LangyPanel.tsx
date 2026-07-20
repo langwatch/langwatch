@@ -34,7 +34,6 @@ import {
   useState,
 } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { isLangyManagedVk } from "~/components/gateway/langyVk";
 import { allModelOptions } from "~/components/ModelSelector";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { toaster } from "~/components/ui/toaster";
@@ -77,6 +76,7 @@ import { useLangyConversationCommands } from "../data/useLangyConversationComman
 import { useLangyMessages } from "../data/useLangyMessages";
 import type { LangyMessageDto } from "../data/langy.dtos";
 import { useLangyFreshness } from "../hooks/useLangyFreshness";
+import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydration";
 import {
   createLangyChatTransport,
   type LangyTurnRequestContext,
@@ -610,27 +610,18 @@ function LangyPanel({
 
   // The project's Langy VK carries an optional `modelsAllowed` allowlist. When
   // set, the composer's picker is narrowed to exactly those models; when
-  // null/empty it falls back to all of the project's provider models.
-  const virtualKeysQuery = api.virtualKeys.list.useQuery(
-    { organizationId: organizationId ?? "" },
+  // null/empty it falls back to all of the project's provider models. Served
+  // as its own field — the VK itself is product-managed and no longer reaches
+  // the client.
+  const modelsAllowedQuery = api.langy.modelsAllowed.useQuery(
+    { projectId: projectId ?? "" },
     {
-      enabled: !!organizationId,
+      enabled: !!projectId,
       staleTime: 300_000,
       refetchOnWindowFocus: false,
     },
   );
-  const langyModelsAllowed = useMemo<string[] | null>(() => {
-    const langyVk = virtualKeysQuery.data?.find(
-      (vk) =>
-        isLangyManagedVk(vk) &&
-        vk.scopes.some(
-          (s) => s.scopeType === "PROJECT" && s.scopeId === projectId,
-        ),
-    );
-    const allowed = (langyVk?.config as { modelsAllowed?: string[] | null })
-      ?.modelsAllowed;
-    return allowed && allowed.length > 0 ? allowed : null;
-  }, [virtualKeysQuery.data, projectId]);
+  const langyModelsAllowed = modelsAllowedQuery.data?.modelsAllowed ?? null;
 
   const modelOptions = useMemo(
     () => langyModelsAllowed ?? allModelOptions,
@@ -767,6 +758,48 @@ function LangyPanel({
     }
   }, [activeConversationId, applyHistoryToEngine]);
 
+  const isBusy = status === "submitted" || status === "streaming";
+
+  // Foreign-turn re-hydration. A turn this client did NOT drive (another tab, a
+  // recovered/again-driven turn, a programmatic caller) grows the open
+  // conversation's durable history; `useLangyFreshness` invalidates the
+  // `langy.messages` query on the id-only signal. Reflect that growth in the
+  // engine so the open thread updates without a manual refresh — the engine is
+  // what renders, and the user-selection gate above only re-hydrates on an
+  // explicit open. Four guards keep it from clobbering the live path:
+  //   - a pending user selection owns the engine — let that effect apply it;
+  //   - a live self-driven turn (submitted/streaming) owns the engine;
+  //   - a refetch in flight (isFetchingHistory) — wait for it to settle;
+  //   - apply ONLY when durable is AHEAD of the engine, never shrinking it, so a
+  //     momentarily-stale refetch at a turn's settle boundary can't flash the
+  //     pre-answer history.
+  useEffect(() => {
+    const durableCount = historyMessages.filter(
+      (m) => m.role === "user" || m.role === "assistant",
+    ).length;
+    if (
+      !shouldRehydrateEngineFromDurable({
+        isHistoryLoadPending: historyLoadConversationId !== null,
+        isStreaming: isBusy,
+        isFetchingHistory,
+        hasActiveConversation: activeConversationId !== null,
+        durableMessageCount: durableCount,
+        engineMessageCount: messages.length,
+      })
+    ) {
+      return;
+    }
+    applyHistoryToEngine(historyMessages);
+  }, [
+    historyLoadConversationId,
+    isBusy,
+    isFetchingHistory,
+    activeConversationId,
+    historyMessages,
+    messages.length,
+    applyHistoryToEngine,
+  ]);
+
   // A failed recents list surfaces INSIDE the panel as a dismissable Langy
   // domain-error card — never a toast: the panel is open (a closed panel
   // doesn't even run the query — see useLangyConversationListQuery), so the
@@ -795,7 +828,6 @@ function LangyPanel({
   // and the open conversation's status stay fresh without heavy polling.
   useLangyFreshness(activeConversationId);
 
-  const isBusy = status === "submitted" || status === "streaming";
   const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
   const canDrainQueuedMessages = !isBusy && !serverTurnInFlight;
   const isEmpty = messages.length === 0;

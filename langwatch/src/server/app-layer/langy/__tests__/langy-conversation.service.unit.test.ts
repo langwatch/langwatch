@@ -33,6 +33,7 @@ function makeRepo(
     findActiveOwnedIds: vi.fn(async () => []),
     findPendingHandoff: vi.fn(async () => null),
     findRunToken: vi.fn(async () => null),
+    turnExists: vi.fn(async () => false),
   };
   return { ...defaults, ...overrides };
 }

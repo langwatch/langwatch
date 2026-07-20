@@ -5,6 +5,7 @@ import { batchProjectPermissions, type Permission } from "~/server/api/rbac";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { getLangWatchTracer } from "langwatch";
+import { getLangySessionKeysCounter } from "~/server/metrics";
 
 const logger = createLogger("langwatch:langy:api-key");
 const tracer = getLangWatchTracer("langwatch.langy.api-key");
@@ -125,6 +126,14 @@ export type LangySessionKeyRevocation =
  *     REFUSED, even with a valid internal secret and a real key id. A manager
  *     that is compromised, confused, or fed a bad id cannot use this to take a
  *     customer's API keys offline.
+ *   - It is TENANT-SCOPED: the key must belong to `projectId` (the tenant the
+ *     turn ran for, which the manager holds on the worker's credentials). The
+ *     session key is minted with a PROJECT-scoped role binding, so this is the
+ *     project it was scoped to. Without it, a bearer-secret holder could look a
+ *     key up by id alone and revoke ANY tenant's live session key — the id is
+ *     the only thing gating it otherwise. `not_found` when the key exists but
+ *     under a different project, so the response never confirms a cross-tenant
+ *     id.
  *   - It can only revoke. There is no minting counterpart, by design: revocation
  *     is fail-closed (the worst outcome is the manager destroying its own
  *     access), whereas a mint endpoint would let whoever holds the internal
@@ -137,13 +146,27 @@ export type LangySessionKeyRevocation =
 export async function revokeLangySessionApiKey({
   prisma,
   apiKeyId,
+  projectId,
 }: {
   prisma: PrismaClient;
   apiKeyId: string;
+  projectId: string;
 }): Promise<LangySessionKeyRevocation> {
   const key = await prisma.apiKey.findUnique({
     where: { id: apiKeyId },
-    select: { id: true, name: true, revokedAt: true },
+    select: {
+      id: true,
+      name: true,
+      revokedAt: true,
+      // The PROJECT-scoped binding the session key is minted with is the
+      // tenant anchor: a match proves this key belongs to the calling turn's
+      // project, not some other tenant's.
+      roleBindings: {
+        where: { scopeType: "PROJECT", scopeId: projectId },
+        select: { id: true },
+        take: 1,
+      },
+    },
   });
   if (!key) return "not_found";
 
@@ -156,12 +179,23 @@ export async function revokeLangySessionApiKey({
     return "refused";
   }
 
+  // Tenant scope: the key exists and is a session key, but it is not this
+  // project's. Report not-found so a cross-tenant id is never confirmed.
+  if (key.roleBindings.length === 0) {
+    logger.warn(
+      { apiKeyId, projectId },
+      "refusing to revoke a langy session key that is not scoped to this project",
+    );
+    return "not_found";
+  }
+
   if (key.revokedAt) return "already_revoked";
 
   await prisma.apiKey.update({
     where: { id: apiKeyId },
     data: { revokedAt: new Date() },
   });
+  getLangySessionKeysCounter("revoked").inc();
   return "revoked";
 }
 
@@ -198,6 +232,12 @@ export async function reapExpiredLangySessionApiKeys({
     },
     data: { revokedAt: now },
   });
+  if (count > 0) {
+    // Reaped keys mean revoke-on-worker-death missed — a small steady rate is
+    // normal (SIGKILLed managers), a jump means the fast path is broken.
+    getLangySessionKeysCounter("reaped").inc(count);
+    logger.info({ count }, "reaped expired langy session keys");
+  }
   return count;
 }
 
@@ -343,7 +383,10 @@ export async function mintLangySessionApiKey({
     async () =>
       service.create({
         // Reserved name — hidden from the API-keys UI so per-session keys don't
-        // clutter the list (see HIDDEN_SYSTEM_KEY_NAMES).
+        // clutter the list (see HIDDEN_SYSTEM_KEY_NAMES). `isSystemManaged` is
+        // what lets this path claim the name customer entry points are
+        // refused.
+        isSystemManaged: true,
         name: LANGY_SESSION_API_KEY_NAME,
         description:
           "Ephemeral per-session key for the Langy assistant. Mirrors your own " +
@@ -362,5 +405,6 @@ export async function mintLangySessionApiKey({
       }),
   );
 
+  getLangySessionKeysCounter("minted").inc();
   return { token, apiKeyId: apiKey.id };
 }

@@ -12,6 +12,8 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Markdown } from "~/components/Markdown";
 import { RedactedInline } from "~/components/ui/RedactedField";
 import type { RouterOutputs } from "~/utils/api";
+import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
+import { useTextTranslation } from "../../../hooks/useTextTranslation";
 import type { TraceListItem } from "../../../types/trace";
 import {
   abbreviateModel,
@@ -61,8 +63,8 @@ interface ChatTurnRowProps {
 
 export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   turn,
-  userText,
-  assistantText,
+  userText: originalUserText,
+  assistantText: originalAssistantText,
   assistantReasoning,
   gapSecs,
   showGap,
@@ -76,6 +78,24 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
     () => onSelect(turn.traceId),
     [onSelect, turn.traceId],
   );
+
+  // Per-turn translate-to-English (specs/traces-v2/message-translation
+  // .feature): the separator's action row toggles it, and both bubbles
+  // swap between original and translated text. Sliced to the translate
+  // endpoint's payload cap so a pathological turn can't become one
+  // giant prompt.
+  const translation = useTextTranslation({
+    texts: useMemo(
+      () => ({
+        user: originalUserText.slice(0, TRANSLATE_TEXT_MAX_CHARS),
+        assistant: originalAssistantText.slice(0, TRANSLATE_TEXT_MAX_CHARS),
+      }),
+      [originalUserText, originalAssistantText],
+    ),
+  });
+  const userText = translation.displayTexts.user ?? originalUserText;
+  const assistantText =
+    translation.displayTexts.assistant ?? originalAssistantText;
 
   const annotationSummary = useMemo(() => {
     if (annotationItems.length === 0) return undefined;
@@ -126,6 +146,11 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         // no "opposite side" to anchor the inline actions to — pin them right.
         assistantSide={layout === "thread" ? "right" : assistantSide}
         annotationItems={annotationItems}
+        translation={{
+          isActive: translation.isActive,
+          isLoading: translation.isLoading,
+          onToggle: translation.toggle,
+        }}
       />
 
       {userText ? (
@@ -475,7 +500,20 @@ const TurnSeparator: React.FC<{
   onSelect: () => void;
   assistantSide: "left" | "right";
   annotationItems: AnnotationItem[];
-}> = ({ index, turn, isCurrent, onSelect, assistantSide, annotationItems }) => {
+  translation: {
+    isActive: boolean;
+    isLoading: boolean;
+    onToggle: () => void;
+  };
+}> = ({
+  index,
+  turn,
+  isCurrent,
+  onSelect,
+  assistantSide,
+  annotationItems,
+  translation,
+}) => {
   // Pick the bits worth showing per turn — model, duration, latency, token
   // load, cost, error state — so the separator reads as a per-turn ledger
   // rather than just "Turn N · Xs". Skips fields that don't apply (no cost
@@ -602,7 +640,11 @@ const TurnSeparator: React.FC<{
           output={turn.output}
           prefetchedItems={annotationItems}
         />
-        <TurnActionRow traceId={turn.traceId} output={turn.output} />
+        <TurnActionRow
+          traceId={turn.traceId}
+          output={turn.output}
+          translation={translation}
+        />
       </HStack>
     </Flex>
   );

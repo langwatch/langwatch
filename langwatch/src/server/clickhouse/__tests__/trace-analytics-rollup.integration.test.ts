@@ -186,13 +186,25 @@ afterAll(async () => {
 describe("trace_analytics_rollup app-side projection (integration)", () => {
   describe("given three spans of one trace each contributing cost 0.01, 0.04, 0.05", () => {
     beforeAll(async () => {
-      await repo.insertRows([
+      const rows = [
         makeRow(tenantId, { cost: 0.01 }),
         makeRow(tenantId, { cost: 0.04 }),
         makeRow(tenantId, { cost: 0.05 }),
-      ]);
-      await waitForSpanCount(tenantId, 3);
-    });
+      ];
+      // The client's keep-alive reuse can lose an insert on slow CI runners
+      // (the socket closes before the ack is read and the batch silently
+      // never lands — observed as "expected +0" here). One 3-row insert into
+      // one partition is atomic, so "0 rows visible" is the only retry state
+      // and re-inserting can never double-count.
+      await repo.insertRows(rows);
+      for (let attempt = 0; attempt < 20; attempt++) {
+        if ((await readRollupForTenant(tenantId)).spanCount === 3) return;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        if ((await readRollupForTenant(tenantId)).spanCount === 0) {
+          await repo.insertRows(rows);
+        }
+      }
+    }, 30_000);
 
     describe("when each span contributes its own cost as a SimpleAggregateFunction(sum) row", () => {
       it("sums the bucket cost to 0.10", async () => {

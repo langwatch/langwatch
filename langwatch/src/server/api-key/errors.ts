@@ -93,6 +93,39 @@ export class ApiKeyPermissionDeniedError extends HandledError {
  * creator's ceiling — e.g., binding a role the creator does not hold on the
  * target scope. Surfaced to the user before the token is persisted.
  */
+/**
+ * Thrown when a caller tries to create a key with — or rename a key to — a
+ * name in HIDDEN_SYSTEM_KEY_NAMES. Those names mark keys the product mints
+ * and retires on its own, and the listings + by-id mutation guards key on
+ * them; letting a customer claim one would make their key invisible AND
+ * unrevocable (the system-managed guard refuses mutations on it).
+ */
+export class ApiKeyReservedNameError extends HandledError {
+  declare readonly code: "api_key_reserved_name";
+
+  constructor(
+    name: string,
+    options: {
+      meta?: Record<string, unknown>;
+      reasons?: readonly Error[];
+    } = {},
+  ) {
+    super(
+      "api_key_reserved_name",
+      `The API key name "${name}" is reserved for keys LangWatch manages`,
+      {
+        httpStatus: 422,
+        ...remediation("api_key_reserved_name"),
+        ...options,
+        // After ...options so a caller-supplied meta can add fields but never
+        // drop the attempted name this class promises to carry.
+        meta: { ...options.meta, name },
+      },
+    );
+    this.name = "ApiKeyReservedNameError";
+  }
+}
+
 export class ApiKeyScopeViolationError extends HandledError {
   declare readonly code: "api_key_scope_violation";
 

@@ -99,6 +99,12 @@ const registry = {
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  api_key_reserved_name: {
+    tips: [
+      "This name is reserved for keys LangWatch manages on your behalf — pick a different name",
+    ],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
 
   // ---- evaluations ----
   evaluation_not_found: {

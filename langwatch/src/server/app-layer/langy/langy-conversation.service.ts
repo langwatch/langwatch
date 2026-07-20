@@ -130,6 +130,27 @@ function turnMessageId(turnId: string): string {
 }
 
 /**
+ * Module-level (not a method) so the traced() proxy in presets.ts never wraps
+ * it: it is sync and its results are spread/mapped — an async wrapper would
+ * silently turn them into Promises.
+ */
+function toListItem(
+  row: LangyConversationRow,
+  userId: string,
+): ConversationListItem {
+  return {
+    id: row.id,
+    title: row.title,
+    isShared: row.isShared,
+    isOwn: row.userId === userId,
+    lastActivityAt: new Date(
+      row.lastActivityAtMs > 0 ? row.lastActivityAtMs : row.createdAtMs,
+    ),
+    messageCount: row.messageCount,
+  };
+}
+
+/**
  * Langy application service. Reads come from the Postgres operational
  * projection; writes remain event-sourcing commands.
  */
@@ -139,22 +160,6 @@ export class LangyConversationService {
     private readonly commands: LangyConversationCommands,
     private readonly messages: LangyMessageRepository = new NullLangyMessageRepository(),
   ) {}
-
-  private toListItem(
-    row: LangyConversationRow,
-    userId: string,
-  ): ConversationListItem {
-    return {
-      id: row.id,
-      title: row.title,
-      isShared: row.isShared,
-      isOwn: row.userId === userId,
-      lastActivityAt: new Date(
-        row.lastActivityAtMs > 0 ? row.lastActivityAtMs : row.createdAtMs,
-      ),
-      messageCount: row.messageCount,
-    };
-  }
 
   /**
    * A conversation the caller may see.
@@ -193,7 +198,7 @@ export class LangyConversationService {
     });
     if (!row) throw new LangyConversationNotFoundError(id);
     return {
-      ...this.toListItem(row, userId),
+      ...toListItem(row, userId),
       status: row.status,
       lastError: row.lastError,
     };
@@ -238,7 +243,7 @@ export class LangyConversationService {
       userId,
       limit,
     });
-    return rows.map((r) => this.toListItem(r, userId));
+    return rows.map((r) => toListItem(r, userId));
   }
 
   /**
@@ -276,7 +281,7 @@ export class LangyConversationService {
         : last.cursorActivityAtMs;
 
     return {
-      items: pageRows.map((row) => this.toListItem(row, userId)),
+      items: pageRows.map((row) => toListItem(row, userId)),
       nextCursor:
         hasMore && last
           ? { lastActivityAtMs: rawCursorActivity, id: last.id }
@@ -718,6 +723,28 @@ export class LangyConversationService {
    * place, so the durable body is identical to the relay's and never carries raw
    * agent prose (`LastError` is a vetted domain error, rendered on history load).
    */
+  /**
+   * True when the (projectId, conversationId, turnId) triple names a turn that
+   * was really accepted under this conversation in this project. The durable
+   * result-ingest route checks this before writing: unlike the relay (which
+   * verifies an HMAC over the conversation's runToken), that route has only
+   * the shared bearer, so without this cross-check a caller who holds the
+   * secret could forge a result into any tenant's conversation, and a benign
+   * projectId/conversationId mix-up in the multiplexing manager would write
+   * one tenant's output into another's with nothing to catch it.
+   */
+  async turnExists({
+    projectId,
+    conversationId,
+    turnId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean> {
+    return this.repository.turnExists({ projectId, conversationId, turnId });
+  }
+
   async ingestAgentTurnResult({
     projectId,
     conversationId,

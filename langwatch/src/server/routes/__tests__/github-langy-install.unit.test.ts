@@ -2,8 +2,8 @@
  * @vitest-environment node
  *
  * Locks the security-critical bits of the GitHub App install routes:
- *   /install — session-gated, org-membership checked, redirects to GitHub with a
- *              signed state.
+ *   /install — session-gated, org-membership + langy:manage checked, redirects
+ *              to GitHub with a signed state.
  *   /setup   — verifies the signed state + session rebind before recording the
  *              installation; rejects tampered/expired state and a session change.
  *   /webhook — verifies the X-Hub-Signature-256 HMAC before touching anything;
@@ -24,11 +24,11 @@ process.env.GITHUB_LANGY_WEBHOOK_SECRET = "whsecret";
 
 const getServerAuthSession = vi.fn();
 const isOrganizationMember = vi.fn();
+const hasOrganizationPermission = vi.fn();
 const recordInstallation = vi.fn();
 const handleWebhookEvent = vi.fn();
 const auditLog = vi.fn();
 const isEnabled = vi.fn();
-const isLangwatchStaff = vi.fn();
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: (...args: unknown[]) => getServerAuthSession(...args),
@@ -50,14 +50,14 @@ vi.mock("~/server/auditLog", () => ({
 vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: (...args: unknown[]) => isEnabled(...args) },
 }));
-vi.mock("~/utils/isLangwatchStaff", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/utils/isLangwatchStaff")>();
-  return {
-    ...actual,
-    isLangwatchStaff: (...args: unknown[]) => isLangwatchStaff(...args),
-  };
-});
+// Partial mock: the route uses only this helper, but other modules in the
+// import graph read further rbac exports (Resources etc.).
+vi.mock(import("~/server/api/rbac"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  hasOrganizationPermission: ((...args: unknown[]) =>
+    hasOrganizationPermission(...args)) as never,
+}));
+vi.mock("~/server/db", () => ({ prisma: {} }));
 
 async function request(path: string, init?: RequestInit) {
   const { app } = await import("../github-langy");
@@ -94,10 +94,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   getServerAuthSession.mockResolvedValue({ user: { id: "u1" } });
   isOrganizationMember.mockResolvedValue(true);
+  hasOrganizationPermission.mockResolvedValue(true);
   recordInstallation.mockResolvedValue({ accountLogin: "acme" });
-  // Default: caller is staff, so the rollout flag is bypassed. Non-staff
-  // rollout behaviour is asserted explicitly in the gate tests below.
-  isLangwatchStaff.mockReturnValue(true);
   isEnabled.mockResolvedValue(true);
 });
 
@@ -126,6 +124,20 @@ describe("GET /api/github-langy/install", () => {
     });
   });
 
+  describe("when a member lacks langy:manage", () => {
+    it("rejects with 403 without ever evaluating the flag", async () => {
+      // Connecting the App grants Langy repository access for every project
+      // underneath — membership alone must not be enough on the REST twin
+      // either.
+      hasOrganizationPermission.mockResolvedValue(false);
+      const res = await request(
+        "http://localhost/api/github-langy/install?organizationId=org1",
+      );
+      expect(res.status).toBe(403);
+      expect(isEnabled).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when organizationId is missing", () => {
     it("rejects with 400", async () => {
       const res = await request(
@@ -135,9 +147,8 @@ describe("GET /api/github-langy/install", () => {
     });
   });
 
-  describe("when the caller is non-staff and the rollout is enabled for the org", () => {
+  describe("when the rollout is enabled for the org", () => {
     it("evaluates the flag against the organization and allows the install", async () => {
-      isLangwatchStaff.mockReturnValue(false);
       isEnabled.mockResolvedValue(true);
 
       const res = await request(
@@ -153,9 +164,8 @@ describe("GET /api/github-langy/install", () => {
     });
   });
 
-  describe("when a member is non-staff and the rollout is disabled for the org", () => {
+  describe("when a member's org has the rollout disabled", () => {
     it("denies with 404", async () => {
-      isLangwatchStaff.mockReturnValue(false);
       isEnabled.mockResolvedValue(false);
 
       const res = await request(
@@ -172,7 +182,6 @@ describe("GET /api/github-langy/install", () => {
   describe("when a non-member probes an org with the rollout enabled", () => {
     it("returns 403 without ever evaluating the flag", async () => {
       isOrganizationMember.mockResolvedValue(false);
-      isLangwatchStaff.mockReturnValue(false);
       isEnabled.mockResolvedValue(true);
 
       const res = await request(
@@ -187,7 +196,6 @@ describe("GET /api/github-langy/install", () => {
   describe("when a non-member probes an org with the rollout disabled", () => {
     it("returns the same 403 (response independent of the org's flag)", async () => {
       isOrganizationMember.mockResolvedValue(false);
-      isLangwatchStaff.mockReturnValue(false);
       isEnabled.mockResolvedValue(false);
 
       const res = await request(
@@ -267,12 +275,25 @@ describe("GET /api/github-langy/setup", () => {
     });
   });
 
+  describe("when the connect permission was lowered mid-flow", () => {
+    it("re-checks langy:manage and refuses to persist the installation", async () => {
+      hasOrganizationPermission.mockResolvedValue(false);
+      const state = await makeState({ mode: "popup" });
+
+      const res = await request(
+        `http://localhost/api/github-langy/setup?installation_id=555&state=${encodeURIComponent(state)}`,
+      );
+
+      expect(res.status).toBe(403);
+      expect(recordInstallation).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when Langy access was revoked after the install began", () => {
     it("re-checks the gate and refuses to persist the installation", async () => {
       // Install started while allowed; the rollout is now off for this
-      // non-staff caller. The kill switch must be immediate on the persisting
+      // caller. The kill switch must be immediate on the persisting
       // path, so setup denies before recordInstallation runs.
-      isLangwatchStaff.mockReturnValue(false);
       isEnabled.mockResolvedValue(false);
       const state = await makeState({ mode: "popup" });
 

@@ -75,7 +75,7 @@ type Options struct {
 // destroy a credential and must NOT be able to create one. Anything broader here
 // would let a future change quietly hand the manager minting power.
 type CredentialRevoker interface {
-	Revoke(ctx context.Context, endpoint, apiKeyID string) error
+	Revoke(ctx context.Context, endpoint, projectID, apiKeyID string) error
 }
 
 // Pool owns the per-conversation worker registry (the former Manager). It
@@ -385,12 +385,12 @@ func (p *Pool) revokeKeyOf(w *Worker, reason string) {
 	if p.revoker == nil || w == nil || w.apiKeyID == "" {
 		return
 	}
-	apiKeyID, endpoint, conversationID := w.apiKeyID, w.langwatchEndpoint, w.conversationID
+	apiKeyID, projectID, endpoint, conversationID := w.apiKeyID, w.projectID, w.langwatchEndpoint, w.conversationID
 	go func() {
 		defer clog.HandlePanic(p.baseCtx, false)
 		ctx, cancel := context.WithTimeout(p.baseCtx, revokeTimeout)
 		defer cancel()
-		if err := p.revoker.Revoke(ctx, endpoint, apiKeyID); err != nil {
+		if err := p.revoker.Revoke(ctx, endpoint, projectID, apiKeyID); err != nil {
 			clog.Get(p.baseCtx).Warn("revoking worker session key failed — it will expire and be reaped instead",
 				zap.String("conversation", conversationID),
 				zap.String("reason", reason),
@@ -665,6 +665,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	if p.otelRelay != nil {
 		otelToken, err = p.otelRelay.Register(otelrelay.WorkerInfo{
 			ConversationID:    conversationID,
+			ActorUserID:       creds.ActorUserID,
 			LangwatchEndpoint: creds.LangwatchEndpoint,
 			LangwatchAPIKey:   creds.LangwatchAPIKey,
 			Model:             creds.Model,
@@ -877,6 +878,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		uid:               uid,
 		credSig:           sig,
 		apiKeyID:          creds.LangwatchAPIKeyID,
+		projectID:         creds.ProjectID,
 		langwatchEndpoint: creds.LangwatchEndpoint,
 		lastSeen:          time.Now(),
 	}, nil

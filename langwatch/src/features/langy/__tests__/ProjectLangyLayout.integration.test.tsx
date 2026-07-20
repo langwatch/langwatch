@@ -6,7 +6,7 @@
  *
  * Spec: specs/langy/langy-navigation-persistence.feature
  *
- * Boundary mocks: the gate-input hooks (session / project / flag / staff) and
+ * Boundary mocks: the gate-input hooks (session / project / flag) and
  * the heavy LangyDrawer chat surface. LangyContext is REAL, so the open/closed
  * state is genuine — its survival across navigation is exactly what we assert.
  */
@@ -20,12 +20,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Controllable gate state (flipped per-test to exercise the visibility gate).
 // ---------------------------------------------------------------------------
 const gate = {
-  staff: true,
   flagEnabled: true,
+  permissions: ["langy:view"] as string[],
   project: { id: "project-demo", slug: "demo" } as {
     id: string;
     slug: string;
   } | null,
+  demoSlug: "not-this-project",
 };
 
 vi.mock("~/hooks/useRequiredSession", () => ({
@@ -44,26 +45,20 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     },
     organization: { id: "org-1" },
     organizationRole: "MEMBER",
+    hasPermission: (permission: string) => gate.permissions.includes(permission),
   }),
 }));
 
 vi.mock("~/hooks/usePublicEnv", () => ({
-  // A demo slug that does NOT match the active project, so the demo-project
-  // branch of the gate stays out of the way and membership is what counts.
-  usePublicEnv: () => ({ data: { DEMO_PROJECT_SLUG: "not-this-project" } }),
+  // Defaults to a demo slug that does NOT match the active project, so the
+  // demo-project branch of the gate stays out of the way and membership is
+  // what counts. The demo-refusal test points it at the active project.
+  usePublicEnv: () => ({ data: { DEMO_PROJECT_SLUG: gate.demoSlug } }),
 }));
 
 vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: () => ({ enabled: gate.flagEnabled }),
 }));
-
-vi.mock("~/utils/isLangwatchStaff", async (importOriginal) => {
-  // Keep the real LANGY_RELEASE_FLAG constant (useShowLangy reads it); only the
-  // staff predicate is driven by the test's gate.
-  const actual =
-    await importOriginal<typeof import("~/utils/isLangwatchStaff")>();
-  return { ...actual, isLangwatchStaff: () => gate.staff };
-});
 
 // Stub the heavy chat surface. Open state genuinely lives in the zustand
 // store nowadays, so the stub reads the REAL store and exposes a button that
@@ -122,9 +117,10 @@ const openLangy = () =>
   userEvent.click(screen.getByRole("button", { name: "open-langy" }));
 
 beforeEach(() => {
-  gate.staff = true;
   gate.flagEnabled = true;
+  gate.permissions = ["langy:view"];
   gate.project = { id: "project-demo", slug: "demo" };
+  gate.demoSlug = "not-this-project";
   // The store is a module singleton — start every test closed and uncounted.
   useLangyStore.setState({ isOpen: false });
   sidecarMounts.count = 0;
@@ -174,33 +170,61 @@ describe("ProjectLangyLayout", () => {
     });
   });
 
-  // Visibility gate (re-instated for PR #4913, mirrors the server-side gate in
-  // routes/langy.ts). Staff bypass the rollout flag; for everyone else the
-  // flag must resolve true. The registry default is off, so non-staff are
-  // dark by default and the panel must not render.
-  describe("given the staff + rollout-flag visibility gate", () => {
-    it("renders Langy for staff even when the rollout flag is off", () => {
-      gate.staff = true;
-      gate.flagEnabled = false;
-      renderAt("/demo/traces");
-      expect(screen.getByText("traces page")).toBeTruthy();
-      expect(drawer()).not.toBeNull();
+  // Visibility gate (mirrors the server-side gate in langyAccessGate.ts). The
+  // rollout flag is the only lever — there is no staff bypass — and the
+  // registry default is off, so the panel is dark until a user is opted in.
+  describe("given the rollout-flag visibility gate", () => {
+    describe("when the rollout flag is on", () => {
+      it("renders Langy for a team member", () => {
+        gate.flagEnabled = true;
+        renderAt("/demo/traces");
+        expect(drawer()).not.toBeNull();
+      });
     });
 
-    it("renders Langy for a non-staff team member when the rollout flag is on", () => {
-      gate.staff = false;
-      gate.flagEnabled = true;
-      renderAt("/demo/traces");
-      expect(drawer()).not.toBeNull();
+    describe("when the rollout flag is off", () => {
+      /** @scenario "The visibility gate is not widened" */
+      it("hides Langy for a team member", () => {
+        gate.flagEnabled = false;
+        renderAt("/demo/traces");
+        expect(screen.getByText("traces page")).toBeTruthy();
+        expect(drawer()).toBeNull();
+      });
+
+      /** @scenario "Working at LangWatch is not a way in" */
+      it("hides Langy for a @langwatch.ai session", () => {
+        // The mocked session is staff@langwatch.ai. Before the flag-only
+        // rework that address bypassed the flag outright; pin that it no
+        // longer does.
+        gate.flagEnabled = false;
+        renderAt("/demo/traces");
+        expect(drawer()).toBeNull();
+      });
     });
 
-    /** @scenario "The visibility gate is not widened" */
-    it("hides Langy for a non-staff team member when the rollout flag is off", () => {
-      gate.staff = false;
-      gate.flagEnabled = false;
-      renderAt("/demo/traces");
-      expect(screen.getByText("traces page")).toBeTruthy();
-      expect(drawer()).toBeNull();
+    describe("when the member's role lacks langy:view", () => {
+      it("hides Langy despite the flag being on", () => {
+        // A custom role can hold project access without the Langy read grant;
+        // rendering the panel would produce a chat whose every call 401s.
+        gate.flagEnabled = true;
+        gate.permissions = [];
+        renderAt("/demo/traces");
+        expect(screen.getByText("traces page")).toBeTruthy();
+        expect(drawer()).toBeNull();
+      });
+    });
+
+    describe("when the project is the demo project", () => {
+      /** @scenario "The demo project refuses Langy on every surface" */
+      it("hides Langy even with the flag and permission", () => {
+        // The server refuses Langy on the demo project outright; the panel
+        // mirrors that so it can't render a chat where every send 403s.
+        gate.flagEnabled = true;
+        gate.demoSlug = "demo";
+        renderAt("/demo/traces");
+        expect(screen.getByText("traces page")).toBeTruthy();
+        expect(drawer()).toBeNull();
+      });
     });
   });
 });

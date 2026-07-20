@@ -59,6 +59,12 @@ var errAuthProbeUnreachable = errors.New("opencode-auth-probe-unreachable")
 // httpClient is reused across all opencode calls. opencode binds 127.0.0.1 per
 // worker; we only ever talk to localhost. A long stream timeout would truncate
 // generations, so the read deadline is per-request.
+//
+// Deliberately NOT wrapped in otelhttp: the /event SSE poll and per-message
+// POSTs would parent a client span per call into the turn's trace — dense,
+// low-value spans at exactly the trace's hottest point. Worker activity
+// reaches the trace through the OTel relay's reparenting instead, and
+// opencode ignores inbound traceparent anyway.
 var httpClient = &http.Client{Transport: &http.Transport{
 	MaxIdleConnsPerHost: 4,
 	IdleConnTimeout:     30 * time.Second,

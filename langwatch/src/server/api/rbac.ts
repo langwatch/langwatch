@@ -102,6 +102,20 @@ export const Resources = {
   //   - aiTools:manage → org ADMIN only. Catalog editor surface at
   //     /settings/governance/tool-catalog (CRUD + reorder + enable).
   AI_TOOLS: "aiTools",
+  // The Langy in-product assistant. Its own resource rather than riding on
+  // `evaluations:view`, because starting a turn is not a read: it provisions
+  // credentials, spawns an OpenCode worker and spends the project's model
+  // budget. `langy:view` reads conversations; `langy:create` starts or
+  // continues a turn (and forks, which creates one); `langy:update` renames;
+  // `langy:delete` archives. Project-scoped, since conversations belong to a
+  // project — except `langy:manage`, which also appears in the ORG role bag
+  // to gate the org-wide GitHub App connection.
+  //
+  // Granted from MEMBER upward, and to org admins; VIEWER and EXTERNAL get
+  // nothing. The permission grain is not what keeps Langy scarce — the
+  // `release_langy_enabled` flag is — so it draws the line at "can this person
+  // act on the project at all" rather than trying to be finer than that.
+  LANGY: "langy",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
@@ -189,6 +203,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Evaluations
     "evaluations:view",
     "evaluations:manage",
+    // Langy (manage implies create/update/delete via the hierarchy rule)
+    "langy:view",
+    "langy:manage",
     // Workflows
     "workflows:view",
     "workflows:manage",
@@ -269,6 +286,11 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Evaluations
     "evaluations:view",
     "evaluations:manage",
+    // Langy — may run the assistant, not administer it
+    "langy:view",
+    "langy:create",
+    "langy:update",
+    "langy:delete",
     // Workflows
     "workflows:view",
     "workflows:manage",
@@ -392,6 +414,12 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     "organization:view",
     "organization:manage",
     "organization:delete",
+    // Org admins get Langy at member level, and `langy:manage` additionally
+    // gates connecting the org-wide GitHub App, which grants Langy repository
+    // access for every project underneath. Manage implies the rest via the
+    // hierarchy rule.
+    "langy:view",
+    "langy:manage",
     // AI Governance — org-level permissions for the governance offering
     // (anomaly rules, ingestion sources, OCSF SIEM export, activity
     // monitor, top-level Govern section). Default-attached to ADMIN so
@@ -1457,9 +1485,22 @@ export async function batchScopePermissions(
   const teamsMap = new Map<string, boolean>();
   const projectsMap = new Map<string, boolean>();
 
+  // A project inherits TEAM-scoped bindings from its team, so the binding
+  // load must cover the projects' team ids too — `projectGrants` below
+  // checks `scopeKey(TEAM, teamId)`, and a binding that was never loaded
+  // can't grant. Without this, a member whose only access is a TEAM-scope
+  // binding (no legacy TeamUser rows) fails every project in the batch
+  // while the single-project resolver — which always queries the team
+  // scope — grants it.
   const resolution = await loadScopeResolution(ctx, {
     organizationId: args.organizationId,
-    scopeIds: [...args.teamIds, ...args.projectIds],
+    scopeIds: [
+      ...new Set([
+        ...args.teamIds,
+        ...args.projectIds,
+        ...Object.values(args.projectTeamId),
+      ]),
+    ],
   });
   if (!resolution) {
     args.teamIds.forEach((id) => teamsMap.set(id, false));
@@ -1524,9 +1565,7 @@ const DEMO_VIEW_PERMISSIONS: Permission[] = [
  * on this directly instead of on the permission check that the demo silently
  * grants.
  */
-export function isDemoProjectId(
-  projectId: string | null | undefined,
-): boolean {
+export function isDemoProjectId(projectId: string | null | undefined): boolean {
   if (!projectId) return false;
   // Prefer dynamic process.env in tests; fall back to validated env.
   const demoId = process.env.DEMO_PROJECT_ID ?? env.DEMO_PROJECT_ID;
@@ -1537,7 +1576,9 @@ export function isDemoProject(
   projectId: string,
   permission: Permission,
 ): boolean {
-  return isDemoProjectId(projectId) && DEMO_VIEW_PERMISSIONS.includes(permission);
+  return (
+    isDemoProjectId(projectId) && DEMO_VIEW_PERMISSIONS.includes(permission)
+  );
 }
 
 // ============================================================================

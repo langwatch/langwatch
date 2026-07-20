@@ -54,6 +54,21 @@ export interface LangyConversationRepository {
     projectId: string;
     conversationId: string;
   }): Promise<string | null>;
+
+  /**
+   * True when a turn projection row exists for this exact
+   * (projectId, conversationId, turnId) triple — i.e. the turn was really
+   * accepted under this conversation in this project. The durable
+   * result-ingest uses it to reject a forged or mismatched triple before
+   * writing (the relay proves the same thing with an HMAC; this path has only
+   * the bearer). A turn row exists the moment `acceptTurn` is projected, long
+   * before any result arrives.
+   */
+  turnExists(params: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean>;
 }
 
 export class NullLangyConversationRepository
@@ -81,5 +96,9 @@ export class NullLangyConversationRepository
 
   async findRunToken(): Promise<null> {
     return null;
+  }
+
+  async turnExists(): Promise<boolean> {
+    return false;
   }
 }

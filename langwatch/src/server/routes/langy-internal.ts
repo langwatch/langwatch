@@ -26,10 +26,14 @@ import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { ValidationError } from "@langwatch/handled-error";
 import { prisma } from "~/server/db";
+import {
+  getLangySessionKeysCounter,
+  getLangyTurnResultsCounter,
+} from "~/server/metrics";
 import { revokeLangySessionApiKey } from "~/server/app-layer/langy/langyApiKey";
 import { createLogger } from "@langwatch/observability";
 
-const logger = createLogger("langwatch:langy-internal");
+const logger = createLogger("langwatch:langy:internal");
 
 /**
  * Constant-time bearer check against the shared manager secret, applied as the
@@ -132,6 +136,31 @@ secured.access(langyInternalPolicy()).post("/turn/:turnId/result", async (c) => 
   }
   const body = parsed.data;
 
+  // Cross-check the triple before writing. `projectId`/`conversationId` are
+  // body fields the bearer alone would otherwise let through unverified — the
+  // sibling relay proves the same thing with an HMAC over the runToken, but
+  // this durable path has only the shared secret. A turn row exists only if
+  // the turn was really accepted under this conversation in this project, so
+  // this rejects a forged triple and a benign cross-tenant mix-up alike.
+  // 404 (not 4xx-with-detail) so a probe never confirms a cross-tenant id;
+  // the manager treats 4xx as terminal, so it will not retry-loop.
+  const turnExists = await getApp().langy.conversations.turnExists({
+    projectId: body.projectId,
+    conversationId: body.conversationId,
+    turnId,
+  });
+  if (!turnExists) {
+    logger.warn(
+      {
+        projectId: body.projectId,
+        conversationId: body.conversationId,
+        turnId,
+      },
+      "refusing a turn-result ingest for an unknown (project, conversation, turn) triple",
+    );
+    return c.json({ error: "turn not found" }, 404);
+  }
+
   await getApp().langy.conversations.ingestAgentTurnResult({
     projectId: body.projectId,
     conversationId: body.conversationId,
@@ -142,6 +171,20 @@ secured.access(langyInternalPolicy()).post("/turn/:turnId/result", async (c) => 
     errorCode: body.errorCode,
   });
 
+  // The durable completion of a turn — the one line that says a turn ended
+  // and how, attributable by ids and graphable by outcome.
+  getLangyTurnResultsCounter(body.status).inc();
+  logger.info(
+    {
+      projectId: body.projectId,
+      conversationId: body.conversationId,
+      turnId,
+      status: body.status,
+      ...(body.errorCode ? { errorCode: body.errorCode } : {}),
+    },
+    "langy turn result ingested",
+  );
+
   return c.json({ status: "accepted" }, 202);
 });
 
@@ -149,6 +192,10 @@ secured.access(langyInternalPolicy()).post("/turn/:turnId/result", async (c) => 
 
 const revokeCredentialsSchema = z.object({
   apiKeyId: z.string().min(1).max(128),
+  // The tenant the key belongs to. Required so the revoke is scoped to one
+  // project — without it a bearer-secret holder could revoke any tenant's live
+  // session key by id alone.
+  projectId: z.string().min(1).max(128),
 });
 
 /**
@@ -168,6 +215,7 @@ secured.access(langyInternalPolicy()).post("/credentials/revoke", async (c) => {
   const outcome = await revokeLangySessionApiKey({
     prisma,
     apiKeyId: parsed.data.apiKeyId,
+    projectId: parsed.data.projectId,
   });
 
   switch (outcome) {
@@ -181,7 +229,10 @@ secured.access(langyInternalPolicy()).post("/credentials/revoke", async (c) => {
       return c.json({ outcome }, 404);
     case "refused":
       // The id resolved to a key that is not ours. Refused, and loud: this
-      // should never happen in normal operation.
+      // should never happen in normal operation. (The warn with the key id
+      // fires inside revokeLangySessionApiKey; the counter makes a sustained
+      // rate alertable.)
+      getLangySessionKeysCounter("revoke_refused").inc();
       return c.json({ error: "Not a Langy session key" }, 403);
   }
 });

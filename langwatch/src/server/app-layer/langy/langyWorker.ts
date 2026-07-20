@@ -10,9 +10,10 @@
  * if cold" (the pre-optimisation cost, never a broken turn); a failed warm means
  * a cold start (the status quo). Neither can start or duplicate a turn.
  */
-import { context, propagation } from "@opentelemetry/api";
+import { context, propagation, trace } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "@langwatch/observability";
+import { getLangyDispatchCounter } from "~/server/metrics";
 
 const logger = createLogger("langwatch:langy:worker");
 const tracer = getLangWatchTracer("langwatch.langy.chat");
@@ -125,12 +126,17 @@ export function createLangyWorkerPort(config: {
       egressAllowlist,
     }) {
       try {
+        // traceparent rides along (no span of its own — the probe is a single
+        // cheap read on the turn's critical path) so the manager's probe
+        // handling lands in the same trace as the dispatch that follows.
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${internalSecret}`,
+        };
+        propagation.inject(context.active(), headers);
         const response = await fetch(`${agentUrl}/worker/probe`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${internalSecret}`,
-          },
+          headers,
           body: JSON.stringify({
             projectId,
             actorUserId,
@@ -147,7 +153,11 @@ export function createLangyWorkerPort(config: {
         });
         if (!response.ok) return false;
         const body = (await response.json()) as { alive?: unknown };
-        return body.alive === true;
+        const alive = body.alive === true;
+        trace
+          .getActiveSpan()
+          ?.setAttribute("langy.probe.hit", alive);
+        return alive;
       } catch (error) {
         logger.debug(
           { error, conversationId },
@@ -170,7 +180,13 @@ export function createLangyWorkerPort(config: {
       // is injected so the manager's spawn/boot spans attach to THIS trace.
       await tracer.withActiveSpan(
         "langy.chat.warm_worker",
-        { attributes: { "langy.conversation.id": conversationId } },
+        {
+          attributes: {
+            "tenant.id": projectId,
+            "user.id": actorUserId,
+            "langy.conversation.id": conversationId,
+          },
+        },
         async () => {
           try {
             const headers: Record<string, string> = {
@@ -220,12 +236,14 @@ export function createLangyWorkerPort(config: {
         "langy.chat.dispatch_turn",
         {
           attributes: {
+            "tenant.id": projectId,
+            "user.id": userId,
             "langy.conversation.id": conversationId,
             "langy.turn.id": turnId,
             "langy.worker.intent": intent,
           },
         },
-        async (): Promise<LangyDispatchOutcome> => {
+        async (span): Promise<LangyDispatchOutcome> => {
           try {
             const headers: Record<string, string> = {
               "Content-Type": "application/json",
@@ -257,15 +275,26 @@ export function createLangyWorkerPort(config: {
             // Fire-and-forget output: the worker streams the turn to the relay, not
             // on this response — read the status, drop the body.
             void response.body?.cancel();
-            if (response.status === 202 || response.ok) return "accepted";
-            if (response.status === 409) return "busy";
-            if (response.status === 428) return "credentialsRequired";
-            return "unavailable";
+            const outcome: LangyDispatchOutcome =
+              response.status === 202 || response.ok
+                ? "accepted"
+                : response.status === 409
+                  ? "busy"
+                  : response.status === 428
+                    ? "credentialsRequired"
+                    : "unavailable";
+            span.setAttribute("langy.dispatch.outcome", outcome);
+            getLangyDispatchCounter(
+              outcome === "credentialsRequired" ? "credentials_required" : outcome,
+            ).inc();
+            return outcome;
           } catch (error) {
             logger.warn(
               { error, conversationId, turnId },
               "langy worker dispatch failed — leaving the turn to the liveness subscriber",
             );
+            span.setAttribute("langy.dispatch.outcome", "error");
+            getLangyDispatchCounter("error").inc();
             return "unavailable";
           }
         },

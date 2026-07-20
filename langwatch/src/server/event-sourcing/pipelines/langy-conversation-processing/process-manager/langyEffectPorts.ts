@@ -79,7 +79,10 @@ export interface CreateLangyEffectPortsOptions {
     projectId: string;
     organizationId: string;
   }) => Promise<{ token: string; apiKeyId: string }>;
-  revokeSessionKey: (args: { apiKeyId: string }) => Promise<void>;
+  revokeSessionKey: (args: {
+    apiKeyId: string;
+    projectId: string;
+  }) => Promise<void>;
   titleGenerator: LangyTitleGenerator;
   saveTitle: (params: {
     projectId: string;
@@ -195,7 +198,7 @@ export function createLangyEffectPorts(
             await deps.handoffStore.stash(dispatchHandoff);
           } catch (error) {
             await deps
-              .revokeSessionKey({ apiKeyId: minted.apiKeyId })
+              .revokeSessionKey({ apiKeyId: minted.apiKeyId, projectId })
               .catch((revokeError) => {
                 logger.warn(
                   { revokeError, projectId, conversationId, turnId },

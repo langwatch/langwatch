@@ -565,10 +565,11 @@ export class PipelineRegistry {
           projectId,
           organizationId,
         }),
-      revokeSessionKey: ({ apiKeyId }) =>
+      revokeSessionKey: ({ apiKeyId, projectId }) =>
         revokeLangySessionApiKey({
           prisma: this.deps.prisma,
           apiKeyId,
+          projectId,
         }).then(() => undefined),
       titleGenerator: this.deps.langy.titleGenerator,
       saveTitle: (args) => saveTitle.fn(args),
