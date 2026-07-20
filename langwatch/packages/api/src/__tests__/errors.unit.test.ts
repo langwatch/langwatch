@@ -1,131 +1,77 @@
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { describe, it, expect } from "vitest";
 import { ZodError, z } from "zod";
 
-import { formatError, isHandledErrorLike } from "../errors.js";
+import { createErrorHandler, formatError } from "../errors.js";
 
 // ---------------------------------------------------------------------------
-// Helpers -- fake HandledError-like object (duck-typed)
+// Helpers
 // ---------------------------------------------------------------------------
 
-function makeHandledError(
-  overrides: {
-    code?: string;
-    message?: string;
-    httpStatus?: number;
-    meta?: Record<string, unknown>;
-    fault?: string;
-    tips?: readonly string[];
-    docsUrl?: string;
-  } = {},
-): Error & {
-  code: string;
-  httpStatus: number;
-  meta: Record<string, unknown>;
-  serialize: () => {
-    code: string;
-    meta: Record<string, unknown>;
-    traceId: undefined;
-    spanId: undefined;
-    httpStatus: number;
-    fault?: string;
-    tips?: readonly string[];
-    docsUrl?: string;
-    reasons: Array<{ code: string }>;
-  };
-} {
-  const code = overrides.code ?? "test_error";
-  const httpStatus = overrides.httpStatus ?? 422;
-  const meta = overrides.meta ?? {};
-  const message = overrides.message ?? "Test error message";
+/** A concrete HandledError, since the base class is abstract. */
+class TestError extends HandledError {
+  constructor(
+    code: string,
+    message: string,
+    options: ConstructorParameters<typeof HandledError>[2] = {},
+  ) {
+    super(code, message, options);
+    this.name = "TestError";
+  }
+}
 
-  const error = new Error(message) as Error & {
-    code: string;
-    httpStatus: number;
-    meta: Record<string, unknown>;
-    serialize: () => {
-      code: string;
-      meta: Record<string, unknown>;
-      traceId: undefined;
-      spanId: undefined;
-      httpStatus: number;
-      reasons: Array<{ code: string }>;
-    };
-  };
-  error.code = code;
-  error.httpStatus = httpStatus;
-  error.meta = meta;
-  error.serialize = () => ({
-    code,
-    meta,
-    traceId: undefined,
-    spanId: undefined,
-    httpStatus,
-    ...(overrides.fault ? { fault: overrides.fault } : {}),
-    ...(overrides.tips ? { tips: overrides.tips } : {}),
-    ...(overrides.docsUrl ? { docsUrl: overrides.docsUrl } : {}),
-    reasons: [],
-  });
+function zodErrorFrom(parse: () => unknown): ZodError {
+  try {
+    parse();
+    throw new Error("expected a ZodError");
+  } catch (err) {
+    return err as ZodError;
+  }
+}
 
-  return error;
+/** Minimal Hono-ish context for the error handler. */
+function fakeContext(overrides: { isVersioned?: boolean } = {}) {
+  const store = new Map<string, unknown>();
+  if (overrides.isVersioned) store.set("isVersionedRequest", true);
+  return {
+    req: { method: "POST", path: "/api/things" },
+    get: (key: string) => store.get(key),
+    set: (key: string, value: unknown) => store.set(key, value),
+    json: (body: unknown, status: number) => ({ body, status }),
+    _store: store,
+  };
 }
 
 // ---------------------------------------------------------------------------
-// isHandledErrorLike
-// ---------------------------------------------------------------------------
-
-describe("isHandledErrorLike", () => {
-  describe("when given a HandledError-like object", () => {
-    it("returns true", () => {
-      const err = makeHandledError();
-      expect(isHandledErrorLike(err)).toBe(true);
-    });
-  });
-
-  describe("when given a plain Error", () => {
-    it("returns false", () => {
-      expect(isHandledErrorLike(new Error("plain"))).toBe(false);
-    });
-  });
-
-  describe("when given null", () => {
-    it("returns false", () => {
-      expect(isHandledErrorLike(null)).toBe(false);
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// formatError -- HandledError-like
+// formatError -- HandledError
 // ---------------------------------------------------------------------------
 
 describe("formatError", () => {
-  describe("when given a HandledError-like error", () => {
+  describe("when given a HandledError", () => {
     describe("when the request is versioned", () => {
       it("returns the new format without the error field", () => {
-        const err = makeHandledError({
-          code: "not_found",
-          message: "Resource not found",
-          httpStatus: 404,
-          meta: { id: "abc" },
-        });
+        const err = new NotFoundError("not_found", "Resource", "abc");
 
         const { status, body } = formatError({ err, isVersioned: true });
 
         expect(status).toBe(404);
         expect(body.code).toBe("not_found");
-        expect(body.message).toBe("Resource not found");
+        expect(body.message).toBe("Resource not found: abc");
         expect(body.meta).toEqual({ id: "abc" });
         expect(body.error).toBeUndefined();
       });
 
       it("carries fault, tips and docsUrl when present", () => {
-        const err = makeHandledError({
-          code: "query_memory_exceeded",
-          httpStatus: 422,
-          fault: "customer",
-          tips: ["Narrow the time range"],
-          docsUrl: "https://docs.langwatch.ai/traces",
-        });
+        const err = new TestError(
+          "query_memory_exceeded",
+          "Query used too much memory",
+          {
+            httpStatus: 422,
+            fault: "customer",
+            tips: ["Narrow the time range"],
+            docsUrl: "https://docs.langwatch.ai/traces",
+          },
+        );
 
         const { body } = formatError({ err, isVersioned: true });
 
@@ -133,25 +79,11 @@ describe("formatError", () => {
         expect(body.tips).toEqual(["Narrow the time range"]);
         expect(body.docsUrl).toBe("https://docs.langwatch.ai/traces");
       });
-
-      it("omits remediation keys when absent", () => {
-        const err = makeHandledError({ code: "not_found", httpStatus: 404 });
-
-        const { body } = formatError({ err, isVersioned: true });
-
-        expect(body.fault).toBeUndefined();
-        expect(body.tips).toBeUndefined();
-        expect(body.docsUrl).toBeUndefined();
-      });
     });
 
     describe("when the request is unversioned", () => {
       it("returns the union format with the error field", () => {
-        const err = makeHandledError({
-          code: "not_found",
-          message: "Resource not found",
-          httpStatus: 404,
-        });
+        const err = new NotFoundError("not_found", "Resource", "abc");
 
         const { status, body } = formatError({ err, isVersioned: false });
 
@@ -162,22 +94,17 @@ describe("formatError", () => {
     });
 
     describe("back-compat `kind` alias", () => {
-      it("emits `kind` equal to `code` for a HandledError (versioned)", () => {
-        const err = makeHandledError({ code: "not_found", httpStatus: 404 });
+      it("emits `kind` equal to `code`", () => {
+        const err = new NotFoundError("not_found", "Resource", "abc");
         const { body } = formatError({ err, isVersioned: true });
         expect(body.kind).toBe("not_found");
         expect(body.kind).toBe(body.code);
       });
 
       it("emits `kind` for synthesized error bodies too", () => {
-        const zodErr = (() => {
-          try {
-            z.object({ name: z.string() }).parse({});
-            throw new Error("should not reach");
-          } catch (e) {
-            return e as ZodError;
-          }
-        })();
+        const zodErr = zodErrorFrom(() =>
+          z.object({ name: z.string() }).parse({}),
+        );
         expect(formatError({ err: zodErr, isVersioned: true }).body.kind).toBe(
           "validation_error",
         );
@@ -188,65 +115,78 @@ describe("formatError", () => {
     });
   });
 
+  describe("when given an object that merely looks like a HandledError", () => {
+    it("treats it as unknown rather than trusting its serialize()", () => {
+      // The framework used to duck-type. It no longer does: only real
+      // HandledError instances get to choose their own status and body.
+      const impostor = Object.assign(new Error("nope"), {
+        code: "not_found",
+        httpStatus: 404,
+        meta: {},
+        serialize: () => ({ code: "not_found", httpStatus: 404, reasons: [] }),
+      });
+
+      const { status, body } = formatError({ err: impostor, isVersioned: true });
+
+      expect(status).toBe(500);
+      expect(body.code).toBe("internal_error");
+      expect(body.message).toBe("An unknown error occurred");
+    });
+  });
+
   // -------------------------------------------------------------------------
   // ZodError
   // -------------------------------------------------------------------------
 
   describe("when given a ZodError", () => {
-    it("maps to validation_error with reasons per field", () => {
-      const schema = z.object({
-        name: z.string().min(1),
-        age: z.number(),
-      });
+    it("maps to validation_error with a reason per field", () => {
+      const zodError = zodErrorFrom(() =>
+        z
+          .object({ name: z.string().min(1), age: z.number() })
+          .parse({ name: "", age: "not-a-number" }),
+      );
 
-      let zodError: ZodError;
-      try {
-        schema.parse({ name: "", age: "not-a-number" });
-        throw new Error("should not reach");
-      } catch (err) {
-        zodError = err as ZodError;
-      }
-
-      const { status, body } = formatError({
-        err: zodError!,
-        isVersioned: true,
-      });
+      const { status, body } = formatError({ err: zodError, isVersioned: true });
 
       expect(status).toBe(422);
       expect(body.code).toBe("validation_error");
       expect(body.message).toBe("Validation error");
       expect(body.reasons).toEqual(
         expect.arrayContaining([
-          {
+          expect.objectContaining({
             code: "schema_failure",
             meta: expect.objectContaining({ field: "name", type: "too_small" }),
-          },
-          {
+          }),
+          expect.objectContaining({
             code: "schema_failure",
             meta: expect.objectContaining({
               field: "age",
               type: "invalid_type",
             }),
-          },
+          }),
         ]),
       );
     });
 
+    it("gains the remediation channel by travelling as a HandledError", () => {
+      // Before, the ZodError branch built a bare payload and validation errors
+      // silently missed fault/tips/docsUrl entirely.
+      const zodError = zodErrorFrom(() =>
+        z.object({ name: z.string() }).parse({}),
+      );
+
+      const { body } = formatError({ err: zodError, isVersioned: true });
+
+      expect(body.fault).toBe("customer");
+    });
+
     describe("when the request is unversioned", () => {
       it("includes the error field", () => {
-        const schema = z.object({ name: z.string() });
-        let zodError: ZodError;
-        try {
-          schema.parse({});
-          throw new Error("should not reach");
-        } catch (err) {
-          zodError = err as ZodError;
-        }
+        const zodError = zodErrorFrom(() =>
+          z.object({ name: z.string() }).parse({}),
+        );
 
-        const { body } = formatError({
-          err: zodError!,
-          isVersioned: false,
-        });
+        const { body } = formatError({ err: zodError, isVersioned: false });
         expect(body.error).toBe("Unprocessable Entity");
       });
     });
@@ -272,35 +212,23 @@ describe("formatError", () => {
   // -------------------------------------------------------------------------
 
   describe("when given an unknown error", () => {
-    it("returns 500 with a sanitized message in non-dev mode", () => {
-      const originalEnv = process.env["NODE_ENV"];
-      process.env["NODE_ENV"] = "production";
-      try {
-        const err = new Error("secret internal details");
-        const { status, body } = formatError({ err, isVersioned: true });
+    it.each(["production", "development"])(
+      "returns 500 with a sanitized message in %s",
+      (nodeEnv) => {
+        const originalEnv = process.env["NODE_ENV"];
+        process.env["NODE_ENV"] = nodeEnv;
+        try {
+          const err = new Error("secret internal details");
+          const { status, body } = formatError({ err, isVersioned: true });
 
-        expect(status).toBe(500);
-        expect(body.code).toBe("internal_error");
-        expect(body.message).toBe("An unknown error occurred");
-      } finally {
-        process.env["NODE_ENV"] = originalEnv;
-      }
-    });
-
-    it("does not expose the error message in development mode", () => {
-      const originalEnv = process.env["NODE_ENV"];
-      process.env["NODE_ENV"] = "development";
-      try {
-        const err = new Error("secret internal details");
-        const { status, body } = formatError({ err, isVersioned: true });
-
-        expect(status).toBe(500);
-        expect(body.code).toBe("internal_error");
-        expect(body.message).toBe("An unknown error occurred");
-      } finally {
-        process.env["NODE_ENV"] = originalEnv;
-      }
-    });
+          expect(status).toBe(500);
+          expect(body.code).toBe("internal_error");
+          expect(body.message).toBe("An unknown error occurred");
+        } finally {
+          process.env["NODE_ENV"] = originalEnv;
+        }
+      },
+    );
 
     describe("when the request is unversioned", () => {
       it("includes the error field", () => {
@@ -308,6 +236,93 @@ describe("formatError", () => {
         const { body } = formatError({ err, isVersioned: false });
         expect(body.error).toBe("Internal Server Error");
       });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createErrorHandler -- resolved error handoff
+// ---------------------------------------------------------------------------
+
+describe("createErrorHandler", () => {
+  describe("when the error is unhandled", () => {
+    it("publishes it with the 500 it sent", () => {
+      const handler = createErrorHandler();
+      const err = new Error("secret internal details");
+      const c = fakeContext();
+
+      handler(err, c as never);
+
+      expect(c._store.get("resolvedError")).toMatchObject({
+        status: 500,
+        error: err,
+      });
+    });
+
+    it("does not leak the cause into the response", () => {
+      const handler = createErrorHandler();
+
+      const res = handler(
+        new Error("secret internal details"),
+        fakeContext() as never,
+      ) as unknown as { body: { message: string } };
+
+      expect(res.body.message).toBe("An unknown error occurred");
+    });
+  });
+
+  describe("when the error is handled", () => {
+    it("publishes the error and the status it sent", () => {
+      const handler = createErrorHandler();
+      const err = new NotFoundError("not_found", "Resource", "abc");
+      const c = fakeContext();
+
+      handler(err as Error, c as never);
+
+      expect(c._store.get("resolvedError")).toMatchObject({
+        status: 404,
+        error: err,
+      });
+    });
+
+    it("carries the traceId through for the request logger", () => {
+      const handler = createErrorHandler();
+      const err = new TestError("upstream_down", "Upstream is down", {
+        httpStatus: 502,
+        fault: "provider",
+      });
+      (err as { traceId?: string }).traceId = "trace-abc";
+      const c = fakeContext();
+
+      handler(err as Error, c as never);
+
+      expect(c._store.get("resolvedError")).toMatchObject({
+        status: 502,
+        traceId: "trace-abc",
+      });
+    });
+  });
+
+  describe("when the error is a ZodError", () => {
+    it("publishes the promoted ValidationError and the 422 the caller received", () => {
+      // Regression: a bare ZodError has no `httpStatus`, so the request logger
+      // derived 500 and logged at error while the response went out 422.
+      const handler = createErrorHandler();
+      const zodError = zodErrorFrom(() =>
+        z.object({ name: z.string() }).parse({}),
+      );
+      const c = fakeContext();
+
+      handler(zodError as unknown as Error, c as never);
+
+      const resolved = c._store.get("resolvedError") as {
+        status: number;
+        error: HandledError;
+      };
+      expect(resolved.status).toBe(422);
+      expect(HandledError.isHandled(resolved.error)).toBe(true);
+      expect(resolved.error.code).toBe("validation_error");
+      expect(resolved.error.fault).toBe("customer");
     });
   });
 });
