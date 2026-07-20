@@ -17,6 +17,7 @@ export enum ProductScreenIndex {
   VIA_PLATFORM = 2,
   VIA_CLAUDE_DESKTOP = 3,
   MANUALLY = 4,
+  MODEL_PROVIDER = 5,
 }
 
 export enum OnboardingFlowDirection {
