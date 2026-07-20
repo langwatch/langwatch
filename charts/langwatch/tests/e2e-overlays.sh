@@ -523,11 +523,27 @@ test_install_prod_ingress() {
     -o jsonpath='{.spec.tls[0].secretName}')
   assert_eq "Ingress TLS secret" "$tls_secret" "langwatch-tls"
 
-  # Ingress backend auto-wired
+  # Ingress backend auto-wired. Select the app's catch-all path by VALUE, not by
+  # index: ingress.blockedPaths emits /api/internal first, so paths[0] is the
+  # blackhole Service, not the app.
   local backend_svc
   backend_svc=$(kc get ingress "${RELEASE}-ingress" \
-    -o jsonpath='{.spec.rules[0].http.paths[0].backend.service.name}')
+    -o jsonpath='{.spec.rules[0].http.paths[?(@.path=="/")].backend.service.name}')
   assert_eq "Ingress backend → app" "$backend_svc" "${RELEASE}-app"
+
+  # …and the blocked control-plane prefix really is wired to the no-endpoints
+  # blackhole in a live cluster, not just in the rendered template.
+  local blocked_svc
+  blocked_svc=$(kc get ingress "${RELEASE}-ingress" \
+    -o jsonpath='{.spec.rules[0].http.paths[?(@.path=="/api/internal")].backend.service.name}')
+  assert_eq "Ingress /api/internal → blackhole" "$blocked_svc" "${RELEASE}-blackhole"
+
+  # The blackhole Service exists and has no Endpoints — the property that makes
+  # the block a dead end (502/503) rather than a route to something live.
+  local blackhole_eps
+  blackhole_eps=$(kc get endpoints "${RELEASE}-blackhole" \
+    -o jsonpath='{.subsets}' 2>/dev/null || true)
+  assert_eq "Blackhole Service has no Endpoints" "$blackhole_eps" ""
 
   # Workers Deployment created (0 replicas, but resource exists)
   kc get deployment "${RELEASE}-workers" &>/dev/null \
