@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MapProjectionExecutor } from "../mapProjectionExecutor";
 import {
   createMockAppendStore,
   createMockMapProjectionDefinition,
@@ -7,6 +6,7 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
+import { MapProjectionExecutor } from "../mapProjectionExecutor";
 import type { ProjectionStoreContext } from "../projectionStoreContext";
 
 describe("MapProjectionExecutor.execute", () => {
@@ -103,9 +103,9 @@ describe("MapProjectionExecutor.execute", () => {
         tenantId,
       };
 
-      await expect(
-        executor.execute(mapDef, event, context),
-      ).rejects.toThrow("map failed");
+      await expect(executor.execute(mapDef, event, context)).rejects.toThrow(
+        "map failed",
+      );
     });
   });
 
@@ -132,9 +132,79 @@ describe("MapProjectionExecutor.execute", () => {
         tenantId,
       };
 
-      await expect(
-        executor.execute(mapDef, event, context),
-      ).rejects.toThrow("append failed");
+      await expect(executor.execute(mapDef, event, context)).rejects.toThrow(
+        "append failed",
+      );
+    });
+  });
+});
+
+describe("MapProjectionExecutor.executeBatch", () => {
+  const tenantId = createTestTenantId();
+
+  it("persists mapped records with one tenant-scoped bulk append", async () => {
+    const executor = new MapProjectionExecutor();
+    const store = createMockAppendStore<{ aggregateId: string }>();
+    const bulkAppend = vi.fn(async () => undefined);
+    store.bulkAppend = bulkAppend;
+    const mapDef = createMockMapProjectionDefinition("mapper", {
+      store,
+      map: (event) => ({ aggregateId: String(event.aggregateId) }),
+    });
+    const events = ["one", "two"].map((aggregateId) =>
+      createTestEvent(aggregateId, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
+    );
+    const contexts = events.map((event) => ({
+      aggregateId: String(event.aggregateId),
+      tenantId,
+      retentionPolicy: { traces: 49, scenarios: 49, experiments: 49 },
+    }));
+
+    const result = await executor.executeBatch(mapDef, events, contexts);
+
+    expect(result.map(({ record }) => record)).toEqual([
+      { aggregateId: "one" },
+      { aggregateId: "two" },
+    ]);
+    expect(bulkAppend).toHaveBeenCalledTimes(1);
+    expect(bulkAppend).toHaveBeenCalledWith(
+      [{ aggregateId: "one" }, { aggregateId: "two" }],
+      {
+        tenantId,
+        retentionPolicy: { traces: 49, scenarios: 49, experiments: 49 },
+      },
+    );
+    expect(store.append).not.toHaveBeenCalled();
+  });
+
+  describe("given a batch whose contexts carry different tenantIds", () => {
+    describe("when the store exposes bulkAppend", () => {
+      it("throws the cross-tenant guard error without appending", async () => {
+        const executor = new MapProjectionExecutor();
+        const store = createMockAppendStore<{ aggregateId: string }>();
+        const bulkAppend = vi.fn(async () => undefined);
+        store.bulkAppend = bulkAppend;
+        const mapDef = createMockMapProjectionDefinition("mapper", {
+          store,
+          map: (event) => ({ aggregateId: String(event.aggregateId) }),
+        });
+        const tenantA = createTestTenantId("tenant-a");
+        const tenantB = createTestTenantId("tenant-b");
+        const events = [
+          createTestEvent("one", TEST_CONSTANTS.AGGREGATE_TYPE, tenantA),
+          createTestEvent("two", TEST_CONSTANTS.AGGREGATE_TYPE, tenantB),
+        ];
+        const contexts = events.map((event) => ({
+          aggregateId: String(event.aggregateId),
+          tenantId: event.tenantId,
+        }));
+
+        await expect(
+          executor.executeBatch(mapDef, events, contexts),
+        ).rejects.toThrow("Map projection batches cannot cross tenants");
+        expect(bulkAppend).not.toHaveBeenCalled();
+        expect(store.append).not.toHaveBeenCalled();
+      });
     });
   });
 });

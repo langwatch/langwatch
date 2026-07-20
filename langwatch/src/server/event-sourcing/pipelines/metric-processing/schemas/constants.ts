@@ -1,0 +1,22 @@
+export const METRIC_DATA_POINT_RECEIVED_EVENT_TYPE =
+  "lw.obs.metric.data_point_received" as const;
+export const METRIC_DATA_POINT_RECEIVED_EVENT_VERSION_LATEST =
+  "2026-07-15" as const;
+
+export const METRIC_PROCESSING_EVENT_TYPES = [
+  METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
+] as const;
+
+export const RECORD_METRIC_DATA_POINT_COMMAND_TYPE =
+  "lw.obs.metric.record_data_point" as const;
+
+export const METRIC_PROCESSING_COMMAND_TYPES = [
+  RECORD_METRIC_DATA_POINT_COMMAND_TYPE,
+] as const;
+
+export const METRIC_ROLLUP_INTERVAL_MS = 30_000;
+export const METRIC_MAP_COALESCE_MAX_BATCH = 256;
+export const MAX_CANONICAL_METRIC_PAYLOAD_BYTES = 256 * 1024;
+export const DEFAULT_METRIC_COMMAND_SHARDS = 16;
+export const MIN_METRIC_COMMAND_SHARDS = 1;
+export const MAX_METRIC_COMMAND_SHARDS = 128;

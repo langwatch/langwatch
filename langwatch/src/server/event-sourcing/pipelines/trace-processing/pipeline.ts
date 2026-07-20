@@ -18,7 +18,8 @@ import {
   logCommandGroupKey,
 } from "./commands/logCommandGroupKey";
 import { RecordLogCommand } from "./commands/recordLogCommand";
-import { RecordMetricCommand } from "./commands/recordMetricCommand";
+import { RecordLogContributionCommand } from "./commands/recordLogContributionCommand";
+import { RecordMetricCorrelationCommand } from "./commands/recordMetricCorrelationCommand";
 import {
   RECORD_SPAN_DEDUPLICATION,
   RecordSpanCommand,
@@ -29,7 +30,6 @@ import {
   spanCommandGroupKey,
 } from "./commands/spanCommandGroupKey";
 import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
-import { MetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
 import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
 import {
   type TraceAnalyticsData,
@@ -50,16 +50,24 @@ import {
 } from "./schemas/constants";
 import type { TraceProcessingEvent } from "./schemas/events";
 import type { NormalizedLogRecord } from "./schemas/logRecords";
-import type { NormalizedMetricRecord } from "./schemas/metricRecords";
 import type { NormalizedSpan } from "./schemas/spans";
 import { TraceRequestUtils } from "./utils/traceRequest.utils";
 
 export interface TraceProcessingPipelineDeps {
   spanAppendStore: AppendStore<NormalizedSpan>;
+  /**
+   * CUTOVER ONLY. Canonical logs replace this path, and nothing in this build
+   * sends `recordLog` — but during a rolling deploy an old instance still can,
+   * and the `recordLog` command stays registered to accept it. Without this
+   * projection those commands append a `log_record_received` event that no
+   * projection consumes, so the record reaches neither `stored_log_records`
+   * nor canonical `log_records`. Migration 00049 retains the legacy table on
+   * exactly this promise. Remove together with `recordLog`, the legacy table
+   * and this store once no pre-cutover instance can be running.
+   */
+  logRecordAppendStore: AppendStore<NormalizedLogRecord>;
   /** ADR-034 Phase 1: per-span rollup writer (app-side, replaces the MV). */
   traceAnalyticsRollupAppendStore: AppendStore<TraceAnalyticsRollupRow>;
-  logRecordAppendStore: AppendStore<NormalizedLogRecord>;
-  metricRecordAppendStore: AppendStore<NormalizedMetricRecord>;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   /** ADR-034 Phase 2: slim per-trace fold writer (silent dual-tap, no read path). */
   traceAnalyticsStore: FoldProjectionStore<TraceAnalyticsData>;
@@ -182,16 +190,12 @@ export function createTraceProcessingPipeline(
         store: deps.traceAnalyticsRollupAppendStore,
       }),
     )
+    // CUTOVER ONLY — drains `recordLog` commands still in flight from
+    // pre-canonical instances. See logRecordAppendStore on the deps above.
     .withMapProjection(
       "logRecordStorage",
       new LogRecordStorageMapProjection({
         store: deps.logRecordAppendStore,
-      }),
-    )
-    .withMapProjection(
-      "metricRecordStorage",
-      new MetricRecordStorageMapProjection({
-        store: deps.metricRecordAppendStore,
       }),
     )
     .withReactor("traceSummary", "originGate", deps.originGateReactor)
@@ -247,7 +251,7 @@ export function createTraceProcessingPipeline(
       deps.spanStorageBroadcastReactor,
     )
     .withReactor(
-      "logRecordStorage",
+      "traceSummary",
       "claudeCodeSpanSync",
       deps.claudeCodeSpanSyncReactor,
     );
@@ -369,7 +373,8 @@ export function createTraceProcessingPipeline(
   return recordSpanBuilder
     .withCommand("assignTopic", AssignTopicCommand)
     .withCommand("recordLog", RecordLogCommand, recordLogOptions)
-    .withCommand("recordMetric", RecordMetricCommand)
+    .withCommand("recordLogContribution", RecordLogContributionCommand)
+    .withCommand("recordMetricCorrelation", RecordMetricCorrelationCommand)
     .withCommand("resolveOrigin", ResolveOriginCommand)
     .withCommand("addAnnotation", AddAnnotationCommand)
     .withCommand("removeAnnotation", RemoveAnnotationCommand)
