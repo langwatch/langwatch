@@ -38,11 +38,21 @@ const tenantId = `test-monitor-rate-${nanoid()}`;
 const PII_EVALUATOR_ID = `${tenantId}-pii`;
 const OTHER_EVALUATOR_ID = `${tenantId}-compliance`;
 
+// Days are anchored relative to now, never fixed calendar dates: the raw
+// ch.insert seeding takes the tables' `_retention_days` DDL default
+// (MIGRATION_DEFAULT_RETENTION_DAYS) and rows TTL-delete that many days after
+// OccurredAt, so a fixed date eventually ages past the horizon and the
+// fixtures silently vanish before the reads.
+const DAY_MS = 24 * 60 * 60 * 1000;
+const dayString = (daysAgo: number) =>
+  new Date(Math.floor(Date.now() / DAY_MS) * DAY_MS - daysAgo * DAY_MS)
+    .toISOString()
+    .slice(0, 10);
 // Four active days inside the query window. PII only runs on the last one.
-const DAY_1 = "2026-07-12";
-const DAY_2 = "2026-07-13";
-const DAY_3 = "2026-07-14";
-const PII_DAY = "2026-07-16";
+const DAY_1 = dayString(8);
+const DAY_2 = dayString(7);
+const DAY_3 = dayString(6);
+const PII_DAY = dayString(4);
 
 let ch: ClickHouseClient;
 let shim: ClickHouseLegacyAnalyticsShim;
@@ -130,8 +140,8 @@ const passRateKey = buildSeriesName(passRateSeries, 0);
 function queryInput(timeScale: number | "full") {
   return {
     projectId: tenantId,
-    startDate: new Date("2026-07-10T00:00:00.000Z").getTime(),
-    endDate: new Date("2026-07-17T00:00:00.000Z").getTime(),
+    startDate: new Date(`${dayString(10)}T00:00:00.000Z`).getTime(),
+    endDate: new Date(`${dayString(3)}T00:00:00.000Z`).getTime(),
     filters: {},
     series: [passRateSeries],
     timeScale,
