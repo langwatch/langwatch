@@ -39,6 +39,11 @@ Feature: Topic clustering owns the topic model
     And their ids, names, and hierarchy are preserved exactly
     And re-running the seed changes nothing
 
+  Scenario: A late duplicate seed can never remove recorded topics
+    Given a project whose topics were seeded and then extended by clustering
+    When a duplicate seed carrying only the original topics arrives late
+    Then the model keeps every topic recorded since the first seed
+
   Scenario: Seeding coordinates across replicas without a deploy-time job
     Given several worker replicas starting at once
     When seeding runs on service start

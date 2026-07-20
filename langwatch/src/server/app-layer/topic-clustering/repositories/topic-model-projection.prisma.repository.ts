@@ -51,6 +51,7 @@ export class PrismaTopicModelProjectionRepository
       p95Distance: row.p95Distance,
       automaticallyGenerated: row.automaticallyGenerated,
       firstRecordedAt: row.createdAt.getTime(),
+      recordedByEventId: row.lastEventId,
     }));
 
     return {
@@ -88,9 +89,9 @@ export class PrismaTopicModelProjectionRepository
       "id" | "projectId"
     >;
 
-    // Parents before subtopics, purely for readability of the write — the
-    // Topic table carries no DB-level FK (see 0_init), so ordering is not
-    // load-bearing.
+    // Parents before subtopics — LOAD-BEARING: relationMode = "prisma"
+    // makes the client emulate the Topic self-relation (no DB FK), so a
+    // child upserted before its parent exists is rejected.
     const ordered = [
       ...topics.filter((t) => t.parentId === null),
       ...topics.filter((t) => t.parentId !== null),
@@ -111,8 +112,21 @@ export class PrismaTopicModelProjectionRepository
       // an empty state must never reconcile the table — `notIn: []` would
       // delete every row for the project. Advancing the cursor while
       // leaving the rows is the recoverable direction.
+      //
+      // Two phases, children then parents: the client-emulated Subtopics
+      // relation (relationMode = "prisma") refuses to delete a parent that
+      // still has children — even when the same deleteMany removes both.
+      // A batch replace drops the whole previous model at once, so a
+      // single-phase reconcile would fail on every re-cluster.
       ...(keptIds.length > 0
         ? [
+            this.prisma.topic.deleteMany({
+              where: {
+                projectId,
+                parentId: { not: null },
+                id: { notIn: keptIds },
+              },
+            }),
             this.prisma.topic.deleteMany({
               where: { projectId, id: { notIn: keptIds } },
             }),
@@ -121,10 +135,10 @@ export class PrismaTopicModelProjectionRepository
       ...ordered.map((topic) =>
         this.prisma.topic.upsert({
           // Topic ids are globally-unique nanoids minted by clustering or
-          // carried from seed events, and the reconcile delete above is
-          // project-scoped — a cross-project id collision would take a
-          // forged event to produce.
-          where: { id: topic.id },
+          // carried from seed events; projectId rides along both to satisfy
+          // the tenancy guard and so a forged cross-project id could never
+          // update another tenant's row.
+          where: { id: topic.id, projectId },
           create: {
             id: topic.id,
             projectId,
@@ -135,6 +149,7 @@ export class PrismaTopicModelProjectionRepository
             p95Distance: topic.p95Distance,
             automaticallyGenerated: topic.automaticallyGenerated,
             createdAt: new Date(topic.firstRecordedAt),
+            lastEventId: topic.recordedByEventId,
           },
           update: {
             projectId,
@@ -147,6 +162,7 @@ export class PrismaTopicModelProjectionRepository
             // The batch cadence gate reads the newest topic's age from
             // createdAt; keep it deterministic under replay.
             createdAt: new Date(topic.firstRecordedAt),
+            lastEventId: topic.recordedByEventId,
           },
         }),
       ),

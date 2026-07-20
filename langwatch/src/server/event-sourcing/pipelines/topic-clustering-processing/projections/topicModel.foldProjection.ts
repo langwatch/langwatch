@@ -17,6 +17,14 @@ import { TopicClusteringTopicsRecordedEventSchema } from "../schemas/events";
 /** A projected topic with its firstRecordedAt resolved (never optional). */
 export type ProjectedTopic = Omit<TopicModelEntry, "firstRecordedAt"> & {
   firstRecordedAt: number;
+  /**
+   * The `topics_recorded` event that recorded this topic — per-row
+   * provenance into the event log. A merge keeps untouched topics'
+   * provenance, so this names the event that actually carried the topic,
+   * not merely the last fold. Null only on states loaded from rows written
+   * before the column existed.
+   */
+  recordedByEventId: string | null;
 };
 
 /**
@@ -96,6 +104,7 @@ export class TopicModelFoldProjection
         topic.firstRecordedAt ??
         existingById.get(topic.id)?.firstRecordedAt ??
         event.occurredAt,
+      recordedByEventId: event.id,
     }));
 
     if (event.data.mode === TOPIC_MODEL_RECORD_MODE.REPLACE) {

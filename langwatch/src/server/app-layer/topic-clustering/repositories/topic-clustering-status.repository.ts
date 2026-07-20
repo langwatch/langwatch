@@ -44,6 +44,9 @@ export class PrismaTopicClusteringStatusRepository
       }),
       this.prisma.processManagerInstance.findUnique({
         where: {
+          // The bare projectId satisfies the tenancy guard (same pattern as
+          // PrismaProcessStore); the compound key is the actual selector.
+          projectId,
           processName_projectId_processKey: {
             processName: TOPIC_CLUSTERING_PROCESS_NAME,
             projectId,
