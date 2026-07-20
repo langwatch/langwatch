@@ -111,7 +111,6 @@ import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { LangyThinkingLine } from "./LangyThinkingLine";
 import { toPendingCapabilities } from "./LangyToolActivity";
 import { LangyWave } from "./LangyWave";
-import { langyThinkingShimmerStyles } from "./langyShimmer";
 import {
   type LangyProposal,
   MessageContent,
@@ -1450,8 +1449,9 @@ function LangyPanel({
                 })}
       >
         {/* Texture, under the content (which stacks at zIndex 1) and inert to
-          the pointer. Dark only, the light panel is the app's own clean
-          surface. CSS does the gating, see langyTheme.css. */}
+          the pointer. Two gates on purpose: the JSX renders it in the FLOATING
+          card only (the docked card stays plain), and langyTheme.css shows it
+          on the dark ground only (light is the app's own clean surface). */}
         {floating ? <Box className="langy-signal-grid" aria-hidden /> : null}
         {/* A whisper of the brand rising from the top of the panel, so the ink
           ground has depth and a hint of identity instead of reading flat. Dark

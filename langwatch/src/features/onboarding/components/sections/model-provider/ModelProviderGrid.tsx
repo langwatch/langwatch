@@ -32,12 +32,12 @@ export function ModelProviderGrid({
   // The Langy panel already leads with its own "needs a model" heading, and
   // its column is a third the width of an onboarding page: no second heading,
   // and compact cards so the grid doesn't dwarf the panel.
-  const compact = variant === "langy";
+  const isCompact = variant === "langy";
 
   return (
     <VStack align="stretch" gap={3}>
       <VStack align="stretch" gap={0}>
-        {!compact && (
+        {!isCompact && (
           <Text fontSize="md" fontWeight="semibold">
             Give LangWatch access to{" "}
             {modelProvider?.label ?? "selected model provider"}
@@ -47,13 +47,13 @@ export function ModelProviderGrid({
           {variantDescriptions[variant]}
         </Text>
       </VStack>
-      <HStack gap={compact ? 2 : 3} wrap="wrap">
+      <HStack gap={isCompact ? 2 : 3} wrap="wrap">
         {modelProviderRegistry.map((mp) => (
           <SelectableIconCard
             key={mp.key}
             label={mp.label}
-            size={compact ? "sm" : "md"}
-            iconSize={compact ? "lg" : "2xl"}
+            size={isCompact ? "sm" : "md"}
+            iconSize={isCompact ? "lg" : "2xl"}
             icon={mp.icon}
             selected={mp.key === modelProviderKey}
             onClick={() => onSelectModelProvider(mp.key)}

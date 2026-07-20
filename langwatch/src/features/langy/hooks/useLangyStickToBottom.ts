@@ -74,8 +74,6 @@ export function useLangyStickToBottom({
   // and must see the CURRENT value, not one closed over at subscribe time); the
   // state is what the UI renders. They are kept in lockstep by `setPinned`.
   const pinnedRef = useRef(true);
-  const enabledRef = useRef(enabled);
-  enabledRef.current = enabled;
   const [isPinned, setIsPinned] = useState(true);
   const [canScroll, setCanScroll] = useState(false);
 
@@ -199,12 +197,12 @@ export function useLangyStickToBottom({
 
     const observer = new ResizeObserver(() => {
       setCanScroll(measure(el).overflows);
-      if (!enabledRef.current || !pinnedRef.current) return;
+      if (!enabled || !pinnedRef.current) return;
       scrollToEnd(reduceMotion ? "auto" : "smooth");
     });
     observer.observe(content);
     return () => observer.disconnect();
-  }, [measure, reduceMotion, scrollToEnd]);
+  }, [measure, reduceMotion, scrollToEnd, enabled]);
 
   return { scrollRef, contentRef, endRef, isPinned, canScroll, jumpToLatest };
 }
