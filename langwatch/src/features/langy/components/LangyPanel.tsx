@@ -758,15 +758,18 @@ function LangyPanel({
     }
   }, [activeConversationId, applyHistoryToEngine]);
 
+  const isBusy = status === "submitted" || status === "streaming";
+
   // Foreign-turn re-hydration. A turn this client did NOT drive (another tab, a
   // recovered/again-driven turn, a programmatic caller) grows the open
   // conversation's durable history; `useLangyFreshness` invalidates the
   // `langy.messages` query on the id-only signal. Reflect that growth in the
   // engine so the open thread updates without a manual refresh — the engine is
   // what renders, and the user-selection gate above only re-hydrates on an
-  // explicit open. Three guards keep it from clobbering the live path:
+  // explicit open. Four guards keep it from clobbering the live path:
   //   - a pending user selection owns the engine — let that effect apply it;
   //   - a live self-driven turn (submitted/streaming) owns the engine;
+  //   - a refetch in flight (isFetchingHistory) — wait for it to settle;
   //   - apply ONLY when durable is AHEAD of the engine, never shrinking it, so a
   //     momentarily-stale refetch at a turn's settle boundary can't flash the
   //     pre-answer history.
@@ -777,7 +780,7 @@ function LangyPanel({
     if (
       !shouldRehydrateEngineFromDurable({
         isHistoryLoadPending: historyLoadConversationId !== null,
-        isStreaming: status === "submitted" || status === "streaming",
+        isStreaming: isBusy,
         isFetchingHistory,
         hasActiveConversation: activeConversationId !== null,
         durableMessageCount: durableCount,
@@ -789,7 +792,7 @@ function LangyPanel({
     applyHistoryToEngine(historyMessages);
   }, [
     historyLoadConversationId,
-    status,
+    isBusy,
     isFetchingHistory,
     activeConversationId,
     historyMessages,
@@ -825,7 +828,6 @@ function LangyPanel({
   // and the open conversation's status stay fresh without heavy polling.
   useLangyFreshness(activeConversationId);
 
-  const isBusy = status === "submitted" || status === "streaming";
   const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
   const canDrainQueuedMessages = !isBusy && !serverTurnInFlight;
   const isEmpty = messages.length === 0;
