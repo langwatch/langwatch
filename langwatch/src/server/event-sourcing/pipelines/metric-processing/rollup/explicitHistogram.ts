@@ -44,6 +44,26 @@ function coarsenExplicit({
   return out;
 }
 
+/**
+ * The predecessor a cumulative point is differenced against, or undefined when
+ * the sequence reset/gapped. Bounds selection and differencing share this
+ * predicate so they can never disagree about which points contribute.
+ */
+function usablePredecessor({
+  point,
+  all,
+  index,
+}: {
+  point: CanonicalMetricDataPoint;
+  all: CanonicalMetricDataPoint[];
+  index: number;
+}): CanonicalMetricDataPoint | undefined {
+  if (point.aggregationTemporality !== "cumulative") return undefined;
+  const previous = previousPoint(all, index);
+  if (!previous || previous.metricKind !== "histogram") return undefined;
+  return startsNewSequence(previous, point) ? undefined : previous;
+}
+
 /** Predecessors that a cumulative point in this bucket will be differenced against. */
 function usablePredecessors({
   entries,
@@ -54,14 +74,8 @@ function usablePredecessors({
 }): CanonicalMetricDataPoint[] {
   const predecessors: CanonicalMetricDataPoint[] = [];
   for (const { point, index } of entries) {
-    if (point.aggregationTemporality !== "cumulative") continue;
-    const previous = previousPoint(all, index);
-    if (
-      !startsNewSequence(previous, point) &&
-      previous?.metricKind === "histogram"
-    ) {
-      predecessors.push(previous);
-    }
+    const previous = usablePredecessor({ point, all, index });
+    if (previous) predecessors.push(previous);
   }
   return predecessors;
 }
@@ -78,11 +92,8 @@ function differenceHistogramPoint({
   all: CanonicalMetricDataPoint[];
   bounds: number[];
 }): { counts: bigint[]; count: bigint; sum: number | null } | null {
-  const previous = previousPoint(all, index);
+  const previous = usablePredecessor({ point, all, index });
   if (!previous) return null;
-  const usable =
-    !startsNewSequence(previous, point) && previous.metricKind === "histogram";
-  if (!usable) return null;
   const previousCounts = coarsenExplicit({ point: previous, targetBounds: bounds });
   const currentCounts = coarsenExplicit({ point, targetBounds: bounds });
   const deltaCounts = currentCounts.map(
