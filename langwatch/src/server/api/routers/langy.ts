@@ -440,7 +440,7 @@ export const langyRouter = createTRPCRouter({
    * turn. Returns the ids the client subscribes to `onTurnStream` with.
    *
    * This is the tRPC replacement for `POST /api/langy/chat` on the create path.
-   * The Phase-1 gate (session + demo refusal + `evaluations:view` + rate limit)
+   * The Phase-1 gate (session + demo refusal + `langy:create` + rate limit)
    * is the `langyTurnProcedure`; the turn service throws DomainErrors that the
    * shared middleware maps to coded TRPCErrors.
    */
@@ -490,12 +490,6 @@ export const langyRouter = createTRPCRouter({
     ),
 
   /**
-   * Count of conversations touched since a timestamp — the "N new" pill. The
-   * client only polls this when the freshness SSE is disconnected (adaptive
-   * backoff), mirroring `tracesV2.newCount`. The count derivation lives in the
-   * service (`countSince`), not here — transport only shapes input/output.
-   */
-  /**
    * The model allowlist the composer's picker narrows to, or null when the
    * project's Langy VK sets none (every eligible model is allowed).
    *
@@ -514,6 +508,12 @@ export const langyRouter = createTRPCRouter({
     },
   ),
 
+  /**
+   * Count of conversations touched since a timestamp — the "N new" pill. The
+   * client only polls this when the freshness SSE is disconnected (adaptive
+   * backoff), mirroring `tracesV2.newCount`. The count derivation lives in the
+   * service (`countSince`), not here — transport only shapes input/output.
+   */
   newCount: langyReadProcedure
     .input(z.object({ since: z.number() }))
     .query(async ({ input, ctx }): Promise<{ count: number }> => {

@@ -9,16 +9,17 @@ import { resolveAttributionUserId } from "./langyAttribution";
 const logger = createLogger("langwatch:langy:virtual-key");
 
 /**
- * Display name the VK row carries in the gateway/virtual-keys list. Exported
- * for UI heuristics ("is this row the auto-managed Langy VK?").
+ * Display name the VK row carries. Server-side only — the row no longer
+ * appears in customer-facing listings (purpose USER filter), so nothing in
+ * the UI keys on this.
  */
 export const LANGY_VK_DISPLAY_NAME = "Langy";
 
 /**
  * Idempotently provision a Langy VirtualKey for a project + persist its
  * secret to ProjectSecret. Exported so project.create can call it eagerly
- * (so users see the VK in /virtual-keys from day 1) AND the credential
- * service can still self-heal on first chat. Returns the VK secret token.
+ * AND the credential service can still self-heal on first chat. Returns the
+ * VK secret token.
  *
  * Safe to call multiple times for the same project — the ProjectSecret
  * unique constraint on (projectId, name) plus race-loser retry guarantees
@@ -79,8 +80,9 @@ export async function provisionLangyVirtualKey(args: {
     principalUserId: null,
     scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
     actorUserId,
-    // Marks this VK as managed by Langy so the gateway UI badges + locks the
-    // row, and LangyCredentialService can look it up by column instead of
+    // Marks this VK as product-managed: listings filter it out, the
+    // requireOwn seam refuses customer mutations on it, and
+    // LangyCredentialService looks it up by this column instead of
     // name-matching (which broke under user renames + i18n).
     purpose: "LANGY",
   });

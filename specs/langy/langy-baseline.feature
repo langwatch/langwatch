@@ -43,7 +43,7 @@ Feature: Langy in-product AI assistant — baseline (v1)
     And no evaluator from another project is included
 
   Scenario: Permission gate at chat entry
-    Given I do not have "evaluations:view" permission for project "demo"
+    Given I do not have "langy:create" permission for project "demo"
     When I send a message to Langy in project "demo"
     Then the request is rejected with a 403
 
