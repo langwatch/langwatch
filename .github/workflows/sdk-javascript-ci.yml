@@ -223,6 +223,12 @@ jobs:
 
       - name: Start LangWatch server and worker
         working-directory: langwatch
+        env:
+          # The app server and the workers are langwatch *platform* processes, and
+          # a platform process refuses to boot with LANGWATCH_API_KEY set (it would
+          # export its own telemetry into its own trace ingest). The workflow-level
+          # key belongs to the SDK client under test, so clear it for this step only.
+          LANGWATCH_API_KEY: ""
         run: |
           NODE_ENV=production pnpm run start &
           # Start the worker process so the event-sourcing pipeline
