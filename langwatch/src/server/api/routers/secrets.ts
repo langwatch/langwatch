@@ -78,6 +78,16 @@ export const secretsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("secrets:manage"))
     .mutation(async ({ ctx, input }) => {
+      // The uppercase-only name schema can never produce a reserved
+      // (lowercase) name today; this check pins the boundary rather than
+      // trusting that disjointness to hold forever.
+      if (RESERVED_PROJECT_SECRET_NAMES.includes(input.name)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `The name "${input.name}" is reserved`,
+        });
+      }
+
       const count = await ctx.prisma.projectSecret.count({
         where: { projectId: input.projectId },
       });
