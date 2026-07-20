@@ -776,7 +776,7 @@ function LangyPanel({
     ).length;
     if (
       !shouldRehydrateEngineFromDurable({
-        historyLoadPending: historyLoadConversationId !== null,
+        isHistoryLoadPending: historyLoadConversationId !== null,
         isStreaming: status === "submitted" || status === "streaming",
         isFetchingHistory,
         hasActiveConversation: activeConversationId !== null,

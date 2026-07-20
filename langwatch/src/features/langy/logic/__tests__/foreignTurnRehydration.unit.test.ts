@@ -5,7 +5,7 @@ import { shouldRehydrateEngineFromDurable } from "../foreignTurnRehydration";
 // the engine — the case that MUST re-hydrate. Each test overrides one field to
 // prove a single guard.
 const rehydrating = {
-  historyLoadPending: false,
+  isHistoryLoadPending: false,
   isStreaming: false,
   isFetchingHistory: false,
   hasActiveConversation: true,
@@ -25,7 +25,7 @@ describe("shouldRehydrateEngineFromDurable", () => {
       expect(
         shouldRehydrateEngineFromDurable({
           ...rehydrating,
-          historyLoadPending: true,
+          isHistoryLoadPending: true,
         }),
       ).toBe(false);
     });

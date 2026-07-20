@@ -75,6 +75,7 @@ describe("useLangyFreshness", () => {
         renderHook(() => useLangyFreshness("conv_open"));
         capturedOnUpdate?.([signal("conv_open")]);
 
+        expect(listCancel).toHaveBeenCalledTimes(1);
         expect(listInvalidate).toHaveBeenCalledTimes(1);
       });
     });
@@ -91,6 +92,7 @@ describe("useLangyFreshness", () => {
         renderHook(() => useLangyFreshness("conv_open"));
         capturedOnUpdate?.([signal("conv_other")]);
 
+        expect(listCancel).toHaveBeenCalledTimes(1);
         expect(listInvalidate).toHaveBeenCalledTimes(1);
       });
     });
@@ -103,6 +105,7 @@ describe("useLangyFreshness", () => {
         capturedOnUpdate?.([signal("conv_any")]);
 
         expect(messagesInvalidate).not.toHaveBeenCalled();
+        expect(listCancel).toHaveBeenCalledTimes(1);
         expect(listInvalidate).toHaveBeenCalledTimes(1);
       });
     });

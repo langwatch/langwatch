@@ -22,7 +22,7 @@
  */
 export function shouldRehydrateEngineFromDurable(params: {
   /** A user selection/switch is loading — that effect owns the engine. */
-  historyLoadPending: boolean;
+  isHistoryLoadPending: boolean;
   /** A live self-driven turn (useChat submitted/streaming) owns the engine. */
   isStreaming: boolean;
   /** The durable messages query is mid-refetch; wait for fresh data. */
@@ -33,7 +33,7 @@ export function shouldRehydrateEngineFromDurable(params: {
   /** messages currently held by the useChat engine. */
   engineMessageCount: number;
 }): boolean {
-  if (params.historyLoadPending) return false;
+  if (params.isHistoryLoadPending) return false;
   if (params.isStreaming) return false;
   if (params.isFetchingHistory) return false;
   if (!params.hasActiveConversation) return false;
