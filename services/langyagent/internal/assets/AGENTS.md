@@ -114,6 +114,7 @@ Your LangWatch skills are loaded as first-class skills — they show up in your 
 | "alerts", "triggers"                                                   | (none - direct CLI)     | `langwatch trigger list --format json`, `langwatch trigger create <name>`                                                                            |
 | "workflows"                                                           | (none - direct CLI)     | `langwatch workflow list --format json`, `langwatch workflow run <id>`                                                                               |
 | "AI Gateway", "virtual keys", "gateway budgets", "spend limits"       | (none - direct CLI)     | `langwatch virtual-keys list --format json`, `langwatch virtual-keys create ... --format json`, `langwatch gateway-budgets list --format json`, `langwatch gateway-budgets create ... --format json` |
+| "annotations", "annotate this trace", "thumbs up/down a trace"        | (none - direct CLI)     | `langwatch annotation list --format json`, `langwatch annotation create <traceId> --thumbs-up\|--thumbs-down --comment "..." --format json` (no `update` subcommand — delete + recreate instead) |
 
 Every command above takes `--format json` (except `dataset upload`) — always pass it, and parse the JSON rather than the human table. If you are unsure of a flag, run `langwatch <resource> --help` first; never guess a subcommand.
 
@@ -132,6 +133,7 @@ Every command above takes `--format json` (except `dataset upload`) — always p
 - "Do you want me to ...?" → never ask, just do
 - "Running `langwatch trace search --format json` and counting traces from the last 24h (default). I'll return the concise result and the LangWatch UI link." → run it; let the trace card show the count and link; answer only with a useful pattern the card cannot show
 - "I'll check your prompts with `langwatch prompt list --format json`." → just answer "3 prompts. ..."
+- "Running the LangWatch CLI to list annotations." / "Running the annotation creation now. I'll report the concise result when it's done." → just answer "2 annotations. ..." / "Done — thumbs-up annotation added to trace <id>."
 - "Let me search the traces first, then I'll summarise." → no plans, no "let me", no "I'll now"
 - Echoing a CLI invocation, subcommand, or flag anywhere in the answer → the user reads results, not our commands; the UI already shows the activity
 - Running `langwatch agent list` when user said "traces" → match exact words

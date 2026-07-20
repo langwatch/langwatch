@@ -83,7 +83,7 @@ npx vitest run langy-dogfood.scenario.test.ts --reporter=verbose
 
 `langy-redteam.scenario.test.ts` uses `@langwatch/scenario`'s `redTeamCrescendo()`
 (NOT a hand-rolled adversarial prompt set) to probe jailbreak / prompt-injection /
-destructive-action-without-confirmation attempts across 12 categories, judged
+destructive-action-without-confirmation attempts across 14 categories, judged
 against `LANGY_CORE_RULE_CRITERIA` plus attack-specific criteria. Run the same way.
 
 ## Browser QA

@@ -1,16 +1,16 @@
-// Scenario tests for Langy. These hit the pod wrapper via HTTP directly,
-// without going through the LangWatch Next.js backend. Run with:
+// Scenario tests for Langy, driven through the real product surface (see
+// langy-agent.ts). All LANGY_*/LW_BASE_URL/LANGWATCH_API_KEY env vars default
+// to this repo's local haven seed identity (see config.ts) — a bare
 //
-//   LANGY_AGENT_URL=http://172.22.160.1:8081 \
-//   OPENAI_API_KEY=$YOUR_VK \
-//   OPENAI_BASE_URL=http://localhost:5563/v1 \
-//   LANGWATCH_API_KEY=... \
-//   LW_BASE_URL=http://localhost:5560 \
-//   npx vitest run langy.scenario.test.ts --reporter=verbose
+//   cd langwatch/e2e/langy && npx vitest run langy.scenario.test.ts --reporter=verbose
+//
+// Just Works against a running `pnpm dev:haven` stack. Override any of them
+// to point at a different stack (see README.md).
 
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
+import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
 import {
   listAgents,
   listDashboards,
@@ -24,8 +24,8 @@ import {
 import { makeLangyAdapter } from "./langy-agent";
 import { runScenarioAndLog } from "./scenario-logger";
 
-const LW_BASE = process.env.LW_BASE_URL ?? "http://localhost:5560";
-const LW_KEY = process.env.LANGWATCH_API_KEY ?? "";
+const LW_BASE = LW_BASE_URL;
+const LW_KEY = LANGWATCH_API_KEY;
 
 async function deleteAllTestDatasets() {
   const datasets = await listDatasets();

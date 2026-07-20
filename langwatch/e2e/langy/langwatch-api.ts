@@ -3,8 +3,10 @@
 // project API key, so a passing call here proves the entity actually
 // landed in the backend regardless of what Langy claimed.
 
-const LW_BASE = process.env.LW_BASE_URL ?? "http://localhost:5560";
-const LW_KEY = process.env.LANGWATCH_API_KEY ?? "";
+import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
+
+const LW_BASE = LW_BASE_URL;
+const LW_KEY = LANGWATCH_API_KEY;
 
 async function lwGet(path: string): Promise<any> {
   const res = await fetch(`${LW_BASE}${path}`, {
@@ -14,6 +16,21 @@ async function lwGet(path: string): Promise<any> {
   if (!res.ok) {
     throw new Error(
       `GET ${path} -> ${res.status}: ${(await res.text()).slice(0, 200)}`,
+    );
+  }
+  return res.json();
+}
+
+async function lwPost(path: string, body: unknown): Promise<any> {
+  const res = await fetch(`${LW_BASE}${path}`, {
+    method: "POST",
+    headers: { "X-Auth-Token": LW_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `POST ${path} -> ${res.status}: ${(await res.text()).slice(0, 200)}`,
     );
   }
   return res.json();
@@ -82,7 +99,27 @@ export async function listWorkflows(): Promise<
   return toArray(await lwGet("/api/workflows"));
 }
 
-export async function listAnnotations(): Promise<Array<{ id: string }>> {
+/**
+ * A real, currently-existing trace id, for scenarios that need to give Langy
+ * something concrete to act on (e.g. annotate a trace) without depending on
+ * Langy's own trace-search tool finding it first — see the "Langy's own
+ * trace search returns 0 hits" follow-up finding for why that isn't reliable
+ * yet. Wide date range (2020 -> now+1yr) so this never itself goes empty.
+ */
+export async function mostRecentTraceId(): Promise<string | null> {
+  const result = await lwPost("/api/traces/search", {
+    startDate: new Date("2020-01-01").getTime(),
+    endDate: Date.now() + 365 * 24 * 60 * 60 * 1000,
+    pageSize: 1,
+    format: "json",
+  });
+  const traces = toArray<{ trace_id?: string }>(result?.traces ?? result);
+  return traces[0]?.trace_id ?? null;
+}
+
+export async function listAnnotations(): Promise<
+  Array<{ id: string; traceId?: string; comment?: string }>
+> {
   return toArray(await lwGet("/api/annotations"));
 }
 
