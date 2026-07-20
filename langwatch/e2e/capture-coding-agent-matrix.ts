@@ -9,13 +9,13 @@ import { chromium, type Page } from "playwright";
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5570";
 const PROJECT = "local-dev-project-jcq4ii";
-const OUTER_TRACE = "6088c5691a9e1177ee738e7897228d38";
-const CHILD_TRACE = "a9b9c64f8b53f3c3c8397a1feb994218";
+const OUTER_TRACE = "a9b4d26c775ec3ae84baa4fc33c50828";
+const CHILD_TRACE = "b7c3c72286083d6a1f5c40bae447839e";
 const AGENT_TRACES: Array<[string, string]> = [
-  ["05-gemini-terminal", "1413e253e00eada61d4d37d260a6193b"],
-  ["06-opencode-terminal", "0fd529d4e60f7ba9a0bd5799e514d50d"],
-  ["07-codex-terminal", "c642eae1677da5ddc9b91103066a5336"],
-  ["08-copilot-terminal", "3c4db830224ede997f954ea8d99c9561"],
+  ["05-gemini-terminal", "12e266f98539369fc63b6ea38d4a959c"],
+  ["06-opencode-terminal", "71e8f5bd85e5e307f3a58fe6e1667aa8"],
+  ["07-codex-terminal", "ef1a15ceba8c812c9336de7f14076383"],
+  ["08-copilot-terminal", "2b5a083a33cc06db2538356762c49664"],
 ];
 const OUT_DIR = "/tmp/cam-shots";
 
@@ -46,7 +46,7 @@ void (async () => {
   await page.click('button[type="submit"]');
   try {
     await page.waitForURL((u) => !u.pathname.includes("/auth/"), {
-      timeout: 20_000,
+      timeout: 90_000,
     });
   } catch {
     await shoot(page, "00-login-debug");
@@ -56,49 +56,66 @@ void (async () => {
   }
   console.log("logged in ->", page.url());
 
-  // Traces list, waiting for the real dogfood row.
-  await page.goto(`${BASE_URL}/${PROJECT}/traces`);
-  await page.waitForSelector("text=telemetry dogfood", { timeout: 60_000 });
-  await page.waitForTimeout(1500);
-  await shoot(page, "01-traces-list");
-
-  // Data-aware waits everywhere: every terminal/session shot waits for
-  // rendered CONTENT (the banner name, a prompt row, or the contentless
-  // note), never a fixed sleep — a fixed sleep screenshots the loading
-  // skeleton on cold caches, which is exactly what happened once.
+  // Data-aware waits everywhere: every shot waits for rendered CONTENT (the
+  // banner name, a counters row, or the contentless note), never a fixed
+  // sleep — a fixed sleep screenshots the loading skeleton on cold caches.
+  // Local ClickHouse shares its 50-query concurrency budget with every other
+  // worktree's stack, so a page load can starve and stick on skeletons; a
+  // reload re-fires the queries, so each shot retries with reloads instead
+  // of trusting one navigation.
   const TERMINAL_READY =
-    "text=/❯|reported tokens|Claude Code v|Gemini CLI v|opencode v|Codex v|Copilot v/";
-  const SESSION_READY = "text=/model calls|step \\d/";
+    "text=/reported tokens|Claude Code v|Gemini CLI v|opencode v|Codex v|Copilot v/";
+  const SESSION_READY = "text=/model calls|no usage summary/i";
 
-  await page.goto(
-    `${BASE_URL}/${PROJECT}/traces/${OUTER_TRACE}?drawer.mode=terminal`,
-  );
-  await page.waitForSelector(TERMINAL_READY, { timeout: 60_000 });
-  await page.waitForTimeout(1500);
-  await shoot(page, "02-outer-terminal");
-
-  await page.goto(
-    `${BASE_URL}/${PROJECT}/traces/${OUTER_TRACE}?drawer.mode=session`,
-  );
-  await page.waitForSelector(SESSION_READY, { timeout: 60_000 });
-  await page.waitForTimeout(1500);
-  await shoot(page, "03-outer-session");
-
-  // The child claude session proves sub-sessions record independently.
-  await page.goto(
-    `${BASE_URL}/${PROJECT}/traces/${CHILD_TRACE}?drawer.mode=session`,
-  );
-  await page.waitForSelector(SESSION_READY, { timeout: 60_000 });
-  await page.waitForTimeout(1500);
-  await shoot(page, "04-child-session");
-
-  for (const [name, traceId] of AGENT_TRACES) {
-    await page.goto(
-      `${BASE_URL}/${PROJECT}/traces/${traceId}?drawer.mode=terminal`,
-    );
-    await page.waitForSelector(TERMINAL_READY, { timeout: 60_000 });
+  async function capture(url: string, selector: string, name: string) {
+    for (let attempt = 1; ; attempt++) {
+      await page.goto(url);
+      // The first-visit product tour overlays a spotlight veil that washes
+      // out every screenshot — skip it before waiting on content.
+      try {
+        await page.click("text=Skip tour", { timeout: 5_000 });
+      } catch {
+        // No tour this session.
+      }
+      try {
+        await page.waitForSelector(selector, { timeout: 60_000 });
+        break;
+      } catch (error) {
+        if (attempt >= 4) throw error;
+        console.log(`${name}: content not ready, reloading (${attempt})`);
+      }
+    }
     await page.waitForTimeout(1500);
     await shoot(page, name);
+  }
+
+  await capture(
+    `${BASE_URL}/${PROJECT}/traces`,
+    "text=telemetry dogfood",
+    "01-traces-list",
+  );
+  await capture(
+    `${BASE_URL}/${PROJECT}/traces/${OUTER_TRACE}?drawer.mode=terminal`,
+    TERMINAL_READY,
+    "02-claude-terminal",
+  );
+  await capture(
+    `${BASE_URL}/${PROJECT}/traces/${OUTER_TRACE}?drawer.mode=session`,
+    SESSION_READY,
+    "03-claude-session",
+  );
+  // The child claude session proves sub-sessions record independently.
+  await capture(
+    `${BASE_URL}/${PROJECT}/traces/${CHILD_TRACE}?drawer.mode=session`,
+    SESSION_READY,
+    "04-child-session",
+  );
+  for (const [name, traceId] of AGENT_TRACES) {
+    await capture(
+      `${BASE_URL}/${PROJECT}/traces/${traceId}?drawer.mode=terminal`,
+      TERMINAL_READY,
+      name,
+    );
   }
 
   await browser.close();
