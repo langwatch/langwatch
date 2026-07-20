@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bytedance/sonic"
 	"github.com/go-chi/chi/v5"
@@ -51,6 +52,16 @@ type RouterDeps struct {
 	// that send full-context multi-image / media payloads; lower on public
 	// edge deployments to tighten DDoS protection.
 	MaxRequestBodyBytes int64
+	// HeartbeatInterval sets how often a non-streaming response writes a
+	// keep-alive byte while dispatch is still in flight, so a large-context
+	// completion that legitimately runs long doesn't sit silent long enough
+	// for an edge proxy (e.g. Cloudflare's ~100s default) to kill the
+	// connection with a 524 — see
+	// specs/ai-gateway/non-streaming-time-to-first-byte.feature and
+	// https://github.com/langwatch/langwatch/issues/4806. 0 falls back to
+	// config.DefaultNonStreamingHeartbeatInterval (45s); negative disables
+	// heartbeating entirely.
+	HeartbeatInterval time.Duration
 }
 
 // NewRouter creates the chi router with all gateway routes mounted.
@@ -147,13 +158,15 @@ func chatHandler(deps RouterDeps) http.HandlerFunc {
 			setMetaHeaders(w, result.Meta)
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
-			result, err := deps.App.HandleChat(r.Context(), bundle, bytes.NewReader(body), model)
+			result, hw, err := withHeartbeat(w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+				return deps.App.HandleChat(r.Context(), bundle, bytes.NewReader(body), model)
+			})
 			if err != nil {
-				writeError(deps.Logger, w, r.Context(), err)
+				writeError(deps.Logger, hw, r.Context(), err)
 				return
 			}
-			setMetaHeaders(w, result.Meta)
-			writeJSONResponse(w, result.Response)
+			setMetaHeaders(hw, result.Meta)
+			writeJSONResponse(hw, result.Response)
 		}
 	}
 }
@@ -194,13 +207,15 @@ func messagesHandler(deps RouterDeps) http.HandlerFunc {
 			setMetaHeaders(w, result.Meta)
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
-			result, err := deps.App.HandleMessages(r.Context(), bundle, bytes.NewReader(body), model)
+			result, hw, err := withHeartbeat(w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+				return deps.App.HandleMessages(r.Context(), bundle, bytes.NewReader(body), model)
+			})
 			if err != nil {
-				writeError(deps.Logger, w, r.Context(), err)
+				writeError(deps.Logger, hw, r.Context(), err)
 				return
 			}
-			setMetaHeaders(w, result.Meta)
-			writeJSONResponse(w, result.Response)
+			setMetaHeaders(hw, result.Meta)
+			writeJSONResponse(hw, result.Response)
 		}
 	}
 }
@@ -251,13 +266,15 @@ func responsesHandler(deps RouterDeps) http.HandlerFunc {
 			setMetaHeaders(w, result.Meta)
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
-			result, err := deps.App.HandleResponses(r.Context(), bundle, bytes.NewReader(body), model)
+			result, hw, err := withHeartbeat(w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+				return deps.App.HandleResponses(r.Context(), bundle, bytes.NewReader(body), model)
+			})
 			if err != nil {
-				writeError(deps.Logger, w, r.Context(), err)
+				writeError(deps.Logger, hw, r.Context(), err)
 				return
 			}
-			setMetaHeaders(w, result.Meta)
-			writeJSONResponse(w, result.Response)
+			setMetaHeaders(hw, result.Meta)
+			writeJSONResponse(hw, result.Response)
 		}
 	}
 }
@@ -275,13 +292,15 @@ func embeddingsHandler(deps RouterDeps) http.HandlerFunc {
 		}
 		defer release()
 
-		result, err := deps.App.HandleEmbeddings(r.Context(), bundle, body, app.PeekModel(peek))
+		result, hw, err := withHeartbeat(w, deps.HeartbeatInterval, func() (*app.EmbeddingResult, error) {
+			return deps.App.HandleEmbeddings(r.Context(), bundle, body, app.PeekModel(peek))
+		})
 		if err != nil {
-			writeError(deps.Logger, w, r.Context(), err)
+			writeError(deps.Logger, hw, r.Context(), err)
 			return
 		}
-		setMetaHeaders(w, result.Meta)
-		writeJSONResponse(w, result.Response)
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
 	}
 }
 
@@ -339,13 +358,15 @@ func geminiPassthroughHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		result, err := deps.App.HandlePassthrough(r.Context(), bundle, body, model, meta)
+		result, hw, err := withHeartbeat(w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandlePassthrough(r.Context(), bundle, body, model, meta)
+		})
 		if err != nil {
-			writeError(deps.Logger, w, r.Context(), err)
+			writeError(deps.Logger, hw, r.Context(), err)
 			return
 		}
-		setMetaHeaders(w, result.Meta)
-		writeJSONResponse(w, result.Response)
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
 	}
 }
 
@@ -541,6 +562,108 @@ func (l *lazyPooledBody) Read(p []byte) (n int, err error) {
 		l.buf.Write(p[:n])
 	}
 	return n, err
+}
+
+// heartbeatByte is a single RFC 8259 §2 insignificant-whitespace byte.
+// Every conformant JSON parser skips whitespace before the top-level
+// value, so writing one periodically keeps the connection producing bytes
+// without corrupting the eventual response body.
+var heartbeatByte = []byte{' '}
+
+// heartbeatWriter tracks whether anything has reached the transport yet.
+// Once a heartbeat has flushed, the HTTP status is irrevocably committed
+// (net/http sends an implicit 200 on the first Write); a later real
+// WriteHeader call from writeError/writeJSONResponse would otherwise log a
+// "superfluous WriteHeader" warning for no effect, so it's turned into a
+// harmless no-op here — the body write immediately after it still goes
+// through and reaches the client normally.
+type heartbeatWriter struct {
+	http.ResponseWriter
+	started bool
+}
+
+func (h *heartbeatWriter) WriteHeader(statusCode int) {
+	if h.started {
+		return
+	}
+	h.started = true
+	h.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (h *heartbeatWriter) Write(p []byte) (int, error) {
+	h.started = true
+	return h.ResponseWriter.Write(p)
+}
+
+func (h *heartbeatWriter) Flush() {
+	if f, ok := h.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (h *heartbeatWriter) Unwrap() http.ResponseWriter {
+	return h.ResponseWriter
+}
+
+// withHeartbeat runs dispatch on a background goroutine and, while it is
+// still in flight, periodically writes a heartbeat byte to w and flushes
+// it. This resets the idle-connection timer of any proxy/CDN sitting in
+// front of the gateway (e.g. Cloudflare's ~100s default) so a large-context
+// completion that legitimately runs long doesn't go silent long enough to
+// get killed before it can finish. See
+// specs/ai-gateway/non-streaming-time-to-first-byte.feature and
+// https://github.com/langwatch/langwatch/issues/4806.
+//
+// Requests that finish inside the first interval are byte-for-byte
+// unaffected — the returned writer just proxies to w. Once a heartbeat has
+// fired, the HTTP status is irrevocably committed to 200 (the same
+// trade-off the streaming path already accepts for errors that surface
+// mid-stream — see streaming.feature): if dispatch ultimately errors after
+// heartbeating has started, the caller's writeError call still produces
+// the correct structured error body via the returned writer, but the wire
+// status can no longer be changed to the real 4xx/5xx. A client that
+// checks the response body (not just the status) still gets the accurate
+// error. interval of zero resolves to config.DefaultNonStreamingHeartbeatInterval;
+// negative disables heartbeating entirely.
+func withHeartbeat[T any](w http.ResponseWriter, interval time.Duration, dispatch func() (T, error)) (T, http.ResponseWriter, error) {
+	hw := &heartbeatWriter{ResponseWriter: w}
+
+	type outcome struct {
+		val T
+		err error
+	}
+	resultCh := make(chan outcome, 1)
+	go func() {
+		val, err := dispatch()
+		resultCh <- outcome{val, err}
+	}()
+
+	if interval == 0 {
+		interval = config.DefaultNonStreamingHeartbeatInterval
+	}
+	if interval <= 0 {
+		r := <-resultCh
+		return r.val, hw, r.err
+	}
+
+	// Every non-streaming JSON response is application/json whatever the
+	// eventual outcome — set it before the first possible heartbeat write
+	// so it's still part of the header block if a heartbeat commits the
+	// response early. writeJSONResponse still overwrites this with the
+	// more precise upstream content type for the common (fast) case.
+	hw.Header().Set("Content-Type", "application/json")
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case r := <-resultCh:
+			return r.val, hw, r.err
+		case <-ticker.C:
+			_, _ = hw.Write(heartbeatByte)
+			hw.Flush()
+		}
+	}
 }
 
 func writeJSONResponse(w http.ResponseWriter, resp *domain.Response) {
