@@ -318,6 +318,51 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
         GEMINI_API_KEY: `sk-gem-team-${ns}`,
       });
     });
+
+    it("never lets a sibling-project attachment tie with the current project's own row", async () => {
+      // Pre-fix, the shared row's foreign PROJECT attachment scored the
+      // same top tier as a row scoped to the CURRENT project, leaving
+      // the winner to findMany's unspecified order. The current
+      // project's row must win outright.
+      await service().updateModelProvider(
+        {
+          projectId,
+          provider: "groq",
+          enabled: true,
+          customKeys: { GROQ_API_KEY: `sk-groq-shared-${ns}` },
+          customModels: [
+            { modelId: "groq-x", displayName: "groq-x", mode: "chat" },
+          ],
+          scopes: [
+            { scopeType: "ORGANIZATION", scopeId: organizationId },
+            { scopeType: "PROJECT", scopeId: otherProjectId },
+          ],
+        },
+        ctx(),
+      );
+      await service().updateModelProvider(
+        {
+          projectId,
+          provider: "groq",
+          enabled: true,
+          customKeys: { GROQ_API_KEY: `sk-groq-current-${ns}` },
+          customModels: [
+            { modelId: "groq-x", displayName: "groq-x", mode: "chat" },
+          ],
+          scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+        },
+        ctx(),
+      );
+
+      const row = await service().findRowServingModel({
+        projectId,
+        provider: "groq",
+        bareModel: "groq-x",
+      });
+      expect(row?.customKeys).toMatchObject({
+        GROQ_API_KEY: `sk-groq-current-${ns}`,
+      });
+    });
   });
 
   describe("when no row lists the model (registry-model providers)", () => {
