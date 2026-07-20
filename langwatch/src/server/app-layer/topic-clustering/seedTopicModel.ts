@@ -122,7 +122,9 @@ async function runSeedPass(
     // due-scan uses it. Each project's rows are still READ back through the
     // guarded model API in seedProjectTopicModel, which carries its
     // projectId — only this projectId enumeration is cross-tenant.
-    const page = await deps.prisma.$queryRaw<Array<{ projectId: string }>>(
+    const page: Array<{ projectId: string }> = await deps.prisma.$queryRaw<
+      Array<{ projectId: string }>
+    >(
       Prisma.sql`
         SELECT DISTINCT "projectId"
         FROM "Topic"
