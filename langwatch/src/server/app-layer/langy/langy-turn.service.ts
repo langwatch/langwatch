@@ -20,6 +20,8 @@
  * renders them. Infrastructure failures throw and surface generically.
  */
 import type { Session } from "~/server/auth";
+import { createHash } from "node:crypto";
+
 import { createLogger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
 import { getLangyTurnsCounter } from "~/server/metrics";
@@ -37,6 +39,8 @@ import {
   LangyAgentUnavailableError,
   LangyInsufficientScopeError,
   LangyModelNotAllowedError,
+  LangyEmptyMessageError,
+  LangyIdempotencyMismatchError,
   LangyTurnInProgressError,
 } from "./errors";
 import type { LangyConversationService } from "./langy-conversation.service";
@@ -56,12 +60,38 @@ const logger = createLogger("langwatch:langy:turn-service");
  */
 const LANGY_OVERRIDE = LANGY_TURN_OVERRIDE_FALLBACK;
 
-function turnIdForRequest(requestId: string): string {
-  return `langyturn_request-${requestId}`;
-}
-
-function messageIdForRequest(requestId: string): string {
-  return `langymsg_request-${requestId}`;
+/**
+ * Turn identity binds the client's idempotency key to WHO sent it and WHAT was
+ * sent. Three properties fall out structurally:
+ *
+ * - a transport retry (same user, same key, same content) derives the same id
+ *   and collapses onto the admitted turn;
+ * - the same key with DIFFERENT content derives a different id, which the
+ *   admission receipt exposes as a mismatch instead of silently replaying the
+ *   original send;
+ * - two users can never mint the same turn id, whatever keys they choose.
+ *
+ * The hash input uses the zod-parsed messages verbatim: a retry is the same
+ * client re-serializing the same payload, so byte-stable JSON is a fair
+ * equality. Semantic reordering counts as different content — by design.
+ */
+export function langyTurnIdentity(input: {
+  userId: string;
+  idempotencyKey: string;
+  messages: unknown;
+  modelOverride?: string;
+}): { turnId: string; messageId: string } {
+  const digest = createHash("sha256")
+    .update(input.userId)
+    .update("\u0000")
+    .update(input.idempotencyKey)
+    .update("\u0000")
+    .update(JSON.stringify(input.messages))
+    .update("\u0000")
+    .update(input.modelOverride ?? "")
+    .digest("hex")
+    .slice(0, 32);
+  return { turnId: `langyturn_${digest}`, messageId: `langymsg_${digest}` };
 }
 
 export interface LangyChatMessageInput {
@@ -72,7 +102,7 @@ export interface LangyChatMessageInput {
 export interface StartConversationTurnInput {
   projectId: string;
   /** Stable identity for one logical send, reused by every transport retry. */
-  requestId: string;
+  idempotencyKey: string;
   session: Session;
   /** The client-supplied conversation id, or null to mint a fresh one. */
   requestedConversationId: string | null;
@@ -130,7 +160,7 @@ export class LangyTurnService {
   ): Promise<{ conversationId: string; turnId: string }> {
     const {
       projectId,
-      requestId,
+      idempotencyKey,
       session,
       requestedConversationId,
       messages,
@@ -148,6 +178,25 @@ export class LangyTurnService {
     if (!accessStore || !handoffStore) {
       throw new LangyAgentUnavailableError();
     }
+
+    // Reject content-free sends BEFORE anything durable happens: an admitted
+    // empty turn is one the agent can only 422, and a permanently rejected
+    // dispatch used to poison the process outbox with endless retries.
+    const lastUserMessage = messages[messages.length - 1];
+    const userText = extractTextFromParts(lastUserMessage?.parts);
+    if (!userText.trim()) {
+      // Self-report like every other rejection branch — without this the
+      // empty-send path is invisible in the turn-outcome metric.
+      getLangyTurnsCounter("rejected").inc();
+      throw new LangyEmptyMessageError();
+    }
+
+    const identity = langyTurnIdentity({
+      userId,
+      idempotencyKey,
+      messages,
+      ...(modelOverride ? { modelOverride } : {}),
+    });
 
     const conversationService = this.deps.conversations;
     const credentialService = this.deps.credentials;
@@ -168,10 +217,14 @@ export class LangyTurnService {
     const admission = await this.deps.admission.claim({
       projectId,
       userId,
-      requestId,
+      idempotencyKey,
       conversationId: speculativeConversation.id,
-      turnId: turnIdForRequest(requestId),
+      turnId: identity.turnId,
     });
+    if (admission.kind === "mismatch") {
+      getLangyTurnsCounter("mismatch").inc();
+      throw new LangyIdempotencyMismatchError();
+    }
     if (admission.kind === "replay") {
       getLangyTurnsCounter("replay").inc();
       return {
@@ -214,7 +267,7 @@ export class LangyTurnService {
       {
         projectId,
         userId,
-        requestId,
+        idempotencyKey,
         conversationId: conversation.id,
         turnId,
         claimToken: admission.claimToken,
@@ -223,8 +276,6 @@ export class LangyTurnService {
     );
 
     try {
-      const lastUserMessage = messages[messages.length - 1];
-      const userText = extractTextFromParts(lastUserMessage?.parts);
       const questionParts = lastUserMessage?.parts ?? [];
       const title =
         extractTextFromParts(messages[0]?.parts).slice(0, 80) || null;
@@ -419,7 +470,7 @@ export class LangyTurnService {
             ? {
                 userMessage: {
                   userId,
-                  messageId: messageIdForRequest(requestId),
+                  messageId: identity.messageId,
                   role: lastUserMessage.role,
                   parts: lastUserMessage.parts,
                   title,

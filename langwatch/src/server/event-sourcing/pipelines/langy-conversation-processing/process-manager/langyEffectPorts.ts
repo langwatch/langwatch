@@ -1,6 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import type { LangyTitleGenerator } from "~/server/app-layer/langy/langy-title-generation.service";
+import { LangyDispatchRejectedError } from "~/server/app-layer/langy/errors";
+import { serializeLangyTurnError } from "~/server/app-layer/langy/execution/langy-turn-errors";
 import { LangyTurnDispatchRetry } from "~/server/app-layer/langy/langy-turn-retry.error";
+import type { LangyFailTurnCommandPort } from "~/server/app-layer/langy/subscribers/agent-turn-liveness.subscriber";
 import {
   AGENT_DISPATCH_TIMEOUT_MS,
   type LangyWorkerPort,
@@ -82,6 +85,14 @@ export interface CreateLangyEffectPortsOptions {
   revokeSessionKey: (args: {
     apiKeyId: string;
     projectId: string;
+  }) => Promise<void>;
+  /** Terminalizes a permanently rejected turn — same port liveness uses. */
+  failTurn: LangyFailTurnCommandPort;
+  /** Client-visible error frame for the stream tail. Best-effort. */
+  markError: (params: {
+    conversationId: string;
+    turnId: string;
+    error: ReturnType<typeof serializeLangyTurnError>;
   }) => Promise<void>;
   titleGenerator: LangyTitleGenerator;
   saveTitle: (params: {
@@ -212,6 +223,29 @@ export function createLangyEffectPorts(
         }
 
         if (outcome === "accepted") return;
+
+        // A permanent rejection poisons the outbox if it is allowed to retry:
+        // the agent will answer the same 4xx forever, every ~minute, and every
+        // later turn queues behind it. Terminalize instead — durably fail the
+        // turn (the same path liveness uses for an abandoned one) and consume
+        // the intent.
+        if (outcome === "rejected") {
+          logger.warn(
+            { projectId, conversationId, turnId },
+            "langy dispatch permanently rejected; terminalizing the turn",
+          );
+          const error = serializeLangyTurnError(new LangyDispatchRejectedError());
+          await deps
+            .markError({ conversationId, turnId, error })
+            .catch(() => undefined);
+          await deps.failTurn.failTurn({
+            projectId,
+            conversationId,
+            turnId,
+            error,
+          });
+          return;
+        }
 
         throw new LangyTurnDispatchRetry(
           `langy dispatch not accepted (${outcome}) for turn ${turnId}`,

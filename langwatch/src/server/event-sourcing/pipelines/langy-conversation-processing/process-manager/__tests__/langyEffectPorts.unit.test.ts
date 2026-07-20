@@ -44,6 +44,8 @@ function makeDeps(value: LangyTurnHandoff | null = handoff()) {
     revokeSessionKey: vi.fn().mockResolvedValue(undefined),
     titleGenerator: vi.fn().mockResolvedValue(null),
     saveTitle: vi.fn().mockResolvedValue(undefined),
+    failTurn: { failTurn: vi.fn().mockResolvedValue(undefined) },
+    markError: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -247,5 +249,37 @@ describe("createLangyEffectPorts", () => {
       title: "Fix Trace Ingestion",
       model: "openai/gpt-5-mini",
     });
+  });
+});
+
+describe("when the agent permanently rejects the dispatch", () => {
+  it("terminalizes the turn instead of retrying forever", async () => {
+    const deps = makeDeps();
+    deps.worker.dispatch.mockResolvedValue("rejected");
+    const ports = createLangyEffectPorts(deps);
+
+    // Resolving (not throwing) is what consumes the outbox intent — a throw
+    // here is the poison loop this behavior exists to prevent.
+    await ports.workerDispatch.dispatchTurn(dispatchParams);
+
+    expect(deps.failTurn.failTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: PROJECT,
+        conversationId: CONVERSATION,
+        turnId: TURN,
+      }),
+    );
+    expect(deps.markError).toHaveBeenCalled();
+  });
+
+  it("still retries transient unavailability", async () => {
+    const deps = makeDeps();
+    deps.worker.dispatch.mockResolvedValue("unavailable");
+    const ports = createLangyEffectPorts(deps);
+
+    await expect(
+      ports.workerDispatch.dispatchTurn(dispatchParams),
+    ).rejects.toThrow(/not accepted/);
+    expect(deps.failTurn.failTurn).not.toHaveBeenCalled();
   });
 });
