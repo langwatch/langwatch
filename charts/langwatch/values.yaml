@@ -800,15 +800,6 @@ datasetS3Migration:
   extraVolumeMounts: []
 
 # =============================================================================
-# Topic Clustering Schedule Backfill (ADR-051)
-# =============================================================================
-# ADR-051 replaced the topic-clustering CronJob with durable per-project
-# process wakes. New projects get a wake when they first ingest a trace;
-# projects that already existed at upgrade time get theirs from this
-# post-install/post-upgrade hook Job. Disabling it on an upgrade means topic
-# clustering never runs again for existing projects until the task is run by
-# hand (`pnpm run task backfillTopicClusteringSchedules`).
-# =============================================================================
 # LangWatch NLP Service Configuration
 # =============================================================================
 # Configuration for the NLP service (nlpgo).

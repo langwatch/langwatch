@@ -417,18 +417,6 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `datasetS3Migration.extraVolumes`              | Additional pod volumes.                                                                                                                                                                                  | `[]`    |
 | `datasetS3Migration.extraVolumeMounts`         | Additional volume mounts.                                                                                                                                                                                | `[]`    |
 
-### Topic clustering schedule backfill
-
-ADR-051 replaced the topic-clustering CronJob with durable per-project process
-wakes. New projects get a wake when they first ingest a trace; projects that
-already existed at upgrade time are seeded by this post-install/post-upgrade
-hook Job. The task is idempotent, so it re-runs harmlessly on every upgrade.
-**Disabling this on an upgrade stops topic clustering for all pre-existing
-projects** until `pnpm run task backfillTopicClusteringSchedules` is run by hand.
-
-| Name                                                | Description                                                                                                                                                                        | Value   |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-
 ### NLP service
 
 | Name                                            | Description                                   | Value           |

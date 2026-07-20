@@ -138,7 +138,7 @@ decision memory. No prompts, trace content, or credentials.
 - **On `requested` (manual)** — emit a `run:manual:<occurredAt>` intent
   immediately. Manual runs do not disturb the daily schedule.
 - **On `requested` (bootstrap)** — initialize state and schedule the
-  first wake; no intent. Idempotent, so the backfill task can re-send it.
+  first wake; no intent. Idempotent, so the boot-time seed can re-send it.
 - **On `run_completed` with a cursor** — emit the continuation intent
   for the next page. The cursor is process state: a crash mid-backlog
   resumes from the last committed page, not from scratch.
