@@ -115,9 +115,11 @@ export class ApiKeyReservedNameError extends HandledError {
       `The API key name "${name}" is reserved for keys LangWatch manages`,
       {
         httpStatus: 422,
-        meta: { name },
         ...remediation("api_key_reserved_name"),
         ...options,
+        // After ...options so a caller-supplied meta can add fields but never
+        // drop the attempted name this class promises to carry.
+        meta: { ...options.meta, name },
       },
     );
     this.name = "ApiKeyReservedNameError";

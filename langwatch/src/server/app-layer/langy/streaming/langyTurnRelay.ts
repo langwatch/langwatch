@@ -195,7 +195,7 @@ export class LangyTurnRelay {
   async handle(raw: unknown): Promise<LangyRelayOutcome> {
     const envelopeParse = langyFrameEnvelopeSchema.safeParse(raw);
     if (!envelopeParse.success) {
-      return this.reject("malformed-envelope");
+      return this.reject({ reason: "malformed-envelope" });
     }
     const envelope = envelopeParse.data;
 
@@ -203,15 +203,19 @@ export class LangyTurnRelay {
     // runToken is looked up by the (as-yet-unverified) conversationId; a wrong
     // conversationId simply yields a token the MAC won't match against.
     const runToken = await this.loadRunToken(envelope.conversationId, envelope.projectId);
-    if (runToken === null) return this.reject("no-run-token", envelope);
+    if (runToken === null) {
+      return this.reject({ reason: "no-run-token", envelope });
+    }
     if (!verifyFrame(runToken, envelope)) {
-      return this.reject("bad-signature", envelope);
+      return this.reject({ reason: "bad-signature", envelope });
     }
 
     // Pin to THIS connection's conversation+turn (turnId is now authenticated).
     // The first verified frame pins; any later frame from a different turn is a
     // cross-turn replay and is refused.
-    if (!this.checkTurn(envelope)) return this.reject("wrong-turn", envelope);
+    if (!this.checkTurn(envelope)) {
+      return this.reject({ reason: "wrong-turn", envelope });
+    }
 
     // Intra-turn replay: a redelivered/duplicated frameNonce is dropped.
     const fresh = await this.deps.reserveFrameNonce({
@@ -222,7 +226,9 @@ export class LangyTurnRelay {
     if (!fresh) return { status: "duplicate" };
 
     const frameParse = langyRelayFrameSchema.safeParse(safeJson(envelope.payload));
-    if (!frameParse.success) return this.reject("invalid-payload", envelope);
+    if (!frameParse.success) {
+      return this.reject({ reason: "invalid-payload", envelope });
+    }
 
     return this.apply(envelope, frameParse.data);
   }
@@ -464,13 +470,16 @@ export class LangyTurnRelay {
     return { status: "applied" };
   }
 
-  private reject(
-    reason: LangyRelayRejection,
+  private reject({
+    reason,
+    envelope,
+  }: {
+    reason: LangyRelayRejection;
     envelope?: Pick<
       LangyFrameEnvelope,
       "conversationId" | "turnId" | "projectId"
-    >,
-  ): LangyRelayOutcome {
+    >;
+  }): LangyRelayOutcome {
     // The envelope ids are CLAIMED, not verified, for every reason that fires
     // before the MAC check — but a flood of bad-signature frames is exactly
     // when an operator needs to know which conversation is being replayed at,

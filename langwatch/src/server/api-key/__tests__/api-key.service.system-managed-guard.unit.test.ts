@@ -101,15 +101,15 @@ describe("ApiKeyService system-managed guard", () => {
       ).rejects.toBeInstanceOf(ApiKeyReservedNameError);
     });
 
-    it("lets the product's own mint claim the name via systemManaged", async () => {
+    it("lets the product's own mint claim the name via isSystemManaged", async () => {
       // The discriminating positive case: Langy's session-key mint passes
-      // `systemManaged: true` and must get past the guard (here: far enough
+      // `isSystemManaged: true` and must get past the guard (here: far enough
       // to hit the transaction sentinel instead of the reserved-name error).
       const sut = ApiKeyService.create(mockPrisma("irrelevant"));
 
       await expect(
         sut.create({
-          systemManaged: true,
+          isSystemManaged: true,
           name: LANGY_SESSION_API_KEY_NAME,
           organizationId: ORG_ID,
           permissionMode: "all",

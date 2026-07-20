@@ -115,7 +115,7 @@ export class ApiKeyService {
     ingestSourceType,
     ingestionTemplateId,
     createdByDeviceLabel,
-    systemManaged = false,
+    isSystemManaged = false,
   }: {
     name: string;
     description?: string | null;
@@ -136,9 +136,9 @@ export class ApiKeyService {
      * every listing and the system-managed guard would refuse to ever rename
      * or revoke it — a stealth, permanent credential.
      */
-    systemManaged?: boolean;
+    isSystemManaged?: boolean;
   }): Promise<{ token: string; apiKey: ApiKey }> {
-    if (!systemManaged && HIDDEN_SYSTEM_KEY_NAMES.includes(name)) {
+    if (!isSystemManaged && HIDDEN_SYSTEM_KEY_NAMES.includes(name)) {
       throw new ApiKeyReservedNameError(name);
     }
 
