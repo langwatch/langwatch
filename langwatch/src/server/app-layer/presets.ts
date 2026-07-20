@@ -118,9 +118,7 @@ import { PrismaProcessStore } from "../event-sourcing/process-manager";
 import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
 import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
 import { PrismaTopicModelProjectionRepository } from "./topic-clustering/repositories/topic-model-projection.prisma.repository";
-import { seedTopicModelHistory } from "./topic-clustering/seedTopicModel";
-import { seedClusteringSchedules } from "./topic-clustering/seedClusteringSchedules";
-import { TOPIC_CLUSTERING_PROCESS_NAME } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringProcess.types";
+import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
 import { PrismaTopicClusteringStatusRepository } from "./topic-clustering/repositories/topic-clustering-status.repository";
 import { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
@@ -935,60 +933,18 @@ export function initializeDefaultApp(options?: {
     commands.scenarioExecutionHandle;
 
   if (roleRunsWorkers(config.processRole)) {
-    // One-time on boot: record pre-ownership Topic rows onto the clustering
-    // stream so the event log owns the model. Redis elects a replica; the
-    // seed is idempotent either way. Fire-and-forget like the other boot
-    // reconciliations — a failure is logged and the next boot retries.
-    void seedTopicModelHistory({
+    // One-time background seeds on worker boot (ADR-051): topic-model
+    // history onto the event stream, and daily-wake schedules for
+    // pre-cutover projects. The module owns its own wiring, coordination,
+    // and error handling — a failure is logged and the next boot retries.
+    startTopicClusteringBootSeeds({
       prisma,
       redis: redis ?? null,
-      recordTopics: (args) => commands.topicClustering.recordTopics(args),
-    }).catch((error: unknown) => {
-      createLogger("langwatch:topic-clustering:seed").error(
-        { error: error instanceof Error ? error.message : String(error) },
-        "Topic model seed pass failed; the next boot retries",
-      );
-    });
-
-    // One-time on boot: give every pre-cutover project (that predates
-    // level-triggered bootstrap) a scheduled daily wake. Replaces the old
-    // Helm post-install/post-upgrade hook Job — a worker boot never races
-    // app migrations the way a hook did, so no schema wait is needed.
-    void seedClusteringSchedules({
-      redis: redis ?? null,
-      findEligibleProjectsPage: ({ afterId, take }) =>
-        prisma.project.findMany({
-          where: {
-            firstMessage: true,
-            ...(afterId ? { id: { gt: afterId } } : {}),
-          },
-          select: { id: true },
-          orderBy: { id: "asc" },
-          take,
-        }),
-      findAlreadyScheduledProjectIds: async ({ projectIds }) => {
-        const instances = await prisma.processManagerInstance.findMany({
-          where: {
-            processName: TOPIC_CLUSTERING_PROCESS_NAME,
-            projectId: { in: projectIds },
-            nextWakeAt: { not: null },
-          },
-          select: { projectId: true },
-        });
-        return new Set(instances.map((instance) => instance.projectId));
+      commands: {
+        recordTopics: (args) => commands.topicClustering.recordTopics(args),
+        requestClustering: (args) =>
+          commands.topicClustering.requestClustering(args),
       },
-      requestClustering: async ({ projectId }) => {
-        await commands.topicClustering.requestClustering({
-          tenantId: projectId,
-          occurredAt: Date.now(),
-          trigger: "bootstrap",
-        });
-      },
-    }).catch((error: unknown) => {
-      createLogger("langwatch:topic-clustering:schedule-seed").error(
-        { error: error instanceof Error ? error.message : String(error) },
-        "Topic clustering schedule seed failed; the next boot retries",
-      );
     });
   }
 
