@@ -69,10 +69,23 @@ Feature: Handled errors — the handled-error boundary
     So clients read validation detail exactly where they read every other fact
 
   @bdd @domain-errors
+  Scenario: Producers emit both names for the discriminant
+    Given a handled error is serialised by Go or by the REST layer
+    Then the body carries "type" and "code" with the same value
+    And readers resolve the discriminant as code, then kind, then type
+    So an OpenAI-compatible consumer and a LangWatch one both read it natively
+
+  @bdd @domain-errors
+  Scenario: A displayed message prefers copy that was authored to be shown
+    Given a client needs one line to show a user
+    Then it reads meta.message, then message, then code
+    And meta.message is the only channel carrying server-authored prose
+    And a handled error's own message stays server-side and is never a source
+
+  @bdd @domain-errors
   Scenario: An external contract wins over cross-transport symmetry
-    Given the AI Gateway's envelope is OpenAI-compatible
-    Then its discriminant stays "type" so provider SDKs keep raising typed errors
-    And the REST body stays flat at the root while published SDKs read `error` as a string
+    Given published SDKs read the REST body's `error` field as a string
+    Then that body stays flat at the root rather than nesting under `error`
     So consistency is pursued only where no caller contract forbids it
 
   @bdd @domain-errors

@@ -425,17 +425,25 @@ export function explainLangyError(
         ...debug,
       };
 
-    default:
+    default: {
       // A handled kind we don't have bespoke copy for yet: still useful, never
-      // a raw string, and its meta + reasons are surfaced for debugging.
+      // a raw string, and its meta + reasons are surfaced for debugging. A
+      // server-authored sentence in `meta.message` wins over the stock line —
+      // that is the only channel carrying prose (ADR-045), and it is how a
+      // proxied Go herr explains itself before we write copy for its code.
+      const authored = domain.meta?.message;
       return {
         kind: domain.code,
         title: "Langy couldn't finish that",
-        description: "The request was rejected. Try rephrasing or start again.",
+        description:
+          typeof authored === "string" && authored.length > 0
+            ? authored
+            : "The request was rejected. Try rephrasing or start again.",
         render: "card",
         action: { label: "Try again", kind: "retry" },
         traceId: domain.traceId,
         ...debug,
       };
+    }
   }
 }

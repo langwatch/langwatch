@@ -59,6 +59,13 @@ interface ErrorResponseBody {
   error?: string;
   code: string;
   /**
+   * Always equal to `code`. The Go envelope calls the discriminant `type`
+   * (OpenAI-compatible — see pkg/herr/http.go), so both names are emitted here
+   * too: a consumer can read whichever its transport taught it and get the
+   * same answer either way.
+   */
+  type?: string;
+  /**
    * @deprecated Back-compat alias of `code`, emitted during the
    * `DomainError` → `HandledError` transition so clients still reading the old
    * `kind` discriminant keep working. Read `code` in new code; removed once no
@@ -88,8 +95,10 @@ function finalizeErrorResponse({
   if (!isVersioned) body.error = httpStatusText(status);
   // Emit the deprecated `kind` alias alongside `code` so clients still reading
   // the old discriminant keep working through the transition. See
-  // ErrorResponseBody.kind.
+  // ErrorResponseBody.kind. `type` mirrors the Go envelope's name for the same
+  // value — see ErrorResponseBody.type.
   body.kind = body.code;
+  body.type = body.code;
   return { status, body };
 }
 

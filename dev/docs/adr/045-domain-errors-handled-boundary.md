@@ -252,20 +252,41 @@ error needs prose for those consumers, add tips — never widen the message.**
 one handled-error channel and its issues ride in `meta.fieldErrors` /
 `meta.formErrors` like every other domain fact. It had no client consumers.
 
-### Two deliberate asymmetries
+### Every producer emits both `type` and `code`
 
-Consistency stops where an external contract begins. Both of these are load
-bearing, not oversights:
+Rather than pick a winner, Go and the Hono body now emit **both names with the
+same value**: `type` because the AI Gateway's envelope is OpenAI-compatible
+(`docs/ai-gateway/api/errors.mdx` — the `openai` and Anthropic SDKs parse it and
+must keep raising their usual typed exceptions), and `code` because that is the
+name the TypeScript side uses everywhere. Readers resolve `code` → `kind` →
+`type`, so a consumer gets the same answer whichever name its transport taught
+it, and neither ecosystem has to be broken to satisfy the other. `kind` remains
+the deprecated pre-`HandledError` alias.
 
-1. **Go keeps `type`, not `code`.** The AI Gateway's envelope is
-   OpenAI-compatible (`docs/ai-gateway/api/errors.mdx`) so that the `openai` and
-   Anthropic SDKs raise their usual typed exceptions unchanged. `type` is their
-   field name; renaming it breaks every SDK pointed at the gateway.
-2. **Hono stays flat at the root.** Nesting the body under an `error` key would
-   read better, but `error` is already a string there, and the Python SDK
-   (`better_raise_for_status`), the TS SDK's legacy path and `directUpload.ts`
-   all read it as one. Changing it is a breaking change to published SDKs and
-   needs its own migration, not a drive-by.
+### Reading a message for display
+
+A handled error carries no message on the wire, so anything rendering one reads,
+in order: **`meta.message` → `message` → `code`**.
+
+- `meta.message` is prose the server *deliberately* authored to be shown. It is
+  the only channel that carries a sentence, and it is opt-in per error — which
+  is what keeps the leak closed: the constructor's `message` stays server-side.
+  `herr.FromBody` populates it, so proxied Go errors explain themselves.
+- `message` is the code for a handled error, but real copy for a plain
+  `TRPCError` a procedure authored — still exactly what to show.
+- `code` is the last resort, so a caller never gets an empty string.
+
+`errorDisplayMessage` (`src/utils/trpcError.ts`) implements this for the app; the
+CLI does it in `asErrorBody`, and the Python SDK in `extract_api_error_detail`
+(which also appends `tips` and `docsUrl`, since those exist to be shown).
+
+### One deliberate asymmetry
+
+**The Hono body stays flat at the root.** Nesting it under an `error` key would
+read better, but `error` is already a *string* there, and the Python SDK
+(`better_raise_for_status`), the TS SDK's legacy path and `directUpload.ts` all
+read it as one. Changing it is a breaking change to published SDKs and needs its
+own migration, not a drive-by.
 
 ### Known follow-up
 

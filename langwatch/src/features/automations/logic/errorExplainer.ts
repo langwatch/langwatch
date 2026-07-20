@@ -97,7 +97,16 @@ export function explainHandledError(
     }
     case "project_not_found":
       return { title: "Project not found", description: "" };
-    default:
-      return { title: "Something went wrong", description: "" };
+    default: {
+      // No bespoke copy for this code yet. If the server deliberately authored
+      // a user-facing sentence it rides in `meta.message` (the only channel
+      // that carries prose — see ADR-045); otherwise say something calm rather
+      // than showing a raw code slug.
+      const authored = domain.meta.message;
+      return {
+        title: "Something went wrong",
+        description: typeof authored === "string" ? authored : "",
+      };
+    }
   }
 }
