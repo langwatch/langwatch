@@ -170,4 +170,36 @@ describe("LogRecordStorageClickHouseRepository.getMarkedClaudeCodeLogsByTrace", 
       expect(toMs - fromMs).toBe(sevenCcRetentionMs + partitionWindowMs);
     });
   });
+
+  // stored_log_records carries an idx_attr_key bloom over mapKeys(Attributes)
+  // (migration 00034). ClickHouse only consults it for an explicit
+  // key-existence test, so `Attributes[key] != ''` on its own reads the heavy
+  // Attributes Map for every candidate granule.
+  describe("when selecting the Claude-Code-marked records", () => {
+    it("pairs the kind test with a mapContains so the attribute-key index is used", async () => {
+      const { repo, query } = repoCapturingQuery();
+
+      await repo.getMarkedClaudeCodeLogsByTrace("project_test", "trace-1");
+
+      const { query: sql, query_params } = capturedQuery(query);
+      expect(sql).toContain("mapContains(Attributes, {kindKey:String})");
+      // The original value test is kept: mapContains alone would also match a
+      // key present with an empty value.
+      expect(sql).toContain("Attributes[{kindKey:String}] != ''");
+      expect(query_params.kindKey).toBe(CLAUDE_CODE_KIND_ATTR);
+    });
+  });
+});
+
+describe("LogRecordStorageClickHouseRepository.countMarkedClaudeCodeLogsByTrace", () => {
+  it("uses the same index-eligible kind predicate as the get, so the count matches", async () => {
+    const { repo, query } = repoCapturingQuery();
+
+    await repo.countMarkedClaudeCodeLogsByTrace("project_test", "trace-1");
+
+    const { query: sql, query_params } = capturedQuery(query);
+    expect(sql).toContain("mapContains(Attributes, {kindKey:String})");
+    expect(sql).toContain("Attributes[{kindKey:String}] != ''");
+    expect(query_params.kindKey).toBe(CLAUDE_CODE_KIND_ATTR);
+  });
 });

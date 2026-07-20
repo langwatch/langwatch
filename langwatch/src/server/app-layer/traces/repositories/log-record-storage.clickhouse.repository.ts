@@ -15,6 +15,26 @@ import type {
 
 const TABLE_NAME = "stored_log_records" as const;
 
+/**
+ * Predicate selecting the Claude-Code-marked log records of a trace.
+ *
+ * `mapContains` is redundant with the `!= ''` test on its own — a non-empty
+ * value implies the key is present, so it can never exclude a row the second
+ * test would keep. It is here purely so the predicate becomes index-eligible:
+ * `stored_log_records` carries an `idx_attr_key` bloom filter over
+ * `mapKeys(Attributes)` (migration 00034), and ClickHouse only consults it for
+ * an explicit key-existence test. `Attributes[key] != ''` alone reads the heavy
+ * `Attributes` Map for every candidate granule; EXPLAIN INDEXES confirms the
+ * index is not consulted at all without `mapContains`, and prunes granules that
+ * cannot hold the key once it is present.
+ *
+ * Both marked-log reads share this so their WHERE clauses stay identical and
+ * the count keeps matching the set the get would return.
+ */
+const MARKED_KIND_FILTER =
+  "AND mapContains(Attributes, {kindKey:String}) " +
+  "AND Attributes[{kindKey:String}] != ''";
+
 const logger = createLogger(
   "langwatch:app-layer:traces:log-record-storage-repository",
 );
@@ -195,7 +215,7 @@ export class LogRecordStorageClickHouseRepository
               ${timeFilter}
             GROUP BY TenantId, TraceId, SpanId, ProjectionId
           )
-          AND Attributes[{kindKey:String}] != ''
+          ${MARKED_KIND_FILTER}
         ${orderBy}
         ${limitClause}
       `,
@@ -267,7 +287,7 @@ export class LogRecordStorageClickHouseRepository
               ${timeFilter}
             GROUP BY TenantId, TraceId, SpanId, ProjectionId
           )
-          AND Attributes[{kindKey:String}] != ''
+          ${MARKED_KIND_FILTER}
       `,
       query_params: {
         tenantId,
