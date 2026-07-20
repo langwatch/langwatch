@@ -115,7 +115,7 @@ describe("<MainMenu /> navigation", () => {
       "Analytics",
       "Trace Explorer",
       "Traces",
-      "Online Evaluations",
+      "Online evals",
       "Automations",
       "Simulations",
       "Experiments",

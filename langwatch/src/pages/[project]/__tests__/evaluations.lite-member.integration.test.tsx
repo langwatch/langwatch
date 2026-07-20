@@ -260,6 +260,15 @@ describe("given the Experiments page permission model", () => {
   });
 
   describe("when every matching permission is granted", () => {
+    /** @scenario Use the available width for online evaluation configuration */
+    it("uses the full-width list layout", () => {
+      renderPage();
+
+      expect(screen.getByTestId("full-width-list-page-content")).toHaveStyle({
+        width: "var(--chakra-sizes-full)",
+      });
+    });
+
     it("shows all experiment actions", () => {
       renderPage();
 

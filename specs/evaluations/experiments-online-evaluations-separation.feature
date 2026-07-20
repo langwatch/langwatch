@@ -15,13 +15,15 @@ Feature: Separate experiments from online evaluations
     And "Test" contains "Simulations", "Experiments", and "Annotations" in that order
     And the existing "Build" section is named "Library"
     And "Library" contains "Prompts", "Agents", "Workflows", "Evaluators", and "Datasets" in their existing order
-    And "Observe" contains its existing destinations followed by "Online Evaluations" after "Traces"
+    And "Observe" contains its existing destinations followed by the menu label "Online evals" after "Traces"
+    And the destination page and product copy keep the full name "Online Evaluations"
     And "Automations" is the final destination in "Observe"
     And the remaining destinations keep their current section, name, and order
 
   Scenario: Collapse primary navigation sections
     Given the project navigation is expanded
     Then every primary section has a visible caret and an accessible expand or collapse control
+    And each caret is positioned immediately beside its section label
     When I collapse a section
     Then its destinations are hidden
     And the preference is restored after I reload the application
@@ -42,7 +44,8 @@ Feature: Separate experiments from online evaluations
   Scenario: Discover online evaluations as a distinct observation workflow
     Given I want to monitor application quality in production
     When I scan the "Observe" section
-    Then I can open an "Online Evaluations" destination without opening an experiments screen
+    Then I can open an "Online evals" destination without opening an experiments screen
+    And its page heading uses the full name "Online Evaluations"
     And the page explains that configured evaluations run on live traces or threads
     And the page does not list experiments
     And its primary actions create an online evaluation or configure a guardrail
@@ -56,6 +59,13 @@ Feature: Separate experiments from online evaluations
     And improving trends are green
     And declining trends are red
     And unavailable trends have an explicit neutral state
+
+  Scenario: Use the available width for online evaluation configuration
+    Given the online evaluations page has configured rows
+    When the content area is wider than the table's minimum readable width
+    Then the explanatory copy and configuration table expand to the available content width
+    And the layout does not constrain the table to a compact centered column
+    And the experiments table follows the same full-width list layout
 
   Scenario: Open analytics for one online evaluation
     Given I am viewing an online evaluation row

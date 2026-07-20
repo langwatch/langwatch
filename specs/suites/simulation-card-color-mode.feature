@@ -9,6 +9,7 @@ Feature: Simulation card completion treatment follows the selected color mode
     When its status treatment is rendered
     Then the status gradient covers the full card
     And a successful run uses the established layered green wash
+    And the card title is white above the status wash
 
   Scenario: Dark mode keeps the compact status scrim
     Given a completed simulation run is displayed as a card in dark mode

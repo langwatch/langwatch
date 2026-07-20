@@ -65,6 +65,18 @@ describe("<SidebarSection />", () => {
   });
 
   /** @scenario Collapse primary navigation sections */
+  it("positions the caret immediately after the section label", () => {
+    renderSection();
+
+    const label = screen.getByText("Observe");
+    const heading = label.parentElement;
+
+    expect(heading).not.toBeNull();
+    expect(heading).toHaveStyle({ justifyContent: "flex-start" });
+    expect(label.nextElementSibling?.tagName.toLowerCase()).toBe("svg");
+  });
+
+  /** @scenario Collapse primary navigation sections */
   it("restores a saved preference after remount", () => {
     localStorage.setItem(getSidebarSectionStorageKey("observe"), "false");
 

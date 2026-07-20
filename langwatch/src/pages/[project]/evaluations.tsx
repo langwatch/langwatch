@@ -1,7 +1,6 @@
 import {
   Badge,
   Box,
-  Container,
   HStack,
   Skeleton,
   Spacer,
@@ -25,6 +24,7 @@ import { CreateExperimentButton } from "~/components/experiments/CreateExperimen
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { ListTable } from "~/components/ui/ListTable";
+import { FullWidthListPageContent } from "~/components/ui/layouts/FullWidthListPageContent";
 import { Link } from "~/components/ui/link";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { useRouter } from "~/utils/compat/next-router";
@@ -171,12 +171,8 @@ export function ExperimentsPage() {
           </PageLayout.Content>
         </PageLayout.Container>
       ) : (
-        <Container
-          maxW={"calc(min(1440px, 100vw - 200px))"}
-          paddingX={6}
-          paddingTop={4}
-        >
-          <VStack width="fill" gap={4} align="stretch">
+        <FullWidthListPageContent>
+          <VStack width="full" gap={4} align="stretch">
             <Text color="fg.muted">
               Compare configurations and analyze batch test results
             </Text>
@@ -485,7 +481,7 @@ export function ExperimentsPage() {
               )}
             </>
           </VStack>
-        </Container>
+        </FullWidthListPageContent>
       )}
       {copyDialogState && (
         <CopyExperimentDialog

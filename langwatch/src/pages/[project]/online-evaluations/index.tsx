@@ -1,12 +1,4 @@
-import {
-  Box,
-  Container,
-  HStack,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Activity } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -19,6 +11,7 @@ import {
 } from "~/components/evaluations/OnlineEvaluationsTable";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { FullWidthListPageContent } from "~/components/ui/layouts/FullWidthListPageContent";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
@@ -195,11 +188,7 @@ function OnlineEvaluationsPage() {
           </PageLayout.Content>
         </PageLayout.Container>
       ) : (
-        <Container
-          maxW="calc(min(1440px, 100vw - 200px))"
-          paddingX={6}
-          paddingTop={4}
-        >
+        <FullWidthListPageContent>
           <VStack width="full" gap={4} align="stretch">
             <VStack align="start" gap={1}>
               <Text color="fg.muted">
@@ -236,7 +225,7 @@ function OnlineEvaluationsPage() {
               }}
             />
           </VStack>
-        </Container>
+        </FullWidthListPageContent>
       )}
 
       {copyMonitor && (

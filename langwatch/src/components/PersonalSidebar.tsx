@@ -148,7 +148,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
             {personalProjectSlug && features?.evaluations && (
               <SideMenuLink
                 icon={ClipboardList}
-                label="Online Evaluations"
+                label="Online evals"
                 href={`/${personalProjectSlug}/online-evaluations`}
                 isActive={isOnlineEvaluationsActive}
                 showLabel={showExpanded}
