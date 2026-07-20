@@ -178,6 +178,23 @@ jobs:
             agentic-e2e-tests/pnpm-lock.yaml
             mcp-server/pnpm-lock.yaml
 
+      # start.sh auto-starts the aigateway + nlpgo Go services via
+      # `go run ./cmd/service`. Without a Go toolchain + warm caches, both
+      # lanes cold-download the toolchain and the full module graph while
+      # tsx is booting the API server — starving it past global-setup's
+      # 60s readiness window on the 2-core runner (intermittent
+      # "API not ready ... backend never served publicEnv" failures).
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # Compile the service dispatcher (imports both aigateway and nlpgo)
+      # up front so the auto-start lanes' `go run` during `pnpm start` is a
+      # warm-cache no-op and the API lane keeps the CPU while it boots.
+      - name: Pre-build Go services
+        run: go build -o /dev/null ./cmd/service
+
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
       # its postinstall always falls back to `node-gyp rebuild`. With
       # pnpm/action-setup v6's npm-bootstrap path, node-gyp isn't on PATH
