@@ -106,9 +106,18 @@ export class PrismaTopicModelProjectionRepository
         },
         update: cursorData,
       }),
-      this.prisma.topic.deleteMany({
-        where: { projectId, id: { notIn: keptIds } },
-      }),
+      // Fail-safe: no event can legitimately fold the model to zero topics
+      // (replace requires a non-empty list, seeds skip empty projects), so
+      // an empty state must never reconcile the table — `notIn: []` would
+      // delete every row for the project. Advancing the cursor while
+      // leaving the rows is the recoverable direction.
+      ...(keptIds.length > 0
+        ? [
+            this.prisma.topic.deleteMany({
+              where: { projectId, id: { notIn: keptIds } },
+            }),
+          ]
+        : []),
       ...ordered.map((topic) =>
         this.prisma.topic.upsert({
           // Topic ids are globally-unique nanoids minted by clustering or

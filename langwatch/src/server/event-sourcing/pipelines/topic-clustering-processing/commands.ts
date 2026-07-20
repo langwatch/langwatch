@@ -93,6 +93,16 @@ export const RecordClusteringRunFailedCommand = defineCommand({
     `${String(d.tenantId)}:topic_clustering:${d.runId}:page-${d.page}:failed`,
 });
 
+/**
+ * One key for both the event idempotencyKey and the enqueue dedup id, so a
+ * redelivered page or a re-run seed collapses instead of appending again.
+ * Exported for the pipeline's `deduplication.makeId` wiring.
+ */
+export const recordTopicsDedupeId = (d: {
+  tenantId: PropertyKey;
+  dedupeKey: string;
+}): string => `${String(d.tenantId)}:topic_clustering:topics:${d.dedupeKey}`;
+
 export const RecordTopicsCommand = defineCommand({
   commandType: "lw.obs.topic_clustering.record_topics",
   eventType: "lw.obs.topic_clustering.topics_recorded",
@@ -100,15 +110,12 @@ export const RecordTopicsCommand = defineCommand({
   aggregateType: "topic_clustering",
   schema: topicClusteringTopicsRecordedEventDataSchema,
   aggregateId: (d) => String(d.tenantId),
-  // Keyed by the caller's dedupeKey (`run:<id>:page-<n>` / `seed:v1`), so a
-  // redelivered page or a re-run seed collapses instead of appending again.
-  idempotencyKey: (d) =>
-    `${String(d.tenantId)}:topic_clustering:topics:${d.dedupeKey}`,
+  // Keyed by the caller's dedupeKey (`run:<id>:page-<n>` / `seed:v1`).
+  idempotencyKey: recordTopicsDedupeId,
   spanAttributes: (d) => ({
     "payload.mode": d.mode,
     "payload.source": d.source,
     "payload.topics_count": d.topics.length,
   }),
-  makeJobId: (d) =>
-    `${String(d.tenantId)}:topic_clustering:topics:${d.dedupeKey}`,
+  makeJobId: recordTopicsDedupeId,
 });

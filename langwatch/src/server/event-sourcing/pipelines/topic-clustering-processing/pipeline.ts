@@ -27,6 +27,7 @@ import {
   RecordClusteringRunStartedCommand,
   RecordClusteringRunFailedCommand,
   RecordTopicsCommand,
+  recordTopicsDedupeId,
   RequestTopicClusteringCommand,
 } from "./commands";
 import { TOPIC_CLUSTERING_EVENT_TYPES } from "./schemas/constants";
@@ -149,7 +150,16 @@ export function createTopicClusteringProcessingPipeline(
       RecordClusteringRunCompletedCommand,
     )
     .withCommand("recordClusteringRunFailed", RecordClusteringRunFailedCommand)
-    .withCommand("recordTopics", RecordTopicsCommand)
+    .withCommand("recordTopics", RecordTopicsCommand, {
+      // Suppress duplicate appends for the same dedupeKey at enqueue (the
+      // boot seed racing the write-path seed, or a retried page). TTL-bound
+      // and best-effort — the fold's stale-seed guard is the correctness
+      // backstop (topicModel.foldProjection.ts).
+      deduplication: {
+        makeId: recordTopicsDedupeId,
+        ttlMs: 60_000,
+      },
+    })
     .withProcessManager(
       TOPIC_CLUSTERING_PROCESS_NAME,
       topicClusteringPM(deps.dispatch),
