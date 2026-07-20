@@ -209,17 +209,7 @@ export function RecentChatsMenu({
       onOpenChange={(details) => {
         if (details.open) setQuery("");
       }}
-      // Keep the popover on screen: flip to the other side and shift along the
-      // edge when there isn't room (the docked panel sits flush to the right,
-      // so an un-shifted "bottom-end" ran off the viewport). `overflowPadding`
-      // holds an 8px margin from the edge.
-      positioning={{
-        placement,
-        gutter: 6,
-        flip: true,
-        slide: true,
-        overflowPadding: 8,
-      }}
+      positioning={{ placement, gutter: 6 }}
       width="auto"
       // When hosted on a caller's trigger (the header title), grow to fill the
       // row AND allow shrinking below the title's intrinsic width — that is what
@@ -229,8 +219,15 @@ export function RecentChatsMenu({
       minWidth={trigger ? 0 : undefined}
     >
       {/* Ark anchors the listbox to the Control. Without it the popover lands in
-          the viewport's top-left corner. */}
-      <Combobox.Control display="flex" flex={1} minWidth={0}>
+          the viewport's top-left corner. Stretch ONLY when hosted on a caller's
+          title trigger (so the title can ellipsis-truncate); the bare icon case
+          stays intrinsic, or a stretched control would push its "bottom-end"
+          popover off the right edge of a right-docked panel. */}
+      <Combobox.Control
+        display="flex"
+        flex={trigger ? 1 : undefined}
+        minWidth={trigger ? 0 : undefined}
+      >
         {trigger ? (
           <Combobox.Trigger asChild>{trigger}</Combobox.Trigger>
         ) : (
@@ -264,6 +261,19 @@ export function RecentChatsMenu({
             borderColor="border.muted"
             boxShadow="lg"
             css={{
+              // Ark's Combobox positioner start-aligns even on a "bottom-end"
+              // placement, so from the icon at the panel's right edge the 340px
+              // popover ran off the viewport. Right-align the content to the
+              // trigger ourselves: shift it left by its own width less the
+              // trigger's (`--reference-width`, exposed by the positioner), on
+              // the standalone `translate` so it composes with the open/close
+              // scale on `transform`. Only the bare icon form needs it; a
+              // caller trigger positions itself.
+              ...(trigger
+                ? {}
+                : {
+                    translate: "calc(-100% + var(--reference-width, 24px)) 0",
+                  }),
               backdropFilter: "blur(18px) saturate(0.5)",
               WebkitBackdropFilter: "blur(18px) saturate(0.5)",
             }}
