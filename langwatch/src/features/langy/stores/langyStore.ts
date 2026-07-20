@@ -241,10 +241,18 @@ interface LangyState {
 
   // Feedback cards the user waved away, keyed by the assistant message they sat
   // under. Conversation-scoped (see emptyConversationState) — a dismissal means
-  // "not for this answer", not "never again"; the long cross-session snooze is
-  // localStorage's job (see logic/langyFeedbackDirective).
+  // "not for this answer", not "never again"; the cross-session quiet period is
+  // the backend's job (langy.messages `askFeedback` + langy.feedbackPromptShown).
   dismissedFeedbackMessageIds: Set<string>;
   dismissFeedback: (messageId: string) => void;
+  /**
+   * The assistant message whose feedback card must stay rendered regardless of
+   * the server cadence flag. Two producers: a shown card pins itself (so the
+   * refetch that follows `feedbackPromptShown` cannot unmount it mid-look), and
+   * the `/feedback` composer command pins on demand. Conversation-scoped.
+   */
+  pinnedFeedbackMessageId: string | null;
+  pinFeedback: (messageId: string) => void;
 
   // The in-flight turn + its live status/progress signals. The ChatTransport
   // adopts the turn id and pushes signals off the `langy.onTurnStream`
@@ -252,6 +260,15 @@ interface LangyState {
   // Conversation-scoped (reset on switch / new turn), never persisted.
   activeTurnId: string | null;
   setActiveTurnId: (id: string | null) => void;
+  /**
+   * The turn whose live stream ended with a genuine end-of-turn frame. The
+   * durable fold finalizes asynchronously (projection + refetch), so the panel
+   * uses this to retire the working indicator the instant the answer is
+   * complete instead of trusting a briefly-stale in-flight flag. Cleared when
+   * a new turn is adopted.
+   */
+  settledTurnId: string | null;
+  markTurnSettled: (turnId: string | null) => void;
   /** Latest coarse status line for the turn (e.g. "Searching traces…"). */
   turnStatus: string | null;
   /** Latest progress fraction/percentage for the turn (0..1 or 0..100). */
@@ -308,7 +325,9 @@ const emptyConversationState = () => ({
   discardedProposalIds: new Set<string>(),
   applyingProposalIds: new Set<string>(),
   dismissedFeedbackMessageIds: new Set<string>(),
+  pinnedFeedbackMessageId: null as string | null,
   activeTurnId: null as string | null,
+  settledTurnId: null as string | null,
   turnStatus: null as string | null,
   turnProgress: null as number | null,
   turnProgressSample: null as LangyProgressSample | null,
@@ -486,9 +505,26 @@ export const useLangyStore = create<LangyState>()(
           next.add(messageId);
           return { dismissedFeedbackMessageIds: next };
         }),
+      pinnedFeedbackMessageId: null,
+      // Pinning un-dismisses: `/feedback` after waving the card away must
+      // re-open it, and the dismissal check would otherwise win forever.
+      pinFeedback: (messageId) =>
+        set((state) => {
+          const dismissed = new Set(state.dismissedFeedbackMessageIds);
+          dismissed.delete(messageId);
+          return {
+            pinnedFeedbackMessageId: messageId,
+            dismissedFeedbackMessageIds: dismissed,
+          };
+        }),
 
       activeTurnId: null,
-      setActiveTurnId: (activeTurnId) => set({ activeTurnId }),
+      // Adopting a turn (fresh or re-driven) means it is live again, so the
+      // settled marker from the previous turn must not bleed onto it.
+      setActiveTurnId: (activeTurnId) =>
+        set({ activeTurnId, settledTurnId: null }),
+      settledTurnId: null,
+      markTurnSettled: (settledTurnId) => set({ settledTurnId }),
       turnStatus: null,
       turnProgress: null,
       turnProgressSample: null,

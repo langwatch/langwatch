@@ -8,23 +8,43 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { submitMock } = vi.hoisted(() => ({ submitMock: vi.fn() }));
+const { submitMock, promptShownMock } = vi.hoisted(() => ({
+  submitMock: vi.fn(),
+  promptShownMock: vi.fn(),
+}));
 
 vi.mock("../data/useLangyFeedback", () => ({
   useLangyFeedback: () => ({ submit: submitMock, isSubmitting: false }),
 }));
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
+}));
+vi.mock("~/utils/api", () => ({
+  api: {
+    langy: {
+      feedbackPromptShown: {
+        useMutation: () => ({ mutate: promptShownMock }),
+      },
+    },
+  },
+}));
 
 import { LangyFeedback } from "../components/LangyFeedback";
+import { useLangyStore } from "../stores/langyStore";
 
-function renderFeedback() {
+function renderFeedback(
+  props: Partial<React.ComponentProps<typeof LangyFeedback>> = {},
+) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <LangyFeedback
         conversationId="conv-1"
         messageId="msg-1"
         traceId="trace-1"
+        {...props}
       />
     </ChakraProvider>,
   );
@@ -33,6 +53,11 @@ function renderFeedback() {
 afterEach(() => {
   cleanup();
   submitMock.mockClear();
+  promptShownMock.mockClear();
+  useLangyStore.setState({
+    pinnedFeedbackMessageId: null,
+    dismissedFeedbackMessageIds: new Set<string>(),
+  });
 });
 
 describe("given the Langy feedback card", () => {
@@ -90,6 +115,40 @@ describe("given the Langy feedback card", () => {
       renderFeedback();
       fireEvent.click(screen.getByLabelText("Submit typed rating"));
       expect(submitMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the card is shown by the backend cadence", () => {
+    it("reports the ask so the quiet period starts even if it is ignored", () => {
+      renderFeedback({ origin: "asked" });
+      expect(promptShownMock).toHaveBeenCalledWith({
+        projectId: "proj-1",
+        conversationId: "conv-1",
+      });
+    });
+
+    it("pins itself so a refetch cannot unmount it mid-look", () => {
+      renderFeedback({ origin: "asked" });
+      expect(useLangyStore.getState().pinnedFeedbackMessageId).toBe("msg-1");
+    });
+  });
+
+  describe("when the card is summoned via /feedback", () => {
+    it("does not count against the quiet period", () => {
+      renderFeedback({ origin: "requested" });
+      expect(promptShownMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the card was already dismissed for this answer", () => {
+    it("stays dismissed on a remount instead of resurrecting itself", () => {
+      useLangyStore.setState({
+        dismissedFeedbackMessageIds: new Set(["msg-1"]),
+      });
+      renderFeedback({ origin: "asked" });
+      expect(screen.queryByText("How did Langy do?")).toBeNull();
+      expect(useLangyStore.getState().pinnedFeedbackMessageId).toBeNull();
+      expect(promptShownMock).not.toHaveBeenCalled();
     });
   });
 });

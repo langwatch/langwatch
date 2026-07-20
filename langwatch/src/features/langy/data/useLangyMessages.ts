@@ -27,9 +27,31 @@ export interface LangyMessagesResult {
    * hold a working state through that gap instead of going blank.
    */
   isTurnInFlight: boolean;
+  /**
+   * The backend-driven feedback cadence: should the panel ask "How did Langy
+   * do?" under the latest answer? Computed server-side (conversation depth +
+   * per-user quiet period) so it holds across tabs and devices.
+   */
+  askFeedback: boolean;
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
+}
+
+/** How often the durable turn state is re-checked while a turn is in flight. */
+const TURN_IN_FLIGHT_POLL_MS = 3_000;
+
+/**
+ * Self-stopping poll (see dev/docs/best_practices/async-processing-ui.md):
+ * while the fold says a turn is in flight, re-check on a short interval so the
+ * settled state lands even when the freshness signal is delayed or lost —
+ * without it a stale `isTurnInFlight: true` sits in the cache and the working
+ * indicator outlives the answer. Stops itself the moment the turn settles.
+ */
+export function langyMessagesPollInterval(
+  data: { isTurnInFlight: boolean } | undefined,
+): number | false {
+  return data?.isTurnInFlight ? TURN_IN_FLIGHT_POLL_MS : false;
 }
 
 /**
@@ -53,6 +75,7 @@ export function useLangyMessages(
       staleTime: 30_000,
       refetchOnWindowFocus: false,
       keepPreviousData: true,
+      refetchInterval: langyMessagesPollInterval,
     },
   );
 
@@ -60,6 +83,7 @@ export function useLangyMessages(
     messages: (query.data?.messages ?? []) as LangyMessageDto[],
     lastError: query.data?.lastError ?? null,
     isTurnInFlight: query.data?.isTurnInFlight ?? false,
+    askFeedback: query.data?.askFeedback ?? false,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,

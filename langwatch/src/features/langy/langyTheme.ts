@@ -181,6 +181,12 @@ export const langyThemeConfig = defineConfig({
 
           // The signal grid's line colour (dark only — see langyTheme.css).
           grid: langy("transparent", white(0.035)),
+
+          // Langy's answer text: a step dimmer than `fg`, so a glance separates
+          // "what I said" (bright, bubbled) from "what it said" (the quiet
+          // page). Light is ink-800 eased toward paper; dark is the site's
+          // paper-at-alpha move, one notch under full white.
+          answerFg: langy("#363530", white(0.87)),
         },
       },
 
@@ -203,6 +209,16 @@ export const langyThemeConfig = defineConfig({
         xs: { value: { _langy: "0.71875rem", _langyDark: "0.71875rem" } },
         sm: { value: { _langy: "0.8125rem", _langyDark: "0.8125rem" } },
         md: { value: { _langy: "0.9375rem", _langyDark: "0.9375rem" } },
+        // The answer body: half a step under `sm`, so Langy's prose sits
+        // visibly below the user's words without dropping to `xs` caption
+        // territory. Base value matches `sm` for any use outside `.langy-root`.
+        langyAnswer: {
+          value: {
+            base: "0.8125rem",
+            _langy: "0.78125rem",
+            _langyDark: "0.78125rem",
+          },
+        },
       },
     },
 

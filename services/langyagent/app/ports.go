@@ -88,6 +88,9 @@ type Worker interface {
 	// Release returns the worker to idle and records the turn as recently-handled.
 	// Always paired with a granted ClaimTurn.
 	Release()
+	// HasServedTurn reports whether this worker has completed at least one turn —
+	// the honest cold/warm signal behind the pre-first-frame status copy.
+	HasServedTurn() bool
 	// Touch resets the idle timer.
 	Touch()
 	// PostMessage queues the turn on the worker's opencode session. resumeToken

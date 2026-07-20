@@ -2,15 +2,14 @@ import { chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { ArrowRight, X } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ACCENT, CARD } from "~/features/asaplangy/tokens";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
+import { api } from "~/utils/api";
 import { useLangyFeedback } from "../data/useLangyFeedback";
 import { useLangyStore } from "../stores/langyStore";
-import {
-  type LangyFeedbackSentiment,
-  markFeedbackAsked,
-} from "../logic/langyFeedbackDirective";
+import type { LangyFeedbackSentiment } from "../logic/langyFeedbackDirective";
 
 /** What the backend feedback capture accepts as the coarse rating + tone. */
 type FeedbackRating = "up" | "down";
@@ -86,20 +85,47 @@ export function LangyFeedback({
   messageId,
   traceId,
   sentiment,
+  origin = "asked",
 }: {
   conversationId?: string;
   messageId?: string;
   traceId?: string;
   /** The moment Langy classified this as, via its feedback directive. */
   sentiment?: LangyFeedbackSentiment;
+  /**
+   * How this card came to be: the backend cadence asked ("asked"), the agent's
+   * in-stream directive asked ("directive"), or the user summoned it with
+   * `/feedback` ("requested"). Only the first two count against the quiet
+   * period — a user asking to rate is not us nagging them.
+   */
+  origin?: "asked" | "directive" | "requested";
 }) {
   const { submit } = useLangyFeedback();
+  const { project } = useOrganizationTeamProject();
+  const promptShown = api.langy.feedbackPromptShown.useMutation();
   const reduce = useReducedMotion();
   const [done, setDone] = useState(false);
   const [typed, setTyped] = useState("");
   const dismissedIds = useLangyStore((s) => s.dismissedFeedbackMessageIds);
   const dismissFeedback = useLangyStore((s) => s.dismissFeedback);
   const [locallyDismissed, setLocallyDismissed] = useState(false);
+
+  // Showing IS asking. On first render: pin the card (so the refetch that
+  // follows the shown-mark can't flip the server flag and unmount it mid-look)
+  // and start the server-side quiet period — an ignored card must not re-ask
+  // under the next answer. `/feedback` pins without marking. Mount-only on
+  // purpose: this card renders once per answer. A card the user already waved
+  // away must stay away — pinning un-dismisses, so a remount (say, a history
+  // reload) would otherwise resurrect it.
+  useEffect(() => {
+    const store = useLangyStore.getState();
+    if (messageId && store.dismissedFeedbackMessageIds.has(messageId)) return;
+    if (messageId) store.pinFeedback(messageId);
+    if (origin !== "requested" && conversationId && project?.id) {
+      promptShown.mutate({ projectId: project.id, conversationId });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Persist one rating, then collapse the card. */
   const record = ({
@@ -119,7 +145,6 @@ export function LangyFeedback({
       sentiment: tone,
       ...(comment ? { comment } : {}),
     });
-    markFeedbackAsked();
     setDone(true);
   };
 
@@ -149,14 +174,11 @@ export function LangyFeedback({
   };
 
   /**
-   * "Not now." The card had no exit before — you either rated the answer or
-   * lived with it sitting there. Dismissing records the ask against the long
-   * snooze (so the next turn doesn't just ask again) AND remembers this
-   * message, so the card can't reappear when the conversation re-renders or is
-   * reloaded from history.
+   * "Not now." Remembers this message so the card can't reappear when the
+   * conversation re-renders or reloads from history. The cross-session quiet
+   * period already started when the card was shown (the mount effect above).
    */
   const dismiss = () => {
-    markFeedbackAsked();
     if (messageId) dismissFeedback(messageId);
     setLocallyDismissed(true);
   };

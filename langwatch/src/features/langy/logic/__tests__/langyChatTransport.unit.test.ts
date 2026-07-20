@@ -192,7 +192,7 @@ describe("createLangyChatTransport", () => {
       const { onData } = streamHandlers();
 
       // The manager's cold-window placeholder, then the first real output (plan).
-      onData({ type: "status", status: "Setting up a fresh workspace…" });
+      onData({ type: "status", status: "Waking Langy up…" });
       onData({
         type: "plan",
         items: [{ content: "Find the slow traces", status: "in_progress" }],
@@ -235,6 +235,63 @@ describe("createLangyChatTransport", () => {
         type: "status",
         status: "",
       });
+    });
+  });
+
+  describe("given the live stream terminates", () => {
+    function handlers() {
+      return subscription.mock.calls[0]![2] as {
+        onData: (entry: unknown) => void;
+        onError: (err: unknown) => void;
+        onComplete: () => void;
+      };
+    }
+
+    it("reports reason 'end' for the genuine end-of-turn frame", async () => {
+      const onTurnSettled = vi.fn();
+      const { transport } = makeTransport({}, { onTurnSettled });
+      await transport.sendMessages(options());
+
+      handlers().onData({ type: "end" });
+
+      expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({ reason: "end" });
+    });
+
+    it("reports reason 'error' for an error frame", async () => {
+      const onTurnSettled = vi.fn();
+      const { transport } = makeTransport({}, { onTurnSettled });
+      await transport.sendMessages(options());
+
+      handlers().onData({ type: "error", error: "it broke" });
+
+      expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({
+        reason: "error",
+      });
+    });
+
+    it("reports reason 'closed' for a silent subscription completion", async () => {
+      // A quiet worker's stream closing is NOT the answer finishing — the
+      // caller must keep trusting the durable fold, so the reason says so.
+      const onTurnSettled = vi.fn();
+      const { transport } = makeTransport({}, { onTurnSettled });
+      await transport.sendMessages(options());
+
+      handlers().onComplete();
+
+      expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({
+        reason: "closed",
+      });
+    });
+
+    it("settles exactly once even when the close races the end frame", async () => {
+      const onTurnSettled = vi.fn();
+      const { transport } = makeTransport({}, { onTurnSettled });
+      await transport.sendMessages(options());
+
+      handlers().onData({ type: "end" });
+      handlers().onComplete();
+
+      expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({ reason: "end" });
     });
   });
 

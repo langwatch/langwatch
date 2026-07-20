@@ -8,10 +8,12 @@
  * as `[langy:feedback:<sentiment>]`, so we ask at high-signal times (a clearly
  * great answer, or an obviously rough one) instead of nagging under every reply.
  *
- * The agent-side cheap-model timing and the server "last asked" throttle (so we
- * don't over-ask across turns/conversations) are the backend half — seamed in
- * PR3. On the client, `shouldAskFeedback` is a lightweight localStorage
- * backstop so even the default path respects a minimum interval.
+ * WHEN to ask on the default (non-directive) path is the backend's call: the
+ * `langy.messages` read carries an `askFeedback` flag computed by
+ * `LangyFeedbackPromptService` (conversation depth + a per-user quiet period),
+ * and the panel reports the card being shown back through
+ * `langy.feedbackPromptShown` so the cadence holds across tabs and devices.
+ * Nothing here keeps client-side timing state.
  */
 
 export type LangyFeedbackSentiment = "frustrated" | "delighted" | "neutral";
@@ -76,34 +78,4 @@ const SUBSTANTIVE_ANSWER_MIN_CHARS = 55;
 
 export function isSubstantiveLangyAnswer(text: string): boolean {
   return text.trim().length >= SUBSTANTIVE_ANSWER_MIN_CHARS;
-}
-
-const THROTTLE_KEY = "langwatch:langy:feedback:last-asked:v1";
-/** Minimum gap between unprompted feedback asks (client backstop). 6 hours. */
-const MIN_INTERVAL_MS = 6 * 60 * 60 * 1000;
-
-/**
- * The snooze. Feedback should never nag, so we only allow an ask once per
- * interval — and this now gates BOTH paths (default and the fast-model
- * directive): a high-signal moment is still not worth asking about if we just
- * asked. The directive lowers the substance bar, not the snooze.
- */
-export function shouldAskFeedback(now: number = Date.now()): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const raw = window.localStorage.getItem(THROTTLE_KEY);
-    const last = raw ? Number(raw) : 0;
-    return !Number.isFinite(last) || now - last >= MIN_INTERVAL_MS;
-  } catch {
-    return true;
-  }
-}
-
-export function markFeedbackAsked(now: number = Date.now()): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(THROTTLE_KEY, String(now));
-  } catch {
-    // Best-effort.
-  }
 }

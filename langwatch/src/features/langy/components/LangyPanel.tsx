@@ -122,7 +122,6 @@ import {
   turnHadSideEffects,
   useLangyTurnRecovery,
 } from "../hooks/useLangyTurnRecovery";
-import { shouldAskFeedback } from "../logic/langyFeedbackDirective";
 // Langy's own skin: scoped warm/cream palette + serif display face. The
 // `.langy-root` class (below) is where the Chakra semantic-token overrides land.
 import "../langyTheme.css";
@@ -574,10 +573,17 @@ function LangyPanel({
           }
           // milestone entries carry no numeric rollup and have no consumer yet.
         },
-        onTurnSettled: () => {
+        onTurnSettled: ({ reason }) => {
           // The turn ended: drop the live status line. The streamed message
           // stands as the view; the durable fold is canonical on reload.
-          useLangyStore.getState().resetTurnSignals();
+          const store = useLangyStore.getState();
+          store.resetTurnSignals();
+          // A genuine end-of-turn frame means the answer is COMPLETE — retire
+          // the durable in-flight flag locally right now, because the fold
+          // finalizes asynchronously and a refetch can cache it stale for
+          // seconds. A silent close ("closed") or an error keeps the durable
+          // truth in charge: the turn may genuinely still be running there.
+          if (reason === "end") store.markTurnSettled(store.activeTurnId);
           // Refetch the durable view NOW. `isTurnInFlight` (which keeps the
           // thinking line mounted) is read from this query, and nothing else
           // ever invalidates it — a mid-turn fetch cached `true` and the line
@@ -706,9 +712,22 @@ function LangyPanel({
   const {
     messages: historyMessages,
     lastError: historyLastError,
-    isTurnInFlight: serverTurnInFlight,
+    isTurnInFlight: foldTurnInFlight,
+    askFeedback,
     isFetching: isFetchingHistory,
   } = useLangyMessages(activeConversationId);
+
+  // The fold's in-flight flag, corrected by what the live stream PROVED: a
+  // genuine end-of-turn frame means the answer is complete, and the fold is
+  // merely lagging (async projection + a refetch that can cache the stale
+  // flag). Without this the working indicator outlives the answer. The RAW
+  // fold flag still gates queue draining below — the next turn's busy guard
+  // reads the fold, not our local knowledge.
+  const activeTurnId = useLangyStore((s) => s.activeTurnId);
+  const settledTurnId = useLangyStore((s) => s.settledTurnId);
+  const serverTurnInFlight =
+    foldTurnInFlight &&
+    !(activeTurnId !== null && settledTurnId === activeTurnId);
 
   // Push a settled server history into the chat engine. Gated on a USER
   // selection (`historyLoadConversationId`) so a background refetch — or the
@@ -829,7 +848,10 @@ function LangyPanel({
   useLangyFreshness(activeConversationId);
 
   const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
-  const canDrainQueuedMessages = !isBusy && !serverTurnInFlight;
+  // Draining waits for the DURABLE fold, not the locally-corrected flag: the
+  // busy guard on continueConversation reads the fold, so sending the moment
+  // the stream ends would race the projection and bounce with "busy".
+  const canDrainQueuedMessages = !isBusy && !foldTurnInFlight;
   const isEmpty = messages.length === 0;
   // The floating card's resting floor. While a turn is in flight we never fall
   // back to the empty floor, so sending from an empty thread steps UP
@@ -933,6 +955,19 @@ function LangyPanel({
   );
   sendImplementationRef.current = async (text: string) => {
     if (!text.trim() || !projectId || isBusy) return;
+    // `/feedback` is a client command, not a message: it summons the rating
+    // card under the latest answer (bypassing the backend cadence — the user
+    // asking to rate is never nagging) and sends nothing to Langy.
+    if (text.trim().toLowerCase() === "/feedback") {
+      setDraft("");
+      const lastAssistant = [...messages]
+        .reverse()
+        .find((message) => message.role === "assistant");
+      if (lastAssistant) {
+        useLangyStore.getState().pinFeedback(lastAssistant.id);
+      }
+      return;
+    }
     // A new question opens a new recovery chain: the policy's attempt budget is
     // per-question, so the previous turn's spent attempts don't eat this one's.
     recovery.reset();
@@ -1145,9 +1180,10 @@ function LangyPanel({
     ],
   );
 
-  // Default (non-directive) feedback is throttled so we don't nag; a
-  // [langy:feedback] directive from Langy bypasses this in MessageContent.
-  const canAskFeedback = useMemo(() => shouldAskFeedback(), [messages.length]);
+  // A card pinned open: a shown ask riding out refetches, or `/feedback`.
+  const pinnedFeedbackMessageId = useLangyStore(
+    (s) => s.pinnedFeedbackMessageId,
+  );
 
   // Granular streaming state (PR3 transport seam) + domain-error rendering.
   const turnSignals = useLangyTurnSignals(activeConversationId);
@@ -1695,15 +1731,21 @@ function LangyPanel({
                         //
                         // `!turnError` covers the failure; `!recovery.isRecovering`
                         // covers the turn that is still being re-driven and might
-                        // yet succeed.
+                        // yet succeed. This is only the position + settled gate:
+                        // whether a card actually shows is `askFeedback` (the
+                        // backend cadence), the directive, or the pin.
                         showFeedback={
                           !isBusy &&
+                          // The durable flag too — never ask "How did Langy
+                          // do?" while the working indicator is still up.
+                          !serverTurnInFlight &&
                           !turnError &&
                           !recovery.isRecovering &&
                           message.role === "assistant" &&
-                          index === messages.length - 1 &&
-                          canAskFeedback
+                          index === messages.length - 1
                         }
+                        askFeedback={askFeedback}
+                        forceFeedback={pinnedFeedbackMessageId === message.id}
                         // (No connect-card prop: MessageContent no longer sniffs
                         // the prose for `[langy:connect-github]`. The connect card
                         // is driven by the structured `langy_github_not_connected`
@@ -1711,7 +1753,11 @@ function LangyPanel({
                       />
                     ))}
                     {turnInFlight ? (
-                      <>
+                      // Extra air above the working lines: the column's gap
+                      // alone left them hugging the cards of the streaming
+                      // answer, which read as part of the message rather than
+                      // the live edge below it.
+                      <VStack align="stretch" gap={2.5} marginTop={1.5}>
                         {/* Reasoning is independent from status/progress. The old
                           either/or hid it as soon as any progress frame existed,
                           which is most useful turns. */}
@@ -1736,7 +1782,7 @@ function LangyPanel({
                           !hasInlineProgressOwner ? (
                           <LangyThinkingLine messages={messages} />
                         ) : null}
-                      </>
+                      </VStack>
                     ) : null}
                     {/* Recovering beats failing. While the policy has a retry
                     pending, the turn is — as far as the user is concerned —

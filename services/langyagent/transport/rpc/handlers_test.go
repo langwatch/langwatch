@@ -32,6 +32,7 @@ func (w *stubWorker) ClaimTurn(string) app.ClaimOutcome {
 }
 func (w *stubWorker) Release()                                                  {}
 func (w *stubWorker) Touch()                                                    {}
+func (w *stubWorker) HasServedTurn() bool                                       { return false }
 func (w *stubWorker) SetTurnTraceContext(trace.SpanContext)                     {}
 func (w *stubWorker) LastLLMError() (herr.E, bool)                              { return herr.E{}, false }
 func (w *stubWorker) PostMessage(context.Context, string, string, string) error { return nil }
