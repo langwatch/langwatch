@@ -853,6 +853,15 @@ function LangyPanel({
   const { scrollRef, contentRef, endRef, isPinned, canScroll, jumpToLatest } =
     useLangyStickToBottom({ enabled: !langyNeedsModel && !showCardGallery });
 
+  // The setup verdict arrives ASYNC (the resolved-default query): between the
+  // panel opening and `langyNeedsModel` flipping true, auto-follow is still
+  // armed and the mounting grid can drag the column to the bottom. Snap back
+  // to the top the moment the column becomes a document, so the heading is
+  // where reading starts.
+  useEffect(() => {
+    if (langyNeedsModel && scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [langyNeedsModel, scrollRef]);
+
   // Page context (task #14): the experiment / trace / dataset / project the
   // user is viewing, surfaced as removable composer chips and forwarded with
   // the turn.
