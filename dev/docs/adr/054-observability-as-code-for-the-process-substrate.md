@@ -35,16 +35,15 @@ outcomes exist only as events and log lines).
 
 ## Decision
 
-1. **Alert rules ship in the chart.** The chart already renders its own
-   `prometheus.yml` ConfigMap; it now also renders
-   `alerting_rules.yml` from `charts/langwatch/files/alerting-rules.yml`
-   and lists it under `rule_files`. Every deployment (ours and
-   self-hosted) evaluates the same reviewed rules; firing alerts are
-   visible in Prometheus (`/alerts`, the `ALERTS` series) and in any
-   Grafana pointed at that Prometheus. Routing to receivers
-   (Alertmanager, PagerDuty, Slack) stays an operator concern — the
-   rules define *what is wrong*, values define *who hears it*.
-   `prometheus.alerting.enabled` (default true) opts out.
+1. **Alert rules live in the infra repo, not the chart.** (Amended: the
+   chart originally shipped `alerting_rules.yml` from
+   `charts/langwatch/files/alerting-rules.yml`; that was removed —
+   self-hosted operators don't need our alert taxonomy imposed on them,
+   and shipping rules meant every rule change was a chart release.) The
+   reviewed rules are provisioned with the rest of the Grafana tier in
+   the SaaS infrastructure repo; the chart's bundled Prometheus keeps
+   scraping the same metrics, so an operator who wants alerts can point
+   their own rules at them.
 
 2. **Dashboards live in the infra repo**, not here: prod Grafana (AWS
    Managed Grafana) is provisioned from

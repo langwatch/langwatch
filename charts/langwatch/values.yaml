@@ -33,7 +33,7 @@ global:
       drop:
         - ALL
     readOnlyRootFilesystem: true
-  ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis, dataset-s3-migration Job). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
+  ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
   automountServiceAccountToken: false
   ## @extra global.scheduling Global scheduling defaults for all pods.
   ## @param global.scheduling.nodeSelector [object] Node selector labels for all pods.
@@ -50,44 +50,6 @@ global:
 # This section enables automatic secret generation for development environments.
 # In production, you should manually create and manage secrets.
 ## @section Auto-generation
-# =============================================================================
-# Pre-Upgrade Preflight
-# =============================================================================
-# Helm pre-upgrade hook Job that verifies every required Secret key exists
-# in the live namespace BEFORE pods roll. Catches the postmortem trap
-# where a chart bump added a required key (virtualKeyPepper / LW_GATEWAY_*)
-# and pods crashlooped at boot with an opaque CreateContainerConfigError.
-# Skipped entirely on fresh installs (only the upgrade path runs the hook).
-## @section Preflight
-preflight:
-  ## @param preflight.enabled [default: true] Run the pre-upgrade Secret-keys check.
-  enabled: true
-  # Alpine + kubectl + the standard shell utilities the preflight script
-  # relies on (sh, printf). registry.k8s.io/kubectl is distroless and
-  # has no /bin/sh, which the script needs. Override for air-gapped
-  # clusters with an internal mirror.
-  ## @param preflight.image [string, default: alpine/k8s:1.30.0] Container image for the preflight Job (needs sh + kubectl).
-  image: alpine/k8s:1.30.0
-  ## @param preflight.imagePullPolicy [string, default: IfNotPresent] Pull policy for the preflight image.
-  imagePullPolicy: IfNotPresent
-  ## @param preflight.activeDeadlineSeconds [default: 60] Hard limit on hook runtime — beats helm hook timeout for clearer logs.
-  activeDeadlineSeconds: 60
-
-  # Per-hook overrides for pod security and scheduling. Empty defaults
-  # fall through to `global.podSecurityContext` / `global.scheduling.*`
-  # via the coalesce chain in the template, matching the convention the
-  # langwatch_nlp / app / workers Deployments use.
-  ## @param preflight.podSecurityContext [object] Pod security context override for the preflight hook.
-  podSecurityContext: {}
-  ## @param preflight.containerSecurityContext [object] Container security context override for the preflight container.
-  containerSecurityContext: {}
-  ## @param preflight.nodeSelector [object] Node selector override for the preflight hook.
-  nodeSelector: {}
-  ## @param preflight.tolerations [array] Tolerations override for the preflight hook.
-  tolerations: []
-  ## @param preflight.affinity [object] Affinity override for the preflight hook.
-  affinity: {}
-
 autogen:
   # Enable automatic secret generation (set to false in production)
   ## @param autogen.enabled [default: false] Enable automatic secret generation (development only).
@@ -726,78 +688,6 @@ workers:
   ## @param workers.extraVolumeMounts [array] Additional volume mounts for workers container.
   extraVolumeMounts: []
 
-# =============================================================================
-# Dataset PG→S3 backfill migration (ADR-032 Decision 7, rung 5)
-# =============================================================================
-# A post-install,post-upgrade hook Job that runs the
-# `backfillDatasetContentToS3` task — flipping existing datasets whose content
-# still lives in Postgres onto the chunked-JSONL S3 layout. It runs OFF the boot
-# path (after the deploy completes), is idempotent, advisory-locked and
-# self-skipping (no-op when no postgres-layout datasets remain; each dataset
-# migrates to S3 when configured, else to the local-filesystem stored-objects
-# volume), so it is safe to fire on every `helm upgrade`. Image + env
-# mirror the workers Deployment (same app image, same shared env). See
-# templates/dataset-s3-migration-job.yaml.
-#
-# RELEASE-FAILURE SEMANTICS: this is a post-install,post-upgrade hook, so a
-# CATASTROPHIC, top-level task failure (DB unreachable, storage hard-down — NOT
-# a per-dataset error, which is caught and logged so the run continues) fails
-# the Helm release. This is deliberate: the task throws on such failures so the
-# problem stays visible rather than being silently swallowed. Recovery is
-# low-risk because the run is IDEMPOTENT and SELF-RESUMING — already-migrated
-# datasets are skipped under the advisory lock and a half-written dataset is
-# re-driven (overwrite-by-key + atomic flip), so simply re-running the upgrade
-# after fixing the underlying outage completes the migration. To unblock a
-# deploy WITHOUT waiting on the migration, set `datasetS3Migration.skip: true`
-# (below): the hook Job is not rendered and the release proceeds; datasets stay
-# on the `postgres` layout (and keep reading from PG) until a later upgrade with
-# `skip: false` migrates them.
-## @section Dataset S3 migration
-datasetS3Migration:
-  ## @param datasetS3Migration.enabled [default: true] Render the post-install/post-upgrade migration hook Job.
-  enabled: true
-  # Operator opt-out for the migration (ADR-032 SKIP_DATASET_S3_MIGRATE). When
-  # true the hook Job is not rendered at all; the task additionally self-skips
-  # at runtime if it ever runs with this env set.
-  ## @param datasetS3Migration.skip [default: false] Disable the dataset PG→S3 backfill migration entirely.
-  skip: false
-  ## @param datasetS3Migration.backoffLimit [default: 3] Job backoffLimit — retries on transient failure (the task is idempotent).
-  backoffLimit: 3
-  ## @param datasetS3Migration.activeDeadlineSeconds [default: 21600] Hard runtime limit (s) for the hook Job — a backstop so a hung migration can't run forever. The task is idempotent/resumable, so a re-run resumes; raise for very large installs or set null to disable.
-  activeDeadlineSeconds: 21600
-  # ServiceAccount for the migration Job. Leave empty to use the namespace
-  # default (matching the app/workers). On EKS+IRSA, set this to the same
-  # IAM-role-annotated ServiceAccount the app/workers use so the Job can reach S3.
-  ## @param datasetS3Migration.serviceAccountName [string, default: ""] ServiceAccount for the Job (set to the app/workers IRSA SA on EKS).
-  serviceAccountName: ""
-  ## @param datasetS3Migration.ttlSecondsAfterFinished [default: 600] Clean up the finished Job after this many seconds.
-  ttlSecondsAfterFinished: 600
-  ## @extra datasetS3Migration.resources Resource requests and limits for the migration Job.
-  ## @param datasetS3Migration.resources.requests.cpu [string, default: 100m] Requested CPU.
-  ## @param datasetS3Migration.resources.requests.memory [string, default: 512Mi] Requested memory.
-  ## @param datasetS3Migration.resources.limits.cpu [string, default: 1000m] CPU limit.
-  ## @param datasetS3Migration.resources.limits.memory [string, default: 2Gi] Memory limit.
-  resources:
-    requests: { cpu: 100m, memory: 512Mi }
-    limits: { cpu: 1000m, memory: 2Gi }
-  # Per-hook overrides; empty defaults fall through to global.* via the
-  # coalesce chain in the template (same convention as workers / preflight).
-  ## @param datasetS3Migration.podSecurityContext [object] Pod security context override.
-  podSecurityContext: {}
-  ## @param datasetS3Migration.containerSecurityContext [object] Container security context override.
-  containerSecurityContext: {}
-  ## @param datasetS3Migration.nodeSelector [object] Node selector override.
-  nodeSelector: {}
-  ## @param datasetS3Migration.tolerations [array] Tolerations override.
-  tolerations: []
-  ## @param datasetS3Migration.affinity [object] Affinity override.
-  affinity: {}
-  ## @param datasetS3Migration.extraEnvs [array] Additional environment variables for the migration Job.
-  extraEnvs: []
-  ## @param datasetS3Migration.extraVolumes [array] Additional pod volumes.
-  extraVolumes: []
-  ## @param datasetS3Migration.extraVolumeMounts [array] Additional volume mounts.
-  extraVolumeMounts: []
 
 # =============================================================================
 # LangWatch NLP Service Configuration
@@ -1254,14 +1144,6 @@ prometheus:
   ## @param prometheus.chartManaged [default: true] Manage Prometheus via this chart.
   chartManaged: true
 
-  # ADR-054: reviewed alert rules for the app's own metrics (process
-  # substrate, topic clustering) ship with the chart and are evaluated by
-  # the bundled Prometheus. They define WHAT is wrong; routing alerts to
-  # receivers (Alertmanager, PagerDuty, ...) remains operator configuration.
-  alerting:
-    ## @param prometheus.alerting.enabled [default: true] Load the chart's bundled alert rules (charts/langwatch/files/alerting-rules.yml) into the managed Prometheus.
-    enabled: true
-
   # External Prometheus configuration (when chartManaged: false)
   external:
     # Reference to existing secret containing connection details
@@ -1557,10 +1439,9 @@ clickhouse:
   ## Disable the subchart's pre-install Secret-keys check under the umbrella:
   ## the parent's url-secret.yaml materialises the Secret in the same release,
   ## so the subchart preflight would run before the Secret exists and fail
-  ## with BackoffLimitExceeded. The parent chart's preflight-secrets-job.yaml
-  ## (which knows about the install ordering) is the right place to enforce
-  ## key presence for umbrella installs. Standalone subchart installs leave
-  ## preflight enabled by default.
+  ## with BackoffLimitExceeded. (The parent chart ships no hook Jobs of its
+  ## own; missing keys surface at pod boot instead.) Standalone subchart
+  ## installs leave preflight enabled by default.
   preflight:
     ## @param clickhouse.preflight.enabled [default: false] Disable subchart preflight under umbrella install.
     enabled: false
