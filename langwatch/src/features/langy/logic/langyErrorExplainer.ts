@@ -7,7 +7,7 @@ import {
  * Langy error explainer (ADR-045).
  *
  * The platform serializes handled `HandledError`s to `{ code, kind, meta,
- * httpStatus, traceId, spanId, reasons }` — over tRPC as `error.data.domainError`, and (new in
+ * httpStatus, traceId, spanId, reasons }` — over tRPC as `error.data.error`, and (new in
  * this PR) over the chat stream as a JSON-encoded string in the error part.
  * This module turns either into a keyed presentation the UI renders:
  *

@@ -23,7 +23,7 @@ import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 interface TraceDrawerEmptyStateProps {
   /**
    * Loose shape so we can read the tRPC error envelope (`data.code`,
-   * `data.domainError`) or a plain `Error` without coupling to tRPC
+   * `data.error`) or a plain `Error` without coupling to tRPC
    * client types — whatever `useQuery().error` returns.
    */
   error: unknown;

@@ -212,7 +212,7 @@ async function canWatchTurn({
  * the SAME operation — `isNewConversation` is the only difference (it emits the
  * semantically-first `conversation_started`). The service throws DomainErrors,
  * which the shared `domainErrorMiddleware` maps to coded TRPCErrors carrying
- * `data.domainError` (read by the client's `readLangyTrpcError`).
+ * `data.error` (read by the client's `readLangyTrpcError`).
  */
 async function acceptTurn({
   input,
