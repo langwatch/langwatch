@@ -221,13 +221,41 @@ func TestCodexStream_PlanLimitForwardedVerbatim(t *testing.T) {
 	}
 }
 
-func TestCodex_NonStreamingAndWrongTypeAreRejected(t *testing.T) {
-	router := codexTestRouter("http://unused.test", nil)
+func TestCodex_NonStreamingAggregatesTheSSE(t *testing.T) {
+	// The backend is SSE-only and its response.completed carries an EMPTY
+	// output array — the aggregate must stitch the output_item.done items in.
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w,
+			`data: {"type":"response.output_item.done","item":{"type":"message","content":[{"type":"output_text","text":"hello"}]}}`+"\n\n"+
+				`data: {"type":"response.completed","response":{"id":"resp-1","output":[],"usage":{"input_tokens":3,"output_tokens":2}}}`+"\n\n")
+	}))
+	defer backend.Close()
 
-	if _, err := router.dispatchCodex(context.Background(), codexRequest(`{}`)); err == nil {
-		t.Fatal("non-streaming codex dispatch must be rejected")
+	router := codexTestRouter(backend.URL, nil)
+	resp, err := router.dispatchCodex(
+		context.Background(),
+		codexRequest(`{"input":[]}`),
+		"openai_codex/gpt-5.6-terra",
+		codexCredential(),
+	)
+	if err != nil {
+		t.Fatalf("aggregate dispatch: %v", err)
 	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	body := string(resp.Body)
+	if !strings.Contains(body, `"id":"resp-1"`) || !strings.Contains(body, "hello") {
+		t.Errorf("output items not stitched into the completed response: %s", body)
+	}
+	if resp.Usage.TotalTokens != 5 {
+		t.Errorf("usage not carried: %+v", resp.Usage)
+	}
+}
 
+func TestCodex_WrongRequestTypeIsRejected(t *testing.T) {
+	router := codexTestRouter("http://unused.test", nil)
 	chatReq := codexRequest(`{}`)
 	chatReq.Type = domain.RequestTypeChat
 	if _, err := router.dispatchCodexStream(

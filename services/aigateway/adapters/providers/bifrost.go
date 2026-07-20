@@ -157,10 +157,10 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		return r.dispatchVoyageDirect(ctx, req, model, cred)
 	}
 
-	// Codex is SSE-only; the non-streaming path returns the actionable
-	// rejection rather than an upstream mystery. See codex.go.
+	// Codex streams upstream always (the backend is SSE-only); the
+	// non-streaming path aggregates to the completed Response. See codex.go.
 	if cred.ProviderID == domain.ProviderOpenAICodex {
-		return r.dispatchCodex(ctx, req)
+		return r.dispatchCodex(ctx, req, model, cred)
 	}
 
 	provider := mapProvider(cred)

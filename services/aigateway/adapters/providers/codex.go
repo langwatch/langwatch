@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -57,17 +58,96 @@ func newCodexClient() *http.Client {
 	}
 }
 
-// dispatchCodex handles the non-streaming path: the codex backend has none,
-// so the caller gets a clean, actionable rejection instead of an upstream
-// mystery.
+// dispatchCodex handles non-streaming Responses requests. The codex backend
+// itself is SSE-only, so the gateway streams upstream and aggregates to the
+// completed Response object here — what lets non-streaming clients (the tiny
+// AI assists via the Vercel AI SDK's responses provider) use codex without
+// speaking SSE. One quirk, verified live by the reference implementation:
+// this backend's `response.completed` event carries an EMPTY output array,
+// so output items are collected from `response.output_item.done` events and
+// stitched back in.
 func (r *BifrostRouter) dispatchCodex(
 	ctx context.Context,
 	req *domain.Request,
+	model string,
+	cred domain.Credential,
 ) (*domain.Response, error) {
-	_ = req
-	return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
-		"reason": "codex models are stream-only; send the request with stream: true",
+	iter, err := r.dispatchCodexStream(ctx, req, model, cred)
+	if err != nil {
+		var upstream *domain.UpstreamError
+		if errors.As(err, &upstream) {
+			// Non-streaming callers get the provider's error as a plain HTTP
+			// response, same as every other provider's non-stream path.
+			return &domain.Response{
+				Body:       upstream.Body,
+				StatusCode: upstream.StatusCode,
+				Headers:    upstream.Headers,
+			}, nil
+		}
+		return nil, err
+	}
+	defer func() { _ = iter.Close() }()
+
+	var items []json.RawMessage
+	for iter.Next(ctx) {
+		payload, ok := codexFrameData(iter.Chunk())
+		if !ok {
+			continue
+		}
+		switch gjson.GetBytes(payload, "type").String() {
+		case "response.output_item.done":
+			if item := gjson.GetBytes(payload, "item"); item.Exists() {
+				items = append(items, json.RawMessage(item.Raw))
+			}
+		case "response.completed", "response.done":
+			response := []byte(gjson.GetBytes(payload, "response").Raw)
+			if len(response) == 0 {
+				continue
+			}
+			if !gjson.GetBytes(response, "output.0").Exists() && len(items) > 0 {
+				stitched, err := sonic.Marshal(items)
+				if err == nil {
+					response, _ = sjson.SetRawBytes(response, "output", stitched)
+				}
+			}
+			return &domain.Response{
+				Body:       response,
+				StatusCode: http.StatusOK,
+				Usage:      iter.Usage(),
+			}, nil
+		case "response.failed", "error":
+			message := gjson.GetBytes(payload, "response.error.message").String()
+			if message == "" {
+				message = gjson.GetBytes(payload, "error.message").String()
+			}
+			if message == "" {
+				message = "codex response failed"
+			}
+			return nil, herr.New(ctx, domain.ErrProviderError, herr.M{"reason": message})
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return nil, fmt.Errorf("codex aggregate: %w", err)
+	}
+	return nil, herr.New(ctx, domain.ErrProviderError, herr.M{
+		"reason": "codex stream ended without response.completed",
 	})
+}
+
+// codexFrameData extracts the data payload from one SSE frame.
+func codexFrameData(frame []byte) ([]byte, bool) {
+	for _, line := range bytes.Split(frame, []byte("\n")) {
+		line = bytes.TrimSpace(line)
+		if !bytes.HasPrefix(line, []byte("data:")) {
+			continue
+		}
+		payload := bytes.TrimSpace(line[len("data:"):])
+		if len(payload) == 0 || bytes.Equal(payload, []byte("[DONE]")) {
+			continue
+		}
+		return payload, true
+	}
+	return nil, false
 }
 
 // dispatchCodexStream proxies a streaming Responses-API request to the codex
