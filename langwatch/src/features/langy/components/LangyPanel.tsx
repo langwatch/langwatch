@@ -712,7 +712,7 @@ function LangyPanel({
   const {
     messages: historyMessages,
     lastError: historyLastError,
-    isTurnInFlight: foldTurnInFlight,
+    isTurnInFlight: isFoldTurnInFlight,
     shouldAskFeedback,
     isFetching: isFetchingHistory,
   } = useLangyMessages(activeConversationId);
@@ -726,7 +726,7 @@ function LangyPanel({
   const activeTurnId = useLangyStore((s) => s.activeTurnId);
   const settledTurnId = useLangyStore((s) => s.settledTurnId);
   const serverTurnInFlight =
-    foldTurnInFlight &&
+    isFoldTurnInFlight &&
     !(activeTurnId !== null && settledTurnId === activeTurnId);
 
   // The marker's job ends the moment the fold agrees the turn settled. Without
@@ -735,10 +735,10 @@ function LangyPanel({
   // stale marker forever: no working indicator, and the feedback ask free to
   // render mid-turn.
   useEffect(() => {
-    if (!foldTurnInFlight && settledTurnId !== null) {
+    if (!isFoldTurnInFlight && settledTurnId !== null) {
       useLangyStore.getState().markTurnSettled(null);
     }
-  }, [foldTurnInFlight, settledTurnId]);
+  }, [isFoldTurnInFlight, settledTurnId]);
 
   // Push a settled server history into the chat engine. Gated on a USER
   // selection (`historyLoadConversationId`) so a background refetch — or the
@@ -862,7 +862,7 @@ function LangyPanel({
   // Draining waits for the DURABLE fold, not the locally-corrected flag: the
   // busy guard on continueConversation reads the fold, so sending the moment
   // the stream ends would race the projection and bounce with "busy".
-  const canDrainQueuedMessages = !isBusy && !foldTurnInFlight;
+  const canDrainQueuedMessages = !isBusy && !isFoldTurnInFlight;
   const isEmpty = messages.length === 0;
   // The floating card's resting floor. While a turn is in flight we never fall
   // back to the empty floor, so sending from an empty thread steps UP
