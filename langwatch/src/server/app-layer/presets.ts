@@ -944,7 +944,7 @@ export function initializeDefaultApp(options?: {
       redis: redis ?? null,
       recordTopics: (args) => commands.topicClustering.recordTopics(args),
     }).catch((error: unknown) => {
-      logger.error(
+      createLogger("langwatch:topic-clustering:seed").error(
         { error: error instanceof Error ? error.message : String(error) },
         "Topic model seed pass failed; the next boot retries",
       );
