@@ -50,6 +50,17 @@ export const useLatestPromptVersion = ({
     },
     {
       enabled: !!configId && !!project?.id,
+      // Runs in every open tab's always-mounted label (for the outdated
+      // badge). Deliberately save-driven, not focus-live: a save invalidates
+      // this key (see useHandleSavePrompt), so same-app version bumps update
+      // the badge, but we don't re-fetch for every open tab on each window
+      // focus — that was the N-tab storm this fix targets, and matches the
+      // codebase convention for dashboard queries (see useFilterParams).
+      // Tradeoff: a *different session's* new version isn't reflected until
+      // the next save/reload; true cross-session liveness would need a
+      // lightweight version-number endpoint (noted in #5585).
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
     },
   );
 

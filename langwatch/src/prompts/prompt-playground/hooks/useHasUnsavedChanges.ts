@@ -24,7 +24,13 @@ export function useHasUnsavedChanges(tabId: string): boolean {
   // baseline form values to compare against.
   const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
     { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
+    {
+      enabled: !!project?.id,
+      // Project-level config; changes rarely. Don't re-fetch on every window
+      // focus — this hook runs in every open tab's always-mounted label.
+      staleTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+    },
   );
   const resolvedDefaultModel = resolvedDefault.data?.model;
 
@@ -44,6 +50,11 @@ export function useHasUnsavedChanges(tabId: string): boolean {
       },
       {
         enabled: !!configId && !!project?.id,
+        // This runs in every open tab's always-mounted label. The saved
+        // version is stable within a session (a save invalidates this key),
+        // so don't re-fetch it for every tab on each window focus.
+        staleTime: 30_000,
+        refetchOnWindowFocus: false,
       },
     );
 

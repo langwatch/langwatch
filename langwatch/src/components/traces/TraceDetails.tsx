@@ -221,6 +221,14 @@ export function TraceDetails(props: {
         colorPalette="blue"
         display="flex"
         flexDirection="column"
+        // lazyMount only (no unmountOnExit): the Thread (messages) tab
+        // renders Conversation -> TraceMessages -> Annotations ->
+        // AnnotationComment, which holds an in-progress annotation
+        // comment via react-hook-form local state. Unmounting that tab
+        // while the user is mid-comment (e.g. after clicking "Annotate"
+        // and switching to another tab) would destroy the draft, so we
+        // only skip mounting tabs that were never opened.
+        lazyMount
       >
         <VStack
           width="full"

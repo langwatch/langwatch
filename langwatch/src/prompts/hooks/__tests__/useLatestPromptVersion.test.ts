@@ -46,6 +46,25 @@ describe("useLatestPromptVersion", () => {
     });
   });
 
+  describe("when configured for the always-mounted tab label", () => {
+    it("disables window-focus refetch so N open tabs don't re-storm", () => {
+      mockUseQuery.mockReturnValue({
+        data: { version: 3 },
+        isLoading: false,
+        isFetching: false,
+      });
+
+      renderHook(() =>
+        useLatestPromptVersion({ configId: "config-123", currentVersion: 3 }),
+      );
+
+      expect(mockUseQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ idOrHandle: "config-123" }),
+        expect.objectContaining({ refetchOnWindowFocus: false }),
+      );
+    });
+  });
+
   describe("when current version matches latest", () => {
     it("returns isOutdated as false", () => {
       mockUseQuery.mockReturnValue({

@@ -42,7 +42,21 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
 
       {/* Right pane — minmax(0,1fr) prevents blowout */}
       <GridItem overflow="hidden" display="flex" flexDirection="column">
-        <Tabs.Root defaultValue="editor" variant="line" size="sm" display="flex" flexDirection="column" flex={1} overflow="hidden">
+        <Tabs.Root
+          defaultValue="editor"
+          variant="line"
+          size="sm"
+          display="flex"
+          flexDirection="column"
+          flex={1}
+          overflow="hidden"
+          // lazyMount only (no unmountOnExit): the Editor tab renders
+          // SpanEditorPanel, whose Input/Textarea fields are live editing
+          // surfaces for the selected span. Unmounting on tab switch risks
+          // losing in-progress edits, so inactive tabs are only skipped
+          // until first opened, then kept mounted.
+          lazyMount
+        >
           <Tabs.List borderBottom="1px solid" borderColor="border" px={3} gap={0} flexShrink={0}>
             <Tabs.Trigger value="editor" fontSize="xs" px={3} py={1.5} color="fg.muted" _selected={{ color: "fg.default", borderColor: "orange.500" }}>
               Editor
