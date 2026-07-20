@@ -27,6 +27,14 @@ Feature: Langy persists across in-project navigation
     And it shows the same conversation it had on the traces page
     And the panel was not remounted or reloaded
 
+  @unit
+  Scenario: The open state survives a full page reload
+    Given the Langy panel is open
+    When I reload the window
+    Then the panel is restored open
+    And had I closed it first, a reload would restore it closed
+    But the conversation is not restored (per-session state starts clean)
+
   @integration @unimplemented
   Scenario: A half-typed message survives navigation
     # Tracked: needs a draft store wired into LangyContext + a regression test

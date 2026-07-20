@@ -577,10 +577,14 @@ export const useLangyStore = create<LangyState>()(
     }),
     {
       name: "langy:store",
-      // Durable across sessions: developer mode + the layout mode. Everything
-      // else is per-session client state that must start clean (the panel opens
-      // empty by default).
+      // Durable across sessions: whether the panel is open, developer mode, and
+      // the layout mode. `isOpen` persists so a page reload restores the panel
+      // exactly as the user left it (open stays open, closed stays closed) —
+      // the visibility gate (useShowLangy) still decides whether it renders at
+      // all, so this never forces the panel onto a surface without Langy.
+      // Everything else is per-session conversation state that must start clean.
       partialize: (state) => ({
+        isOpen: state.isOpen,
         devMode: state.devMode,
         panelMode: state.panelMode,
         panelEffect: state.panelEffect,

@@ -8,9 +8,10 @@ Feature: Langy panel header controls and title overflow
   # not a masthead. Identity leads: the generated conversation title (the
   # wordmark until one lands), as a LABEL, not a control; no subtitle. Then the
   # actions, new chat, history (its own icon, opening the searchable recents
-  # popover), more, and finally Close, always last, held apart by a divider.
-  # Layout switching (floating / sidebar) lives in the overflow menu only. A
-  # long title must never push the controls off-panel.
+  # popover), a one-click LAYOUT TOGGLE (Dock-to-side when floating, Float when
+  # docked, the reverse of the current mode), more, and finally Close, always
+  # last, held apart by a divider. The overflow menu still lists both layouts
+  # explicitly. A long title must never push the controls off-panel.
   # ---------------------------------------------------------------------------
 
   @unit
@@ -39,11 +40,12 @@ Feature: Langy panel header controls and title overflow
     Then the searchable recents popover opens
     And the title itself is a label, not a dropdown trigger
 
-  @unit
-  Scenario: The layout switch lives in the overflow menu only
-    Given the Langy panel is open
-    Then no dock or pop-out control sits on the header rail
-    And the overflow menu offers the Floating and Sidebar layouts
+  Scenario: The header rail carries a one-click layout toggle
+    Given the Langy panel is open in floating mode
+    Then a "Dock to side" control sits on the header rail
+    When the panel is docked instead
+    Then that control becomes a "Float" control, the reverse of the current mode
+    And the overflow menu still offers both the Floating and Sidebar layouts explicitly
 
   @unit
   Scenario: A long conversation title truncates instead of shoving the controls off-panel

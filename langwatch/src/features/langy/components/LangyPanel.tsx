@@ -18,6 +18,7 @@ import {
   type LucideIcon,
   MoreHorizontal,
   PanelRight,
+  PictureInPicture2,
   Square,
   SquarePen,
   Waves,
@@ -250,6 +251,11 @@ function LangyLauncher({
   onOpen: () => void;
 }) {
   const reduceMotion = useReducedMotion();
+  // A right-anchored drawer fills the right edge while the panel is closed, so
+  // the bottom-right launcher would sit on top of it (and the table pager).
+  // Dodge to the bottom-LEFT corner while a drawer is open.
+  const { currentDrawer } = useDrawer();
+  const dodgeLeft = !!currentDrawer;
   // The orb leans + glows toward the cursor as it approaches (the one place a
   // Langy surface reacts to the pointer — a hover affordance on the target
   // itself, not ambient chrome). Disabled under reduced motion. `transform` is
@@ -287,7 +293,11 @@ function LangyLauncher({
         aria-keyshortcuts="Meta+I Control+I"
         position="fixed"
         bottom="20px"
-        right="20px"
+        // Bottom-right by default; hops to bottom-left while a drawer holds the
+        // right edge so it never sits on the drawer or the table pager. (The
+        // proximity hook owns `transform`, and left/right can't cross-fade, so
+        // this repositions rather than slides.)
+        {...(dodgeLeft ? { left: "20px" } : { right: "20px" })}
         // Keep modal/dialog layers above Langy. Chakra's modal stack starts at
         // the modal layer, while Langy remains a persistent app companion.
         zIndex={1200}
@@ -397,18 +407,25 @@ function LangyPanel({
   const [devMode] = useLangyDevMode();
   const cardGalleryOpen = useLangyStore((s) => s.cardGalleryOpen);
 
-  // ── Riding beside an open drawer ──────────────────────────────────────────
-  // While a drawer is open, the panel HOLDS the right edge as a floating
-  // companion card (the drawer's own chrome: height, radius, material) and
-  // the drawer yields, sliding further left to leave the panel its slot (see
-  // DrawerContent in components/ui/drawer.tsx). The dock's page reservation
-  // releases while it rides (see LangyShiftedRoot). The panel MORPHS to the
-  // companion placement via framer-motion's `layout` prop below: it grows
-  // taller and lifts above all content, rather than sliding off-screen and
-  // back. The drawer slides in from behind the panel's card (Langy sits at a
-  // higher z-index, see the placement block). Spec: specs/langy/langy-panel-layout.feature
+  // ── Opening a drawer beside the panel ─────────────────────────────────────
+  // Two different moves, one per layout, so docked and floating stay visibly
+  // distinct:
+  //
+  //  - DOCKED (sidebar): the panel becomes the drawer's COMPANION. It morphs
+  //    (framer `layout`) to hold the right edge as a floating card wearing the
+  //    drawer's chrome; the drawer yields left (see DrawerContent) and slides
+  //    in from BEHIND the panel (Langy at a higher z-index). The dock's page
+  //    reservation releases while it rides (see LangyShiftedRoot).
+  //  - FLOATING: the panel DODGES. It keeps floating but hops to the LEFT so it
+  //    is out of the drawer's way; the drawer opens full-width on the right,
+  //    exactly as it does with Langy closed. This reads as a window getting
+  //    out of the way, which is the whole point of floating.
+  //
+  // Spec: specs/langy/langy-panel-layout.feature
   const { currentDrawer } = useDrawer();
-  const isDrawerCompanion = isOpen && !!currentDrawer;
+  const hasDrawer = isOpen && !!currentDrawer;
+  const isDrawerCompanion = hasDrawer && !floating;
+  const floatingDodgesDrawer = hasDrawer && floating;
   const viewportWidth = useViewportWidth();
   const floatingPanelWidth = resolveFloatingPanelWidth(viewportWidth);
 
@@ -1294,10 +1311,14 @@ function LangyPanel({
             : FLOATING_PANEL_CSS_WIDTH
         }
         // Dialogs, drawers, and command surfaces must be able to cover Langy.
-        // Riding beside a drawer, the panel sits ABOVE the drawer's layer
-        // (Chakra's modal z-index is 1400) so the drawer slides IN from behind
-        // the companion card rather than over the whole screen.
-        zIndex={isDrawerCompanion ? 1500 : 1200}
+        // Riding beside a drawer, the panel sits ABOVE the drawer CARD (Chakra's
+        // drawer positioner is z 1500) so the drawer slides IN from behind the
+        // companion rather than over it. 1600 stays BELOW the overlay layer
+        // (menus/popovers/dialogs are z 2000+, including Langy's own header
+        // menus), so those still open above the panel. Equal z-index alone
+        // isn't enough: the drawer portal is later in the DOM and would win the
+        // paint on a tie.
+        zIndex={isDrawerCompanion ? 1600 : 1200}
         background="bg.surface"
         borderStyle="solid"
         // The brand's workhorse hairline (white/10 on dark, a warm paper line on
@@ -1383,12 +1404,17 @@ function LangyPanel({
             }
           : floating
             ? {
-                // Anchored bottom-right, growing UPWARD. The 80vh cap (never cover
+                // Anchored bottom corner, growing UPWARD. The 80vh cap (never cover
                 // the top fifth of the page) is the rule. The resting floor is
                 // deliberately short — a compact card at rest that GROWS with its
                 // conversation up to the cap, rather than opening as a tall stub over
                 // an empty thread. (Dynamic content-driven sizing is the next step.)
-                right: `${PANEL_INSET}px`,
+                // While a drawer is open it DODGES to the left corner so the
+                // drawer keeps the full right edge — a floating window getting out
+                // of the way. Otherwise it rests bottom-right as usual.
+                ...(floatingDodgesDrawer
+                  ? { left: `${PANEL_INSET}px` }
+                  : { right: `${PANEL_INSET}px` }),
                 bottom: `${PANEL_INSET}px`,
                 height: "auto",
                 minHeight: floatingMinHeight,
@@ -1945,9 +1971,9 @@ function PanelHeader({
 
           <LangyFoundryMenu />
 
-          {/* Floating only: one click back to the dock. The docked rail has no
-              twin control on purpose (the rail stays lean; layout switching
-              lives in the overflow menu). */}
+          {/* One-click layout toggle, present in BOTH modes: floating offers
+              "Dock to side", docked offers "Float" (the reverse). The overflow
+              menu still lists both explicitly. */}
           {panelMode === "floating" ? (
             <Tooltip
               content="Dock to side"
@@ -1963,7 +1989,19 @@ function PanelHeader({
                 <PanelRight size={15} />
               </IconButton>
             </Tooltip>
-          ) : null}
+          ) : (
+            <Tooltip content="Float" positioning={{ placement: "bottom" }}>
+              <IconButton
+                size="xs"
+                variant="ghost"
+                aria-label="Float the panel"
+                color="fg.muted"
+                onClick={() => setPanelMode("floating")}
+              >
+                <PictureInPicture2 size={15} />
+              </IconButton>
+            </Tooltip>
+          )}
 
           <LangyOverflowMenu />
 

@@ -36,6 +36,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Check,
   CopyPlus,
@@ -45,12 +46,11 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { Tooltip } from "~/components/ui/tooltip";
 import { Menu } from "~/components/ui/menu";
+import { Tooltip } from "~/components/ui/tooltip";
 import type { LangyConversationListItemDto } from "../data/langy.dtos";
 import { useLangyConversationListQuery } from "../data/useLangyConversationListQuery";
 import { formatLangyConversationDate } from "../logic/langyConversationDate";
@@ -209,7 +209,17 @@ export function RecentChatsMenu({
       onOpenChange={(details) => {
         if (details.open) setQuery("");
       }}
-      positioning={{ placement, gutter: 6 }}
+      // Keep the popover on screen: flip to the other side and shift along the
+      // edge when there isn't room (the docked panel sits flush to the right,
+      // so an un-shifted "bottom-end" ran off the viewport). `overflowPadding`
+      // holds an 8px margin from the edge.
+      positioning={{
+        placement,
+        gutter: 6,
+        flip: true,
+        slide: true,
+        overflowPadding: 8,
+      }}
       width="auto"
       // When hosted on a caller's trigger (the header title), grow to fill the
       // row AND allow shrinking below the title's intrinsic width — that is what

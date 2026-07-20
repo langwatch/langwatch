@@ -416,7 +416,7 @@ describe("Feature: Langy panel layout modes", () => {
 
   describe("given the Langy panel is riding beside an open drawer", () => {
     describe("when the header renders", () => {
-      /** @scenario The companion offers a single close affordance */
+      /** @scenario The docked companion offers a single close affordance */
       it("hides its own Close so the drawer owns the only X", async () => {
         currentDrawerRef.current = "traceV2Details";
         resolvedDefaultRef.current = {

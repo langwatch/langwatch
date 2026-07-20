@@ -334,7 +334,7 @@ describe("ProjectLangyLayout", () => {
       expect(useLangyStore.getState().dockShifted).toBe(false);
     });
 
-    /** @scenario "An open drawer turns Langy into its floating companion" */
+    /** @scenario "A drawer turns the DOCKED panel into its floating companion" */
     it("releases the reservation while a drawer is open", async () => {
       drawerState.current = "traceV2Details";
       renderAt("/demo/traces");

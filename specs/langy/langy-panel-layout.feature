@@ -63,16 +63,27 @@ Feature: Langy panel layout modes
     Then page content reclaims the full viewport width
     And the content card extends back to the viewport edge without right rounding
 
-  Scenario: An open drawer turns Langy into its floating companion
-    Given the Langy panel is open
+  # Opening a drawer does something DIFFERENT per layout, so docked and
+  # floating stay visibly distinct.
+
+  Scenario: A drawer turns the DOCKED panel into its floating companion
+    Given the Langy panel is open in sidebar mode
     When a right-anchored drawer opens
     Then the panel MORPHS in place to the right edge as a floating card: it grows taller and lifts above all content, it does not slide off-screen and back
     And the companion card wears exactly the drawer's chrome: height, radius, hairline, material and shadow
-    And the drawer keeps its own slide-in but starts from BEHIND the companion card, which sits above it
+    And the drawer keeps its own slide-in but starts from BEHIND the companion card, which sits above it at a higher z-index
     And a strip of space separates the two cards, both above all content
     And the page content reclaims the dock's reserved width underneath
 
-  Scenario: Closing the drawer sends Langy back to its dock
+  Scenario: A drawer makes the FLOATING panel dodge to the left
+    Given the Langy panel is open in floating mode
+    When a right-anchored drawer opens
+    Then the floating panel hops to the LEFT corner, out of the drawer's way
+    And the drawer keeps the full right edge, it does not yield
+    And the drawer's entrance is held back briefly so the panel clears out first
+    And the panel keeps its own Close, the two cards being far apart
+
+  Scenario: Closing the drawer sends the docked companion back to its dock
     Given the Langy panel is riding beside an open drawer
     When the drawer closes
     Then the panel morphs back to where it was before the drawer opened
@@ -84,8 +95,12 @@ Feature: Langy panel layout modes
     Then the drawer returns to the viewport's right edge
 
   @integration
-  Scenario: The companion offers a single close affordance
-    Given the Langy panel is riding beside an open drawer
+  Scenario: The docked companion offers a single close affordance
+    Given the Langy panel is riding beside an open drawer as the docked companion
     Then the panel's header hides its own Close control
     And the drawer's own close is the only X on screen
     So closing the drawer, not Langy, is the obvious action
+
+  Scenario: The closed-panel launcher dodges the drawer
+    Given the Langy panel is closed and a right-anchored drawer is open
+    Then the launcher orb sits in the bottom-LEFT corner, clear of the drawer and the table pager

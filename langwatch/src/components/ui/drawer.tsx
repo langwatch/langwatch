@@ -53,16 +53,35 @@ export const DrawerContent = React.forwardRef<
   const marginTopProp =
     rest.marginTop ?? (contextMarginTop ? `${contextMarginTop}px` : undefined);
 
-  // While the Langy panel is open it HOLDS the right edge as a floating
-  // companion card (see LangyPanel's drawer-companion mode); every drawer
-  // yields, sliding further left to leave the panel its slot plus a strip of
-  // space between the two cards. The drawer keeps its own slide-in, but Langy
-  // sits above it (higher z-index), so the drawer slides in from BEHIND the
-  // companion card. Reactive, so closing the panel mid-drawer returns the
-  // drawer to the edge. Spec: specs/langy/langy-panel-layout.feature
-  const isLangyOpen = useLangyStore((s) => s.isOpen);
-  const langyYieldMarginEnd = isLangyOpen
+  // Only the DOCKED (sidebar) Langy holds the right edge as the drawer's
+  // companion; the drawer then yields, sliding further left to leave the panel
+  // its slot plus a strip of space between the two cards. The drawer keeps its
+  // own slide-in, but the docked companion sits above it (higher z-index) so
+  // the drawer slides in from BEHIND it. When Langy is FLOATING it dodges to
+  // the left instead (see LangyPanel), so the drawer keeps the full right edge
+  // and does NOT yield. Reactive, so closing the panel or switching layout
+  // mid-drawer returns the drawer to the edge.
+  // Spec: specs/langy/langy-panel-layout.feature
+  const isLangyDockedCompanion = useLangyStore(
+    (s) => s.isOpen && s.panelMode === "sidebar",
+  );
+  const langyYieldMarginEnd = isLangyDockedCompanion
     ? `${8 + SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP}px`
+    : undefined;
+
+  // Floating Langy dodges to the left when a drawer opens. Hold the drawer's
+  // entrance back briefly so the panel clears out FIRST and the drawer then
+  // slides in behind it — the two moving in lockstep read as one clumsy jump.
+  // FROZEN at mount: the drawer that triggered the dodge gets the delay; a
+  // drawer opened later (panel already parked) enters normally.
+  const isLangyOpenFloating = useLangyStore(
+    (s) => s.isOpen && s.panelMode === "floating",
+  );
+  const [staggerBehindFloatingLangy] = React.useState(
+    () => isLangyOpenFloating,
+  );
+  const langyStaggerEnter = staggerBehindFloatingLangy
+    ? { animationDelay: "200ms", animationFillMode: "backwards" as const }
     : undefined;
 
   // Crash inside the drawer body should NOT close the drawer. Wrap the
@@ -88,6 +107,7 @@ export const DrawerContent = React.forwardRef<
           marginTop={marginTopProp}
           marginEnd={langyYieldMarginEnd}
           transition={`margin ${LANGY_TRANSITION}`}
+          {...(langyStaggerEnter ? { _open: langyStaggerEnter } : {})}
           asChild={false}
         >
           {safeChildren}
