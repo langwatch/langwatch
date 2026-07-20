@@ -65,7 +65,23 @@ Feature: Canonical OTLP log ingestion
       And it correlates to a known span
       When the project sends it
       Then that detail is available on the trace
-      And the record remains readable in its own right
+
+    # The spans built from these records carry every field the records did, so
+    # the records are duplicated data from that point on. They are kept only
+    # long enough to build and repair the fold, never for the project's full
+    # retention, and never indefinitely even where the project retains
+    # indefinitely. See specs/traces-v2/claude-code-log-conversion.feature,
+    # which also governs their absence from the events view.
+    Scenario: A log record the span fold consumes is evicted early
+      Given a log record that the Claude Code span fold consumes
+      When the project sends it
+      Then it is retained only for the brief claude-fold period
+      And a project that retains logs indefinitely does not keep it indefinitely
+
+    Scenario: A log record outside the fold keeps the project's retention
+      Given a log record that no span fold consumes
+      When the project sends it
+      Then it is retained for the project's configured period
 
   Rule: Upgrades do not lose logs in flight
 

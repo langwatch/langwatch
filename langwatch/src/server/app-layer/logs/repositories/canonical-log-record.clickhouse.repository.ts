@@ -1,4 +1,8 @@
 import { createLogger } from "@langwatch/observability";
+import {
+  CLAUDE_CODE_KIND_ATTR,
+  CLAUDE_CODE_LOG_RETENTION_DAYS,
+} from "~/server/app-layer/traces/claude-code-log-to-span";
 import type { StoredLogRecordRow } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
@@ -21,6 +25,26 @@ function validate(record: CanonicalLogRecord, operation: string) {
   if (!/^[a-f0-9]{64}$/.test(record.recordId)) {
     throw new SecurityError(operation, "invalid RecordId", record.tenantId);
   }
+}
+
+/**
+ * Raw claude_code logs the span fold consumes become pure duplication once
+ * claudeCodeSpanSync folds them into stored_spans, so they are evicted far
+ * sooner than the platform default (the spans inherit the real retention).
+ *
+ * Stamped, not min'd against the caller's value, so an indefinite (0) project
+ * retention cannot make a fold-intermediate log live forever. This mirrors the
+ * legacy log-record-storage repository; canonical logs replace that table, so
+ * dropping the cap here would silently retain every folded Claude Code log at
+ * full trace retention from the cutover onwards.
+ */
+function retentionDaysFor(
+  record: CanonicalLogRecord,
+  retentionDays: number,
+): number {
+  return record.attributeKeys.includes(CLAUDE_CODE_KIND_ATTR)
+    ? CLAUDE_CODE_LOG_RETENTION_DAYS
+    : retentionDays;
 }
 
 function groupByTenant(
@@ -109,7 +133,7 @@ export class CanonicalLogRecordClickHouseRepository
             OccurredAt: new Date(record.occurredAt),
             AcceptedAt: new Date(record.acceptedAt),
             DedupVersion: dedupVersion(record.acceptedAt),
-            _retention_days: retentionDays,
+            _retention_days: retentionDaysFor(record, retentionDays),
             _size_bytes: record.canonicalSizeBytes,
           })),
           format: "JSONEachRow",

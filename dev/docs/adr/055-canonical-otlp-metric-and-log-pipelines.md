@@ -69,7 +69,8 @@ our side (queue, storage) answer `503`, which is in OTLP's retryable set, and
 return a stable message rather than an exception that could name internal hosts,
 tables or queries.
 
-**Usage is metered on the record's content, not its stored row.** Both canonical
+**Usage is metered on the record's content, not its stored row.** Customer-facing
+storage totals come from the storage meter summing `_size_bytes`. Both canonical
 tables carry an app-supplied `_size_bytes` holding the canonical payload's byte
 length, a deliberate exception to the rule set by migration `00032` that
 `_size_bytes` is always a `MATERIALIZED byteSize(...)` the application never
@@ -147,6 +148,20 @@ gap it represents, because a gap is only counted when a predecessor exists.
 Choosing between an unbounded scan and an undercounted `gapCount` needs a
 product view of what that counter is for.
 
+The usage-estimate ledgers are not symmetrical, and should not be read as if
+they were. `metric_usage_estimates` has a reader, which is what the organization
+-scoped carve-out to the TenantId-first rule exists for. `log_usage_estimates`
+is written on the same path but currently has no reader: log usage is answered
+by the storage meter over `log_records`. It is kept for parity and for the
+per-record accounting a future log usage query will need, and either that query
+lands or the table should be dropped rather than left as a silent write.
+
+Records that the Claude Code span fold consumes keep the short retention floor
+they had before the cutover. The spans built from them inherit the real
+retention, so the records are duplicated data; the floor is stamped rather than
+combined with the project's value, so an indefinite project retention cannot
+keep a fold intermediate forever.
+
 The legacy `stored_log_records` and `stored_metric_records` tables are retained,
 unmodified, and drain under their existing TTLs. They can be dropped together
 with the `recordLog` command and its projection once no pre-canonical instance
@@ -154,8 +169,10 @@ can be running.
 
 ## References
 
-- Related ADRs: ADR-034 (event-sourced analytics materialization), ADR-046
-  (event-sourced Langy conversations)
+- Related ADRs: ADR-034 (event-sourced analytics materialization), whose
+  rollups accept non-idempotent increments with truncate-first replay where
+  these recompute instead; ADR-046 (event-sourced Langy conversations, itself
+  superseded by ADR-049 for projection storage)
 - Migration `00032` (retention and `_size_bytes` columns), whose
   never-insert-`_size_bytes` rule this ADR carves an exception to
 - PRs: #5945 (this work), superseding #5851 and #5886

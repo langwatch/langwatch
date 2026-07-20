@@ -64,16 +64,16 @@ Feature: Canonical OTLP metric ingestion
 
   Rule: Over-plan usage is refused at the door
 
-    Scenario: A batch beyond the project's plan limit is rejected
+    Scenario: A batch beyond the project's plan limit is refused
       Given the project is over its metrics plan limit
       When the project sends a batch of data points
-      Then the response reports the points as rejected
-      And the reason is visible to the sender
+      Then the batch is refused with a reason the sender can read
+      And no data point reaches storage
 
   Rule: Rolled-up metrics can always be rebuilt
 
     Scenario: A late point corrects the summaries around it
-      Given a series already has points either side of a 30 second window
+      Given a series already has points either side of a rollup window
       When a point arrives late for that window
       Then the summaries covering it reflect the late point
       And summaries for untouched windows are unchanged
