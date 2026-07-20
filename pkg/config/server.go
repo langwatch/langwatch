@@ -39,16 +39,6 @@ type Server struct {
 	Addr                string `env:"ADDR"`
 	GracefulSeconds     int    `env:"GRACEFUL_SECONDS"`
 	MaxRequestBodyBytes int64  `env:"MAX_REQUEST_BODY_BYTES"`
-	// NonStreamingHeartbeatIntervalSeconds sets how often (in seconds) a
-	// non-streaming response writes a keep-alive byte while dispatch is
-	// still in flight. 0 falls back to DefaultNonStreamingHeartbeatInterval;
-	// negative disables heartbeating entirely. Plain seconds, not a Go
-	// duration string ("45s") — config.Hydrate parses time.Duration fields
-	// as raw nanosecond integers (setField's int64 branch), not via
-	// time.ParseDuration, so "45s" would fail to parse and a correct value
-	// would have to be an opaque nanosecond count. Plain seconds sidesteps
-	// that trap entirely.
-	NonStreamingHeartbeatIntervalSeconds int64 `env:"NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS"`
 }
 
 // ListenAndServe starts the server and handles graceful shutdown on SIGTERM/SIGINT.
