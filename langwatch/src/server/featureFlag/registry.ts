@@ -205,6 +205,13 @@ export const FEATURE_FLAGS = [
       "Shows the Langy teaser banner on the home page to users who do NOT have Langy yet (spec: specs/home/langy-home-banner.feature). Purely promotional — it never grants access; users who already have Langy (staff or release_langy_enabled) see the activation banner instead, regardless of this flag. Target the promo audience via a PostHog rule.",
   },
   {
+    key: "release_ui_home_signal_focused_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Switches the project home to the signal-focused composition — the briefing sheet leads, the chrome grid and recent work follow (spec: specs/home/signal-focused-home-rollout.feature). Deliberately decoupled from release_langy_enabled: this flag alone decides the home's composition, while Langy access only decides whether the sheet's hand-to-Langy affordances render. Default off = classic home. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_home_signal_focused_enabled.",
+  },
+  {
     key: "release_webhook_automations",
     scope: "PRODUCT",
     defaultValue: false,
