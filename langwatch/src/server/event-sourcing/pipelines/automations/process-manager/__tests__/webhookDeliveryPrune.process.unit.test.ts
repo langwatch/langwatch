@@ -41,6 +41,7 @@ describe("webhook delivery prune process", () => {
           { lastPruneAt: null },
           {
             at: 10_000,
+            now: 10_000,
             key: "webhookDeliveryPrune",
             projectId: "__global__",
             intents: buildIntentFactories(definition.config.intents),

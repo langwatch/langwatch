@@ -70,9 +70,6 @@ overrides:
   "@opentelemetry/sdk-node@<0.217.0": "0.217.0"
 
 packageExtensions:
-  bullmq-otel:
-    dependencies:
-      tslib: "^2.6.0"
   "@google-cloud/dlp":
     dependencies:
       protobufjs: "^7.5.4"
