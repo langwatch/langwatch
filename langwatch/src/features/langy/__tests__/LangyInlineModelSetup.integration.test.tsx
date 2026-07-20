@@ -222,7 +222,10 @@ vi.mock("~/utils/api", () => ({
     },
     ops: {
       getScope: {
-        useQuery: () => ({ data: { scope: { kind: "none" } }, isLoading: false }),
+        useQuery: () => ({
+          data: { scope: { kind: "none" } },
+          isLoading: false,
+        }),
       },
     },
   },
@@ -290,7 +293,9 @@ describe("Feature: Langy prompts for a model when the project has none configure
 
         // It replaces — not supplements — the normal empty state.
         expect(
-          screen.queryByText("Ask in plain language, or start with one of these."),
+          screen.queryByText(
+            "Ask in plain language, or start with one of these.",
+          ),
         ).not.toBeInTheDocument();
       });
     });

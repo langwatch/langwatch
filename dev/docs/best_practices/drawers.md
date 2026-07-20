@@ -5,6 +5,15 @@ query param onto the page URL; closing pops it. The shell that renders
 the drawer (`<CurrentDrawer />`, mounted once near the app root) keys
 off that param and resolves the component via `drawerRegistry`.
 
+Always render through the shared `Drawer.Root` wrapper
+(`components/ui/drawer.tsx`), never raw Chakra. Besides the nested-drawer
+defaults, the wrapper owns SIDE RESOLUTION: while the Langy panel is open,
+every right-anchored (`end`) drawer resolves to the LEFT (`start`) — Langy
+holds the right edge, and a drawer sliding over it would hide exactly the
+conversation you opened the drawer to talk about. Don't hand-roll placement
+logic per drawer; declare `placement="end"` (or omit it) and let the wrapper
+decide.
+
 This is the only pattern. Don't reach for `useState`-driven open/close
 on a new drawer — the URL form gives you:
 

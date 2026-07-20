@@ -1,8 +1,8 @@
 Feature: Langy panel layout modes
 
-  The Langy panel has two user-picked layouts: a floating card that overlays
-  the page, and a sidebar dock attached to the right edge that reserves room
-  so page content is never covered. The floating card overlays content, so it
+  The Langy panel has two user-picked layouts: a sidebar dock attached to the
+  right edge that reserves room so page content is never covered (the
+  default), and a floating card that overlays the page. The floating card overlays content, so it
   can afford to be wide; the docked sidebar takes its width FROM the page for
   as long as it is open, so it runs narrower and denser — on a laptop screen
   the page must keep enough room to work in.
@@ -62,3 +62,11 @@ Feature: Langy panel layout modes
     When I close the panel
     Then page content reclaims the full viewport width
     And the content card extends back to the viewport edge without right rounding
+
+  Scenario: Drawers yield the right edge while Langy is open
+    Given the Langy panel is open in either layout
+    When any right-anchored drawer opens
+    Then the drawer slides in from the LEFT side instead
+    And the panel does not move out of its place
+    When the panel is closed
+    Then drawers anchor to the right edge as usual

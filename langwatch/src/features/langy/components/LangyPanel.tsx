@@ -39,7 +39,6 @@ import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
-import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 // ONE definition of the wire shape, server-side, imported by both ends — the
@@ -398,40 +397,19 @@ function LangyPanel({
   const [devMode] = useLangyDevMode();
   const cardGalleryOpen = useLangyStore((s) => s.cardGalleryOpen);
 
-  // ── Getting out of the drawer's way ───────────────────────────────────────
-  // Drawers (the trace view among them) are right-anchored overlays, and the
-  // floating panel is a right-anchored overlay. They were fighting for the same
-  // corner: open a trace and the panel sat on top of it.
-  //
-  // So while a drawer is open, the floating card CROSSES TO THE OTHER SIDE —
-  // it slides to the left edge and the drawer gets the right. Both are then
-  // fully visible, which is the whole point of asking Langy about the thing you
-  // just opened.
-  //
-  // The shift is computed from the viewport rather than measured off the
-  // drawer's DOM: drawers vary in width and are rendered by a registry this
-  // panel has no business reaching into, and a measurement would be a race with
-  // the drawer's own open animation. Translating to the left EDGE is correct for
-  // any drawer narrower than the space it leaves — which is all of them at a
-  // normal viewport — and degrades gracefully rather than wrongly when it isn't
-  // (the panel keeps its higher z-index, so it still floats ABOVE the drawer,
-  // which is the behaviour originally asked for).
-  const { currentDrawer } = useDrawer();
-  const isDrawerOpen = !!currentDrawer;
+  // Langy owns the RIGHT edge. Drawers yield it while the panel is open —
+  // every right-anchored drawer resolves to the LEFT side instead (see
+  // DrawerRoot in components/ui/drawer.tsx) — so the panel never needs to
+  // dodge them, in either layout.
   const viewportWidth = useViewportWidth();
   const floatingPanelWidth = resolveFloatingPanelWidth(viewportWidth);
 
-  const drawerShiftX =
-    floating && isDrawerOpen
-      ? -Math.max(0, viewportWidth - floatingPanelWidth - PANEL_INSET * 2)
-      : 0;
-
   const variants = useMemo(
     () => ({
-      open: { opacity: 1, scale: 1, x: drawerShiftX, y: 0 },
+      open: { opacity: 1, scale: 1, x: 0, y: 0 },
       closed: floating ? FLOATING_CLOSED : SIDEBAR_CLOSED,
     }),
-    [drawerShiftX, floating],
+    [floating],
   );
 
   // Conversation-scoped client state belongs to the active project only; the
@@ -1335,7 +1313,7 @@ function LangyPanel({
         // Any change in the floating card's resolved size eases instead of
         // snapping — chiefly the min-height floor stepping up as the conversation
         // grows (send: 340 → 410 → 520), but also the 80dvh cap. Transform-driven
-        // open/close and the drawer cross-shift are motion's own inline transform;
+        // open/close is motion's own inline transform;
         // this CSS transition names only the size floor/cap, so the two never
         // fight. Off under reduced motion.
         css={
