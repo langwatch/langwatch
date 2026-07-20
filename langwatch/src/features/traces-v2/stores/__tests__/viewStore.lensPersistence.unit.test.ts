@@ -68,6 +68,7 @@ describe("viewStore last-used lens persistence", () => {
           sort: { columnId: "time", direction: "desc" },
           grouping: "flat",
           columns: [],
+          addons: [],
           isBuiltIn: false,
         },
       ]);
@@ -89,6 +90,7 @@ describe("viewStore last-used lens persistence", () => {
           sort: { columnId: "time", direction: "desc" },
           grouping: "flat",
           columns: [],
+          addons: [],
           isBuiltIn: false,
         },
       ]);
