@@ -2,6 +2,7 @@ package customertracebridge
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -188,3 +189,48 @@ func (p captureProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
 }
 func (p captureProcessor) Shutdown(context.Context) error   { return nil }
 func (p captureProcessor) ForceFlush(context.Context) error { return nil }
+
+// True repro of the production leak: on a real pod, OTEL_RESOURCE_ATTRIBUTES /
+// OTEL_SERVICE_NAME carry the gateway's infra identity, and otel-go's
+// WithResource silently merges the given resource OVER resource.Environment()
+// — so "empty resource" still shipped k8s topology, cloud region, and service
+// identity on every customer-retold span. This test constructs the emitter
+// with those variables set, exactly like production, and asserts none of it
+// survives onto the customer-visible resource.
+func TestEmitter_CustomerSpanResourceExcludesPodEnvironment(t *testing.T) {
+	t.Setenv("OTEL_RESOURCE_ATTRIBUTES",
+		"k8s.pod.name=test-pod,cloud.region=eu-central-1,deployment.environment.name=lw-prod")
+	t.Setenv("OTEL_SERVICE_NAME", "langwatch-service-aigateway")
+
+	ctx := contexts.SetServiceInfo(context.Background(), contexts.ServiceInfo{
+		Service: "langwatch-service-aigateway",
+		Version: "test",
+	})
+
+	e, err := NewEmitter(ctx, EmitterOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
+
+	// Construction must not eat the process env — the gateway's own ops
+	// provider still needs these variables afterwards.
+	v, ok := os.LookupEnv("OTEL_SERVICE_NAME")
+	require.True(t, ok)
+	assert.Equal(t, "langwatch-service-aigateway", v)
+
+	captured := make(chan sdktrace.ReadOnlySpan, 1)
+	e.tp.RegisterSpanProcessor(captureProcessor{spans: captured})
+
+	spanCtx, _ := e.BeginSpan(ctx, "proj-1", domain.RequestTypeChat)
+	e.EndSpan(spanCtx, domain.AITraceParams{})
+
+	select {
+	case span := <-captured:
+		kvs := span.Resource().Attributes()
+		require.Len(t, kvs, 1,
+			"pod environment leaked onto the customer-visible resource: %v", kvs)
+		assert.Equal(t, gatewaytracer.AttrOrigin, string(kvs[0].Key))
+		assert.Equal(t, gatewaytracer.OriginGateway, kvs[0].Value.AsString())
+	case <-time.After(2 * time.Second):
+		t.Fatal("no span captured")
+	}
+}

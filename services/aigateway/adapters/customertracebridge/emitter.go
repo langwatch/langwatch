@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -87,6 +88,31 @@ type EmitterOptions struct {
 	MaxQueueSize int
 }
 
+// withoutResourceEnv runs build with OTEL_RESOURCE_ATTRIBUTES and
+// OTEL_SERVICE_NAME temporarily cleared, restoring them before returning.
+//
+// otel-go's sdktrace.WithResource silently merges the given resource OVER
+// resource.Environment() (provider.go: resource.Merge(resource.Environment(), r))
+// and offers no way to opt out. On a production pod those variables carry the
+// gateway's full infra identity — k8s topology, cloud region, service name —
+// which rode on every customer-retold span from the moment the deployment
+// gained OTEL_RESOURCE_ATTRIBUTES, despite the provider being constructed with
+// an "empty" resource. Clearing the variables for the duration of provider
+// construction is the only supported way to keep them off customer data.
+//
+// NewEmitter runs once at boot, on one goroutine, before the HTTP server
+// starts, so the brief unset is not observable by concurrent readers; the
+// gateway's own ops provider reads the restored values afterwards.
+func withoutResourceEnv(build func() *sdktrace.TracerProvider) *sdktrace.TracerProvider {
+	for _, key := range []string{"OTEL_RESOURCE_ATTRIBUTES", "OTEL_SERVICE_NAME"} {
+		if prev, ok := os.LookupEnv(key); ok {
+			defer func(k, v string) { _ = os.Setenv(k, v) }(key, prev)
+			_ = os.Unsetenv(key)
+		}
+	}
+	return build()
+}
+
 // NewEmitter creates a customer trace bridge backed by a private TracerProvider.
 func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 	if opts.Registry == nil {
@@ -113,16 +139,18 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 	// Origin=Gateway in the product.
 	// AlwaysSample: the gateway never drops customer spans regardless of
 	// the gateway's own sample ratio setting.
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithResource(resource.NewSchemaless(
-			attribute.String(gatewaytracer.AttrOrigin, gatewaytracer.OriginGateway),
-		)),
-		sdktrace.WithBatcher(router,
-			sdktrace.WithBatchTimeout(batchTimeout),
-			sdktrace.WithMaxQueueSize(queueSize),
-		),
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-	)
+	tp := withoutResourceEnv(func() *sdktrace.TracerProvider {
+		return sdktrace.NewTracerProvider(
+			sdktrace.WithResource(resource.NewSchemaless(
+				attribute.String(gatewaytracer.AttrOrigin, gatewaytracer.OriginGateway),
+			)),
+			sdktrace.WithBatcher(router,
+				sdktrace.WithBatchTimeout(batchTimeout),
+				sdktrace.WithMaxQueueSize(queueSize),
+			),
+			sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		)
+	})
 
 	svcCtx := contexts.MustGetServiceInfo(ctx)
 
