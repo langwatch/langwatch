@@ -34,10 +34,8 @@ import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import {
   buildIntentHandlers,
-  buildProcessDefinition,
   ProcessRuntime,
 } from "~/server/event-sourcing/process-manager/processRuntime";
-import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
 
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { langyConversationProcess } from "../langyConversationProcess";
@@ -67,11 +65,6 @@ function buildLangyManager(ports = createStubLangyEffectPorts().ports) {
     applier: langyConversationProcess(ports),
   });
 }
-
-const langyConversationProcessDefinition = buildProcessDefinition(
-  buildLangyManager().config,
-) as ProcessDefinition<LangyConversationProcessState>;
-
 
 const W3C_TRACEPARENT_REGEX = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9a-f]{2})$/;
 
