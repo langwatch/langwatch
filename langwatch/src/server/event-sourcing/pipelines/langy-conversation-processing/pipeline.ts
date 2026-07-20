@@ -3,6 +3,11 @@ import type { AppendStore } from "../../projections/mapProjection.types";
 import type { StateProjectionStore } from "../../projections/stateProjection.types";
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
 import {
+  langyConversationProcess,
+  LANGY_CONVERSATION_PROCESS_NAME,
+} from "~/server/app-layer/langy/process-manager";
+import type { LangyEffectPorts } from "~/server/app-layer/langy/process-manager";
+import {
   ArchiveConversationCommand,
   ConsumeTurnHandoffCommand,
   RecordMessageCommand,
@@ -51,6 +56,11 @@ export interface LangyConversationProcessingPipelineDeps {
   langyAnalyticsEventProjectionStore: AppendStore<LangyAnalyticsEventProjectionRecord>;
   /** Live consumers are independent from projection state and replay. */
   subscribers?: EventSubscriberDefinition<LangyConversationProcessingEvent>[];
+  /**
+   * Effect ports the conversation process manager dispatches into. Only the
+   * effects are injected -- the process topology is declared on this pipeline.
+   */
+  langyProcessPorts: LangyEffectPorts;
 }
 
 /**
@@ -124,6 +134,10 @@ export function createLangyConversationProcessingPipeline(
   }
 
   return builder
+    .withProcessManager(
+      LANGY_CONVERSATION_PROCESS_NAME,
+      langyConversationProcess(deps.langyProcessPorts),
+    )
     .withCommand("createConversation", CreateConversationCommand)
     .withCommand("forkConversation", ForkConversationCommand)
     .withCommand("recordMessage", RecordMessageCommand)

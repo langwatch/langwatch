@@ -17,6 +17,10 @@ import {
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import type { ProcessEventEnvelope } from "~/server/event-sourcing/process-manager";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+
+import { buildLangyProcessEventView } from "../../langyConversationProcess";
 
 export const PROJECT_ID = "proj_langy";
 export const CONVERSATION_ID = "conv_langy_1";
@@ -276,4 +280,28 @@ export function titleGeneratedEvent(params: {
       model: "openai/gpt-5-mini",
     },
   });
+}
+
+/**
+ * Builds the envelope ProcessRuntime's generated `pm:langyConversation`
+ * subscriber would hand the process for this event.
+ *
+ * This mirrors `ProcessRuntime.registerPipeline` deliberately: the unit tests
+ * drive `ProcessManagerService` directly (no pipeline, no queue), but they
+ * must see the same envelope production does — in particular the content
+ * boundary, applied here via the real `buildLangyProcessEventView`, and the
+ * `idempotencyKey ?? id` inbox key that makes a redelivered command a no-op.
+ */
+export function toLangyProcessEnvelope(
+  event: LangyConversationProcessingEvent,
+): ProcessEventEnvelope {
+  return {
+    eventId: event.idempotencyKey ?? event.id,
+    eventType: event.type,
+    occurredAt: event.occurredAt,
+    tenantId: event.tenantId,
+    projectId: event.tenantId,
+    processKey: event.data.conversationId,
+    payload: buildLangyProcessEventView(event),
+  };
 }

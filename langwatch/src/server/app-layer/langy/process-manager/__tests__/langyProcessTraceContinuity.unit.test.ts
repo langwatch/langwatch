@@ -31,22 +31,47 @@ import {
 import { OutboxDispatcherService } from "~/server/event-sourcing/process-manager";
 import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 
-import { langyConversationProcessDefinition } from "../langyConversationProcess.definition";
+import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
+import {
+  buildIntentHandlers,
+  buildProcessDefinition,
+  ProcessRuntime,
+} from "~/server/event-sourcing/process-manager/processRuntime";
+import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
+
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import { langyConversationProcess } from "../langyConversationProcess";
+import { createStubLangyEffectPorts } from "../langyEffectPorts";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   type LangyConversationProcessState,
 } from "../langyConversationProcess.types";
-import {
-  createLangyIntentHandlers,
-  createStubLangyEffectPorts,
-} from "../langyEffectPorts";
-import { createLangyProcessSubscriber } from "../langyProcessSubscriber";
 import {
   agentTurnAcceptedEvent,
   CONVERSATION_ID,
   PROJECT_ID,
   T0,
 } from "./helpers/langyEventFixtures";
+
+/**
+ * The EXACT definition the runtime mounts — built through the pipeline's own
+ * `langyConversationProcess` applier and the runtime's
+ * `buildProcessDefinition`, so these tests cover the generated evolve
+ * (intent-key prefixing, undeclared-event guard, schema-validated intent
+ * payloads) rather than a re-implementation. The effect ports are stubs:
+ * evolve never dispatches.
+ */
+function buildLangyManager(ports = createStubLangyEffectPorts().ports) {
+  return buildProcessManager<LangyConversationProcessingEvent>({
+    name: LANGY_CONVERSATION_PROCESS_NAME,
+    applier: langyConversationProcess(ports),
+  });
+}
+
+const langyConversationProcessDefinition = buildProcessDefinition(
+  buildLangyManager().config,
+) as ProcessDefinition<LangyConversationProcessState>;
+
 
 const W3C_TRACEPARENT_REGEX = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9a-f]{2})$/;
 
@@ -89,17 +114,26 @@ describe("Langy process trace continuity", () => {
     exporter.reset();
   });
 
-  function subscriberOver(
-    service: ProcessManagerService<LangyConversationProcessState>,
-  ) {
-    return createLangyProcessSubscriber({
-      processManager: service,
-      clock: () => T0,
+  /**
+   * The `pm:langyConversation` subscriber ProcessRuntime generates for the
+   * pipeline — the real production path now that Langy no longer hand-rolls
+   * one. It builds the envelope (including the content boundary) and drives
+   * the process itself.
+   */
+  function generatedSubscriber(ports = createStubLangyEffectPorts().ports) {
+    const runtime = new ProcessRuntime({ store, consumersEnabled: false });
+    const definition = buildLangyManager(ports);
+    const { subscribers } = runtime.registerPipeline<LangyConversationProcessingEvent>({
+      pipelineName: "langy-conversation-processing",
+      processManagers: new Map([[LANGY_CONVERSATION_PROCESS_NAME, definition]]),
     });
+    const subscriber = subscribers[0];
+    if (!subscriber) throw new Error("runtime generated no subscriber");
+    return subscriber;
   }
 
   async function handleStartedTurnInsideProducerSpan(
-    subscriber: ReturnType<typeof createLangyProcessSubscriber>,
+    subscriber: { handle: (event: any, context: any) => Promise<void> },
   ): Promise<{ producerTraceId: string }> {
     const tracer = trace.getTracer("test");
     return await tracer.startActiveSpan(
@@ -124,12 +158,8 @@ describe("Langy process trace continuity", () => {
 
   describe("given the subscriber handles a queued event inside an active trace", () => {
     it("persists the ambient W3C carrier on the pending intent", async () => {
-      const service = new ProcessManagerService({
-        definition: langyConversationProcessDefinition,
-        store,
-      });
       const { producerTraceId } = await handleStartedTurnInsideProducerSpan(
-        subscriberOver(service),
+        generatedSubscriber(),
       );
 
       const [message] = await store.findMessagesByRef({ ref });
@@ -144,26 +174,27 @@ describe("Langy process trace continuity", () => {
 
   describe("when the outbox later dispatches the intent in a fresh context", () => {
     it("continues the original trace through the typed Langy handler", async () => {
-      const liveService = new ProcessManagerService({
-        definition: langyConversationProcessDefinition,
-        store,
-      });
+      const { ports, calls } = createStubLangyEffectPorts();
       const { producerTraceId } = await handleStartedTurnInsideProducerSpan(
-        subscriberOver(liveService),
+        generatedSubscriber(ports),
       );
       const [message] = await store.findMessagesByRef({ ref });
       const [, , carrierSpanId] = W3C_TRACEPARENT_REGEX.exec(
         message!.traceCarrier.traceparent!,
       )!;
 
-      const { ports, calls } = createStubLangyEffectPorts();
       const dispatcher = new OutboxDispatcherService({
         store,
-        handlers: createLangyIntentHandlers({ ports }),
+        // The builder generates these from the declared intents, schema
+        // validation included -- Langy no longer hand-writes them.
+        handlers: buildIntentHandlers(buildLangyManager(ports).config),
       });
-      const report = await dispatcher.runOnce({ now: T0 + 1 });
+      // The generated subscriber stamps the commit with real `Date.now()` --
+      // unlike the hand-rolled one it replaces, it takes no injectable clock --
+      // so the dispatch window has to be read against the same clock.
+      const report = await dispatcher.runOnce({ now: Date.now() + 1 });
 
-      expect(report.dispatched).toEqual(["dispatch:turn_1"]);
+      expect(report.dispatched).toEqual([`process:${CONVERSATION_ID}:dispatch:turn_1`]);
       expect(calls.dispatchedTurns).toEqual([
         {
           projectId: PROJECT_ID,
@@ -182,7 +213,7 @@ describe("Langy process trace continuity", () => {
       expect(consumerSpan!.attributes).toMatchObject({
         "process.name": LANGY_CONVERSATION_PROCESS_NAME,
         "process.key": CONVERSATION_ID,
-        "process.message_key": "dispatch:turn_1",
+        "process.message_key": `process:${CONVERSATION_ID}:dispatch:turn_1`,
         "process.attempt": 1,
         "tenant.id": PROJECT_ID,
         "project.id": PROJECT_ID,
