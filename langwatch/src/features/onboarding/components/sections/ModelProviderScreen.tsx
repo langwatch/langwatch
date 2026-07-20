@@ -25,7 +25,7 @@ export const ModelProviderScreen: React.FC<ModelProviderScreenProps> = ({
 
   // In the Langy panel the screen lives in a narrow scrolling column, and the
   // credential form sits below the fold of the provider grid: picking a
-  // provider must bring the key fields into view — focused on the first one —
+  // provider must bring the key fields into view, focused on the first one,
   // or the click appears to do nothing. Driven from the click (not an effect
   // on the selection) so re-picking the already-selected provider scrolls
   // too. The rAF lets the remounted form lay out first; focus goes first with

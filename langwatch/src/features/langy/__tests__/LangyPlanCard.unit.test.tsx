@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { UIMessage } from "ai";
 
 // The capability renderer (reached via the collapsed-receipt scenario) reads
-// the project off this hook, which is tRPC-backed — mock the boundary, as the
+// the project off this hook, which is tRPC-backed, mock the boundary, as the
 // other panel tests do, instead of standing up a client.
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { slug: "demo" } }),

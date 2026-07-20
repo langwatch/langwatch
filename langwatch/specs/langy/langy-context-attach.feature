@@ -6,7 +6,7 @@ Feature: Attaching context to Langy and showing what it holds
   # ---------------------------------------------------------------------------
   # Any surface (a home card, a trace row, a briefing receipt) can hand Langy a
   # piece of context through one small typed store API. The context Langy holds
-  # lives in ONE place — the composer's own summary row, in both layouts —
+  # lives in ONE place, the composer's own summary row, in both layouts,
   # named for humans (trace summary / first message / endpoint / model), with
   # the raw id kept as a secondary tooltip. A second strip above the
   # conversation restated the same chips and read as duplication.

@@ -41,7 +41,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-// ONE definition of the wire shape, server-side, imported by both ends — the
+// ONE definition of the wire shape, server-side, imported by both ends, the
 // route spreads `langyTurnContextSchema.shape` into its body schema, and this
 // types the payload against the same source. If the route stops accepting a
 // field, this stops compiling. That is the whole point: the last time these two
@@ -397,9 +397,9 @@ function LangyPanel({
   const [devMode] = useLangyDevMode();
   const cardGalleryOpen = useLangyStore((s) => s.cardGalleryOpen);
 
-  // Langy owns the RIGHT edge. Drawers yield it while the panel is open —
+  // Langy owns the RIGHT edge. Drawers yield it while the panel is open,
   // every right-anchored drawer resolves to the LEFT side instead (see
-  // DrawerRoot in components/ui/drawer.tsx) — so the panel never needs to
+  // DrawerRoot in components/ui/drawer.tsx), so the panel never needs to
   // dodge them, in either layout.
   const viewportWidth = useViewportWidth();
   const floatingPanelWidth = resolveFloatingPanelWidth(viewportWidth);
@@ -806,7 +806,7 @@ function LangyPanel({
 
   // The composer is the ONE remove affordance for context (the dock's old
   // banner restated these chips and is gone). A chip can be page-derived,
-  // explicitly attached, or both (deduped above) — clear every source it has,
+  // explicitly attached, or both (deduped above), clear every source it has,
   // or it reappears from the other one.
   const removeContextChip = useCallback(
     (id: string) => {
@@ -1370,12 +1370,12 @@ function LangyPanel({
           : dockShellClaimed
             ? {
                 // An app shell is mounted: the dock joins it as a SECOND
-                // content card. It starts below the full-width header —
-                // aligned with the content card's top edge — and wears the
+                // content card. It starts below the full-width header,
+                // aligned with the content card's top edge, and wears the
                 // card's own language: the same top-left radius, the same
                 // muted hairline on the two edges that meet the page ground,
                 // and (dark) the same faint lit top rim. The strip of page
-                // ground between the two cards is reserved by the shell — see
+                // ground between the two cards is reserved by the shell, see
                 // DashboardLayout. Spec: specs/langy/langy-panel-layout.feature
                 top: `${APP_HEADER_HEIGHT}px`,
                 right: 0,
@@ -1401,8 +1401,8 @@ function LangyPanel({
               })}
       >
         {/* Texture, under the content (which stacks at zIndex 1) and inert to
-          the pointer. Dark only — the light panel is the app's own clean
-          surface. CSS does the gating — see langyTheme.css. */}
+          the pointer. Dark only, the light panel is the app's own clean
+          surface. CSS does the gating, see langyTheme.css. */}
         {floating ? <Box className="langy-signal-grid" aria-hidden /> : null}
         {/* A whisper of the brand rising from the top of the panel, so the ink
           ground has depth and a hint of identity instead of reading flat. Dark
@@ -1444,7 +1444,7 @@ function LangyPanel({
             onForkConversation={handleForkConversation}
             onRenameConversation={handleRenameConversation}
           />
-          {/* The context Langy is holding lives in ONE place — the composer's
+          {/* The context Langy is holding lives in ONE place, the composer's
             own summary row (both layouts). A second banner above the
             conversation restated the same chips and read as duplication. */}
           {/* The message column and, BEHIND it, the ambient wash. The wash is a
@@ -1821,12 +1821,12 @@ function PanelHeader({
 }) {
   return (
     <>
-      {/* ONE line, at the trace explorer search bar's height — a chat app's
+      {/* ONE line, at the trace explorer search bar's height, a chat app's
           header, not a masthead. Identity leads: the generated conversation
           title (the wordmark until one lands), as a LABEL, not a control; it
           truncates so it can never shove the rail off the edge. Then the
-          actions — compose, history (its own icon, with the searchable
-          popover), Foundry, more — and finally the exit, held apart by a
+          actions, compose, history (its own icon, with the searchable
+          popover), Foundry, more, and finally the exit, held apart by a
           divider so Close is unmistakably the last control. Layout switching
           lives in the overflow menu only.
           Spec: specs/langy/langy-panel-header.feature */}

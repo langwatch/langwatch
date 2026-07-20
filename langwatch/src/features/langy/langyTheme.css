@@ -100,7 +100,7 @@
 }
 
 /* ── Texture: the ink ground's signal grid (dark only) ────────────────────
-   Light mode is the app's own surface and carries no texture at all — see
+   Light mode is the app's own surface and carries no texture at all, see
    langyTheme.ts. The ink ground gets the signal grid, lifted from the
    marketing site's `.dark-signal-grid` (72px cells, 1px lines, and a
    `to right` mask that fades it out by 82%). It is the faint technical
@@ -259,7 +259,7 @@
    the edge of perceptible.
 
    DARK ONLY: the light panel is the app's own clean surface (see
-   langyTheme.ts) — the mesh impression belongs to the ink ground it was
+   langyTheme.ts), the mesh impression belongs to the ink ground it was
    sampled from. */
 .langy-wash {
   display: none;

@@ -12,7 +12,7 @@ Feature: Langy panel theme per color mode
   # `.langy-root` the app's standard light tokens apply unchanged, so the panel
   # reads as part of the product, not a beige island.
   #
-  # Langy's own namespace (`langy.*` — the identity gradient stops, the data
+  # Langy's own namespace (`langy.*`, the identity gradient stops, the data
   # bar colours, the signal grid line) keeps values in BOTH modes: those tokens
   # have no app-level fallback and feed the mark, shimmer and fold.
   # ---------------------------------------------------------------------------

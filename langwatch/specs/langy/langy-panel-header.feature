@@ -4,11 +4,11 @@ Feature: Langy panel header controls and title overflow
   So that I never confuse "new chat" for "close" and a long title never hides them
 
   # ---------------------------------------------------------------------------
-  # ONE line, at the trace explorer search bar's height — a chat app's header,
+  # ONE line, at the trace explorer search bar's height, a chat app's header,
   # not a masthead. Identity leads: the generated conversation title (the
   # wordmark until one lands), as a LABEL, not a control; no subtitle. Then the
-  # actions — new chat, history (its own icon, opening the searchable recents
-  # popover), more — and finally Close, always last, held apart by a divider.
+  # actions, new chat, history (its own icon, opening the searchable recents
+  # popover), more, and finally Close, always last, held apart by a divider.
   # Layout switching (floating / sidebar) lives in the overflow menu only. A
   # long title must never push the controls off-panel.
   # ---------------------------------------------------------------------------
@@ -16,7 +16,7 @@ Feature: Langy panel header controls and title overflow
   @unit
   Scenario: The header is a single line
     Given the Langy panel is open
-    Then the header shows one line — the title, then the actions
+    Then the header shows one line, the title, then the actions
     And no subtitle renders under the title
 
   @unit

@@ -4,15 +4,15 @@ Feature: Langy panel layout modes
   right edge that reserves room so page content is never covered (the
   default), and a floating card that overlays the page. The floating card overlays content, so it
   can afford to be wide; the docked sidebar takes its width FROM the page for
-  as long as it is open, so it runs narrower and denser — on a laptop screen
+  as long as it is open, so it runs narrower and denser, on a laptop screen
   the page must keep enough room to work in.
 
   The app shell draws its content as a rounded card on the gray page ground:
   the header bar spans the full width on gray, and the content card below it
   has a rounded top-left corner with a muted hairline. When Langy docks
   inside that shell it joins the same language: the content card also rounds
-  its top-right corner, and Langy becomes a SECOND card — same surface, same
-  radius, same hairline — separated from the first by a strip of the page
+  its top-right corner, and Langy becomes a SECOND card, same surface, same
+  radius, same hairline, separated from the first by a strip of the page
   ground, starting below the header exactly like the content card does. The
   app header keeps the full viewport width, so there is no second header
   line to mis-align with. Pages that do not use the app shell (full-screen

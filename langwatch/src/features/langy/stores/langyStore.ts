@@ -176,7 +176,7 @@ interface LangyState {
    * header full-width) and the docked panel renders as a second rounded card
    * below the header. Pages without a shell (full-screen tools like the
    * studio) leave the count at zero and keep the flush full-height dock with
-   * the page-level width reservation. A count — not a boolean — so nested or
+   * the page-level width reservation. A count, not a boolean, so nested or
    * twin mounts (StrictMode) stay correct. Never persisted: it mirrors what
    * is mounted right now. Spec: specs/langy/langy-panel-layout.feature
    */
@@ -185,7 +185,7 @@ interface LangyState {
   releaseDockShell: () => void;
 
   /**
-   * The docked panel is open and reserving room right now — the one truth the
+   * The docked panel is open and reserving room right now, the one truth the
    * page wrapper computes (visibility gate + open + sidebar mode, see
    * LangyShiftedRoot) and the app shell consumes to reserve the dock's room
    * inside its content row. Kept in the store so the shell never re-derives

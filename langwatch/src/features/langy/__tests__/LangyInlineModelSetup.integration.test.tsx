@@ -278,7 +278,7 @@ describe("Feature: Langy prompts for a model when the project has none configure
 
         renderPanel();
 
-        // The panel shows a prompt to add a model provider. One heading only —
+        // The panel shows a prompt to add a model provider. One heading only,
         // the provider grid below carries the single explanatory subtitle.
         expect(
           await screen.findByText("Langy needs a model to get started"),

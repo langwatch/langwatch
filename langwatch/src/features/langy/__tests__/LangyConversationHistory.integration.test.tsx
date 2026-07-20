@@ -654,7 +654,7 @@ function renderPanel() {
 }
 
 /**
- * History is its own icon control in the header rail — the labelled
+ * History is its own icon control in the header rail, the labelled
  * RecentChatsMenu trigger. Conversations are only in the DOM while the
  * popover is open.
  */

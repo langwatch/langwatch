@@ -2,8 +2,8 @@
  * Pins Langy's per-mode palette contract at the token layer (spec:
  * specs/langy/langy-panel-theme.feature).
  *
- * The system here is built the same way _app.tsx builds the real one —
- * `createSystem(defaultConfig, mergeConfigs(app tokens, langyThemeConfig))` —
+ * The system here is built the same way _app.tsx builds the real one,
+ * `createSystem(defaultConfig, mergeConfigs(app tokens, langyThemeConfig))`,
  * with the app config reduced to the one token the contract turns on:
  * `bg.surface` with the app's own `_light` / `_dark` values. The assertions
  * run against the CSS the system actually emits, so they hold exactly when

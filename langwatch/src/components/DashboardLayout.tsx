@@ -478,7 +478,7 @@ export const DashboardLayout = ({
   // Langy's docked panel joins this shell as a second content card. Claim the
   // dock while the shell is mounted so the page-level wrapper stands down
   // (LangyShiftedRoot), then reserve the panel's room inside the content row
-  // only — the header keeps the full viewport width above both cards. The
+  // only, the header keeps the full viewport width above both cards. The
   // reservation truth (`dockShifted`) is computed by the wrapper, which owns
   // Langy's visibility gate. Spec: specs/langy/langy-panel-layout.feature
   const langyDockShifted = useLangyStore((s) => s.dockShifted);

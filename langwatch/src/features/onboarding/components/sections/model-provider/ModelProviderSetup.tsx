@@ -169,8 +169,8 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
-    // A NEW provider saves at the widest scope the caller can manage — org
-    // for admins, else team, else project — the same default the settings
+    // A NEW provider saves at the widest scope the caller can manage, org
+    // for admins, else team, else project, the same default the settings
     // form uses (the hook decides; an existing row keeps its stored scope).
     // The embedded screens make that decision silently instead of showing a
     // scope picker.
@@ -497,7 +497,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
           />
 
           <HStack justify="end">
-            {/* Same button as every settings drawer's Save (solid orange) —
+            {/* Same button as every settings drawer's Save (solid orange),
                 the surface variant read as an unrelated control here. */}
             <Button
               colorPalette="orange"

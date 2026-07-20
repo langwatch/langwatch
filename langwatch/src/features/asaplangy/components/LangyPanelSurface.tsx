@@ -63,7 +63,7 @@ export function LangyPanelSurface({
         {...fillColumn}
         {...rest}
       >
-        {/* Texture, under the content and inert to the pointer. Dark only —
+        {/* Texture, under the content and inert to the pointer. Dark only,
             the light surface is the app's own clean panel. The glow is the ink
             ground's faint top-of-panel brand lift. */}
         <Box className="langy-signal-grid" aria-hidden />

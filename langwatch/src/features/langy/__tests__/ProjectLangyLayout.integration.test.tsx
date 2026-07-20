@@ -275,7 +275,7 @@ describe("ProjectLangyLayout", () => {
       });
       await openLangy();
       expect(useLangyStore.getState().dockShifted).toBe(true);
-      // Floating mode reserves nothing — the card overlays the page.
+      // Floating mode reserves nothing, the card overlays the page.
       act(() => {
         useLangyStore.setState({ panelMode: "floating" });
       });

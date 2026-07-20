@@ -1,5 +1,5 @@
 /**
- * Drawers yield the right edge while the Langy panel is open — every `end`
+ * Drawers yield the right edge while the Langy panel is open, every `end`
  * placement (explicit or defaulted) resolves to `start`; other anchors are
  * untouched. Spec: specs/langy/langy-panel-layout.feature
  */

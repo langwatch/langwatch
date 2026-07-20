@@ -103,7 +103,7 @@ export const DrawerCloseTrigger = React.forwardRef<
  *   interacting with a child drawer.
  * - `preventScroll={false}`: Default to allowing background scrolling.
  *
- * All defaults can be overridden by passing props explicitly — except that a
+ * All defaults can be overridden by passing props explicitly, except that a
  * right-anchored drawer yields the right edge while the Langy panel is open:
  * Langy lives on the right, and a drawer sliding over it hides exactly the
  * conversation you opened the drawer to talk about. Every `end` placement

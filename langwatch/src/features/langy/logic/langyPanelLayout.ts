@@ -16,14 +16,14 @@ export const LANGY_DOCKED_OFFSET = SIDEBAR_PANEL_WIDTH;
 
 /**
  * The strip of page ground between the content card and the docked panel when
- * an app shell claims the dock — the gray breathing room that makes the panel
+ * an app shell claims the dock, the gray breathing room that makes the panel
  * read as a second card rather than a pane glued to the first.
  */
 export const LANGY_DOCK_GAP = 12;
 
 /**
- * The app shell's header-bar height. The shell's content cards — and the
- * docked panel, which joins them as a second card — start below this line.
+ * The app shell's header-bar height. The shell's content cards, and the
+ * docked panel, which joins them as a second card, start below this line.
  * DashboardLayout derives its own viewport math from the same constant, so
  * the two cannot drift apart.
  */

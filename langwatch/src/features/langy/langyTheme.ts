@@ -3,12 +3,12 @@ import { defineConfig } from "@chakra-ui/react";
 /**
  * Langy's colour theme — a real Chakra config, not a stylesheet of overrides.
  *
- * Two custom CONDITIONS are declared —
+ * Two custom CONDITIONS are declared,
  *
  *     _langy      →  ".langy-root &"          (Langy, light)
  *     _langyDark  →  ".dark .langy-root &"    (Langy, dark)
  *
- * — and Langy's palette is attached to the SAME semantic tokens the rest of
+ *, and Langy's palette is attached to the SAME semantic tokens the rest of
  * the app uses (`bg.surface`, `fg.muted`, `border`, `orange.*`). `mergeConfigs`
  * folds these condition keys in beside the app's existing `_light` / `_dark`
  * values rather than replacing them, so:
@@ -32,7 +32,7 @@ import { defineConfig } from "@chakra-ui/react";
  * type scale.
  *
  * DARK IS THE MARKETING SITE'S INK. Lifted from the homepage's dark sections
- * (`SectionLangy`, `SectionEnterprise`) — the very sections that present
+ * (`SectionLangy`, `SectionEnterprise`), the very sections that present
  * Langy:
  *
  *   - TEXT IS PAPER AT ALPHA, NOT GREY. The site never writes a grey on ink; it
@@ -83,7 +83,7 @@ export const langyThemeConfig = defineConfig({
   theme: {
     semanticTokens: {
       colors: {
-        // ── Surfaces (dark only — light is the app's own) ───────────────────
+        // ── Surfaces (dark only, light is the app's own) ───────────────────
         // Dark is an ink ground with white-alpha layers stacked on it:
         //   ground ink-950 · panel ink-900 (= ink-950 under white/4, their card)
         //   card white/3 · hover white/6 · pressed white/10
@@ -140,7 +140,7 @@ export const langyThemeConfig = defineConfig({
         // ── Pass / fail ─────────────────────────────────────────────────────
         // Moss and rust are the site's own status accents. The `fg` variants
         // are lifted a little from the raw hexes so 11px text on ink stays
-        // legible — the site uses them at larger sizes than Langy does.
+        // legible, the site uses them at larger sizes than Langy does.
         green: {
           fg: langyDark("#7fa06a"),
           solid: langyDark("#5b7a4a"),
