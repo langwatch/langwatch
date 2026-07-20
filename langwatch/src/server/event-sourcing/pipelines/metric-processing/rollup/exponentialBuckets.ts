@@ -32,6 +32,15 @@ export function downscaleBuckets({
   return result;
 }
 
+/**
+ * Densification never allocates more than this many buckets. Bucket offsets
+ * are sender-controlled int32s, so a merged map can span the whole int32
+ * range — allocating an array proportional to that span is an OOM waiting for
+ * one hostile OTLP batch. Layout selection downscales to fit this cap first;
+ * the fold below only fires for spans no legal scale can absorb.
+ */
+export const MAX_DENSE_BUCKET_SPAN = 512;
+
 export function denseBuckets(map: BucketMap): {
   offset: number;
   counts: string[];
@@ -40,11 +49,15 @@ export function denseBuckets(map: BucketMap): {
   const indices = [...map.keys()].sort((a, b) => a - b);
   const offset = indices[0]!;
   const end = indices.at(-1)!;
-  const counts: string[] = [];
-  for (let index = offset; index <= end; index++) {
-    counts.push((map.get(index) ?? 0n).toString());
+  // Everything past the cap folds into the topmost kept bucket:
+  // count-preserving, with only the folded counts' magnitudes clamped down.
+  const cappedEnd = Math.min(end, offset + MAX_DENSE_BUCKET_SPAN - 1);
+  const dense = Array.from({ length: cappedEnd - offset + 1 }, () => 0n);
+  for (const [index, count] of map) {
+    const target = Math.min(index, cappedEnd) - offset;
+    dense[target] = dense[target]! + count;
   }
-  return { offset, counts };
+  return { offset, counts: dense.map((count) => count.toString()) };
 }
 
 export function mergeMap(target: BucketMap, source: BucketMap): void {

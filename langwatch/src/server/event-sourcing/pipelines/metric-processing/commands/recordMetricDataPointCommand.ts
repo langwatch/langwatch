@@ -32,7 +32,12 @@ export class RecordMetricDataPointCommand implements CommandHandler<
       data,
       metadata: {},
       occurredAt: data.occurredAt,
-      idempotencyKey: data.pointId,
+      // Tenant-scoped like every other command's. A PointId already hashes
+      // its tenant transitively (via SeriesId), so a collision is not
+      // reachable today — but nothing states that invariant at this layer,
+      // and a dedup key that silently depends on it would suppress another
+      // tenant's work the day it changes.
+      idempotencyKey: `${command.tenantId}:${data.pointId}`,
     });
     return [event];
   }

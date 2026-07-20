@@ -45,10 +45,19 @@ export class MetricDataPointClickHouseRepository implements MetricDataPointRepos
    * Defaulting this to the project resolver would hand it an organization id
    * to look up as a project.
    */
-  constructor(
-    private readonly resolveClient: ClickHouseClientResolver,
-    private readonly resolveOrganizationClient: ClickHouseClientResolver,
-  ) {}
+  private readonly resolveClient: ClickHouseClientResolver;
+  private readonly resolveOrganizationClient: ClickHouseClientResolver;
+
+  constructor({
+    resolveClient,
+    resolveOrganizationClient,
+  }: {
+    resolveClient: ClickHouseClientResolver;
+    resolveOrganizationClient: ClickHouseClientResolver;
+  }) {
+    this.resolveClient = resolveClient;
+    this.resolveOrganizationClient = resolveOrganizationClient;
+  }
 
   async ensureDataPoint(args: MetricDataPointWrite): Promise<void> {
     await this.ensureDataPoints({

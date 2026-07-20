@@ -146,18 +146,22 @@ describe("orgBillableEventsMeter — evaluation billing (issue #5124)", () => {
 });
 
 describe("orgBillableEventsMeter — canonical metrics remain shadow-only", () => {
-  it("does not dispatch metric data-point events to the production billable store", async () => {
-    const tenantId = createTestTenantId();
-    const { router, appendSpy } = createMeterRouterWithSpyStore();
-    const metricEvent = createTestEvent(
-      "a".repeat(64),
-      TEST_CONSTANTS.AGGREGATE_TYPE,
-      tenantId,
-      METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
-    );
+  describe("given the real meter projection registered on a router", () => {
+    describe("when a canonical metric data-point event is dispatched", () => {
+      it("keeps the production billable store untouched", async () => {
+        const tenantId = createTestTenantId();
+        const { router, appendSpy } = createMeterRouterWithSpyStore();
+        const metricEvent = createTestEvent(
+          "a".repeat(64),
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+          METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
+        );
 
-    await router.dispatch([metricEvent], { tenantId });
+        await router.dispatch([metricEvent], { tenantId });
 
-    expect(appendSpy).not.toHaveBeenCalled();
+        expect(appendSpy).not.toHaveBeenCalled();
+      });
+    });
   });
 });

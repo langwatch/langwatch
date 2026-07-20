@@ -632,10 +632,10 @@ export function initializeDefaultApp(options?: {
       ? new CanonicalLogRecordClickHouseRepository(resolveClickHouseClient)
       : new NullCanonicalLogRecordRepository(),
     metricDataPointStorage: clickhouseEnabled
-      ? new MetricDataPointClickHouseRepository(
-          resolveClickHouseClient,
-          getClickHouseClientForOrganization,
-        )
+      ? new MetricDataPointClickHouseRepository({
+          resolveClient: resolveClickHouseClient,
+          resolveOrganizationClient: getClickHouseClientForOrganization,
+        })
       : new NullMetricDataPointRepository(),
     traceAnalyticsRollup: clickhouseEnabled
       ? new TraceAnalyticsRollupClickHouseRepository(resolveClickHouseClient)

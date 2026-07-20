@@ -129,4 +129,16 @@ describe("gauge and sum rollups", () => {
       expect(rows[0]).toMatchObject({ sum: 12, resetCount: 0 });
     });
   });
+  describe("when a valueless point follows a valid gauge sample", () => {
+    it("keeps the last observed gauge value", () => {
+      const rows = buildMetricRollups({
+        points: [
+          point({ timeUnixMs: 1_000, valueDouble: 4 }),
+          point({ timeUnixMs: 2_000, valueType: "none" }),
+        ],
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ gaugeLast: 4 });
+    });
+  });
 });

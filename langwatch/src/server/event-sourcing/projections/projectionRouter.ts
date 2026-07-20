@@ -657,6 +657,8 @@ export class ProjectionRouter<
             const contexts = toApply.map((event) => ({
               ...firstContext,
               aggregateId: String(event.aggregateId),
+              // Per-event tenantId keeps the executor's cross-tenant guard honest.
+              tenantId: event.tenantId,
             }));
             const mapped = await withMetrics({
               fn: () =>

@@ -45,6 +45,9 @@ const MAP_TARGET_TABLE: Record<string, string> = {
   metricTimeRollup: "metric_time_rollups",
 };
 
+/** Pipelines with no fold store whose map projections still replay. */
+const STORELESS_REPLAYABLE = new Set(["metric_processing", "log_processing"]);
+
 /**
  * Create a replay runtime using the app's tenant-aware ClickHouse resolver.
  * Every CH query routes through getClickHouseClientForProject, which
@@ -128,7 +131,7 @@ export function createReplayRuntime(config: {
   for (const def of definitions) {
     const { name: pipelineName, aggregateType } = def.metadata;
     const store = storeByPipeline.get(pipelineName);
-    if (!store && pipelineName !== "metric_processing") continue;
+    if (!store && !STORELESS_REPLAYABLE.has(pipelineName)) continue;
 
     if (store) {
       for (const [, { definition: foldDef }] of def.foldProjections) {

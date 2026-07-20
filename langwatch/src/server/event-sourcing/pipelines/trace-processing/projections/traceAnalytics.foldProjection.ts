@@ -575,6 +575,86 @@ export function applySpanToAnalytics({
   };
 }
 
+/**
+ * A single log record's normalized contribution to the slim analytics
+ * fold: `log_record_received` builds it from the raw record (canonical
+ * lift + resource-level non-billable flag), `log_contributed` carries
+ * the already-lifted fields on the event itself.
+ */
+interface LogContribution {
+  traceId: string;
+  liftedAttributes: Record<string, unknown>;
+  nonBillable: boolean;
+}
+
+/**
+ * Fold one log contribution into slim: bump the reserved log count,
+ * merge the lifted canonical langwatch.* attributes, and mirror them
+ * onto slim's top-level columns. Each api_request event is its OWN
+ * turn — cost + tokens are additive across turns, models are deduped.
+ * Read from contribution.liftedAttributes (this event's contribution)
+ * NOT mergedAttributes, so cost doesn't double-count across replays.
+ */
+function applyLogContribution({
+  state,
+  contribution,
+}: {
+  state: TraceAnalyticsData;
+  contribution: LogContribution;
+}): TraceAnalyticsData {
+  const mergedAttributes = { ...state.attributes };
+  const logCount = parseInt(
+    mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
+    10,
+  );
+  mergedAttributes["langwatch.reserved.log_record_count"] = String(
+    logCount + 1,
+  );
+  for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
+    mergedAttributes[key] = String(value);
+  }
+
+  let models = state.models;
+  let totalCost = state.totalCost;
+  let nonBilledCost = state.nonBilledCost;
+  let totalPromptTokenCount = state.totalPromptTokenCount;
+  let totalCompletionTokenCount = state.totalCompletionTokenCount;
+  const model = contribution.liftedAttributes["langwatch.model"];
+  if (typeof model === "string" && model.length > 0) {
+    models = mergeModelsMostRecentFirst(models, [model]);
+  }
+  const cost = Number(contribution.liftedAttributes["langwatch.cost.usd"]);
+  if (Number.isFinite(cost) && cost > 0) {
+    totalCost = (totalCost ?? 0) + cost;
+    if (contribution.nonBillable) {
+      nonBilledCost = (nonBilledCost ?? 0) + cost;
+    }
+  }
+  const inputTokens = Number(
+    contribution.liftedAttributes["langwatch.input_tokens"],
+  );
+  if (Number.isFinite(inputTokens) && inputTokens > 0) {
+    totalPromptTokenCount = (totalPromptTokenCount ?? 0) + inputTokens;
+  }
+  const outputTokens = Number(
+    contribution.liftedAttributes["langwatch.output_tokens"],
+  );
+  if (Number.isFinite(outputTokens) && outputTokens > 0) {
+    totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
+  }
+
+  return {
+    ...state,
+    traceId: state.traceId || contribution.traceId,
+    attributes: mergedAttributes,
+    models,
+    totalCost,
+    nonBilledCost,
+    totalPromptTokenCount,
+    totalCompletionTokenCount,
+  };
+}
+
 // ─── Fold projection class ──────────────────────────────────────────
 
 /**
@@ -713,124 +793,34 @@ export class TraceAnalyticsFoldProjection
       return state;
     }
 
-    const mergedAttributes = { ...state.attributes };
-    const logCount = parseInt(
-      mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
-      10,
-    );
-    mergedAttributes["langwatch.reserved.log_record_count"] = String(
-      logCount + 1,
-    );
-
     // Run the canonical extractor registry against this log record — each
     // extractor lifts model / cost / tokens / cache / thread.id onto
     // canonical langwatch.* keys. Slim mirrors the trace-summary fold's
     // canonical lift so log-only emitters (Claude Code Path B, Codex Path
     // B) populate the slim columns even though no spans ever arrive.
-    const liftedAttrs = liftCanonicalAttributesFromLogRecord(event.data);
-    for (const [key, value] of Object.entries(liftedAttrs)) {
-      mergedAttributes[key] = value as string;
-    }
-
-    // Mirror the canonical lift onto slim's top-level columns. Each
-    // api_request event is its OWN turn — cost + tokens are additive
-    // across turns, models are deduped. Read from liftedAttrs (this
-    // event's contribution) NOT mergedAttributes, so cost doesn't
-    // double-count across replays.
-    let models = state.models;
-    let totalCost = state.totalCost;
-    let nonBilledCost = state.nonBilledCost;
-    let totalPromptTokenCount = state.totalPromptTokenCount;
-    let totalCompletionTokenCount = state.totalCompletionTokenCount;
-    const liftedModel = liftedAttrs["langwatch.model"];
-    if (typeof liftedModel === "string" && liftedModel.length > 0) {
-      models = mergeModelsMostRecentFirst(models, [liftedModel]);
-    }
-    const liftedCost = Number(liftedAttrs["langwatch.cost.usd"]);
-    if (Number.isFinite(liftedCost) && liftedCost > 0) {
-      totalCost = (totalCost ?? 0) + liftedCost;
-      const resAttr = event.data.resourceAttributes?.[NON_BILLABLE_ATTR];
-      if (resAttr === "true") {
-        nonBilledCost = (nonBilledCost ?? 0) + liftedCost;
-      }
-    }
-    const liftedIn = Number(liftedAttrs["langwatch.input_tokens"]);
-    if (Number.isFinite(liftedIn) && liftedIn > 0) {
-      totalPromptTokenCount = (totalPromptTokenCount ?? 0) + liftedIn;
-    }
-    const liftedOut = Number(liftedAttrs["langwatch.output_tokens"]);
-    if (Number.isFinite(liftedOut) && liftedOut > 0) {
-      totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + liftedOut;
-    }
-
-    return {
-      ...state,
-      traceId: state.traceId || event.data.traceId,
-      attributes: mergedAttributes,
-      models,
-      totalCost,
-      nonBilledCost,
-      totalPromptTokenCount,
-      totalCompletionTokenCount,
-    };
+    return applyLogContribution({
+      state,
+      contribution: {
+        traceId: event.data.traceId,
+        liftedAttributes: liftCanonicalAttributesFromLogRecord(event.data),
+        nonBillable:
+          event.data.resourceAttributes?.[NON_BILLABLE_ATTR] === "true",
+      },
+    });
   }
 
   handleTraceLogContributed(
     event: LogContributedEvent,
     state: TraceAnalyticsData,
   ): TraceAnalyticsData {
-    const mergedAttributes = { ...state.attributes };
-    const logCount = parseInt(
-      mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
-      10,
-    );
-    mergedAttributes["langwatch.reserved.log_record_count"] = String(
-      logCount + 1,
-    );
-    for (const [key, value] of Object.entries(event.data.liftedAttributes)) {
-      mergedAttributes[key] = String(value);
-    }
-
-    let models = state.models;
-    let totalCost = state.totalCost;
-    let nonBilledCost = state.nonBilledCost;
-    let totalPromptTokenCount = state.totalPromptTokenCount;
-    let totalCompletionTokenCount = state.totalCompletionTokenCount;
-    const model = event.data.liftedAttributes["langwatch.model"];
-    if (typeof model === "string" && model.length > 0) {
-      models = mergeModelsMostRecentFirst(models, [model]);
-    }
-    const cost = Number(event.data.liftedAttributes["langwatch.cost.usd"]);
-    if (Number.isFinite(cost) && cost > 0) {
-      totalCost = (totalCost ?? 0) + cost;
-      if (event.data.nonBillable) {
-        nonBilledCost = (nonBilledCost ?? 0) + cost;
-      }
-    }
-    const inputTokens = Number(
-      event.data.liftedAttributes["langwatch.input_tokens"],
-    );
-    if (Number.isFinite(inputTokens) && inputTokens > 0) {
-      totalPromptTokenCount = (totalPromptTokenCount ?? 0) + inputTokens;
-    }
-    const outputTokens = Number(
-      event.data.liftedAttributes["langwatch.output_tokens"],
-    );
-    if (Number.isFinite(outputTokens) && outputTokens > 0) {
-      totalCompletionTokenCount =
-        (totalCompletionTokenCount ?? 0) + outputTokens;
-    }
-
-    return {
-      ...state,
-      traceId: state.traceId || event.data.traceId,
-      attributes: mergedAttributes,
-      models,
-      totalCost,
-      nonBilledCost,
-      totalPromptTokenCount,
-      totalCompletionTokenCount,
-    };
+    return applyLogContribution({
+      state,
+      contribution: {
+        traceId: event.data.traceId,
+        liftedAttributes: event.data.liftedAttributes,
+        nonBillable: event.data.nonBillable,
+      },
+    });
   }
 
   handleTraceMetricDataPointCorrelated(

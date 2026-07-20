@@ -176,4 +176,35 @@ describe("MapProjectionExecutor.executeBatch", () => {
     );
     expect(store.append).not.toHaveBeenCalled();
   });
+
+  describe("given a batch whose contexts carry different tenantIds", () => {
+    describe("when the store exposes bulkAppend", () => {
+      it("throws the cross-tenant guard error without appending", async () => {
+        const executor = new MapProjectionExecutor();
+        const store = createMockAppendStore<{ aggregateId: string }>();
+        const bulkAppend = vi.fn(async () => undefined);
+        store.bulkAppend = bulkAppend;
+        const mapDef = createMockMapProjectionDefinition("mapper", {
+          store,
+          map: (event) => ({ aggregateId: String(event.aggregateId) }),
+        });
+        const tenantA = createTestTenantId("tenant-a");
+        const tenantB = createTestTenantId("tenant-b");
+        const events = [
+          createTestEvent("one", TEST_CONSTANTS.AGGREGATE_TYPE, tenantA),
+          createTestEvent("two", TEST_CONSTANTS.AGGREGATE_TYPE, tenantB),
+        ];
+        const contexts = events.map((event) => ({
+          aggregateId: String(event.aggregateId),
+          tenantId: event.tenantId,
+        }));
+
+        await expect(
+          executor.executeBatch(mapDef, events, contexts),
+        ).rejects.toThrow("Map projection batches cannot cross tenants");
+        expect(bulkAppend).not.toHaveBeenCalled();
+        expect(store.append).not.toHaveBeenCalled();
+      });
+    });
+  });
 });

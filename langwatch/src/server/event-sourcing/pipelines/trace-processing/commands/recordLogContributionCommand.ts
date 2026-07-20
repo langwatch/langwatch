@@ -53,7 +53,12 @@ export class RecordLogContributionCommand
         },
         metadata: {},
         occurredAt: data.occurredAt,
-        idempotencyKey: data.recordId,
+        // Tenant-scoped like every other trace command's. A RecordId is a
+        // content hash that already includes its tenant, so a collision is
+        // not reachable today — but nothing states that invariant at this
+        // layer, and a dedup key that silently depends on it would suppress
+        // another tenant's work the day it changes.
+        idempotencyKey: `${command.tenantId}:${data.recordId}`,
       }),
     ];
   }

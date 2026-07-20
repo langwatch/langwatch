@@ -58,10 +58,10 @@ describe("MetricDataPointClickHouseRepository", () => {
       (args: { table: string; values: unknown[] }) => Promise<void>
     >(async () => {});
     const client = { insert } as never;
-    const repository = new MetricDataPointClickHouseRepository(
-      async () => client,
-      async () => client,
-    );
+    const repository = new MetricDataPointClickHouseRepository({
+      resolveClient: async () => client,
+      resolveOrganizationClient: async () => client,
+    });
 
     await repository.ensureDataPoint({ point: dataPoint(), retentionDays: 49 });
 
@@ -111,10 +111,10 @@ describe("MetricDataPointClickHouseRepository", () => {
         (args: { table: string; values: unknown[] }) => Promise<void>
       >(async () => {});
       const client = { insert } as never;
-      const repository = new MetricDataPointClickHouseRepository(
-        async () => client,
-        async () => client,
-      );
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
       const points = [
         { ...dataPoint(), pointId: "a".repeat(64), timeUnixMs: 1 },
         { ...dataPoint(), pointId: "b".repeat(64), timeUnixMs: 2 },
@@ -137,10 +137,10 @@ describe("MetricDataPointClickHouseRepository", () => {
         (args: { table: string; values: unknown[] }) => Promise<void>
       >(async () => {});
       const client = { insert } as never;
-      const repository = new MetricDataPointClickHouseRepository(
-        async () => client,
-        async () => client,
-      );
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
       const base = dataPoint();
       const points = [
         { ...base, pointId: "a".repeat(64), timeUnixMs: 1_000 },
@@ -176,10 +176,10 @@ describe("MetricDataPointClickHouseRepository", () => {
     }));
     const projectResolver = vi.fn(async () => ({ query }) as never);
     const organizationResolver = vi.fn(async () => ({ query }) as never);
-    const repository = new MetricDataPointClickHouseRepository(
-      projectResolver,
-      organizationResolver,
-    );
+    const repository = new MetricDataPointClickHouseRepository({
+      resolveClient: projectResolver,
+      resolveOrganizationClient: organizationResolver,
+    });
 
     const result = await repository.queryUsageEstimates({
       organizationId: "organization-1",

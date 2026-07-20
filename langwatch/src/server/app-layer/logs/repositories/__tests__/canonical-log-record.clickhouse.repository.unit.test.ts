@@ -178,12 +178,12 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
       async () => ({ query }) as never,
     );
 
-    await repository.getMarkedClaudeCodeLogsByTrace(
-      "project_test",
-      "b".repeat(32),
-      1_700_000_000_000,
-      101,
-    );
+    await repository.getMarkedClaudeCodeLogsByTrace({
+      tenantId: "project_test",
+      traceId: "b".repeat(32),
+      occurredAtMs: 1_700_000_000_000,
+      limit: 101,
+    });
 
     const request = query.mock.calls[0]![0];
     expect(request.query).toContain("FROM log_records FINAL");

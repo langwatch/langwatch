@@ -66,6 +66,41 @@ function usablePredecessors({
   return predecessors;
 }
 
+/** Delta vs the coarsened predecessor, or null when the sequence reset/gapped. */
+function differenceHistogramPoint({
+  point,
+  index,
+  all,
+  bounds,
+}: {
+  point: CanonicalMetricDataPoint;
+  index: number;
+  all: CanonicalMetricDataPoint[];
+  bounds: number[];
+}): { counts: bigint[]; count: bigint; sum: number | null } | null {
+  const previous = previousPoint(all, index);
+  if (!previous) return null;
+  const usable =
+    !startsNewSequence(previous, point) && previous.metricKind === "histogram";
+  if (!usable) return null;
+  const previousCounts = coarsenExplicit({ point: previous, targetBounds: bounds });
+  const currentCounts = coarsenExplicit({ point, targetBounds: bounds });
+  const deltaCounts = currentCounts.map(
+    (value, i) => value - previousCounts[i]!,
+  );
+  if (deltaCounts.some((value) => value < 0n)) return null;
+  const deltaCount = bigint(point.count) - bigint(previous.count);
+  if (deltaCount < 0n) return null;
+  return {
+    counts: deltaCounts,
+    count: deltaCount,
+    sum:
+      previous.sum !== null && point.sum !== null
+        ? point.sum - previous.sum
+        : null,
+  };
+}
+
 export function buildHistogramRow({
   row,
   entries,
@@ -94,29 +129,14 @@ export function buildHistogramRow({
     let sum = point.sum;
 
     if (point.aggregationTemporality === "cumulative") {
-      const previous = previousPoint(all, index);
-      const starts = startsNewSequence(previous, point);
-      const previousCounts =
-        !starts && previous?.metricKind === "histogram"
-          ? coarsenExplicit({ point: previous, targetBounds: bounds })
-          : null;
-      const currentCounts = coarsenExplicit({ point, targetBounds: bounds });
-      const deltaCounts = previousCounts
-        ? currentCounts.map((value, i) => value - previousCounts[i]!)
-        : null;
-      const countsDecreased = deltaCounts?.some((value) => value < 0n);
-      const deltaCount = previous ? count - bigint(previous.count) : -1n;
-      const deltaSum =
-        previous && previous.sum !== null && sum !== null
-          ? sum - previous.sum
-          : null;
-      if (!deltaCounts || countsDecreased || deltaCount < 0n) {
-        resetOrGap({ row, previous, current: point });
+      const delta = differenceHistogramPoint({ point, index, all, bounds });
+      if (!delta) {
+        resetOrGap({ row, previous: previousPoint(all, index), current: point });
         usesWholePoint = true;
       } else {
-        coarsenedCounts = deltaCounts;
-        count = deltaCount;
-        sum = deltaSum;
+        coarsenedCounts = delta.counts;
+        count = delta.count;
+        sum = delta.sum;
       }
     }
 

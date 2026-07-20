@@ -59,6 +59,77 @@ function groupByTenant(
   return groups;
 }
 
+function toLogRecordRow({
+  record,
+  retentionDays,
+}: {
+  record: CanonicalLogRecord;
+  retentionDays: number;
+}) {
+  return {
+    TenantId: record.tenantId,
+    RecordId: record.recordId,
+    ResourceSchemaUrl: record.resourceSchemaUrl,
+    ResourceAttributesJson: record.resourceAttributesJson,
+    ResourceAttributesFlatJson: record.resourceAttributesFlatJson,
+    ResourceAttributeKeys: record.resourceAttributeKeys,
+    ResourceDroppedAttributesCount: record.resourceDroppedAttributesCount,
+    ScopeSchemaUrl: record.scopeSchemaUrl,
+    ScopeName: record.scopeName,
+    ScopeVersion: record.scopeVersion,
+    ScopeAttributesJson: record.scopeAttributesJson,
+    ScopeAttributeKeys: record.scopeAttributeKeys,
+    ScopeDroppedAttributesCount: record.scopeDroppedAttributesCount,
+    WireTraceId: record.wireTraceId,
+    WireSpanId: record.wireSpanId,
+    CorrelationTraceId: record.correlationTraceId,
+    CorrelationSpanId: record.correlationSpanId,
+    CorrelationSource: record.correlationSource,
+    TimeUnixNano: record.timeUnixNano,
+    ObservedTimeUnixNano: record.observedTimeUnixNano,
+    TimeUnixMs: new Date(record.timeUnixMs),
+    SeverityNumber: record.severityNumber,
+    SeverityText: record.severityText,
+    BodyType: record.bodyType,
+    BodyJson: record.bodyJson,
+    BodyText: record.bodyText,
+    AttributesJson: record.attributesJson,
+    AttributesFlatJson: record.attributesFlatJson,
+    AttributeKeys: record.attributeKeys,
+    DroppedAttributesCount: record.droppedAttributesCount,
+    Flags: record.flags,
+    EventName: record.eventName,
+    ProviderKind: record.providerKind,
+    ProviderEventKind: record.providerEventKind,
+    ProviderEventSequence: record.providerEventSequence,
+    ProviderSessionId: record.providerSessionId,
+    ProviderConversationId: record.providerConversationId,
+    ProviderPromptId: record.providerPromptId,
+    PiiRedactionLevel: record.piiRedactionLevel,
+    CanonicalPayload: record.canonicalPayload,
+    OccurredAt: new Date(record.occurredAt),
+    AcceptedAt: new Date(record.acceptedAt),
+    DedupVersion: dedupVersion(record.acceptedAt),
+    _retention_days: retentionDaysFor(record, retentionDays),
+    _size_bytes: record.canonicalSizeBytes,
+  };
+}
+
+function toUsageEstimateRow(record: CanonicalLogRecord) {
+  return {
+    OrganizationId: record.organizationId,
+    TenantId: record.tenantId,
+    RecordId: record.recordId,
+    ProviderKind: record.providerKind,
+    AcceptedAt: new Date(record.acceptedAt),
+    AcceptedHour: new Date(
+      Math.floor(record.acceptedAt / 3_600_000) * 3_600_000,
+    ),
+    CanonicalSourceBytes: record.canonicalSizeBytes,
+    DedupVersion: dedupVersion(record.acceptedAt),
+  };
+}
+
 export class CanonicalLogRecordClickHouseRepository
   implements CanonicalLogRecordRepository
 {
@@ -88,71 +159,15 @@ export class CanonicalLogRecordClickHouseRepository
       try {
         await client.insert({
           table: "log_records",
-          values: tenantRecords.map((record) => ({
-            TenantId: record.tenantId,
-            RecordId: record.recordId,
-            ResourceSchemaUrl: record.resourceSchemaUrl,
-            ResourceAttributesJson: record.resourceAttributesJson,
-            ResourceAttributesFlatJson: record.resourceAttributesFlatJson,
-            ResourceAttributeKeys: record.resourceAttributeKeys,
-            ResourceDroppedAttributesCount:
-              record.resourceDroppedAttributesCount,
-            ScopeSchemaUrl: record.scopeSchemaUrl,
-            ScopeName: record.scopeName,
-            ScopeVersion: record.scopeVersion,
-            ScopeAttributesJson: record.scopeAttributesJson,
-            ScopeAttributeKeys: record.scopeAttributeKeys,
-            ScopeDroppedAttributesCount: record.scopeDroppedAttributesCount,
-            WireTraceId: record.wireTraceId,
-            WireSpanId: record.wireSpanId,
-            CorrelationTraceId: record.correlationTraceId,
-            CorrelationSpanId: record.correlationSpanId,
-            CorrelationSource: record.correlationSource,
-            TimeUnixNano: record.timeUnixNano,
-            ObservedTimeUnixNano: record.observedTimeUnixNano,
-            TimeUnixMs: new Date(record.timeUnixMs),
-            SeverityNumber: record.severityNumber,
-            SeverityText: record.severityText,
-            BodyType: record.bodyType,
-            BodyJson: record.bodyJson,
-            BodyText: record.bodyText,
-            AttributesJson: record.attributesJson,
-            AttributesFlatJson: record.attributesFlatJson,
-            AttributeKeys: record.attributeKeys,
-            DroppedAttributesCount: record.droppedAttributesCount,
-            Flags: record.flags,
-            EventName: record.eventName,
-            ProviderKind: record.providerKind,
-            ProviderEventKind: record.providerEventKind,
-            ProviderEventSequence: record.providerEventSequence,
-            ProviderSessionId: record.providerSessionId,
-            ProviderConversationId: record.providerConversationId,
-            ProviderPromptId: record.providerPromptId,
-            PiiRedactionLevel: record.piiRedactionLevel,
-            CanonicalPayload: record.canonicalPayload,
-            OccurredAt: new Date(record.occurredAt),
-            AcceptedAt: new Date(record.acceptedAt),
-            DedupVersion: dedupVersion(record.acceptedAt),
-            _retention_days: retentionDaysFor(record, retentionDays),
-            _size_bytes: record.canonicalSizeBytes,
-          })),
+          values: tenantRecords.map((record) =>
+            toLogRecordRow({ record, retentionDays }),
+          ),
           format: "JSONEachRow",
           clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
         });
         await client.insert({
           table: "log_usage_estimates",
-          values: tenantRecords.map((record) => ({
-            OrganizationId: record.organizationId,
-            TenantId: record.tenantId,
-            RecordId: record.recordId,
-            ProviderKind: record.providerKind,
-            AcceptedAt: new Date(record.acceptedAt),
-            AcceptedHour: new Date(
-              Math.floor(record.acceptedAt / 3_600_000) * 3_600_000,
-            ),
-            CanonicalSourceBytes: record.canonicalSizeBytes,
-            DedupVersion: dedupVersion(record.acceptedAt),
-          })),
+          values: tenantRecords.map((record) => toUsageEstimateRow(record)),
           format: "JSONEachRow",
           clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
         });
@@ -183,12 +198,17 @@ export class CanonicalLogRecordClickHouseRepository
     };
   }
 
-  async getMarkedClaudeCodeLogsByTrace(
-    tenantId: string,
-    traceId: string,
-    occurredAtMs?: number,
-    limit?: number,
-  ): Promise<StoredLogRecordRow[]> {
+  async getMarkedClaudeCodeLogsByTrace({
+    tenantId,
+    traceId,
+    occurredAtMs,
+    limit,
+  }: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]> {
     EventUtils.validateTenantId(
       { tenantId },
       "CanonicalLogRecordClickHouseRepository.getMarkedClaudeCodeLogsByTrace",
@@ -248,11 +268,15 @@ export class CanonicalLogRecordClickHouseRepository
     }));
   }
 
-  async countMarkedClaudeCodeLogsByTrace(
-    tenantId: string,
-    traceId: string,
-    occurredAtMs?: number,
-  ): Promise<number> {
+  async countMarkedClaudeCodeLogsByTrace({
+    tenantId,
+    traceId,
+    occurredAtMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+  }): Promise<number> {
     EventUtils.validateTenantId(
       { tenantId },
       "CanonicalLogRecordClickHouseRepository.countMarkedClaudeCodeLogsByTrace",

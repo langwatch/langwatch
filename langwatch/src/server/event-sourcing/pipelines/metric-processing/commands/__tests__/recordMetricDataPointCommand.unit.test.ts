@@ -9,7 +9,7 @@ import {
 import type { RecordMetricDataPointCommandData } from "../../schemas/commands";
 
 describe("RecordMetricDataPointCommand", () => {
-  it("uses PointId for the aggregate and idempotency key", async () => {
+  it("uses PointId for the aggregate and a tenant-prefixed idempotency key", async () => {
     const pointId = "a".repeat(64);
     const data = {
       tenantId: "project-1",
@@ -33,7 +33,7 @@ describe("RecordMetricDataPointCommand", () => {
       tenantId: "project-1",
       type: METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
       occurredAt: 1_700_000_000_000,
-      idempotencyKey: pointId,
+      idempotencyKey: `project-1:${pointId}`,
       data,
     });
   });

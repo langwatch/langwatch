@@ -13,8 +13,10 @@ export function buildGaugeRow({
   entries: BucketEntry[];
 }): void {
   for (const { point } of entries) {
-    addStats(row, numberValue(point));
-    row.gaugeLast = numberValue(point);
+    const value = numberValue(point);
+    addStats(row, value);
+    // A valueless point must not clobber the last observed gauge value.
+    if (value !== null) row.gaugeLast = value;
   }
 }
 

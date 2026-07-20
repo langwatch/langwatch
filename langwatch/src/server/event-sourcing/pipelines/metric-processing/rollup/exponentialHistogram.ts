@@ -8,6 +8,7 @@ import {
   denseBuckets,
   downscaleBuckets,
   mergeMap,
+  MAX_DENSE_BUCKET_SPAN,
   subtractMaps,
   type BucketMap,
 } from "./exponentialBuckets";
@@ -21,6 +22,150 @@ interface NormalizedPoint {
   zeroCount: bigint;
   count: bigint;
   sum: number | null;
+}
+
+/** Matches validate.ts's floor for exponential histogram scales. */
+const MIN_EXPONENTIAL_SCALE = -10;
+
+/** The common scale, zero threshold, and per-point buckets rescaled to both. */
+interface CommonLayout {
+  scale: number;
+  threshold: number;
+  downscaled: Map<string, { positive: BucketMap; negative: BucketMap }>;
+}
+
+/** Worst-case dense index span (per sign) the contributors merge to at `scale`. */
+function mergedIndexSpan({
+  points,
+  scale,
+}: {
+  points: CanonicalMetricDataPoint[];
+  scale: number;
+}): number {
+  let span = 0;
+  for (const side of ["positive", "negative"] as const) {
+    let low = Number.POSITIVE_INFINITY;
+    let high = Number.NEGATIVE_INFINITY;
+    for (const point of points) {
+      const counts =
+        side === "positive"
+          ? point.positiveBucketCounts
+          : point.negativeBucketCounts;
+      if (counts.length === 0) continue;
+      const offset =
+        (side === "positive" ? point.positiveOffset : point.negativeOffset) ??
+        0;
+      const divisor = 2 ** Math.max(0, (point.exponentialScale ?? 0) - scale);
+      low = Math.min(low, Math.floor(offset / divisor));
+      high = Math.max(high, Math.floor((offset + counts.length - 1) / divisor));
+    }
+    if (high >= low) span = Math.max(span, high - low + 1);
+  }
+  return span;
+}
+
+function selectCommonLayout(
+  contributors: Map<string, CanonicalMetricDataPoint>,
+): CommonLayout {
+  const points = [...contributors.values()];
+  let scale = Math.min(...points.map((point) => point.exponentialScale ?? 0));
+  // Bucket offsets are sender-controlled int32s, so two tiny points can merge
+  // into a span covering the whole int32 range. Keep halving the resolution
+  // until the span fits the densification cap; denseBuckets clamps whatever
+  // even the scale floor cannot absorb.
+  while (
+    scale > MIN_EXPONENTIAL_SCALE &&
+    mergedIndexSpan({ points, scale }) > MAX_DENSE_BUCKET_SPAN
+  ) {
+    scale--;
+  }
+  const downscaled = new Map<
+    string,
+    { positive: BucketMap; negative: BucketMap }
+  >();
+  for (const [pointId, point] of contributors) {
+    downscaled.set(pointId, {
+      positive: downscaleBuckets({
+        offset: point.positiveOffset,
+        counts: point.positiveBucketCounts,
+        fromScale: point.exponentialScale ?? 0,
+        toScale: scale,
+      }),
+      negative: downscaleBuckets({
+        offset: point.negativeOffset,
+        counts: point.negativeBucketCounts,
+        fromScale: point.exponentialScale ?? 0,
+        toScale: scale,
+      }),
+    });
+  }
+  const threshold = commonZeroThreshold({
+    thresholds: points.map((point) => point.exponentialZeroThreshold),
+    bucketMaps: [...downscaled.values()].flatMap(({ positive, negative }) => [
+      positive,
+      negative,
+    ]),
+    scale,
+  });
+  return { scale, threshold, downscaled };
+}
+
+function normalizePoint({
+  point,
+  layout,
+}: {
+  point: CanonicalMetricDataPoint;
+  layout: CommonLayout;
+}): NormalizedPoint {
+  const buckets = layout.downscaled.get(point.pointId)!;
+  const positive = absorbZeroBuckets({
+    buckets: buckets.positive,
+    threshold: layout.threshold,
+    scale: layout.scale,
+  });
+  const negative = absorbZeroBuckets({
+    buckets: buckets.negative,
+    threshold: layout.threshold,
+    scale: layout.scale,
+  });
+  return {
+    positive: positive.buckets,
+    negative: negative.buckets,
+    zeroCount: bigint(point.zeroCount) + positive.absorbed + negative.absorbed,
+    count: bigint(point.count),
+    sum: point.sum,
+  };
+}
+
+/** Delta between two normalized points, or null when the sequence reset. */
+function differenceExponentialPoint({
+  current,
+  previous,
+}: {
+  current: NormalizedPoint;
+  previous: NormalizedPoint;
+}): NormalizedPoint | null {
+  const positive = subtractMaps({
+    current: current.positive,
+    previous: previous.positive,
+  });
+  const negative = subtractMaps({
+    current: current.negative,
+    previous: previous.negative,
+  });
+  const zeroCount = current.zeroCount - previous.zeroCount;
+  const count = current.count - previous.count;
+  if (!positive || !negative || zeroCount < 0n || count < 0n) return null;
+  return {
+    positive,
+    negative,
+    zeroCount,
+    count,
+    sum:
+      previous.sum !== null && current.sum !== null
+        ? current.sum - previous.sum
+        : null,
+  };
 }
 
 function usablePredecessor({
@@ -40,6 +185,27 @@ function usablePredecessor({
   return startsNewSequence(previous, point) ? undefined : previous;
 }
 
+/** Every point with a say in the layout: the bucket's own plus predecessors. */
+function collectContributors({
+  entries,
+  all,
+}: {
+  entries: BucketEntry[];
+  all: CanonicalMetricDataPoint[];
+}): Map<string, CanonicalMetricDataPoint> {
+  const predecessors = new Map<string, CanonicalMetricDataPoint>();
+  for (const { point, index } of entries) {
+    const previous = usablePredecessor({ point, all, index });
+    if (previous) predecessors.set(previous.pointId, previous);
+  }
+  return new Map<string, CanonicalMetricDataPoint>([
+    ...entries.map(
+      ({ point }) => [point.pointId, point] as [string, CanonicalMetricDataPoint],
+    ),
+    ...predecessors,
+  ]);
+}
+
 /**
  * Rolls up exponential histograms onto one scale and one zero threshold. Both
  * are chosen across every contributing point — including the predecessors that
@@ -55,69 +221,7 @@ export function buildExponentialHistogramRow({
   entries: BucketEntry[];
   all: CanonicalMetricDataPoint[];
 }): void {
-  const predecessors = new Map<string, CanonicalMetricDataPoint>();
-  for (const { point, index } of entries) {
-    const previous = usablePredecessor({ point, all, index });
-    if (previous) predecessors.set(previous.pointId, previous);
-  }
-  const contributors = new Map<string, CanonicalMetricDataPoint>([
-    ...entries.map(
-      ({ point }) => [point.pointId, point] as [string, CanonicalMetricDataPoint],
-    ),
-    ...predecessors,
-  ]);
-
-  const scale = Math.min(
-    ...[...contributors.values()].map((point) => point.exponentialScale ?? 0),
-  );
-  const downscaled = new Map<string, { positive: BucketMap; negative: BucketMap }>();
-  for (const [pointId, point] of contributors) {
-    downscaled.set(pointId, {
-      positive: downscaleBuckets({
-        offset: point.positiveOffset,
-        counts: point.positiveBucketCounts,
-        fromScale: point.exponentialScale ?? 0,
-        toScale: scale,
-      }),
-      negative: downscaleBuckets({
-        offset: point.negativeOffset,
-        counts: point.negativeBucketCounts,
-        fromScale: point.exponentialScale ?? 0,
-        toScale: scale,
-      }),
-    });
-  }
-  const threshold = commonZeroThreshold({
-    thresholds: [...contributors.values()].map(
-      (point) => point.exponentialZeroThreshold,
-    ),
-    bucketMaps: [...downscaled.values()].flatMap(({ positive, negative }) => [
-      positive,
-      negative,
-    ]),
-    scale,
-  });
-
-  const normalize = (point: CanonicalMetricDataPoint): NormalizedPoint => {
-    const buckets = downscaled.get(point.pointId)!;
-    const positive = absorbZeroBuckets({
-      buckets: buckets.positive,
-      threshold,
-      scale,
-    });
-    const negative = absorbZeroBuckets({
-      buckets: buckets.negative,
-      threshold,
-      scale,
-    });
-    return {
-      positive: positive.buckets,
-      negative: negative.buckets,
-      zeroCount: bigint(point.zeroCount) + positive.absorbed + negative.absorbed,
-      count: bigint(point.count),
-      sum: point.sum,
-    };
-  };
+  const layout = selectCommonLayout(collectContributors({ entries, all }));
 
   const positive: BucketMap = new Map();
   const negative: BucketMap = new Map();
@@ -127,37 +231,24 @@ export function buildExponentialHistogramRow({
   let hasSum = false;
 
   for (const { point, index } of entries) {
-    let current = normalize(point);
+    let current = normalizePoint({ point, layout });
     let usesWholePoint = point.aggregationTemporality !== "cumulative";
 
     if (point.aggregationTemporality === "cumulative") {
       const previousRaw = usablePredecessor({ point, all, index });
-      // Both sides now share a threshold, so a mid-series threshold change no
+      // Both sides share a threshold, so a mid-series threshold change no
       // longer forces the whole point to be counted as a reset.
-      const previous = previousRaw ? normalize(previousRaw) : null;
-      const positiveDelta = previous
-        ? subtractMaps({ current: current.positive, previous: previous.positive })
+      const delta = previousRaw
+        ? differenceExponentialPoint({
+            current,
+            previous: normalizePoint({ point: previousRaw, layout }),
+          })
         : null;
-      const negativeDelta = previous
-        ? subtractMaps({ current: current.negative, previous: previous.negative })
-        : null;
-      const zeroDelta = previous ? current.zeroCount - previous.zeroCount : -1n;
-      const countDelta = previous ? current.count - previous.count : -1n;
-      const sumDelta =
-        previous && previous.sum !== null && current.sum !== null
-          ? current.sum - previous.sum
-          : null;
-      if (!positiveDelta || !negativeDelta || zeroDelta < 0n || countDelta < 0n) {
+      if (!delta) {
         resetOrGap({ row, previous: previousPoint(all, index), current: point });
         usesWholePoint = true;
       } else {
-        current = {
-          positive: positiveDelta,
-          negative: negativeDelta,
-          zeroCount: zeroDelta,
-          count: countDelta,
-          sum: sumDelta,
-        };
+        current = delta;
       }
     }
 
@@ -174,8 +265,8 @@ export function buildExponentialHistogramRow({
 
   const densePositive = denseBuckets(positive);
   const denseNegative = denseBuckets(negative);
-  row.exponentialScale = scale;
-  row.exponentialZeroThreshold = threshold;
+  row.exponentialScale = layout.scale;
+  row.exponentialZeroThreshold = layout.threshold;
   row.zeroCount = zeroCount.toString();
   row.positiveOffset = densePositive.offset;
   row.positiveBucketCounts = densePositive.counts;

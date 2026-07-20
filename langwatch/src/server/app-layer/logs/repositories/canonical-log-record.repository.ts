@@ -10,17 +10,17 @@ export interface CanonicalLogRecordRepository {
     records: CanonicalLogRecord[],
     retentionDays?: number,
   ): Promise<void>;
-  getMarkedClaudeCodeLogsByTrace(
-    tenantId: string,
-    traceId: string,
-    occurredAtMs?: number,
-    limit?: number,
-  ): Promise<StoredLogRecordRow[]>;
-  countMarkedClaudeCodeLogsByTrace(
-    tenantId: string,
-    traceId: string,
-    occurredAtMs?: number,
-  ): Promise<number>;
+  getMarkedClaudeCodeLogsByTrace(params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]>;
+  countMarkedClaudeCodeLogsByTrace(params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+  }): Promise<number>;
 }
 
 export class NullCanonicalLogRecordRepository
@@ -40,20 +40,20 @@ export class NullCanonicalLogRecordRepository
     return;
   }
 
-  async getMarkedClaudeCodeLogsByTrace(
-    _tenantId: string,
-    _traceId: string,
-    _occurredAtMs?: number,
-    _limit?: number,
-  ): Promise<StoredLogRecordRow[]> {
+  async getMarkedClaudeCodeLogsByTrace(_params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]> {
     return [];
   }
 
-  async countMarkedClaudeCodeLogsByTrace(
-    _tenantId: string,
-    _traceId: string,
-    _occurredAtMs?: number,
-  ): Promise<number> {
+  async countMarkedClaudeCodeLogsByTrace(_params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+  }): Promise<number> {
     return 0;
   }
 }

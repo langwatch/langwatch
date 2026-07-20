@@ -201,12 +201,15 @@ function mergeClaudeLogRows(
 ): StoredLogRecordRow[] {
   const deduped = new Map<string, StoredLogRecordRow>();
   for (const row of rows) {
+    // Legacy rows preserve OTLP insertion order while canonical rows are
+    // key-sorted (stableStringify), so sort keys before serialising or the
+    // same record can produce two different keys and slip past dedup.
     const key = [
       row.traceId,
       row.spanId,
       row.timeUnixMs,
       row.scopeName,
-      JSON.stringify(row.attributes),
+      JSON.stringify(Object.fromEntries(Object.entries(row.attributes).sort())),
     ].join("\0");
     deduped.set(key, row);
   }
@@ -794,10 +797,7 @@ export class PipelineRegistry {
       ) => {
         const [canonical, legacy] = await Promise.all([
           this.deps.repositories.canonicalLogStorage.getMarkedClaudeCodeLogsByTrace(
-            tenantId,
-            traceId,
-            occurredAtMs,
-            limit,
+            { tenantId, traceId, occurredAtMs, limit },
           ),
           this.deps.repositories.logRecordStorage.getMarkedClaudeCodeLogsByTrace(
             tenantId,
@@ -811,9 +811,7 @@ export class PipelineRegistry {
       countMarkedClaudeCodeLogs: async (tenantId, traceId, occurredAtMs) => {
         const [canonical, legacy] = await Promise.all([
           this.deps.repositories.canonicalLogStorage.countMarkedClaudeCodeLogsByTrace(
-            tenantId,
-            traceId,
-            occurredAtMs,
+            { tenantId, traceId, occurredAtMs },
           ),
           this.deps.repositories.logRecordStorage.countMarkedClaudeCodeLogsByTrace(
             tenantId,

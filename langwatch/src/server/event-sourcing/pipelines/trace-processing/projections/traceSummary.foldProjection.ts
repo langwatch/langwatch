@@ -244,6 +244,144 @@ export function applySpanToSummary({
   };
 }
 
+/**
+ * A single log record's normalized contribution to the trace summary fold.
+ * Both log-path events fold identically once normalized to this shape:
+ * `log_record_received` builds it from the raw record (IO extraction +
+ * canonical lift + resource-level non-billable flag), `log_contributed`
+ * carries the already-lifted fields on the event itself.
+ */
+interface LogContribution {
+  traceId: string;
+  input: string | null;
+  output: string | null;
+  timeUnixMs: number;
+  liftedAttributes: Record<string, unknown>;
+  nonBillable: boolean;
+}
+
+/**
+ * Fold one log contribution into the summary: bump the reserved log
+ * count, apply the input/output override semantics, merge the lifted
+ * canonical langwatch.* attributes, and mirror them onto the top-level
+ * TraceSummary columns the v2 drawer + /traces list read directly
+ * (Models / TotalCost / TotalPromptTokenCount /
+ * TotalCompletionTokenCount). Without this mirror a Path B log-only
+ * trace ends up with the right strings on state.attributes but
+ * trace.totalCost still NULL, so the drawer chip and the cost column
+ * on /traces both render empty even though the data is sitting in CH.
+ *
+ * Each api_request event is its OWN turn. Cost + tokens are additive
+ * across turns; models are a deduped set. Reading from
+ * contribution.liftedAttributes (this event's contribution) rather
+ * than mergedAttributes (the cumulative latest snapshot) is critical
+ * for cost so we don't double-count across replays.
+ */
+function applyLogContribution({
+  state,
+  contribution,
+}: {
+  state: TraceSummaryData;
+  contribution: LogContribution;
+}): TraceSummaryData {
+  const mergedAttributes = { ...state.attributes };
+  const logCount = parseInt(
+    mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
+    10,
+  );
+  mergedAttributes["langwatch.reserved.log_record_count"] = String(
+    logCount + 1,
+  );
+
+  let computedInput = state.computedInput;
+  let computedOutput = state.computedOutput;
+  let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
+  const currentOutputSource =
+    state.attributes["langwatch.reserved.output_source"] ??
+    OUTPUT_SOURCE.INFERRED;
+  const currentInputIsFallback =
+    state.attributes["langwatch.reserved.input_is_fallback"] === "true";
+  const currentOutputIsFallback =
+    state.attributes["langwatch.reserved.output_is_fallback"] === "true";
+
+  if (
+    contribution.input !== null &&
+    (computedInput === null || currentInputIsFallback)
+  ) {
+    computedInput = contribution.input;
+    delete mergedAttributes["langwatch.reserved.input_is_fallback"];
+  }
+
+  if (contribution.output !== null) {
+    const shouldReplace =
+      currentOutputIsFallback ||
+      shouldOverrideOutput({
+        isRoot: false,
+        outputFromRoot: state.outputFromRootSpan,
+        isExplicit: false,
+        currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
+        endTime: contribution.timeUnixMs,
+        currentEndTime: outputSpanEndTimeMs,
+      });
+    if (shouldReplace) {
+      computedOutput = contribution.output;
+      outputSpanEndTimeMs = contribution.timeUnixMs;
+      mergedAttributes["langwatch.reserved.output_source"] =
+        OUTPUT_SOURCE.INFERRED;
+      delete mergedAttributes["langwatch.reserved.output_is_fallback"];
+    }
+  }
+
+  // The lifts are merged into mergedAttributes here so the reserved +
+  // log_count keys set above remain intact.
+  for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
+    mergedAttributes[key] = String(value);
+  }
+
+  let models = state.models;
+  let totalCost = state.totalCost;
+  let nonBilledCost = state.nonBilledCost;
+  let totalPromptTokenCount = state.totalPromptTokenCount;
+  let totalCompletionTokenCount = state.totalCompletionTokenCount;
+  const model = contribution.liftedAttributes["langwatch.model"];
+  if (typeof model === "string" && model.length > 0) {
+    models = mergeModelsMostRecentFirst(models, [model]);
+  }
+  const cost = Number(contribution.liftedAttributes["langwatch.cost.usd"]);
+  if (Number.isFinite(cost) && cost > 0) {
+    totalCost = (totalCost ?? 0) + cost;
+    if (contribution.nonBillable) {
+      nonBilledCost = (nonBilledCost ?? 0) + cost;
+    }
+  }
+  const inputTokens = Number(
+    contribution.liftedAttributes["langwatch.input_tokens"],
+  );
+  if (Number.isFinite(inputTokens) && inputTokens > 0) {
+    totalPromptTokenCount = (totalPromptTokenCount ?? 0) + inputTokens;
+  }
+  const outputTokens = Number(
+    contribution.liftedAttributes["langwatch.output_tokens"],
+  );
+  if (Number.isFinite(outputTokens) && outputTokens > 0) {
+    totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
+  }
+
+  return {
+    ...state,
+    traceId: state.traceId || contribution.traceId,
+    computedInput,
+    computedOutput,
+    outputSpanEndTimeMs,
+    attributes: mergedAttributes,
+    models,
+    totalCost,
+    nonBilledCost,
+    totalPromptTokenCount,
+    totalCompletionTokenCount,
+  };
+}
+
 // ─── Fold projection class ──────────────────────────────────────────
 
 const traceSummaryEvents = [
@@ -434,225 +572,48 @@ export class TraceSummaryFoldProjection
       return state;
     }
 
-    const mergedAttributes = { ...state.attributes };
-    const logCount = parseInt(
-      mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
-      10,
-    );
-    mergedAttributes["langwatch.reserved.log_record_count"] = String(
-      logCount + 1,
-    );
-
-    let computedInput = state.computedInput;
-    let computedOutput = state.computedOutput;
-    let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
-    const currentOutputSource =
-      state.attributes["langwatch.reserved.output_source"] ??
-      OUTPUT_SOURCE.INFERRED;
-    const currentInputIsFallback =
-      state.attributes["langwatch.reserved.input_is_fallback"] === "true";
-    const currentOutputIsFallback =
-      state.attributes["langwatch.reserved.output_is_fallback"] === "true";
-
     const logIO = extractIOFromLogRecord(event.data);
-
-    if (
-      logIO.input !== null &&
-      (computedInput === null || currentInputIsFallback)
-    ) {
-      computedInput = logIO.input;
-      delete mergedAttributes["langwatch.reserved.input_is_fallback"];
-    }
-
-    if (logIO.output !== null) {
-      const shouldOverride =
-        currentOutputIsFallback ||
-        shouldOverrideOutput({
-          isRoot: false,
-          outputFromRoot: state.outputFromRootSpan,
-          isExplicit: false,
-          currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
-          endTime: event.data.timeUnixMs,
-          currentEndTime: outputSpanEndTimeMs,
-        });
-      if (shouldOverride) {
-        computedOutput = logIO.output;
-        outputSpanEndTimeMs = event.data.timeUnixMs;
-        mergedAttributes["langwatch.reserved.output_source"] =
-          OUTPUT_SOURCE.INFERRED;
-        delete mergedAttributes["langwatch.reserved.output_is_fallback"];
-      }
-    }
 
     // Run the canonical extractor registry against this log record.
     // Each extractor (ClaudeCode, Codex, GenAI, SpringAI) claims its
     // own scope/event-name surface and lifts model / cost / tokens /
     // cache / thread.id onto canonical langwatch.* keys. Adding a new
     // platform tool is a one-line addition to the registry plus a new
-    // extractor class under canonicalisation/extractors/. The lifts
-    // are merged into mergedAttributes here so reserved + log_count
-    // keys set above remain intact.
-    const liftedAttrs = liftCanonicalAttributesFromLogRecord(event.data);
-    for (const [key, value] of Object.entries(liftedAttrs)) {
-      mergedAttributes[key] = value as string;
-    }
+    // extractor class under canonicalisation/extractors/.
+    const liftedAttributes = liftCanonicalAttributesFromLogRecord(event.data);
 
-    // Mirror the canonical langwatch.* attrs lifted from this log
-    // record onto the top-level TraceSummary columns the v2 drawer +
-    // /traces list read directly (Models / TotalCost /
-    // TotalPromptTokenCount / TotalCompletionTokenCount). Without this
-    // mirror a Path B log-only trace ends up with the right strings on
-    // state.attributes but trace.totalCost still NULL, so the drawer
-    // chip and the cost column on /traces both render empty even
-    // though the data is sitting in CH.
-    //
-    // Each api_request event is its OWN turn. Cost + tokens are
-    // additive across turns; models are a deduped set. Reading from
-    // liftedAttrs (this event's contribution) rather than
-    // mergedAttributes (the cumulative latest snapshot) is critical
-    // for cost so we don't double-count across replays.
-    let models = state.models;
-    let totalCost = state.totalCost;
-    let nonBilledCost = state.nonBilledCost;
-    let totalPromptTokenCount = state.totalPromptTokenCount;
-    let totalCompletionTokenCount = state.totalCompletionTokenCount;
-    const liftedModel = liftedAttrs["langwatch.model"];
-    if (typeof liftedModel === "string" && liftedModel.length > 0) {
-      models = mergeModelsMostRecentFirst(models, [liftedModel]);
-    }
-    const liftedCost = Number(liftedAttrs["langwatch.cost.usd"]);
-    if (Number.isFinite(liftedCost) && liftedCost > 0) {
-      totalCost = (totalCost ?? 0) + liftedCost;
-      // A log-only emitter has no per-span markers; the receiver stamps the
-      // bundled flag on the log record's resource, so classify the whole
-      // increment by that.
-      const resAttr = event.data.resourceAttributes?.[NON_BILLABLE_ATTR];
-      if (resAttr === "true") {
-        nonBilledCost = (nonBilledCost ?? 0) + liftedCost;
-      }
-    }
-    const liftedIn = Number(liftedAttrs["langwatch.input_tokens"]);
-    if (Number.isFinite(liftedIn) && liftedIn > 0) {
-      totalPromptTokenCount = (totalPromptTokenCount ?? 0) + liftedIn;
-    }
-    const liftedOut = Number(liftedAttrs["langwatch.output_tokens"]);
-    if (Number.isFinite(liftedOut) && liftedOut > 0) {
-      totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + liftedOut;
-    }
-
-    return {
-      ...state,
-      traceId: state.traceId || event.data.traceId,
-      computedInput,
-      computedOutput,
-      outputSpanEndTimeMs,
-      attributes: mergedAttributes,
-      models,
-      totalCost,
-      nonBilledCost,
-      totalPromptTokenCount,
-      totalCompletionTokenCount,
-    };
+    return applyLogContribution({
+      state,
+      contribution: {
+        traceId: event.data.traceId,
+        input: logIO.input,
+        output: logIO.output,
+        timeUnixMs: event.data.timeUnixMs,
+        liftedAttributes,
+        // A log-only emitter has no per-span markers; the receiver stamps the
+        // bundled flag on the log record's resource, so classify the whole
+        // increment by that.
+        nonBillable:
+          event.data.resourceAttributes?.[NON_BILLABLE_ATTR] === "true",
+      },
+    });
   }
 
   handleTraceLogContributed(
     event: LogContributedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
-    const mergedAttributes = { ...state.attributes };
-    const logCount = parseInt(
-      mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
-      10,
-    );
-    mergedAttributes["langwatch.reserved.log_record_count"] = String(
-      logCount + 1,
-    );
-
-    let computedInput = state.computedInput;
-    let computedOutput = state.computedOutput;
-    let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
-    const currentOutputSource =
-      state.attributes["langwatch.reserved.output_source"] ??
-      OUTPUT_SOURCE.INFERRED;
-    const currentInputIsFallback =
-      state.attributes["langwatch.reserved.input_is_fallback"] === "true";
-    const currentOutputIsFallback =
-      state.attributes["langwatch.reserved.output_is_fallback"] === "true";
-
-    if (
-      event.data.input !== null &&
-      (computedInput === null || currentInputIsFallback)
-    ) {
-      computedInput = event.data.input;
-      delete mergedAttributes["langwatch.reserved.input_is_fallback"];
-    }
-    if (event.data.output !== null) {
-      const shouldReplace =
-        currentOutputIsFallback ||
-        shouldOverrideOutput({
-          isRoot: false,
-          outputFromRoot: state.outputFromRootSpan,
-          isExplicit: false,
-          currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
-          endTime: event.data.timeUnixMs,
-          currentEndTime: outputSpanEndTimeMs,
-        });
-      if (shouldReplace) {
-        computedOutput = event.data.output;
-        outputSpanEndTimeMs = event.data.timeUnixMs;
-        mergedAttributes["langwatch.reserved.output_source"] =
-          OUTPUT_SOURCE.INFERRED;
-        delete mergedAttributes["langwatch.reserved.output_is_fallback"];
-      }
-    }
-
-    for (const [key, value] of Object.entries(event.data.liftedAttributes)) {
-      mergedAttributes[key] = String(value);
-    }
-
-    let models = state.models;
-    let totalCost = state.totalCost;
-    let nonBilledCost = state.nonBilledCost;
-    let totalPromptTokenCount = state.totalPromptTokenCount;
-    let totalCompletionTokenCount = state.totalCompletionTokenCount;
-    const model = event.data.liftedAttributes["langwatch.model"];
-    if (typeof model === "string" && model.length > 0) {
-      models = mergeModelsMostRecentFirst(models, [model]);
-    }
-    const cost = Number(event.data.liftedAttributes["langwatch.cost.usd"]);
-    if (Number.isFinite(cost) && cost > 0) {
-      totalCost = (totalCost ?? 0) + cost;
-      if (event.data.nonBillable) {
-        nonBilledCost = (nonBilledCost ?? 0) + cost;
-      }
-    }
-    const inputTokens = Number(
-      event.data.liftedAttributes["langwatch.input_tokens"],
-    );
-    if (Number.isFinite(inputTokens) && inputTokens > 0) {
-      totalPromptTokenCount = (totalPromptTokenCount ?? 0) + inputTokens;
-    }
-    const outputTokens = Number(
-      event.data.liftedAttributes["langwatch.output_tokens"],
-    );
-    if (Number.isFinite(outputTokens) && outputTokens > 0) {
-      totalCompletionTokenCount =
-        (totalCompletionTokenCount ?? 0) + outputTokens;
-    }
-
-    return {
-      ...state,
-      traceId: state.traceId || event.data.traceId,
-      computedInput,
-      computedOutput,
-      outputSpanEndTimeMs,
-      attributes: mergedAttributes,
-      models,
-      totalCost,
-      nonBilledCost,
-      totalPromptTokenCount,
-      totalCompletionTokenCount,
-    };
+    return applyLogContribution({
+      state,
+      contribution: {
+        traceId: event.data.traceId,
+        input: event.data.input,
+        output: event.data.output,
+        timeUnixMs: event.data.timeUnixMs,
+        liftedAttributes: event.data.liftedAttributes,
+        nonBillable: event.data.nonBillable,
+      },
+    });
   }
 
   handleTraceMetricDataPointCorrelated(

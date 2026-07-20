@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildMetricRollups } from "../rollup";
+import { MAX_DENSE_BUCKET_SPAN } from "../rollup/exponentialBuckets";
 import { point } from "./fixtures/metric-point.fixtures";
 
 /** At scale 0 the base is 2, so bucket i covers (2^i, 2^(i+1)]. */
@@ -191,6 +192,36 @@ describe("exponential histogram rollups", () => {
         resetCount: 0,
         count: "14",
       });
+    });
+  });
+  describe("when bucket offsets span the whole int32 range", () => {
+    it("bounds the densified span instead of allocating across it", () => {
+      const rows = buildMetricRollups({
+        points: [
+          exponential({
+            timeUnixMs: 1_000,
+            count: "1",
+            positiveOffset: -2147483648,
+            positiveBucketCounts: ["1"],
+          }),
+          exponential({
+            timeUnixMs: 2_000,
+            count: "1",
+            positiveOffset: 2147483647,
+            positiveBucketCounts: ["1"],
+          }),
+        ],
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.count).toBe("2");
+      expect(
+        rows[0]!.positiveBucketCounts.length,
+      ).toBeLessThanOrEqual(MAX_DENSE_BUCKET_SPAN);
+      const totalBucketed = rows[0]!.positiveBucketCounts.reduce(
+        (total, count) => total + BigInt(count),
+        0n,
+      );
+      expect(totalBucketed).toBe(2n);
     });
   });
 });
