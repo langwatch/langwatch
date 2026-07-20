@@ -107,14 +107,16 @@ describe("IOPreview media badges", () => {
 
   describe("given a root input carrying an image part", () => {
     /** @scenario "The trace list shows a tiny thumbnail when the root input carries an image" */
-    it("leads the preview row with a small thumbnail of the image", () => {
-      const { getByTestId, container } = renderPreview(imageInput, null);
-      expect(getByTestId("io-preview-thumbnail")).toHaveAttribute(
-        "src",
-        "/api/files/p1/img1",
-      );
-      // The text preview still renders next to it.
-      expect(container.textContent).toContain("what is in this picture?");
+    it("renders the thumbnail below the preview text, drawer-style", () => {
+      const { getByTestId, getByText } = renderPreview(imageInput, null);
+      const thumb = getByTestId("io-preview-thumbnail");
+      expect(thumb).toHaveAttribute("src", "/api/files/p1/img1");
+      // Text first, image after it in document order — the same
+      // text-then-media order the drawer renders.
+      const text = getByText(/what is in this picture\?/);
+      expect(
+        text.compareDocumentPosition(thumb) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
     });
   });
 

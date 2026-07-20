@@ -195,7 +195,7 @@ const ClampedPreviewText: React.FC<
       position="relative"
       whiteSpace="pre-line"
       lineClamp={CLAMP_LINES}
-      flex={1}
+      width="full"
       minWidth={0}
       css={{ ...HIDE_TRUNCATED_MARKER, ...(css as object) }}
       {...rest}
@@ -235,9 +235,11 @@ function renderWithBreakMarkers(text: string): ReactNode {
 }
 
 /**
- * Compact media summary for a preview row: the first image becomes a tiny
- * thumbnail, everything else collapses into per-kind indicator icons. The
- * collection is media-hint gated, so text-only rows never pay a JSON parse.
+ * Compact media summary for a preview row: the first image becomes a small
+ * thumbnail below the preview text (same text-then-media order as the
+ * drawer), everything else collapses into per-kind indicator icons inline
+ * before the text. The collection is media-hint gated, so text-only rows
+ * never pay a JSON parse.
  */
 interface RowMedia {
   imageSrc: string | null;
@@ -301,39 +303,16 @@ export function collectRowMedia(raw: string | null): RowMedia {
 }
 
 /**
- * Thumbnail + indicator icons rendered at the start of a preview row.
- * Renders nothing for media-free rows.
+ * Per-kind indicator icons rendered inline at the start of a preview row.
+ * Renders nothing when the row has no audio/video/attachment media (the
+ * image thumbnail is rendered separately, below the text).
  */
-const RowMediaBadges: React.FC<{ media: RowMedia; thumbSize: string }> = ({
-  media,
-  thumbSize,
-}) => {
-  if (
-    !media.imageSrc &&
-    !media.hasAudio &&
-    !media.hasVideo &&
-    !media.hasAttachment
-  ) {
+const RowMediaIndicators: React.FC<{ media: RowMedia }> = ({ media }) => {
+  if (!media.hasAudio && !media.hasVideo && !media.hasAttachment) {
     return null;
   }
   return (
     <Flex align="center" gap={1} flexShrink={0}>
-      {media.imageSrc && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          data-testid="io-preview-thumbnail"
-          src={media.imageSrc}
-          alt=""
-          loading="lazy"
-          style={{
-            height: thumbSize,
-            width: thumbSize,
-            objectFit: "cover",
-            borderRadius: "4px",
-            display: "block",
-          }}
-        />
-      )}
       {media.hasAudio && (
         <Icon boxSize="12px" color="fg.muted" data-testid="io-preview-audio">
           <AudioLines />
@@ -356,6 +335,32 @@ const RowMediaBadges: React.FC<{ media: RowMedia; thumbSize: string }> = ({
     </Flex>
   );
 };
+
+/**
+ * The row's image, rendered on its own line below the preview text — the
+ * same text-then-media order the drawer uses. Height-capped with natural
+ * aspect ratio; a width cap crops runaway panoramas.
+ */
+const RowThumbnail: React.FC<{ src: string; height: string }> = ({
+  src,
+  height,
+}) => (
+  // eslint-disable-next-line @next/next/no-img-element
+  <img
+    data-testid="io-preview-thumbnail"
+    src={src}
+    alt=""
+    loading="lazy"
+    style={{
+      height,
+      width: "auto",
+      maxWidth: "160px",
+      objectFit: "cover",
+      borderRadius: "4px",
+      display: "block",
+    }}
+  />
+);
 
 function buildRow(
   raw: string | null,
@@ -452,19 +457,24 @@ const CompactRow: React.FC<CompactRowProps> = ({
           {isInput ? <ArrowUp /> : <ArrowDown />}
         </Icon>
         <RoleIcon row={row} color={accent} direction={direction} />
-        <RowMediaBadges media={row.media} thumbSize="20px" />
+        <RowMediaIndicators media={row.media} />
       </Flex>
-      {/* Preserve real newlines coming through formatPreview (the row text
-          used to inline-render `↵` glyphs — now wraps onto a real second
-          line). Capped at 2 lines so the preview stays compact in the
-          table. */}
-      <ClampedPreviewText
-        text={row.text}
-        fontSize={fontSize}
-        color={textColor}
-        fontStyle="italic"
-        fontWeight="400"
-      />
+      <VStack align="start" gap={1} flex={1} minWidth={0}>
+        {/* Preserve real newlines coming through formatPreview (the row text
+            used to inline-render `↵` glyphs — now wraps onto a real second
+            line). Capped at 2 lines so the preview stays compact in the
+            table. */}
+        <ClampedPreviewText
+          text={row.text}
+          fontSize={fontSize}
+          color={textColor}
+          fontStyle="italic"
+          fontWeight="400"
+        />
+        {row.media.imageSrc && (
+          <RowThumbnail src={row.media.imageSrc} height="36px" />
+        )}
+      </VStack>
     </HStack>
   );
 };
@@ -567,7 +577,12 @@ const ComfortableRow: React.FC<{
     >
       {label}
     </Text>
-    <RowMediaBadges media={media} thumbSize="28px" />
-    <ClampedPreviewText text={text} textStyle="sm" color={textColor} />
+    <VStack align="start" gap={1.5} flex={1} minWidth={0}>
+      <HStack width="full" gap={1} align="flex-start">
+        <RowMediaIndicators media={media} />
+        <ClampedPreviewText text={text} textStyle="sm" color={textColor} />
+      </HStack>
+      {media.imageSrc && <RowThumbnail src={media.imageSrc} height="48px" />}
+    </VStack>
   </HStack>
 );

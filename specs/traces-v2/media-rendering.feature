@@ -61,8 +61,8 @@ Feature: Media rendering across trace surfaces
   Scenario: The trace list shows a tiny thumbnail when the root input carries an image
     Given a trace whose root input contains an image part
     When I view the traces table
-    Then the input preview cell leads with a small thumbnail of the image
-    And the text preview still renders next to it
+    Then the input preview cell shows the text preview first
+    And a small thumbnail of the image renders below the text, matching the drawer's text-then-media order
 
   @integration
   Scenario: The trace list marks audio and attachments without inflating the row
