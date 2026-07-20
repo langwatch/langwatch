@@ -21,10 +21,13 @@ const SERIES = [
 const seriesKey = (index: number) =>
   `${index}/${SERIES[index]!.metric}/${SERIES[index]!.aggregation}`;
 
-const sumSeries = (
-  buckets: Record<string, unknown>[] | undefined,
-  key: string,
-): number =>
+const sumSeries = ({
+  buckets,
+  key,
+}: {
+  buckets: Record<string, unknown>[] | undefined;
+  key: string;
+}): number =>
   (buckets ?? []).reduce((total, bucket) => {
     const value = bucket[key];
     return total + (typeof value === "number" ? value : 0);
@@ -71,12 +74,18 @@ export function ModelCostComparisonCard() {
     queryOpts,
   );
 
-  const promptTokens = sumSeries(timeseries.data?.currentPeriod, seriesKey(0));
-  const completionTokens = sumSeries(
-    timeseries.data?.currentPeriod,
-    seriesKey(1),
-  );
-  const actualCost = sumSeries(timeseries.data?.currentPeriod, seriesKey(2));
+  const promptTokens = sumSeries({
+    buckets: timeseries.data?.currentPeriod,
+    key: seriesKey(0),
+  });
+  const completionTokens = sumSeries({
+    buckets: timeseries.data?.currentPeriod,
+    key: seriesKey(1),
+  });
+  const actualCost = sumSeries({
+    buckets: timeseries.data?.currentPeriod,
+    key: seriesKey(2),
+  });
 
   const pricing = selectedModel
     ? modelMetadata?.[selectedModel]?.pricing
@@ -108,7 +117,12 @@ export function ModelCostComparisonCard() {
           )}
         </Box>
       </HStack>
-      {!timeseries.isLoading && !hasTraffic ? (
+      {timeseries.isError ? (
+        <Text textStyle="sm" color="fg.error">
+          Could not load usage for the selected period. Try refreshing the
+          page.
+        </Text>
+      ) : !timeseries.isLoading && !hasTraffic ? (
         <Text textStyle="sm" color="fg.subtle">
           No traffic in the selected period. Adjust the filters or date range
           to compare costs.

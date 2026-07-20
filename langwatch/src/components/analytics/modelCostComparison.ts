@@ -35,9 +35,10 @@ export function estimateReferenceCost({
 }
 
 /**
- * Models eligible as comparison reference: chat models with complete
- * catalog pricing. Models without pricing cannot produce an estimate, so
- * offering them would only lead to an empty result.
+ * Models eligible as comparison reference: models with complete catalog
+ * pricing. Models without pricing cannot produce an estimate, so offering
+ * them would only lead to an empty result. Mode filtering (chat vs
+ * embedding) is the ModelSelector's job — this list is pricing-only.
  */
 export function referenceModelOptions(
   modelMetadata: Record<string, ModelMetadataForFrontend> | undefined,
