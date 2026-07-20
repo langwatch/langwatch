@@ -88,11 +88,39 @@ export function serializeMediaRefs(value: unknown): string | null {
 const VALID_KINDS = new Set(["audio", "image", "video", "file"]);
 
 /**
+ * One parsed entry from the reserved attribute, validated: kind must be
+ * allowlisted and the url must be a stored-objects reference. Returns null
+ * for anything else.
+ */
+function parseMediaRefEntry(entry: unknown): TraceMediaRef | null {
+  if (typeof entry !== "object" || entry === null) return null;
+  const candidate = entry as Record<string, unknown>;
+  if (
+    typeof candidate.kind !== "string" ||
+    !VALID_KINDS.has(candidate.kind) ||
+    typeof candidate.url !== "string" ||
+    !isStoredObjectRefUrl(candidate.url)
+  ) {
+    return null;
+  }
+  return {
+    kind: candidate.kind as TraceMediaRef["kind"],
+    url: candidate.url,
+    ...(typeof candidate.filename === "string"
+      ? { filename: candidate.filename }
+      : {}),
+    ...(typeof candidate.mimeType === "string"
+      ? { mimeType: candidate.mimeType }
+      : {}),
+  };
+}
+
+/**
  * Defensive parse of a reserved media-refs attribute value. The attribute
  * namespace is not writable by SDKs in the normal flow, but nothing in this
  * parser assumes that: kinds are allowlisted and every url must be a
- * stored-objects reference, so a crafted attribute cannot smuggle an
- * external or scripted URL to a renderer.
+ * stored-objects reference (see `parseMediaRefEntry`), so a crafted
+ * attribute cannot smuggle an external or scripted URL to a renderer.
  */
 export function parseMediaRefs(
   serialized: string | null | undefined,
@@ -104,25 +132,8 @@ export function parseMediaRefs(
     const refs: TraceMediaRef[] = [];
     for (const entry of parsed) {
       if (refs.length >= MAX_TRACE_MEDIA_REFS) break;
-      if (typeof entry !== "object" || entry === null) continue;
-      const candidate = entry as Record<string, unknown>;
-      if (
-        typeof candidate.kind === "string" &&
-        VALID_KINDS.has(candidate.kind) &&
-        typeof candidate.url === "string" &&
-        isStoredObjectRefUrl(candidate.url)
-      ) {
-        refs.push({
-          kind: candidate.kind as TraceMediaRef["kind"],
-          url: candidate.url,
-          ...(typeof candidate.filename === "string"
-            ? { filename: candidate.filename }
-            : {}),
-          ...(typeof candidate.mimeType === "string"
-            ? { mimeType: candidate.mimeType }
-            : {}),
-        });
-      }
+      const ref = parseMediaRefEntry(entry);
+      if (ref) refs.push(ref);
     }
     return refs;
   } catch {

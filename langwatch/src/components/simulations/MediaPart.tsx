@@ -182,9 +182,12 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
   // carry header-less pcm16 / G.711 bytes under a raw mime type — a bare
   // <audio src> cannot decode those. Fetch the bytes once, wrap them in a
   // WAV container client-side, and play from a blob URL. New objects are
-  // wrapped at store time and never take this path.
+  // wrapped at store time and never take this path. Gated on
+  // `storedObjectId`: only our own stored objects can BE legacy raw-PCM
+  // refs, and an eager fetch of an arbitrary external URL would beacon the
+  // viewer to whoever controls the part.
   const rawUrlFormat =
-    isUrlBased && !unsafeSrc && category === "audio"
+    storedObjectId && category === "audio"
       ? resolveRawPcmFormat(undefined, mimeType)
       : null;
   const [wrappedSrc, setWrappedSrc] = useState<string | null>(null);

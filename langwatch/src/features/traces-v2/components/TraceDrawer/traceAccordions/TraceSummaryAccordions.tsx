@@ -516,16 +516,6 @@ export function TraceSummaryAccordions({
  * the body replaced by a muted placeholder.
  */
 /**
- * Media widgets (players, images, attachment chips) for the fold-derived
- * media refs riding the summary's reserved attributes — the trace-level
- * input/output are flattened text, so this strip is how the summary panel
- * surfaces the recording/image/attachment the winning span IO carried.
- * Renders nothing for media-free traces. Rendered below its IOViewer like
- * attachments below an email body; items keep their natural size
- * (align="flex-start" — stretching would blow a small image up to panel
- * width).
- */
-/**
  * Drops the reserved media-refs entries from a summary attribute map so the
  * metadata table shows real attributes, not the strips' plumbing JSON.
  */
@@ -539,6 +529,16 @@ export function filterReservedMediaRefAttributes(
   );
 }
 
+/**
+ * Media widgets (players, images, attachment chips) for the fold-derived
+ * media refs riding the summary's reserved attributes — the trace-level
+ * input/output are flattened text, so this strip is how the summary panel
+ * surfaces the recording/image/attachment the winning span IO carried.
+ * Renders nothing for media-free traces. Rendered below its IOViewer like
+ * attachments below an email body; items keep their natural size
+ * (align="flex-start" — stretching would blow a small image up to panel
+ * width).
+ */
 export function SummaryMediaStrip({
   refsJson,
 }: {

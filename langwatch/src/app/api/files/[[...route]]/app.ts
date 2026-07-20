@@ -2,6 +2,7 @@ import { Readable } from "node:stream";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { anyAuthenticated, createServiceApp } from "~/server/api/security";
+import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 import { requireProjectPermission } from "~/server/auth/permissions";
 import { prisma } from "~/server/db";
 import { rateLimit } from "~/server/rateLimit";
@@ -91,6 +92,21 @@ export function requiredPermissionForPurpose(
 }
 
 /**
+ * True only for the denial shapes `requireProjectPermission` documents
+ * (LiteMemberRestrictedError, or its plain-Error denial message). Anything
+ * else — a dropped database connection, a Prisma fault — is an
+ * infrastructure failure that must bubble up as a 5xx, never be masked as
+ * a 403.
+ */
+function isPermissionDenial(err: unknown): boolean {
+  if (err instanceof LiteMemberRestrictedError) return true;
+  return (
+    err instanceof Error &&
+    err.message === "You do not have permission to access this project resource"
+  );
+}
+
+/**
  * Checks that the caller (API key or session user) is allowed to read files
  * owned by `ownerProjectId` AT ALL. Runs BEFORE the row is read so a foreign
  * claim is always 403 regardless of row existence (no 403-vs-404 oracle);
@@ -122,8 +138,9 @@ async function authorizeFileRead({
           prisma,
         });
         return;
-      } catch {
-        // try the next category
+      } catch (err) {
+        if (!isPermissionDenial(err)) throw err;
+        // denied this category — try the next one
       }
     }
     throw new HTTPException(403, { message: "forbidden" });
@@ -156,7 +173,8 @@ async function authorizeFilePurpose({
       permission: requiredPermissionForPurpose(purpose),
       prisma,
     });
-  } catch {
+  } catch (err) {
+    if (!isPermissionDenial(err)) throw err;
     throw new HTTPException(403, { message: "forbidden" });
   }
 }
