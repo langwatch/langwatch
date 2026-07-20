@@ -1,6 +1,5 @@
 import scenario from "@langwatch/scenario";
 import fs from "fs";
-import { execSync } from "child_process";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
 import os from "os";
@@ -33,9 +32,9 @@ describe("Agent Best Practices Skill", () => {
 
       // A minimal agent codebase with no scenarios, no versioned prompts, and
       // no evaluation setup: plenty of best-practice gaps for the audit to find.
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
-      );
+      fs.cpSync(path.resolve(__dirname, "fixtures/python-openai"), tempFolder, {
+        recursive: true,
+      });
 
       installSkillToWorkDir({
         workingDirectory: tempFolder,
