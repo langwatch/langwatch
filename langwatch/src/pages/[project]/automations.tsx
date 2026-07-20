@@ -3,6 +3,7 @@ import {
   Button,
   Code,
   HStack,
+  SimpleGrid,
   Spacer,
   Table,
   Text,
@@ -53,15 +54,21 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 
-type AutomationSection = "automations" | "alerts" | "schedules" | "activity";
+type AutomationSection = "overview" | "automations" | "alerts" | "schedules";
 
 const sectionDetails: Record<
   AutomationSection,
   { title: string; description: string; newLabel?: string }
 > = {
+  overview: {
+    title: "Overview",
+    description:
+      "See what is firing, what is scheduled next, and recent automation activity.",
+  },
   automations: {
     title: "Automations",
     description: "Act on every incoming trace that matches your filters.",
@@ -79,18 +86,12 @@ const sectionDetails: Record<
       "Send a dashboard, graph, or trace table on a recurring cadence.",
     newLabel: "New schedule",
   },
-  activity: {
-    title: "Recent activity",
-    description:
-      "See what alerts, schedules, and automations have done recently.",
-  },
 };
 
 const sectionFromPath = (pathname: string): AutomationSection => {
   if (pathname.includes("/automations/alerts")) return "alerts";
   if (pathname.includes("/automations/schedules")) return "schedules";
-  if (pathname.includes("/automations/activity")) return "activity";
-  return "automations";
+  return "overview";
 };
 
 function AutomationsPage() {
@@ -451,12 +452,34 @@ function AutomationsPage() {
 
   const isLoading = triggers.isLoading;
 
+  const overview = useMemo(() => {
+    const stats = [...statsByTriggerId.values()];
+    const firingNow = stats.filter((stat) => stat.currentlyFiring).length;
+    const fired30d = stats.reduce(
+      (sum, stat) => sum + (stat.recentFireCount ?? 0),
+      0,
+    );
+    const next = (reportSchedules.data ?? [])
+      .filter((schedule) => schedule.nextRunAt)
+      .map((schedule) => ({
+        at: new Date(schedule.nextRunAt!).getTime(),
+        triggerId: schedule.triggerId,
+      }))
+      .sort((left, right) => left.at - right.at)[0];
+    const nextName = next
+      ? ((triggers.data ?? []).find((trigger) => trigger.id === next.triggerId)
+          ?.name ?? null)
+      : null;
+
+    return { firingNow, fired30d, next, nextName };
+  }, [reportSchedules.data, statsByTriggerId, triggers.data]);
+
   return (
     <DashboardLayout>
       <PageLayout.Header>
         <PageLayout.Heading>{details.title}</PageLayout.Heading>
         <Spacer />
-        {section !== "activity" && (
+        {section !== "overview" && (
           <Button
             colorPalette="orange"
             size="sm"
@@ -502,6 +525,9 @@ function AutomationsPage() {
               >
                 Automations
               </Text>
+              <MenuLink href={basePath} icon={<Eye size={14} />}>
+                Overview
+              </MenuLink>
               <MenuLink href={basePath} icon={<Zap size={14} />}>
                 Automations
               </MenuLink>
@@ -516,9 +542,6 @@ function AutomationsPage() {
                 icon={<Calendar size={14} />}
               >
                 Schedules
-              </MenuLink>
-              <MenuLink href={`${basePath}/activity`} icon={<Eye size={14} />}>
-                Recent activity
               </MenuLink>
             </VStack>
           </Box>
@@ -639,6 +662,69 @@ function AutomationsPage() {
                             </Table.Body>
                           </Table.Root>
                         </TableShell>
+                      )}
+                    </VStack>
+                  )}
+
+                  {section === "overview" && (
+                    <VStack align="stretch" gap={8} width="full">
+                      <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
+                        <StatTile
+                          label="Firing now"
+                          value={overview.firingNow}
+                          sub={
+                            overview.firingNow > 0
+                              ? "alerts over their threshold"
+                              : "all clear"
+                          }
+                          alert={overview.firingNow > 0}
+                        />
+                        <StatTile
+                          label="Fired (30 days)"
+                          value={overview.fired30d.toLocaleString()}
+                          sub="across every automation"
+                        />
+                        <StatTile
+                          label="Next scheduled"
+                          value={
+                            overview.next
+                              ? (formatTimeAgo(overview.next.at) ?? "—")
+                              : "—"
+                          }
+                          sub={overview.nextName ?? "no schedules queued"}
+                        />
+                      </SimpleGrid>
+
+                      <VStack align="stretch" gap={3} width="full">
+                        <OverviewSectionHeading
+                          title="Recent activity"
+                          summary="See what alerts, schedules, and automations have done recently."
+                        />
+                        <AutomationsHistory
+                          fires={activity.data ?? []}
+                          triggers={triggers.data ?? []}
+                          isLoading={activity.isLoading}
+                          onOpenAutomation={(triggerId) =>
+                            openDrawer("viewAutomation", {
+                              automationId: triggerId,
+                            })
+                          }
+                        />
+                      </VStack>
+
+                      {alerts.length === 0 && (
+                        <VStack align="stretch" gap={3} width="full">
+                          <OverviewSectionHeading
+                            title="Set up an alert"
+                            summary="Start from a common alert workflow, then tailor the metric and delivery channel."
+                          />
+                          <UseCaseStrip
+                            kind="alert"
+                            onOpen={(prefill) =>
+                              openDrawer("automation", prefill)
+                            }
+                          />
+                        </VStack>
                       )}
                     </VStack>
                   )}
@@ -883,20 +969,6 @@ function AutomationsPage() {
                     </VStack>
                   )}
 
-                  {section === "activity" && (
-                    <VStack align="stretch" gap={3} width="full">
-                      <AutomationsHistory
-                        fires={activity.data ?? []}
-                        triggers={triggers.data ?? []}
-                        isLoading={activity.isLoading}
-                        onOpenAutomation={(triggerId) =>
-                          openDrawer("viewAutomation", {
-                            automationId: triggerId,
-                          })
-                        }
-                      />
-                    </VStack>
-                  )}
                 </>
               )}
             </VStack>
@@ -904,6 +976,69 @@ function AutomationsPage() {
         </HStack>
       </Box>
     </DashboardLayout>
+  );
+}
+
+function OverviewSectionHeading({
+  title,
+  summary,
+}: {
+  title: string;
+  summary: string;
+}) {
+  return (
+    <VStack align="start" gap={0.5}>
+      <Text fontSize="lg" fontWeight="semibold">
+        {title}
+      </Text>
+      <Text textStyle="sm" color="fg.muted">
+        {summary}
+      </Text>
+    </VStack>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  sub,
+  alert = false,
+}: {
+  label: string;
+  value: React.ReactNode;
+  sub: string;
+  alert?: boolean;
+}) {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor={alert ? "red.solid" : "border"}
+      borderRadius="lg"
+      padding={4}
+      bg="bg.panel"
+    >
+      <Text
+        textStyle="2xs"
+        textTransform="uppercase"
+        letterSpacing="0.04em"
+        fontWeight="600"
+        color={alert ? "red.fg" : "fg.muted"}
+      >
+        {label}
+      </Text>
+      <Text
+        fontSize="2xl"
+        fontWeight="semibold"
+        lineHeight="1.2"
+        marginTop={1}
+        color={alert ? "red.fg" : "fg"}
+      >
+        {value}
+      </Text>
+      <Text textStyle="xs" color="fg.muted" marginTop={0.5} lineClamp={1}>
+        {sub}
+      </Text>
+    </Box>
   );
 }
 
