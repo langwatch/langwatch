@@ -444,13 +444,12 @@ function EvaluationsContent() {
             <Alert.Title>No online evaluations yet</Alert.Title>
             <Alert.Description>
               <Text as="span">
-                Online evaluation results will be displayed here. Set up an
-                online evaluation for your project to see results. {" "}
+                Online evaluation results will be displayed here.{" "}
               </Text>
               <Link href={`/${project?.slug}/online-evaluations`}>
                 Set up an online evaluation
               </Link>
-              <Text as="span"> to get started.</Text>
+              <Text as="span"> to see results for your project.</Text>
             </Alert.Description>
           </Alert.Content>
         </Alert.Root>

@@ -50,23 +50,23 @@ export function useFirstTraceSpotlightTrigger({
   const setCurrentSpotlightId = useOnboardingStore(
     (s) => s.setCurrentSpotlightId,
   );
-  const legacyTourHistoryOnMount = useRef(
+  const hasLegacyTourHistoryOnMount = useRef(
     firstTraceSpotlightFired || Object.keys(seenDrawerSpotlights).length > 0,
   ).current;
-  const legacyMigrationAttempted = useRef(false);
+  const hasLegacyMigrationAttempted = useRef(false);
 
   useEffect(() => {
     if (
-      legacyMigrationAttempted.current ||
+      hasLegacyMigrationAttempted.current ||
       !isResolved ||
       isDismissed ||
-      !legacyTourHistoryOnMount
+      !hasLegacyTourHistoryOnMount
     ) {
       return;
     }
-    legacyMigrationAttempted.current = true;
+    hasLegacyMigrationAttempted.current = true;
     persistDismissal();
-  }, [isDismissed, isResolved, legacyTourHistoryOnMount, persistDismissal]);
+  }, [hasLegacyTourHistoryOnMount, isDismissed, isResolved, persistDismissal]);
 
   useEffect(() => {
     if (!projectId) return;

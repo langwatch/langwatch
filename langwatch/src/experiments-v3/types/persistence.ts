@@ -59,23 +59,14 @@ export type PersistedResults = z.infer<typeof persistedResultsSchema>;
  * The state that gets persisted to the database.
  * Excludes transient UI state and execution-only result fields.
  */
-export type PersistedEvaluationsV3State = Omit<
-  EvaluationsV3State,
-  "ui" | "results"
-> & {
-  results?: PersistedResults;
-  // Hidden columns - stored as array for JSON serialization
-  hiddenColumns?: string[];
-  // Concurrency setting for parallel execution
-  concurrency?: number;
-};
+export type PersistedEvaluationsV3State = z.infer<
+  typeof persistedEvaluationsV3StateSchema
+>;
 
 /**
  * Validated persisted state type - derived from schema.
  */
-export type ValidatedPersistedState = z.infer<
-  typeof persistedEvaluationsV3StateSchema
->;
+export type ValidatedPersistedState = PersistedEvaluationsV3State;
 
 // ============================================================================
 // Helper Functions
@@ -117,7 +108,7 @@ const extractPersistedResults = (
 export const extractPersistedState = (
   state: EvaluationsV3State,
 ): PersistedEvaluationsV3State => {
-  const { ui, results, datasets, ...restState } = state;
+  const { ui, results, datasets } = state;
   const persistedResults = extractPersistedResults(results);
 
   // Strip savedRecords from datasets - they're fetched from DB on load
@@ -131,13 +122,18 @@ export const extractPersistedState = (
     return dataset;
   });
 
-  return {
-    ...restState,
+  return persistedEvaluationsV3StateSchema.parse({
+    experimentId: state.experimentId,
+    experimentSlug: state.experimentSlug,
+    name: state.name,
     datasets: datasetsWithoutRecords,
+    activeDatasetId: state.activeDatasetId,
+    evaluators: state.evaluators,
+    targets: state.targets,
     results: persistedResults,
     // Convert Set to array for JSON serialization
     hiddenColumns: Array.from(ui.hiddenColumns),
     // Persist concurrency setting
     concurrency: ui.concurrency,
-  };
+  });
 };

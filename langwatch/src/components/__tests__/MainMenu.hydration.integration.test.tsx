@@ -94,7 +94,9 @@ describe("MainMenu compact hydration", () => {
 
   /** @scenario MainMenu compact mode hydrates without invalid markup */
   it("hydrates the server markup without a React hydration error", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     const container = document.createElement("div");
     container.innerHTML = renderToString(menu);
     document.body.appendChild(container);

@@ -16,7 +16,7 @@ import "@testing-library/jest-dom/vitest";
 
 let mockPageTourActive = false;
 let mockSeenDrawerSpotlights: Record<string, boolean> = {};
-let mockTourDismissed = false;
+let isMockTourDismissed = false;
 const mockPersistDismissal = vi.fn();
 
 const mockMarkDrawerSpotlightSeen = vi.fn((id: string) => {
@@ -35,7 +35,7 @@ vi.mock("../../store/onboardingStore", () => ({
 vi.mock("../../hooks/useTraceExplorerTourPreference", () => ({
   useTraceExplorerTourPreference: () => ({
     dismiss: mockPersistDismissal,
-    isDismissed: mockTourDismissed,
+    isDismissed: isMockTourDismissed,
     isResolved: true,
   }),
 }));
@@ -75,7 +75,7 @@ afterEach(() => {
 beforeEach(() => {
   mockPageTourActive = false;
   mockSeenDrawerSpotlights = {};
-  mockTourDismissed = false;
+  isMockTourDismissed = false;
 });
 
 describe("<DrawerSpotlights />", () => {
@@ -213,16 +213,19 @@ describe("<DrawerSpotlights />", () => {
 
   describe("given the user dismissed Traces Explorer tours", () => {
     beforeEach(() => {
-      mockTourDismissed = true;
+      isMockTourDismissed = true;
       addAnchor("drawer-io");
     });
 
-    /** @scenario Preference loading never flashes an unwanted tour */
-    it("renders no automatic drawer spotlight", async () => {
-      renderDrawerSpotlights();
-      await new Promise((resolve) => setTimeout(resolve, 25));
-      expect(screen.queryByTestId("spotlight-popover")).not.toBeInTheDocument();
-      expect(mockMarkDrawerSpotlightSeen).not.toHaveBeenCalled();
+    describe("when the drawer mounts", () => {
+      it("renders no automatic drawer spotlight", async () => {
+        renderDrawerSpotlights();
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        expect(
+          screen.queryByTestId("spotlight-popover"),
+        ).not.toBeInTheDocument();
+        expect(mockMarkDrawerSpotlightSeen).not.toHaveBeenCalled();
+      });
     });
   });
 

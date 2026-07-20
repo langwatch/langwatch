@@ -9,8 +9,10 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 import { PageLayout } from "../ui/layouts/PageLayout";
+import { toaster } from "../ui/toaster";
 
 export const CreateExperimentButton = () => {
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -24,7 +26,21 @@ export const CreateExperimentButton = () => {
       void router.push(`/${project?.slug}/experiments/workbench/${data.slug}`);
       setIsCreating(false);
     },
-    onError: () => setIsCreating(false),
+    onError: (error) => {
+      setIsCreating(false);
+      if (isHandledByGlobalHandler(error)) return;
+      toaster.create({
+        title: "Error creating experiment",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Please try again. If the problem persists, contact support.",
+        type: "error",
+        meta: {
+          closable: true,
+        },
+      });
+    },
   });
 
   if (!project || !hasPermission("workflows:create")) return null;
@@ -45,7 +61,7 @@ export const CreateExperimentButton = () => {
         state: {
           ...persistedState,
           experimentSlug: name,
-        } as Parameters<typeof createExperiment.mutate>[0]["state"],
+        },
       });
     });
   };

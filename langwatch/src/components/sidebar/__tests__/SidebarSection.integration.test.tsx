@@ -6,11 +6,12 @@
 import { ChakraProvider, defaultSystem, Text } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { getSidebarSectionStorageKey, SidebarSection } from "../SidebarSection";
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
+const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 

@@ -198,7 +198,6 @@ describe("<SpotlightOverlay />", () => {
         expect(mockSetCurrentSpotlightId).toHaveBeenCalledWith(null);
       });
 
-      /** @scenario Skip tour dismisses every automatic Traces Explorer tour */
       it("persists dismissal for the authenticated user", async () => {
         renderOverlay();
         const skipButton = await waitFor(() =>

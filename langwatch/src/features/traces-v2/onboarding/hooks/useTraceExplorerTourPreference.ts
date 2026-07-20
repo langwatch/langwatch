@@ -36,12 +36,12 @@ export function useTraceExplorerTourPreference() {
     },
   });
   const persistDismissal = dismissMutation.mutate;
-  const dismissalIsSaving = dismissMutation.isLoading;
+  const isDismissalSaving = dismissMutation.isPending;
 
   const dismiss = useCallback(() => {
-    if (preference.data?.dismissed || dismissalIsSaving) return;
+    if (preference.data?.dismissed || isDismissalSaving) return;
     persistDismissal({});
-  }, [dismissalIsSaving, persistDismissal, preference.data?.dismissed]);
+  }, [isDismissalSaving, persistDismissal, preference.data?.dismissed]);
 
   return {
     dismiss,

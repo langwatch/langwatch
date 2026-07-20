@@ -6,15 +6,32 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
+import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.unmock("~/utils/compat/next-link");
 
 import {
   type OnlineEvaluationRow,
   OnlineEvaluationsTable,
 } from "../OnlineEvaluationsTable";
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+const LocationProbe = () => {
+  const location = useLocation();
+  return (
+    <output data-testid="current-location">
+      {location.pathname}
+      {location.search}
+    </output>
+  );
+};
+
+const Wrapper = ({ children }: { children: ReactNode }) => (
+  <MemoryRouter>
+    <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+    <LocationProbe />
+  </MemoryRouter>
 );
 
 const rows: OnlineEvaluationRow[] = [
@@ -115,6 +132,21 @@ describe("<OnlineEvaluationsTable />", () => {
     expect(
       await screen.findByRole("menuitem", { name: "View analytics" }),
     ).toHaveAttribute("href", analyticsHref);
+  });
+
+  it("navigates to analytics without reloading the application shell", async () => {
+    const user = userEvent.setup();
+    render(<OnlineEvaluationsTable {...defaultProps} />, { wrapper: Wrapper });
+
+    await user.click(
+      screen.getByRole("link", {
+        name: "View analytics for Answer quality",
+      }),
+    );
+
+    expect(screen.getByTestId("current-location")).toHaveTextContent(
+      "/demo/analytics/evaluations?evaluationId=monitor-up",
+    );
   });
 
   it("keeps configuration actions available from the row menu", async () => {
