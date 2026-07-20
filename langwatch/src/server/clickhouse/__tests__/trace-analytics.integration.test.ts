@@ -46,7 +46,10 @@ let ch: ClickHouseClient;
 let analyticsRepo: TraceAnalyticsClickHouseRepository;
 let summaryRepo: TraceSummaryClickHouseRepository;
 
-const baseMs = new Date("2026-06-15T12:00:00.000Z").getTime();
+// Anchor on the current hour: these tables TTL rows `_retention_days`
+// (default 49) days after their timestamp, so a fixed calendar date makes
+// every row born-expired once the date ages past the horizon.
+const baseMs = Math.floor(Date.now() / 3_600_000) * 3_600_000;
 
 function makeAnalyticsRow(
   overrides: Partial<TraceAnalyticsRow> = {},
