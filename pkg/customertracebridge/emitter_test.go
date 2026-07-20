@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/protobuf/proto"
 
@@ -176,7 +177,15 @@ func TestEmitter_WireResourceIsOriginMarkerOnly(t *testing.T) {
 		Service: "langwatch-service-aigateway",
 		Version: "test",
 	})
-	e, err := NewEmitter(ctx, EmitterOptions{Registry: registry, BatchTimeout: 50 * time.Millisecond})
+	// The policy a service would declare: pass nothing through, stamp the
+	// service's origin identity ("gateway" here, as the gateway's deps do).
+	e, err := NewEmitter(ctx, EmitterOptions{
+		Registry:     registry,
+		BatchTimeout: 50 * time.Millisecond,
+		Policy: Policy{Stamp: []attribute.KeyValue{
+			attribute.String(otelsetup.AttrLangWatchOrigin, "gateway"),
+		}},
+	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
 
@@ -205,6 +214,6 @@ func TestEmitter_WireResourceIsOriginMarkerOnly(t *testing.T) {
 		require.Len(t, attrs, 1,
 			"customer-visible resource must carry ONLY the origin marker, got: %v", attrs)
 		assert.Equal(t, otelsetup.AttrLangWatchOrigin, attrs[0].GetKey())
-		assert.Equal(t, OriginGateway, attrs[0].GetValue().GetStringValue())
+		assert.Equal(t, "gateway", attrs[0].GetValue().GetStringValue())
 	}
 }

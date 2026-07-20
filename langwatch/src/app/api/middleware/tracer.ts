@@ -7,7 +7,7 @@ import {
 } from "@opentelemetry/api";
 import type { Context, Next } from "hono";
 
-import { claimOncePerRequest } from "./request-once";
+import { getCurrentContext } from "../../../server/context/asyncContext";
 
 type TracerOptions = {
   name?: string;
@@ -21,10 +21,14 @@ const headersGetter = {
 
 export const tracerMiddleware = (options?: TracerOptions) => {
   return async (c: Context, next: Next): Promise<any> => {
-    // Every SecuredApp registers this and the families sharing basePath "/api"
-    // all match the same request — without this a request gets one nested
-    // server span per family instead of one span for the request.
-    if (!claimOncePerRequest(c.req.raw, "tracer")) return next();
+    // An existing async request context means an outer SecuredApp already
+    // wrapped this request (the families sharing basePath "/api" all register
+    // this middleware, and every one matches every /api request) — without
+    // this guard a request gets one nested server span per family instead of
+    // one span. The first family's tracer runs before any context exists, so
+    // exactly one span is created; its logger then establishes the context
+    // that makes every later invocation skip.
+    if (getCurrentContext()) return next();
 
     const tracer = trace.getTracer("langwatch:api:hono");
 

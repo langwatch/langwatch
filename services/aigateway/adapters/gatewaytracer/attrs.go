@@ -1,6 +1,11 @@
 package gatewaytracer
 
 const (
+	// OriginGateway is the langwatch.origin value for this service — stamped
+	// on its own operational spans and, via the customer-trace policy in
+	// deps.go, on the spans it retells into customer projects.
+	OriginGateway = "gateway"
+
 	AttrProjectID                 = "langwatch.project_id"
 	AttrTeamID                    = "langwatch.team_id"
 	AttrOrgID                     = "langwatch.organization_id"

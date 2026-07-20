@@ -606,6 +606,11 @@ func (r *Relay) forwardTraces(ctx context.Context, info WorkerInfo, payload []by
 	return nil
 }
 
+// originLangy is the langwatch.origin value for this service's relayed
+// worker telemetry — service identity, declared here rather than in the
+// shared policy package.
+const originLangy = "langy"
+
 // customerTracePolicy is the allowlist for resource attributes on worker
 // telemetry bound for the customer's project. It runs AFTER ReparentTraces,
 // so the allowed keys are the ones that carry customer meaning: the relay's
@@ -623,7 +628,7 @@ var customerTracePolicy = customertracebridge.Policy{
 		"service.name",
 	},
 	Stamp: []attribute.KeyValue{
-		attribute.String(otelsetup.AttrLangWatchOrigin, customertracebridge.OriginLangy),
+		attribute.String(otelsetup.AttrLangWatchOrigin, originLangy),
 	},
 }
 

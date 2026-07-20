@@ -20,7 +20,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/langwatch/langwatch/pkg/contexts"
-	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -116,10 +115,11 @@ type EmitterOptions struct {
 	Registry     *Registry
 	BatchTimeout time.Duration
 	MaxQueueSize int
-	// Policy governs the customer-visible resource. Zero value: allow
-	// nothing, stamp the gateway origin marker — the emitter is the
-	// gateway's retell engine, so its identity marker is the default.
-	Policy *Policy
+	// Policy governs the customer-visible resource. The service supplies its
+	// own — including its langwatch.origin stamp, which is service identity
+	// this package must not decide. The zero value allows nothing and stamps
+	// nothing (fail closed).
+	Policy Policy
 }
 
 // NewEmitter creates a customer trace bridge backed by a private TracerProvider.
@@ -128,14 +128,8 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 		opts.Registry = NewRegistry()
 	}
 
-	policy := Policy{Stamp: []attribute.KeyValue{
-		attribute.String(otelsetup.AttrLangWatchOrigin, OriginGateway),
-	}}
-	if opts.Policy != nil {
-		policy = *opts.Policy
-	}
 	router := dropFilterExporter{
-		inner: resourceScrubExporter{inner: newRouterExporter(ctx, opts.Registry), policy: policy},
+		inner: resourceScrubExporter{inner: newRouterExporter(ctx, opts.Registry), policy: opts.Policy},
 	}
 
 	batchTimeout := opts.BatchTimeout

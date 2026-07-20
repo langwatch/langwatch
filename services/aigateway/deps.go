@@ -16,12 +16,15 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/jwtverify"
+	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/authresolver"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/budget"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/cacherules"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/controlplane"
-	"github.com/langwatch/langwatch/pkg/customertracebridge"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/modelresolver"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/policy"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/providers"
@@ -70,6 +73,14 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	projectRegistry := customertracebridge.NewRegistry()
 	bridge, err := customertracebridge.NewEmitter(ctx, customertracebridge.EmitterOptions{
 		Registry: projectRegistry,
+		// This service's customer-trace policy: no resource attribute passes
+		// through (the pod environment is platform detail), and every retold
+		// span carries this service's origin identity.
+		Policy: customertracebridge.Policy{
+			Stamp: []attribute.KeyValue{
+				attribute.String(otelsetup.AttrLangWatchOrigin, gatewaytracer.OriginGateway),
+			},
+		},
 	})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("customer trace bridge init: %w", err)

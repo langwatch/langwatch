@@ -10,7 +10,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/langwatch/langwatch/pkg/clog"
-	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 )
 
@@ -45,7 +44,7 @@ func Middleware(spanNamer func(*http.Request) string) func(http.Handler) http.Ha
 				trace.WithNewRoot(),
 				trace.WithSpanKind(trace.SpanKindServer),
 				trace.WithAttributes(
-					attribute.String(otelsetup.AttrLangWatchOrigin, customertracebridge.OriginGateway),
+					attribute.String(otelsetup.AttrLangWatchOrigin, OriginGateway),
 					attribute.String("http.request.method", r.Method),
 					attribute.String("url.path", r.URL.Path),
 				),
