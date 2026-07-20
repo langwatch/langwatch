@@ -108,7 +108,7 @@ interface ViewState {
   columnOrder: string[];
   draftState: Map<string, DraftLensState>;
 
-  selectLens: (id: string) => void;
+  selectLens: (id: string, opts?: { persist?: boolean }) => void;
   setSort: (sort: SortConfig) => void;
   setGrouping: (mode: GroupingMode) => void;
   toggleColumn: (columnId: string) => void;
@@ -159,10 +159,13 @@ const DRAFTS_KEY = "langwatch:traces-v2:drafts:v1";
 // project, so a single global key restores the user's preferred view
 // cross-project. A custom lens id only exists in its own project, so on a
 // different project it simply won't be found and the store falls back to
-// the default — the desired behaviour.
+// the default — the desired behaviour. The lens is otherwise URL-fragment
+// driven (`useURLSync`); this key is the fallback the fragment reader
+// consults when a bare URL carries no lens, so returning to a lensless URL
+// restores the last-used view instead of snapping back to All.
 const ACTIVE_LENS_KEY = "langwatch:traces-v2:active-lens:v1";
 
-function loadActiveLensId(): string | null {
+export function getPersistedActiveLensId(): string | null {
   if (typeof window === "undefined") return null;
   try {
     return localStorage.getItem(ACTIVE_LENS_KEY);
@@ -181,13 +184,11 @@ function persistActiveLensId(id: string): void {
 }
 
 // One-shot latch for restoring a persisted CUSTOM lens. Built-in lenses
-// restore synchronously at store init (their ids exist before hydration);
-// custom lenses only appear once `setUserLenses` runs, so we re-apply the
-// persisted id on that first server hydration — but only if the user hasn't
-// already picked a lens this session (so an explicit choice never gets
-// clobbered by late-arriving hydration).
+// restore synchronously (their ids exist before hydration); custom lenses
+// only appear once `setUserLenses` runs, so we re-apply the persisted id on
+// that first server hydration — but only while still on the default lens, so
+// an explicit pick is never clobbered by late-arriving hydration.
 let customLensHydrationDone = false;
-let userPickedLensThisSession = false;
 
 const DEFAULT_SORT: SortConfig = { columnId: "time", direction: "desc" };
 
@@ -594,7 +595,7 @@ const initialDismissedBuiltIns = loadDismissedBuiltInIds();
 const initialLenses: LensConfig[] = builtInLenses.filter(
   (l) => !initialDismissedBuiltIns.has(l.id),
 );
-const persistedActiveLensId = loadActiveLensId();
+const persistedActiveLensId = getPersistedActiveLensId();
 const initialActiveLensId =
   // Restore the persisted lens when it's already known (a built-in, present
   // at init). Custom lenses hydrate later and are restored in setUserLenses.
@@ -621,14 +622,16 @@ export const useViewStore = create<ViewState>((set, get) => ({
     defaultColumnOrder,
   draftState: initialDrafts,
 
-  selectLens: (id) => {
+  selectLens: (id, opts) => {
     set((s) => {
       const lens = s.allLenses.find((l) => l.id === id);
       if (!lens) return s;
-      // A deliberate pick — remember it (cross-navigation, cross-project for
-      // built-ins) and stop late hydration from overriding this choice.
-      userPickedLensThisSession = true;
-      persistActiveLensId(id);
+      // Remember the choice as the last-used lens (cross-navigation, and
+      // cross-project for built-ins). `useURLSync` passes persist:false when
+      // it's only *applying* a lens (e.g. falling back to the default because
+      // a bare URL carries none), so that path never clobbers the stored
+      // preference.
+      if (opts?.persist !== false) persistActiveLensId(id);
       const draft = s.draftState.get(id);
       // Apply the lens's filter (or its draft override) to filterStore via
       // the silent setter — `applyQueryText` would loop back through
@@ -894,14 +897,14 @@ export const useViewStore = create<ViewState>((set, get) => ({
       const allLenses = [...builtIns, ...userLenses];
 
       // First server hydration: the persisted last-used lens may be a CUSTOM
-      // lens that only becomes available now. Restore it once, unless the
-      // user already picked a lens this session (never clobber an explicit
-      // choice with late-arriving hydration).
+      // lens that only becomes available now. Restore it once — but only
+      // while still on the default lens, so an explicit pick (or a lens the
+      // URL fragment already applied) is never clobbered.
       if (!customLensHydrationDone) {
         customLensHydrationDone = true;
-        const persisted = loadActiveLensId();
+        const persisted = getPersistedActiveLensId();
         if (
-          !userPickedLensThisSession &&
+          s.activeLensId === "all-traces" &&
           persisted &&
           persisted !== s.activeLensId
         ) {
