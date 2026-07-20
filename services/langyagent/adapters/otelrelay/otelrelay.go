@@ -399,7 +399,7 @@ func (r *Relay) logRequests(ctx context.Context, next http.Handler) http.Handler
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, req)
-		clog.Get(ctx).Debug("otelrelay request",
+		clog.Get(ctx).Info("otelrelay request",
 			zap.String("method", req.Method),
 			zap.String("signal", pathSignal(req.URL.Path)),
 			zap.String("token_prefix", redactToken(req.PathValue("token"))),
@@ -452,7 +452,13 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	td, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(body)
+	// Content-type-aware decode. opencode's native exporter ships OTLP/HTTP
+	// JSON and IGNORES OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf — a
+	// proto-only parse 400'd every worker batch this relay ever received,
+	// which is exactly why worker spans never reached anyone. Everything
+	// downstream (the internal copy and the customer forward) is normalized
+	// to protobuf regardless of what arrived.
+	td, err := unmarshalTraces(req.Header.Get("Content-Type"), body)
 	if err != nil {
 		http.Error(w, "invalid OTLP payload", http.StatusBadRequest)
 		return
@@ -462,7 +468,11 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 	// LangWatch's own copy, content-stripped, built from the batch BEFORE it is
 	// re-parented in place for the customer. Best-effort and detached: our
 	// observability must never delay or fail the customer's telemetry.
-	r.exportInternal(conversationID, entry.info.Model, turn, body)
+	// Marshaled here (not the raw body) so the internal leg always carries
+	// protobuf, whatever encoding the worker chose.
+	if internalBody, imErr := (&ptrace.ProtoMarshaler{}).MarshalTraces(td); imErr == nil {
+		r.exportInternal(conversationID, entry.info.Model, turn, internalBody)
+	}
 
 	ReparentTraces(td, conversationID, entry.info.ActorUserID, turn)
 	applyCustomerTracePolicy(td, customerTracePolicy)
@@ -644,6 +654,15 @@ func (r *Relay) postInternal(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("internal collector answered %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// unmarshalTraces decodes an OTLP trace payload by its content type:
+// application/json → the OTLP JSON encoding, anything else → protobuf.
+func unmarshalTraces(contentType string, body []byte) (ptrace.Traces, error) {
+	if strings.HasPrefix(strings.TrimSpace(strings.ToLower(contentType)), "application/json") {
+		return (&ptrace.JSONUnmarshaler{}).UnmarshalTraces(body)
+	}
+	return (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(body)
 }
 
 // forwardTraces POSTs the re-parented protobuf batch to the customer's

@@ -201,3 +201,52 @@ func TestRelayDropsNonTraceSignals(t *testing.T) {
 		t.Errorf("logs/metrics must be dropped, never forwarded; upstream saw %q", ingest.path)
 	}
 }
+
+// opencode's native exporter ships OTLP/HTTP JSON and ignores
+// OTEL_EXPORTER_OTLP_PROTOCOL — the relay must accept it, and everything it
+// forwards must still be protobuf.
+func TestRelayTraces_JSONEncodedExport(t *testing.T) {
+	relay := startRelay(t)
+	ingest := startIngest(t)
+	token, err := relay.Register(WorkerInfo{
+		ConversationID:    "conv-json",
+		LangwatchEndpoint: ingest.srv.URL,
+		LangwatchAPIKey:   "sk-session",
+	})
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	relay.SetTurnContext(token, turnContext())
+
+	td, _, _ := workerBatch()
+	payload, err := (&ptrace.JSONMarshaler{}).MarshalTraces(td)
+	if err != nil {
+		t.Fatalf("marshal JSON fixture: %v", err)
+	}
+
+	resp, err := http.Post(
+		relay.OTLPEndpointFor(token)+"/v1/traces",
+		"application/json",
+		bytes.NewReader(payload),
+	)
+	if err != nil {
+		t.Fatalf("POST JSON traces: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("relay answered %d for a JSON body, want 200", resp.StatusCode)
+	}
+
+	forwarded, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(ingest.body)
+	if err != nil {
+		t.Fatalf("forwarded payload is not OTLP protobuf: %v", err)
+	}
+	span := forwarded.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0)
+	if span.TraceID() != pcommon.TraceID(turnTraceID) {
+		t.Errorf("forwarded span trace id = %v, want the turn's %v", span.TraceID(), turnTraceID)
+	}
+	attrs := forwarded.ResourceSpans().At(0).Resource().Attributes()
+	if origin, ok := attrs.Get("langwatch.origin"); !ok || origin.Str() != "langy" {
+		t.Errorf("forwarded origin = %v, want langy", origin.Str())
+	}
+}
