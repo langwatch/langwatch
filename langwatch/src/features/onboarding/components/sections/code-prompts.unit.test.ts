@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  PROMPT_ANALYTICS,
+  PROMPT_AGENT_PERFORMANCE,
   PROMPT_EVALUATIONS,
   PROMPT_LEVEL_UP,
   PROMPT_PROMPTS,
@@ -71,7 +71,7 @@ describe("code-prompts Gemini CLI compatibility (issue #3104)", () => {
     { name: "PROMPT_EVALUATIONS", text: PROMPT_EVALUATIONS },
     { name: "PROMPT_SCENARIOS", text: PROMPT_SCENARIOS },
     { name: "PROMPT_PROMPTS", text: PROMPT_PROMPTS },
-    { name: "PROMPT_ANALYTICS", text: PROMPT_ANALYTICS },
+    { name: "PROMPT_AGENT_PERFORMANCE", text: PROMPT_AGENT_PERFORMANCE },
     { name: "PROMPT_LEVEL_UP", text: PROMPT_LEVEL_UP },
   ];
 

@@ -35,9 +35,9 @@ You are using LangWatch for your AI agent project. Follow these instructions.
 IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
-# Analyze Agent Performance with LangWatch
+# Diagnose Your Agent's Production Behavior
 
-This skill queries and presents analytics. It does NOT write code.
+This skill is a production diagnostician. It reads the real traffic, not the code, and answers: what is my agent actually doing out there, where is it failing, who is it annoying, and where is the money going. It is read-only on the platform: the only thing it writes is a report file.
 
 ## Step 1: Set up the LangWatch CLI
 
@@ -69,75 +69,86 @@ And two ways to authenticate:
 
 So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
-## Step 2: Get a Project Overview
+## Step 2: Baseline the Vital Signs
+
+Establish the macro picture first, always comparing against the previous period (the analytics API returns both periods for every query):
 
 ```bash
-langwatch status
+langwatch status                                                  # Resource counts and project overview
+langwatch analytics query --metric trace-count --format json      # Volume trend, last 7 days
+langwatch analytics query --metric total-cost --format json       # Spend trend
+langwatch analytics query --metric avg-latency --format json      # Latency trend
+langwatch analytics query --metric p95-latency --format json      # Tail latency
+langwatch analytics query --metric total-tokens --format json     # Token consumption
+langwatch analytics query --metric eval-pass-rate --format json   # Quality trend, if evaluators exist
 ```
 
-This shows resource counts (traces, evaluators, scenarios, datasets, etc.) and reminds you which subcommands are available.
-
-## Step 3: Query Trends and Aggregations
-
-Use `langwatch analytics query` for time-series data and aggregate metrics. Start with the presets:
+Then slice the same metrics to find WHERE the numbers come from:
 
 ```bash
-langwatch analytics query --metric trace-count        # Total traces over the last 7 days
-langwatch analytics query --metric total-cost         # Total LLM cost
-langwatch analytics query --metric avg-latency        # Average completion latency
-langwatch analytics query --metric p95-latency        # P95 completion latency
-langwatch analytics query --metric eval-pass-rate     # Evaluation pass rate
+langwatch analytics query --metric total-cost --group-by metadata.model --format json
+langwatch analytics query --metric trace-count --group-by metadata.labels --format json
+langwatch analytics query --metric p95-latency --group-by metadata.model --format json
 ```
 
-Refine with `--start-date`, `--end-date`, `--group-by`, `--time-scale`, and `--aggregation`. Use `langwatch analytics query --help` to see every flag and `--format json` to feed the output to other tools.
+Widen with `--start-date` (ISO) to 30 days when trends look suspicious: a gradual drift only shows on longer windows. Run `langwatch analytics query --help` for every preset and flag.
 
-If you don't know which preset names exist or want a non-preset metric path:
+## Step 3: Export the Evidence and Mine It
+
+Aggregates say WHAT changed; only the traces say WHY. Export a large sample and analyze it locally:
 
 ```bash
-langwatch analytics query --help                       # Lists presets and flags
-langwatch docs analytics/custom-metrics                # Background on the metric model
+langwatch trace export --format jsonl --limit 1000 -o traces.jsonl
+langwatch trace export --format jsonl --limit 1000 --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
 ```
 
-## Step 4: Find Specific Traces
+Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
+
+1. **Failure patterns**: cluster error traces by error message and by input shape. Which user intents fail most?
+2. **Dissatisfied users**: traces with negative feedback or angry language in inputs ("this is wrong", "that's not what I asked", repeated rephrasing of the same question in a thread). Check annotations on candidate traces too: thumbs down and reviewer comments are gold.
+3. **Token and cost hotspots**: distribution of tokens per trace; the p99 tail; which metadata slice (model, label, user) concentrates the spend; prompts that balloon context.
+4. **Edge cases**: inputs far from the common distribution (very long, empty, non-primary language, unusual formats) and how the agent handled them.
+5. **Behavior changes**: compare the recent window against the older export: output length, tool usage mix, model mix, refusal rate, latency. Anything that moved, find the first day it moved.
+6. **Outliers**: the single weirdest traces by duration, cost, span count, and output size. Read them individually.
 
 ```bash
-langwatch trace search -q "error" --limit 10           # Find error traces by keyword
-langwatch trace search --start-date 2026-01-01         # Custom date range
-langwatch trace search --format json                   # Machine-readable output
+langwatch trace search -q "<keyword from a pattern>" --limit 10 --format json   # Chase a specific pattern
+langwatch trace get <traceId>                                                   # Read a representative trace in full
+langwatch trace get <traceId> -f json                                           # Every span, token count, and timing
 ```
 
-## Step 5: Inspect Individual Traces
+For every pattern you claim, keep 2-3 example trace IDs as evidence. Never report a pattern without example traces behind it.
 
-```bash
-langwatch trace get <traceId>                          # Human-readable digest (default)
-langwatch trace get <traceId> -f json                  # Raw JSON for full detail
-langwatch trace export --format csv -o traces.csv      # Bulk export as CSV
-langwatch trace export --format jsonl --limit 500      # Bulk export as JSONL
-```
+## Step 4: Build the Report
 
-For each interesting trace, look at:
+Write a single self-contained `agent-performance-report.html` in the project root (inline CSS, no external assets) with:
 
-- The full request/response
-- Token counts and costs per span
-- Error messages and stack traces
-- Individual LLM calls within a multi-step agent
+- **Executive summary**: the 3-5 findings that matter, each one sentence with its magnitude ("34% of errors come from date parsing on non-English inputs")
+- One section per finding: the metric evidence (small tables, before/after numbers), what it means, and **links to example traces** so every claim is verifiable in one click
+- A cost breakdown section, a reliability section, and a user-satisfaction section, even when healthy: say what was checked and that it looks fine
+- A closing "recommended next steps" section ranked by impact
 
-## Step 6: Present Findings
+Trace links: `langwatch trace get` returns the platform URL for each trace; use those URLs directly. Anyone on the project team can open them.
 
-Summarize the data clearly for the user:
+Open the report path for the user and also summarize the top findings directly in the conversation, leading with the numbers.
 
-- Lead with the key numbers they asked about
-- Highlight anomalies or concerning trends (cost spikes, latency increases, error rate changes)
-- Provide context by comparing to previous periods when relevant
-- Suggest next steps if issues are found (e.g., "The p95 latency spiked on Tuesday — here are the slowest traces from that day")
+## Step 5: Hand Off to Improvement
+
+Diagnosis without treatment is just bad news. Close by proposing the next step:
+
+- If the `agent-improvement` skill is installed, offer to run `/agent-improvement` on the findings right away: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes.
+- If it is not installed, tell the user to install it: `npx skills add langwatch/skills/agent-improvement`
+
+Pass along the report: agent-improvement uses these findings and trace examples as its evidence base.
 
 ## Common Mistakes
 
-- Do NOT try to write code — this skill queries existing data, no SDK installation or code changes
-- Use the preset names with `langwatch analytics query --metric ...` (trace-count, total-cost, avg-latency, etc.); do NOT hardcode raw metric paths unless the preset list doesn't cover what you need
-- Do NOT use `langwatch evaluator create` / `langwatch monitor create` here — this skill is read-only analytics
-- Do NOT present raw JSON to the user — summarize the data in a clear, human-readable format
-- If the CLI returns an error, surface the exact message in your reply rather than paraphrasing — the user often needs the raw error to debug API key, project, or date-range issues
+- Do NOT modify the agent's code, prompts, or any platform resource; this skill is read-only plus one report file
+- Do NOT report a pattern without linked example traces; unverifiable claims are worthless
+- Do NOT rely on aggregates alone; always read at least a handful of full traces per finding, the surprise is always in the details
+- Do NOT analyze only the happy window; without a before/after comparison you cannot see behavior change
+- Do NOT dump raw JSON at the user; the deliverable is the diagnosis and the report, written in plain language with numbers
+- If the CLI returns an error, surface the exact message in your reply rather than paraphrasing; the user often needs the raw error to debug API key, project, or date-range issues
 ````
 
         </div>
