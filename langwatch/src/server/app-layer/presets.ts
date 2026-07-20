@@ -1085,12 +1085,6 @@ export function initializeDefaultApp(options?: {
       await broadcast.close();
     },
   });
-  gracefulCloseables.push({
-    // The enterprise process outbox/wake workers share one stop composite
-    // exposed by the registry; everything else is runtime-owned (ADR-052).
-    name: "enterprise-process-workers",
-    close: () => commands.enterpriseWorkers.stop(),
-  });
   if (scheduler) {
     gracefulCloseables.push({
       name: "scheduler",
@@ -1507,11 +1501,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         },
         setPool: () => {
           /* noop */
-        },
-      },
-      enterpriseWorkers: {
-        stop: async () => {
-          // Test preset has no background process workers.
         },
       },
     },

@@ -127,13 +127,7 @@ import {
   type TopicClusteringOutcomeCommands,
   type TopicClusteringRunPort,
 } from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
-import {
-  OutboxDispatcherService,
-  ProcessManagerService,
-  ProcessOutboxWorker,
-  ProcessWakeWorker,
-  type ProcessStore,
-} from "./process-manager";
+import { type ProcessStore } from "./process-manager";
 import { createTopicClusteringProcessingPipeline } from "./pipelines/topic-clustering-processing/pipeline";
 import type { TopicClusteringRunStatusData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
@@ -439,20 +433,7 @@ export class PipelineRegistry {
     const enterprisePipelines = registerEnterprisePipelineSet({
       ...this.deps.enterprisePipelines,
       eventSourcing: this.deps.eventSourcing,
-      processStore: this.deps.repositories.processStore,
     });
-    // Topic clustering's wake-ups are runtime-owned (ADR-052); this worker
-    // scans only the enterprise process managers, so the two never
-    // double-claim.
-    const enterpriseWakeWorker = new ProcessWakeWorker({
-      store: this.deps.repositories.processStore,
-      managers: { ...enterprisePipelines.processManagers },
-      logger,
-      notifyOutbox: () => enterprisePipelines.notifyOutbox(),
-    });
-    if (enterprisePipelines.runsWorkers) {
-      enterpriseWakeWorker.start();
-    }
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -470,19 +451,6 @@ export class PipelineRegistry {
       automations: automationCommands,
       /** Late-bind the execution pool for scenario execution reactor. */
       scenarioExecutionHandle,
-      // Starting and notifying are private composition concerns so a web role
-      // cannot accidentally start the workers. App shutdown only needs stop().
-      // Langy and topic clustering are runtime-owned (ADR-052) and stop with
-      // EventSourcing.close(); only the enterprise set still runs its own
-      // outbox and wake workers.
-      enterpriseWorkers: {
-        stop: async () => {
-          await Promise.all([
-            enterprisePipelines.stop(),
-            enterpriseWakeWorker.stop(),
-          ]);
-        },
-      },
     };
   }
 

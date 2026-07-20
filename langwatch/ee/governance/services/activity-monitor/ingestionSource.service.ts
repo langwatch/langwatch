@@ -31,7 +31,7 @@ import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
-import { assertValidPullSchedule } from "@ee/governance/services/pullers/process-manager";
+import { assertValidPullSchedule } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPull.process";
 import { syncIngestionPullSource } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import { encryptParserConfigCredentials } from "./ingestionCredentials";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "./ingestionSource.constants";
