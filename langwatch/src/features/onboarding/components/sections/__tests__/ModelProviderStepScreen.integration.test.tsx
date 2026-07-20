@@ -71,8 +71,10 @@ describe("ModelProviderStepScreen", () => {
     it("offers Codex first, ahead of the registry-first provider", () => {
       renderStep();
 
+      // The badge folds into the accessible name ("…, Recommended"), so match
+      // on the label prefix rather than the exact string.
       const codexCard = screen.getByRole("button", {
-        name: "Codex (OpenAI account)",
+        name: /^Codex \(OpenAI account\)/,
       });
       const openAiCard = screen.getByRole("button", { name: "OpenAI" });
 
