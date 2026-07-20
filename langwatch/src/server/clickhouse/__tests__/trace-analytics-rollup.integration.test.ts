@@ -129,6 +129,43 @@ async function readRollupForTenant(tenant: string): Promise<{
   };
 }
 
+/**
+ * Wait until the tenant's inserted rows are visible to SELECTs. The
+ * repository inserts with async_insert + wait_for_async_insert, but the ack
+ * can still beat part visibility when a server profile overrides the wait —
+ * both CI and local runs have seen a read land on 0 rows milliseconds after
+ * an acked insert. Deadline-polling is the same pattern
+ * metricsSync.convergence uses; a genuinely lost insert still fails, loudly,
+ * after the deadline.
+ */
+async function waitForSpanCount(
+  tenant: string,
+  expected: number,
+): Promise<void> {
+  const deadline = Date.now() + 15_000;
+  for (;;) {
+    const result = await ch.query({
+      query: `
+        SELECT sum(SpanCount) AS spanCount
+        FROM trace_analytics_rollup
+        WHERE TenantId = {tenantId:String}
+      `,
+      query_params: { tenantId: tenant },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{
+      spanCount: number | string;
+    }>;
+    if (Number(rows[0]?.spanCount ?? 0) >= expected) return;
+    if (Date.now() > deadline) {
+      throw new Error(
+        `trace_analytics_rollup rows not visible after 15s (tenant ${tenant}, want ${expected})`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
@@ -154,6 +191,7 @@ describe("trace_analytics_rollup app-side projection (integration)", () => {
         makeRow(tenantId, { cost: 0.04 }),
         makeRow(tenantId, { cost: 0.05 }),
       ]);
+      await waitForSpanCount(tenantId, 3);
     });
 
     describe("when each span contributes its own cost as a SimpleAggregateFunction(sum) row", () => {
@@ -183,6 +221,7 @@ describe("trace_analytics_rollup root-span duration (integration)", () => {
       makeRow(rootTenantId, { cost: 0, durationMs: 0 }),
       makeRow(rootTenantId, { cost: 0, durationMs: 0 }),
     ]);
+    await waitForSpanCount(rootTenantId, 3);
   });
 
   afterAll(async () => {
@@ -221,6 +260,7 @@ describe("trace_analytics_rollup per-trace average via TraceCount (integration)"
       makeRow(avgTenantId, { cost: 0, durationMs: 300, isRoot: true }),
       makeRow(avgTenantId, { cost: 0, durationMs: 0 }),
     ]);
+    await waitForSpanCount(avgTenantId, 3);
   });
 
   afterAll(async () => {
@@ -261,6 +301,7 @@ describe("trace_analytics_rollup re-delivered span (integration)", () => {
     // — no back-out, no signs, no settle.
     await dupRepo.insertRows([row]);
     await dupRepo.insertRows([row]);
+    await waitForSpanCount(dupTenantId, 2);
   });
 
   afterAll(async () => {

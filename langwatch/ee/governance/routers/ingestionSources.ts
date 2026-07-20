@@ -158,6 +158,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         parserConfig: z.record(z.string(), z.unknown()).optional(),
         status: statusSchema.optional(),
         teamId: z.string().nullable().optional(),
+        pullSchedule: z.string().min(1).max(64).nullable().optional(),
       }),
     )
     .use(checkOrganizationPermission("ingestionSources:manage"))
@@ -171,6 +172,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         parserConfig: input.parserConfig,
         status: input.status,
         teamId: input.teamId,
+        pullSchedule: input.pullSchedule,
       });
       return toDto(updated);
     }),

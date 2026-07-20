@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
@@ -19,8 +20,8 @@ import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/
 import {
   type ClickHouseClientResolver,
   clearCustomClientCache,
-  getClickHouseClientForProject,
   getClickHouseClientForOrganization,
+  getClickHouseClientForProject,
   getSharedClickHouseClient,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
@@ -172,6 +173,8 @@ import { PrismaLangyTurnAdmissionRepository } from "./langy/repositories/langy-t
 import { NullLangyTurnAdmissionRepository } from "./langy/repositories/langy-turn-admission.repository";
 import { CanonicalLogRecordClickHouseRepository } from "./logs/repositories/canonical-log-record.clickhouse.repository";
 import { NullCanonicalLogRecordRepository } from "./logs/repositories/canonical-log-record.repository";
+import { MetricDataPointClickHouseRepository } from "./metrics/repositories/metric-data-point.clickhouse.repository";
+import { NullMetricDataPointRepository } from "./metrics/repositories/metric-data-point.repository";
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { EventExplorerService } from "./ops/event-explorer.service";
@@ -210,9 +213,16 @@ import { createCompositePlanProvider } from "./subscription/composite-plan-provi
 import { PlanProviderService } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
-import { NullTopicRepository } from "./topics/null-topic.repository";
-import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
-import { TopicService } from "./topics/topic.service";
+import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
+import { clusterTopicsForProject } from "./topic-clustering/clustering";
+import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
+import { PrismaTopicRepository } from "./topic-clustering/repositories/topic.prisma.repository";
+import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
+import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
+import { PrismaTopicClusteringStatusRepository } from "./topic-clustering/repositories/topic-clustering-status.repository";
+import { PrismaTopicModelProjectionRepository } from "./topic-clustering/repositories/topic-model-projection.prisma.repository";
+import { TopicService } from "./topic-clustering/topic.service";
+import { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
 import { CodingAgentSessionService } from "./traces/coding-agent-session.service";
 import { maybeSpool } from "./traces/edge-spool";
 import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
@@ -223,8 +233,6 @@ import { CodingAgentSessionClickHouseRepository } from "./traces/repositories/co
 import { NullCodingAgentSessionRepository } from "./traces/repositories/coding-agent-session.repository";
 import { LogRecordStorageClickHouseRepository } from "./traces/repositories/log-record-storage.clickhouse.repository";
 import { NullLogRecordStorageRepository } from "./traces/repositories/log-record-storage.repository";
-import { MetricDataPointClickHouseRepository } from "./metrics/repositories/metric-data-point.clickhouse.repository";
-import { NullMetricDataPointRepository } from "./metrics/repositories/metric-data-point.repository";
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
 import { TraceAnalyticsClickHouseRepository } from "./traces/repositories/trace-analytics.clickhouse.repository";
@@ -686,7 +694,13 @@ export function initializeDefaultApp(options?: {
         ? new ClickHouseLangyAnalyticsEventRepository(resolveClickHouseClient)
         : new NullLangyAnalyticsEventRepository(),
     ),
-    langyProcessStore: new PrismaProcessStore(prisma),
+    processStore: new PrismaProcessStore(prisma),
+    topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
+      prisma,
+    ),
+    topicClusteringRunHistory:
+      new PrismaTopicClusteringRunHistoryProjectionRepository(prisma),
+    topicModel: new PrismaTopicModelProjectionRepository(prisma),
     langyTurnAdmission,
   };
 
@@ -724,7 +738,7 @@ export function initializeDefaultApp(options?: {
     retentionPolicyResolver: retentionPolicyCache,
     // ADR-052: durable persistence for withProcessManager declarations —
     // the SAME store instance the registry's dependency assembly uses.
-    processStore: repositories.langyProcessStore,
+    processStore: repositories.processStore,
   });
 
   // ADR-052: automation dispatch ports for the process-manager runtime the
@@ -897,10 +911,22 @@ export function initializeDefaultApp(options?: {
       handoffStore: langyHandoffStore,
       worker: langyWorker,
       titleGenerator: langyTitleGenerator,
-      runsWorkers: roleRunsWorkers(config.processRole),
     },
     automations: {
       ports: automationPorts,
+    },
+    topicClustering: {
+      runPort: {
+        runClusteringPage: ({ projectId, searchAfter, runId, page }) =>
+          clusterTopicsForProject(projectId, searchAfter ?? undefined, {
+            runId,
+            page,
+          }),
+      },
+    },
+    enterprisePipelines: {
+      prisma,
+      runsWorkers: roleRunsWorkers(config.processRole),
     },
     projects,
     monitors,
@@ -923,6 +949,22 @@ export function initializeDefaultApp(options?: {
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle =
     commands.scenarioExecutionHandle;
+
+  if (roleRunsWorkers(config.processRole)) {
+    // One-time background seeds on worker boot (ADR-051): topic-model
+    // history onto the event stream, and daily-wake schedules for
+    // pre-cutover projects. The module owns its own wiring, coordination,
+    // and error handling — a failure is logged and the next boot retries.
+    startTopicClusteringBootSeeds({
+      prisma,
+      redis: redis ?? null,
+      commands: {
+        recordTopics: (args) => commands.topicClustering.recordTopics(args),
+        requestClustering: (args) =>
+          commands.topicClustering.requestClustering(args),
+      },
+    });
+  }
 
   // Langy operational reads come from the Postgres projections; writes remain
   // commands against the canonical ClickHouse event log.
@@ -1162,12 +1204,6 @@ export function initializeDefaultApp(options?: {
       await broadcast.close();
     },
   });
-  gracefulCloseables.push({
-    // The langy + automation process outbox/wake workers share one stop
-    // composite exposed by the registry.
-    name: "process-outbox-workers",
-    close: () => commands.processOutboxWorker.stop(),
-  });
   if (scheduler) {
     gracefulCloseables.push({
       name: "scheduler",
@@ -1235,6 +1271,12 @@ export function initializeDefaultApp(options?: {
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
+    topicClustering: {
+      status: new TopicClusteringStatusService(
+        new PrismaTopicClusteringStatusRepository(prisma),
+      ),
+      topics,
+    },
     langy: {
       conversations: langyConversations,
       turns: langyTurns,
@@ -1415,6 +1457,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         queueSimulationRun: noop,
       }),
     },
+    topicClustering: {
+      status: new TopicClusteringStatusService(
+        new PrismaTopicClusteringStatusRepository(testPrisma),
+      ),
+      topics: new TopicService(new PrismaTopicRepository(testPrisma)),
+    },
     langy: {
       conversations: LangyConversationService.create(
         {
@@ -1561,6 +1609,14 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         consumeTurnHandoff: noop,
         generateConversationTitle: noop,
       } as AppCommands["langy"],
+      topicClustering: {
+        requestClustering: noop,
+        recordClusteringRunStarted: noop,
+        recordClusteringRunCompleted: noop,
+        recordClusteringRunFailed: noop,
+        recordTopics: noop,
+      } as AppCommands["topicClustering"],
+      ...createNoopEnterprisePipelineCommands(),
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],
@@ -1578,9 +1634,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         setPool: () => {
           /* noop */
         },
-      },
-      processOutboxWorker: {
-        stop: async () => {},
       },
     },
     retentionPolicyCache: testRetentionPolicyCache,

@@ -1,4 +1,8 @@
 import {
+  type EnterprisePipelineSetConfig,
+  registerEnterprisePipelineSet,
+} from "@ee/event-sourcing/pipelineSet";
+import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
 } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
@@ -47,16 +51,6 @@ import {
   revokeLangySessionApiKey,
 } from "../app-layer/langy/langyApiKey";
 import type { LangyWorkerPort } from "../app-layer/langy/langyWorker";
-import {
-  createLangyProcessSubscriber,
-  LANGY_CONVERSATION_PROCESS_NAME,
-  langyConversationProcessDefinition,
-} from "../app-layer/langy/process-manager";
-import {
-  createLangyEffectPorts,
-  createLangyIntentHandlers,
-  LANGY_OUTBOX_LEASE_DURATION_MS,
-} from "../app-layer/langy/process-manager/langyEffectPorts";
 import type { LangyTurnAdmissionRepository } from "../app-layer/langy/repositories/langy-turn-admission.repository";
 import type { LangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
@@ -70,6 +64,7 @@ import type { MetricDataPointRepository } from "../app-layer/metrics/repositorie
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
+import { createRateLimitedBootstrap } from "../app-layer/topic-clustering/topicClusteringBootstrapGate";
 import type { CodingAgentSessionRepository } from "../app-layer/traces/repositories/coding-agent-session.repository";
 import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
 import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
@@ -84,6 +79,10 @@ import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyR
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
+import type {
+  TopicClusteringOutcomeCommands,
+  TopicClusteringRunPort,
+} from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
 import { type CommandDispatcher, Deferred } from "./deferred";
 import { createTenantId } from "./domain/tenantId";
 import type { EventSourcing } from "./eventSourcing";
@@ -113,6 +112,7 @@ import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-pr
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
+import { createLangyEffectPorts } from "./pipelines/langy-conversation-processing/process-manager/langyEffectPorts";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import type { LangyConversationStateData } from "./pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
 import type { LangyConversationTurnData } from "./pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
@@ -146,6 +146,10 @@ import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processi
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
+import { createTopicClusteringProcessingPipeline } from "./pipelines/topic-clustering-processing/pipeline";
+import type { TopicClusteringRunHistoryData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
+import type { TopicClusteringRunStatusData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
+import type { TopicModelData } from "./pipelines/topic-clustering-processing/projections/topicModel.foldProjection";
 import { resolveLogCommandShardCount } from "./pipelines/trace-processing/commands/logCommandGroupKey";
 import { resolveSpanCommandShardCount } from "./pipelines/trace-processing/commands/spanCommandGroupKey";
 import {
@@ -154,8 +158,8 @@ import {
 } from "./pipelines/trace-processing/pipeline";
 import type { CodingAgentSessionState } from "./pipelines/trace-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "./pipelines/trace-processing/projections/codingAgentSession.store";
-import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
+import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
@@ -270,8 +274,18 @@ export interface PipelineRepositories {
   langyMessageStorage: AppendStore<LangyMessageProjectionRecord>;
   /** Content-free ClickHouse event-grain analytics. */
   langyAnalyticsEventStorage: AppendStore<LangyAnalyticsEventProjectionRecord>;
-  /** Durable process inbox, state, and outbox persistence. */
-  langyProcessStore: ProcessStore;
+  /**
+   * Durable process inbox, state, and outbox persistence — SHARED across
+   * every process manager (the ProcessManager* tables are generic; each
+   * domain's dispatcher scopes its leases via `processNames`).
+   */
+  processStore: ProcessStore;
+  /** Per-project topic clustering run status (ADR-051, Postgres). */
+  topicClusteringRunStatus: StateProjectionStore<TopicClusteringRunStatusData>;
+  /** Per-project topic clustering run history (audit; bounded). */
+  topicClusteringRunHistory: StateProjectionStore<TopicClusteringRunHistoryData>;
+  /** Write-through topic model store (the Topic table + cursor row). */
+  topicModel: StateProjectionStore<TopicModelData>;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionRepository;
 }
@@ -286,8 +300,12 @@ export interface PipelineRegistryDeps {
     handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
     worker: Pick<LangyWorkerPort, "dispatch">;
     titleGenerator: LangyTitleGenerator;
-    runsWorkers: boolean;
   };
+  topicClustering: {
+    /** Runs one clustering page (the ADR-051 effect's domain function). */
+    runPort: TopicClusteringRunPort;
+  };
+  enterprisePipelines: EnterprisePipelineSetConfig;
   projects: ProjectService;
   monitors: MonitorService;
   triggers: TriggerService;
@@ -328,6 +346,16 @@ export interface PipelineRegistryDeps {
 export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
 
+  /**
+   * ADR-051: the trace pipeline's projectMetadata reactor bootstraps a
+   * project's clustering schedule on its first real trace, but the topic
+   * clustering pipeline (whose command it dispatches) registers later —
+   * late-bound like the other cross-pipeline dispatchers.
+   */
+  private readonly bootstrapTopicClustering = new Deferred<
+    (projectId: string) => Promise<void>
+  >("bootstrapTopicClustering");
+
   private cached<State>(
     inner: FoldProjectionStore<State>,
     keyPrefix: string,
@@ -364,16 +392,12 @@ export class PipelineRegistry {
           decideSweepCandidates: automationPorts.decideSweepCandidates,
           evaluateGraphTrigger: automationPorts.evaluateGraphTrigger,
           deleteDispatchedBefore: (params) =>
-            this.deps.repositories.langyProcessStore.deleteDispatchedBefore(
-              params,
-            ),
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },
         prune: {
           pruneExpired: automationPorts.pruneWebhookDeliveries,
           deleteDispatchedBefore: (params) =>
-            this.deps.repositories.langyProcessStore.deleteDispatchedBefore(
-              params,
-            ),
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },
       }),
     );
@@ -420,8 +444,14 @@ export class PipelineRegistry {
     const experimentRunPipeline = this.registerExperimentRunPipeline({
       wireExperimentDeps,
     });
-    const { pipeline: langyConversationPipeline, processOutboxWorker } =
+    const { pipeline: langyConversationPipeline } =
       this.registerLangyConversationPipeline();
+    const { pipeline: topicClusteringPipeline } =
+      this.registerTopicClusteringPipeline();
+    const enterprisePipelines = registerEnterprisePipelineSet({
+      ...this.deps.enterprisePipelines,
+      eventSourcing: this.deps.eventSourcing,
+    });
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -435,16 +465,73 @@ export class PipelineRegistry {
       simulations: mapCommands(simulationPipeline.commands),
       suiteRuns: mapCommands(suiteRunPipeline.commands),
       langy: mapCommands(langyConversationPipeline.commands),
+      topicClustering: mapCommands(topicClusteringPipeline.commands),
+      ...enterprisePipelines.commands,
       billing: mapCommands(billingPipeline.commands),
       automations: automationCommands,
       /** Late-bind the execution pool for scenario execution reactor. */
       scenarioExecutionHandle,
-      // Starting and notifying are private composition concerns so a web role
-      // cannot accidentally start the worker. App shutdown only needs stop().
-      processOutboxWorker: {
-        stop: () => processOutboxWorker.stop(),
-      },
     };
+  }
+
+  /**
+   * ADR-051: topic clustering scheduling as a builder-mounted process
+   * manager (ADR-052) — the pipeline declares the whole topology (events,
+   * projection, commands, process manager, outbox tuning); the shared
+   * ProcessRuntime owns the manager, outbox and wake workers. The registry
+   * only injects executor dependencies and late-binds the outcome commands,
+   * which are this same pipeline's own write surface and exist only after
+   * `.build()`.
+   */
+  private registerTopicClusteringPipeline() {
+    let outcomeCommands: TopicClusteringOutcomeCommands | null = null;
+
+    const pipeline = this.deps.eventSourcing.register(
+      createTopicClusteringProcessingPipeline({
+        topicClusteringRunStatusStore:
+          this.deps.repositories.topicClusteringRunStatus,
+        topicClusteringRunHistoryStore:
+          this.deps.repositories.topicClusteringRunHistory,
+        topicModelStore: this.deps.repositories.topicModel,
+        dispatch: {
+          runPort: this.deps.topicClustering.runPort,
+          commands: () => {
+            if (!outcomeCommands) {
+              throw new Error(
+                "Topic clustering outcome commands used before the pipeline finished registering",
+              );
+            }
+            return outcomeCommands;
+          },
+        },
+      }),
+    );
+
+    const commands = mapCommands(pipeline.commands);
+    outcomeCommands = {
+      recordClusteringRunStarted: (args) =>
+        commands.recordClusteringRunStarted(args),
+      recordClusteringRunCompleted: (args) =>
+        commands.recordClusteringRunCompleted(args),
+      recordClusteringRunFailed: (args) =>
+        commands.recordClusteringRunFailed(args),
+    };
+    // Level-triggered bootstrap: the projectMetadata reactor asks on every
+    // real ingest, and this claim keeps that to one commit per project per
+    // window. See createRateLimitedBootstrap for why re-asking is safe.
+    this.bootstrapTopicClustering.resolve(
+      createRateLimitedBootstrap({
+        redis: this.deps.redis,
+        bootstrap: (projectId) =>
+          commands.requestClustering({
+            tenantId: projectId,
+            occurredAt: Date.now(),
+            trigger: "bootstrap",
+          }),
+      }),
+    );
+
+    return { pipeline };
   }
 
   /** Langy writes its low-latency operational projections directly to Postgres. */
@@ -468,10 +555,6 @@ export class PipelineRegistry {
       }) => Promise<void>
     >("langyGenerateTitle");
 
-    const processManager = new ProcessManagerService({
-      definition: langyConversationProcessDefinition,
-      store: this.deps.repositories.langyProcessStore,
-    });
     const effectPorts = createLangyEffectPorts({
       handoffStore: this.deps.langy.handoffStore,
       worker: this.deps.langy.worker,
@@ -490,23 +573,6 @@ export class PipelineRegistry {
       titleGenerator: this.deps.langy.titleGenerator,
       saveTitle: (args) => saveTitle.fn(args),
     });
-    const outboxDispatcher = new OutboxDispatcherService({
-      store: this.deps.repositories.langyProcessStore,
-      handlers: createLangyIntentHandlers({ ports: effectPorts }),
-      logger,
-      processNames: [LANGY_CONVERSATION_PROCESS_NAME],
-      // The lease MUST outlive the slowest accepted dispatch, or a healthy
-      // long-running turn loses its lease mid-flight and a second instance
-      // re-delivers it concurrently (the completing handler is then fenced
-      // out and the message never retires). The generic 30s default is unsafe
-      // against the 60s dispatch budget.
-      leaseDurationMs: LANGY_OUTBOX_LEASE_DURATION_MS,
-    });
-    const processOutboxWorker = new ProcessOutboxWorker({
-      dispatcher: outboxDispatcher,
-      logger,
-    });
-
     const conversationReader = {
       read: async ({
         projectId,
@@ -531,10 +597,6 @@ export class PipelineRegistry {
       },
     };
 
-    const processSubscriber = createLangyProcessSubscriber({
-      processManager,
-      notifyOutbox: () => processOutboxWorker.notify(),
-    });
     const livenessSubscriber = createAgentTurnLivenessSubscriber({
       buffer: this.deps.langy.buffer,
       conversations: conversationReader,
@@ -560,8 +622,8 @@ export class PipelineRegistry {
         langyMessageProjectionStore: this.deps.repositories.langyMessageStorage,
         langyAnalyticsEventProjectionStore:
           this.deps.repositories.langyAnalyticsEventStorage,
+        langyProcessPorts: effectPorts,
         subscribers: [
-          processSubscriber,
           livenessSubscriber,
           broadcastSubscriber,
           admissionLifecycleSubscriber,
@@ -590,10 +652,10 @@ export class PipelineRegistry {
         model: args.model,
       }),
     );
-    if (this.deps.langy.runsWorkers) {
-      processOutboxWorker.start();
-    }
-    return { pipeline, processOutboxWorker };
+    // The outbox worker, dispatcher and process service are owned by
+    // ProcessRuntime now that the process is declared on the pipeline; the
+    // registry no longer constructs or starts them.
+    return { pipeline };
   }
 
   private registerMetricPipeline() {
@@ -756,6 +818,8 @@ export class PipelineRegistry {
 
     const projectMetadataReactor = createProjectMetadataReactor({
       projects: this.deps.projects,
+      bootstrapTopicClustering: (projectId) =>
+        this.bootstrapTopicClustering.fn(projectId),
     });
 
     const simulationMetricsSyncReactor = createSimulationMetricsSyncReactor({
