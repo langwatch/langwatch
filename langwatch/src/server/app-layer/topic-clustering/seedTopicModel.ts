@@ -93,7 +93,20 @@ export async function seedTopicModelHistory(
   if (!(await claimSeed(deps.redis))) {
     return { seeded: 0, skipped: 0 };
   }
+  try {
+    return await runSeedPass(deps);
+  } finally {
+    // Release the claim once the pass is over (finished or crashed): the
+    // claim only elects one replica per concurrent boot window, it must not
+    // hold failed projects hostage until the TTL — "the next boot retries"
+    // is the contract.
+    await releaseSeedClaim(deps.redis);
+  }
+}
 
+async function runSeedPass(
+  deps: SeedTopicModelDeps,
+): Promise<{ seeded: number; skipped: number }> {
   let seeded = 0;
   let skipped = 0;
   let failed = 0;
@@ -161,6 +174,15 @@ export async function seedTopicModelHistory(
 
   logger.info({ seeded, skipped, failed }, "Topic model seed pass finished");
   return { seeded, skipped };
+}
+
+async function releaseSeedClaim(redis: Redis | Cluster | null): Promise<void> {
+  if (!redis) return;
+  try {
+    await redis.del(SEED_CLAIM_KEY);
+  } catch {
+    // Best-effort: worst case the TTL clears it.
+  }
 }
 
 async function isSeedDone(redis: Redis | Cluster | null): Promise<boolean> {

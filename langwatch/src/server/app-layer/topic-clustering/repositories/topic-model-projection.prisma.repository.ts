@@ -111,6 +111,10 @@ export class PrismaTopicModelProjectionRepository
       }),
       ...ordered.map((topic) =>
         this.prisma.topic.upsert({
+          // Topic ids are globally-unique nanoids minted by clustering or
+          // carried from seed events, and the reconcile delete above is
+          // project-scoped — a cross-project id collision would take a
+          // forged event to produce.
           where: { id: topic.id },
           create: {
             id: topic.id,
