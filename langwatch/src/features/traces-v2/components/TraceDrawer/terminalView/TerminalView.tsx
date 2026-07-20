@@ -419,6 +419,12 @@ function JumpToBottomPill({ onClick }: { onClick: () => void }) {
 interface MarkSegment {
   text: string;
   color: string;
+  /**
+   * Cell background fill. Backgrounds paint the full line box (block glyphs
+   * only ink the glyph itself), so marks that shade their letter counters
+   * need it to read as solid letterforms instead of outlines.
+   */
+  bg?: string;
 }
 
 interface MarkSpec {
@@ -447,21 +453,6 @@ function columnColoredMark(
   };
 }
 
-/** Split each row at one column — how opencode two-tones its wordmark. */
-function splitMark(
-  rows: readonly string[],
-  splitColumn: number,
-  leftColor: string,
-  rightColor: string,
-): MarkSpec {
-  return {
-    rows: rows.map((row) => [
-      { text: row.slice(0, splitColumn), color: leftColor },
-      { text: row.slice(splitColumn), color: rightColor },
-    ]),
-  };
-}
-
 function claudeGradientMark(rows: readonly string[]): MarkSpec {
   return {
     rows: rows.map((row) =>
@@ -484,21 +475,50 @@ const GEMINI_MARK = columnColoredMark(
 );
 
 /**
- * opencode's block wordmark, captured from the real TUI: "open" in gray,
- * "code" in near-white (the accent over the d is white too). Letters are
- * five columns each, so the tone splits at column 20.
+ * opencode's block wordmark, segment-for-segment from the real TUI (tmux
+ * capture-pane -e of `opencode` v1.18): "open" in gray, "code" in near-white,
+ * the letter counters filled with a raised background tone, and the n's
+ * under-arch gap drawn in the counter color. Without the background fills the
+ * letters read as hollow outlines and the n welds shut into an o.
  */
-const OPENCODE_MARK = splitMark(
-  [
-    "                                 ▄",
-    "█▀▀█ █▀▀█ █▀▀█ █▀▀▄ █▀▀▀ █▀▀█ █▀▀█ █▀▀█",
-    "█  █ █  █ █▀▀▀ █  █ █    █  █ █  █ █▀▀▀",
-    "▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀",
+const OPENCODE_GRAY = "#808080";
+const OPENCODE_GRAY_FILL = "#282828";
+const OPENCODE_WHITE = "#EEEEEE";
+const OPENCODE_WHITE_FILL = "#434343";
+const OPENCODE_MARK: MarkSpec = {
+  rows: [
+    [{ text: "                                 ▄", color: OPENCODE_WHITE }],
+    [
+      { text: "█▀▀█ █▀▀█ █▀▀█ █▀▀▄ ", color: OPENCODE_GRAY },
+      { text: "█▀▀▀ █▀▀█ █▀▀█ █▀▀█", color: OPENCODE_WHITE },
+    ],
+    [
+      { text: "█", color: OPENCODE_GRAY },
+      { text: "  ", color: OPENCODE_GRAY, bg: OPENCODE_GRAY_FILL },
+      { text: "█ █", color: OPENCODE_GRAY },
+      { text: "  ", color: OPENCODE_GRAY, bg: OPENCODE_GRAY_FILL },
+      { text: "█ █", color: OPENCODE_GRAY },
+      { text: "▀▀▀", color: OPENCODE_GRAY, bg: OPENCODE_GRAY_FILL },
+      { text: " █", color: OPENCODE_GRAY },
+      { text: "  ", color: OPENCODE_GRAY, bg: OPENCODE_GRAY_FILL },
+      { text: "█ ", color: OPENCODE_GRAY },
+      { text: "█", color: OPENCODE_WHITE },
+      { text: "   ", color: OPENCODE_WHITE, bg: OPENCODE_WHITE_FILL },
+      { text: " █", color: OPENCODE_WHITE },
+      { text: "  ", color: OPENCODE_WHITE, bg: OPENCODE_WHITE_FILL },
+      { text: "█ █", color: OPENCODE_WHITE },
+      { text: "  ", color: OPENCODE_WHITE, bg: OPENCODE_WHITE_FILL },
+      { text: "█ █", color: OPENCODE_WHITE },
+      { text: "▀▀▀", color: OPENCODE_WHITE, bg: OPENCODE_WHITE_FILL },
+    ],
+    [
+      { text: "▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀", color: OPENCODE_GRAY },
+      { text: "▀▀", color: OPENCODE_GRAY_FILL },
+      { text: "▀ ", color: OPENCODE_GRAY },
+      { text: "▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀", color: OPENCODE_WHITE },
+    ],
   ],
-  20,
-  "#808080",
-  "#EEEEEE",
-);
+};
 
 /** The OpenAI knot, drawn in blocks; tiny cells keep it banner-sized. */
 const CODEX_MARK: MarkSpec = {
@@ -599,12 +619,19 @@ function AgentMark({ mark }: { mark: MarkSpec }) {
           key={rowIndex}
           {...CELL}
           fontSize={mark.fontSize ?? CELL.fontSize}
-          lineHeight="1.15"
+          // Block-glyph art paints exactly the 1em glyph box, so any leading
+          // above 1 shows through as background hairlines between the rows
+          // and visually welds letterforms shut.
+          lineHeight="1"
           whiteSpace="pre"
+          // Adjacent block glyphs antialias their shared fractional-pixel
+          // boundary independently, compositing into hairline seams that make
+          // the art look tiled. A sub-pixel ink bleed welds the cells.
+          textShadow="0.4px 0 currentColor, -0.4px 0 currentColor, 0 0.4px currentColor, 0 -0.4px currentColor"
         >
           {segments.map((segment, segmentIndex) => (
             <Fragment key={segmentIndex}>
-              <Text as="span" color={segment.color}>
+              <Text as="span" color={segment.color} bg={segment.bg}>
                 {segment.text}
               </Text>
             </Fragment>
