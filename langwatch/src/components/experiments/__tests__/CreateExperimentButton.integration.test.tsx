@@ -92,7 +92,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 const renderButton = () =>
   render(<CreateExperimentButton />, { wrapper: Wrapper });
 
-describe("CreateExperimentButton permissions", () => {
+describe("given experiment creation permissions and mutation boundaries", () => {
   beforeEach(() => {
     permissionResult.current = true;
     mockHasPermission.mockReset();
@@ -104,46 +104,58 @@ describe("CreateExperimentButton permissions", () => {
 
   afterEach(() => cleanup());
 
-  it("renders when workflows:create is granted", () => {
-    renderButton();
+  describe("when workflows:create is granted", () => {
+    it("renders the create button", () => {
+      renderButton();
 
-    expect(mockHasPermission).toHaveBeenCalledWith("workflows:create");
-    expect(screen.getByRole("button", { name: "New Experiment" })).toBeTruthy();
+      expect(mockHasPermission).toHaveBeenCalledWith("workflows:create");
+      expect(
+        screen.getByRole("button", { name: "New Experiment" }),
+      ).toBeTruthy();
+    });
   });
 
-  it("stays hidden when workflows:create is denied", () => {
-    permissionResult.current = false;
-    renderButton();
+  describe("when workflows:create is denied", () => {
+    it("keeps the create button hidden", () => {
+      permissionResult.current = false;
+      renderButton();
 
-    expect(mockHasPermission).toHaveBeenCalledWith("workflows:create");
-    expect(screen.queryByRole("button", { name: "New Experiment" })).toBeNull();
+      expect(mockHasPermission).toHaveBeenCalledWith("workflows:create");
+      expect(
+        screen.queryByRole("button", { name: "New Experiment" }),
+      ).toBeNull();
+    });
   });
 
-  it("sends only schema-compatible state to the create mutation", () => {
-    renderButton();
+  describe("when the user creates an experiment", () => {
+    it("sends only schema-compatible state to the mutation", () => {
+      renderButton();
 
-    fireEvent.click(screen.getByRole("button", { name: "New Experiment" }));
+      fireEvent.click(screen.getByRole("button", { name: "New Experiment" }));
 
-    expect(mockMutate).toHaveBeenCalledOnce();
-    expect(mockMutate.mock.calls[0]?.[0]?.state).not.toHaveProperty(
-      "pendingSavedChanges",
-    );
-  });
-
-  it("shows the mutation error when creation fails", () => {
-    renderButton();
-
-    act(() => {
-      mutationOptions.current?.onError?.(
-        new Error("Experiment service failed"),
+      expect(mockMutate).toHaveBeenCalledOnce();
+      expect(mockMutate.mock.calls[0]?.[0]?.state).not.toHaveProperty(
+        "pendingSavedChanges",
       );
     });
+  });
 
-    expect(mockToasterCreate).toHaveBeenCalledWith({
-      title: "Error creating experiment",
-      description: "Experiment service failed",
-      type: "error",
-      meta: { closable: true },
+  describe("when the create mutation fails", () => {
+    it("shows the mutation error", () => {
+      renderButton();
+
+      act(() => {
+        mutationOptions.current?.onError?.(
+          new Error("Experiment service failed"),
+        );
+      });
+
+      expect(mockToasterCreate).toHaveBeenCalledWith({
+        title: "Error creating experiment",
+        description: "Experiment service failed",
+        type: "error",
+        meta: { closable: true },
+      });
     });
   });
 });

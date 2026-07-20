@@ -226,7 +226,7 @@ function renderPage() {
   );
 }
 
-describe("Experiments page permission visibility", () => {
+describe("given the Experiments page permission model", () => {
   afterEach(() => {
     cleanup();
   });
@@ -253,45 +253,55 @@ describe("Experiments page permission visibility", () => {
     ];
   });
 
-  it("guards the experiment list with experiments:view", () => {
-    expect(mockGuardPermissionRef.current).toBe("experiments:view");
+  describe("when the page guard is registered", () => {
+    it("requires experiments:view", () => {
+      expect(mockGuardPermissionRef.current).toBe("experiments:view");
+    });
   });
 
-  it("shows all actions when every matching permission is granted", () => {
-    renderPage();
+  describe("when every matching permission is granted", () => {
+    it("shows all experiment actions", () => {
+      renderPage();
 
-    expect(screen.getByText("Edit")).toBeTruthy();
-    expect(screen.getByText("Delete")).toBeTruthy();
-    expect(screen.getByText("Replicate to another project")).toBeTruthy();
+      expect(screen.getByText("Edit")).toBeTruthy();
+      expect(screen.getByText("Delete")).toBeTruthy();
+      expect(screen.getByText("Replicate to another project")).toBeTruthy();
+    });
   });
 
-  it("uses workflows:create for edit", () => {
-    mockHasPermissionRef.current = (permission: string) =>
-      permission === "workflows:create";
-    renderPage();
+  describe("when only workflows:create is granted", () => {
+    it("shows only edit", () => {
+      mockHasPermissionRef.current = (permission: string) =>
+        permission === "workflows:create";
+      renderPage();
 
-    expect(screen.getByText("Edit")).toBeTruthy();
-    expect(screen.queryByText("Delete")).toBeNull();
-    expect(screen.queryByText("Replicate to another project")).toBeNull();
+      expect(screen.getByText("Edit")).toBeTruthy();
+      expect(screen.queryByText("Delete")).toBeNull();
+      expect(screen.queryByText("Replicate to another project")).toBeNull();
+    });
   });
 
-  it("uses workflows:delete for delete", () => {
-    mockHasPermissionRef.current = (permission: string) =>
-      permission === "workflows:delete";
-    renderPage();
+  describe("when only workflows:delete is granted", () => {
+    it("shows only delete", () => {
+      mockHasPermissionRef.current = (permission: string) =>
+        permission === "workflows:delete";
+      renderPage();
 
-    expect(screen.getByText("Delete")).toBeTruthy();
-    expect(screen.queryByText("Edit")).toBeNull();
-    expect(screen.queryByText("Replicate to another project")).toBeNull();
+      expect(screen.getByText("Delete")).toBeTruthy();
+      expect(screen.queryByText("Edit")).toBeNull();
+      expect(screen.queryByText("Replicate to another project")).toBeNull();
+    });
   });
 
-  it("uses evaluations:manage for replicate", () => {
-    mockHasPermissionRef.current = (permission: string) =>
-      permission === "evaluations:manage";
-    renderPage();
+  describe("when only evaluations:manage is granted", () => {
+    it("shows only replicate", () => {
+      mockHasPermissionRef.current = (permission: string) =>
+        permission === "evaluations:manage";
+      renderPage();
 
-    expect(screen.getByText("Replicate to another project")).toBeTruthy();
-    expect(screen.queryByText("Edit")).toBeNull();
-    expect(screen.queryByText("Delete")).toBeNull();
+      expect(screen.getByText("Replicate to another project")).toBeTruthy();
+      expect(screen.queryByText("Edit")).toBeNull();
+      expect(screen.queryByText("Delete")).toBeNull();
+    });
   });
 });
