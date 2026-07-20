@@ -230,4 +230,71 @@ describe("ProjectLangyLayout", () => {
       });
     });
   });
+
+  // The dock's room is reserved by exactly one party (spec:
+  // specs/langy/langy-panel-layout.feature). The wrapper exposes who holds it
+  // via data-langy-dock; the app shell claims through the real store.
+  describe("given the panel is open in sidebar mode", () => {
+    const dockWrapper = () =>
+      document.querySelector("[data-langy-dock]") as HTMLElement | null;
+
+    /** @scenario "Pages without the app shell keep the flush dock" */
+    it("reserves the width at the page wrapper when no shell is mounted", async () => {
+      renderAt("/demo/traces");
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("none");
+      act(() => {
+        useLangyStore.setState({ panelMode: "sidebar" });
+      });
+      await openLangy();
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("page");
+    });
+
+    /** @scenario "The app header spans the full width while Langy is docked" */
+    it("stands down while an app shell claims the dock", async () => {
+      renderAt("/demo/traces");
+      act(() => {
+        useLangyStore.setState({ panelMode: "sidebar" });
+        useLangyStore.getState().claimDockShell();
+      });
+      await openLangy();
+      // The shell reserves the room inside its own content row; padding the
+      // page wrapper too would reserve the width twice.
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("shell");
+      act(() => {
+        useLangyStore.getState().releaseDockShell();
+      });
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("page");
+    });
+
+    /** @scenario "The content card rounds its right corner while Langy is docked" */
+    it("publishes the reservation truth for the claiming shell", async () => {
+      renderAt("/demo/traces");
+      expect(useLangyStore.getState().dockShifted).toBe(false);
+      act(() => {
+        useLangyStore.setState({ panelMode: "sidebar" });
+      });
+      await openLangy();
+      expect(useLangyStore.getState().dockShifted).toBe(true);
+      // Floating mode reserves nothing — the card overlays the page.
+      act(() => {
+        useLangyStore.setState({ panelMode: "floating" });
+      });
+      expect(useLangyStore.getState().dockShifted).toBe(false);
+    });
+
+    /** @scenario "Closing the dock returns the page to full width" */
+    it("releases the reservation when the panel closes", async () => {
+      renderAt("/demo/traces");
+      act(() => {
+        useLangyStore.setState({ panelMode: "sidebar" });
+      });
+      await openLangy();
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("page");
+      act(() => {
+        useLangyStore.getState().closePanel();
+      });
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("none");
+      expect(useLangyStore.getState().dockShifted).toBe(false);
+    });
+  });
 });

@@ -123,7 +123,8 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     }
     return fallbackProviderMeta ?? requestedMeta;
   }, [fallbackProviderMeta, modelProviderKey]);
-  const { project } = useOrganizationTeamProject();
+  const { project, team, organization, hasPermission } =
+    useOrganizationTeamProject();
   const projectId = project?.id;
 
   const backendModelProviderKey = useMemo(() => {
@@ -168,6 +169,15 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
+    // A NEW provider saves at the widest scope the caller can manage — org
+    // for admins, else team, else project — the same default the settings
+    // form uses (the hook decides; an existing row keeps its stored scope).
+    // The embedded screens make that decision silently instead of showing a
+    // scope picker.
+    teamId: team?.id,
+    organizationId: organization?.id,
+    canManageOrganization: hasPermission("organization:manage"),
+    canManageTeam: hasPermission("team:manage"),
     enabledProvidersCount: 1, // Onboarding always sets up the first provider
     isUsingEnvVars,
     onSuccess: () => {
@@ -487,11 +497,12 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
           />
 
           <HStack justify="end">
+            {/* Same button as every settings drawer's Save (solid orange) —
+                the surface variant read as an unrelated control here. */}
             <Button
               colorPalette="orange"
               onClick={handleSaveAndContinue}
               loading={state.isSaving || isValidatingApiKey}
-              variant="surface"
               size="sm"
             >
               Save

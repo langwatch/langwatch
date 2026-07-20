@@ -1,10 +1,9 @@
 import { Box } from "@chakra-ui/react";
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { Outlet, useParams } from "react-router";
-
-import { LangyProvider, useLangy } from "./LangyContext";
-import { useShowLangy } from "./hooks/useShowLangy";
 import { LangySidecar } from "./components/LangyPanel";
+import { useShowLangy } from "./hooks/useShowLangy";
+import { LangyProvider, useLangy } from "./LangyContext";
 import {
   LANGY_DOCKED_OFFSET,
   LANGY_TRANSITION,
@@ -71,11 +70,15 @@ function LangyShiftedRoot({
     setDockShifted(shifted);
     return () => setDockShifted(false);
   }, [shifted, setDockShifted]);
+  // Who reserves the dock's room right now: the page wrapper ("page"), a
+  // claiming app shell ("shell"), or nobody ("none", panel closed/floating).
+  const reservation = !shifted ? "none" : shellClaimed ? "shell" : "page";
   return (
     <>
       <Box
         width="full"
-        paddingRight={shifted && !shellClaimed ? `${LANGY_DOCKED_OFFSET}px` : 0}
+        data-langy-dock={reservation}
+        paddingRight={reservation === "page" ? `${LANGY_DOCKED_OFFSET}px` : 0}
         transition={`padding-right ${LANGY_TRANSITION}`}
       >
         {children}
@@ -86,11 +89,6 @@ function LangyShiftedRoot({
 }
 
 function LangySidecarConnected() {
-  const { proposalHandlersRef, experimentSlug } = useLangy();
-  return (
-    <LangySidecar
-      proposalHandlersRef={proposalHandlersRef}
-      experimentSlug={experimentSlug}
-    />
-  );
+  const { proposalHandlersRef } = useLangy();
+  return <LangySidecar proposalHandlersRef={proposalHandlersRef} />;
 }

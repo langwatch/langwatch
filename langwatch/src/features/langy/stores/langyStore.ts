@@ -372,7 +372,10 @@ export const useLangyStore = create<LangyState>()(
         }),
       consumePendingPrompt: () => set({ pendingPrompt: null }),
 
-      panelMode: "floating",
+      // Sidebar by default: docked inside the app shell as a second content
+      // card, working alongside the page. Floating stays one toggle away in
+      // the overflow menu (user-picked, persisted).
+      panelMode: "sidebar",
       setPanelMode: (panelMode) => set({ panelMode }),
       panelEffect: "plain",
       setPanelEffect: (panelEffect) => set({ panelEffect }),

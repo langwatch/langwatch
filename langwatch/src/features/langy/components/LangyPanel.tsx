@@ -8,13 +8,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { type UIMessage } from "ai";
+import type { UIMessage } from "ai";
 import {
   AppWindow,
   ArrowDown,
   Braces,
   Check,
-  ChevronDown,
   LayoutGrid,
   type LucideIcon,
   MoreHorizontal,
@@ -24,8 +23,8 @@ import {
   Waves,
   X,
 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import {
-  forwardRef,
   Profiler,
   useCallback,
   useEffect,
@@ -33,69 +32,16 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "motion/react";
 import { allModelOptions } from "~/components/ModelSelector";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { Menu } from "~/components/ui/menu";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
-import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
-import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
-import { langyThinkingShimmerStyles } from "./langyShimmer";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
-import { Composer } from "./Composer";
-import {
-  type LangyRevealableKind,
-  useLangyContextTargetStore,
-} from "../stores/langyContextTargetStore";
-import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
-import { SURFACE_PATH_FOR_KIND } from "../logic/langyContextKindIntent";
-import { useRouter } from "~/utils/compat/next-router";
-import { LangyCardGallery } from "./LangyCardGallery";
-import { EmptyState } from "./EmptyState";
-import { LangyWave } from "./LangyWave";
-import { deriveWaveActivity } from "../logic/langyWaveMotion";
-import { useLangyDevMode } from "../hooks/useLangyDevMode";
-import { LangyFoundryMenu } from "./LangyFoundryMenu";
-import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
-import {
-  type LangyProposal,
-  MessageContent,
-  type ProposalHandlers,
-} from "./MessageContent";
-import { RecentChatsMenu } from "./RecentChatsMenu";
-import { useGlobalLangyShortcut } from "../hooks/useGlobalLangyShortcut";
-import { useLangyOrbProximity } from "../hooks/useLangyOrbProximity";
-import { useLangyConversationList } from "../data/useLangyConversationList";
-import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
-import { useLangyMessages } from "../data/useLangyMessages";
-import type { LangyMessageDto } from "../data/langy.dtos";
-import { useLangyFreshness } from "../hooks/useLangyFreshness";
-import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydration";
-import {
-  createLangyChatTransport,
-  type LangyTurnRequestContext,
-} from "../logic/langyChatTransport";
-import { useLangyStickToBottom } from "../hooks/useLangyStickToBottom";
-import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
-import {
-  attachedContextToChip,
-  type LangyPanelEffect,
-  type LangyPanelMode,
-  useLangyStore,
-} from "../stores/langyStore";
-import { mergeContextChips } from "../logic/langyContextChips";
-import {
-  LangySidebarContext,
-  type SidebarContextEntry,
-} from "./LangySidebarContext";
-import { Menu } from "~/components/ui/menu";
-import { useLangyPageContext } from "../hooks/useLangyPageContext";
 // ONE definition of the wire shape, server-side, imported by both ends — the
 // route spreads `langyTurnContextSchema.shape` into its body schema, and this
 // types the payload against the same source. If the route stops accepting a
@@ -103,28 +49,76 @@ import { useLangyPageContext } from "../hooks/useLangyPageContext";
 // drifted, `safeParse` silently dropped `pageContext` on every single turn and
 // nobody found out for weeks.
 import type { LangyResourceContext } from "~/server/app-layer/langy/langyTurnContext.schema";
-import { LangyError } from "./LangyError";
-import { LangyRecoveringLine } from "./LangyRecoveringLine";
-import { LangyThinkingLine } from "./LangyThinkingLine";
-import { StreamingStatusLine } from "./StreamingStatusLine";
-import { toPendingCapabilities } from "./LangyToolActivity";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
+import type { LangyMessageDto } from "../data/langy.dtos";
+import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
+import { useLangyConversationList } from "../data/useLangyConversationList";
+import { useLangyMessages } from "../data/useLangyMessages";
+import { useGlobalLangyShortcut } from "../hooks/useGlobalLangyShortcut";
+import { useLangyDevMode } from "../hooks/useLangyDevMode";
+import { useLangyFreshness } from "../hooks/useLangyFreshness";
+import { useLangyOrbProximity } from "../hooks/useLangyOrbProximity";
+import { useLangyPageContext } from "../hooks/useLangyPageContext";
+import { useLangyStickToBottom } from "../hooks/useLangyStickToBottom";
+import {
+  turnHadSideEffects,
+  useLangyTurnRecovery,
+} from "../hooks/useLangyTurnRecovery";
+import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
+import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydration";
 import { resolveLangyActivityOwnership } from "../logic/langyActivityOwnership";
+import {
+  createLangyChatTransport,
+  type LangyTurnRequestContext,
+} from "../logic/langyChatTransport";
+import { mergeContextChips } from "../logic/langyContextChips";
+import { SURFACE_PATH_FOR_KIND } from "../logic/langyContextKindIntent";
+import {
+  explainLangyError,
+  readLangyStreamError,
+  readLangyTrpcError,
+} from "../logic/langyErrorExplainer";
+import { shouldAskFeedback } from "../logic/langyFeedbackDirective";
 import {
   APP_HEADER_HEIGHT,
   FLOATING_PANEL_CSS_WIDTH,
   resolveFloatingPanelWidth,
   SIDEBAR_PANEL_WIDTH,
 } from "../logic/langyPanelLayout";
+import { deriveWaveActivity } from "../logic/langyWaveMotion";
 import {
-  explainLangyError,
-  readLangyStreamError,
-  readLangyTrpcError,
-} from "../logic/langyErrorExplainer";
+  type LangyRevealableKind,
+  useLangyContextTargetStore,
+} from "../stores/langyContextTargetStore";
 import {
-  turnHadSideEffects,
-  useLangyTurnRecovery,
-} from "../hooks/useLangyTurnRecovery";
-import { shouldAskFeedback } from "../logic/langyFeedbackDirective";
+  attachedContextToChip,
+  type LangyPanelEffect,
+  type LangyPanelMode,
+  useLangyStore,
+} from "../stores/langyStore";
+import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
+import { Composer } from "./Composer";
+import { EmptyState } from "./EmptyState";
+import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
+import { LangyCardGallery } from "./LangyCardGallery";
+import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
+import { LangyError } from "./LangyError";
+import { LangyFoundryMenu } from "./LangyFoundryMenu";
+import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
+import { LangyRecoveringLine } from "./LangyRecoveringLine";
+import { LangyThinkingLine } from "./LangyThinkingLine";
+import { toPendingCapabilities } from "./LangyToolActivity";
+import { LangyWave } from "./LangyWave";
+import { langyThinkingShimmerStyles } from "./langyShimmer";
+import {
+  type LangyProposal,
+  MessageContent,
+  type ProposalHandlers,
+} from "./MessageContent";
+import { RecentChatsMenu } from "./RecentChatsMenu";
+import { StreamingStatusLine } from "./StreamingStatusLine";
 // Langy's own skin: scoped warm/cream palette + serif display face. The
 // `.langy-root` class (below) is where the Chakra semantic-token overrides land.
 import "../langyTheme.css";
@@ -225,13 +219,9 @@ function onLangyProfilerRender(
 
 interface LangySidecarProps {
   proposalHandlersRef?: React.RefObject<ProposalHandlers>;
-  experimentSlug?: string;
 }
 
-export function LangySidecar({
-  proposalHandlersRef,
-  experimentSlug,
-}: LangySidecarProps) {
+export function LangySidecar({ proposalHandlersRef }: LangySidecarProps) {
   const isOpen = useLangyStore((s) => s.isOpen);
   const toggle = useLangyStore((s) => s.togglePanel);
   useGlobalLangyShortcut(toggle);
@@ -241,10 +231,7 @@ export function LangySidecar({
       <LangyMarkGradientDefs />
       <LangyLauncher isOpen={isOpen} onOpen={toggle} />
       <LangyContextTargetLayer />
-      <LangyPanel
-        proposalHandlersRef={proposalHandlersRef}
-        experimentSlug={experimentSlug}
-      />
+      <LangyPanel proposalHandlersRef={proposalHandlersRef} />
     </>
   );
 }
@@ -338,10 +325,8 @@ function LangyLauncher({
 
 function LangyPanel({
   proposalHandlersRef,
-  experimentSlug,
 }: {
   proposalHandlersRef?: React.RefObject<ProposalHandlers>;
-  experimentSlug?: string;
 }) {
   const { organization, project } = useOrganizationTeamProject();
   const projectId = project?.id;
@@ -841,24 +826,19 @@ function LangyPanel({
     [contextChips, attachedChips],
   );
 
-  // What the sidebar renders: every held chip tagged by source, so removing one
-  // routes to the right store action (dismiss a derived chip / detach an
-  // attached one).
-  const sidebarContextEntries = useMemo<SidebarContextEntry[]>(() => {
-    const seen = new Set<string>();
-    const entries: SidebarContextEntry[] = [];
-    for (const chip of contextChips) {
-      if (seen.has(chip.id)) continue;
-      seen.add(chip.id);
-      entries.push({ chip, source: "page" });
-    }
-    for (const chip of attachedChips) {
-      if (seen.has(chip.id)) continue;
-      seen.add(chip.id);
-      entries.push({ chip, source: "attached" });
-    }
-    return entries;
-  }, [contextChips, attachedChips]);
+  // The composer is the ONE remove affordance for context (the dock's old
+  // banner restated these chips and is gone). A chip can be page-derived,
+  // explicitly attached, or both (deduped above) — clear every source it has,
+  // or it reappears from the other one.
+  const removeContextChip = useCallback(
+    (id: string) => {
+      if (useLangyStore.getState().attachedContext.some((c) => c.id === id)) {
+        detachContext(id);
+      }
+      dismissChip(id);
+    },
+    [detachContext, dismissChip],
+  );
 
   // Keep the transport's request context fresh every render; it is read at send
   // time (including on regenerate, which carries no per-send body). This is the
@@ -1283,12 +1263,6 @@ function LangyPanel({
     retryTurn();
   }, [utils, organizationId, retryTurn]);
 
-  const subtitle = experimentSlug
-    ? `On: ${experimentSlug}`
-    : isEmpty
-      ? "Your AI copilot"
-      : "Working in this project";
-
   // The generated title for the open conversation, read off the recents list —
   // the SAME server state, kept fresh by the useLangyFreshness SSE coordinator,
   // so the title-generation reactor's `conversation_title_generated` event
@@ -1481,7 +1455,6 @@ function LangyPanel({
           zIndex={1}
         >
           <PanelHeader
-            subtitle={subtitle}
             conversationTitle={conversationTitle}
             onNewChat={handleNewChat}
             onClose={closePanel}
@@ -1493,19 +1466,9 @@ function LangyPanel({
             onForkConversation={handleForkConversation}
             onRenameConversation={handleRenameConversation}
           />
-          {/* Docked only: the context Langy is holding, shown loud with remove
-            affordances. The floating card keeps its compact composer summary
-            (it floats over the page and must stay small); the dock has the room
-            and the "working alongside you" job, so it makes context explicit. */}
-          {!floating ? (
-            <LangySidebarContext
-              entries={sidebarContextEntries}
-              addableChips={addableChips}
-              onRemovePage={dismissChip}
-              onDetach={detachContext}
-              onAdd={restoreChip}
-            />
-          ) : null}
+          {/* The context Langy is holding lives in ONE place — the composer's
+            own summary row (both layouts). A second banner above the
+            conversation restated the same chips and read as duplication. */}
           {/* The message column and, BEHIND it, the ambient wash. The wash is a
             sibling of the scroller (not a child) so it never scrolls, never
             repaints on scroll, and never reaches the composer below.
@@ -1620,10 +1583,9 @@ function LangyPanel({
                     <Text fontSize="sm" fontWeight="semibold">
                       Langy needs a model to get started
                     </Text>
-                    <Text fontSize="xs" color="fg.muted">
-                      Add a provider key and pick a default model — Langy starts
-                      working the moment you save.
-                    </Text>
+                    {/* The one subtitle under this heading is the provider
+                        grid's own description; a second line here read as a
+                        double title. */}
                     <ModelProviderScreen
                       variant="langy"
                       onComplete={() => void resolvedDefaultQuery.refetch()}
@@ -1781,7 +1743,7 @@ function LangyPanel({
             // investigate/attach) — so the `#` palette can reference everything
             // the conversation will actually be given.
             contextChips={allContextChips}
-            onRemoveChip={dismissChip}
+            onRemoveChip={removeContextChip}
             addableChips={addableChips}
             onAddChip={restoreChip}
             onKindIntent={onKindIntent}
@@ -1856,7 +1818,6 @@ function JumpToLatest({
 }
 
 function PanelHeader({
-  subtitle,
   conversationTitle,
   onNewChat,
   onClose,
@@ -1868,7 +1829,6 @@ function PanelHeader({
   onForkConversation,
   onRenameConversation,
 }: {
-  subtitle: string;
   /** The conversation's GENERATED title, or null while it has none yet. */
   conversationTitle: string | null;
   onNewChat: () => void;
@@ -1881,49 +1841,42 @@ function PanelHeader({
   onForkConversation: (id: string) => Promise<void>;
   onRenameConversation: (id: string, title: string) => Promise<void>;
 }) {
-  const panelMode = useLangyStore((s) => s.panelMode);
-  const setPanelMode = useLangyStore((s) => s.setPanelMode);
-  const dockedToSide = panelMode === "sidebar";
-
   return (
     <>
-      {/* A chat app's header, not a toolbar. Identity LEADS: the title doubles
-          as the recents dropdown and TRUNCATES, so a long title can never shove
-          the controls off the edge (it used to). Then the actions — compose,
-          Foundry, dock, more — and finally the exit, held apart by a divider so
-          Close is unmistakably the last control and never lost in a row of
-          look-alike ghost icons. No avatar (the mark lives on the launcher and
-          above the empty state), no permanent GitHub icon (that connect lives
-          in the conversation, where it matters). */}
+      {/* ONE line, at the trace explorer search bar's height — a chat app's
+          header, not a masthead. Identity leads: the generated conversation
+          title (the wordmark until one lands), as a LABEL, not a control; it
+          truncates so it can never shove the rail off the edge. Then the
+          actions — compose, history (its own icon, with the searchable
+          popover), Foundry, more — and finally the exit, held apart by a
+          divider so Close is unmistakably the last control. Layout switching
+          lives in the overflow menu only.
+          Spec: specs/langy/langy-panel-header.feature */}
       <HStack
-        paddingTop="13px"
-        paddingBottom="12px"
+        minHeight="38px"
         paddingLeft="12px"
         paddingRight="10px"
         gap={1}
         flexShrink={0}
       >
-        {/* The TITLE IS the history control — the pattern every chat app uses,
-            and it retires a whole icon from the rail. RecentChatsMenu is
-            re-parented onto it (same list, same select, same delete); when
-            there is nothing to list it renders the title bare, so an empty
-            account never gets a dropdown that opens onto nothing. */}
-        <RecentChatsMenu
-          conversations={conversations}
-          isLoading={isLoadingConversations}
-          hasError={hasListError}
-          onSelect={onSelectConversation}
-          onDelete={onDeleteConversation}
-          onFork={onForkConversation}
-          onRename={onRenameConversation}
-          placement="bottom-start"
-          trigger={
-            <HeaderTitleTrigger
-              conversationTitle={conversationTitle}
-              subtitle={subtitle}
-            />
-          }
-        />
+        <Box
+          flex={1}
+          minWidth={0}
+          textStyle="sm"
+          fontWeight="600"
+          letterSpacing="-0.01em"
+          lineHeight="1.25"
+          color="fg"
+          whiteSpace="nowrap"
+          overflow="hidden"
+          textOverflow="ellipsis"
+        >
+          {conversationTitle ? (
+            <AnimatedConversationTitle title={conversationTitle} />
+          ) : (
+            "Langy"
+          )}
+        </Box>
 
         <HStack gap={0.5} flexShrink={0}>
           <Tooltip content="New chat" positioning={{ placement: "bottom" }}>
@@ -1938,34 +1891,21 @@ function PanelHeader({
             </IconButton>
           </Tooltip>
 
-          <LangyFoundryMenu />
+          {/* No trigger prop: RecentChatsMenu renders its own History icon
+              button. An empty account gets a calm "No conversations yet"
+              popover rather than a dead control. */}
+          <RecentChatsMenu
+            conversations={conversations}
+            isLoading={isLoadingConversations}
+            hasError={hasListError}
+            onSelect={onSelectConversation}
+            onDelete={onDeleteConversation}
+            onFork={onForkConversation}
+            onRename={onRenameConversation}
+            placement="bottom-end"
+          />
 
-          {/* Dock ⇄ pop-out: the "minimize"/place control, now a real button in
-              the rail instead of buried in the overflow menu. */}
-          <Tooltip
-            content={dockedToSide ? "Pop out" : "Dock to side"}
-            positioning={{ placement: "bottom" }}
-          >
-            <IconButton
-              size="xs"
-              variant="ghost"
-              aria-label={
-                dockedToSide
-                  ? "Pop out into a floating panel"
-                  : "Dock to the side"
-              }
-              color="fg.muted"
-              onClick={() =>
-                setPanelMode(dockedToSide ? "floating" : "sidebar")
-              }
-            >
-              {dockedToSide ? (
-                <AppWindow size={15} />
-              ) : (
-                <PanelRight size={15} />
-              )}
-            </IconButton>
-          </Tooltip>
+          <LangyFoundryMenu />
 
           <LangyOverflowMenu />
 
@@ -1995,104 +1935,6 @@ function PanelHeader({
     </>
   );
 }
-
-/**
- * The header's title block, doubling as the recents dropdown trigger.
- *
- * Idle it is TEXT — no border, no background, no button chrome; the chevron is
- * invisible. On hover, on `:focus-visible`, and while the menu is open it grows
- * a faint surface and reveals the chevron, so the affordance is discoverable
- * without the header permanently looking like a row of buttons.
- *
- * It is a real `<button>`, so it is tabbable and Enter/Space open the menu.
- * `forwardRef` + prop-spreading matter here: Chakra's `Menu.Trigger asChild`
- * clones this element and needs to land its ref and its aria/data attributes on
- * the DOM node.
- */
-const HeaderTitleTrigger = forwardRef<
-  HTMLButtonElement,
-  {
-    conversationTitle: string | null;
-    subtitle: string;
-  } & React.ButtonHTMLAttributes<HTMLButtonElement>
->(function HeaderTitleTrigger({ conversationTitle, subtitle, ...rest }, ref) {
-  return (
-    <chakra.button
-      ref={ref}
-      type="button"
-      // Sans, deliberately. Sentient is a DISPLAY face — it belongs on the empty
-      // state's one big line, not on chrome. Once the title reactor lands a
-      // generated title it REPLACES the wordmark, written in with the same
-      // blur-reveal the recents list uses. Until then there is no title at all —
-      // no skeleton, no id, no "New chat" stand-in. Absent, then present.
-      {...rest}
-      display="flex"
-      alignItems="center"
-      gap={1}
-      flex={1}
-      minWidth={0}
-      textAlign="left"
-      paddingX={1.5}
-      paddingY={1}
-      borderRadius="8px"
-      background="transparent"
-      cursor="pointer"
-      transition="background 130ms ease"
-      _hover={{ background: "bg.subtle" }}
-      _focusVisible={{ outline: "none", background: "bg.subtle" }}
-      css={{
-        "&:hover .title-chev, &:focus-visible .title-chev, &[data-state='open'] .title-chev":
-          { opacity: 1 },
-      }}
-    >
-      <VStack align="start" gap={0} flex={1} minWidth={0}>
-        <Box
-          textStyle="sm"
-          fontWeight="600"
-          letterSpacing="-0.01em"
-          lineHeight="1.25"
-          color="fg"
-          width="full"
-          // minWidth:0 lets this shrink below the title's intrinsic width so the
-          // ellipsis engages instead of the title pushing the header controls
-          // off the panel's edge — the whole point of the truncation chain here
-          // and inside AnimatedConversationTitle.
-          minWidth={0}
-          whiteSpace="nowrap"
-          overflow="hidden"
-          textOverflow="ellipsis"
-        >
-          {conversationTitle ? (
-            <AnimatedConversationTitle title={conversationTitle} />
-          ) : (
-            "Langy"
-          )}
-        </Box>
-        <Text
-          textStyle="2xs"
-          color="fg.muted"
-          lineHeight="1.3"
-          marginTop="1px"
-          truncate
-          width="full"
-        >
-          {subtitle}
-        </Text>
-      </VStack>
-      <Box
-        className="title-chev"
-        color="fg.subtle"
-        opacity={0}
-        flexShrink={0}
-        transition="opacity 130ms ease"
-        display="grid"
-        placeItems="center"
-      >
-        <ChevronDown size={14} />
-      </Box>
-    </chakra.button>
-  );
-});
 
 /**
  * The header's overflow — one `⋯` for everything that is a SETTING rather than
