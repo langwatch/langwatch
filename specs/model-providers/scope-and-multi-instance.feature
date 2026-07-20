@@ -422,3 +422,53 @@ Feature: Model Provider Scope and Multi-Instance
   #
   # The old (scopeType, scopeId) columns on ModelProvider are dropped in
   # this same migration — no dual-write window, no follow-up cleanup.
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Runtime provider-row selection follows the model
+  # ────────────────────────────────────────────────────────────────────────────
+  #
+  # With multi-instance providers, the same provider key can exist at several
+  # scopes with different credentials AND different model catalogs. A default
+  # model is picked from the union catalog in the settings UI, so the runtime
+  # must execute it against a row that actually serves that model — not
+  # blindly against the narrowest-scope row of the provider key. Otherwise an
+  # org-catalog model runs with a stale project row's credentials and the
+  # provider 404s ("Resource not found" on Azure).
+
+  @integration
+  Scenario: Model served only by a wider-scope row uses that row's credentials
+    Given an ORGANIZATION-scoped "azure" row whose catalog lists "gpt-5.4-mini"
+    And a PROJECT-scoped "azure" row for "web-app" whose catalog lists only "gpt-4o"
+    And both rows are enabled
+    When the runtime prepares a call for model "azure/gpt-5.4-mini" in project "web-app"
+    Then the call uses the ORGANIZATION row's credentials and deployment mapping
+
+  @integration
+  Scenario: Model served by several rows uses the narrowest scope
+    Given an ORGANIZATION-scoped "azure" row whose catalog lists "gpt-4o"
+    And a PROJECT-scoped "azure" row for "web-app" whose catalog also lists "gpt-4o"
+    And both rows are enabled
+    When the runtime prepares a call for model "azure/gpt-4o" in project "web-app"
+    Then the call uses the PROJECT row's credentials
+
+  @integration
+  Scenario: Model served by no row keeps the collapse winner
+    Given an ORGANIZATION-scoped "openai" row with no custom catalog
+    And a PROJECT-scoped "openai" row for "web-app" with no custom catalog
+    And both rows are enabled
+    When the runtime prepares a call for model "openai/gpt-5-mini" in project "web-app"
+    Then the call uses the PROJECT row's credentials (narrowest enabled row)
+
+  @integration
+  Scenario: Disabled rows never serve a model even when their catalog lists it
+    Given an ORGANIZATION-scoped "azure" row whose catalog lists "gpt-5.4-mini" but is disabled
+    And a PROJECT-scoped enabled "azure" row for "web-app" whose catalog lists only "gpt-4o"
+    When the runtime prepares a call for model "azure/gpt-5.4-mini" in project "web-app"
+    Then the call uses the PROJECT row's credentials (no swap to a disabled row)
+
+  @integration
+  Scenario: Embeddings models follow the same row-selection rule
+    Given an ORGANIZATION-scoped "azure" row whose embeddings catalog lists "text-embedding-3-small"
+    And a PROJECT-scoped enabled "azure" row for "web-app" whose embeddings catalog lists only "text-embedding-ada-002"
+    When the runtime prepares a call for model "azure/text-embedding-3-small" in project "web-app"
+    Then the call uses the ORGANIZATION row's credentials

@@ -5,7 +5,10 @@ import type {
   ReasoningConfig,
 } from "../../modelProviders/llmModels.types";
 import { translateModelIdForLitellm } from "../../modelProviders/modelIdBoundary";
-import { ModelProviderService } from "../../modelProviders/modelProvider.service";
+import {
+  ModelProviderService,
+  providerRowServesModel,
+} from "../../modelProviders/modelProvider.service";
 import {
   getAllModels,
   getParameterConstraints,
@@ -281,7 +284,7 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
  */
 export const DEFAULT_AZURE_API_VERSION = "2025-04-01-preview";
 
-export const prepareLitellmParams = async ({
+async function resolveServingRow({
   model,
   modelProvider,
   projectId,
@@ -289,8 +292,50 @@ export const prepareLitellmParams = async ({
   model: string;
   modelProvider: MaybeStoredModelProvider;
   projectId: string;
+}): Promise<MaybeStoredModelProvider> {
+  const parsedWire = parseWireValue(model);
+  if (
+    parsedWire.kind !== "legacy" ||
+    !modelProvider.id ||
+    providerRowServesModel(modelProvider, parsedWire.model)
+  ) {
+    return modelProvider;
+  }
+  const service = ModelProviderService.create(prisma);
+  const servingRow = await service.findRowServingModel({
+    projectId,
+    provider: modelProvider.provider,
+    bareModel: parsedWire.model,
+  });
+  return servingRow ?? modelProvider;
+}
+
+export const prepareLitellmParams = async ({
+  model,
+  modelProvider: givenModelProvider,
+  projectId,
+}: {
+  model: string;
+  modelProvider: MaybeStoredModelProvider;
+  projectId: string;
 }) => {
   const params: Record<string, string> = {};
+
+  // Multi-instance correction: the caller hands us the scope-collapse
+  // winner for the provider key, but with several rows per provider that
+  // row may not serve this model at all (its catalog doesn't list it) —
+  // the model was picked from a wider-scope row's catalog. Executing it
+  // against the wrong row's credentials targets a deployment that doesn't
+  // exist there (Azure answers 404 "Resource not found"). Re-select the
+  // narrowest ENABLED row that lists the model. Only for legacy
+  // `{provider}/{model}` wire values — an `{mpId}/{model}` value is an
+  // explicit row pick — and only for stored rows (env-fed pseudo-rows
+  // have no id and no custom catalog).
+  const modelProvider = await resolveServingRow({
+    model,
+    modelProvider: givenModelProvider,
+    projectId,
+  });
 
   // Normalise the incoming wire value for LiteLLM. After iter 109 two
   // formats coexist: the canonical `{mpId}/{model}` and the legacy

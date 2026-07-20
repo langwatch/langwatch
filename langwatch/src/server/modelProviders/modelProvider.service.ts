@@ -100,6 +100,25 @@ function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
 }
 
 /**
+ * Whether this provider row's custom catalog (chat or embeddings) lists
+ * `bareModel`. Accepts both the raw DB shape (legacy string[] or new
+ * object[]) and the normalized `MaybeStoredModelProvider` lists. A row
+ * with no custom catalog serves only registry models — it never "lists"
+ * anything here.
+ */
+export function providerRowServesModel(
+  row: { customModels?: unknown; customEmbeddingsModels?: unknown },
+  bareModel: string,
+): boolean {
+  const chat = toLegacyCompatibleCustomModels(row.customModels ?? null, "chat");
+  const embeddings = toLegacyCompatibleCustomModels(
+    row.customEmbeddingsModels ?? null,
+    "embedding",
+  );
+  return chat.concat(embeddings).some((m) => m.modelId === bareModel);
+}
+
+/**
  * Service layer for ModelProvider business logic.
  * Single Responsibility: Model provider lifecycle management.
  *
@@ -821,44 +840,11 @@ export class ModelProviderService {
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
       .reduce(
         (acc, mp) => {
-          // Always use registry models for models/embeddingsModels
-          const defaultProvider = defaultProviders[mp.provider];
-
-          // Convert DB custom models (may be legacy string[] or new object[])
-          const customModels = toLegacyCompatibleCustomModels(
-            mp.customModels,
-            "chat",
+          const provider_ = this.toMaybeStoredProvider(
+            mp,
+            defaultProviders,
+            includeKeys,
           );
-          const customEmbeddingsModels = toLegacyCompatibleCustomModels(
-            mp.customEmbeddingsModels,
-            "embedding",
-          );
-
-          const narrowestScope = this.pickNarrowestScope(mp.scopes);
-
-          const provider_: MaybeStoredModelProvider = {
-            id: mp.id,
-            name: mp.name,
-            provider: mp.provider,
-            enabled: mp.enabled,
-            customKeys: includeKeys ? mp.customKeys : null,
-            models: defaultProvider?.models ?? null,
-            embeddingsModels: defaultProvider?.embeddingsModels ?? null,
-            customModels: customModels.length > 0 ? customModels : null,
-            customEmbeddingsModels:
-              customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
-            deploymentMapping: mp.deploymentMapping,
-            disabledByDefault: defaultProvider?.disabledByDefault,
-            extraHeaders: mp.extraHeaders as
-              | { key: string; value: string }[]
-              | null,
-            scopes: mp.scopes.map((s) => ({
-              scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-              scopeId: s.scopeId,
-            })),
-            scopeType: narrowestScope.scopeType,
-            scopeId: narrowestScope.scopeId,
-          };
 
           // Collapse rules when the same provider string has multiple
           // accessible rows: an enabled row beats a disabled one, then
@@ -872,6 +858,99 @@ export class ModelProviderService {
         },
         {} as Record<string, MaybeStoredModelProvider>,
       );
+  }
+
+  /** Map a stored row to the `MaybeStoredModelProvider` shape consumers
+   * expect: registry models for models/embeddingsModels, normalized
+   * custom lists, and the narrowest scope surfaced as scopeType/scopeId. */
+  private toMaybeStoredProvider(
+    mp: ModelProviderWithScopes,
+    defaultProviders: Record<string, MaybeStoredModelProvider>,
+    includeKeys: boolean,
+  ): MaybeStoredModelProvider {
+    // Always use registry models for models/embeddingsModels
+    const defaultProvider = defaultProviders[mp.provider];
+
+    // Convert DB custom models (may be legacy string[] or new object[])
+    const customModels = toLegacyCompatibleCustomModels(
+      mp.customModels,
+      "chat",
+    );
+    const customEmbeddingsModels = toLegacyCompatibleCustomModels(
+      mp.customEmbeddingsModels,
+      "embedding",
+    );
+
+    const narrowestScope = this.pickNarrowestScope(mp.scopes);
+
+    return {
+      id: mp.id,
+      name: mp.name,
+      provider: mp.provider,
+      enabled: mp.enabled,
+      customKeys: includeKeys ? mp.customKeys : null,
+      models: defaultProvider?.models ?? null,
+      embeddingsModels: defaultProvider?.embeddingsModels ?? null,
+      customModels: customModels.length > 0 ? customModels : null,
+      customEmbeddingsModels:
+        customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
+      deploymentMapping: mp.deploymentMapping,
+      disabledByDefault: defaultProvider?.disabledByDefault,
+      extraHeaders: mp.extraHeaders as { key: string; value: string }[] | null,
+      scopes: mp.scopes.map((s) => ({
+        scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+        scopeId: s.scopeId,
+      })),
+      scopeType: narrowestScope.scopeType,
+      scopeId: narrowestScope.scopeId,
+    };
+  }
+
+  /**
+   * The accessible row that actually serves `bareModel` for this provider
+   * key: the narrowest-scope ENABLED row whose custom catalog (chat or
+   * embeddings) lists the model. Null when no enabled row lists it —
+   * callers then keep the scope-collapse winner, which also covers
+   * registry-model providers whose rows list nothing custom.
+   *
+   * Why this exists: with multi-instance providers the default-models
+   * picker offers the union of every accessible row's catalog, so a
+   * configured default may only be served by a wider-scope row than the
+   * collapse winner. Executing it against the narrower row's credentials
+   * targets a deployment that doesn't exist there (Azure answers 404
+   * "Resource not found"). See
+   * specs/model-providers/scope-and-multi-instance.feature ("Runtime
+   * provider-row selection follows the model").
+   */
+  async findRowServingModel(params: {
+    projectId: string;
+    provider: string;
+    bareModel: string;
+  }): Promise<MaybeStoredModelProvider | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: params.projectId },
+    });
+    if (!project) return null;
+
+    const defaultProviders = this.buildDefaultProviders(project);
+    const rows = await this.repository.findAllAccessibleForProject(
+      params.projectId,
+    );
+
+    const candidates = rows.filter(
+      (mp) =>
+        mp.provider === params.provider &&
+        mp.enabled &&
+        providerRowServesModel(mp, params.bareModel),
+    );
+    if (candidates.length === 0) return null;
+
+    const specificity = (mp: (typeof candidates)[number]) =>
+      this.scopePriority(this.pickNarrowestScope(mp.scopes).scopeType);
+    const best = candidates.reduce((acc, mp) =>
+      specificity(mp) > specificity(acc) ? mp : acc,
+    );
+    return this.toMaybeStoredProvider(best, defaultProviders, true);
   }
 
   private scopePriority(

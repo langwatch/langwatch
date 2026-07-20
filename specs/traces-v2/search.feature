@@ -1302,6 +1302,31 @@ Rule: AI query composer (Ask AI)
     Then the pill shows the message as a tooltip on hover (no expand affordance)
     And no popover opens on click
 
+  # The FloatingAiBar portal covers the docked search bar while AI mode is
+  # active, so an error that only renders in the docked bar's banner is
+  # invisible exactly when the user is looking for it. The floating bar owns
+  # its own error surface: the tip row under the input swaps to the error
+  # pill the moment a failure lands, and stays until the prompt changes or
+  # AI mode closes.
+
+  Scenario: Provider error is visible while the FloatingAiBar is open
+    Given the user is in AI mode with the FloatingAiBar open
+    When the AI search request fails with a provider error
+    Then the row under the floating input swaps from the rotating tip to a red error pill
+    And the pill shows the curated error message
+    And the composer stays open so the user can rephrase or bail out
+
+  Scenario: Provider config errors point the user at Model Providers settings
+    Given the AI search request fails with a provider error (e.g. 404 "Resource not found")
+    When the floating bar renders the error
+    Then the error row includes a "Review model providers" link to /settings/model-providers
+    And the message names the model that failed when the backend knows it
+
+  Scenario: Editing the prompt clears the floating error row
+    Given the floating bar shows an error pill
+    When the user edits the prompt text
+    Then the error row swaps back to the rotating tip
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CHIP LABELS WITH HOVER-TO-ID

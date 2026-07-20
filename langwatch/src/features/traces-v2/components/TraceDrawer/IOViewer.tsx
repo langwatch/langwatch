@@ -7,6 +7,7 @@ import {
   LuCode,
   LuCopy,
   LuEye,
+  LuLanguages,
   LuLightbulb,
   LuList,
   LuMessageSquare,
@@ -18,6 +19,7 @@ import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
+import { useTextTranslation } from "../../hooks/useTextTranslation";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
 import { IOViewerBody } from "./IOViewerBody";
 import { safePrettyJson } from "./JsonHighlight";
@@ -219,6 +221,32 @@ function SuggestCorrectionButton({
   );
 }
 
+function TranslateButton({
+  isActive,
+  isLoading,
+  onToggle,
+}: {
+  isActive: boolean;
+  isLoading: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <ActionButton
+      icon={LuLanguages}
+      label={
+        isLoading ? "Translating…" : isActive ? "Show original" : "Translate"
+      }
+      aria-pressed={isActive}
+      color={isActive ? "blue.fg" : "fg.muted"}
+      disabled={isLoading}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+    />
+  );
+}
+
 function CopyButton({ text }: { text: string }) {
   const { copied, copy } = useCopyToClipboard();
 
@@ -248,12 +276,20 @@ function CopyButton({ text }: { text: string }) {
 
 export const IOViewer = memo(function IOViewer({
   label,
-  content,
+  content: originalContent,
   mode = "input",
   traceId,
   spanId,
   spanType,
 }: IOViewerProps) {
+  // Translate-to-English swaps the content feeding the whole viewer
+  // pipeline, so every format (pretty/chat/json/markdown) renders the
+  // translated variant; Copy follows what's displayed.
+  const translation = useTextTranslation({
+    texts: useMemo(() => ({ content: originalContent }), [originalContent]),
+  });
+  const content = translation.displayTexts.content ?? originalContent;
+
   const parsed = useMemo(() => tryParseJSON(content), [content]);
   // Coerce parsed into a chat message array — handles top-level arrays,
   // single message objects, and `{messages: [...]}` / `{input: [...]}`
@@ -507,6 +543,13 @@ export const IOViewer = memo(function IOViewer({
               }
               return opt;
             })}
+          />
+        )}
+        {!collapsed && (
+          <TranslateButton
+            isActive={translation.isActive}
+            isLoading={translation.isLoading}
+            onToggle={translation.toggle}
           />
         )}
         {!collapsed && traceId && <AnnotateButton traceId={traceId} />}
