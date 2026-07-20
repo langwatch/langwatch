@@ -131,6 +131,21 @@ export const projectRoutes = {
     path: "/[project]/automations",
     title: "Automations",
   },
+  automations_alerts: {
+    path: "/[project]/automations/alerts",
+    title: "Alerts",
+    parent: "automations",
+  },
+  automations_schedules: {
+    path: "/[project]/automations/schedules",
+    title: "Schedules",
+    parent: "automations",
+  },
+  automations_activity: {
+    path: "/[project]/automations/activity",
+    title: "Recent activity",
+    parent: "automations",
+  },
   prompts: {
     path: "/[project]/prompts",
     title: "Prompts",

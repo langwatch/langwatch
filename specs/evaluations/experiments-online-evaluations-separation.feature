@@ -14,10 +14,10 @@ Feature: Separate experiments from online evaluations
     Then the existing "Evaluate" section is named "Test"
     And "Test" contains "Simulations", "Experiments", and "Annotations" in that order
     And the existing "Build" section is named "Library"
-    And "Library" contains "Prompts", "Agents", "Workflows", "Evaluators", and "Datasets" in their existing order
+    And "Library" contains "Prompts", "Agents", "Workflows", "Evaluators", "Datasets", and "Automations" in that order
     And "Observe" contains its existing destinations followed by the menu label "Online evals" after "Traces"
     And the destination page and product copy keep the full name "Online Evaluations"
-    And "Automations" is the final destination in "Observe"
+    And "Automations" is not listed in "Observe"
     And the remaining destinations keep their current section, name, and order
 
   Scenario: Collapse primary navigation sections
@@ -27,6 +27,13 @@ Feature: Separate experiments from online evaluations
     When I collapse a section
     Then its destinations are hidden
     And the preference is restored after I reload the application
+
+  Scenario: Focus automation work by purpose
+    Given I open Automations from "Library"
+    Then I can use a local navigation to open "Automations", "Alerts", "Schedules", or "Recent activity"
+    And each destination has its own URL
+    And each destination shows only the controls and records for that purpose
+    And the automation content uses a readable maximum width instead of stretching across the page
 
   Scenario: Use sensible section defaults without a saved preference
     Given I have no saved primary navigation preferences

@@ -373,6 +373,18 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/[project]/automations")),
       },
       {
+        path: "/:project/automations/alerts",
+        ...page(() => import("./pages/[project]/automations/alerts")),
+      },
+      {
+        path: "/:project/automations/schedules",
+        ...page(() => import("./pages/[project]/automations/schedules")),
+      },
+      {
+        path: "/:project/automations/activity",
+        ...page(() => import("./pages/[project]/automations/activity")),
+      },
+      {
         path: "/:project/datasets",
         ...page(() => import("./pages/[project]/datasets")),
       },

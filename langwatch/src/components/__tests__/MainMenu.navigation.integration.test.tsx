@@ -116,7 +116,6 @@ describe("<MainMenu /> navigation", () => {
       "Trace Explorer",
       "Traces",
       "Online evals",
-      "Automations",
       "Simulations",
       "Experiments",
       "Annotations",
@@ -137,12 +136,13 @@ describe("<MainMenu /> navigation", () => {
 
     const labels = visibleLinkLabels();
     const libraryStart = labels.indexOf("Prompts");
-    expect(labels.slice(libraryStart, libraryStart + 5)).toEqual([
+    expect(labels.slice(libraryStart, libraryStart + 6)).toEqual([
       "Prompts",
       "Agents",
       "Workflows",
       "Evaluators",
       "Datasets",
+      "Automations",
     ]);
   });
 });

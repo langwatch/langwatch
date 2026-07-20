@@ -155,16 +155,6 @@ export const MainMenu = React.memo(function MainMenu({
                 isActive={isOnlineEvaluationsActivePath(router.pathname)}
                 showLabel={showExpanded}
               />
-              {hasPermission("triggers:view") && (
-                <PageMenuLink
-                  path={projectRoutes.automations.path}
-                  icon={featureIcons.automations.icon}
-                  label={projectRoutes.automations.title}
-                  project={project}
-                  isActive={router.pathname.includes("/automations")}
-                  showLabel={showExpanded}
-                />
-              )}
             </SidebarSection>
 
             <SidebarSection
@@ -279,6 +269,17 @@ export const MainMenu = React.memo(function MainMenu({
                 isActive={router.pathname.includes("/datasets")}
                 showLabel={showExpanded}
               />
+
+              {hasPermission("triggers:view") && (
+                <PageMenuLink
+                  path={projectRoutes.automations.path}
+                  icon={featureIcons.automations.icon}
+                  label={projectRoutes.automations.title}
+                  project={project}
+                  isActive={router.pathname.includes("/automations")}
+                  showLabel={showExpanded}
+                />
+              )}
             </SidebarSection>
 
             <GovernSection showExpanded={showExpanded} />
