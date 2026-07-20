@@ -716,20 +716,44 @@ function AutomationsPage() {
                         />
                       </VStack>
 
-                      {alerts.length === 0 && (
-                        <VStack align="stretch" gap={3} width="full">
-                          <OverviewSectionHeading
-                            title="Set up an alert"
-                            summary="Start from a common alert workflow, then tailor the metric and delivery channel."
-                          />
+                      <VStack align="stretch" gap={4} width="full">
+                        <OverviewSectionHeading
+                          title="Popular uses"
+                          summary="Start from a common workflow and tailor it to your project."
+                        />
+                        <VStack align="stretch" gap={2}>
+                          <Text
+                            textStyle="xs"
+                            fontWeight="semibold"
+                            color="fg.muted"
+                          >
+                            Alerts
+                          </Text>
                           <UseCaseStrip
                             kind="alert"
+                            showLabel={false}
                             onOpen={(prefill) =>
                               openDrawer("automation", prefill)
                             }
                           />
                         </VStack>
-                      )}
+                        <VStack align="stretch" gap={2}>
+                          <Text
+                            textStyle="xs"
+                            fontWeight="semibold"
+                            color="fg.muted"
+                          >
+                            Automations
+                          </Text>
+                          <UseCaseStrip
+                            kind="automation"
+                            showLabel={false}
+                            onOpen={(prefill) =>
+                              openDrawer("automation", prefill)
+                            }
+                          />
+                        </VStack>
+                      </VStack>
                     </VStack>
                   )}
 

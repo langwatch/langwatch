@@ -5,6 +5,7 @@ import { getProjectSlug } from "../helpers";
 test("automation overview keeps activity and setup guidance", async ({
   page,
 }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
   const projectSlug = await getProjectSlug(page);
   const basePath = `/${projectSlug}/automations`;
 
@@ -17,8 +18,16 @@ test("automation overview keeps activity and setup guidance", async ({
     page.getByRole("link", { name: "Overview", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("Recent activity")).toBeVisible();
-  await expect(page.getByText("Set up an alert")).toBeVisible();
+  await expect(page.getByText("Error spike")).toBeVisible();
+  await expect(page.getByText("Traffic drop")).toBeVisible();
+  await expect(page.getByText("Cost spike")).toBeVisible();
+  await expect(page.getByText("Flag failing evaluations")).toBeVisible();
+  await expect(page.getByText("Build a dataset from errors")).toBeVisible();
+  await expect(page.getByText("Queue for review")).toBeVisible();
   await page.getByRole("button", { name: "Expand Library" }).click();
+  await expect(
+    page.locator(`a[href="${basePath}"]`, { hasText: "Automations" }),
+  ).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("automations.png") });
 
   await page.getByRole("link", { name: "Alerts", exact: true }).last().click();
@@ -27,6 +36,9 @@ test("automation overview keeps activity and setup guidance", async ({
   await expect(
     page.getByRole("button", { name: "New alert" }).first(),
   ).toBeVisible();
+  await expect(page.getByText("Error spike")).toBeVisible();
+  await expect(page.getByText("Traffic drop")).toBeVisible();
+  await expect(page.getByText("Cost spike")).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("alerts.png") });
 
   await page.getByRole("link", { name: "Schedules", exact: true }).click();

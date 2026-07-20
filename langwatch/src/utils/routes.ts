@@ -129,7 +129,7 @@ export const projectRoutes = {
   },
   automations: {
     path: "/[project]/automations",
-    title: "Overview",
+    title: "Automations",
   },
   automations_automations: {
     path: "/[project]/automations/automations",
