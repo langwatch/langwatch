@@ -363,6 +363,63 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
         GROQ_API_KEY: `sk-groq-current-${ns}`,
       });
     });
+
+    it("breaks same-tier ties deterministically (older row wins), not by DB row order", async () => {
+      // Two ORGANIZATION-tier rows both serving the model: multi-instance
+      // explicitly supports this, and routing must not depend on
+      // findMany's unspecified order. With no fallbackPriorityGlobal set,
+      // createdAt ASC decides.
+      await service().updateModelProvider(
+        {
+          projectId,
+          provider: "anthropic",
+          enabled: true,
+          customKeys: { ANTHROPIC_API_KEY: `sk-ant-first-${ns}` },
+          customModels: [
+            { modelId: "claude-tie", displayName: "claude-tie", mode: "chat" },
+          ],
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+        },
+        ctx(),
+      );
+      await service().updateModelProvider(
+        {
+          projectId,
+          provider: "anthropic",
+          enabled: true,
+          customKeys: { ANTHROPIC_API_KEY: `sk-ant-second-${ns}` },
+          customModels: [
+            { modelId: "claude-tie", displayName: "claude-tie", mode: "chat" },
+          ],
+          scopes: [{ scopeType: "TEAM", scopeId: teamId }],
+        },
+        ctx(),
+      );
+      // Third row ties with the second at TEAM tier but is newer — the
+      // second (older) must win regardless of return order.
+      await service().updateModelProvider(
+        {
+          projectId,
+          provider: "anthropic",
+          enabled: true,
+          customKeys: { ANTHROPIC_API_KEY: `sk-ant-third-${ns}` },
+          customModels: [
+            { modelId: "claude-tie", displayName: "claude-tie", mode: "chat" },
+          ],
+          scopes: [{ scopeType: "TEAM", scopeId: teamId }],
+        },
+        ctx(),
+      );
+
+      const row = await service().findRowServingModel({
+        projectId,
+        provider: "anthropic",
+        bareModel: "claude-tie",
+      });
+      expect(row?.customKeys).toMatchObject({
+        ANTHROPIC_API_KEY: `sk-ant-second-${ns}`,
+      });
+    });
   });
 
   describe("when no row lists the model (registry-model providers)", () => {

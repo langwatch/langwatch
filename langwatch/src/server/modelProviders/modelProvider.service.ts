@@ -239,56 +239,10 @@ export class ModelProviderService {
 
     const storedRows = savedProviders
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
-      .map((mp) => {
-        const defaultProvider = defaultProviders[mp.provider];
-        const customModels = toLegacyCompatibleCustomModels(
-          mp.customModels,
-          "chat",
-        );
-        const customEmbeddingsModels = toLegacyCompatibleCustomModels(
-          mp.customEmbeddingsModels,
-          "embedding",
-        );
-        const narrowestScope = this.pickNarrowestScope(mp.scopes);
-        const masked = (
-          mp.customKeys
-            ? Object.fromEntries(
-                Object.entries(mp.customKeys as Record<string, unknown>).map(
-                  ([key, value]) => [
-                    key,
-                    KEY_CHECK.some((k) => key.includes(k))
-                      ? MASKED_KEY_PLACEHOLDER
-                      : value,
-                  ],
-                ),
-              )
-            : null
-        ) as MaybeStoredModelProvider["customKeys"];
-        const provider_: MaybeStoredModelProvider = {
-          id: mp.id,
-          name: mp.name,
-          provider: mp.provider,
-          enabled: mp.enabled,
-          customKeys: masked,
-          models: defaultProvider?.models ?? null,
-          embeddingsModels: defaultProvider?.embeddingsModels ?? null,
-          customModels: customModels.length > 0 ? customModels : null,
-          customEmbeddingsModels:
-            customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
-          deploymentMapping: mp.deploymentMapping,
-          disabledByDefault: defaultProvider?.disabledByDefault,
-          extraHeaders: mp.extraHeaders as
-            | { key: string; value: string }[]
-            | null,
-          scopes: mp.scopes.map((s) => ({
-            scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-            scopeId: s.scopeId,
-          })),
-          scopeType: narrowestScope.scopeType,
-          scopeId: narrowestScope.scopeId,
-        };
-        return provider_;
-      });
+      .map((mp) => ({
+        ...this.toMaybeStoredProvider(mp, defaultProviders, true),
+        customKeys: this.maskRowCustomKeys(mp.customKeys),
+      }));
     return [...storedRows, ...systemRows];
   }
 
@@ -354,56 +308,10 @@ export class ModelProviderService {
 
     const storedRows = savedProviders
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
-      .map((mp) => {
-        const defaultProvider = defaultProviders[mp.provider];
-        const customModels = toLegacyCompatibleCustomModels(
-          mp.customModels,
-          "chat",
-        );
-        const customEmbeddingsModels = toLegacyCompatibleCustomModels(
-          mp.customEmbeddingsModels,
-          "embedding",
-        );
-        const narrowestScope = this.pickNarrowestScope(mp.scopes);
-        const masked = (
-          mp.customKeys
-            ? Object.fromEntries(
-                Object.entries(mp.customKeys as Record<string, unknown>).map(
-                  ([key, value]) => [
-                    key,
-                    KEY_CHECK.some((k) => key.includes(k))
-                      ? MASKED_KEY_PLACEHOLDER
-                      : value,
-                  ],
-                ),
-              )
-            : null
-        ) as MaybeStoredModelProvider["customKeys"];
-        const provider_: MaybeStoredModelProvider = {
-          id: mp.id,
-          name: mp.name,
-          provider: mp.provider,
-          enabled: mp.enabled,
-          customKeys: masked,
-          models: defaultProvider?.models ?? null,
-          embeddingsModels: defaultProvider?.embeddingsModels ?? null,
-          customModels: customModels.length > 0 ? customModels : null,
-          customEmbeddingsModels:
-            customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
-          deploymentMapping: mp.deploymentMapping,
-          disabledByDefault: defaultProvider?.disabledByDefault,
-          extraHeaders: mp.extraHeaders as
-            | { key: string; value: string }[]
-            | null,
-          scopes: mp.scopes.map((s) => ({
-            scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-            scopeId: s.scopeId,
-          })),
-          scopeType: narrowestScope.scopeType,
-          scopeId: narrowestScope.scopeId,
-        };
-        return provider_;
-      });
+      .map((mp) => ({
+        ...this.toMaybeStoredProvider(mp, defaultProviders, true),
+        customKeys: this.maskRowCustomKeys(mp.customKeys),
+      }));
     return [...storedRows, ...systemRows];
   }
 
@@ -909,6 +817,24 @@ export class ModelProviderService {
     };
   }
 
+  /** Mask key-bearing fields of a row's customKeys for frontend display,
+   * leaving URLs and other non-secret values visible. */
+  private maskRowCustomKeys(
+    customKeys: unknown,
+  ): MaybeStoredModelProvider["customKeys"] {
+    if (!customKeys) return null;
+    return Object.fromEntries(
+      Object.entries(customKeys as Record<string, unknown>).map(
+        ([key, value]) => [
+          key,
+          KEY_CHECK.some((k) => key.includes(k))
+            ? MASKED_KEY_PLACEHOLDER
+            : value,
+        ],
+      ),
+    ) as MaybeStoredModelProvider["customKeys"];
+  }
+
   /**
    * The accessible row that actually serves `bareModel` for this provider
    * key: the narrowest-scope ENABLED row whose custom catalog (chat or
@@ -957,13 +883,21 @@ export class ModelProviderService {
       teamId: project.teamId,
       organizationId: project.team?.organizationId ?? null,
     };
-    const best = candidates.reduce((acc, mp) =>
-      this.chainSpecificity(mp.scopes, chain) >
-      this.chainSpecificity(acc.scopes, chain)
-        ? mp
-        : acc,
-    );
-    return this.toMaybeStoredProvider(best, defaultProviders, true);
+    // Deterministic order within the same tier: fallbackPriorityGlobal
+    // ASC (nulls last) then createdAt ASC — two same-tier rows both
+    // serving the model must not route by the DB's unspecified row
+    // order.
+    const sorted = [...candidates].sort((a, b) => {
+      const tier =
+        this.chainSpecificity(b.scopes, chain) -
+        this.chainSpecificity(a.scopes, chain);
+      if (tier !== 0) return tier;
+      const aPriority = a.fallbackPriorityGlobal ?? Number.MAX_SAFE_INTEGER;
+      const bPriority = b.fallbackPriorityGlobal ?? Number.MAX_SAFE_INTEGER;
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    });
+    return this.toMaybeStoredProvider(sorted[0]!, defaultProviders, true);
   }
 
   /**
