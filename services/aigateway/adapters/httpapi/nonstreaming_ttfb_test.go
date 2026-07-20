@@ -51,6 +51,69 @@ func (s *ttfbSpyWriter) Write(p []byte) (int, error) {
 	return s.ResponseWriter.Write(p)
 }
 
+// newHeartbeatRouter builds a router wired with the standard passthrough
+// auth (always resolves to testBundle()), the given provider, and an
+// explicit HeartbeatInterval — the one knob every heartbeat test needs to
+// set that buildRouter (router_test.go's shared helper) doesn't expose.
+func newHeartbeatRouter(provider *mockProvider, interval time.Duration) http.Handler {
+	auth := &mockAuth{
+		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+			return testBundle(), nil
+		},
+	}
+	reg := health.New("test")
+	reg.MarkStarted()
+	application := app.New(
+		app.WithAuth(auth),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+	return NewRouter(RouterDeps{
+		App:               application,
+		Logger:            zap.NewNop(),
+		Health:            reg,
+		HeartbeatInterval: interval,
+	})
+}
+
+// serveAsync runs router.ServeHTTP on its own goroutine and returns a
+// channel that closes when it's done. The heartbeat mechanism runs
+// concurrently with the caller by design, so every test needs to observe
+// the response from outside the goroutine that produces it.
+func serveAsync(router http.Handler, w http.ResponseWriter, req *http.Request) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		router.ServeHTTP(w, req)
+		close(done)
+	}()
+	return done
+}
+
+// waitOrFatal blocks on ch for up to 2s, failing the test instead of
+// hanging the suite if the fix regresses into a deadlock.
+func waitOrFatal(t *testing.T, ch <-chan struct{}, timeoutMsg string) {
+	t.Helper()
+	select {
+	case <-ch:
+	case <-time.After(2 * time.Second):
+		t.Fatal(timeoutMsg)
+	}
+}
+
+// slowSuccessProvider returns a mockProvider whose dispatch blocks until
+// release is closed, then returns a fixed success response. entered is
+// closed the moment dispatch is called — the standard "still in flight"
+// choreography most of these tests need and don't otherwise differ on.
+func slowSuccessProvider(entered, release chan struct{}) *mockProvider {
+	return &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+			close(entered)
+			<-release
+			return successResponse(), nil
+		},
+	}
+}
+
 // TestRouter_NonStreaming_NoBytesReachClientWhileProviderIsSlow documents the
 // baseline behind https://github.com/langwatch/langwatch/issues/4806: with
 // no explicit HeartbeatInterval configured (buildRouter's default —
@@ -74,13 +137,7 @@ func TestRouter_NonStreaming_NoBytesReachClientWhileProviderIsSlow(t *testing.T)
 
 	providerEntered := make(chan struct{})
 	releaseProvider := make(chan struct{})
-	provider := &mockProvider{
-		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
-			close(providerEntered)
-			<-releaseProvider // held open to stand in for a slow, large-context completion
-			return successResponse(), nil
-		},
-	}
+	provider := slowSuccessProvider(providerEntered, releaseProvider)
 
 	router := buildRouter(
 		app.WithAuth(auth),
@@ -93,17 +150,8 @@ func TestRouter_NonStreaming_NoBytesReachClientWhileProviderIsSlow(t *testing.T)
 	rec := httptest.NewRecorder()
 	spy := &ttfbSpyWriter{ResponseWriter: rec}
 
-	done := make(chan struct{})
-	go func() {
-		router.ServeHTTP(spy, req)
-		close(done)
-	}()
-
-	select {
-	case <-providerEntered:
-	case <-time.After(2 * time.Second):
-		t.Fatal("provider was never dialed")
-	}
+	done := serveAsync(router, spy, req)
+	waitOrFatal(t, providerEntered, "provider was never dialed")
 
 	// The provider call is deliberately still in flight here. If the
 	// gateway had any mechanism to keep the connection warm (streaming,
@@ -112,12 +160,7 @@ func TestRouter_NonStreaming_NoBytesReachClientWhileProviderIsSlow(t *testing.T)
 	assert.False(t, spy.wroteAny.Load(), "no bytes should reach the client transport while the provider call is still in flight")
 
 	close(releaseProvider)
-
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("handler never completed after the provider call returned")
-	}
+	waitOrFatal(t, done, "handler never completed after the provider call returned")
 
 	// Once the (slow) provider finally returns, the full response arrives
 	// as a single burst — this isn't a hang, just an all-or-nothing
@@ -136,52 +179,17 @@ func TestRouter_NonStreaming_NoBytesReachClientWhileProviderIsSlow(t *testing.T)
 //
 // @scenario "dispatch slower than the heartbeat interval keeps the connection warm and still delivers the correct response"
 func TestRouter_NonStreaming_HeartbeatKeepsConnectionWarm(t *testing.T) {
-	auth := &mockAuth{
-		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
-		},
-	}
-
 	providerEntered := make(chan struct{})
 	releaseProvider := make(chan struct{})
-	provider := &mockProvider{
-		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
-			close(providerEntered)
-			<-releaseProvider
-			return successResponse(), nil
-		},
-	}
-
-	reg := health.New("test")
-	reg.MarkStarted()
-	application := app.New(
-		app.WithAuth(auth),
-		app.WithProviders(provider),
-		app.WithLogger(zap.NewNop()),
-	)
-	router := NewRouter(RouterDeps{
-		App:               application,
-		Logger:            zap.NewNop(),
-		Health:            reg,
-		HeartbeatInterval: 5 * time.Millisecond,
-	})
+	router := newHeartbeatRouter(slowSuccessProvider(providerEntered, releaseProvider), 5*time.Millisecond)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
 	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	spy := &ttfbSpyWriter{ResponseWriter: rec}
 
-	done := make(chan struct{})
-	go func() {
-		router.ServeHTTP(spy, req)
-		close(done)
-	}()
-
-	select {
-	case <-providerEntered:
-	case <-time.After(2 * time.Second):
-		t.Fatal("provider was never dialed")
-	}
+	done := serveAsync(router, spy, req)
+	waitOrFatal(t, providerEntered, "provider was never dialed")
 
 	require.Eventually(t, func() bool { return spy.wroteAny.Load() }, 2*time.Second, 5*time.Millisecond,
 		"a heartbeat byte should reach the client while the provider call is still in flight")
@@ -195,12 +203,7 @@ func TestRouter_NonStreaming_HeartbeatKeepsConnectionWarm(t *testing.T) {
 	}
 
 	close(releaseProvider)
-
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("handler never completed after the provider call returned")
-	}
+	waitOrFatal(t, done, "handler never completed after the provider call returned")
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
@@ -228,12 +231,6 @@ func TestRouter_NonStreaming_HeartbeatKeepsConnectionWarm(t *testing.T) {
 //
 // @scenario "dispatch that errors after heartbeating has started still delivers a structured error body"
 func TestRouter_NonStreaming_HeartbeatThenError_StillDeliversStructuredErrorBody(t *testing.T) {
-	auth := &mockAuth{
-		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
-		},
-	}
-
 	providerEntered := make(chan struct{})
 	releaseProvider := make(chan struct{})
 	provider := &mockProvider{
@@ -243,48 +240,21 @@ func TestRouter_NonStreaming_HeartbeatThenError_StillDeliversStructuredErrorBody
 			return nil, herr.New(ctx, domain.ErrProviderError, nil)
 		},
 	}
-
-	reg := health.New("test")
-	reg.MarkStarted()
-	application := app.New(
-		app.WithAuth(auth),
-		app.WithProviders(provider),
-		app.WithLogger(zap.NewNop()),
-	)
-	router := NewRouter(RouterDeps{
-		App:               application,
-		Logger:            zap.NewNop(),
-		Health:            reg,
-		HeartbeatInterval: 5 * time.Millisecond,
-	})
+	router := newHeartbeatRouter(provider, 5*time.Millisecond)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
 	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	spy := &ttfbSpyWriter{ResponseWriter: rec}
 
-	done := make(chan struct{})
-	go func() {
-		router.ServeHTTP(spy, req)
-		close(done)
-	}()
-
-	select {
-	case <-providerEntered:
-	case <-time.After(2 * time.Second):
-		t.Fatal("provider was never dialed")
-	}
+	done := serveAsync(router, spy, req)
+	waitOrFatal(t, providerEntered, "provider was never dialed")
 
 	require.Eventually(t, func() bool { return spy.wroteAny.Load() }, 2*time.Second, 5*time.Millisecond,
 		"a heartbeat byte should reach the client before the provider call errors")
 
 	close(releaseProvider)
-
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("handler never completed after the provider call returned")
-	}
+	waitOrFatal(t, done, "handler never completed after the provider call returned")
 
 	// Status is stuck at 200 — already committed by the heartbeat — but the
 	// body still carries the real, structured error.
@@ -298,56 +268,21 @@ func TestRouter_NonStreaming_HeartbeatThenError_StillDeliversStructuredErrorBody
 // TestRouter_NonStreaming_HeartbeatDisabled proves the negative-interval
 // escape hatch: no heartbeat byte is ever written, matching pre-fix
 // behavior exactly, for operators who need to turn the mechanism off
-// without a redeploy (e.g. NON_STREAMING_HEARTBEAT_INTERVAL=-1s).
+// without a redeploy (e.g. NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS=-1).
 //
 // @scenario "a negative heartbeat interval disables the mechanism entirely"
 func TestRouter_NonStreaming_HeartbeatDisabled(t *testing.T) {
-	auth := &mockAuth{
-		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
-		},
-	}
-
 	providerEntered := make(chan struct{})
 	releaseProvider := make(chan struct{})
-	provider := &mockProvider{
-		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
-			close(providerEntered)
-			<-releaseProvider
-			return successResponse(), nil
-		},
-	}
-
-	reg := health.New("test")
-	reg.MarkStarted()
-	application := app.New(
-		app.WithAuth(auth),
-		app.WithProviders(provider),
-		app.WithLogger(zap.NewNop()),
-	)
-	router := NewRouter(RouterDeps{
-		App:               application,
-		Logger:            zap.NewNop(),
-		Health:            reg,
-		HeartbeatInterval: -1 * time.Millisecond,
-	})
+	router := newHeartbeatRouter(slowSuccessProvider(providerEntered, releaseProvider), -1*time.Millisecond)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
 	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	spy := &ttfbSpyWriter{ResponseWriter: rec}
 
-	done := make(chan struct{})
-	go func() {
-		router.ServeHTTP(spy, req)
-		close(done)
-	}()
-
-	select {
-	case <-providerEntered:
-	case <-time.After(2 * time.Second):
-		t.Fatal("provider was never dialed")
-	}
+	done := serveAsync(router, spy, req)
+	waitOrFatal(t, providerEntered, "provider was never dialed")
 
 	// Generously longer than several would-be 5ms ticks — with
 	// heartbeating disabled, nothing should ever fire.
@@ -355,12 +290,7 @@ func TestRouter_NonStreaming_HeartbeatDisabled(t *testing.T) {
 	assert.False(t, spy.wroteAny.Load(), "a negative HeartbeatInterval must disable heartbeating entirely")
 
 	close(releaseProvider)
-
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("handler never completed after the provider call returned")
-	}
+	waitOrFatal(t, done, "handler never completed after the provider call returned")
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
@@ -382,34 +312,10 @@ func TestRouter_NonStreaming_HeartbeatFiresAcrossEveryRoute(t *testing.T) {
 		respBody   []byte
 		bodyMarker string
 	}{
-		{
-			name:       "chat_completions",
-			method:     http.MethodPost,
-			path:       "/v1/chat/completions",
-			body:       chatBody(),
-			bodyMarker: "choices",
-		},
-		{
-			name:       "messages",
-			method:     http.MethodPost,
-			path:       "/v1/messages",
-			body:       chatBody(),
-			bodyMarker: "choices",
-		},
-		{
-			name:       "responses",
-			method:     http.MethodPost,
-			path:       "/v1/responses",
-			body:       chatBody(),
-			bodyMarker: "choices",
-		},
-		{
-			name:       "embeddings",
-			method:     http.MethodPost,
-			path:       "/v1/embeddings",
-			body:       chatBody(),
-			bodyMarker: "choices",
-		},
+		{name: "chat_completions", method: http.MethodPost, path: "/v1/chat/completions", body: chatBody(), bodyMarker: "choices"},
+		{name: "messages", method: http.MethodPost, path: "/v1/messages", body: chatBody(), bodyMarker: "choices"},
+		{name: "responses", method: http.MethodPost, path: "/v1/responses", body: chatBody(), bodyMarker: "choices"},
+		{name: "embeddings", method: http.MethodPost, path: "/v1/embeddings", body: chatBody(), bodyMarker: "choices"},
 		{
 			name:       "gemini_passthrough",
 			method:     http.MethodPost,
@@ -422,12 +328,6 @@ func TestRouter_NonStreaming_HeartbeatFiresAcrossEveryRoute(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			auth := &mockAuth{
-				resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-					return testBundle(), nil
-				},
-			}
-
 			providerEntered := make(chan struct{})
 			releaseProvider := make(chan struct{})
 			provider := &mockProvider{
@@ -440,20 +340,7 @@ func TestRouter_NonStreaming_HeartbeatFiresAcrossEveryRoute(t *testing.T) {
 					return successResponse(), nil
 				},
 			}
-
-			reg := health.New("test")
-			reg.MarkStarted()
-			application := app.New(
-				app.WithAuth(auth),
-				app.WithProviders(provider),
-				app.WithLogger(zap.NewNop()),
-			)
-			router := NewRouter(RouterDeps{
-				App:               application,
-				Logger:            zap.NewNop(),
-				Health:            reg,
-				HeartbeatInterval: 5 * time.Millisecond,
-			})
+			router := newHeartbeatRouter(provider, 5*time.Millisecond)
 
 			req := httptest.NewRequest(tc.method, tc.path, bytes.NewReader(tc.body))
 			req.Header.Set("Authorization", "Bearer vk-lw-test")
@@ -462,28 +349,14 @@ func TestRouter_NonStreaming_HeartbeatFiresAcrossEveryRoute(t *testing.T) {
 			rec := httptest.NewRecorder()
 			spy := &ttfbSpyWriter{ResponseWriter: rec}
 
-			done := make(chan struct{})
-			go func() {
-				router.ServeHTTP(spy, req)
-				close(done)
-			}()
-
-			select {
-			case <-providerEntered:
-			case <-time.After(2 * time.Second):
-				t.Fatal("provider was never dialed")
-			}
+			done := serveAsync(router, spy, req)
+			waitOrFatal(t, providerEntered, "provider was never dialed")
 
 			require.Eventually(t, func() bool { return spy.wroteAny.Load() }, 2*time.Second, 5*time.Millisecond,
 				"a heartbeat byte should reach the client on this route while dispatch is in flight")
 
 			close(releaseProvider)
-
-			select {
-			case <-done:
-			case <-time.After(2 * time.Second):
-				t.Fatal("handler never completed after dispatch returned")
-			}
+			waitOrFatal(t, done, "handler never completed after dispatch returned")
 
 			assert.Equal(t, http.StatusOK, rec.Code)
 			assert.Contains(t, rec.Body.String(), tc.bodyMarker)
@@ -496,12 +369,6 @@ func TestRouter_NonStreaming_HeartbeatFiresAcrossEveryRoute(t *testing.T) {
 // into the other — each withHeartbeat call owns its own ticker, goroutine,
 // and wrapped writer, so nothing is shared across concurrent requests.
 func TestRouter_NonStreaming_ConcurrentSlowRequestsDoNotInterfere(t *testing.T) {
-	auth := &mockAuth{
-		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
-		},
-	}
-
 	type reqState struct {
 		entered chan struct{}
 		release chan struct{}
@@ -522,20 +389,7 @@ func TestRouter_NonStreaming_ConcurrentSlowRequestsDoNotInterfere(t *testing.T) 
 			return successResponse(), nil
 		},
 	}
-
-	reg := health.New("test")
-	reg.MarkStarted()
-	application := app.New(
-		app.WithAuth(auth),
-		app.WithProviders(provider),
-		app.WithLogger(zap.NewNop()),
-	)
-	router := NewRouter(RouterDeps{
-		App:               application,
-		Logger:            zap.NewNop(),
-		Health:            reg,
-		HeartbeatInterval: 5 * time.Millisecond,
-	})
+	router := newHeartbeatRouter(provider, 5*time.Millisecond)
 
 	recA, recB := httptest.NewRecorder(), httptest.NewRecorder()
 	spyA := &ttfbSpyWriter{ResponseWriter: recA}
@@ -549,16 +403,11 @@ func TestRouter_NonStreaming_ConcurrentSlowRequestsDoNotInterfere(t *testing.T) 
 	reqB := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(bodyFor("req-b")))
 	reqB.Header.Set("Authorization", "Bearer vk-lw-test")
 
-	doneA, doneB := make(chan struct{}), make(chan struct{})
-	go func() { router.ServeHTTP(spyA, reqA); close(doneA) }()
-	go func() { router.ServeHTTP(spyB, reqB); close(doneB) }()
+	doneA := serveAsync(router, spyA, reqA)
+	doneB := serveAsync(router, spyB, reqB)
 
 	for _, st := range states {
-		select {
-		case <-st.entered:
-		case <-time.After(2 * time.Second):
-			t.Fatal("a provider call was never dialed")
-		}
+		waitOrFatal(t, st.entered, "a provider call was never dialed")
 	}
 
 	require.Eventually(t, func() bool { return spyA.wroteAny.Load() }, 2*time.Second, 5*time.Millisecond, "req-a should have heartbeat bytes")
@@ -568,11 +417,7 @@ func TestRouter_NonStreaming_ConcurrentSlowRequestsDoNotInterfere(t *testing.T) 
 	// the two heartbeat loops (goroutine + ticker each) aren't sharing
 	// state that would let releasing one affect the other.
 	close(states["req-a"].release)
-	select {
-	case <-doneA:
-	case <-time.After(2 * time.Second):
-		t.Fatal("req-a never completed")
-	}
+	waitOrFatal(t, doneA, "req-a never completed")
 	select {
 	case <-doneB:
 		t.Fatal("req-b completed before its own provider call was released")
@@ -580,11 +425,7 @@ func TestRouter_NonStreaming_ConcurrentSlowRequestsDoNotInterfere(t *testing.T) 
 	}
 
 	close(states["req-b"].release)
-	select {
-	case <-doneB:
-	case <-time.After(2 * time.Second):
-		t.Fatal("req-b never completed")
-	}
+	waitOrFatal(t, doneB, "req-b never completed")
 
 	assert.Equal(t, http.StatusOK, recA.Code)
 	assert.Equal(t, http.StatusOK, recB.Code)
@@ -624,17 +465,8 @@ func TestRouter_NonStreaming_PanicInDispatchDoesNotCrashProcess(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 
-	done := make(chan struct{})
-	go func() {
-		router.ServeHTTP(rec, req)
-		close(done)
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("handler never completed — a panic in the background dispatch goroutine likely hung resultCh instead of surfacing an error")
-	}
+	done := serveAsync(router, rec, req)
+	waitOrFatal(t, done, "handler never completed — a panic in the background dispatch goroutine likely hung resultCh instead of surfacing an error")
 
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 
