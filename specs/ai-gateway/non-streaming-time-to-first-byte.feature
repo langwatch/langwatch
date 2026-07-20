@@ -27,6 +27,7 @@ Feature: Non-streaming responses stay warm during slow dispatch
     And dispatch finishes before HeartbeatInterval elapses
     Then no response bytes, including headers, have reached the client before dispatch finished
     And the full response is delivered exactly as it always was
+    And the response does not carry an X-LangWatch-Heartbeat-Active header
     # Fast requests — the overwhelming majority — are byte-for-byte
     # unaffected by the heartbeat mechanism below.
 
@@ -37,6 +38,7 @@ Feature: Non-streaming responses stay warm during slow dispatch
     Then a keep-alive byte reaches the client while dispatch is still in flight
     And the client's JSON parser still parses the eventual response correctly
     And once dispatch finishes, the full response is delivered with status 200 and Content-Type application/json
+    And the response carries an X-LangWatch-Heartbeat-Active header
     # This is the fix for #4806: a large-context completion that legitimately
     # runs long now keeps producing bytes, so it never goes silent long
     # enough for an edge proxy to kill the connection.
@@ -48,11 +50,14 @@ Feature: Non-streaming responses stay warm during slow dispatch
     Then a keep-alive byte reaches the client while dispatch is still in flight
     And once dispatch fails, the response status is still 200
     And the response body is the same structured error envelope a fast failure would have produced
+    And the response carries an X-LangWatch-Heartbeat-Active header
     # Once any byte is on the wire the HTTP status is irrevocably committed
     # to 200 — the same trade-off the streaming path already accepts for
-    # errors that surface mid-stream (see streaming.feature). A client that
-    # inspects the body, not just the status, still gets the accurate
-    # error — a strict improvement over today's 524 with no body at all.
+    # errors that surface mid-stream (see streaming.feature). The header is
+    # the mitigation: its presence on a 200 is the signal for a client that
+    # only checks status to check the body for an error key instead of
+    # trusting the status at face value — a strict improvement over today's
+    # 524 with no body at all.
 
   @unit @regression
   Scenario: a negative heartbeat interval disables the mechanism entirely
@@ -60,5 +65,6 @@ Feature: Non-streaming responses stay warm during slow dispatch
     And a provider that takes longer than a would-be heartbeat tick to complete
     When a client sends a non-streaming chat completion request
     Then no keep-alive byte ever reaches the client before dispatch finishes
-    # Operator kill switch (NON_STREAMING_HEARTBEAT_INTERVAL=-1s) to roll the
-    # fix back without a redeploy.
+    And the response never carries an X-LangWatch-Heartbeat-Active header
+    # Operator kill switch (NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS=-1) to
+    # roll the fix back without a redeploy.

@@ -662,20 +662,36 @@ func withHeartbeat[T any](ctx context.Context, w http.ResponseWriter, interval t
 		return r.val, hw, r.err
 	}
 
-	// Every non-streaming JSON response is application/json whatever the
-	// eventual outcome — set it before the first possible heartbeat write
-	// so it's still part of the header block if a heartbeat commits the
-	// response early. writeJSONResponse still overwrites this with the
-	// more precise upstream content type for the common (fast) case.
-	hw.Header().Set("Content-Type", "application/json")
-
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	heartbeatFired := false
 	for {
 		select {
 		case r := <-resultCh:
 			return r.val, hw, r.err
 		case <-ticker.C:
+			if !heartbeatFired {
+				heartbeatFired = true
+				// Every non-streaming JSON response is application/json
+				// whatever the eventual outcome — set it before the first
+				// heartbeat write so it's still part of the header block if
+				// this response commits early. writeJSONResponse still
+				// overwrites this with the more precise upstream content
+				// type for the common (fast, no-heartbeat) case.
+				hw.Header().Set("Content-Type", "application/json")
+				// Once a heartbeat fires, status 200 is committed even if
+				// dispatch later errors — there is no way to change it
+				// after bytes are on the wire. This header is the only way
+				// a client can distinguish "this 200 is real" from "this
+				// 200 is a committed-early status masking a later error,
+				// check the body for an error key." Tied to the first
+				// actual heartbeat tick, not just to heartbeating being
+				// enabled — every request has interval > 0 by default, so
+				// setting this any earlier would put it on every response
+				// regardless of whether a heartbeat ever fired, making it
+				// useless as a signal.
+				hw.Header().Set("X-LangWatch-Heartbeat-Active", "true")
+			}
 			_, _ = hw.Write(heartbeatByte)
 			hw.Flush()
 		}

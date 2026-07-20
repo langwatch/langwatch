@@ -168,6 +168,7 @@ func TestRouter_NonStreaming_NoBytesReachClientWhileProviderIsSlow(t *testing.T)
 	// timeout while the burst is being assembled.
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.NotZero(t, rec.Body.Len())
+	assert.Empty(t, rec.Header().Get("X-LangWatch-Heartbeat-Active"), "no heartbeat fired, so the header that flags a possibly-stale status must be absent")
 }
 
 // TestRouter_NonStreaming_HeartbeatKeepsConnectionWarm proves the fix for
@@ -207,6 +208,8 @@ func TestRouter_NonStreaming_HeartbeatKeepsConnectionWarm(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+	assert.Equal(t, "true", rec.Header().Get("X-LangWatch-Heartbeat-Active"),
+		"a client should be able to tell this response took the heartbeat path from headers alone")
 
 	// The body is prefixed by one or more heartbeat bytes (insignificant
 	// JSON whitespace, RFC 8259 §2) ahead of the real payload — proving
@@ -227,7 +230,9 @@ func TestRouter_NonStreaming_HeartbeatKeepsConnectionWarm(t *testing.T) {
 // body still carries the exact same structured error a fast failure would
 // have produced, so a client inspecting the body (not just the status)
 // still gets the accurate error — a strict improvement over today's
-// 524 with no body at all.
+// 524 with no body at all. X-LangWatch-Heartbeat-Active on the response is
+// the mitigation for clients that only check status: its presence on a
+// 200 is the signal to check the body for an error key first.
 //
 // @scenario "dispatch that errors after heartbeating has started still delivers a structured error body"
 func TestRouter_NonStreaming_HeartbeatThenError_StillDeliversStructuredErrorBody(t *testing.T) {
@@ -257,8 +262,10 @@ func TestRouter_NonStreaming_HeartbeatThenError_StillDeliversStructuredErrorBody
 	waitOrFatal(t, done, "handler never completed after the provider call returned")
 
 	// Status is stuck at 200 — already committed by the heartbeat — but the
-	// body still carries the real, structured error.
+	// body still carries the real, structured error, and the header flags
+	// that this specific 200 needs a body check before being trusted.
 	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "true", rec.Header().Get("X-LangWatch-Heartbeat-Active"))
 
 	var errResp herr.ErrorResponse
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &errResp))
@@ -293,6 +300,7 @@ func TestRouter_NonStreaming_HeartbeatDisabled(t *testing.T) {
 	waitOrFatal(t, done, "handler never completed after the provider call returned")
 
 	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Empty(t, rec.Header().Get("X-LangWatch-Heartbeat-Active"), "disabled means no heartbeat ever fires, so the header must never be set")
 }
 
 // TestRouter_NonStreaming_HeartbeatFiresAcrossEveryRoute proves the fix is
@@ -360,6 +368,7 @@ func TestRouter_NonStreaming_HeartbeatFiresAcrossEveryRoute(t *testing.T) {
 
 			assert.Equal(t, http.StatusOK, rec.Code)
 			assert.Contains(t, rec.Body.String(), tc.bodyMarker)
+			assert.Equal(t, "true", rec.Header().Get("X-LangWatch-Heartbeat-Active"))
 		})
 	}
 }
