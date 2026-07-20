@@ -5,7 +5,10 @@ import type {
   ModelProviderKey,
   ModelProviderSurface,
 } from "../../regions/model-providers/types";
-import { ModelProviderGrid } from "./model-provider/ModelProviderGrid";
+import {
+  ModelProviderGrid,
+  providersForSurface,
+} from "./model-provider/ModelProviderGrid";
 import { ModelProviderSetup } from "./model-provider/ModelProviderSetup";
 
 interface ModelProviderScreenProps {
@@ -17,14 +20,28 @@ interface ModelProviderScreenProps {
    * re-resolve the model rather than navigate away.
    */
   onComplete?: () => void;
+  /**
+   * Land on this provider instead of the surface's first grid entry — e.g.
+   * Langy's "sign in to Codex again" card opens the screen straight on codex.
+   */
+  initialProviderKey?: ModelProviderKey;
 }
 
 export const ModelProviderScreen: React.FC<ModelProviderScreenProps> = ({
   variant,
   onComplete,
+  initialProviderKey,
 }) => {
+  // The surface's leading provider is the default selection — on surfaces
+  // with a recommended provider (Codex on Langy setup / onboarding) that is
+  // the recommendation itself.
   const [modelProviderKey, setSelectedModelProviderKey] =
-    useState<ModelProviderKey>("open_ai");
+    useState<ModelProviderKey>(
+      () =>
+        initialProviderKey ??
+        providersForSurface(variant)[0]?.key ??
+        "open_ai",
+    );
 
   // In the Langy panel the screen lives in a narrow scrolling column, and the
   // credential form sits below the fold of the provider grid: picking a

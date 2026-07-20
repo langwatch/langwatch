@@ -1568,8 +1568,17 @@ function LangyPanel({
     [refetchHistory],
   );
 
+  // "Sign in to Codex" from the session-expired card: the message column
+  // swaps to the inline model setup landed on codex, and completing it (the
+  // re-auth) re-drives the failed turn.
+  const [reconnectCodex, setReconnectCodex] = useState(false);
+
   const onErrorAction = useCallback(
-    (kind: "connect-github" | "configure-model" | "retry") => {
+    (kind: "connect-github" | "configure-model" | "reconnect-codex" | "retry") => {
+      if (kind === "reconnect-codex") {
+        setReconnectCodex(true);
+        return;
+      }
       if (kind !== "retry") return;
       retryTurn();
     },
@@ -2357,7 +2366,7 @@ function LangyPanel({
                     ) : null}
                     {showCardGallery ? (
                       <LangyCardGallery />
-                    ) : langyNeedsModel ? (
+                    ) : langyNeedsModel || reconnectCodex ? (
                       <VStack
                         align="stretch"
                         gap={2}
@@ -2365,14 +2374,27 @@ function LangyPanel({
                         paddingTop="18px"
                       >
                         <Text fontSize="sm" fontWeight="semibold">
-                          Langy needs a model to get started
+                          {reconnectCodex
+                            ? "Sign in to Codex again"
+                            : "Langy needs a model to get started"}
                         </Text>
                         {/* The one subtitle under this heading is the provider
                         grid's own description; a second line here read as a
                         double title. */}
                         <ModelProviderScreen
                           variant="langy"
-                          onComplete={() => void resolvedDefaultQuery.refetch()}
+                          {...(reconnectCodex
+                            ? { initialProviderKey: "codex" as const }
+                            : {})}
+                          onComplete={() => {
+                            void resolvedDefaultQuery.refetch();
+                            if (reconnectCodex) {
+                              // Re-authenticated: back to the conversation and
+                              // re-drive the turn the dead session failed.
+                              setReconnectCodex(false);
+                              retryTurn();
+                            }
+                          }}
                         />
                       </VStack>
                     ) : historyErrorPresentation ? (

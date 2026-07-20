@@ -26,6 +26,56 @@ const llmPrefix = "/llm"
 // a pathological upstream from ballooning proxy memory.
 const maxErrorBodyBytes = 64 * 1024
 
+// codexModelPrefix marks a turn whose model is served by the gateway's codex
+// provider. The worker itself never sees the prefix (opencode runs its native
+// openai provider); the proxy restores it request-side so the gateway routes
+// to the codex credential.
+const codexModelPrefix = "openai_codex/"
+
+// rewriteCodexModelBody swaps the outbound request body's "model" field for
+// the turn's full provider-prefixed id on codex turns. A no-op for every
+// other turn and for bodies that don't parse as a JSON object (the proxied
+// request stands untouched).
+func rewriteCodexModelBody(out *http.Request, turnModel string) {
+	if !strings.HasPrefix(turnModel, codexModelPrefix) || out.Body == nil {
+		return
+	}
+	raw, err := io.ReadAll(out.Body)
+	_ = out.Body.Close()
+	if err != nil {
+		out.Body = io.NopCloser(bytes.NewReader(nil))
+		out.ContentLength = 0
+		return
+	}
+	restore := func() {
+		out.Body = io.NopCloser(bytes.NewReader(raw))
+		out.ContentLength = int64(len(raw))
+	}
+	var body map[string]json.RawMessage
+	if json.Unmarshal(raw, &body) != nil {
+		restore()
+		return
+	}
+	if _, hasModel := body["model"]; !hasModel {
+		restore()
+		return
+	}
+	encodedModel, err := json.Marshal(turnModel)
+	if err != nil {
+		restore()
+		return
+	}
+	body["model"] = encodedModel
+	rewritten, err := json.Marshal(body)
+	if err != nil {
+		restore()
+		return
+	}
+	out.Body = io.NopCloser(bytes.NewReader(rewritten))
+	out.ContentLength = int64(len(rewritten))
+	out.Header.Set("Content-Length", fmt.Sprintf("%d", len(rewritten)))
+}
+
 // handleLLM mediates one worker LLM call (phase 2): the worker's
 // OPENAI_BASE_URL points at /w/{token}/llm, so the OpenAI-compatible path it
 // requested is re-joined onto the conversation's AI gateway base URL, the
@@ -58,6 +108,11 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			// The worker authenticated to US with a placeholder (its env holds no
 			// virtual key). Replace it with the real credential.
 			pr.Out.Header.Set("Authorization", "Bearer "+entry.info.LLMVirtualKey)
+			// Codex turns run opencode's NATIVE openai provider (the Responses
+			// dialect the codex backend speaks), so the worker's request says
+			// "gpt-…"; restore the full provider-prefixed id on the wire and
+			// the gateway routes it to the codex credential. See provision.go.
+			rewriteCodexModelBody(pr.Out, entry.info.Model)
 			// Stamp the TURN's traceparent so the gateway's customer-facing
 			// gen_ai span joins the turn's trace. The worker's own traceparent
 			// is deliberately NOT continued, for two reasons: its trace id is

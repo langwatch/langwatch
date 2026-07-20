@@ -128,6 +128,15 @@ func (a *Agent) Provision(in ProvisionInput) error {
 	if model == "" {
 		model = "openai/gpt-5-mini"
 	}
+	// Codex models run opencode's NATIVE openai provider: the codex backend
+	// speaks the same Responses dialect, opencode has no "openai_codex"
+	// provider of its own, and the manager's LLM proxy restores the full
+	// prefixed id on the wire so the gateway routes to the codex credential
+	// (see otelrelay's rewriteCodexModelBody). The reasoning-summary option
+	// below then applies to codex turns too.
+	if bare, ok := strings.CutPrefix(model, "openai_codex/"); ok {
+		model = "openai/" + bare
+	}
 
 	// No "plugin" block. The worker previously loaded an external OpenTelemetry
 	// plugin (@devtheops/opencode-plugin-otel), but evaluating that ~2 MB bundle
