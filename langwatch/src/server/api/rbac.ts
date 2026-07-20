@@ -1485,9 +1485,22 @@ export async function batchScopePermissions(
   const teamsMap = new Map<string, boolean>();
   const projectsMap = new Map<string, boolean>();
 
+  // A project inherits TEAM-scoped bindings from its team, so the binding
+  // load must cover the projects' team ids too — `projectGrants` below
+  // checks `scopeKey(TEAM, teamId)`, and a binding that was never loaded
+  // can't grant. Without this, a member whose only access is a TEAM-scope
+  // binding (no legacy TeamUser rows) fails every project in the batch
+  // while the single-project resolver — which always queries the team
+  // scope — grants it.
   const resolution = await loadScopeResolution(ctx, {
     organizationId: args.organizationId,
-    scopeIds: [...args.teamIds, ...args.projectIds],
+    scopeIds: [
+      ...new Set([
+        ...args.teamIds,
+        ...args.projectIds,
+        ...Object.values(args.projectTeamId),
+      ]),
+    ],
   });
   if (!resolution) {
     args.teamIds.forEach((id) => teamsMap.set(id, false));
@@ -1552,9 +1565,7 @@ const DEMO_VIEW_PERMISSIONS: Permission[] = [
  * on this directly instead of on the permission check that the demo silently
  * grants.
  */
-export function isDemoProjectId(
-  projectId: string | null | undefined,
-): boolean {
+export function isDemoProjectId(projectId: string | null | undefined): boolean {
   if (!projectId) return false;
   // Prefer dynamic process.env in tests; fall back to validated env.
   const demoId = process.env.DEMO_PROJECT_ID ?? env.DEMO_PROJECT_ID;
@@ -1565,7 +1576,9 @@ export function isDemoProject(
   projectId: string,
   permission: Permission,
 ): boolean {
-  return isDemoProjectId(projectId) && DEMO_VIEW_PERMISSIONS.includes(permission);
+  return (
+    isDemoProjectId(projectId) && DEMO_VIEW_PERMISSIONS.includes(permission)
+  );
 }
 
 // ============================================================================

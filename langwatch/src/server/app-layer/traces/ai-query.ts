@@ -267,7 +267,9 @@ export async function generateTraceAction(
   if (lastFailure === "provider") {
     return {
       ok: false,
-      error: summarizeProviderError(lastProviderError),
+      error: summarizeProviderError(lastProviderError, {
+        model: model.modelId,
+      }),
     };
   }
   return {
@@ -283,16 +285,26 @@ export async function generateTraceAction(
 
 /**
  * Curate an SDK/provider exception into the operator-actionable fields
- * the UI renders in the AI-search composer. Strips stack traces and
+ * the UI renders in the AI-search composer. Prefers the structured
+ * fields the AI SDK's APICallError carries (statusCode, responseBody)
+ * and falls back to text extraction: strips stack traces and
  * `litellm.XYZException` prefixes; pulls out HTTP status, provider key,
  * referenced model id, and the human-readable `'message'` substring
  * embedded in the JSON-shaped body LiteLLM forwards from providers.
+ *
+ * `context.model` is the model the backend actually resolved for the
+ * call — provider errors like Azure's bare "Resource not found" carry
+ * no model of their own, and the operator can't act on the failure
+ * without knowing which configured model to go fix.
  *
  * Never throws — anything we can't parse falls through to a truncated
  * raw-cleaned text so we still produce *something* for the operator
  * instead of a vacant "Unknown error" badge.
  */
-function summarizeProviderError(err: unknown): AiActionError {
+export function summarizeProviderError(
+  err: unknown,
+  context?: { model?: string },
+): AiActionError {
   const raw = err instanceof Error ? err.message : String(err ?? "");
   const cleaned = raw
     .split("\n")
@@ -300,37 +312,54 @@ function summarizeProviderError(err: unknown): AiActionError {
     .join("\n")
     .trim();
 
+  const structured = err as
+    | { statusCode?: unknown; responseBody?: unknown }
+    | null
+    | undefined;
+  const structuredStatus =
+    typeof structured?.statusCode === "number"
+      ? structured.statusCode
+      : undefined;
+  const structuredBody =
+    typeof structured?.responseBody === "string" ? structured.responseBody : "";
+
   const statusMatch =
     cleaned.match(/status[_\s]*code[:\s]+(\d{3})/i) ??
     cleaned.match(/\b(?:HTTP\s+)?(\d{3})\b/);
-  const httpStatus = statusMatch ? Number(statusMatch[1]) : undefined;
+  const httpStatus =
+    structuredStatus ?? (statusMatch ? Number(statusMatch[1]) : undefined);
 
   const providerMatch = cleaned.match(
     /(?:litellm\.|\b)(OpenAI|Azure|Anthropic|Gemini|Google|Cohere|Mistral|Groq|Together|Bedrock|Vertex)(?:Exception|Error|APIError)/i,
   );
-  const provider = providerMatch?.[1]?.toLowerCase();
+  const provider =
+    providerMatch?.[1]?.toLowerCase() ?? context?.model?.split("/")[0];
 
   const modelMatch =
     cleaned.match(
       /model\s+["']?([\w./:-]+)["']?\s+(?:does\s+not\s+exist|not\s+found|is\s+invalid)/i,
     ) ?? cleaned.match(/Unknown\s+model[:\s]+([\w./:-]+)/i);
-  const model = modelMatch ? modelMatch[1] : undefined;
+  const model = modelMatch ? modelMatch[1] : context?.model;
 
+  const searchable = `${cleaned}\n${structuredBody}`;
   const reasonMatch =
-    cleaned.match(/['"]message['"][:\s]+['"]([^'"]{1,300})['"]/) ??
-    cleaned.match(/['"]error['"][:\s]+['"]([^'"]{1,300})['"]/);
+    searchable.match(/['"]message['"][:\s]+['"]([^'"]{1,300})['"]/) ??
+    searchable.match(/['"]error['"][:\s]+['"]([^'"]{1,300})['"]/);
   const reason = reasonMatch?.[1];
 
   let message = "Couldn't reach the model provider";
+  const modelSuffix = model ? ` for ${model}` : "";
   if (httpStatus && reason) {
-    message = `Provider returned ${httpStatus}: ${reason}`;
+    message = `Provider returned ${httpStatus}${modelSuffix}: ${reason}`;
   } else if (httpStatus) {
-    message = `Provider returned ${httpStatus}`;
+    message = `Provider returned ${httpStatus}${modelSuffix}`;
   } else if (reason) {
-    message = reason;
+    message = model ? `${reason} (${model})` : reason;
   } else if (cleaned) {
     const firstLine = cleaned.split("\n")[0]?.trim() ?? "";
-    if (firstLine) message = firstLine.slice(0, 200);
+    if (firstLine) {
+      message = `${firstLine.slice(0, 200)}${modelSuffix}`;
+    }
   }
 
   return {

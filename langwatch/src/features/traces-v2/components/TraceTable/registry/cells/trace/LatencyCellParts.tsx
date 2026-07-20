@@ -18,7 +18,13 @@ interface LatencyBarProps {
  * a single bigger outlier compressing the whole column. Shared by the
  * Duration and TTFT columns, each scaling against its own p95.
  */
-function LatencyBar({ valueMs, p95Ms, hasStats, width, height }: LatencyBarProps) {
+function LatencyBar({
+  valueMs,
+  p95Ms,
+  hasStats,
+  width,
+  height,
+}: LatencyBarProps) {
   if (!hasStats || valueMs <= 0) {
     return (
       <Box
