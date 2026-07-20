@@ -242,6 +242,84 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
     });
   });
 
+  describe("when a shared row also carries another project's scope", () => {
+    let otherProjectId: string;
+
+    beforeAll(async () => {
+      const otherProject = await prisma.project.create({
+        data: {
+          name: `Other Project ${ns}`,
+          slug: `--proj-other-${ns}`,
+          teamId,
+          language: "typescript",
+          framework: "other",
+          apiKey: `test-key-other-${ns}`,
+        },
+      });
+      otherProjectId = otherProject.id;
+
+      // Shared row: ORGANIZATION scope + the OTHER project's scope. For
+      // the project under test it only applies at ORGANIZATION tier —
+      // the foreign PROJECT attachment must not inflate its rank.
+      await service().updateModelProvider(
+        {
+          projectId,
+          provider: "gemini",
+          enabled: true,
+          customKeys: { GEMINI_API_KEY: `sk-gem-shared-${ns}` },
+          customModels: [
+            {
+              modelId: "gemini-pro-x",
+              displayName: "gemini-pro-x",
+              mode: "chat",
+            },
+          ],
+          scopes: [
+            { scopeType: "ORGANIZATION", scopeId: organizationId },
+            { scopeType: "PROJECT", scopeId: otherProjectId },
+          ],
+        },
+        ctx(),
+      );
+
+      // Team row for the project under test's team — TEAM tier beats the
+      // shared row's ORGANIZATION tier here.
+      await service().updateModelProvider(
+        {
+          projectId,
+          provider: "gemini",
+          enabled: true,
+          customKeys: { GEMINI_API_KEY: `sk-gem-team-${ns}` },
+          customModels: [
+            {
+              modelId: "gemini-pro-x",
+              displayName: "gemini-pro-x",
+              mode: "chat",
+            },
+          ],
+          scopes: [{ scopeType: "TEAM", scopeId: teamId }],
+        },
+        ctx(),
+      );
+    });
+
+    afterAll(async () => {
+      await prisma.project.deleteMany({ where: { id: otherProjectId } });
+    });
+
+    /** @scenario A row's unrelated project scope does not inflate its specificity */
+    it("ranks the shared row by the scope that grants THIS project access", async () => {
+      const row = await service().findRowServingModel({
+        projectId,
+        provider: "gemini",
+        bareModel: "gemini-pro-x",
+      });
+      expect(row?.customKeys).toMatchObject({
+        GEMINI_API_KEY: `sk-gem-team-${ns}`,
+      });
+    });
+  });
+
   describe("when no row lists the model (registry-model providers)", () => {
     beforeAll(async () => {
       await service().updateModelProvider(

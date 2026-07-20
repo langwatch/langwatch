@@ -932,6 +932,7 @@ export class ModelProviderService {
   }): Promise<MaybeStoredModelProvider | null> {
     const project = await this.prisma.project.findUnique({
       where: { id: params.projectId },
+      include: { team: { select: { organizationId: true } } },
     });
     if (!project) return null;
 
@@ -948,12 +949,52 @@ export class ModelProviderService {
     );
     if (candidates.length === 0) return null;
 
-    const specificity = (mp: (typeof candidates)[number]) =>
-      this.scopePriority(this.pickNarrowestScope(mp.scopes).scopeType);
+    // Rank by the scope that grants THIS project access to the row — a
+    // multi-scope row's attachment to some other project's scope must not
+    // inflate its specificity here (that scope grants nothing to us).
+    const chain = {
+      projectId: project.id,
+      teamId: project.teamId,
+      organizationId: project.team?.organizationId ?? null,
+    };
     const best = candidates.reduce((acc, mp) =>
-      specificity(mp) > specificity(acc) ? mp : acc,
+      this.chainSpecificity(mp.scopes, chain) >
+      this.chainSpecificity(acc.scopes, chain)
+        ? mp
+        : acc,
     );
     return this.toMaybeStoredProvider(best, defaultProviders, true);
+  }
+
+  /**
+   * Specificity of a row RELATIVE to a project's scope chain: the highest
+   * tier among the row's attachments that actually grant this project
+   * access (its own PROJECT scope > its TEAM > its ORGANIZATION).
+   * Attachments outside the chain — e.g. another project's PROJECT scope
+   * on a shared row — contribute nothing.
+   */
+  private chainSpecificity(
+    scopes: { scopeType: string; scopeId: string }[],
+    chain: {
+      projectId: string;
+      teamId: string | null;
+      organizationId: string | null;
+    },
+  ): number {
+    let best = 0;
+    for (const s of scopes) {
+      if (s.scopeType === "PROJECT" && s.scopeId === chain.projectId) {
+        best = Math.max(best, 3);
+      } else if (s.scopeType === "TEAM" && s.scopeId === chain.teamId) {
+        best = Math.max(best, 2);
+      } else if (
+        s.scopeType === "ORGANIZATION" &&
+        s.scopeId === chain.organizationId
+      ) {
+        best = Math.max(best, 1);
+      }
+    }
+    return best;
   }
 
   private scopePriority(

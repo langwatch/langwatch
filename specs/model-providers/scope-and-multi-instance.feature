@@ -472,3 +472,11 @@ Feature: Model Provider Scope and Multi-Instance
     And a PROJECT-scoped enabled "azure" row for "web-app" whose embeddings catalog lists only "text-embedding-ada-002"
     When the runtime prepares a call for model "azure/text-embedding-3-small" in project "web-app"
     Then the call uses the ORGANIZATION row's credentials
+
+  @integration
+  Scenario: A row's unrelated project scope does not inflate its specificity
+    Given a shared "azure" row scoped to organization "acme" AND to project "other-app", whose catalog lists "gpt-5.4-mini"
+    And a TEAM-scoped enabled "azure" row for "web-app"'s team whose catalog also lists "gpt-5.4-mini"
+    When the runtime prepares a call for model "azure/gpt-5.4-mini" in project "web-app"
+    Then the call uses the TEAM row's credentials
+    And the shared row ranks at ORGANIZATION tier for "web-app" (its "other-app" attachment grants nothing here)
