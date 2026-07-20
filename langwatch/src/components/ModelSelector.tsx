@@ -88,7 +88,7 @@ export const filterRestrictedModels = ({
   models.filter((model) =>
     featureKey === undefined
       ? !isCodexModel(model)
-      : isModelAllowedForFeature(model, featureKey),
+      : isModelAllowedForFeature({ modelId: model, featureKey }),
   );
 
 export const useModelSelectionOptions = (

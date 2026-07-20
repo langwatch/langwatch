@@ -230,7 +230,13 @@ export async function resolveModelForFeature(
         // the write paths reject saving these, but an older config or a
         // wider-scope value must not leak a terms-restricted model into
         // an ordinary feature.
-        if (!isModelAllowedForFeature(expanded, feature.key)) continue;
+        if (
+          !isModelAllowedForFeature({
+            modelId: expanded,
+            featureKey: feature.key,
+          })
+        )
+          continue;
         return {
           model: expanded,
           source: "feature_override",
@@ -245,7 +251,13 @@ export async function resolveModelForFeature(
       if (value) {
         const expanded = expandLatestAlias(value);
         if (isLatestAlias(value) && expanded === value) continue;
-        if (!isModelAllowedForFeature(expanded, feature.key)) continue;
+        if (
+          !isModelAllowedForFeature({
+            modelId: expanded,
+            featureKey: feature.key,
+          })
+        )
+          continue;
         return {
           model: expanded,
           source: "role_default",

@@ -27,7 +27,7 @@ export async function getCodexVercelAIModel({
   model: string;
   featureKey: string;
 }) {
-  if (!isModelAllowedForFeature(model, featureKey)) {
+  if (!isModelAllowedForFeature({ modelId: model, featureKey })) {
     throw new Error(
       `"${model}" serves the coding-assistant surfaces only and cannot run "${featureKey}".`,
     );

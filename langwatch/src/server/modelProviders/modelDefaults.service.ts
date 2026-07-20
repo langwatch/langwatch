@@ -118,7 +118,7 @@ function sanitizeConfig(raw: Record<string, unknown>): Record<string, string> {
     // that silently loses a key would read as "worked" in the drawer.
     const allowed = roleKeys.has(key)
       ? isModelAllowedAsRoleDefault(value)
-      : isModelAllowedForFeature(value, key);
+      : isModelAllowedForFeature({ modelId: value, featureKey: key });
     if (!allowed) {
       throw new Error(
         `"${value}" serves the coding-assistant surfaces only and cannot be set for "${key}".`,
@@ -300,7 +300,10 @@ export async function setFeatureAtScope(
   }
   if (
     params.model !== null &&
-    !isModelAllowedForFeature(params.model, params.featureKey)
+    !isModelAllowedForFeature({
+      modelId: params.model,
+      featureKey: params.featureKey,
+    })
   ) {
     throw new Error(
       `"${params.model}" serves the coding-assistant surfaces only and cannot be the model for "${params.featureKey}".`,

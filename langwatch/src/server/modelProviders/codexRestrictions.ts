@@ -54,10 +54,13 @@ export const CODEX_DEFAULT_MODEL = "openai_codex/gpt-5.6-terra";
  * kept here (not derived from the registry) so this module stays
  * import-cycle-free and client-safe.
  */
-export function isModelAllowedForFeature(
-  modelId: string,
-  featureKey: string,
-): boolean {
+export function isModelAllowedForFeature({
+  modelId,
+  featureKey,
+}: {
+  modelId: string;
+  featureKey: string;
+}): boolean {
   if (!isCodexModel(modelId)) return true;
   return isCodexAllowedFeature(featureKey);
 }

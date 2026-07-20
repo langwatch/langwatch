@@ -64,7 +64,10 @@ export function SelectableIconCard(
       <Box
         role="button"
         tabIndex={0}
-        aria-label={ariaLabel}
+        // Fold the badge into the accessible name — aria-label overrides the
+        // subtree, so the "Recommended" chip is otherwise invisible to
+        // assistive tech that sighted users can see.
+        aria-label={badge ? `${ariaLabel}, ${badge}` : ariaLabel}
         aria-pressed={selected}
         onClick={onClick}
         onKeyDown={(e) => {

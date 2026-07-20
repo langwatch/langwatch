@@ -32,10 +32,16 @@ describe("codexRestrictions", () => {
 
   it("allows codex only on the coding-assistant surfaces", () => {
     expect(
-      isModelAllowedForFeature(CODEX_DEFAULT_MODEL, LANGY_CHAT_FEATURE_KEY),
+      isModelAllowedForFeature({
+        modelId: CODEX_DEFAULT_MODEL,
+        featureKey: LANGY_CHAT_FEATURE_KEY,
+      }),
     ).toBe(true);
     expect(
-      isModelAllowedForFeature(CODEX_DEFAULT_MODEL, "traces.ai_search"),
+      isModelAllowedForFeature({
+        modelId: CODEX_DEFAULT_MODEL,
+        featureKey: "traces.ai_search",
+      }),
     ).toBe(true);
     for (const forbidden of [
       "prompt.create_default",
@@ -46,7 +52,10 @@ describe("codexRestrictions", () => {
       "datasets.generator",
     ]) {
       expect(
-        isModelAllowedForFeature(CODEX_DEFAULT_MODEL, forbidden),
+        isModelAllowedForFeature({
+          modelId: CODEX_DEFAULT_MODEL,
+          featureKey: forbidden,
+        }),
         `${forbidden} must refuse codex`,
       ).toBe(false);
     }
@@ -59,9 +68,12 @@ describe("codexRestrictions", () => {
 
   it("leaves unrestricted providers untouched on every feature", () => {
     for (const feature of allFeatures()) {
-      expect(isModelAllowedForFeature("openai/gpt-5-mini", feature.key)).toBe(
-        true,
-      );
+      expect(
+        isModelAllowedForFeature({
+          modelId: "openai/gpt-5-mini",
+          featureKey: feature.key,
+        }),
+      ).toBe(true);
     }
   });
 

@@ -267,8 +267,14 @@ export class CodexAccountService {
  * The gateway's 401 recovery: refresh a provider row's stored tokens and
  * hand back a fresh access token, persisting the rotation. A row refreshed
  * within the last few seconds is returned as-is instead of refreshed again,
- * so a burst of concurrent 401s (one per in-flight request) collapses into
- * one issuer round-trip and can't burn a one-time refresh token twice.
+ * so a STAGGERED burst of 401s (the second arriving after the first has
+ * persisted its rotation) collapses into one issuer round-trip. This is a
+ * best-effort window, not a lock: two 401s that both read the stale tokens
+ * before either persists can still double-refresh, and the loser's call
+ * fails once the issuer rotates the one-time refresh token — the gateway
+ * then surfaces that as a re-auth, which is the correct terminal state
+ * anyway. A per-row single-flight lock would close the gap if it proves real
+ * under load.
  */
 export class CodexGatewayRefreshService {
   /** A token this fresh is the one we just minted — don't refresh again. */

@@ -330,7 +330,11 @@ export const modelProviderRouter = createTRPCRouter({
 
   /**
    * The connected Codex account for a project, for the setup surfaces'
-   * connected state. Never returns tokens — display fields only.
+   * connected state. Never returns tokens, and deliberately NOT the account
+   * email: this is a project:view query, so a plain member must not read the
+   * (often personal) OpenAI address the connecting admin signed in with. The
+   * plan tier is non-identifying. The connector still sees their own email at
+   * connect time from the sign-in mutation's result.
    */
   codexStatus: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -343,7 +347,6 @@ export const modelProviderRouter = createTRPCRouter({
       return {
         connected: true as const,
         providerId: row.id,
-        email: keys.CODEX_EMAIL ?? "",
         plan: keys.CODEX_PLAN ?? "",
       };
     }),

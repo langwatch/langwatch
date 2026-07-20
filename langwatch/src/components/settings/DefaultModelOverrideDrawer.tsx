@@ -85,7 +85,9 @@ export function featureRowModelOptions({
   options: string[];
   featureKey: string;
 }): string[] {
-  return options.filter((model) => isModelAllowedForFeature(model, featureKey));
+  return options.filter((model) =>
+    isModelAllowedForFeature({ modelId: model, featureKey }),
+  );
 }
 
 interface Props {

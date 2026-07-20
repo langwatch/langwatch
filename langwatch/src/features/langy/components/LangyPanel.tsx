@@ -1383,7 +1383,16 @@ function LangyPanel({
     recovery.reset();
   };
 
+  // "Sign in to Codex" from the session-expired card: the message column swaps
+  // to the inline model setup landed on codex, and completing it (the re-auth)
+  // re-drives the failed turn. Declared here so every escape hatch below
+  // (new chat, close, switching the composer model) can clear it — otherwise a
+  // user who takes the plan-limit card's "pick another model" suggestion sends
+  // successfully but the reply renders behind a stuck setup screen.
+  const [reconnectCodex, setReconnectCodex] = useState(false);
+
   const handleNewChat = () => {
+    setReconnectCodex(false);
     resetChatEngine({ clearMessages: true });
     startNewConversation();
     // Starting a chat means you want the chat, not the filing cabinet.
@@ -1567,11 +1576,6 @@ function LangyPanel({
     },
     [refetchHistory],
   );
-
-  // "Sign in to Codex" from the session-expired card: the message column
-  // swaps to the inline model setup landed on codex, and completing it (the
-  // re-auth) re-drives the failed turn.
-  const [reconnectCodex, setReconnectCodex] = useState(false);
 
   const onErrorAction = useCallback(
     (
@@ -2217,7 +2221,10 @@ function LangyPanel({
           <PanelHeader
             conversationTitle={conversationTitle}
             onNewChat={handleNewChat}
-            onClose={closePanel}
+            onClose={() => {
+              setReconnectCodex(false);
+              closePanel();
+            }}
             // Riding beside a drawer, the drawer owns the only close affordance
             // on screen; a second X on the companion read as "close the drawer"
             // and kept dismissing Langy instead. Closing the drawer returns
@@ -2699,7 +2706,13 @@ function LangyPanel({
                   model={modelOverride}
                   modelOptions={modelOptions}
                   langyDefaultModel={langyDefaultModel}
-                  onModelChange={setModelOverride}
+                  onModelChange={(model) => {
+                    // Switching models is choosing the other way out of a dead
+                    // codex session; leaving the reconnect screen up would trap
+                    // the panel on the sign-in it no longer needs.
+                    setReconnectCodex(false);
+                    setModelOverride(model);
+                  }}
                   onSend={send}
                   onStop={handleStop}
                   variant={floating ? "floating" : "sidebar"}

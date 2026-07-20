@@ -157,11 +157,13 @@ export function CodexSignIn({
 
   // ── Connected (from a previous session or the flow that just finished) ──
   const storedStatus = status.data?.connected ? status.data : null;
+  // The email is only known from THIS session's sign-in (the status query
+  // doesn't expose it — see codexStatus); a re-visit shows the generic label.
   const connected =
     phase.name === "complete"
       ? { email: phase.email, plan: phase.plan }
       : storedStatus
-        ? { email: storedStatus.email, plan: storedStatus.plan }
+        ? { email: "", plan: storedStatus.plan }
         : null;
 
   if (connected && phase.name !== "pending" && phase.name !== "starting") {
