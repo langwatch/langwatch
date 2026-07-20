@@ -1,4 +1,5 @@
 import type React from "react";
+import { DrawerExitRideProvider } from "~/components/ui/drawer";
 import { useRouter } from "~/utils/compat/next-router";
 import { useTraceDrawerUrlHydrator } from "../hooks/useTraceDrawerUrlHydrator";
 import { useDrawerStore } from "../stores/drawerStore";
@@ -28,6 +29,14 @@ export const GlobalTraceV2DrawerMount: React.FC = () => {
 const GlobalTraceV2DrawerMountInner: React.FC = () => {
   useTraceDrawerUrlHydrator();
   const hasTrace = useDrawerStore((s) => !!s.traceId);
+  // A ride-held close keeps `traceId` (and so this mount) alive for the
+  // Langy companion's shared exit beat; the provider flips the shell's
+  // DrawerContent into its pointer-inert pair-out. See drawerStore.closeDrawer.
+  const closingRide = useDrawerStore((s) => s.closingRide);
   if (!hasTrace) return null;
-  return <TraceV2DrawerShell />;
+  return (
+    <DrawerExitRideProvider value={closingRide}>
+      <TraceV2DrawerShell />
+    </DrawerExitRideProvider>
+  );
 };

@@ -31,6 +31,34 @@ export const APP_HEADER_HEIGHT = 56;
 
 export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 
+/** The house easing curve on its own, for animations that need their own duration. */
+export const LANGY_EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
+
+/**
+ * The drawer-companion ride's beat lengths
+ * (spec: specs/langy/langy-panel-layout.feature, "The companion ride is
+ * choreographed, not a teleport"):
+ *
+ *   1. the docked panel slides off the right edge (STAGE_EXIT)
+ *   2. the drawer and the companion slide in from the right TOGETHER — the
+ *      same keyframes on both, so they travel as one unit (PAIR)
+ *   3. on close the pair slides out together (PAIR again)
+ *   4. the panel slides back into its dock (DOCK_RETURN)
+ *
+ * DrawerContent delays its entrance by STAGE_EXIT so the drawer waits in the
+ * wings for beat 1, and swaps its own slide for the PAIR keyframes so beats
+ * 2 and 3 are genuinely shared. The panel folds its beats into single
+ * composite animations (RIDE_IN / RIDE_OUT) — one animation per element per
+ * ride, created in the same frame as the drawer's, which is what guarantees
+ * a shared start time. Keep these in sync with the `langy-companion-ride-*`
+ * keyframe percentages in langyTheme.css.
+ */
+export const LANGY_STAGE_EXIT_MS = 240;
+export const LANGY_PAIR_MS = 340;
+export const LANGY_DOCK_RETURN_MS = 260;
+export const LANGY_RIDE_IN_MS = LANGY_STAGE_EXIT_MS + LANGY_PAIR_MS;
+export const LANGY_RIDE_OUT_MS = LANGY_PAIR_MS + LANGY_DOCK_RETURN_MS;
+
 /** Desktop ceiling for the floating companion. */
 export const FLOATING_PANEL_MAX_WIDTH = 432;
 

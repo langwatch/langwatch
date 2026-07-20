@@ -1,11 +1,19 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MAXIMIZE_EDGE_PX,
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
 } from "../drawerStore";
+
+// The companion ride reads Langy's open state to decide whether a close is
+// held on stage for the shared exit beat. Mocked so the store test can drive
+// both grounds without mounting Langy.
+const langyMock = { isOpen: false };
+vi.mock("~/features/langy/stores/langyStore", () => ({
+  useLangyStore: { getState: () => langyMock },
+}));
 
 const VIEWPORT_WIDTH = 1440;
 
@@ -267,6 +275,81 @@ describe("drawerStore.backfillOccurredAtMs", () => {
 
         expect(useDrawerStore.getState().occurredAtMs).toBeNull();
       });
+    });
+  });
+});
+
+describe("drawerStore.closeDrawer companion ride", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    langyMock.isOpen = false;
+    // jsdom has no matchMedia; default to "motion allowed" so the ride path
+    // is reachable, and let individual tests override.
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as never;
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("given Langy is closed", () => {
+    /** @scenario The companion ride is choreographed, not a teleport */
+    it("clears the drawer immediately, no ride hold", () => {
+      langyMock.isOpen = false;
+      useDrawerStore.getState().openTrace("trace-1");
+
+      useDrawerStore.getState().closeDrawer();
+
+      expect(useDrawerStore.getState().traceId).toBeNull();
+      expect(useDrawerStore.getState().closingRide).toBe(false);
+    });
+  });
+
+  describe("given Langy is open", () => {
+    /** @scenario The companion ride is choreographed, not a teleport */
+    it("holds the drawer on stage for the shared exit, then clears it", () => {
+      langyMock.isOpen = true;
+      useDrawerStore.getState().openTrace("trace-1");
+
+      useDrawerStore.getState().closeDrawer();
+
+      // Held: content stays mounted (traceId set) but marked as riding out.
+      expect(useDrawerStore.getState().traceId).toBe("trace-1");
+      expect(useDrawerStore.getState().closingRide).toBe(true);
+      expect(useDrawerStore.getState().isOpen).toBe(false);
+
+      // The exit beat finishes and the content clears for real.
+      vi.advanceTimersByTime(500);
+      expect(useDrawerStore.getState().traceId).toBeNull();
+      expect(useDrawerStore.getState().closingRide).toBe(false);
+    });
+
+    /** @scenario Reduced motion re-seats the companion without the ride */
+    it("clears immediately under reduced motion", () => {
+      langyMock.isOpen = true;
+      window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as never;
+      useDrawerStore.getState().openTrace("trace-1");
+
+      useDrawerStore.getState().closeDrawer();
+
+      expect(useDrawerStore.getState().traceId).toBeNull();
+      expect(useDrawerStore.getState().closingRide).toBe(false);
+    });
+
+    /** @scenario The companion ride is choreographed, not a teleport */
+    it("re-opening mid-ride cancels the pending clear", () => {
+      langyMock.isOpen = true;
+      useDrawerStore.getState().openTrace("trace-1");
+      useDrawerStore.getState().closeDrawer();
+      expect(useDrawerStore.getState().closingRide).toBe(true);
+
+      // Re-open before the exit beat lands: the finalizer must not fire and
+      // wipe the freshly opened trace.
+      useDrawerStore.getState().openTrace("trace-2");
+      expect(useDrawerStore.getState().traceId).toBe("trace-2");
+      expect(useDrawerStore.getState().closingRide).toBe(false);
+
+      vi.advanceTimersByTime(500);
+      expect(useDrawerStore.getState().traceId).toBe("trace-2");
     });
   });
 });

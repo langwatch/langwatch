@@ -3,10 +3,14 @@ import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import {
   LANGY_DOCK_GAP,
+  LANGY_EASE,
+  LANGY_PAIR_MS,
+  LANGY_STAGE_EXIT_MS,
   LANGY_TRANSITION,
   SIDEBAR_PANEL_WIDTH,
 } from "~/features/langy/logic/langyPanelLayout";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { CloseButton } from "./close-button";
 import { IsolatedErrorBoundary } from "./IsolatedErrorBoundary";
 
@@ -18,6 +22,15 @@ import { IsolatedErrorBoundary } from "./IsolatedErrorBoundary";
  */
 const DrawerOffsetContext = React.createContext<{ marginTop?: number }>({});
 export const DrawerOffsetProvider = DrawerOffsetContext.Provider;
+
+/**
+ * True while CurrentDrawer is holding an already-closed drawer on stage for
+ * the companion ride's shared exit (see CurrentDrawer): the content plays
+ * the pair-out beat and goes pointer-inert, leaving together with the Langy
+ * panel instead of vanishing on unmount.
+ */
+const DrawerExitRideContext = React.createContext(false);
+export const DrawerExitRideProvider = DrawerExitRideContext.Provider;
 
 interface DrawerContentProps extends ChakraDrawer.ContentProps {
   portalled?: boolean;
@@ -59,9 +72,44 @@ export const DrawerContent = React.forwardRef<
   // space between the two cards. Reactive, so closing the panel mid-drawer
   // returns the drawer to the edge. Spec: specs/langy/langy-panel-layout.feature
   const isLangyOpen = useLangyStore((s) => s.isOpen);
+  const reduceMotion = useReducedMotion();
   const langyYieldMarginEnd = isLangyOpen
     ? `${8 + SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP}px`
     : undefined;
+
+  // The companion ride's shared beats. When the panel was open as this drawer
+  // mounted, the panel plays its stage-exit first, so the drawer WAITS in the
+  // wings (the delay) and then enters with the panel's own pair keyframes:
+  // the same fixed 100vw travel on both elements, which is what makes them
+  // slide in as one unit. FROZEN at mount on purpose — were it live, the
+  // panel opening beside an already-open drawer would change animation-name
+  // on a settled element and visibly replay its entrance.
+  const [ridesWithLangy] = React.useState(() => isLangyOpen && !reduceMotion);
+  const langyPairEnter = ridesWithLangy
+    ? {
+        animationName: "langy-pair-slide-in",
+        animationDuration: `${LANGY_PAIR_MS}ms`,
+        animationTimingFunction: LANGY_EASE,
+        animationDelay: `${LANGY_STAGE_EXIT_MS}ms`,
+        animationFillMode: "backwards",
+      }
+    : undefined;
+  // The exit IS live: however the ride began, a drawer closing beside the
+  // open panel leaves together with it (the panel mirrors this with its
+  // ride-out beat). Two paths cover the two ways drawers close: state-driven
+  // roots (open=false, exit via _closed) and CurrentDrawer's unmount-driven
+  // close, where the ride-exit hold below replays the same beat on the held
+  // element. Closed-state declarations only apply at close time, so toggling
+  // them never restarts the settled entrance.
+  const langyPairExit =
+    isLangyOpen && !reduceMotion
+      ? {
+          animationName: "langy-pair-slide-out",
+          animationDuration: `${LANGY_PAIR_MS}ms`,
+          animationTimingFunction: LANGY_EASE,
+        }
+      : undefined;
+  const isExitRide = React.useContext(DrawerExitRideContext);
 
   // Crash inside the drawer body should NOT close the drawer. Wrap the
   // children so a render error renders an inline error panel within the
@@ -86,6 +134,16 @@ export const DrawerContent = React.forwardRef<
           marginTop={marginTopProp}
           marginEnd={langyYieldMarginEnd}
           transition={`margin ${LANGY_TRANSITION}`}
+          {...(langyPairEnter ? { _open: langyPairEnter } : {})}
+          {...(langyPairExit ? { _closed: langyPairExit } : {})}
+          {...(isExitRide
+            ? {
+                pointerEvents: "none",
+                css: {
+                  animation: `langy-pair-slide-out ${LANGY_PAIR_MS}ms ${LANGY_EASE} forwards`,
+                },
+              }
+            : {})}
           asChild={false}
         >
           {safeChildren}

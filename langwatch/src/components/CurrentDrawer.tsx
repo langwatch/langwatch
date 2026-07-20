@@ -1,8 +1,18 @@
 import { Center, Spinner } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
 import qs from "qs";
-import { Suspense, useEffect, useMemo, useSyncExternalStore } from "react";
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { ErrorBoundary } from "react-error-boundary";
+import { LANGY_PAIR_MS } from "~/features/langy/logic/langyPanelLayout";
+import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   type DrawerType,
@@ -15,7 +25,7 @@ import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject"
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { URL_QS_PARSE_OPTIONS } from "../utils/qsParseOptions";
 import { drawers } from "./drawerRegistry";
-import { DrawerOffsetProvider } from "./ui/drawer";
+import { DrawerExitRideProvider, DrawerOffsetProvider } from "./ui/drawer";
 
 // Re-export for backward compatibility
 export { useDrawer } from "../hooks/useDrawer";
@@ -129,36 +139,89 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
 
   const offsetValue = useMemo(() => ({ marginTop }), [marginTop]);
 
-  if (!CurrentDrawerComponent) return null;
+  // ── The companion ride's shared exit ──────────────────────────────────────
+  // Closing a drawer here means UNMOUNTING it, which would skip any exit
+  // motion. While the Langy panel is open the storyboard needs the pair to
+  // leave together (spec: specs/langy/langy-panel-layout.feature), so the
+  // just-closed drawer is HELD on stage for the beat: same component, same
+  // props, pointer-inert, playing the shared pair-out via DrawerExitRideContext
+  // (see DrawerContent). Held via a render-phase state update so the element
+  // never unmounts between the URL change and the hold — the ride starts on
+  // the same painted frame the close happens.
+  const isLangyOpen = useLangyStore((s) => s.isOpen);
+  const reduceMotion = useReducedMotion();
+  type HeldDrawer = {
+    Component: React.FC<Record<string, unknown>>;
+    props: Record<string, unknown>;
+  };
+  const lastOpenRef = useRef<HeldDrawer | null>(null);
+  const [heldForExit, setHeldForExit] = useState<HeldDrawer | null>(null);
+  if (CurrentDrawerComponent) {
+    lastOpenRef.current = {
+      Component: CurrentDrawerComponent,
+      props: {
+        ...queryDrawer,
+        ...complexProps,
+        ...flowCallbacksForDrawer,
+      },
+    };
+    if (heldForExit) setHeldForExit(null);
+  } else if (
+    lastOpenRef.current &&
+    isLangyOpen &&
+    !reduceMotion &&
+    !heldForExit
+  ) {
+    setHeldForExit(lastOpenRef.current);
+    lastOpenRef.current = null;
+  } else if (!isLangyOpen && lastOpenRef.current) {
+    lastOpenRef.current = null;
+  }
+  useEffect(() => {
+    if (!heldForExit) return;
+    const timer = setTimeout(() => setHeldForExit(null), LANGY_PAIR_MS + 60);
+    return () => clearTimeout(timer);
+  }, [heldForExit]);
+
+  const exiting = !CurrentDrawerComponent ? heldForExit : null;
+  const ActiveComponent = CurrentDrawerComponent ?? exiting?.Component;
+
+  if (!ActiveComponent) return null;
 
   return (
     <DrawerOffsetProvider value={offsetValue}>
-      <ErrorBoundary
-        resetKeys={[drawerType]}
-        fallback={null}
-        onError={() => {
-          void router.push(
-            "?" +
-              qs.stringify(
-                Object.fromEntries(
-                  Object.entries(router.query).filter(
-                    ([key]) => !key.startsWith("drawer."),
+      <DrawerExitRideProvider value={!!exiting}>
+        <ErrorBoundary
+          resetKeys={[drawerType]}
+          fallback={null}
+          onError={() => {
+            void router.push(
+              "?" +
+                qs.stringify(
+                  Object.fromEntries(
+                    Object.entries(router.query).filter(
+                      ([key]) => !key.startsWith("drawer."),
+                    ),
                   ),
                 ),
-              ),
-            undefined,
-            { shallow: true, flushSync: true },
-          );
-        }}
-      >
-        <Suspense fallback={<DrawerLoadingFallback />}>
-          <CurrentDrawerComponent
-            {...queryDrawer}
-            {...complexProps}
-            {...flowCallbacksForDrawer}
-          />
-        </Suspense>
-      </ErrorBoundary>
+              undefined,
+              { shallow: true, flushSync: true },
+            );
+          }}
+        >
+          <Suspense fallback={<DrawerLoadingFallback />}>
+            {exiting ? (
+              <ActiveComponent {...exiting.props} />
+            ) : (
+              <ActiveComponent
+                {...queryDrawer}
+                {...complexProps}
+                {...flowCallbacksForDrawer}
+              />
+            )}
+          </Suspense>
+        </ErrorBoundary>
+      </DrawerExitRideProvider>
     </DrawerOffsetProvider>
   );
 }

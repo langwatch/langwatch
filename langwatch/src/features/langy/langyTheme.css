@@ -368,6 +368,87 @@
   }
 }
 
+/* ── The drawer-companion ride ────────────────────────────────────────────
+   Four beats (spec: specs/langy/langy-panel-layout.feature): the panel
+   slides off the right edge, then the drawer and the companion slide in from
+   the right TOGETHER, and on close they leave together before the panel
+   slides back into its dock. "Together" is literal, and it is why each side
+   gets exactly ONE animation per ride: two CSS animations only share a start
+   time when created in the same frame, so the drawer folds its wait into an
+   animation-delay (see DrawerContent) and the panel folds its beats into the
+   composite timelines below. The shared beat travels a fixed 100vw on both
+   elements — one rigid unit, neither ever crosses the other.
+
+   Timeline maths (keep in sync with LANGY_STAGE_EXIT_MS / LANGY_PAIR_MS /
+   LANGY_DOCK_RETURN_MS in langyPanelLayout.ts):
+     ride-in  580ms = 240 exit  (0% → 41.4%) + 340 shared (41.5% → 100%)
+     ride-out 600ms = 340 shared (0% → 56.7%) + 260 dock-in (56.8% → 100%)
+   The hairline segment between the halves teleports the card between its
+   two off-screen resting points — both invisible, nothing to see.
+
+   These animate the standalone `translate` property, deliberately: the panel's
+   open/close scale lives on `transform` (motion's inline styles), and the two
+   compose instead of clobbering each other. */
+@keyframes langy-companion-ride-in {
+  0% {
+    translate: 0 0;
+    animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  41.4% {
+    translate: calc(100% + 24px) 0;
+  }
+  41.5% {
+    translate: 100vw 0;
+    animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  100% {
+    translate: 0 0;
+  }
+}
+@keyframes langy-companion-ride-out {
+  0% {
+    translate: 0 0;
+    animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  56.7% {
+    translate: 100vw 0;
+  }
+  56.8% {
+    translate: calc(100% + 24px) 0;
+    animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  100% {
+    translate: 0 0;
+  }
+}
+/* The solo entrance (panel opens beside an already open drawer): the dock's
+   ordinary slide-in at the companion's resting spot. */
+@keyframes langy-slide-in-right {
+  from {
+    translate: calc(100% + 24px) 0;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+/* The drawer's halves of the shared beats (see DrawerContent). */
+@keyframes langy-pair-slide-in {
+  from {
+    translate: 100vw 0;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+@keyframes langy-pair-slide-out {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 100vw 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .langy-root .langy-mesh,
   .langy-wash {

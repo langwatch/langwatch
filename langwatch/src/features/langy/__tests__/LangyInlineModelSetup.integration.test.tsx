@@ -40,6 +40,20 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: projectRef.current }),
 }));
 
+// The panel reads `currentDrawer` to decide whether it is riding beside a
+// drawer as the floating companion. Defaults to no drawer (the dock/floating
+// cases); the companion-header test flips it. `openDrawer` is here because
+// LangyFoundryMenu in the header also reads useDrawer.
+const currentDrawerRef = { current: undefined as string | undefined };
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({
+    currentDrawer: currentDrawerRef.current,
+    openDrawer: vi.fn(),
+    closeDrawer: vi.fn(),
+    goBack: vi.fn(),
+  }),
+}));
+
 vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
@@ -256,6 +270,7 @@ beforeEach(() => {
   resolvedDefaultRef.current = { data: undefined, isLoading: false };
   refetchResolvedDefault.mockClear();
   lastOnComplete.current = null;
+  currentDrawerRef.current = undefined;
   window.localStorage.clear();
   useLangyStore.setState({ isOpen: true });
 });
@@ -376,6 +391,48 @@ describe("Feature: Langy prompts for a model when the project has none configure
         ).not.toBeInTheDocument();
         expect(
           screen.queryByTestId("model-provider-screen"),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
+});
+
+describe("Feature: Langy panel layout modes", () => {
+  describe("given the Langy panel is docked or floating on its own", () => {
+    describe("when the header renders", () => {
+      it("offers its own Close control", async () => {
+        resolvedDefaultRef.current = {
+          data: { model: "gpt-5-mini" },
+          isLoading: false,
+        };
+        renderPanel();
+
+        expect(
+          await screen.findByRole("button", { name: "Close Langy" }),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given the Langy panel is riding beside an open drawer", () => {
+    describe("when the header renders", () => {
+      /** @scenario The companion offers a single close affordance */
+      it("hides its own Close so the drawer owns the only X", async () => {
+        currentDrawerRef.current = "traceV2Details";
+        resolvedDefaultRef.current = {
+          data: { model: "gpt-5-mini" },
+          isLoading: false,
+        };
+        renderPanel();
+
+        // The panel is up (its new-chat control is present)...
+        expect(
+          await screen.findByRole("button", { name: "New chat" }),
+        ).toBeInTheDocument();
+        // ...but the companion header carries no Close: two X's beside the
+        // drawer's own read as "close the drawer" and kept dismissing Langy.
+        expect(
+          screen.queryByRole("button", { name: "Close Langy" }),
         ).not.toBeInTheDocument();
       });
     });
