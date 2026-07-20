@@ -82,10 +82,37 @@ Rule: Built-in lenses
     Then a "Cost" dropdown and a "Performance" dropdown sit in the lens bar
     And the expensive / slow / token / turn built-ins are reached through them
 
-  Scenario: All is the default lens
+  Scenario: All is the default lens on a first visit
+    Given no lens preference has been stored yet
     When the Observe page loads
     Then the "All" tab is active
     And the table shows traces in flat grouping with no default filters
+
+  Rule: The last-used lens is remembered across navigation and projects
+
+  The active lens persists to localStorage, so leaving the Observe page and
+  coming back restores the view the user was on instead of snapping back to
+  All. Built-in lenses (All, Simplified, Conversations, Errors, …) share the
+  same ids across every project, so the preference carries across projects:
+  a user who prefers the Simplified or Conversations view sees it everywhere.
+  A custom lens, whose id only exists in its own project, is restored once
+  that project's saved lenses hydrate.
+
+    Scenario: Returning to Observe restores the last-used built-in lens
+      Given the user selected the "Simplified" lens
+      When the user leaves the Observe page and returns
+      Then the "Simplified" tab is active, not "All"
+
+    Scenario: The built-in lens preference carries across projects
+      Given the user selected the "Conversations" lens in one project
+      When the user opens the Observe page in a different project
+      Then the "Conversations" tab is active
+
+    Scenario: A restored custom lens waits for its project's lenses to load
+      Given the user's last-used lens was a custom lens
+      When the Observe page loads and the saved lenses hydrate
+      Then that custom lens becomes active once it is available
+      But a lens the user picks before hydration is not overridden
 
   Scenario: Errors lens filters to error status
     When the user clicks the "Errors" tab

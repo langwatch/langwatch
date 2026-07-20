@@ -37,7 +37,6 @@ import { useConversationContext } from "../../../hooks/useConversationContext";
 import { usePinnedAttributes } from "../../../hooks/usePinnedAttributes";
 import { useSpanTree } from "../../../hooks/useSpanTree";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
-import { useTraceHeader } from "../../../hooks/useTraceHeader";
 import { useTraceRefresh } from "../../../hooks/useTraceRefresh";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { useDrawerStore } from "../../../stores/drawerStore";
@@ -72,7 +71,6 @@ import {
   type PinCategory,
   renderPinPills,
 } from "./PinStrip";
-import { ThreadProgressIndicator } from "./ThreadProgressIndicator";
 import { TraceOverflowMenu } from "./TraceOverflowMenu";
 import { useRetainedTraceHeader } from "./useRetainedTraceHeader";
 import {
@@ -410,11 +408,6 @@ interface HoistedPinDef {
 }
 
 const HOISTED_AUTO_PINS: HoistedPinDef[] = [
-  // Conversation / thread are surfaced via the clickable
-  // ThreadProgressIndicator in row 2 when this trace lives in a multi-turn
-  // conversation. The auto-pins below stay as the fallback for single-turn
-  // traces — the resolution logic skips them when the indicator is showing.
-  //
   // Only `Conversation` is hoisted. The legacy `Thread` chip used to live
   // here and fell back to `conversationId` when no explicit thread was set,
   // which produced two chips with the same value side-by-side in the
@@ -508,8 +501,6 @@ export const DrawerHeader = memo(function DrawerHeader({
 
   const { canGoBack, goBack, goBackTo, backStackDepth, backStack } =
     useTraceDrawerNavigation();
-  const headerQuery = useTraceHeader();
-  const isNavigating = headerQuery.isFetching;
 
   const statusColor = STATUS_COLORS[trace.status] as string;
   const { project } = useOrganizationTeamProject();
@@ -586,21 +577,6 @@ export const DrawerHeader = memo(function DrawerHeader({
   // pin shape change.
   const applyQueryTextFromPin = useFilterStore((s) => s.applyQueryText);
   const { closeDrawer, openDrawer } = useDrawer();
-  // When the trace lives in a multi-turn conversation the
-  // ThreadProgressIndicator already exposes the conversation id (with copy
-  // + filter affordances), so the conversation / thread auto-pins would be
-  // redundant. Skip them in that case to keep the strip lean.
-  // While the conversation context is still resolving we don't yet know
-  // whether the indicator will take over — render the chip optimistically
-  // and the half-second flap ("chip shows, context lands with total > 1,
-  // chip unmounts") is exactly the flash users reported. Treat "unknown"
-  // as covered so the chip only ever *appears* (once we know the trace is
-  // single-turn) and never appears-then-vanishes.
-  const conversationCoveredByIndicator =
-    conversationContext.total > 1 ||
-    (!!trace.conversationId &&
-      conversationContext.isLoading &&
-      conversationContext.turns.length === 0);
   // Resolve auto + user pins into a single array with category buckets so the
   // strip can group them with subtle dividers between identity / run / tag /
   // custom. Auto-pins are skipped when the user has already pinned the same
@@ -655,13 +631,6 @@ export const DrawerHeader = memo(function DrawerHeader({
       }
     };
     for (const def of HOISTED_AUTO_PINS) {
-      if (
-        conversationCoveredByIndicator &&
-        (def.key === "gen_ai.conversation.id" ||
-          def.key === "langwatch.thread_id")
-      ) {
-        continue;
-      }
       // The rich `Scenario run` chip (built from `useScenarioChipData`
       // in `TraceHeaderChips`) already surfaces the scenario run id with
       // status + criteria + click-to-open behaviour. The plain hoisted
@@ -777,7 +746,6 @@ export const DrawerHeader = memo(function DrawerHeader({
     pins,
     trace,
     resources.resourceAttributes,
-    conversationCoveredByIndicator,
     toggleFacet,
     applyQueryTextFromPin,
     closeDrawer,
@@ -979,22 +947,6 @@ export const DrawerHeader = memo(function DrawerHeader({
             titleIsFallback={titleIsFallback}
           />
           <StatusChip trace={trace} statusColor={statusColor} />
-          {conversationContext.total > 1 && (
-            <ThreadProgressIndicator
-              position={conversationContext.position}
-              total={conversationContext.total}
-              conversationId={trace.conversationId}
-              onFilterByConversation={
-                trace.conversationId
-                  ? () => {
-                      toggleFacet("conversation", trace.conversationId!);
-                      closeDrawer();
-                    }
-                  : undefined
-              }
-              isLoading={isNavigating}
-            />
-          )}
         </HStack>
 
         {/* Negative marginRight cancels the header's paddingX so the
