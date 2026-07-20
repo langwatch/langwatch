@@ -3,6 +3,11 @@ import {
   SCOPE_TIERS,
   scopeAssignmentSchema,
 } from "~/server/scopes/scope.types";
+import { CodexAccountService } from "../../modelProviders/codexAccount.service";
+import {
+  CODEX_ALLOWED_FEATURE_KEYS,
+  CODEX_DEFAULT_MODEL,
+} from "../../modelProviders/codexRestrictions";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
 import {
   featureByKey,
@@ -229,6 +234,120 @@ export const modelProviderRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { provider, customKeys } = input;
       return validateProviderApiKey(provider, customKeys);
+    }),
+
+  /**
+   * Codex sign-in, step 1: ask OpenAI for a device code. Nothing is stored —
+   * the pending sign-in's identifiers travel to the client and come back on
+   * every poll, so polling works across server instances.
+   * Spec: specs/model-providers/codex-account-provider.feature
+   */
+  codexSignInStart: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("project:update"))
+    .mutation(async () => {
+      const codex = new CodexAccountService();
+      return await codex.startDeviceSignIn();
+    }),
+
+  /**
+   * Codex sign-in, step 2..n: one poll of the pending device authorization.
+   * While the user hasn't approved yet this returns `{ status: "pending" }`.
+   * On approval it exchanges the code, saves the provider row with the
+   * encrypted token set at the requested scopes (service authz fails closed
+   * on any non-manageable scope), and — when the caller asks — writes the
+   * coding-assistant defaults so Langy and the tiny assists start using the
+   * account immediately.
+   */
+  codexSignInPoll: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        deviceAuthId: z.string(),
+        userCode: z.string(),
+        scopes: z.array(scopeAssignmentSchema).min(1),
+        /** Langy setup + onboarding pass true: also point the allowed
+         *  feature slots at the codex model. Settings passes false. */
+        setAsCodingDefaults: z.boolean().default(false),
+      }),
+    )
+    .use(checkProjectPermission("project:update"))
+    .mutation(async ({ input, ctx }) => {
+      const codex = new CodexAccountService();
+      const poll = await codex.pollDeviceSignIn({
+        deviceAuthId: input.deviceAuthId,
+        userCode: input.userCode,
+      });
+      if (poll.status === "pending") {
+        return { status: "pending" as const };
+      }
+
+      const service = ModelProviderService.create(ctx.prisma);
+      const saved = await service.updateModelProvider(
+        {
+          projectId: input.projectId,
+          provider: "openai_codex",
+          enabled: true,
+          customKeys: poll.keys,
+          scopes: input.scopes,
+        },
+        { prisma: ctx.prisma, session: ctx.session },
+      );
+
+      if (input.setAsCodingDefaults) {
+        for (const scope of input.scopes) {
+          await assertCanWriteScope(
+            { prisma: ctx.prisma, session: ctx.session },
+            scope.scopeType,
+            scope.scopeId,
+          );
+        }
+        // The widest selected scope carries the defaults; feature overrides
+        // cascade down from it. One scope is the norm (the sign-in surfaces
+        // pick the widest manageable), so this is scopes[0] in practice.
+        const scope = input.scopes[0]!;
+        for (const featureKey of CODEX_ALLOWED_FEATURE_KEYS) {
+          await setFeatureAtScope(
+            { prisma: ctx.prisma },
+            {
+              scopeType: scope.scopeType,
+              scopeId: scope.scopeId,
+              featureKey,
+              model: CODEX_DEFAULT_MODEL,
+              authorId: ctx.session?.user?.id ?? null,
+            },
+          );
+        }
+      }
+
+      return {
+        status: "complete" as const,
+        providerId: saved?.id,
+        email: poll.keys.CODEX_EMAIL,
+        plan: poll.keys.CODEX_PLAN,
+      };
+    }),
+
+  /**
+   * The connected Codex account for a project, for the setup surfaces'
+   * connected state. Never returns tokens — display fields only.
+   */
+  codexStatus: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("project:view"))
+    .query(async ({ input }) => {
+      const providers = await getProjectModelProviders(input.projectId);
+      const row = providers.openai_codex;
+      if (!row?.enabled) return { connected: false as const };
+      const keys = (row.customKeys ?? {}) as Partial<
+        Record<string, string>
+      >;
+      return {
+        connected: true as const,
+        providerId: row.id,
+        email: keys.CODEX_EMAIL ?? "",
+        plan: keys.CODEX_PLAN ?? "",
+      };
     }),
 
   isManagedProvider: protectedProcedure

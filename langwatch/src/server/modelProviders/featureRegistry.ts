@@ -41,6 +41,12 @@ export interface FeatureDescriptor {
 const REGISTRY: FeatureDescriptor[] = [
   // DEFAULT — heavy / user-content-creating surfaces.
   {
+    key: "langy.chat",
+    role: "DEFAULT",
+    displayName: "Langy",
+    description: "The model Langy chats and works with.",
+  },
+  {
     key: "prompt.create_default",
     role: "DEFAULT",
     displayName: "New prompt model",
