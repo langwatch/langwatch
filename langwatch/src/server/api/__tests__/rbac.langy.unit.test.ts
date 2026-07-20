@@ -26,6 +26,7 @@ describe("Langy permissions", () => {
     // Below MEMBER gets no Langy at all. The permission grain is not what
     // keeps Langy scarce — `release_langy_enabled` is — so the line is drawn
     // at "can this person act on the project", not at read-vs-write.
+    /** @scenario "Below member, Langy is not granted at all" */
     it.each(["langy:view", ...WRITE_PERMISSIONS, "langy:manage"] as const)(
       "does not hold %s",
       (permission) => {
@@ -47,6 +48,7 @@ describe("Langy permissions", () => {
       expect(teamRoleHasPermission(TeamUserRole.MEMBER, permission)).toBe(true);
     });
 
+    /** @scenario "A member can run Langy but cannot administer it" */
     it("cannot administer Langy", () => {
       // `langy:manage` also gates the org-wide GitHub App connection.
       expect(teamRoleHasPermission(TeamUserRole.MEMBER, "langy:manage")).toBe(

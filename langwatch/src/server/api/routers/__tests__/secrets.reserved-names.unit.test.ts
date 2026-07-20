@@ -10,7 +10,10 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { LANGY_VK_SECRET_NAME } from "~/server/projects/reserved-secret-names";
+import {
+  LANGY_VK_SECRET_NAME,
+  RESERVED_PROJECT_SECRET_NAMES,
+} from "~/server/projects/reserved-secret-names";
 
 const findMany = vi.fn().mockResolvedValue([]);
 const findFirst = vi.fn();
@@ -65,6 +68,7 @@ const projectId = "proj_1";
 
 describe("secrets router reserved-name guard", () => {
   describe("when listing a project's secrets", () => {
+    /** @scenario "The stored Langy virtual-key secret is hidden and immutable" */
     it("excludes product-owned rows from the query", async () => {
       await caller().list({ projectId });
 
@@ -102,6 +106,28 @@ describe("secrets router reserved-name guard", () => {
         caller().update({ projectId, secretId: "sec_1", value: "hijacked" }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" });
       expect(update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when creating a secret with a reserved name", () => {
+    it("refuses it outright", async () => {
+      await expect(
+        caller().create({
+          projectId,
+          name: LANGY_VK_SECRET_NAME,
+          value: "squatted",
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
+
+    it("keeps every reserved name outside the creatable namespace", () => {
+      // The reserved names are lowercase and the schema demands uppercase, so
+      // squatting-before-provisioning is impossible even without the explicit
+      // guard. Pin that disjointness so a future uppercase reserved name (or
+      // a loosened schema) fails a test instead of silently re-opening it.
+      for (const name of RESERVED_PROJECT_SECRET_NAMES) {
+        expect(name).not.toMatch(/^[A-Z][A-Z0-9_]*$/);
+      }
     });
   });
 

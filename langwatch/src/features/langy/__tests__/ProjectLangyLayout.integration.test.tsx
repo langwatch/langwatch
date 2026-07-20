@@ -26,6 +26,7 @@ const gate = {
     id: string;
     slug: string;
   } | null,
+  demoSlug: "not-this-project",
 };
 
 vi.mock("~/hooks/useRequiredSession", () => ({
@@ -49,9 +50,10 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 }));
 
 vi.mock("~/hooks/usePublicEnv", () => ({
-  // A demo slug that does NOT match the active project, so the demo-project
-  // branch of the gate stays out of the way and membership is what counts.
-  usePublicEnv: () => ({ data: { DEMO_PROJECT_SLUG: "not-this-project" } }),
+  // Defaults to a demo slug that does NOT match the active project, so the
+  // demo-project branch of the gate stays out of the way and membership is
+  // what counts. The demo-refusal test points it at the active project.
+  usePublicEnv: () => ({ data: { DEMO_PROJECT_SLUG: gate.demoSlug } }),
 }));
 
 vi.mock("~/hooks/useFeatureFlag", () => ({
@@ -118,6 +120,7 @@ beforeEach(() => {
   gate.flagEnabled = true;
   gate.permissions = ["langy:view"];
   gate.project = { id: "project-demo", slug: "demo" };
+  gate.demoSlug = "not-this-project";
   // The store is a module singleton — start every test closed and uncounted.
   useLangyStore.setState({ isOpen: false });
   sidecarMounts.count = 0;
@@ -195,12 +198,23 @@ describe("ProjectLangyLayout", () => {
       expect(drawer()).toBeNull();
     });
 
-    /** @scenario "A LangWatch address gets no bypass" */
+    /** @scenario "Working at LangWatch is not a way in" */
     it("hides Langy for a @langwatch.ai session when the rollout flag is off", () => {
       // The mocked session is staff@langwatch.ai. Before the flag-only rework
       // that address bypassed the flag outright; pin that it no longer does.
       gate.flagEnabled = false;
       renderAt("/demo/traces");
+      expect(drawer()).toBeNull();
+    });
+
+    /** @scenario "The demo project refuses Langy on every surface" */
+    it("hides Langy on the demo project even with the flag and permission", () => {
+      // The server refuses Langy on the demo project outright; the panel
+      // mirrors that so it can't render a chat where every send 403s.
+      gate.flagEnabled = true;
+      gate.demoSlug = "demo";
+      renderAt("/demo/traces");
+      expect(screen.getByText("traces page")).toBeTruthy();
       expect(drawer()).toBeNull();
     });
   });

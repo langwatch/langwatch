@@ -13,7 +13,7 @@ import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiKeyService } from "../api-key.service";
-import { ApiKeyNotFoundError } from "../errors";
+import { ApiKeyNotFoundError, ApiKeyReservedNameError } from "../errors";
 import { LANGY_SESSION_API_KEY_NAME } from "../reserved-names";
 
 const ORG_ID = "org_1";
@@ -47,6 +47,7 @@ const caller = {
 
 describe("ApiKeyService system-managed guard", () => {
   describe("given the ephemeral Langy session key", () => {
+    /** @scenario "The ephemeral Langy session key cannot be renamed or revoked" */
     it("refuses a rename as not-found", async () => {
       const sut = ApiKeyService.create(mockPrisma(LANGY_SESSION_API_KEY_NAME));
 
@@ -72,6 +73,49 @@ describe("ApiKeyService system-managed guard", () => {
       await expect(sut.revoke({ id: KEY_ID, ...caller })).rejects.toThrow(
         REACHED_ADMIN_CHECK,
       );
+    });
+  });
+
+  // The guard keys on the name, so the name itself must be unclaimable: a
+  // customer key created with — or renamed to — a reserved name would vanish
+  // from every listing while this very guard made it unrevocable.
+  describe("when a caller tries to claim a reserved name", () => {
+    it("refuses to create a key with a reserved name", async () => {
+      const sut = ApiKeyService.create(mockPrisma("irrelevant"));
+
+      await expect(
+        sut.create({
+          name: LANGY_SESSION_API_KEY_NAME,
+          organizationId: ORG_ID,
+          permissionMode: "all",
+          bindings: [],
+        }),
+      ).rejects.toBeInstanceOf(ApiKeyReservedNameError);
+    });
+
+    it("refuses to rename a customer key to a reserved name", async () => {
+      const sut = ApiKeyService.create(mockPrisma("My CI key"));
+
+      await expect(
+        sut.update({ id: KEY_ID, ...caller, name: LANGY_SESSION_API_KEY_NAME }),
+      ).rejects.toBeInstanceOf(ApiKeyReservedNameError);
+    });
+
+    it("lets the product's own mint claim the name via systemManaged", async () => {
+      // The discriminating positive case: Langy's session-key mint passes
+      // `systemManaged: true` and must get past the guard (here: far enough
+      // to hit the transaction sentinel instead of the reserved-name error).
+      const sut = ApiKeyService.create(mockPrisma("irrelevant"));
+
+      await expect(
+        sut.create({
+          systemManaged: true,
+          name: LANGY_SESSION_API_KEY_NAME,
+          organizationId: ORG_ID,
+          permissionMode: "all",
+          bindings: [],
+        }),
+      ).rejects.toThrow(REACHED_ADMIN_CHECK);
     });
   });
 });

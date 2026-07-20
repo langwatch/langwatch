@@ -55,6 +55,7 @@ describe("VirtualKeyService product-managed guard", () => {
       await expect(sut.getById("vk_1", "org_1")).resolves.toBeNull();
     });
 
+    /** @scenario "Product-managed virtual keys refuse customer mutations" */
     it("refuses update with NOT_FOUND", async () => {
       const sut = VirtualKeyService.create(mockPrisma(vkRow("LANGY")));
 
@@ -102,6 +103,7 @@ describe("VirtualKeyService product-managed guard", () => {
   });
 
   describe("when listing keys", () => {
+    /** @scenario "Product-managed virtual keys are absent from customer listings" */
     it("constrains the organization listing to customer-owned keys", async () => {
       const findMany = vi.fn().mockResolvedValue([]);
       const sut = VirtualKeyService.create(

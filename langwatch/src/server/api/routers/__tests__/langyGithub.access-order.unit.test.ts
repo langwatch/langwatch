@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -31,7 +32,9 @@ vi.mock("~/server/api/rbac", async (importOriginal) => {
       () =>
       async ({ ctx, next }: any) => {
         if (!hasOrgPermission()) {
-          throw new (await import("@trpc/server")).TRPCError({
+          // The top-level TRPCError binding is safe here: this closure runs
+          // at request time, long after the hoisted factory phase.
+          throw new TRPCError({
             code: "UNAUTHORIZED",
             message: "You do not have permission",
           });
@@ -79,6 +82,7 @@ describe("langyGithubRouter membership-before-rollout gate", () => {
   });
 
   describe("when the caller lacks langy:manage on the organization", () => {
+    /** @scenario "Connecting the organization's GitHub App is admin-only" */
     it("is refused without ever evaluating the flag", async () => {
       hasOrgPermission.mockReturnValue(false);
       isOrganizationMember.mockResolvedValue(true);
