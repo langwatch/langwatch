@@ -4,4 +4,8 @@ export class NullTopicRepository implements TopicRepository {
   async findNamesByIds(): Promise<Map<string, string>> {
     return new Map();
   }
+
+  async findAll() {
+    return [];
+  }
 }

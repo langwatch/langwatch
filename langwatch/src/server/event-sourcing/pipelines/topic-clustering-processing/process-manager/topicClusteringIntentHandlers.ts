@@ -45,6 +45,9 @@ export interface TopicClusteringRunPort {
   runClusteringPage(params: {
     projectId: string;
     searchAfter: [number, string] | null;
+    /** Logical run identity; keys the recordTopics dedupe per page. */
+    runId: string;
+    page: number;
   }): Promise<ClusteringPageOutcome>;
 }
 
@@ -284,6 +287,8 @@ export function createTopicClusteringRunHandler(
       outcome = await deps.runPort.runClusteringPage({
         projectId: context.projectId,
         searchAfter: payload.searchAfter,
+        runId: payload.runId,
+        page: payload.page,
       });
     } catch (error) {
       // Attempts below the cap rethrow so the outbox retries with backoff;

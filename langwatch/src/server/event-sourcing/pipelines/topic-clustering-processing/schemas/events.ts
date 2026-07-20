@@ -6,6 +6,8 @@ import {
   TOPIC_CLUSTERING_RUN_MODE,
   TOPIC_CLUSTERING_SKIP_REASON,
   TOPIC_CLUSTERING_TRIGGER,
+  TOPIC_MODEL_RECORD_MODE,
+  TOPIC_MODEL_RECORD_SOURCE,
 } from "./constants";
 
 /**
@@ -141,9 +143,68 @@ export type TopicClusteringRunFailedEvent = z.infer<
   typeof TopicClusteringRunFailedEventSchema
 >;
 
+/**
+ * One topic or subtopic in the recorded model. Ids are the SAME nanoids the
+ * assignTopic path writes into ClickHouse TopicId/SubTopicId, so they must
+ * pass through unchanged. `centroid`/`p95Distance` are the clustering
+ * working state incremental runs need; carrying them makes the model fully
+ * rebuildable by replay.
+ */
+export const topicModelEntrySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** Parent topic id for subtopics; null for top-level topics. */
+  parentId: z.string().nullable(),
+  embeddingsModel: z.string(),
+  centroid: z.array(z.number()),
+  p95Distance: z.number(),
+  automaticallyGenerated: z.boolean(),
+  /**
+   * Epoch ms the topic first existed. Seeds carry the original createdAt so
+   * the batch cadence gate (which reads the newest topic's age) keeps its
+   * pre-seed answer; clustering omits it and the event's occurredAt is used.
+   */
+  firstRecordedAt: z.number().optional(),
+});
+export type TopicModelEntry = z.infer<typeof topicModelEntrySchema>;
+
+/**
+ * TopicsRecorded — the topic model changed. The Topic table is a projection
+ * of these events; nothing else writes it.
+ */
+export const topicClusteringTopicsRecordedEventDataSchema = z.object({
+  mode: z.enum([
+    TOPIC_MODEL_RECORD_MODE.REPLACE,
+    TOPIC_MODEL_RECORD_MODE.MERGE,
+  ]),
+  source: z.enum([
+    TOPIC_MODEL_RECORD_SOURCE.CLUSTERING,
+    TOPIC_MODEL_RECORD_SOURCE.SEED,
+  ]),
+  /**
+   * Deduplicates redeliveries: `run:<runId>:page-<n>` for clustering,
+   * `seed:v1` for the boot seed.
+   */
+  dedupeKey: z.string(),
+  topics: z.array(topicModelEntrySchema),
+});
+export type TopicClusteringTopicsRecordedEventData = z.infer<
+  typeof topicClusteringTopicsRecordedEventDataSchema
+>;
+
+export const TopicClusteringTopicsRecordedEventSchema = EventSchema.extend({
+  type: z.literal(TOPIC_CLUSTERING_EVENT_TYPES.TOPICS_RECORDED),
+  version: z.literal(TOPIC_CLUSTERING_EVENT_VERSIONS.TOPICS_RECORDED),
+  data: topicClusteringTopicsRecordedEventDataSchema,
+});
+export type TopicClusteringTopicsRecordedEvent = z.infer<
+  typeof TopicClusteringTopicsRecordedEventSchema
+>;
+
 /** Union of all topic clustering processing event types. */
 export type TopicClusteringProcessingEvent =
   | TopicClusteringRequestedEvent
   | TopicClusteringRunStartedEvent
   | TopicClusteringRunCompletedEvent
-  | TopicClusteringRunFailedEvent;
+  | TopicClusteringRunFailedEvent
+  | TopicClusteringTopicsRecordedEvent;

@@ -117,6 +117,8 @@ import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/lang
 import { PrismaProcessStore } from "../event-sourcing/process-manager";
 import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
 import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
+import { PrismaTopicModelProjectionRepository } from "./topic-clustering/repositories/topic-model-projection.prisma.repository";
+import { seedTopicModelHistory } from "./topic-clustering/seedTopicModel";
 import { PrismaTopicClusteringStatusRepository } from "./topic-clustering/repositories/topic-clustering-status.repository";
 import { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
@@ -201,9 +203,9 @@ import { createCompositePlanProvider } from "./subscription/composite-plan-provi
 import { PlanProviderService } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
-import { NullTopicRepository } from "./topics/null-topic.repository";
-import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
-import { TopicService } from "./topics/topic.service";
+import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
+import { PrismaTopicRepository } from "./topic-clustering/repositories/topic.prisma.repository";
+import { TopicService } from "./topic-clustering/topic.service";
 import { maybeSpool } from "./traces/edge-spool";
 import { LogRecordStorageService } from "./traces/log-record-storage.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
@@ -680,6 +682,7 @@ export function initializeDefaultApp(options?: {
     ),
     topicClusteringRunHistory:
       new PrismaTopicClusteringRunHistoryProjectionRepository(prisma),
+    topicModel: new PrismaTopicModelProjectionRepository(prisma),
     langyTurnAdmission,
   };
 
@@ -897,8 +900,11 @@ export function initializeDefaultApp(options?: {
     },
     topicClustering: {
       runPort: {
-        runClusteringPage: ({ projectId, searchAfter }) =>
-          clusterTopicsForProject(projectId, searchAfter ?? undefined),
+        runClusteringPage: ({ projectId, searchAfter, runId, page }) =>
+          clusterTopicsForProject(projectId, searchAfter ?? undefined, {
+            runId,
+            page,
+          }),
       },
       runsWorkers: roleRunsWorkers(config.processRole),
     },
@@ -927,6 +933,23 @@ export function initializeDefaultApp(options?: {
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle =
     commands.scenarioExecutionHandle;
+
+  if (roleRunsWorkers(config.processRole)) {
+    // One-time on boot: record pre-ownership Topic rows onto the clustering
+    // stream so the event log owns the model. Redis elects a replica; the
+    // seed is idempotent either way. Fire-and-forget like the other boot
+    // reconciliations — a failure is logged and the next boot retries.
+    void seedTopicModelHistory({
+      prisma,
+      redis: redis ?? null,
+      recordTopics: (args) => commands.topicClustering.recordTopics(args),
+    }).catch((error: unknown) => {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        "Topic model seed pass failed; the next boot retries",
+      );
+    });
+  }
 
   // Langy operational reads come from the Postgres projections; writes remain
   // commands against the canonical ClickHouse event log.
@@ -1160,6 +1183,7 @@ export function initializeDefaultApp(options?: {
       status: new TopicClusteringStatusService(
         new PrismaTopicClusteringStatusRepository(prisma),
       ),
+      topics,
     },
     langy: {
       conversations: langyConversations,
@@ -1338,6 +1362,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       status: new TopicClusteringStatusService(
         new PrismaTopicClusteringStatusRepository(testPrisma),
       ),
+      topics: new TopicService(new PrismaTopicRepository(testPrisma)),
     },
     langy: {
       conversations: LangyConversationService.create(
@@ -1490,6 +1515,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordClusteringRunStarted: noop,
         recordClusteringRunCompleted: noop,
         recordClusteringRunFailed: noop,
+        recordTopics: noop,
       } as AppCommands["topicClustering"],
       ...createNoopEnterprisePipelineCommands(),
       billing: {

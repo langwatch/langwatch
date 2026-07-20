@@ -19,6 +19,11 @@ vi.mock("~/server/db", () => ({
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    // The projection already owns the model: the write-path seed guard
+    // must be a no-op here.
+    topicModelProjection: {
+      findUnique: vi.fn().mockResolvedValue({ id: "topicmodel_1" }),
+    },
     cost: { create: vi.fn() },
   },
 }));
@@ -31,10 +36,12 @@ vi.mock("~/server/embeddings", () => ({
 }));
 
 const assignTopicMock = vi.fn().mockResolvedValue(undefined);
+const recordTopicsMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(() => ({
     traces: { assignTopic: assignTopicMock },
+    topicClustering: { recordTopics: recordTopicsMock },
   })),
 }));
 

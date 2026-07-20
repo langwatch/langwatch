@@ -9,6 +9,7 @@ import {
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
 import { getApp } from "../app";
+import { seedProjectTopicModel } from "./seedTopicModel";
 import {
   CLUSTERING_ERROR_CODES,
   ClusteringError,
@@ -98,9 +99,16 @@ export interface ClusteringPageOutcome {
   nextSearchAfter?: [number, string];
 }
 
+/** Identity of the outbox dispatch driving this page; keys topic dedupe. */
+export interface ClusteringRunContext {
+  runId: string;
+  page: number;
+}
+
 export const clusterTopicsForProject = async (
   projectId: string,
   searchAfter?: [number, string],
+  runContext?: ClusteringRunContext,
 ): Promise<ClusteringPageOutcome> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -230,8 +238,8 @@ export const clusterTopicsForProject = async (
   }
 
   const summary = isIncrementalProcessing
-    ? await incrementalClustering(project, traces)
-    : await batchClusterTraces(project, traces);
+    ? await incrementalClustering(project, traces, runContext)
+    : await batchClusterTraces(project, traces, runContext);
 
   logger.info({ projectId }, "done! project");
 
@@ -592,6 +600,7 @@ export interface ClusteringStoreSummary {
 export const batchClusterTraces = async (
   project: Project,
   traces: TopicClusteringTrace[],
+  runContext?: ClusteringRunContext,
 ): Promise<ClusteringStoreSummary | null> => {
   logger.info(
     { tracesLength: traces.length, projectId: project.id },
@@ -621,12 +630,13 @@ export const batchClusterTraces = async (
     traces,
   });
 
-  return await storeResults(project.id, clusteringResult, false);
+  return await storeResults(project.id, clusteringResult, false, runContext);
 };
 
 export const incrementalClustering = async (
   project: Project,
   traces: TopicClusteringTrace[],
+  runContext?: ClusteringRunContext,
 ): Promise<ClusteringStoreSummary | null> => {
   logger.info(
     { tracesLength: traces.length, projectId: project.id },
@@ -689,13 +699,14 @@ export const incrementalClustering = async (
     subtopics,
   });
 
-  return await storeResults(project.id, clusteringResult, true);
+  return await storeResults(project.id, clusteringResult, true, runContext);
 };
 
 export const storeResults = async (
   projectId: string,
   clusteringResult: TopicClusteringResponse | undefined,
   isIncremental: boolean,
+  runContext?: ClusteringRunContext,
 ): Promise<ClusteringStoreSummary | null> => {
   // NO RESULT IS A SKIP, NOT AN EMPTY CLUSTERING.
   //
@@ -735,50 +746,57 @@ export const storeResults = async (
     "found new topics, subtopics and traces to assign for project",
   );
 
-  // Batch mode REPLACES the topic model, so it deletes the old one first.
-  // Only ever do that when there is a new model to put back: an empty result
-  // from an otherwise successful call would leave the project with no topics
-  // at all, which is strictly worse than keeping the previous ones. The delete
-  // and the createMany below are not one transaction, so an empty delete is a
-  // permanent loss, not a rollback.
-  if (!isIncremental && topics.length > 0) {
-    await prisma.topic.deleteMany({
-      where: { projectId, parentId: { not: null } },
+  // The topic model is recorded as an event; the Topic table is that
+  // event's projection (spec: specs/topic-clustering/topics-source-of-truth
+  // .feature). Batch mode REPLACES the model — but only when there is a new
+  // model to put back: an empty result from an otherwise successful call
+  // would leave the project with no topics at all, which is strictly worse
+  // than keeping the previous ones. Everything else merges. Ids pass through
+  // unchanged so ClickHouse TopicId/SubTopicId references stay valid.
+  //
+  // The projection applies asynchronously: the next incremental page may
+  // read a model that is one event behind. The merge event converges either
+  // way, and pages are minutes apart while projections settle in seconds.
+  if (topics.length > 0 || subtopics.length > 0) {
+    const embeddingsModel = await getProjectEmbeddingsModel(projectId);
+    // No clustering topics_recorded may be appended before the project's
+    // pre-ownership history is on the stream: per-aggregate log order then
+    // guarantees the seed folds first, so this event can never reconcile
+    // the table down to just its own delta. Idempotent (`seed:v1`) and a
+    // no-op once the projection owns the model.
+    await seedProjectTopicModel({
+      prisma,
+      recordTopics: (args) => getApp().topicClustering.recordTopics(args),
+      projectId,
     });
-    await prisma.topic.deleteMany({
-      where: { projectId },
-    });
-  }
-
-  const embeddingsModel = await getProjectEmbeddingsModel(projectId);
-
-  if (topics.length > 0) {
-    await prisma.topic.createMany({
-      data: topics.map((topic) => ({
-        id: topic.id,
-        projectId,
-        name: topic.name,
-        embeddings_model: embeddingsModel.model,
-        centroid: topic.centroid,
-        p95Distance: topic.p95_distance,
-        automaticallyGenerated: true,
-      })),
-      skipDuplicates: true,
-    });
-  }
-  if (subtopics.length > 0) {
-    await prisma.topic.createMany({
-      data: subtopics.map((subtopic) => ({
-        id: subtopic.id,
-        projectId,
-        name: subtopic.name,
-        embeddings_model: embeddingsModel.model,
-        centroid: subtopic.centroid,
-        p95Distance: subtopic.p95_distance,
-        parentId: subtopic.parent_id,
-        automaticallyGenerated: true,
-      })),
-      skipDuplicates: true,
+    await getApp().topicClustering.recordTopics({
+      tenantId: projectId,
+      occurredAt: Date.now(),
+      mode: !isIncremental && topics.length > 0 ? "replace" : "merge",
+      source: "clustering",
+      dedupeKey: runContext
+        ? `run:${runContext.runId}:page-${runContext.page}`
+        : `adhoc:${Date.now()}`,
+      topics: [
+        ...topics.map((topic) => ({
+          id: topic.id,
+          name: topic.name,
+          parentId: null,
+          embeddingsModel: embeddingsModel.model,
+          centroid: topic.centroid,
+          p95Distance: topic.p95_distance,
+          automaticallyGenerated: true,
+        })),
+        ...subtopics.map((subtopic) => ({
+          id: subtopic.id,
+          name: subtopic.name,
+          parentId: subtopic.parent_id,
+          embeddingsModel: embeddingsModel.model,
+          centroid: subtopic.centroid,
+          p95Distance: subtopic.p95_distance,
+          automaticallyGenerated: true,
+        })),
+      ],
     });
   }
 

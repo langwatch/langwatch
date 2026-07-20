@@ -11,6 +11,7 @@ export const TOPIC_CLUSTERING_EVENT_TYPES = {
   RUN_STARTED: "lw.obs.topic_clustering.run_started",
   RUN_COMPLETED: "lw.obs.topic_clustering.run_completed",
   RUN_FAILED: "lw.obs.topic_clustering.run_failed",
+  TOPICS_RECORDED: "lw.obs.topic_clustering.topics_recorded",
 } as const;
 
 export const TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES = [
@@ -18,6 +19,7 @@ export const TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES = [
   TOPIC_CLUSTERING_EVENT_TYPES.RUN_STARTED,
   TOPIC_CLUSTERING_EVENT_TYPES.RUN_COMPLETED,
   TOPIC_CLUSTERING_EVENT_TYPES.RUN_FAILED,
+  TOPIC_CLUSTERING_EVENT_TYPES.TOPICS_RECORDED,
 ] as const;
 
 export type TopicClusteringProcessingEventType =
@@ -28,6 +30,7 @@ export const TOPIC_CLUSTERING_COMMAND_TYPES = {
   RECORD_RUN_STARTED: "lw.obs.topic_clustering.record_run_started",
   RECORD_RUN_COMPLETED: "lw.obs.topic_clustering.record_run_completed",
   RECORD_RUN_FAILED: "lw.obs.topic_clustering.record_run_failed",
+  RECORD_TOPICS: "lw.obs.topic_clustering.record_topics",
 } as const;
 
 export const TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES = [
@@ -35,6 +38,7 @@ export const TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES = [
   TOPIC_CLUSTERING_COMMAND_TYPES.RECORD_RUN_STARTED,
   TOPIC_CLUSTERING_COMMAND_TYPES.RECORD_RUN_COMPLETED,
   TOPIC_CLUSTERING_COMMAND_TYPES.RECORD_RUN_FAILED,
+  TOPIC_CLUSTERING_COMMAND_TYPES.RECORD_TOPICS,
 ] as const;
 
 export type TopicClusteringProcessingCommandType =
@@ -46,13 +50,34 @@ export const TOPIC_CLUSTERING_EVENT_VERSIONS = {
   RUN_STARTED: "2026-07-19",
   RUN_COMPLETED: "2026-07-17",
   RUN_FAILED: "2026-07-17",
+  TOPICS_RECORDED: "2026-07-20",
 } as const;
 
 /** Projection schema versions using calendar versioning (YYYY-MM-DD). */
 export const TOPIC_CLUSTERING_PROJECTION_VERSIONS = {
   RUN_STATUS: "2026-07-17",
   RUN_HISTORY: "2026-07-20",
+  TOPIC_MODEL: "2026-07-20",
 } as const;
+
+/** How a topics_recorded event changes the model. */
+export const TOPIC_MODEL_RECORD_MODE = {
+  /** The event's topics ARE the model; anything else is gone. */
+  REPLACE: "replace",
+  /** Upsert the event's topics into the existing model. */
+  MERGE: "merge",
+} as const;
+export type TopicModelRecordMode =
+  (typeof TOPIC_MODEL_RECORD_MODE)[keyof typeof TOPIC_MODEL_RECORD_MODE];
+
+/** Who recorded the topics. */
+export const TOPIC_MODEL_RECORD_SOURCE = {
+  CLUSTERING: "clustering",
+  /** One-time boot seed of topics that predate event-sourced ownership. */
+  SEED: "seed",
+} as const;
+export type TopicModelRecordSource =
+  (typeof TOPIC_MODEL_RECORD_SOURCE)[keyof typeof TOPIC_MODEL_RECORD_SOURCE];
 
 /** How many finished runs the history read model keeps per project. */
 export const TOPIC_CLUSTERING_RUN_HISTORY_LIMIT = 50;

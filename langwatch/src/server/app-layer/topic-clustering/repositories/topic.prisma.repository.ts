@@ -15,4 +15,16 @@ export class PrismaTopicRepository implements TopicRepository {
     });
     return new Map(rows.map((r) => [r.id, r.name]));
   }
+
+  async findAll(params: { projectId: string }) {
+    return this.prisma.topic.findMany({
+      where: { projectId: params.projectId },
+      select: {
+        id: true,
+        name: true,
+        parentId: true,
+        automaticallyGenerated: true,
+      },
+    });
+  }
 }

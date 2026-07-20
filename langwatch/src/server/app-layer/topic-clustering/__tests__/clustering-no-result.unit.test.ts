@@ -14,8 +14,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { assignTopicMock, stagedLangevalsFetchMock } = vi.hoisted(() => ({
+const { assignTopicMock, recordTopicsMock, stagedLangevalsFetchMock } = vi.hoisted(() => ({
   assignTopicMock: vi.fn(),
+  recordTopicsMock: vi.fn(),
   stagedLangevalsFetchMock: vi.fn(),
 }));
 
@@ -24,6 +25,9 @@ const mockClickHouseQuery = vi.fn();
 vi.mock("~/server/db", () => ({
   prisma: {
     project: { findUnique: vi.fn() },
+    topicModelProjection: {
+      findUnique: vi.fn(),
+    },
     topic: {
       findMany: vi.fn().mockResolvedValue([]),
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -61,7 +65,10 @@ vi.mock("~/server/api/routers/modelProviders.utils", () => ({
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
-  getApp: vi.fn(() => ({ traces: { assignTopic: assignTopicMock } })),
+  getApp: vi.fn(() => ({
+    traces: { assignTopic: assignTopicMock },
+    topicClustering: { recordTopics: recordTopicsMock },
+  })),
 }));
 
 vi.mock("~/server/metrics", () => ({
@@ -148,8 +155,11 @@ describe("clusterTopicsForProject", () => {
 describe("storeResults", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(prisma.topic.deleteMany).mockResolvedValue({ count: 0 } as any);
-    vi.mocked(prisma.topic.createMany).mockResolvedValue({ count: 0 } as any);
+    // The projection already owns this project's model, so the write-path
+    // seed guard is a no-op in these tests.
+    vi.mocked(prisma.topicModelProjection.findUnique).mockResolvedValue({
+      id: "topicmodel_1",
+    } as any);
   });
 
   describe("given the clustering call returned no result", () => {
@@ -157,8 +167,7 @@ describe("storeResults", () => {
       it("leaves the existing topic model in place", async () => {
         await storeResults("proj-1", undefined, false);
 
-        expect(prisma.topic.deleteMany).not.toHaveBeenCalled();
-        expect(prisma.topic.createMany).not.toHaveBeenCalled();
+        expect(recordTopicsMock).not.toHaveBeenCalled();
       });
 
       it("returns null so the caller can report a skip", async () => {
@@ -170,15 +179,15 @@ describe("storeResults", () => {
   describe("given the clustering call returned an empty topic set", () => {
     describe("when storing in batch mode", () => {
       it("keeps the previous topics rather than replacing them with nothing", async () => {
-        // Delete and createMany are not one transaction, so deleting for an
-        // empty replacement is permanent loss, not a rollback.
+        // An empty replacement would leave the project with no topics at
+        // all, which is strictly worse than keeping the previous model.
         await storeResults(
           "proj-1",
           { topics: [], subtopics: [], traces: [], cost: undefined } as any,
           false,
         );
 
-        expect(prisma.topic.deleteMany).not.toHaveBeenCalled();
+        expect(recordTopicsMock).not.toHaveBeenCalled();
       });
     });
   });
@@ -204,8 +213,16 @@ describe("storeResults", () => {
           false,
         );
 
-        expect(prisma.topic.deleteMany).toHaveBeenCalled();
-        expect(prisma.topic.createMany).toHaveBeenCalled();
+        expect(recordTopicsMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tenantId: "proj-1",
+            mode: "replace",
+            source: "clustering",
+            topics: [
+              expect.objectContaining({ id: "topic_a", name: "Greetings" }),
+            ],
+          }),
+        );
       });
     });
   });

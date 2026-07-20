@@ -145,6 +145,7 @@ import { type ProcessStore } from "./process-manager";
 import { createTopicClusteringProcessingPipeline } from "./pipelines/topic-clustering-processing/pipeline";
 import type { TopicClusteringRunHistoryData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
 import type { TopicClusteringRunStatusData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
+import type { TopicModelData } from "./pipelines/topic-clustering-processing/projections/topicModel.foldProjection";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -307,6 +308,8 @@ export interface PipelineRepositories {
   topicClusteringRunStatus: StateProjectionStore<TopicClusteringRunStatusData>;
   /** Per-project topic clustering run history (audit; bounded). */
   topicClusteringRunHistory: StateProjectionStore<TopicClusteringRunHistoryData>;
+  /** Write-through topic model store (the Topic table + cursor row). */
+  topicModel: StateProjectionStore<TopicModelData>;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionRepository;
 }
@@ -519,6 +522,7 @@ export class PipelineRegistry {
           this.deps.repositories.topicClusteringRunStatus,
         topicClusteringRunHistoryStore:
           this.deps.repositories.topicClusteringRunHistory,
+        topicModelStore: this.deps.repositories.topicModel,
         dispatch: {
           runPort: this.deps.topicClustering.runPort,
           commands: () => {

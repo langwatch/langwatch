@@ -54,4 +54,5 @@ export const KSUID_RESOURCES = {
   LANGY_MESSAGE: "langymsg",
   TOPIC_CLUSTERING_RUN: "topicrun",
   TOPIC_CLUSTERING_RUN_HISTORY: "topicrunhist",
+  TOPIC_MODEL_PROJECTION: "topicmodel",
 } as const;

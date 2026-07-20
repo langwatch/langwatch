@@ -26,6 +26,7 @@ import {
   RecordClusteringRunCompletedCommand,
   RecordClusteringRunStartedCommand,
   RecordClusteringRunFailedCommand,
+  RecordTopicsCommand,
   RequestTopicClusteringCommand,
 } from "./commands";
 import { TOPIC_CLUSTERING_EVENT_TYPES } from "./schemas/constants";
@@ -37,6 +38,10 @@ import {
   type TopicClusteringRunStatusData,
   TopicClusteringRunStatusFoldProjection,
 } from "./projections/topicClusteringRunStatus.foldProjection";
+import {
+  type TopicModelData,
+  TopicModelFoldProjection,
+} from "./projections/topicModel.foldProjection";
 import type { TopicClusteringProcessingEvent } from "./schemas/events";
 
 /** Only the executor dependencies are injected — the process-manager
@@ -47,6 +52,8 @@ export interface TopicClusteringProcessingPipelineDeps {
   topicClusteringRunStatusStore: StateProjectionStore<TopicClusteringRunStatusData>;
   /** Postgres run-history read model (audit; bounded, newest first). */
   topicClusteringRunHistoryStore: StateProjectionStore<TopicClusteringRunHistoryData>;
+  /** Write-through store for the topic model (the Topic table + cursor). */
+  topicModelStore: StateProjectionStore<TopicModelData>;
   dispatch: TopicClusteringDispatchDeps;
 }
 
@@ -131,6 +138,10 @@ export function createTopicClusteringProcessingPipeline(
         store: deps.topicClusteringRunHistoryStore,
       }),
     )
+    .withProjection(
+      "topicModel",
+      new TopicModelFoldProjection({ store: deps.topicModelStore }),
+    )
     .withCommand("requestClustering", RequestTopicClusteringCommand)
     .withCommand("recordClusteringRunStarted", RecordClusteringRunStartedCommand)
     .withCommand(
@@ -138,6 +149,7 @@ export function createTopicClusteringProcessingPipeline(
       RecordClusteringRunCompletedCommand,
     )
     .withCommand("recordClusteringRunFailed", RecordClusteringRunFailedCommand)
+    .withCommand("recordTopics", RecordTopicsCommand)
     .withProcessManager(
       TOPIC_CLUSTERING_PROCESS_NAME,
       topicClusteringPM(deps.dispatch),
