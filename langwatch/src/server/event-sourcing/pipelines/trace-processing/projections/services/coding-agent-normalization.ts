@@ -250,6 +250,107 @@ export function isCodingAgentMetricName(metricName: string): boolean {
   );
 }
 
+/**
+ * The scalar coding-agent vocabulary a log contribution carries so the
+ * session fold (and the trace summary's code-agent accumulation) can run
+ * entirely on canonical `log_contributed` events. Content never rides here:
+ * prompts and replies stay in the canonical row; these are lengths, ids,
+ * names and counters. Raw key names are preserved on purpose — the fold's
+ * derivation reads the same keys off a legacy raw event, so the two paths
+ * cannot drift.
+ */
+const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
+  "event.name",
+  "session.id",
+  "user.id",
+  "user.email",
+  "app.version",
+  "app.entrypoint",
+  "terminal.type",
+  "gen_ai.request.model",
+  "mcp_server.name",
+  "mcp_tool.name",
+  "plugin.name",
+  "skill.name",
+  "interaction.sequence",
+  "agent_id",
+  "agent_type",
+  "attempt",
+  "cache_creation_tokens",
+  "cache_read_tokens",
+  "category",
+  "command_name",
+  "cost_usd",
+  "decision",
+  "duration_ms",
+  "error_type",
+  "file_path",
+  "input_tokens",
+  "language",
+  "model",
+  "num_blocking",
+  "num_cancelled",
+  "output_tokens",
+  "post_tokens",
+  "pre_tokens",
+  "prompt_length",
+  "request_id",
+  "response_length",
+  "server_fallback_hop",
+  "server_name",
+  "skill_name",
+  "source",
+  "status_code",
+  "stop_reason",
+  "subagent_type",
+  "success",
+  "to_mode",
+  "tool_input_size_bytes",
+  "tool_name",
+  "tool_result_size_bytes",
+  "total_duration_ms",
+  "total_retry_duration_ms",
+  "ttft_ms",
+  "type",
+];
+
+/**
+ * The coding-agent facts off one log record, for its trace contribution —
+ * or null when the record is not a coding agent's, which doubles as the
+ * consumer-side gate (a contribution without the lift never reaches the
+ * session fold).
+ */
+export function liftCodingAgentLogFacts({
+  scopeName,
+  attributes,
+}: {
+  scopeName: string | null | undefined;
+  attributes: Record<string, unknown>;
+}): Record<string, string | number | boolean> | null {
+  const eventName = attributes["event.name"];
+  if (
+    detectCodingAgent({
+      scopeName,
+      recordName: typeof eventName === "string" ? eventName : null,
+    }) === "unknown"
+  ) {
+    return null;
+  }
+
+  const facts: Record<string, string | number | boolean> = {};
+  for (const key of CODING_AGENT_CONTRIBUTION_KEYS) {
+    const value = attributes[key];
+    if (
+      (typeof value === "string" && value.length > 0) ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      facts[key] = value;
+    }
+  }
+  return facts;
+}
+
 /** `claude_code.tool_result` → `tool_result`; `tool_result` → `tool_result`. */
 function stripAgentPrefix(name: string): string {
   const AGENT_PREFIXES = [

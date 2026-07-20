@@ -9,40 +9,47 @@ import type {
   FoldProjectionStore,
 } from "~/server/event-sourcing/projections/foldProjection.types";
 import {
+  type LogContributedEvent,
   type LogRecordReceivedEvent,
+  logContributedEventSchema,
   logRecordReceivedEventSchema,
-  type MetricRecordReceivedEvent,
-  metricRecordReceivedEventSchema,
   type SpanReceivedEvent,
   spanReceivedEventSchema,
 } from "../schemas/events";
 import {
   applyLogToCodingAgentSession,
-  applyMetricToCodingAgentSession,
   applySpanToCodingAgentSession,
   CODING_AGENT_SPAN_NAMES,
   createInitCodingAgentSession,
   isCodingAgentLogRecord,
-  isCodingAgentMetric,
 } from "./services/coding-agent-session.derivation";
 import type { CodingAgentSessionData } from "./services/coding-agent-session.types";
 
 /**
  * The coding-agent session fold (ADR-041).
  *
- * One row per SESSION, folded from that session's spans, logs AND metrics — all
- * three, because the agent splits the story across them. See the derivation for
- * why each is load-bearing.
+ * One row per SESSION, folded from that session's spans and logs. Log facts
+ * arrive two ways during the canonical cutover: the legacy raw
+ * `log_record_received` event (a pre-canonical instance's `recordLog`), and
+ * the canonical `log_contributed` event, whose `codingAgentAttributes` carry
+ * the scalar coding-agent vocabulary lifted at collection time — same keys,
+ * same derivation, so the fold cannot drift between the two paths.
  *
- * Writes `coding_agent_sessions` (migration 00049). A trace that is not a coding
- * agent never produces a row: the store drops the record when the fold saw no
- * model calls and no tool runs, so an ordinary LLM trace costs one name
- * comparison per span and nothing else.
+ * METRICS deliberately do not feed this fold: a coding agent's metrics carry
+ * no exemplars (neither the OTel Rust nor JS SDK implements them), so no
+ * `metric_data_point_correlated` event can ever fire for them. Their
+ * session-keyed read (`session.id` rides the datapoint attributes) happens at
+ * serve time against the canonical metric tables instead.
+ *
+ * Writes `coding_agent_sessions` (migration 00051). A trace that is not a
+ * coding agent never produces a row: the store drops the record when the fold
+ * saw no model calls and no tool runs, so an ordinary LLM trace costs one
+ * name comparison per span and nothing else.
  */
 const codingAgentSessionEvents = [
   spanReceivedEventSchema,
   logRecordReceivedEventSchema,
-  metricRecordReceivedEventSchema,
+  logContributedEventSchema,
 ] as const;
 
 /** The `event.name` attribute off a raw log record, if it carries one. */
@@ -186,13 +193,23 @@ export class CodingAgentSessionFoldProjection
     };
   }
 
-  handleTraceMetricRecordReceived(
-    event: MetricRecordReceivedEvent,
+  handleTraceLogContributed(
+    event: LogContributedEvent,
     state: CodingAgentSessionState,
   ): CodingAgentSessionState {
-    if (!isCodingAgentMetric(event.data.metricName)) return state;
+    // The collection side lifts the scalar coding-agent vocabulary onto the
+    // contribution only for coding-agent records, so presence of the lift IS
+    // the gate — no scope re-derivation here.
+    const attributes = event.data.codingAgentAttributes;
+    if (!attributes) return state;
 
-    const next = applyMetricToCodingAgentSession({ state, data: event.data });
+    const next = applyLogToCodingAgentSession({
+      state,
+      data: {
+        attributes,
+        scopeName: event.data.scopeName,
+      } as Parameters<typeof applyLogToCodingAgentSession>[0]["data"],
+    });
     return {
       ...state,
       ...next,
@@ -202,7 +219,7 @@ export class CodingAgentSessionFoldProjection
 }
 
 /**
- * The row that lands in `coding_agent_sessions` (migration 00049). Field names
+ * The row that lands in `coding_agent_sessions` (migration 00051). Field names
  * mirror the ClickHouse columns 1:1 so the repository's record literal is a
  * straight mapping.
  */

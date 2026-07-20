@@ -10,7 +10,10 @@
  */
 import { describe, expect, it } from "vitest";
 import type { LogRecordReceivedEventData } from "../../../schemas/events";
-import { NormalizedStatusCode, type NormalizedSpan } from "../../../schemas/spans";
+import {
+  type NormalizedSpan,
+  NormalizedStatusCode,
+} from "../../../schemas/spans";
 import {
   accumulateCodeAgentSummaryFromLog,
   accumulateCodeAgentSummaryFromSpan,
@@ -71,7 +74,10 @@ function foldAll({
   for (const data of logs) {
     Object.assign(
       attributes,
-      accumulateCodeAgentSummaryFromLog({ attributes, data }),
+      accumulateCodeAgentSummaryFromLog({
+        attributes,
+        logAttributes: data.attributes,
+      }),
     );
   }
   return attributes;
@@ -125,7 +131,10 @@ describe("code-agent interaction summary", () => {
       ],
       logs: [
         logData({ "event.name": "user_prompt", command_name: "review" }),
-        logData({ "event.name": "skill_activated", "skill.name": "code-review" }),
+        logData({
+          "event.name": "skill_activated",
+          "skill.name": "code-review",
+        }),
       ],
     });
 
@@ -139,7 +148,10 @@ describe("code-agent interaction summary", () => {
       const merged = foldAll({
         spans: [span("claude_code.tool", { skill_name: "deep-research" })],
         logs: [
-          logData({ "event.name": "skill_activated", "skill.name": "code-review" }),
+          logData({
+            "event.name": "skill_activated",
+            "skill.name": "code-review",
+          }),
         ],
       });
 
@@ -150,10 +162,9 @@ describe("code-agent interaction summary", () => {
     });
 
     it("records WHICH agents and skills ran, without duplicates", () => {
-      expect(JSON.parse(attributes[CODE_AGENT_ATTRS.SUBAGENT_TYPES] ?? "[]")).toEqual([
-        "Explore",
-        "general-purpose",
-      ]);
+      expect(
+        JSON.parse(attributes[CODE_AGENT_ATTRS.SUBAGENT_TYPES] ?? "[]"),
+      ).toEqual(["Explore", "general-purpose"]);
       expect(JSON.parse(attributes[CODE_AGENT_ATTRS.SKILLS] ?? "[]")).toEqual([
         "code-review",
       ]);
@@ -311,11 +322,7 @@ describe("the ORDER things happened", () => {
       } as unknown as NormalizedSpan;
 
       const attributes = foldAll({
-        spans: [
-          toolSpan("Task", 2000),
-          subAgentRead,
-          toolSpan("Edit", 3000),
-        ],
+        spans: [toolSpan("Task", 2000), subAgentRead, toolSpan("Edit", 3000)],
       });
 
       expect(stepNames(attributes)).toEqual(["Task", "Edit"]);

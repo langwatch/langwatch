@@ -3,7 +3,7 @@ import {
   CLAUDE_CODE_KIND_ATTR,
   CLAUDE_CODE_PII_ATTR,
   claudeCodeLogKind,
-} from "~/server/app-layer/traces/claude-code-log-to-span";
+} from "~/server/app-layer/traces/claude-code-log-marking";
 import type { DeepPartial } from "~/utils/types";
 import {
   compareOrdinal,

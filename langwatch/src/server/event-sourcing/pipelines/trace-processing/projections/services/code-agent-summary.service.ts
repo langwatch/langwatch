@@ -1,6 +1,6 @@
 import { extractAssistantTextFromResponseBody } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
 import type { LogRecordReceivedEventData } from "../../schemas/events";
-import { NormalizedStatusCode, type NormalizedSpan } from "../../schemas/spans";
+import { type NormalizedSpan, NormalizedStatusCode } from "../../schemas/spans";
 
 /**
  * What a coding-agent interaction actually DID, folded onto the trace.
@@ -129,7 +129,9 @@ function readJsonRecord(
   if (typeof raw !== "string" || raw.length === 0) return {};
   try {
     const parsed: unknown = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+    return typeof parsed === "object" &&
+      parsed !== null &&
+      !Array.isArray(parsed)
       ? (parsed as Record<string, number>)
       : {};
   } catch {
@@ -343,12 +345,17 @@ export function accumulateCodeAgentSummaryFromSpan({
  */
 export function accumulateCodeAgentSummaryFromLog({
   attributes,
-  data,
+  logAttributes,
 }: {
   attributes: Record<string, string>;
-  data: LogRecordReceivedEventData;
+  /**
+   * The log record's facts — either the raw attribute map off a legacy
+   * event, or the contribution's `codingAgentAttributes` (same keys, lifted
+   * at collection), so both cutover paths accumulate identically.
+   */
+  logAttributes: Record<string, unknown>;
 }): Record<string, string> {
-  const attrs = data.attributes;
+  const attrs = logAttributes;
   const eventName = str(attrs["event.name"]);
   if (eventName === null) return {};
 

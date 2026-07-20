@@ -1,7 +1,4 @@
-import type {
-  LogRecordReceivedEventData,
-  MetricRecordReceivedEventData,
-} from "../../schemas/events";
+import type { LogRecordReceivedEventData } from "../../schemas/events";
 import { type NormalizedSpan, NormalizedStatusCode } from "../../schemas/spans";
 import {
   detectCodingAgent,
@@ -739,12 +736,24 @@ export function applyLogToCodingAgentSession({
  * own time. A summary built from spans and logs alone can tell you the agent ran
  * 192 tools and can't tell you whether anything came of it.
  */
+/**
+ * Structural on purpose: the legacy metric event this used to consume is gone
+ * (metrics live in their own canonical pipeline now), and the caller is the
+ * READ-side session join, which shapes canonical datapoint rows into this.
+ */
+export interface CodingAgentMetricRecord {
+  metricName: string;
+  value: number;
+  attributes: Record<string, unknown>;
+  resourceAttributes?: Record<string, unknown>;
+}
+
 export function applyMetricToCodingAgentSession({
   state,
   data,
 }: {
   state: CodingAgentSessionData;
-  data: MetricRecordReceivedEventData;
+  data: CodingAgentMetricRecord;
 }): CodingAgentSessionData {
   const attrs = data.attributes;
   const value = num(data.value);

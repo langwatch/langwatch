@@ -16,6 +16,8 @@ import {
   liftCanonicalAttributesFromLogRecord,
   NON_BILLABLE_ATTR,
 } from "../../event-sourcing/pipelines/trace-processing/projections/services";
+import { deriveCodeAgentSessionTitle } from "../../event-sourcing/pipelines/trace-processing/projections/services/code-agent-summary.service";
+import { liftCodingAgentLogFacts } from "../../event-sourcing/pipelines/trace-processing/projections/services/coding-agent-normalization";
 import { piiRedactionLevelSchema } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { LogRecordReceivedEventData } from "../../event-sourcing/pipelines/trace-processing/schemas/events";
 import { IO_PREVIEW_BYTES, utf8Preview } from "./lean-for-projection";
@@ -243,6 +245,20 @@ function makeTraceContribution(
       liftedAttributes[key] = value;
     }
   }
+  // The scalar coding-agent vocabulary the session fold runs on. Null for
+  // every non-coding-agent record, so the field's absence doubles as the
+  // fold's gate.
+  const codingAgentAttributes = liftCodingAgentLogFacts({
+    scopeName: normalized.scopeName,
+    attributes: normalized.attributes,
+  });
+  // The session title's source is the record's CONTENT payload, which the
+  // contribution does not carry — so it is derived here, where the full
+  // record is in hand, and travels as a scalar.
+  const sessionTitle =
+    codingAgentAttributes !== null
+      ? deriveCodeAgentSessionTitle(normalized.attributes)
+      : null;
   const io = extractIOFromLogRecord(legacyView);
   const input =
     io.input === null ? null : utf8Preview(io.input, IO_PREVIEW_BYTES);
@@ -268,6 +284,8 @@ function makeTraceContribution(
     input,
     output,
     liftedAttributes,
+    ...(codingAgentAttributes !== null ? { codingAgentAttributes } : {}),
+    ...(sessionTitle !== null ? { sessionTitle } : {}),
     nonBillable: normalized.resourceAttributes[NON_BILLABLE_ATTR] === "true",
     piiRedactionLevel: record.piiRedactionLevel,
     occurredAt: record.acceptedAt,

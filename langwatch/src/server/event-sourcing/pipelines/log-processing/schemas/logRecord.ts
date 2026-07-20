@@ -96,6 +96,22 @@ export const logTraceContributionSchema = z.object({
     z.string(),
     z.union([z.string(), z.number(), z.boolean()]),
   ),
+  /**
+   * The scalar coding-agent vocabulary (lengths, ids, names, counters —
+   * never content), present only when the record came from a coding agent.
+   * Kept apart from `liftedAttributes` because those merge wholesale onto
+   * the trace summary's attribute map, and these must not.
+   */
+  codingAgentAttributes: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+    .optional(),
+  /**
+   * The agent's own generated session title, when this record carries one
+   * (claude's title-generation response). Derived at collection because the
+   * source is the record's content payload, which the contribution
+   * deliberately does not carry.
+   */
+  sessionTitle: z.string().optional(),
   nonBillable: z.boolean(),
   piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]),
   occurredAt: z.number().int().nonnegative(),

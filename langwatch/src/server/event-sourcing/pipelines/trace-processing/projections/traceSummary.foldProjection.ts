@@ -42,21 +42,6 @@ import {
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import {
-  accumulateCodeAgentSummaryFromLog,
-  accumulateCodeAgentSummaryFromSpan,
-  deriveCodeAgentSessionTitle,
-} from "./services/code-agent-summary.service";
-import {
-  SpanTimingService,
-  SpanStatusService,
-  SpanCostService,
-  NON_BILLABLE_ATTR,
-  TraceOriginService,
-  TraceAttributeAccumulationService,
-  TraceIOAccumulationService,
-  TracePromptAccumulationService,
-  TraceNameResolutionService,
-  shouldOverrideOutput,
   extractIOFromLogRecord,
   liftCanonicalAttributesFromLogRecord,
   NON_BILLABLE_ATTR,
@@ -71,6 +56,12 @@ import {
   TraceOriginService,
   TracePromptAccumulationService,
 } from "./services";
+import {
+  accumulateCodeAgentSummaryFromLog,
+  accumulateCodeAgentSummaryFromSpan,
+  deriveCodeAgentSessionTitle,
+} from "./services/code-agent-summary.service";
+import { liftCodingAgentLogFacts } from "./services/coding-agent-normalization";
 
 export type { TraceSummaryData };
 
@@ -296,6 +287,22 @@ interface LogContribution {
   output: string | null;
   timeUnixMs: number;
   liftedAttributes: Record<string, unknown>;
+  /**
+   * The scalar coding-agent vocabulary, present only for coding-agent
+   * records. Folded onto the `langwatch.code_agent.*` summary attributes;
+   * never merged wholesale the way `liftedAttributes` is.
+   */
+  codingAgentAttributes?: Record<string, string | number | boolean>;
+  /** The agent's own generated session title, when this record carried one. */
+  sessionTitle?: string;
+  /**
+   * Set when this record's trace id was minted by LangWatch (a log-only
+   * emitter with no trace context) — carried onto the summary so the read
+   * path can mark the trace as grouped by LangWatch rather than by a tracer.
+   * `derivedFrom` names the grouping key when the ingestion path could name
+   * one (`session.id`, `conversation.id`), and stays null when it could not.
+   */
+  syntheticTrace: { derivedFrom: string | null } | null;
   nonBillable: boolean;
 }
 
@@ -377,6 +384,30 @@ function applyLogContribution({
     mergedAttributes[key] = String(value);
   }
 
+  // Claude splits its facts across signals: the slash command that opened the
+  // interaction, a mid-interaction compaction, a failed-and-retried model call
+  // exist ONLY as logs — no span carries them.
+  if (contribution.codingAgentAttributes) {
+    Object.assign(
+      mergedAttributes,
+      accumulateCodeAgentSummaryFromLog({
+        attributes: mergedAttributes,
+        logAttributes: contribution.codingAgentAttributes,
+      }),
+    );
+  }
+
+  // Only the TRACE-level marker is carried: a real trace can contain a single
+  // context-less record whose SPAN id was minted while its trace id is real,
+  // and that must never make the whole trace read as synthetic.
+  if (contribution.syntheticTrace) {
+    mergedAttributes["langwatch.trace.synthetic"] = "true";
+    if (contribution.syntheticTrace.derivedFrom) {
+      mergedAttributes["langwatch.trace.derived_from"] =
+        contribution.syntheticTrace.derivedFrom;
+    }
+  }
+
   let models = state.models;
   let totalCost = state.totalCost;
   let nonBilledCost = state.nonBilledCost;
@@ -406,6 +437,15 @@ function applyLogContribution({
     totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
   }
 
+  // Claude Code's own generated session title beats the raw root-span name
+  // ("claude_code.interaction" reads as an implementation detail, not a
+  // title) — but never a name the USER already set. `traceNameFromFallback`
+  // clears so a later root span can't stomp it back to the span name.
+  const sessionTitle =
+    state.traceNameUserOverridden || !contribution.sessionTitle
+      ? null
+      : contribution.sessionTitle;
+
   return {
     ...state,
     traceId: state.traceId || contribution.traceId,
@@ -418,6 +458,9 @@ function applyLogContribution({
     nonBilledCost,
     totalPromptTokenCount,
     totalCompletionTokenCount,
+    ...(sessionTitle !== null
+      ? { traceName: sessionTitle, traceNameFromFallback: false }
+      : {}),
   };
 }
 
@@ -622,6 +665,22 @@ export class TraceSummaryFoldProjection
         output: logIO.output,
         timeUnixMs: event.data.timeUnixMs,
         liftedAttributes,
+        codingAgentAttributes:
+          liftCodingAgentLogFacts({
+            scopeName: event.data.scopeName,
+            attributes: event.data.attributes,
+          }) ?? undefined,
+        sessionTitle:
+          deriveCodeAgentSessionTitle(event.data.attributes) ?? undefined,
+        // The legacy receiver stamps the marker straight onto the record's
+        // attributes; the canonical path carries it as correlationSource.
+        syntheticTrace:
+          event.data.attributes["langwatch.trace.synthetic"] === "true"
+            ? {
+                derivedFrom:
+                  event.data.attributes["langwatch.trace.derived_from"] ?? null,
+              }
+            : null,
         // A log-only emitter has no per-span markers; the receiver stamps the
         // bundled flag on the log record's resource, so classify the whole
         // increment by that.
@@ -643,6 +702,14 @@ export class TraceSummaryFoldProjection
         output: event.data.output,
         timeUnixMs: event.data.timeUnixMs,
         liftedAttributes: event.data.liftedAttributes,
+        codingAgentAttributes: event.data.codingAgentAttributes,
+        sessionTitle: event.data.sessionTitle,
+        syntheticTrace:
+          event.data.correlationSource === "claude_synthesized"
+            ? { derivedFrom: "session.id" }
+            : event.data.correlationSource === "codex_synthesized"
+              ? { derivedFrom: "conversation.id" }
+              : null,
         nonBillable: event.data.nonBillable,
       },
     });
