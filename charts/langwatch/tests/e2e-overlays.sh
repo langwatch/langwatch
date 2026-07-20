@@ -209,11 +209,16 @@ test_access_ingress() {
   assert_not_contains "Blackhole Service has no selector" "$blackhole_svc" "selector:"
 
   # Operators can disable the block by emptying blockedPaths.
+  # --set-json, NOT --set: `--set 'x=[]'` assigns the two-character STRING "[]",
+  # which is truthy (so the blackhole Service still renders) and then blows up
+  # the ingress template with "range can't iterate over []". Only --set-json
+  # produces a real empty list — the same value an operator writing
+  # `blockedPaths: []` in a values file gets.
   local no_block
   no_block=$(tmpl --set autogen.enabled=true \
     -f "${OVERLAYS}/size-prod.yaml" \
     -f "${OVERLAYS}/access-ingress.yaml" \
-    --set 'ingress.blockedPaths=[]')
+    --set-json 'ingress.blockedPaths=[]')
   assert_not_contains "blockedPaths=[] drops the block" "$no_block" "${RELEASE}-blackhole"
 }
 
