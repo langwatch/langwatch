@@ -2,13 +2,16 @@ package customertracebridge
 
 import (
 	"context"
-	"os"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
@@ -144,93 +147,65 @@ func hexEncode(b []byte) string {
 }
 
 
-// The bridge's TracerProvider resource is the customer-visible resource on
-// every retold span. It must carry the origin marker (the control plane's
-// trace-origin resolution treats resource-level langwatch.origin as
-// authoritative) and NOTHING else — no service identity, k8s topology, or
-// cloud attributes: that is LangWatch infrastructure detail and must never
-// ride on customer data.
-func TestEmitter_CustomerSpanResourceIsOriginMarkerOnly(t *testing.T) {
-	ctx := contexts.SetServiceInfo(context.Background(), contexts.ServiceInfo{
-		Service: "langwatch-service-aigateway",
-		Version: "test",
-	})
-
-	e, err := NewEmitter(ctx, EmitterOptions{})
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
-
-	captured := make(chan sdktrace.ReadOnlySpan, 1)
-	e.tp.RegisterSpanProcessor(captureProcessor{spans: captured})
-
-	spanCtx, _ := e.BeginSpan(ctx, "proj-1", domain.RequestTypeChat)
-	e.EndSpan(spanCtx, domain.AITraceParams{})
-
-	select {
-	case span := <-captured:
-		kvs := span.Resource().Attributes()
-		require.Len(t, kvs, 1,
-			"customer-visible resource must carry ONLY the origin marker, got: %v", kvs)
-		assert.Equal(t, gatewaytracer.AttrOrigin, string(kvs[0].Key))
-		assert.Equal(t, gatewaytracer.OriginGateway, kvs[0].Value.AsString())
-	case <-time.After(2 * time.Second):
-		t.Fatal("no span captured")
-	}
-}
-
-type captureProcessor struct{ spans chan sdktrace.ReadOnlySpan }
-
-func (p captureProcessor) OnStart(context.Context, sdktrace.ReadWriteSpan) {}
-func (p captureProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
-	select {
-	case p.spans <- s:
-	default:
-	}
-}
-func (p captureProcessor) Shutdown(context.Context) error   { return nil }
-func (p captureProcessor) ForceFlush(context.Context) error { return nil }
-
-// True repro of the production leak: on a real pod, OTEL_RESOURCE_ATTRIBUTES /
-// OTEL_SERVICE_NAME carry the gateway's infra identity, and otel-go's
-// WithResource silently merges the given resource OVER resource.Environment()
-// — so "empty resource" still shipped k8s topology, cloud region, and service
-// identity on every customer-retold span. This test constructs the emitter
-// with those variables set, exactly like production, and asserts none of it
-// survives onto the customer-visible resource.
-func TestEmitter_CustomerSpanResourceExcludesPodEnvironment(t *testing.T) {
+// What leaves the process is the contract: every customer-retold span must
+// carry a resource of exactly the langwatch.origin marker — never the
+// gateway's own identity. The pod environment is set to the production shape
+// here because otel-go's WithResource silently merges the provider resource
+// over resource.Environment(); that merge is exactly how k8s topology leaked
+// onto customer spans in production, and this test fails against any
+// construction that lets it back in.
+func TestEmitter_WireResourceIsOriginMarkerOnly(t *testing.T) {
 	t.Setenv("OTEL_RESOURCE_ATTRIBUTES",
 		"k8s.pod.name=test-pod,cloud.region=eu-central-1,deployment.environment.name=lw-prod")
 	t.Setenv("OTEL_SERVICE_NAME", "langwatch-service-aigateway")
 
+	received := make(chan []byte, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		select {
+		case received <- body:
+		default:
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	registry := NewRegistry()
+	require.NoError(t, registry.Set("proj-1", srv.URL, nil))
+
 	ctx := contexts.SetServiceInfo(context.Background(), contexts.ServiceInfo{
 		Service: "langwatch-service-aigateway",
 		Version: "test",
 	})
-
-	e, err := NewEmitter(ctx, EmitterOptions{})
+	e, err := NewEmitter(ctx, EmitterOptions{Registry: registry, BatchTimeout: 50 * time.Millisecond})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
 
-	// Construction must not eat the process env — the gateway's own ops
-	// provider still needs these variables afterwards.
-	v, ok := os.LookupEnv("OTEL_SERVICE_NAME")
-	require.True(t, ok)
-	assert.Equal(t, "langwatch-service-aigateway", v)
-
-	captured := make(chan sdktrace.ReadOnlySpan, 1)
-	e.tp.RegisterSpanProcessor(captureProcessor{spans: captured})
-
 	spanCtx, _ := e.BeginSpan(ctx, "proj-1", domain.RequestTypeChat)
-	e.EndSpan(spanCtx, domain.AITraceParams{})
+	// Real usage, or EndSpan classifies the span as a zero-cost probe and the
+	// drop filter keeps it off the wire entirely.
+	e.EndSpan(spanCtx, domain.AITraceParams{
+		Model: "gpt-test",
+		Usage: domain.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
+	})
+	require.NoError(t, e.tp.ForceFlush(context.Background()))
 
+	var body []byte
 	select {
-	case span := <-captured:
-		kvs := span.Resource().Attributes()
-		require.Len(t, kvs, 1,
-			"pod environment leaked onto the customer-visible resource: %v", kvs)
-		assert.Equal(t, gatewaytracer.AttrOrigin, string(kvs[0].Key))
-		assert.Equal(t, gatewaytracer.OriginGateway, kvs[0].Value.AsString())
-	case <-time.After(2 * time.Second):
-		t.Fatal("no span captured")
+	case body = <-received:
+	case <-time.After(3 * time.Second):
+		t.Fatal("no OTLP export received")
+	}
+
+	var req coltracepb.ExportTraceServiceRequest
+	require.NoError(t, proto.Unmarshal(body, &req))
+	require.NotEmpty(t, req.ResourceSpans)
+
+	for _, rs := range req.ResourceSpans {
+		attrs := rs.GetResource().GetAttributes()
+		require.Len(t, attrs, 1,
+			"customer-visible resource must carry ONLY the origin marker, got: %v", attrs)
+		assert.Equal(t, gatewaytracer.AttrOrigin, attrs[0].GetKey())
+		assert.Equal(t, gatewaytracer.OriginGateway, attrs[0].GetValue().GetStringValue())
 	}
 }

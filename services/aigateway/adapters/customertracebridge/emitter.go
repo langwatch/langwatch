@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 
@@ -81,36 +81,51 @@ func (d dropFilterExporter) Shutdown(ctx context.Context) error {
 	return d.inner.Shutdown(ctx)
 }
 
+// customerResource is the ONLY resource customers ever see on a retold span:
+// the origin marker (the control plane's trace-origin resolution treats a
+// resource-level langwatch.origin as authoritative — this is what makes
+// gateway-retold traces carry Origin=Gateway in the product) and nothing else.
+// The gateway's own identity — service name/version, k8s topology, cloud
+// region — is LangWatch infrastructure detail and must never ride on
+// customer data.
+var customerResource = resource.NewSchemaless(
+	attribute.String(gatewaytracer.AttrOrigin, gatewaytracer.OriginGateway),
+)
+
+// resourceScrubExporter rebuilds every span with customerResource before it
+// reaches the wire. The provider's own resource cannot be trusted:
+// sdktrace.WithResource silently merges the configured resource over
+// resource.Environment() (OTEL_RESOURCE_ATTRIBUTES / OTEL_SERVICE_NAME) with
+// no opt-out, which is exactly how the pod's k8s topology leaked onto
+// customer spans in production. Scrubbing at the export boundary holds
+// regardless of how the provider was built.
+//
+// tracetest is imported in production code deliberately: ReadOnlySpan is a
+// sealed interface, and SpanStub is the SDK's only public way to reconstruct
+// one with a chosen resource.
+type resourceScrubExporter struct {
+	inner sdktrace.SpanExporter
+}
+
+func (r resourceScrubExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
+	scrubbed := make([]sdktrace.ReadOnlySpan, 0, len(spans))
+	for _, s := range spans {
+		stub := tracetest.SpanStubFromReadOnlySpan(s)
+		stub.Resource = customerResource
+		scrubbed = append(scrubbed, stub.Snapshot())
+	}
+	return r.inner.ExportSpans(ctx, scrubbed)
+}
+
+func (r resourceScrubExporter) Shutdown(ctx context.Context) error {
+	return r.inner.Shutdown(ctx)
+}
+
 // EmitterOptions configures the Emitter.
 type EmitterOptions struct {
 	Registry     *Registry
 	BatchTimeout time.Duration
 	MaxQueueSize int
-}
-
-// withoutResourceEnv runs build with OTEL_RESOURCE_ATTRIBUTES and
-// OTEL_SERVICE_NAME temporarily cleared, restoring them before returning.
-//
-// otel-go's sdktrace.WithResource silently merges the given resource OVER
-// resource.Environment() (provider.go: resource.Merge(resource.Environment(), r))
-// and offers no way to opt out. On a production pod those variables carry the
-// gateway's full infra identity — k8s topology, cloud region, service name —
-// which rode on every customer-retold span from the moment the deployment
-// gained OTEL_RESOURCE_ATTRIBUTES, despite the provider being constructed with
-// an "empty" resource. Clearing the variables for the duration of provider
-// construction is the only supported way to keep them off customer data.
-//
-// NewEmitter runs once at boot, on one goroutine, before the HTTP server
-// starts, so the brief unset is not observable by concurrent readers; the
-// gateway's own ops provider reads the restored values afterwards.
-func withoutResourceEnv(build func() *sdktrace.TracerProvider) *sdktrace.TracerProvider {
-	for _, key := range []string{"OTEL_RESOURCE_ATTRIBUTES", "OTEL_SERVICE_NAME"} {
-		if prev, ok := os.LookupEnv(key); ok {
-			defer func(k, v string) { _ = os.Setenv(k, v) }(key, prev)
-			_ = os.Unsetenv(key)
-		}
-	}
-	return build()
 }
 
 // NewEmitter creates a customer trace bridge backed by a private TracerProvider.
@@ -119,7 +134,9 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 		opts.Registry = NewRegistry()
 	}
 
-	router := dropFilterExporter{inner: newRouterExporter(ctx, opts.Registry)}
+	router := dropFilterExporter{
+		inner: resourceScrubExporter{inner: newRouterExporter(ctx, opts.Registry)},
+	}
 
 	batchTimeout := opts.BatchTimeout
 	if batchTimeout == 0 {
@@ -130,27 +147,23 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 		queueSize = 8192
 	}
 
-	// Near-empty resource — customers see the instrumentation scope plus the
-	// origin marker only. Never the gateway's own resource (service identity,
-	// k8s topology, cloud region): that is LangWatch infrastructure detail and
-	// must not ride on customer data. The origin marker IS wanted: the control
-	// plane's trace-origin resolution treats a resource-level langwatch.origin
-	// as authoritative, so this is what makes gateway-retold traces carry
-	// Origin=Gateway in the product.
+	// The provider resource is irrelevant to what customers see: every span is
+	// rebuilt with customerResource by resourceScrubExporter on its way out.
+	// otel-go's WithResource silently merges the given resource OVER
+	// resource.Environment() (OTEL_RESOURCE_ATTRIBUTES / OTEL_SERVICE_NAME)
+	// with no opt-out, so scrubbing at the export boundary — the last hop
+	// before customer data leaves the process — is the only construction that
+	// cannot leak, no matter what the pod environment holds.
 	// AlwaysSample: the gateway never drops customer spans regardless of
 	// the gateway's own sample ratio setting.
-	tp := withoutResourceEnv(func() *sdktrace.TracerProvider {
-		return sdktrace.NewTracerProvider(
-			sdktrace.WithResource(resource.NewSchemaless(
-				attribute.String(gatewaytracer.AttrOrigin, gatewaytracer.OriginGateway),
-			)),
-			sdktrace.WithBatcher(router,
-				sdktrace.WithBatchTimeout(batchTimeout),
-				sdktrace.WithMaxQueueSize(queueSize),
-			),
-			sdktrace.WithSampler(sdktrace.AlwaysSample()),
-		)
-	})
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithResource(resource.Empty()),
+		sdktrace.WithBatcher(router,
+			sdktrace.WithBatchTimeout(batchTimeout),
+			sdktrace.WithMaxQueueSize(queueSize),
+		),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+	)
 
 	svcCtx := contexts.MustGetServiceInfo(ctx)
 
