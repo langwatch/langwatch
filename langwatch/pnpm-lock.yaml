@@ -298,12 +298,6 @@ importers:
       better-auth:
         specifier: ^1.6.23
         version: 1.6.23(@opentelemetry/api@1.9.1)(@prisma/client@5.7.1(prisma@5.7.1))(prisma@5.7.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@4.1.9)
-      bullmq:
-        specifier: ^5.79.2
-        version: 5.79.2
-      bullmq-otel:
-        specifier: ^1.3.1
-        version: 1.3.1
       chakra-react-select:
         specifier: ^6.1.3
         version: 6.1.3(@chakra-ui/react@3.36.0(@emotion/react@11.14.0(@types/react@19.2.17)(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(next-themes@0.4.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -423,7 +417,7 @@ importers:
         version: 17.5.0
       openai:
         specifier: ^6.45.0
-        version: 6.45.0(@aws-sdk/credential-provider-node@3.972.64)(@smithy/signature-v4@5.6.2)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
+        version: 6.45.0(@aws-sdk/credential-provider-node@3.972.64)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
       papaparse:
         specifier: ^5.5.4
         version: 5.5.4
@@ -5616,18 +5610,6 @@ packages:
     resolution: {integrity: sha512-lHblz4ahamxpTmnsk+MNTRWsjYKv965MwOrSJyeD588rR3Jcu7swE+0wN5F+PbL5cjgu/9ObkhfzEPuofEMwLA==}
     engines: {node: '>=10.0.0'}
 
-  bullmq-otel@1.3.1:
-    resolution: {integrity: sha512-s/dXx8+LDV7MYpb3ww4mGNQiC0npaKn/jQxXd0kOCcenCbnf452SkdSw1x7cSUHXZISfC8Eb7sKroFF8HSTIKQ==}
-
-  bullmq@5.79.2:
-    resolution: {integrity: sha512-FebD+8XCZl/hnS1R4to24L4EAN70XSndKZO0776M36vGRk5MKVhKlNFM8/34zXLXKyYB4QaeIPFhVXSYYGTHpQ==}
-    engines: {node: '>=12.22.0'}
-    peerDependencies:
-      redis: '>=5.0.0'
-    peerDependenciesMeta:
-      redis:
-        optional: true
-
   bundle-name@4.1.0:
     resolution: {integrity: sha512-tjwM5exMg6BGRI+kNmTntNsvdZS1X8BFYS6tnJ2hdH0kVxM6/eVZ2xy+FqStSWvYmtfFMDLIxurorHwDKfDz5Q==}
     engines: {node: '>=18'}
@@ -5924,10 +5906,6 @@ packages:
   crc32-stream@6.0.0:
     resolution: {integrity: sha512-piICUB6ei4IlTv1+653yq5+KoqfBYmj9bw6LqXoOneTMDXk5nM1qt12mFW1caG3LlJXEKW1Bp0WggEmIfQB34g==}
     engines: {node: '>= 14'}
-
-  cron-parser@4.9.0:
-    resolution: {integrity: sha512-p0SaNjrHOnQeR8/VnfGbmg9te2kfyYSQ7Sc/j/6DtPL3JQvKxmjO9TSjNFpujqV3vEYYBvNNvXSxzyksBWAx1Q==}
-    engines: {node: '>=12.0.0'}
 
   croner@10.0.1:
     resolution: {integrity: sha512-ixNtAJndqh173VQ4KodSdJEI6nuioBWI0V1ITNKhZZsO0pEMoDxz539T4FTTbSZ/xIOSuDnzxLVRqBVSvPNE2g==}
@@ -7663,10 +7641,6 @@ packages:
     peerDependencies:
       react: ^19.2.7
 
-  luxon@3.7.2:
-    resolution: {integrity: sha512-vtEhXh/gNjI9Yg1u4jX/0YVPMvxzHuGgCm6tC5kZyb08yjGWGnqAjGJvcXbqQR2P3MyMEFnRbpcdFS6PBcLqew==}
-    engines: {node: '>=12'}
-
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
     hasBin: true
@@ -8144,9 +8118,6 @@ packages:
 
   nice-grpc@2.1.16:
     resolution: {integrity: sha512-Cl3Pn00212Hl8/U6bpgMxmhZj5lyv3nWoJov4cd3FjWarktrMHP4DNvSjCnDwkMWYx4W1tyscEia4JX6Y4GVCQ==}
-
-  node-abort-controller@3.1.1:
-    resolution: {integrity: sha512-AGK2yQKIjRuqnc6VkX2Xj5d+QW8xZ87pa1UK6yA6ouUyuxfHuMP6umE5QK7UmTeOAymo+Zx1Fxiuw9rVx8taHQ==}
 
   node-addon-api@7.1.1:
     resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
@@ -10978,7 +10949,7 @@ snapshots:
       '@playwright/test': 1.61.1
       deepmerge: 4.3.1
       dotenv: 17.4.2
-      openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.64)(@smithy/signature-v4@5.6.2)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
+      openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.64)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
       ws: 8.21.1(bufferutil@4.1.0)
       zod: 3.25.76
       zod-to-json-schema: 3.25.2(zod@3.25.76)
@@ -12256,6 +12227,21 @@ snapshots:
       - supports-color
       - ws
 
+  '@openai/agents-core@0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)':
+    dependencies:
+      debug: 4.4.3
+      openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.64)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
+    optionalDependencies:
+      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@cfworker/json-schema'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - supports-color
+      - ws
+
   '@openai/agents-openai@0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.6.2)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76)':
     dependencies:
       '@openai/agents-core': 0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.6.2)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76)
@@ -12272,9 +12258,9 @@ snapshots:
 
   '@openai/agents-openai@0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)':
     dependencies:
-      '@openai/agents-core': 0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.6.2)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
+      '@openai/agents-core': 0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
       debug: 4.4.3
-      openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.64)(@smithy/signature-v4@5.6.2)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
+      openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.64)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
       zod: 3.25.76
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
@@ -12287,6 +12273,22 @@ snapshots:
   '@openai/agents-realtime@0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.6.2)(bufferutil@4.1.0)(zod@3.25.76)':
     dependencies:
       '@openai/agents-core': 0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.6.2)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
+      '@types/ws': 8.18.1
+      debug: 4.4.3
+      ws: 8.21.0(bufferutil@4.1.0)
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@cfworker/json-schema'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - bufferutil
+      - supports-color
+      - utf-8-validate
+
+  '@openai/agents-realtime@0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(bufferutil@4.1.0)(zod@3.25.76)':
+    dependencies:
+      '@openai/agents-core': 0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
       '@types/ws': 8.18.1
       debug: 4.4.3
       ws: 8.21.0(bufferutil@4.1.0)
@@ -12320,11 +12322,11 @@ snapshots:
 
   '@openai/agents@0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)':
     dependencies:
-      '@openai/agents-core': 0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.6.2)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
+      '@openai/agents-core': 0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
       '@openai/agents-openai': 0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
-      '@openai/agents-realtime': 0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.6.2)(bufferutil@4.1.0)(zod@3.25.76)
+      '@openai/agents-realtime': 0.3.9(@aws-sdk/credential-provider-node@3.972.64)(@cfworker/json-schema@4.1.1)(bufferutil@4.1.0)(zod@3.25.76)
       debug: 4.4.3
-      openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.64)(@smithy/signature-v4@5.6.2)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
+      openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.64)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
       zod: 3.25.76
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
@@ -15035,9 +15037,9 @@ snapshots:
       obug: 2.1.3
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@26.1.0)(@vitest/browser-playwright@4.1.9)(@vitest/coverage-v8@4.1.9)(@vitest/ui@4.1.9)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.4(@types/node@26.1.0)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      vitest: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@26.1.0)(@vitest/browser-playwright@4.1.9)(@vitest/coverage-v8@4.1.9)(@vitest/ui@4.1.9)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.2(@types/node@26.1.0)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
     optionalDependencies:
-      '@vitest/browser': 4.1.9(bufferutil@4.1.0)(vite@8.1.4(@types/node@26.1.0)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vitest@4.1.9)
+      '@vitest/browser': 4.1.9(bufferutil@4.1.0)(vite@8.1.2(@types/node@26.1.0)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vitest@4.1.9)
 
   '@vitest/expect@4.1.9':
     dependencies:
@@ -15107,7 +15109,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
-      vitest: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@26.1.0)(@vitest/browser-playwright@4.1.9)(@vitest/coverage-v8@4.1.9)(@vitest/ui@4.1.9)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.4(@types/node@26.1.0)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      vitest: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@26.1.0)(@vitest/browser-playwright@4.1.9)(@vitest/coverage-v8@4.1.9)(@vitest/ui@4.1.9)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.2(@types/node@26.1.0)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   '@vitest/utils@4.1.9':
     dependencies:
@@ -16105,26 +16107,6 @@ snapshots:
   buildcheck@0.0.7:
     optional: true
 
-  bullmq-otel@1.3.1:
-    dependencies:
-      '@opentelemetry/api': 1.9.1
-      bullmq: 5.79.2
-      tslib: 2.8.1
-    transitivePeerDependencies:
-      - redis
-      - supports-color
-
-  bullmq@5.79.2:
-    dependencies:
-      cron-parser: 4.9.0
-      ioredis: 5.10.1
-      msgpackr: 2.0.4
-      node-abort-controller: 3.1.1
-      semver: 7.8.5
-      tslib: 2.8.1
-    transitivePeerDependencies:
-      - supports-color
-
   bundle-name@4.1.0:
     dependencies:
       run-applescript: 7.1.0
@@ -16385,10 +16367,6 @@ snapshots:
     dependencies:
       crc-32: 1.2.2
       readable-stream: 4.7.0
-
-  cron-parser@4.9.0:
-    dependencies:
-      luxon: 3.7.2
 
   croner@10.0.1: {}
 
@@ -18101,7 +18079,7 @@ snapshots:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/exporter-trace-otlp-proto': 0.219.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-base': 2.8.0(@opentelemetry/api@1.9.1)
-      openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.64)(@smithy/signature-v4@5.6.2)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
+      openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.64)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76)
       ws: 8.21.0(bufferutil@4.1.0)
 
   langwatch@0.16.1(75c973d7e678d18d3c56cdd8f152918b):
@@ -18371,8 +18349,6 @@ snapshots:
   lucide-react@1.22.0(react@19.2.7):
     dependencies:
       react: 19.2.7
-
-  luxon@3.7.2: {}
 
   lz-string@1.5.0: {}
 
@@ -19153,8 +19129,6 @@ snapshots:
       abort-controller-x: 0.5.0
       nice-grpc-common: 2.0.3
 
-  node-abort-controller@3.1.1: {}
-
   node-addon-api@7.1.1: {}
 
   node-addon-api@8.9.0: {}
@@ -19321,6 +19295,12 @@ snapshots:
       ws: 8.21.1(bufferutil@4.1.0)
       zod: 4.3.6
     optional: true
+
+  openai@6.45.0(@aws-sdk/credential-provider-node@3.972.64)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76):
+    optionalDependencies:
+      '@aws-sdk/credential-provider-node': 3.972.64
+      ws: 8.21.0(bufferutil@4.1.0)
+      zod: 3.25.76
 
   openapi-fetch@0.16.0:
     dependencies:
