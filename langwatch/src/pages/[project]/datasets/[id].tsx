@@ -1,8 +1,9 @@
-import { Alert, Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Box, Button, Text } from "@chakra-ui/react";
 import { FlaskConical } from "lucide-react";
 import { useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { DatasetEditorTable } from "~/components/datasets/editor/DatasetEditorTable";
+import { DatasetProcessingProgress } from "~/components/datasets/processing/DatasetProcessingProgress";
 import { retryDatasetNormalize } from "~/components/datasets/services/directUpload";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -77,38 +78,20 @@ export default function Dataset() {
   return (
     <DashboardLayout>
       <Box width="full" paddingX={6} paddingY={6}>
-        {(status === "uploading" || status === "processing") && (
-          <Alert.Root status="info" marginBottom={4}>
-            <Alert.Indicator>
-              <Spinner size="sm" />
-            </Alert.Indicator>
-            <Alert.Content>
-              <Alert.Title>
-                Preparing your dataset, this can take a few minutes
-              </Alert.Title>
-            </Alert.Content>
-          </Alert.Root>
-        )}
-        {status === "failed" && (
-          <Alert.Root status="error" marginBottom={4}>
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Title>We could not prepare your dataset</Alert.Title>
-              <Alert.Description>
-                {datasetQuery.data?.statusError ??
-                  "Something went wrong while processing your file. You can retry."}
-              </Alert.Description>
-            </Alert.Content>
-            <Button
-              size="sm"
-              colorPalette="red"
-              variant="outline"
-              loading={isRetrying}
-              onClick={() => void handleRetry()}
-            >
-              Retry
-            </Button>
-          </Alert.Root>
+        {(status === "uploading" ||
+          status === "processing" ||
+          status === "failed") && (
+          <Box marginBottom={4}>
+            <DatasetProcessingProgress
+              projectId={project?.id ?? ""}
+              datasetId={datasetId}
+              status={status}
+              statusError={datasetQuery.data?.statusError}
+              onReconcile={() => void datasetQuery.refetch()}
+              onRetry={() => void handleRetry()}
+              isRetrying={isRetrying}
+            />
+          </Box>
         )}
         {datasetGone && (
           <Text color="fg.muted">This dataset is no longer available.</Text>
