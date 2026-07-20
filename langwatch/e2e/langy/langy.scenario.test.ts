@@ -1157,7 +1157,7 @@ describe("Langy via HTTP wrapper", () => {
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
-      expect(langy.state.sessionId).toBeTruthy();
+      expect(langy.state.conversationId).toBeTruthy();
     });
   });
 
