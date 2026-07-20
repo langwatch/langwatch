@@ -11,6 +11,10 @@ import { startTopicClusteringBootSeeds } from "../bootSeeds";
 
 const emptyPrisma = () =>
   ({
+    // The topic-model seed enumerates projectIds with a raw cross-tenant
+    // walk (the tenancy guard rejects a bare page off project-scoped
+    // `Topic`); the per-project read still goes through the model API.
+    $queryRaw: vi.fn().mockResolvedValue([]),
     topic: { findMany: vi.fn().mockResolvedValue([]) },
     topicModelProjection: { findMany: vi.fn().mockResolvedValue([]) },
     project: { findMany: vi.fn().mockResolvedValue([]) },
@@ -35,7 +39,7 @@ describe("startTopicClusteringBootSeeds", () => {
 
       await vi.waitFor(() => {
         // Topic-model seed pages distinct projectIds off the Topic table…
-        expect(prisma.topic.findMany).toHaveBeenCalled();
+        expect(prisma.$queryRaw).toHaveBeenCalled();
         // …and the schedule seed pages eligible projects.
         expect(prisma.project.findMany).toHaveBeenCalled();
       });
@@ -45,6 +49,7 @@ describe("startTopicClusteringBootSeeds", () => {
   describe("when every query rejects", () => {
     it("returns without throwing and surfaces nothing to the boot path", async () => {
       const prisma = {
+        $queryRaw: vi.fn().mockRejectedValue(new Error("pg down")),
         topic: { findMany: vi.fn().mockRejectedValue(new Error("pg down")) },
         topicModelProjection: {
           findMany: vi.fn().mockRejectedValue(new Error("pg down")),
@@ -65,7 +70,7 @@ describe("startTopicClusteringBootSeeds", () => {
 
       // Both rejections must have been consumed (no unhandled rejection).
       await vi.waitFor(() => {
-        expect(prisma.topic.findMany).toHaveBeenCalled();
+        expect(prisma.$queryRaw).toHaveBeenCalled();
         expect(prisma.project.findMany).toHaveBeenCalled();
       });
       await new Promise((resolve) => setImmediate(resolve));

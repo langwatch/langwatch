@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
 
 import type { TopicModelEntry } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
@@ -113,14 +113,25 @@ async function runSeedPass(
   let cursor: string | null = null;
 
   for (;;) {
-    const page: Array<{ projectId: string }> =
-      await deps.prisma.topic.findMany({
-        distinct: ["projectId"],
-        select: { projectId: true },
-        orderBy: { projectId: "asc" },
-        take: PAGE_SIZE,
-        ...(cursor ? { where: { projectId: { gt: cursor } } } : {}),
-      });
+    // Fleet-wide walk over the projects that still hold pre-ownership Topic
+    // rows. `Topic` is project-scoped, so the tenancy guard rejects the bare
+    // first page of a `findMany` walk (no projectId predicate) — and this
+    // seed is cross-tenant by definition: it is the one-time migration that
+    // hands every project's model to the event stream. `-- @tenancy:` is the
+    // guard's sanctioned opt-out, used here exactly as the scheduler's
+    // due-scan uses it. Each project's rows are still READ back through the
+    // guarded model API in seedProjectTopicModel, which carries its
+    // projectId — only this projectId enumeration is cross-tenant.
+    const page = await deps.prisma.$queryRaw<Array<{ projectId: string }>>(
+      Prisma.sql`
+        SELECT DISTINCT "projectId"
+        FROM "Topic"
+        ${cursor ? Prisma.sql`WHERE "projectId" > ${cursor}` : Prisma.empty}
+        ORDER BY "projectId" ASC
+        LIMIT ${PAGE_SIZE}
+        -- @tenancy: one-time topic-model seed, cross-tenant by design (worker boot)
+      `,
+    );
     if (page.length === 0) break;
     cursor = page[page.length - 1]!.projectId;
 
