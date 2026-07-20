@@ -58,6 +58,21 @@ func ReparentTraces(td ptrace.Traces, conversationID, actorUserID string, turn t
 	isTurnValid := turn.IsValid()
 	turnTraceID := pcommon.TraceID(turn.TraceID())
 	turnSpanID := pcommon.SpanID(turn.SpanID())
+	// Span ids present in THIS batch. The worker's exporter emits its span
+	// forest across batches and omits some ancestors entirely (verified
+	// against opencode's real exports), so a span whose parent is not in the
+	// batch would hang off an id the customer's trace may never contain.
+	// Batch-local orphans re-parent onto the turn span alongside the roots.
+	batchSpanIDs := make(map[pcommon.SpanID]struct{})
+	for i := 0; i < rss.Len(); i++ {
+		sss := rss.At(i).ScopeSpans()
+		for j := 0; j < sss.Len(); j++ {
+			spans := sss.At(j).Spans()
+			for k := 0; k < spans.Len(); k++ {
+				batchSpanIDs[spans.At(k).SpanID()] = struct{}{}
+			}
+		}
+	}
 	for i := 0; i < rss.Len(); i++ {
 		rs := rss.At(i)
 		stampResource(rs.Resource().Attributes(), conversationID, actorUserID)
@@ -77,7 +92,8 @@ func ReparentTraces(td ptrace.Traces, conversationID, actorUserID string, turn t
 					continue
 				}
 				span.SetTraceID(turnTraceID)
-				if span.ParentSpanID().IsEmpty() {
+				parent := span.ParentSpanID()
+				if _, inBatch := batchSpanIDs[parent]; parent.IsEmpty() || !inBatch {
 					span.SetParentSpanID(turnSpanID)
 				}
 			}
