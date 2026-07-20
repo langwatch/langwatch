@@ -163,7 +163,7 @@ const DRAFTS_KEY = "langwatch:traces-v2:drafts:v1";
 // driven (`useURLSync`); this key is the fallback the fragment reader
 // consults when a bare URL carries no lens, so returning to a lensless URL
 // restores the last-used view instead of snapping back to All.
-const ACTIVE_LENS_KEY = "langwatch:traces-v2:active-lens:v1";
+export const ACTIVE_LENS_KEY = "langwatch:traces-v2:active-lens:v1";
 
 export function getPersistedActiveLensId(): string | null {
   if (typeof window === "undefined") return null;
@@ -182,13 +182,6 @@ function persistActiveLensId(id: string): void {
     // storage may be full / disabled
   }
 }
-
-// One-shot latch for restoring a persisted CUSTOM lens. Built-in lenses
-// restore synchronously (their ids exist before hydration); custom lenses
-// only appear once `setUserLenses` runs, so we re-apply the persisted id on
-// that first server hydration — but only while still on the default lens, so
-// an explicit pick is never clobbered by late-arriving hydration.
-let customLensHydrationDone = false;
 
 const DEFAULT_SORT: SortConfig = { columnId: "time", direction: "desc" };
 
@@ -896,30 +889,31 @@ export const useViewStore = create<ViewState>((set, get) => ({
       const userLenses = lenses.map((l) => ({ ...l, isBuiltIn: false }));
       const allLenses = [...builtIns, ...userLenses];
 
-      // First server hydration: the persisted last-used lens may be a CUSTOM
-      // lens that only becomes available now. Restore it once — but only
-      // while still on the default lens, so an explicit pick (or a lens the
-      // URL fragment already applied) is never clobbered.
-      if (!customLensHydrationDone) {
-        customLensHydrationDone = true;
-        const persisted = getPersistedActiveLensId();
-        if (
-          s.activeLensId === "all-traces" &&
-          persisted &&
-          persisted !== s.activeLensId
-        ) {
-          const target = allLenses.find((l) => l.id === persisted);
-          if (target) {
-            const draft = s.draftState.get(persisted);
-            applyFilterTextFromLens(draft?.filter ?? target.filterText);
-            return {
-              allLenses,
-              activeLensId: persisted,
-              sort: draft?.sort ?? target.sort,
-              grouping: draft?.grouping ?? target.grouping,
-              columnOrder: draft?.columns ?? target.columns,
-            };
-          }
+      // The persisted last-used lens may be a CUSTOM lens that only becomes
+      // available once its project's lenses hydrate (possibly across several
+      // partial payloads). Restore it whenever we're still on the default
+      // lens — no one-shot latch, so a late/partial first payload can't
+      // permanently block the restore. The `activeLensId === "all-traces"`
+      // guard is self-limiting: once restored (or once the user picks
+      // anything), the active lens is no longer the default, so subsequent
+      // hydrations skip and an explicit choice is never clobbered.
+      const persisted = getPersistedActiveLensId();
+      if (
+        s.activeLensId === "all-traces" &&
+        persisted &&
+        persisted !== s.activeLensId
+      ) {
+        const target = allLenses.find((l) => l.id === persisted);
+        if (target) {
+          const draft = s.draftState.get(persisted);
+          applyFilterTextFromLens(draft?.filter ?? target.filterText);
+          return {
+            allLenses,
+            activeLensId: persisted,
+            sort: draft?.sort ?? target.sort,
+            grouping: draft?.grouping ?? target.grouping,
+            columnOrder: draft?.columns ?? target.columns,
+          };
         }
       }
 

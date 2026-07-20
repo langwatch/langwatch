@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-const ACTIVE_LENS_KEY = "langwatch:traces-v2:active-lens:v1";
+import { ACTIVE_LENS_KEY } from "../viewStore";
 
 /**
  * The viewStore computes its initial active lens at module-load time from

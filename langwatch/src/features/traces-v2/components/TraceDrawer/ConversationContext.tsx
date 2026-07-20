@@ -344,7 +344,7 @@ export const ConversationContext = memo(function ConversationContext({
         densityPaddingY={densityTokens.sectionTriggerY}
         headerRef={headerRef}
         translation={translation}
-        showTranslate={hasTranslatable && !collapsed}
+        shouldShowTranslate={hasTranslatable && !collapsed}
       />
       {collapsed ? null : (
         // Two-level structure on purpose:
@@ -390,7 +390,7 @@ function ContextHeader({
   densityPaddingY,
   headerRef,
   translation,
-  showTranslate,
+  shouldShowTranslate,
 }: {
   position: number;
   total: number;
@@ -401,7 +401,7 @@ function ContextHeader({
   densityPaddingY: number;
   headerRef?: RefObject<HTMLDivElement | null>;
   translation: UseTextTranslationResult;
-  showTranslate: boolean;
+  shouldShowTranslate: boolean;
 }) {
   // The strip carries two actions — toggle collapse and translate — which
   // can't both live in one button. It's an HStack: one full-width toggle
@@ -471,7 +471,7 @@ function ContextHeader({
           transform={collapsed ? "rotate(0deg)" : "rotate(180deg)"}
         />
       </chakra.button>
-      {showTranslate ? (
+      {shouldShowTranslate ? (
         <ContextTranslateButton translation={translation} />
       ) : null}
     </HStack>

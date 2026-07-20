@@ -32,7 +32,7 @@ function renderDialog() {
 }
 
 describe("PageKeyboardShortcuts", () => {
-  describe("when the shortcuts dialog is open", () => {
+  describe("given the shortcuts dialog is open", () => {
     it("shows a Search section with the former search tips", () => {
       renderDialog();
       expect(screen.getByText("Search")).toBeInTheDocument();

@@ -83,7 +83,7 @@ Feature: Message translation in the trace details drawer
       Then every visible turn preview is shown translated to English
       And a "Show original" toggle restores the untranslated previews
 
-    Scenario: The Translate toggle is hidden when there is nothing to translate
+    Scenario: The Translate toggle is hidden while the panel is collapsed
       Given the Conversation Context panel is collapsed
       Then no Translate action is shown in its header
 
