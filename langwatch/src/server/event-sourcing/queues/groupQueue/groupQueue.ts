@@ -5,6 +5,7 @@ import {
   ROOT_CONTEXT,
   SpanKind,
   TraceFlags,
+  trace,
 } from "@opentelemetry/api";
 import fastq from "fastq";
 import { Cluster, Redis as IORedis } from "ioredis";
