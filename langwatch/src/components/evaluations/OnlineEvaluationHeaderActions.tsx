@@ -13,13 +13,15 @@ export const OnlineEvaluationHeaderActions = () => {
 
   return (
     <>
-      <PageLayout.HeaderButton onClick={() => openDrawer("guardrails", {})}>
+      <PageLayout.HeaderButton
+        background="bg"
+        onClick={() => openDrawer("guardrails", {})}
+      >
         <Shield size={16} />
         Set up Guardrail
       </PageLayout.HeaderButton>
       <PageLayout.HeaderButton
-        colorPalette="blue"
-        variant="solid"
+        background="bg"
         onClick={() => openDrawer("onlineEvaluation", {})}
       >
         <Plus size={16} />

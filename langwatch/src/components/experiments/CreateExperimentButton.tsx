@@ -1,5 +1,5 @@
-import { Spinner } from "@chakra-ui/react";
-import { Plus } from "lucide-react";
+import { Box, HStack, Link, Spinner, Text } from "@chakra-ui/react";
+import { ChevronDown, ExternalLink, Plus } from "lucide-react";
 import { useState } from "react";
 
 import { createInitialState } from "~/experiments-v3/types";
@@ -12,6 +12,7 @@ import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 import { PageLayout } from "../ui/layouts/PageLayout";
+import { Menu } from "../ui/menu";
 import { toaster } from "../ui/toaster";
 
 export const CreateExperimentButton = () => {
@@ -67,14 +68,47 @@ export const CreateExperimentButton = () => {
   };
 
   return (
-    <PageLayout.HeaderButton
-      colorPalette="blue"
-      variant="solid"
-      onClick={handleCreate}
-      disabled={isCreating}
-    >
-      {isCreating ? <Spinner size="xs" /> : <Plus size={16} />}
-      New Experiment
-    </PageLayout.HeaderButton>
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <PageLayout.HeaderButton background="bg">
+          <Plus size={16} />
+          New Experiment
+          <ChevronDown size={14} />
+        </PageLayout.HeaderButton>
+      </Menu.Trigger>
+      <Menu.Content minWidth="320px">
+        <Menu.Item
+          value="experiment-ui"
+          onClick={handleCreate}
+          disabled={isCreating}
+        >
+          <Box width="100%">
+            <Text fontWeight="medium">
+              {isCreating && <Spinner size="xs" marginRight={2} />}
+              Create Experiment
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Compare prompts and agents performance side by side
+            </Text>
+          </Box>
+        </Menu.Item>
+        <Menu.Item value="experiment-sdk" asChild>
+          <Link
+            href="https://langwatch.ai/docs/evaluations/experiments/sdk"
+            target="_blank"
+          >
+            <Box width="100%">
+              <HStack gap={1}>
+                <Text fontWeight="medium">New Experiment via SDK</Text>
+                <ExternalLink size={14} />
+              </HStack>
+              <Text fontSize="xs" color="fg.muted">
+                Run experiments programmatically from notebooks or scripts
+              </Text>
+            </Box>
+          </Link>
+        </Menu.Item>
+      </Menu.Content>
+    </Menu.Root>
   );
 };

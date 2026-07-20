@@ -127,15 +127,35 @@ describe("given experiment creation permissions and mutation boundaries", () => 
     });
   });
 
-  describe("when the user creates an experiment", () => {
-    it("sends only schema-compatible state to the mutation", () => {
+  describe("when the user creates an experiment in the UI", () => {
+    it("sends only schema-compatible state to the mutation", async () => {
       renderButton();
 
       fireEvent.click(screen.getByRole("button", { name: "New Experiment" }));
+      fireEvent.click(
+        await screen.findByRole("menuitem", { name: /Create Experiment/ }),
+      );
 
       expect(mockMutate).toHaveBeenCalledOnce();
       expect(mockMutate.mock.calls[0]?.[0]?.state).not.toHaveProperty(
         "pendingSavedChanges",
+      );
+    });
+  });
+
+  describe("when the user opens the new experiment menu", () => {
+    it("offers the SDK workflow", async () => {
+      renderButton();
+
+      fireEvent.click(screen.getByRole("button", { name: "New Experiment" }));
+
+      expect(
+        await screen.findByRole("menuitem", {
+          name: /New Experiment via SDK/,
+        }),
+      ).toHaveAttribute(
+        "href",
+        "https://langwatch.ai/docs/evaluations/experiments/sdk",
       );
     });
   });

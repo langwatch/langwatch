@@ -167,7 +167,9 @@ export function ExperimentsPage() {
                 </Text>
               }
             >
-              <CreateExperimentButton />
+              <Box marginTop={4}>
+                <CreateExperimentButton />
+              </Box>
             </NoDataInfoBlock>
           </PageLayout.Content>
         </PageLayout.Container>
