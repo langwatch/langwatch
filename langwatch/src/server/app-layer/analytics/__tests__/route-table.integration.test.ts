@@ -39,7 +39,11 @@ import type { AnalyticsTimeseriesBuilderInput } from "../types";
 const tenantId = `test-router-${generate("tenant").toString()}`;
 
 // All seeded rows land in one minute bucket so the rollup collapses cleanly.
-const bucketMs = new Date("2026-06-15T12:00:00.000Z").getTime();
+// Minute-aligned "yesterday", never a fixed calendar date: inserts are stamped
+// with PLATFORM_DEFAULT_RETENTION_DAYS (49) and the tables TTL-delete rows
+// `_retention_days` after BucketStart/OccurredAt, so a fixed date eventually
+// ages past the horizon and the fixtures silently vanish before the reads.
+const bucketMs = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 60_000) * 60_000;
 const bucketStart = new Date(bucketMs);
 
 let ch: ClickHouseClient;
