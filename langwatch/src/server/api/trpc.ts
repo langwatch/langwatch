@@ -188,21 +188,25 @@ export function errorFormatterForTesting({
       ? error.cause.toResponseBody()
       : null;
 
-  // A 5xx is an implementation failure, not user-facing copy. tRPC defaults
-  // the response message to the thrown Error's message, which can contain
-  // Prisma models, SQL, hostnames, or other platform internals. HandledError is
-  // the only exception: its message is explicitly authored as safe domain
-  // copy. The original error remains on the TRPCError for loggerMiddleware,
+  // Free-text error messages never cross the tRPC boundary. `data.domainError`
+  // (code, meta, tips, docsUrl — see SerializedHandledError, which deliberately
+  // has no message field) is the entire client contract for handled errors, and
+  // presentation is decided client-side by the code-keyed explainers. A
+  // HandledError's message is server copy — it can name env vars or internal
+  // services — so the wire carries only its stable code. Unhandled 5xx messages
+  // can contain Prisma models, SQL, or hostnames and collapse to a generic
+  // string. The original error remains on the TRPCError for loggerMiddleware,
   // exception capture, and OTel span recording.
   const isInternalServerError =
     error.code === "INTERNAL_SERVER_ERROR" ||
     shape?.data?.code === "INTERNAL_SERVER_ERROR";
-  const message =
-    isInternalServerError && !HandledError.isHandled(error.cause)
+  const message = HandledError.isHandled(error.cause)
+    ? error.cause.code
+    : isInternalServerError
       ? HandledError.toUserMessage(error.cause)
       : shape.message;
   const shapeData = { ...shape.data };
-  if (isInternalServerError && !HandledError.isHandled(error.cause)) {
+  if (isInternalServerError || HandledError.isHandled(error.cause)) {
     // tRPC includes stacks in development error shapes. Local callers should
     // exercise the same safe wire contract as production callers.
     delete shapeData.stack;

@@ -2,7 +2,7 @@
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
-import { NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { errorFormatterForTesting } from "../trpc";
 
 function format(error: TRPCError) {
@@ -39,24 +39,57 @@ describe("tRPC error response boundary", () => {
     expect(error.cause).toBe(cause);
   });
 
-  it("keeps explicitly handled domain copy and its structured envelope", () => {
+  it("replaces a handled error's free-text message with its stable code, keeping the structured envelope", () => {
     const cause = new NotFoundError(
       "langy_conversation_not_found",
       "Conversation",
       "conversation-1",
     );
     const error = new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
+      code: "NOT_FOUND",
       message: cause.message,
       cause,
     });
 
     const formatted = format(error);
 
-    expect(formatted.message).toBe("Conversation not found: conversation-1");
+    expect(formatted.message).toBe("langy_conversation_not_found");
+    expect(JSON.stringify(formatted)).not.toContain(
+      "Conversation not found: conversation-1",
+    );
     expect(formatted.data.domainError).toMatchObject({
       code: "langy_conversation_not_found",
       httpStatus: 404,
+    });
+  });
+
+  it("never leaks server configuration named in a handled error's message", () => {
+    // Mirrors the reported leak: langy.createConversation returned
+    // "LW_GATEWAY_BASE_URL is not configured on the control plane." as the
+    // wire message alongside the sanitised domainError payload.
+    class CredentialResolutionError extends HandledError {
+      constructor(message: string) {
+        super("langy_credential_resolution", message, { httpStatus: 409 });
+      }
+    }
+    const cause = new CredentialResolutionError(
+      "LW_GATEWAY_BASE_URL is not configured on the control plane.",
+    );
+    const error = new TRPCError({
+      code: "CONFLICT",
+      message: cause.message,
+      cause,
+    });
+
+    const formatted = format(error);
+
+    expect(JSON.stringify(formatted)).not.toContain("LW_GATEWAY_BASE_URL");
+    expect(JSON.stringify(formatted)).not.toContain("db.internal");
+    expect(formatted.message).toBe("langy_credential_resolution");
+    expect(formatted.data.domainError).toMatchObject({
+      code: "langy_credential_resolution",
+      httpStatus: 409,
+      fault: "customer",
     });
   });
 

@@ -43,6 +43,15 @@ Feature: Handled errors — the handled-error boundary
     And its httpStatus is 404
 
   @bdd @domain-errors
+  Scenario: A handled error's free-text message never crosses the tRPC boundary
+    Given a procedure throws a HandledError whose message names server configuration
+    When the client calls that procedure
+    Then the tRPC wire message is the error's stable code, not the free-text message
+    And no part of the response contains the free-text message
+    And `data.domainError` (code, meta, tips, docsUrl) is the entire client contract
+    So client copy comes from the code-keyed explainers, never from server-authored strings
+
+  @bdd @domain-errors
   Scenario: A known failure is normalised by Hono to a client-safe body
     Given a service route throws a HandledError of code "conversation_not_owned" with httpStatus 403
     When the client calls that route
