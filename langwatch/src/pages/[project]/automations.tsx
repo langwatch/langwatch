@@ -89,6 +89,7 @@ const sectionDetails: Record<
 };
 
 const sectionFromPath = (pathname: string): AutomationSection => {
+  if (pathname.includes("/automations/automations")) return "automations";
   if (pathname.includes("/automations/alerts")) return "alerts";
   if (pathname.includes("/automations/schedules")) return "schedules";
   return "overview";
@@ -528,7 +529,10 @@ function AutomationsPage() {
               <MenuLink href={basePath} icon={<Eye size={14} />}>
                 Overview
               </MenuLink>
-              <MenuLink href={basePath} icon={<Zap size={14} />}>
+              <MenuLink
+                href={`${basePath}/automations`}
+                icon={<Zap size={14} />}
+              >
                 Automations
               </MenuLink>
               <MenuLink

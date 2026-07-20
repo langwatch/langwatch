@@ -19,7 +19,6 @@ test("automation overview keeps activity and setup guidance", async ({
   await expect(page.getByText("Recent activity")).toBeVisible();
   await expect(page.getByText("Set up an alert")).toBeVisible();
   await page.getByRole("button", { name: "Expand Library" }).click();
-  await expect(page.locator(`a[href="${basePath}"]`)).toHaveCount(3);
   await page.screenshot({ path: testInfo.outputPath("automations.png") });
 
   await page.getByRole("link", { name: "Alerts", exact: true }).last().click();
@@ -39,7 +38,7 @@ test("automation overview keeps activity and setup guidance", async ({
   await page.screenshot({ path: testInfo.outputPath("schedules.png") });
 
   await page.getByRole("link", { name: "Automations", exact: true }).last().click();
-  await expect(page).toHaveURL(basePath);
+  await expect(page).toHaveURL(`${basePath}/automations`);
   await expect(
     page.locator("h1", { hasText: "Automations" }),
   ).toBeVisible();

@@ -129,7 +129,12 @@ export const projectRoutes = {
   },
   automations: {
     path: "/[project]/automations",
+    title: "Overview",
+  },
+  automations_automations: {
+    path: "/[project]/automations/automations",
     title: "Automations",
+    parent: "automations",
   },
   automations_alerts: {
     path: "/[project]/automations/alerts",
