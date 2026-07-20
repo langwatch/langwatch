@@ -30,7 +30,7 @@ export class PrismaLangyTurnAdmissionRepository
   async claim(input: {
     projectId: string;
     userId: string;
-    requestId: string;
+    idempotencyKey: string;
     conversationId: string;
     turnId: string;
   }): Promise<LangyTurnAdmissionClaim> {
@@ -52,10 +52,19 @@ export class PrismaLangyTurnAdmissionRepository
                 projectId_userId_requestId: {
                   projectId: input.projectId,
                   userId: input.userId,
-                  requestId: input.requestId,
+                  requestId: input.idempotencyKey,
                 },
               },
             });
+
+            // Same key, different content: the turn id is a hash of
+            // who+key+content, so a receipt whose turnId differs proves the
+            // key is being reused for a different send. Never replay it.
+            // (The DB column keeps its historical name `requestId`; the value
+            // stored there is the idempotency key.)
+            if (receipt && receipt.turnId !== input.turnId) {
+              return { kind: "mismatch" as const };
+            }
 
             if (receipt?.status === COMMITTED) {
               return {
@@ -86,7 +95,7 @@ export class PrismaLangyTurnAdmissionRepository
                 data: {
                   projectId: input.projectId,
                   userId: input.userId,
-                  requestId: input.requestId,
+                  requestId: input.idempotencyKey,
                   conversationId: input.conversationId,
                   turnId: input.turnId,
                   status: PREPARING,
@@ -117,7 +126,7 @@ export class PrismaLangyTurnAdmissionRepository
                   projectId: input.projectId,
                   conversationId,
                   turnId,
-                  requestId: input.requestId,
+                  requestId: input.idempotencyKey,
                   userId: input.userId,
                   status: PREPARING,
                   leaseOwner: claimToken,
@@ -128,7 +137,7 @@ export class PrismaLangyTurnAdmissionRepository
               await tx.langyActiveTurn.update({
                 where: { id: active.id, projectId: input.projectId },
                 data: {
-                  requestId: input.requestId,
+                  requestId: input.idempotencyKey,
                   userId: input.userId,
                   status: PREPARING,
                   leaseOwner: claimToken,
@@ -143,7 +152,7 @@ export class PrismaLangyTurnAdmissionRepository
                 where: { id: active.id, projectId: input.projectId },
                 data: {
                   turnId,
-                  requestId: input.requestId,
+                  requestId: input.idempotencyKey,
                   userId: input.userId,
                   status: PREPARING,
                   leaseOwner: claimToken,
@@ -187,7 +196,7 @@ export class PrismaLangyTurnAdmissionRepository
   async commit(input: {
     projectId: string;
     userId: string;
-    requestId: string;
+    idempotencyKey: string;
     conversationId: string;
     turnId: string;
     claimToken: string;
@@ -197,7 +206,7 @@ export class PrismaLangyTurnAdmissionRepository
         where: {
           projectId: input.projectId,
           userId: input.userId,
-          requestId: input.requestId,
+          requestId: input.idempotencyKey,
           conversationId: input.conversationId,
           turnId: input.turnId,
           status: PREPARING,
@@ -212,7 +221,7 @@ export class PrismaLangyTurnAdmissionRepository
             projectId_userId_requestId: {
               projectId: input.projectId,
               userId: input.userId,
-              requestId: input.requestId,
+              requestId: input.idempotencyKey,
             },
           },
         });
@@ -264,7 +273,7 @@ export class PrismaLangyTurnAdmissionRepository
   async abort(input: {
     projectId: string;
     userId: string;
-    requestId: string;
+    idempotencyKey: string;
     conversationId: string;
     turnId: string;
     claimToken: string;
@@ -283,7 +292,7 @@ export class PrismaLangyTurnAdmissionRepository
         where: {
           projectId: input.projectId,
           userId: input.userId,
-          requestId: input.requestId,
+          requestId: input.idempotencyKey,
           conversationId: input.conversationId,
           turnId: input.turnId,
           status: PREPARING,

@@ -176,6 +176,14 @@ const registry = {
       "Wait for the current response to finish before sending another message",
     ],
   },
+  langy_idempotency_mismatch: {
+    tips: [
+      "The same idempotency key was reused with different content — mint a fresh key for every new send",
+    ],
+  },
+  langy_empty_message: {
+    tips: ["Send a message with actual text content"],
+  },
   langy_agent_unavailable: {
     tips: [
       "Retry in a few seconds — the agent is down, mid-deploy, or restarting",

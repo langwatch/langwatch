@@ -92,18 +92,24 @@ describe("createLangyChatTransport", () => {
       });
     });
 
-    it("mints exactly one stable request id for each logical send", async () => {
+    it("mints a fresh idempotency key for each logical send", async () => {
       const { transport } = makeTransport({ conversationId: null });
 
       await transport.sendMessages(options());
-      const firstInput = mutation.mock.calls[0]![1] as { requestId: string };
-      expect(firstInput.requestId).toMatch(
+      const firstInput = mutation.mock.calls[0]![1] as {
+        idempotencyKey: string;
+      };
+      expect(firstInput.idempotencyKey).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
       );
 
+      // A second send is a NEW logical send — even with identical content it
+      // must mint a new key, so re-sending the same text starts a new turn.
       await transport.sendMessages(options());
-      const secondInput = mutation.mock.calls[1]![1] as { requestId: string };
-      expect(secondInput.requestId).not.toBe(firstInput.requestId);
+      const secondInput = mutation.mock.calls[1]![1] as {
+        idempotencyKey: string;
+      };
+      expect(secondInput.idempotencyKey).not.toBe(firstInput.idempotencyKey);
     });
   });
 

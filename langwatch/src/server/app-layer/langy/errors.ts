@@ -125,6 +125,43 @@ export class LangyInsufficientScopeError extends HandledError {
   }
 }
 
+/**
+ * The same idempotency key arrived with different content (HTTP 409). A retry
+ * must replay the SAME send byte-for-byte; a new send mints a new key. Turn
+ * identity is a hash of who+key+content, so this is detected structurally —
+ * the derived turn id no longer matches the admitted one.
+ */
+export class LangyIdempotencyMismatchError extends HandledError {
+  declare readonly code: "langy_idempotency_mismatch";
+  constructor() {
+    super(
+      "langy_idempotency_mismatch",
+      "This idempotency key was already used for a different message.",
+      {
+        httpStatus: 409,
+        ...remediation("langy_idempotency_mismatch"),
+      },
+    );
+    this.name = "LangyIdempotencyMismatchError";
+  }
+}
+
+/**
+ * The send carried no usable text (HTTP 422). Accepting it would admit a turn
+ * the agent can only reject — and a permanently rejected dispatch used to
+ * poison the process outbox with endless retries.
+ */
+export class LangyEmptyMessageError extends HandledError {
+  declare readonly code: "langy_empty_message";
+  constructor() {
+    super("langy_empty_message", "The message has no text content.", {
+      httpStatus: 422,
+      ...remediation("langy_empty_message"),
+    });
+    this.name = "LangyEmptyMessageError";
+  }
+}
+
 /** A turn is already in flight for the conversation — one at a time (HTTP 409). */
 export class LangyTurnInProgressError extends HandledError {
   declare readonly code: "langy_turn_in_progress";
