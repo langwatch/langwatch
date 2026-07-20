@@ -62,7 +62,7 @@ function readEventName(attributes: unknown): string | null {
 
 /** Schema-snapshot version (calendar date). Bump when the derivation changes. */
 export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST =
-  "2026-07-11" as const;
+  "2026-07-20" as const;
 
 const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
   new CanonicalizeSpanAttributesService(),

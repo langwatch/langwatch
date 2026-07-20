@@ -124,6 +124,30 @@ Feature: Coding agent session summary
     Then the summary does not grow with the number of spans
     # This is what makes it safe to summarise an unbounded session at all.
 
+  # Coding agents report lines of code, commits, pull requests, edit decisions
+  # and active time ONLY as metrics, keyed by the session id. Those metrics
+  # never reference a trace, so this is the one road those facts have into the
+  # session view.
+  Scenario: Work the agent reports only as metrics still reaches the session
+    Given the agent reported 120 lines added and 30 removed as session metrics
+    And nothing in the session's spans or logs mentions lines of code
+    When the session is viewed
+    Then the session reports 120 lines added and 30 removed
+
+  Scenario: A fact the session already knows is not overwritten by a metric
+    Given the session counted 2 commits from its own events
+    And the commit metric for the session reports 7
+    When the session is viewed
+    Then the session still reports 2 commits
+    # When both sources speak, the fold's own count wins: it was derived from
+    # the session's events, while the metric window is a best-effort join.
+
+  Scenario: The session view survives the metric store being unavailable
+    Given the metric store cannot be read
+    When the session is viewed
+    Then the session still reports everything its spans and logs said
+    # Metrics are additive garnish here, never a dependency.
+
   # The columns are agent-generic, but Claude Code is the only adapter written:
   # the span-name gate, the metric application, and the log fold all read
   # Claude's names today. Other recognised agents (Codex, opencode, Gemini CLI,
