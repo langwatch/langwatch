@@ -33,6 +33,7 @@ import { useConversationExpand } from "./expandContext";
 import { MessageExpandToggle } from "./MessageExpandToggle";
 import { TurnActionRow, TurnAnnotationBadges } from "./TurnAnnotations";
 import type { TurnLayout } from "./types";
+import { formatGap } from "./utils";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
 const EMPTY_ANNOTATIONS: AnnotationItem[] = [];
@@ -42,6 +43,10 @@ interface ChatTurnRowProps {
   userText: string;
   assistantText: string;
   assistantReasoning: string;
+  /** Wall-clock seconds between the previous turn's end and this turn's start. */
+  gapSecs: number;
+  /** Whether the inter-turn gap is long enough to surface as a divider. */
+  showGap: boolean;
   index: number;
   isCurrent: boolean;
   onSelect: (traceId: string) => void;
@@ -60,6 +65,8 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   userText: originalUserText,
   assistantText: originalAssistantText,
   assistantReasoning,
+  gapSecs,
+  showGap,
   index,
   isCurrent,
   onSelect,
@@ -119,6 +126,16 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
 
   return (
     <VStack align="stretch" gap={layout === "thread" ? 1 : 2}>
+      {showGap && (
+        <Flex align="center" gap={2}>
+          <Box height="1px" flex={1} bg="border.muted" />
+          <Text textStyle="2xs" color="fg.subtle">
+            {formatGap(gapSecs)}
+          </Text>
+          <Box height="1px" flex={1} bg="border.muted" />
+        </Flex>
+      )}
+
       <TurnSeparator
         index={index}
         turn={turn}

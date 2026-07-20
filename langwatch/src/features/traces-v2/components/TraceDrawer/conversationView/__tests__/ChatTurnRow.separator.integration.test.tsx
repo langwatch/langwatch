@@ -1,10 +1,11 @@
 /**
  * @vitest-environment jsdom
  *
- * The per-turn separator ledger was decluttered: the cryptic model
- * abbreviation and the raw input→output token count are gone, the relative
- * time carries an explicit "ago", and the "Xs gap" divider between turns is
- * removed. See specs/traces-v2/conversation-turn-ledger.feature.
+ * The per-turn separator ledger is decluttered: the cryptic model
+ * abbreviation and the raw input→output token count are gone and the relative
+ * time carries an explicit "ago". The "Xs gap" divider between turns is kept —
+ * a long pause since the previous turn is worth surfacing. See
+ * specs/traces-v2/conversation-turn-ledger.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -82,7 +83,7 @@ function turn(over: Partial<TraceListItem>): TraceListItem {
   };
 }
 
-function renderRow() {
+function renderRow(gap?: { gapSecs: number; showGap: boolean }) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <ChatTurnRow
@@ -98,6 +99,8 @@ function renderRow() {
         userText="a question"
         assistantText="an answer"
         assistantReasoning=""
+        gapSecs={gap?.gapSecs ?? 0}
+        showGap={gap?.showGap ?? false}
         index={3}
         isCurrent={false}
         onSelect={() => undefined}
@@ -137,9 +140,16 @@ describe("ChatTurnRow separator ledger", () => {
     });
   });
 
-  describe("given consecutive turns", () => {
-    it("never renders an inter-turn gap divider", () => {
-      const { container } = renderRow();
+  describe("given a turn preceded by a long pause", () => {
+    it("renders the inter-turn gap divider", () => {
+      const { container } = renderRow({ gapSecs: 12.5, showGap: true });
+      expect(container.textContent ?? "").toMatch(/12\.5s gap/);
+    });
+  });
+
+  describe("given the first turn, with no preceding pause", () => {
+    it("does not render a gap divider", () => {
+      const { container } = renderRow({ gapSecs: 0, showGap: false });
       expect(container.textContent ?? "").not.toMatch(/gap/i);
     });
   });

@@ -117,6 +117,8 @@ function renderRow(texts: { user: string; assistant: string }) {
         userText={texts.user}
         assistantText={texts.assistant}
         assistantReasoning=""
+        gapSecs={0}
+        showGap={false}
         index={1}
         isCurrent={false}
         onSelect={() => undefined}

@@ -5,12 +5,12 @@
 #   langwatch/src/features/traces-v2/utils/formatters.ts (formatRelativeTimeAgo)
 #
 # Motivation: a customer found the separator between conversation turns too
-# busy and cryptic — "TURN 3 · small · 20.9s · 4.5K→538 · 1h" plus a "12.5s
-# gap" divider above it. The model abbreviation ("small") and the raw
-# input→output token count read as noise in a reading view, the bare "1h"
-# was ambiguous (elapsed? remaining?), and the gap divider added a second
-# confusing number. The ledger is trimmed to what helps while reading the
-# conversation.
+# busy and cryptic: "TURN 3 · small · 20.9s · 4.5K→538 · 1h". The model
+# abbreviation ("small") and the raw input→output token count read as noise in
+# a reading view, and the bare "1h" was ambiguous (elapsed? remaining?). The
+# ledger is trimmed to what helps while reading the conversation. The "Xs gap"
+# divider between turns is kept, because a long pause since the previous turn
+# is meaningful context worth surfacing.
 
 Feature: Conversation turn ledger
 
@@ -35,8 +35,16 @@ Feature: Conversation turn ledger
       Given a turn with 4500 input and 538 output tokens
       Then the separator does not show a "4.5K→538" token figure
 
-  Rule: No inter-turn gap divider
+  Rule: A long inter-turn pause is surfaced as a gap divider
 
-    Scenario: Consecutive turns render without a gap divider
-      Given two turns separated by several seconds of wall-clock time
-      Then no "Xs gap" divider is drawn between them
+    A noticeable wall-clock gap since the previous turn finished is drawn as an
+    "Xs gap" divider above the turn, so a reader sees where the conversation
+    paused.
+
+    Scenario: A long pause between turns draws a gap divider
+      Given a turn that started 12.5s after the previous turn finished
+      Then a "12.5s gap" divider is drawn above it
+
+    Scenario: The first turn has no preceding gap
+      Given the first turn in the conversation
+      Then no gap divider is drawn above it

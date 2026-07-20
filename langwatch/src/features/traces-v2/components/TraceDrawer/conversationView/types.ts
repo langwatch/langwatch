@@ -15,6 +15,8 @@ export interface ParsedTurn {
    */
   assistantText: string;
   assistantReasoning: string;
+  gapSecs: number;
+  showGap: boolean;
 }
 
 export const EMPTY_TURNS: TraceListItem[] = [];
