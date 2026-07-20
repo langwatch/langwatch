@@ -51,7 +51,11 @@ export const TOPIC_CLUSTERING_EVENT_VERSIONS = {
 /** Projection schema versions using calendar versioning (YYYY-MM-DD). */
 export const TOPIC_CLUSTERING_PROJECTION_VERSIONS = {
   RUN_STATUS: "2026-07-17",
+  RUN_HISTORY: "2026-07-20",
 } as const;
+
+/** How many finished runs the history read model keeps per project. */
+export const TOPIC_CLUSTERING_RUN_HISTORY_LIMIT = 50;
 
 /** Why a clustering request was made. */
 export const TOPIC_CLUSTERING_TRIGGER = {
@@ -89,6 +93,16 @@ export const TOPIC_CLUSTERING_RUN_OUTCOME = {
   COMPLETED: "completed",
   SKIPPED: "skipped",
   FAILED: "failed",
+  /**
+   * History-only: the run is still working. Never a terminal outcome — the
+   * status projection reports in-flight runs through its InProgress* fields.
+   */
+  RUNNING: "running",
+  /**
+   * History-only: the run's terminal outcome never arrived and a later run
+   * superseded it (the scheduler's stale-run guard moved on).
+   */
+  ABANDONED: "abandoned",
 } as const;
 export type TopicClusteringRunOutcome =
   (typeof TOPIC_CLUSTERING_RUN_OUTCOME)[keyof typeof TOPIC_CLUSTERING_RUN_OUTCOME];

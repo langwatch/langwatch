@@ -32,4 +32,13 @@ export const topicsRouter = createTRPCRouter({
         projectId: input.projectId,
       });
     }),
+
+  getClusteringRunHistory: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("project:view"))
+    .query(async ({ input }) => {
+      return await getApp().topicClustering.status.getRunHistoryByProjectId({
+        projectId: input.projectId,
+      });
+    }),
 });

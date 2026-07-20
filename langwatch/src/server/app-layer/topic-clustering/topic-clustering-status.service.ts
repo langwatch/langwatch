@@ -1,4 +1,6 @@
 import { TOPIC_CLUSTERING_STALE_RUN_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClustering.process";
+import { TOPIC_CLUSTERING_RUN_OUTCOME } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/constants";
+import type { TopicClusteringRunHistoryEntry } from "~/server/event-sourcing/pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
 import type { TopicClusteringStatusRepository } from "./repositories/topic-clustering-status.repository";
 
 export interface TopicClusteringStatus {
@@ -103,6 +105,25 @@ export class TopicClusteringStatusService {
         }),
       nextRunAt: nextWakeAt?.getTime() ?? null,
     };
+  }
+
+  /**
+   * The project's recent runs, newest first, from the bounded history read
+   * model. Entries still reading as "running" past the scheduler's stale-run
+   * window are presented as abandoned — their terminal outcome was lost and
+   * the scheduler has already moved on, so the UI must not show them as
+   * working forever. Raw error text is never part of this model (ADR-051 §8).
+   */
+  async getRunHistoryByProjectId(params: {
+    projectId: string;
+  }): Promise<TopicClusteringRunHistoryEntry[]> {
+    const runs = await this.repository.findRunHistoryByProjectId(params);
+    return runs.map((run) =>
+      run.outcome === TOPIC_CLUSTERING_RUN_OUTCOME.RUNNING &&
+      this.now() - run.startedAt >= TOPIC_CLUSTERING_STALE_RUN_MS
+        ? { ...run, outcome: TOPIC_CLUSTERING_RUN_OUTCOME.ABANDONED }
+        : run,
+    );
   }
 
   /**

@@ -6,6 +6,7 @@ import {
   HStack,
   Heading,
   Skeleton,
+  Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -127,6 +128,9 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
       void utils.topics.getClusteringStatus.invalidate({
         projectId: project.id,
       });
+      void utils.topics.getClusteringRunHistory.invalidate({
+        projectId: project.id,
+      });
     },
     onError: (error) => {
       if (isHandledByGlobalHandler(error)) return;
@@ -179,6 +183,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
           </VStack>
         </Card.Body>
       </Card.Root>
+      <RunHistoryCard projectId={project.id} />
     </VStack>
   );
 }
@@ -207,6 +212,10 @@ function outcomeBadge(outcome: string | null, isRunInFlight: boolean) {
       return <Badge colorPalette="gray">Skipped</Badge>;
     case "failed":
       return <Badge colorPalette="red">Failed</Badge>;
+    case "running":
+      return <Badge colorPalette="blue">Running</Badge>;
+    case "abandoned":
+      return <Badge colorPalette="orange">Interrupted</Badge>;
     default:
       return <Badge colorPalette="gray">Never run</Badge>;
   }
@@ -317,6 +326,108 @@ function ClusteringStatusCard({
           </VStack>
         ) : (
           <Text color="fg.muted">Clustering status is unavailable.</Text>
+        )}
+      </Card.Body>
+    </Card.Root>
+  );
+}
+
+/**
+ * What one history row says about its run, in the customer's terms. The
+ * server never sends raw error text (ADR-051 §8) — a failed run's detail is
+ * the same fixed guidance the status card uses.
+ */
+function runDetail(run: {
+  outcome: string;
+  mode: string | null;
+  skippedReason: string | null;
+  errorCode: string | null;
+  isErrorUserActionable: boolean;
+  tracesProcessed: number;
+  topicsCount: number;
+  subtopicsCount: number;
+}): string {
+  switch (run.outcome) {
+    case "completed": {
+      const modeCopy = copyFor(RUN_MODE_COPY, run.mode);
+      const summary = `Organized ${run.tracesProcessed} traces into ${run.topicsCount} topics and ${run.subtopicsCount} subtopics.`;
+      return modeCopy ? `${modeCopy}. ${summary}` : summary;
+    }
+    case "skipped":
+      return `${copyFor(SKIP_REASON_COPY, run.skippedReason) ?? "Skipped"}.`;
+    case "failed": {
+      const guidance = run.isErrorUserActionable
+        ? copyFor(CLUSTERING_FAILURE_GUIDANCE, run.errorCode)
+        : undefined;
+      return guidance
+        ? guidance.title
+        : "Failed on our side. It retries automatically at the next scheduled run.";
+    }
+    case "running":
+      return "Working through your recent traces…";
+    case "abandoned":
+      return "The run was interrupted; the next scheduled run starts fresh.";
+    default:
+      return "";
+  }
+}
+
+function RunHistoryCard({ projectId }: { projectId: string }) {
+  const history = api.topics.getClusteringRunHistory.useQuery(
+    { projectId },
+    {
+      refetchInterval: (data) =>
+        data?.some((run) => run.outcome === "running")
+          ? RUNNING_POLL_MS
+          : false,
+    },
+  );
+
+  return (
+    <Card.Root width="full" overflow="hidden">
+      <Card.Header>
+        <Heading>Run history</Heading>
+      </Card.Header>
+      <Card.Body width="full" paddingX={0} paddingY={0} overflowX="auto">
+        {history.isLoading ? (
+          <VStack align="start" gap={2} width="full" padding={6}>
+            <Skeleton height="20px" width="80%" />
+            <Skeleton height="20px" width="70%" />
+          </VStack>
+        ) : history.data && history.data.length > 0 ? (
+          <Table.Root variant="line" size="sm" width="full">
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeader>When</Table.ColumnHeader>
+                <Table.ColumnHeader>Started by</Table.ColumnHeader>
+                <Table.ColumnHeader>Outcome</Table.ColumnHeader>
+                <Table.ColumnHeader>Details</Table.ColumnHeader>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {history.data.map((run) => (
+                <Table.Row key={run.runId}>
+                  <Table.Cell whiteSpace="nowrap">
+                    {formatTimeAgo(run.startedAt)}
+                  </Table.Cell>
+                  <Table.Cell whiteSpace="nowrap">
+                    {run.trigger === "manual" ? "You" : "Schedule"}
+                  </Table.Cell>
+                  <Table.Cell>{outcomeBadge(run.outcome, false)}</Table.Cell>
+                  <Table.Cell>
+                    <Text fontSize="sm" color="fg.muted">
+                      {runDetail(run)}
+                    </Text>
+                  </Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table.Root>
+        ) : (
+          <Text color="fg.muted" padding={6}>
+            No runs yet. History appears here after the first scheduled or
+            manual run.
+          </Text>
         )}
       </Card.Body>
     </Card.Root>

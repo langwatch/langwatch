@@ -30,6 +30,10 @@ import {
 } from "./commands";
 import { TOPIC_CLUSTERING_EVENT_TYPES } from "./schemas/constants";
 import {
+  type TopicClusteringRunHistoryData,
+  TopicClusteringRunHistoryFoldProjection,
+} from "./projections/topicClusteringRunHistory.foldProjection";
+import {
   type TopicClusteringRunStatusData,
   TopicClusteringRunStatusFoldProjection,
 } from "./projections/topicClusteringRunStatus.foldProjection";
@@ -41,6 +45,8 @@ import type { TopicClusteringProcessingEvent } from "./schemas/events";
 export interface TopicClusteringProcessingPipelineDeps {
   /** Postgres run-status read model behind the settings page (ADR-051 §7). */
   topicClusteringRunStatusStore: StateProjectionStore<TopicClusteringRunStatusData>;
+  /** Postgres run-history read model (audit; bounded, newest first). */
+  topicClusteringRunHistoryStore: StateProjectionStore<TopicClusteringRunHistoryData>;
   dispatch: TopicClusteringDispatchDeps;
 }
 
@@ -117,6 +123,12 @@ export function createTopicClusteringProcessingPipeline(
       "topicClusteringRunStatus",
       new TopicClusteringRunStatusFoldProjection({
         store: deps.topicClusteringRunStatusStore,
+      }),
+    )
+    .withProjection(
+      "topicClusteringRunHistory",
+      new TopicClusteringRunHistoryFoldProjection({
+        store: deps.topicClusteringRunHistoryStore,
       }),
     )
     .withCommand("requestClustering", RequestTopicClusteringCommand)

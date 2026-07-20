@@ -53,6 +53,20 @@ function serviceReading(
       projection: record.projection ?? null,
       nextWakeAt: record.nextWakeAt ?? null,
     }),
+    findRunHistoryByProjectId: async () => [],
+  };
+  return new TopicClusteringStatusService(repository, () => now);
+}
+
+function serviceWithHistory(
+  runs: Awaited<
+    ReturnType<TopicClusteringStatusRepository["findRunHistoryByProjectId"]>
+  >,
+  now: number = NOW,
+) {
+  const repository: TopicClusteringStatusRepository = {
+    findByProjectId: async () => ({ projection: null, nextWakeAt: null }),
+    findRunHistoryByProjectId: async () => runs,
   };
   return new TopicClusteringStatusService(repository, () => now);
 }
@@ -324,6 +338,65 @@ describe("TopicClusteringStatusService", () => {
       await expect(
         service.isRunInFlight({ projectId: PROJECT_ID }),
       ).resolves.toBe(false);
+    });
+  });
+});
+
+describe("TopicClusteringStatusService run history", () => {
+  const finishedRun = {
+    runId: "20260720T093000",
+    trigger: "scheduled",
+    startedAt: NOW - 3_600_000,
+    finishedAt: NOW - 3_500_000,
+    outcome: "completed",
+    mode: "batch",
+    skippedReason: null,
+    errorCode: null,
+    isErrorUserActionable: false,
+    tracesProcessed: 2_500,
+    topicsCount: 12,
+    subtopicsCount: 40,
+    pages: 2,
+  };
+
+  describe("given recorded runs", () => {
+    it("returns them unchanged, newest first", async () => {
+      const runs = await serviceWithHistory([finishedRun]).getRunHistoryByProjectId(
+        { projectId: PROJECT_ID },
+      );
+      expect(runs).toEqual([finishedRun]);
+    });
+  });
+
+  describe("given a run still reading as running inside the stale window", () => {
+    it("keeps presenting it as running", async () => {
+      const running = {
+        ...finishedRun,
+        runId: "run-live",
+        outcome: "running",
+        finishedAt: null,
+        startedAt: NOW - 60_000,
+      };
+      const runs = await serviceWithHistory([running]).getRunHistoryByProjectId(
+        { projectId: PROJECT_ID },
+      );
+      expect(runs[0]?.outcome).toBe("running");
+    });
+  });
+
+  describe("given a running entry older than the stale-run window", () => {
+    it("presents it as abandoned so the UI never shows it working forever", async () => {
+      const wedged = {
+        ...finishedRun,
+        runId: "run-wedged",
+        outcome: "running",
+        finishedAt: null,
+        startedAt: NOW - TOPIC_CLUSTERING_STALE_RUN_MS - 1,
+      };
+      const runs = await serviceWithHistory([wedged]).getRunHistoryByProjectId({
+        projectId: PROJECT_ID,
+      });
+      expect(runs[0]?.outcome).toBe("abandoned");
     });
   });
 });

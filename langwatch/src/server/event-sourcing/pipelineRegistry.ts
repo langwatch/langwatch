@@ -129,6 +129,7 @@ import {
 } from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
 import { type ProcessStore } from "./process-manager";
 import { createTopicClusteringProcessingPipeline } from "./pipelines/topic-clustering-processing/pipeline";
+import type { TopicClusteringRunHistoryData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
 import type { TopicClusteringRunStatusData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
@@ -264,6 +265,8 @@ export interface PipelineRepositories {
   processStore: ProcessStore;
   /** Per-project topic clustering run status (ADR-051, Postgres). */
   topicClusteringRunStatus: StateProjectionStore<TopicClusteringRunStatusData>;
+  /** Per-project topic clustering run history (audit; bounded). */
+  topicClusteringRunHistory: StateProjectionStore<TopicClusteringRunHistoryData>;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionRepository;
 }
@@ -470,6 +473,8 @@ export class PipelineRegistry {
       createTopicClusteringProcessingPipeline({
         topicClusteringRunStatusStore:
           this.deps.repositories.topicClusteringRunStatus,
+        topicClusteringRunHistoryStore:
+          this.deps.repositories.topicClusteringRunHistory,
         dispatch: {
           runPort: this.deps.topicClustering.runPort,
           commands: () => {

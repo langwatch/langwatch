@@ -114,6 +114,7 @@ import { ClickHouseLangyAnalyticsEventRepository } from "./langy/repositories/la
 import { NullLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.repository";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
 import { PrismaProcessStore } from "../event-sourcing/process-manager";
+import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
 import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
 import { PrismaTopicClusteringStatusRepository } from "./topic-clustering/repositories/topic-clustering-status.repository";
 import { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
@@ -678,6 +679,8 @@ export function initializeDefaultApp(options?: {
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),
+    topicClusteringRunHistory:
+      new PrismaTopicClusteringRunHistoryProjectionRepository(prisma),
     langyTurnAdmission,
   };
 
