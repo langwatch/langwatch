@@ -454,7 +454,7 @@ export class ProjectionRouter<
 
     this.queueManager.initializeStateProjectionQueues(
       projectionDefs,
-      async (projectionName, event) => {
+      async (projectionName, event, context) => {
         const projection = this.stateProjections.get(projectionName);
         if (!projection) {
           throw new ConfigurationError(
@@ -463,11 +463,14 @@ export class ProjectionRouter<
             { projectionName },
           );
         }
-        await this.processStateProjectionEvents(projectionName, projection, [
-          event,
-        ]);
+        await this.processStateProjectionEvents(
+          projectionName,
+          projection,
+          [event],
+          context,
+        );
       },
-      async (projectionName, events) => {
+      async (projectionName, events, context) => {
         const projection = this.stateProjections.get(projectionName);
         if (!projection) {
           throw new ConfigurationError(
@@ -480,6 +483,7 @@ export class ProjectionRouter<
           projectionName,
           projection,
           events,
+          context,
         );
       },
     );
@@ -532,7 +536,7 @@ export class ProjectionRouter<
 
     this.queueManager.initializeProjectionQueues(
       projectionDefs,
-      async (projectionName, triggerEvent, _context) => {
+      async (projectionName, triggerEvent, context) => {
         const fold = this.foldProjections.get(projectionName);
         if (!fold) {
           throw new ConfigurationError(
@@ -546,10 +550,15 @@ export class ProjectionRouter<
           projectionName,
           fold,
           triggerEvent,
-          { tenantId: triggerEvent.tenantId },
+          {
+            tenantId: triggerEvent.tenantId,
+            ...(context.deliveryAttempt !== undefined
+              ? { deliveryAttempt: context.deliveryAttempt }
+              : {}),
+          },
         );
       },
-      async (projectionName, events, _context) => {
+      async (projectionName, events, context) => {
         const fold = this.foldProjections.get(projectionName);
         if (!fold) {
           throw new ConfigurationError(
@@ -561,6 +570,9 @@ export class ProjectionRouter<
 
         await this.processFoldProjectionBatch(projectionName, fold, events, {
           tenantId: events[0]!.tenantId,
+          ...(context.deliveryAttempt !== undefined
+            ? { deliveryAttempt: context.deliveryAttempt }
+            : {}),
         });
       },
     );
@@ -670,23 +682,31 @@ export class ProjectionRouter<
                 this.mapExecutor.executeBatch(mapProj, toApply, contexts),
               onComplete: (ms) => {
                 for (const _event of toApply) {
-                  incrementEsMapProjectionTotal(
-                    this.pipelineName,
-                    name,
-                    "completed",
-                  );
+                  incrementEsMapProjectionTotal({
+                    pipelineName: this.pipelineName,
+                    projectionName: name,
+                    status: "completed",
+                  });
                 }
-                observeEsMapProjectionDuration(this.pipelineName, name, ms);
+                observeEsMapProjectionDuration({
+                  pipelineName: this.pipelineName,
+                  projectionName: name,
+                  durationMs: ms,
+                });
               },
               onFail: (ms) => {
                 for (const _event of toApply) {
-                  incrementEsMapProjectionTotal(
-                    this.pipelineName,
-                    name,
-                    "failed",
-                  );
+                  incrementEsMapProjectionTotal({
+                    pipelineName: this.pipelineName,
+                    projectionName: name,
+                    status: "failed",
+                  });
                 }
-                observeEsMapProjectionDuration(this.pipelineName, name, ms);
+                observeEsMapProjectionDuration({
+                  pipelineName: this.pipelineName,
+                  projectionName: name,
+                  durationMs: ms,
+                });
               },
             });
 
@@ -818,7 +838,7 @@ export class ProjectionRouter<
         // Default state projections are independent operational read models.
         if (this.stateProjections.size > 0) {
           try {
-            await this.dispatchToStateProjections(events);
+            await this.dispatchToStateProjections(events, context);
           } catch (e) {
             if (e instanceof AggregateError) {
               errors.push(...(e.errors as Error[]));
@@ -948,6 +968,7 @@ export class ProjectionRouter<
 
   private async dispatchToStateProjections(
     events: readonly EventType[],
+    context: EventStoreReadContext<EventType>,
   ): Promise<void> {
     const queued = this.queueManager.hasStateProjectionQueues();
     const errors: Error[] = [];
@@ -971,7 +992,12 @@ export class ProjectionRouter<
         }
 
         for (const event of matching) {
-          await this.processStateProjectionEvents(name, projection, [event]);
+          await this.processStateProjectionEvents(
+            name,
+            projection,
+            [event],
+            context,
+          );
         }
       } catch (error) {
         this.logger.error(
@@ -1271,6 +1297,7 @@ export class ProjectionRouter<
     projectionName: string,
     projection: StateProjectionDefinition<any, EventType>,
     events: EventType[],
+    context: EventStoreReadContext<EventType>,
   ): Promise<void> {
     if (events.length === 0) return;
     const first = events[0]!;
