@@ -9,6 +9,8 @@ const logger = createLogger("langwatch:topic-clustering:seed");
 /** One claim per window across replicas; the seed is idempotent regardless. */
 const SEED_CLAIM_KEY = "topic-clustering:topics-seed:v1";
 const SEED_CLAIM_TTL_SECONDS = 24 * 60 * 60;
+/** Permanent once a pass finds nothing left to seed: later boots exit on one GET. */
+const SEED_DONE_KEY = "topic-clustering:topics-seed:v1:done";
 
 const PAGE_SIZE = 200;
 
@@ -87,12 +89,14 @@ export async function seedProjectTopicModel(deps: {
 export async function seedTopicModelHistory(
   deps: SeedTopicModelDeps,
 ): Promise<{ seeded: number; skipped: number }> {
+  if (await isSeedDone(deps.redis)) return { seeded: 0, skipped: 0 };
   if (!(await claimSeed(deps.redis))) {
     return { seeded: 0, skipped: 0 };
   }
 
   let seeded = 0;
   let skipped = 0;
+  let failed = 0;
   let cursor: string | null = null;
 
   for (;;) {
@@ -107,7 +111,23 @@ export async function seedTopicModelHistory(
     if (page.length === 0) break;
     cursor = page[page.length - 1]!.projectId;
 
+    // One ownership query per page instead of one per project: projects that
+    // signed up after the cutover always carry a cursor row (the projection
+    // writes it with their first topics), so they cost nothing here.
+    const owned = new Set(
+      (
+        await deps.prisma.topicModelProjection.findMany({
+          where: { projectId: { in: page.map((p) => p.projectId) } },
+          select: { projectId: true },
+        })
+      ).map((row) => row.projectId),
+    );
+
     for (const { projectId } of page) {
+      if (owned.has(projectId)) {
+        skipped++;
+        continue;
+      }
       try {
         const result = await seedProjectTopicModel({
           prisma: deps.prisma,
@@ -117,6 +137,7 @@ export async function seedTopicModelHistory(
         if (result === "seeded") seeded++;
         else skipped++;
       } catch (error) {
+        failed++;
         // Per-project isolation: one bad project must not truncate the
         // fleet. The next boot retries it (its cursor row never appeared).
         logger.error(
@@ -130,8 +151,34 @@ export async function seedTopicModelHistory(
     }
   }
 
-  logger.info({ seeded, skipped }, "Topic model seed pass finished");
+  // Nothing seeded and nothing failed means every legacy project is owned
+  // (or there never were any — fresh installs land here on first boot).
+  // Mark the migration finished so signups after the cutover never pay for
+  // a scan again; without Redis the scan itself is the (cheap) fallback.
+  if (seeded === 0 && failed === 0) {
+    await markSeedDone(deps.redis);
+  }
+
+  logger.info({ seeded, skipped, failed }, "Topic model seed pass finished");
   return { seeded, skipped };
+}
+
+async function isSeedDone(redis: Redis | Cluster | null): Promise<boolean> {
+  if (!redis) return false;
+  try {
+    return (await redis.get(SEED_DONE_KEY)) !== null;
+  } catch {
+    return false;
+  }
+}
+
+async function markSeedDone(redis: Redis | Cluster | null): Promise<void> {
+  if (!redis) return;
+  try {
+    await redis.set(SEED_DONE_KEY, String(Date.now()));
+  } catch {
+    // Best-effort: the next pass just re-derives the same answer.
+  }
 }
 
 async function claimSeed(redis: Redis | Cluster | null): Promise<boolean> {
