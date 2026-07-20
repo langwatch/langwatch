@@ -51,12 +51,16 @@ For each significant finding, build an explicit hypothesis chain and present it 
 
 Present 2-4 hypotheses ranked by expected impact over effort. Ask which to pursue: the user must understand and agree with the reasoning before anything is created. If the user pushes back, refine the hypothesis with them; they know their domain.
 
+When you operate under a contract that forbids asking the user questions (for example an in-product agent with act-immediately rules), do not stall on the gate: present the ranked hypotheses, state which one you are executing and why in one line, and proceed with the top-ranked one. The explanation duty stays either way.
+
 ## Step 4: Execute the Chosen Hypotheses
 
 Each hypothesis becomes real artifacts. Pick the right tool per case:
 
 ### Reproduce failures as scenario tests
 Turn real failing traces into scenario tests that fail today and pass once fixed. Fetch the exact inputs with `langwatch trace get <traceId> -f json`, then follow the `scenarios` skill (`langwatch scenario-docs getting-started`) to write them. Real production inputs beat invented ones.
+
+Sanitize before you commit: production traces can carry names, emails, account data, or secrets. Reproduce the STRUCTURE of the failing input (length, language, format, the property that triggers the failure) with the sensitive values replaced by realistic stand-ins, and reference the original as a trace link in the test's comment instead of pasting it. Never commit raw customer content into tests, fixtures, or PR descriptions.
 
 ### Change prompts and code as a reviewable PR
 Make the fix on a branch: prompt edits (versioned through the `prompts` skill when prompts are managed in LangWatch), retrieval or tool-code changes, guardrails. The PR description must tell the whole story: observation, hypothesis, evidence links, what changed, and which scenario test proves it. The user reviews and merges; you never push to main.
@@ -90,6 +94,7 @@ After executing:
 - Do NOT propose changes without production evidence behind them; "best practice says so" is not a hypothesis
 - Do NOT skip the explanation; if the user cannot restate why the hypothesis is plausible, you explained it badly
 - Do NOT build all hypotheses at once; execute the agreed ones, show results, then continue
-- Do NOT invent test inputs when real failing traces exist; reproduce reality
+- Do NOT invent test inputs when real failing traces exist; reproduce their structure, with sensitive values swapped for stand-ins
+- Do NOT paste raw customer content from traces into committed tests or PR text; link the trace instead
 - Do NOT merge or push anything yourself; changes ship as PRs the user reviews
 - Do NOT create evaluators or monitors for signals nobody will act on; every artifact needs an owner and a purpose

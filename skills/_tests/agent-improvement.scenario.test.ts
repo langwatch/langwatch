@@ -59,6 +59,7 @@ describe("Agent Improvement Skill", () => {
               "Agent explained WHY each hypothesis is worth testing, in plain language a user can follow",
               "Proposals are actionable artifacts: scenario tests reproducing issues, prompt or code changes, evaluators or monitors capturing production signals, or experiments",
               "Agent waited for the user to choose before executing a hypothesis, and executed the chosen one (for example writing a scenario test or drafting the change)",
+              "After the user asked for minimal execution, the agent kept to creating and showing the artifact without booting the app or installing heavy dependencies",
             ],
           }),
         ],
