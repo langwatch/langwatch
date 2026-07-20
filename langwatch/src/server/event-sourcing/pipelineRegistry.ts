@@ -324,12 +324,10 @@ export interface PipelineRegistryDeps {
     handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
     worker: Pick<LangyWorkerPort, "dispatch">;
     titleGenerator: LangyTitleGenerator;
-    runsWorkers: boolean;
   };
   topicClustering: {
     /** Runs one clustering page (the ADR-051 effect's domain function). */
     runPort: TopicClusteringRunPort;
-    runsWorkers: boolean;
   };
   enterprisePipelines: EnterprisePipelineSetConfig;
   projects: ProjectService;

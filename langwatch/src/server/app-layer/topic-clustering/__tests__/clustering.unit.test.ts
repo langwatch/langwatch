@@ -192,6 +192,66 @@ describe("clusterTopicsForProject", () => {
     });
   });
 
+  describe("when topics were just created by the run's previous page", () => {
+    // Regression: page 1 of a batch run writes topics with createdAt = now.
+    // Page 2 re-enters clusterTopicsForProject and recomputes the cadence
+    // gate from those fresh topics; if the gate fired, every batch backlog
+    // larger than one page ended after page one with a recently_clustered
+    // skip and no cursor. The gate throttles run STARTS only — a
+    // continuation page (searchAfter present) must go through.
+    const freshTopics = [
+      { id: "topic-1", parentId: null, createdAt: new Date() },
+    ];
+
+    it("skips a NEW run as recently clustered", async () => {
+      vi.mocked(prisma.project.findUnique).mockResolvedValue(
+        makeProject() as any,
+      );
+      vi.mocked(prisma.topic.findMany).mockResolvedValue(freshTopics as any);
+      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+        query: mockClickHouseQuery,
+      } as any);
+
+      // Counts: topics exist but < 1200 assigned, so still batch mode.
+      mockClickHouseQuery.mockResolvedValueOnce({
+        json: () =>
+          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
+      });
+
+      const outcome = await clusterTopicsForProject("proj-1");
+
+      expect(outcome.skippedReason).toBe("recently_clustered");
+      expect(mockClickHouseQuery).toHaveBeenCalledTimes(1); // counts only
+    });
+
+    it("lets a continuation page through instead of ending the walk", async () => {
+      vi.mocked(prisma.project.findUnique).mockResolvedValue(
+        makeProject() as any,
+      );
+      vi.mocked(prisma.topic.findMany).mockResolvedValue(freshTopics as any);
+      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+        query: mockClickHouseQuery,
+      } as any);
+
+      mockClickHouseQuery.mockResolvedValueOnce({
+        json: () =>
+          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
+      });
+      // The fetch runs (the gate did not fire) and returns nothing further.
+      mockClickHouseQuery.mockResolvedValueOnce({
+        json: () => Promise.resolve([]),
+      });
+
+      const outcome = await clusterTopicsForProject("proj-1", [
+        1700000000000,
+        "trace-xyz",
+      ]);
+
+      expect(outcome.skippedReason).not.toBe("recently_clustered");
+      expect(mockClickHouseQuery).toHaveBeenCalledTimes(2); // counts + search
+    });
+  });
+
   describe("when CH search uses pagination (search_after)", () => {
     it("passes cursor params to CH query", async () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(

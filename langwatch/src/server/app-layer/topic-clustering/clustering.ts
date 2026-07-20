@@ -156,9 +156,17 @@ export const clusterTopicsForProject = async (
     return topic.createdAt > acc ? topic.createdAt : acc;
   }, new Date(0));
 
+  // The cadence gate throttles run STARTS only, so a continuation page
+  // (searchAfter present) never re-takes it. Page 1 of a batch run writes
+  // topics whose createdAt is "now"; if page 2 re-evaluated the gate it
+  // would always read those fresh topics as "recently clustered" and end
+  // the walk with a skip and no cursor — any batch backlog larger than one
+  // page silently stopped after page one. The run was approved when its
+  // first page passed the gate; later pages are the same run.
   const daysFrequency =
     assignedTracesCount < 100 ? 7 : assignedTracesCount < 500 ? 3 : 2;
   if (
+    !searchAfter &&
     !isIncrementalProcessing &&
     lastTopicCreatedAt >
       new Date(Date.now() - daysFrequency * 24 * 60 * 60 * 1000)
@@ -560,8 +568,10 @@ function extractInputFromComputed(computedInput: string | null): string {
 const getProjectTopicClusteringModelProvider = async (project: Project) => {
   // Resolve the analytics.topic_clustering_llm feature at the project's
   // cascade. Throws ModelNotConfiguredError when nothing is set at any
-  // scope; the topic-clustering pipeline catches and skips clustering
-  // for the run while logging the gap.
+  // scope; nothing here catches it — it propagates to the intent handler,
+  // retries through the outbox, and the run records run_failed with the
+  // user-actionable model_not_configured code (surfaced as guidance on
+  // the settings page).
   const resolved = await resolveModelForFeature(
     "analytics.topic_clustering_llm",
     { prisma, projectId: project.id },
@@ -584,7 +594,7 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
   if (!modelProvider.enabled) {
     logger.info(
       { provider },
-      "topic cluste ring model provider is not enabled, skipping topic clustering",
+      "topic clustering model provider is not enabled, skipping topic clustering",
     );
     return;
   }
@@ -740,7 +750,7 @@ export const storeResults = async (
     {
       topicsLength: topics.length,
       subtopicsLength: subtopics.length,
-      tracesToAssignLength: Object.keys(tracesToAssign).length,
+      tracesToAssignLength: tracesToAssign.length,
       projectId,
     },
     "found new topics, subtopics and traces to assign for project",
@@ -849,8 +859,8 @@ export const storeResults = async (
         currency: cost.currency,
         extraInfo: {
           traces_count: tracesToAssign.length,
-          topics_count: Object.keys(topics).length,
-          subtopics_count: Object.keys(subtopics).length,
+          topics_count: topics.length,
+          subtopics_count: subtopics.length,
           is_incremental: isIncremental,
         },
       },
