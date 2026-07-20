@@ -2679,6 +2679,16 @@ export function buildTopDocumentsQuery(
     ]),
   );
 
+  // Prune the stored_spans JOIN to the identity columns plus SpanAttributes
+  // (all the ARRAY JOIN and rag.contexts filter need), and push the StartTime
+  // window into the subquery, instead of joining the full analytics column set
+  // and materialising the heavy Attributes map (#2551 / #2605 pattern).
+  const spanJoin = buildJoinClause({
+    table: "stored_spans",
+    requiredColumns: new Set(["SpanAttributes"]),
+    spanTimeFilter: SPAN_TIME_FILTER_START_END,
+  });
+
   const sql = `
     WITH document_refs AS (
       SELECT
@@ -2686,13 +2696,11 @@ export function buildTopDocumentsQuery(
         toString(context.document_id) AS document_id,
         toString(context.content) AS content
       FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_START_END)}
-      JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
+      ${spanJoin}
       ARRAY JOIN JSONExtract(${ss}.SpanAttributes['langwatch.rag.contexts'], 'Array(JSON)') AS context
       WHERE ${ts}.TenantId = {tenantId:String}
         AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
         AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
-        AND ${ss}.StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY
-        AND ${ss}.StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY
         AND ${ss}.SpanAttributes['langwatch.rag.contexts'] != ''
         ${filterWhere}
     )
@@ -2711,13 +2719,11 @@ export function buildTopDocumentsQuery(
   const totalSql = `
     SELECT uniq(toString(context.document_id)) AS total
     FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_START_END)}
-    JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
+    ${spanJoin}
     ARRAY JOIN JSONExtract(${ss}.SpanAttributes['langwatch.rag.contexts'], 'Array(JSON)') AS context
     WHERE ${ts}.TenantId = {tenantId:String}
       AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
       AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
-      AND ${ss}.StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY
-      AND ${ss}.StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY
       AND ${ss}.SpanAttributes['langwatch.rag.contexts'] != ''
       ${filterWhere}
   `;
@@ -2775,6 +2781,19 @@ export function buildFeedbacksQuery(
     ]),
   );
 
+  // Prune the stored_spans JOIN to identity columns plus the Events.* arrays
+  // the feedback ARRAY JOIN reads, and push the StartTime window into the
+  // subquery, instead of joining the full analytics column set (#2551 / #2605).
+  const spanJoin = buildJoinClause({
+    table: "stored_spans",
+    requiredColumns: new Set([
+      '"Events.Timestamp"',
+      '"Events.Name"',
+      '"Events.Attributes"',
+    ]),
+    spanTimeFilter: SPAN_TIME_FILTER_START_END,
+  });
+
   const sql = `
     SELECT
       ${ts}.TraceId AS trace_id,
@@ -2783,7 +2802,7 @@ export function buildFeedbacksQuery(
       event_name AS event_type,
       event_attrs AS attributes
     FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_START_END)}
-    JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
+    ${spanJoin}
     ARRAY JOIN
       ${ss}."Events.Timestamp" AS event_timestamp,
       ${ss}."Events.Name" AS event_name,
@@ -2791,8 +2810,6 @@ export function buildFeedbacksQuery(
     WHERE ${ts}.TenantId = {tenantId:String}
       AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
       AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
-      AND ${ss}.StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY
-      AND ${ss}.StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY
       AND event_name = 'thumbs_up_down'
       AND mapContains(event_attrs, 'event.metrics.vote')
       ${filterWhere}
