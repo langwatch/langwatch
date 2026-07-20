@@ -62,34 +62,41 @@ void (async () => {
   await page.waitForTimeout(1500);
   await shoot(page, "01-traces-list");
 
+  // Data-aware waits everywhere: every terminal/session shot waits for
+  // rendered CONTENT (the banner name, a prompt row, or the contentless
+  // note), never a fixed sleep — a fixed sleep screenshots the loading
+  // skeleton on cold caches, which is exactly what happened once.
+  const TERMINAL_READY =
+    "text=/❯|reported tokens|Claude Code v|Gemini CLI v|opencode v|Codex v|Copilot v/";
+  const SESSION_READY = "text=/model calls|step \\d/";
+
   await page.goto(
     `${BASE_URL}/${PROJECT}/traces/${OUTER_TRACE}?drawer.mode=terminal`,
   );
-  await page.waitForTimeout(6000);
+  await page.waitForSelector(TERMINAL_READY, { timeout: 60_000 });
+  await page.waitForTimeout(1500);
   await shoot(page, "02-outer-terminal");
 
   await page.goto(
     `${BASE_URL}/${PROJECT}/traces/${OUTER_TRACE}?drawer.mode=session`,
   );
-  await page.waitForTimeout(6000);
+  await page.waitForSelector(SESSION_READY, { timeout: 60_000 });
+  await page.waitForTimeout(1500);
   await shoot(page, "03-outer-session");
 
   // The child claude session proves sub-sessions record independently.
   await page.goto(
     `${BASE_URL}/${PROJECT}/traces/${CHILD_TRACE}?drawer.mode=session`,
   );
-  await page.waitForTimeout(6000);
+  await page.waitForSelector(SESSION_READY, { timeout: 60_000 });
+  await page.waitForTimeout(1500);
   await shoot(page, "04-child-session");
 
   for (const [name, traceId] of AGENT_TRACES) {
     await page.goto(
       `${BASE_URL}/${PROJECT}/traces/${traceId}?drawer.mode=terminal`,
     );
-    // Data-aware wait: the step counter renders only once the transcript
-    // arrived; a fixed sleep screenshots the loading skeleton on cold caches.
-    await page
-      .waitForSelector("text=/step \\d/", { timeout: 30_000 })
-      .catch(() => undefined);
+    await page.waitForSelector(TERMINAL_READY, { timeout: 60_000 });
     await page.waitForTimeout(1500);
     await shoot(page, name);
   }

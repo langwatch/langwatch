@@ -415,42 +415,143 @@ function JumpToBottomPill({ onClick }: { onClick: () => void }) {
   );
 }
 
+/** One same-colored run of a mark row. */
+interface MarkSegment {
+  text: string;
+  color: string;
+}
+
+interface MarkSpec {
+  rows: MarkSegment[][];
+  /** Overrides the terminal cell size — the codex knot needs tiny cells. */
+  fontSize?: string;
+}
+
+function flatMark(rows: readonly string[], color: string): MarkSpec {
+  return { rows: rows.map((row) => [{ text: row, color }]) };
+}
+
+/** Per-character-column colors — how gemini's chevron shades left to right. */
+function columnColoredMark(
+  rows: readonly string[],
+  columnColors: readonly string[],
+): MarkSpec {
+  return {
+    rows: rows.map((row) =>
+      [...row].map((char, column) => ({
+        text: char,
+        color:
+          columnColors[column] ?? columnColors[columnColors.length - 1] ?? "",
+      })),
+    ),
+  };
+}
+
+/** Split each row at one column — how opencode two-tones its wordmark. */
+function splitMark(
+  rows: readonly string[],
+  splitColumn: number,
+  leftColor: string,
+  rightColor: string,
+): MarkSpec {
+  return {
+    rows: rows.map((row) => [
+      { text: row.slice(0, splitColumn), color: leftColor },
+      { text: row.slice(splitColumn), color: rightColor },
+    ]),
+  };
+}
+
+function claudeGradientMark(rows: readonly string[]): MarkSpec {
+  return {
+    rows: rows.map((row) =>
+      [...row].map((char, index) => ({
+        text: char,
+        color: gradientColorAt(index, row.length),
+      })),
+    ),
+  };
+}
+
 /**
- * The name each agent prints for itself, and the mark drawn next to it. The
- * mark is block art in the agent's own visual language: claude's mark keeps
- * its shaded gradient; every other agent gets a flat tint; an agent we can't
- * identify gets a monochrome, armless cousin of the claude creature rather
- * than wearing another agent's badge.
+ * Gemini CLI's chevron, glyphs and colors captured from the real banner
+ * (tmux capture-pane -e of `gemini` v0.51): a five-column gradient from
+ * blue to pink, colored by COLUMN, not by row.
+ */
+const GEMINI_MARK = columnColoredMark(
+  ["▝▜▄  ", "  ▝▜▄", " ▗▟▀ ", "▝▀   "],
+  ["#4796E4", "#6688D9", "#847ACE", "#A471A7", "#C3677F"],
+);
+
+/**
+ * opencode's block wordmark, captured from the real TUI: "open" in gray,
+ * "code" in near-white (the accent over the d is white too). Letters are
+ * five columns each, so the tone splits at column 20.
+ */
+const OPENCODE_MARK = splitMark(
+  [
+    "                                 ▄",
+    "█▀▀█ █▀▀█ █▀▀█ █▀▀▄ █▀▀▀ █▀▀█ █▀▀█ █▀▀█",
+    "█  █ █  █ █▀▀▀ █  █ █    █  █ █  █ █▀▀▀",
+    "▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀",
+  ],
+  20,
+  "#808080",
+  "#EEEEEE",
+);
+
+/** The OpenAI knot, drawn in blocks; tiny cells keep it banner-sized. */
+const CODEX_MARK: MarkSpec = {
+  ...flatMark(
+    [
+      "             ████████",
+      "          ███████████████████",
+      "        █████████████████████████",
+      "        ██████████████████████████",
+      "     ███████████████████████████████",
+      "   █████████████████████████████████",
+      " ████████████████████████████████████",
+      "█████████   ████████████████████████",
+      "██████████   ████████████████████████",
+      "███████████   ████████████████████████",
+      "████████████   ████████████████████████",
+      " ██████████   █████████████████████████",
+      "  ████████   ██████████████████████████",
+      "   ██████   ███████           █████████",
+      "  ████████████████████████████████████",
+      "   █████████████████████████████████",
+      "   ███████████████████████████████",
+      "    ███████████████████████████",
+      "      █████████████████████████",
+      "          ███████████████████",
+    ],
+    TERMINAL_TOKENS.screenFg,
+  ),
+  fontSize: "4px",
+};
+
+/**
+ * The name each agent prints for itself, and the mark drawn next to it —
+ * each agent's REAL startup art, reproduced glyph-for-glyph (and, for
+ * gemini and opencode, color-for-color) from a live session. An agent we
+ * can't identify gets a monochrome, armless cousin of the claude creature
+ * rather than wearing another agent's badge.
  */
 const AGENT_BANNERS: Record<
   SessionBanner["agent"],
-  { name: string; rows: readonly string[]; color: string | null }
+  { name: string; mark: MarkSpec }
 > = {
-  claude_code: { name: "Claude Code", rows: MARK_ROWS, color: null },
-  opencode: {
-    name: "opencode",
-    rows: ["▛▀▀▀▀▜", "▌ ▐█ ▐", "▙▄▄▄▄▟"],
-    color: TERMINAL_TOKENS.green,
-  },
-  codex: {
-    name: "Codex",
-    rows: [" ▗▛▀▜▖", " ▐▙▄▟▌", "  ▝▀▘ "],
-    color: TERMINAL_TOKENS.screenFg,
-  },
-  gemini_cli: {
-    name: "Gemini CLI",
-    rows: ["  ▟▙  ", " ▟██▙ ", "  ▜▛  "],
-    color: TERMINAL_TOKENS.blue,
-  },
+  claude_code: { name: "Claude Code", mark: claudeGradientMark(MARK_ROWS) },
+  opencode: { name: "opencode", mark: OPENCODE_MARK },
+  codex: { name: "Codex", mark: CODEX_MARK },
+  gemini_cli: { name: "Gemini CLI", mark: GEMINI_MARK },
   copilot: {
     name: "GitHub Copilot",
-    rows: ["▗▛▀▀▀▜▖", "▐ ▐▌▐▌▌", "▝▙▄▄▄▟▘"],
-    color: TERMINAL_TOKENS.blue,
+    mark: flatMark(["▗▛▀▀▀▜▖", "▐ ▐▌▐▌▌", "▝▙▄▄▄▟▘"], TERMINAL_TOKENS.blue),
   },
   unknown: {
     name: "Coding agent",
-    rows: [" ▐▛███▜▌", " ▜█████▛ ", "  ▘▘ ▝▝ "],
-    color: TERMINAL_TOKENS.faint,
+    mark: flatMark(["▛███▜", "█████", "▘▘ ▝▝"], TERMINAL_TOKENS.faint),
   },
 };
 
@@ -461,7 +562,7 @@ function TerminalBanner({ banner }: { banner?: SessionBanner }) {
   const identity = AGENT_BANNERS[banner.agent];
   return (
     <HStack align="center" gap={3} paddingBottom={2}>
-      <AgentMark rows={identity.rows} color={identity.color} />
+      <AgentMark mark={identity.mark} />
       <VStack align="stretch" gap={0} minWidth={0}>
         <Text {...CELL} color={TERMINAL_TOKENS.screenFg} fontWeight="semibold">
           {banner.version
@@ -483,17 +584,8 @@ function TerminalBanner({ banner }: { banner?: SessionBanner }) {
   );
 }
 
-/**
- * The startup mark. A `color` draws it flat in that tint; without one it is
- * shaded left-to-right with the claude gradient.
- */
-function AgentMark({
-  rows,
-  color,
-}: {
-  rows: readonly string[];
-  color: string | null;
-}) {
+/** The startup mark, drawn from its precomputed per-row color segments. */
+function AgentMark({ mark }: { mark: MarkSpec }) {
   return (
     <VStack
       align="flex-start"
@@ -502,15 +594,18 @@ function AgentMark({
       aria-hidden
       userSelect="none"
     >
-      {rows.map((row, rowIndex) => (
-        <Text key={rowIndex} {...CELL} lineHeight="1.15" whiteSpace="pre">
-          {[...row].map((char, charIndex) => (
-            <Fragment key={charIndex}>
-              <Text
-                as="span"
-                color={color ?? gradientColorAt(charIndex, row.length)}
-              >
-                {char}
+      {mark.rows.map((segments, rowIndex) => (
+        <Text
+          key={rowIndex}
+          {...CELL}
+          fontSize={mark.fontSize ?? CELL.fontSize}
+          lineHeight="1.15"
+          whiteSpace="pre"
+        >
+          {segments.map((segment, segmentIndex) => (
+            <Fragment key={segmentIndex}>
+              <Text as="span" color={segment.color}>
+                {segment.text}
               </Text>
             </Fragment>
           ))}
