@@ -1327,6 +1327,16 @@ Rule: AI query composer (Ask AI)
     When the user edits the prompt text
     Then the error row swaps back to the rotating tip
 
+  Scenario: The floating error row can be dismissed
+    Given the floating bar shows an error pill
+    When the user clicks the pill's dismiss button
+    Then the error clears, matching the docked banner's dismiss
+
+  Scenario: The floating error strip never blocks the UI underneath
+    Given the floating bar shows an error pill
+    Then only the pill itself takes pointer events
+    And the rest of the strip's width stays click-transparent
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CHIP LABELS WITH HOVER-TO-ID

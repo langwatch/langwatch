@@ -119,12 +119,17 @@ export const IntegratePane: React.FC = () => {
               saw it before scrolling through the integration content. */}
           <HStack justify="space-between" align="flex-start" gap={4}>
             <VStack align="stretch" gap={1.5} flex={1} minWidth={0}>
-              <Text textStyle="2xl" fontWeight="600" color="fg" letterSpacing="-0.015em">
+              <Text
+                textStyle="2xl"
+                fontWeight="600"
+                color="fg"
+                letterSpacing="-0.015em"
+              >
                 Instrument your agents in seconds
               </Text>
               <Text textStyle="sm" color="fg.muted" lineHeight="tall">
-                Mint a token, then pick how you want to send traces. Skills
-                and MCP take under a minute; the SDK takes a couple more.
+                Mint a token, then pick how you want to send traces. Skills and
+                MCP take under a minute; the SDK takes a couple more.
               </Text>
             </VStack>
             <Button
@@ -163,4 +168,3 @@ export const IntegratePane: React.FC = () => {
     </IntegratePaneShell>
   );
 };
-

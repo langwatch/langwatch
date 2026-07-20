@@ -116,6 +116,26 @@ describe("<FloatingAiBar /> error row", () => {
       expect(screen.getByText("404")).toBeInTheDocument();
       expect(screen.getByText("Provider")).toBeInTheDocument();
     });
+
+    it("dismisses on the close button like the docked banner", async () => {
+      const user = userEvent.setup();
+      renderWithProviderError();
+      await user.click(screen.getByRole("button", { name: /dismiss error/i }));
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(useFilterStore.getState().aiError).toBeNull();
+    });
+
+    it("keeps the strip outside the pill click-transparent", () => {
+      renderWithProviderError();
+      // The fixed strip spans the search bar's full width; only the error
+      // pill itself may take pointer events, or everything underneath the
+      // band becomes unclickable while an error shows.
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveStyle({ pointerEvents: "auto" });
+      const strip = alert.closest('[style*="position: fixed"]');
+      expect(strip).not.toBeNull();
+      expect((strip as HTMLElement).style.pointerEvents).toBe("none");
+    });
   });
 
   describe("given a validation error without details", () => {

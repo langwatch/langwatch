@@ -1,8 +1,9 @@
 import { Box, chakra, HStack, Icon, Link, Text } from "@chakra-ui/react";
-import { AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronUp, X } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
+import { useFilterStore } from "../../stores/filterStore";
 import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
 
 /**
@@ -23,6 +24,7 @@ export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const expandable = hasAiErrorDetails(error);
+  const setAiError = useFilterStore((s) => s.setAiError);
 
   return (
     <Box
@@ -35,6 +37,9 @@ export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({
       paddingY={1}
       boxShadow="0 2px 6px rgba(0,0,0,0.1)"
       maxWidth="full"
+      // The parent floating strip is click-transparent (it spans the whole
+      // search-bar width); only this pill takes pointer events.
+      pointerEvents="auto"
     >
       <HStack gap={1.5} align="center">
         <Icon color="red.fg" boxSize="11px" flexShrink={0}>
@@ -69,6 +74,19 @@ export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({
             </Icon>
           </chakra.button>
         )}
+        <chakra.button
+          aria-label="Dismiss error"
+          onClick={() => setAiError(null)}
+          cursor="pointer"
+          display="inline-flex"
+          alignItems="center"
+          color="fg.muted"
+          flexShrink={0}
+        >
+          <Icon boxSize="11px">
+            <X />
+          </Icon>
+        </chakra.button>
       </HStack>
       {expanded && (
         <Box paddingTop={1} paddingLeft={4}>

@@ -1,7 +1,7 @@
 import { chakra, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { ArrowDown, ArrowUp, Bot, User, Wrench } from "lucide-react";
-import { Fragment, type ReactNode, useLayoutEffect, useRef } from "react";
 import type React from "react";
+import { Fragment, type ReactNode, useLayoutEffect, useRef } from "react";
 import { useDensityTokens } from "../../hooks/useDensityTokens";
 import { useDensityStore } from "../../stores/densityStore";
 import { formatPreview } from "../../utils/previewFormatter";
@@ -308,7 +308,9 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
         label="Input"
         labelColor={{ base: "blue.500", _dark: "blue.fg" }}
         textColor="fg.muted"
-        text={formatPreview(input, { maxChars: 200, newlines: "preserve" }).text}
+        text={
+          formatPreview(input, { maxChars: 200, newlines: "preserve" }).text
+        }
       />
     )}
     {output !== null && (
@@ -316,7 +318,9 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
         label="Output"
         labelColor={{ base: "green.solid", _dark: "green.fg" }}
         textColor="fg"
-        text={formatPreview(output, { maxChars: 200, newlines: "preserve" }).text}
+        text={
+          formatPreview(output, { maxChars: 200, newlines: "preserve" }).text
+        }
       />
     )}
   </VStack>

@@ -51,7 +51,6 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
   // The floating bar covers the docked search bar's unified error banner,
   // so failures must render here — the tip row swaps to an error row.
   const aiError = useFilterStore((s) => s.aiError);
-  const shouldShowError = !!aiError && !pending;
   if (typeof document === "undefined" || !rect) return null;
   return createPortal(
     <>
@@ -106,9 +105,11 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
           left: `${rect.left}px`,
           width: `${rect.width}px`,
           zIndex: 31,
-          // The tip row is decorative; the error row carries a settings
-          // link and a details expander that must stay clickable.
-          pointerEvents: shouldShowError ? "auto" : "none",
+          // The strip spans the whole search-bar width; keep it
+          // click-transparent so it never blocks the UI underneath. The
+          // error row (settings link, details expander, dismiss) opts its
+          // own box back in with pointerEvents="auto".
+          pointerEvents: "none",
         }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

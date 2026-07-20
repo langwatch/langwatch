@@ -12,6 +12,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Markdown } from "~/components/Markdown";
 import { RedactedInline } from "~/components/ui/RedactedField";
 import type { RouterOutputs } from "~/utils/api";
+import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
 import { useTextTranslation } from "../../../hooks/useTextTranslation";
 import type { TraceListItem } from "../../../types/trace";
 import {
@@ -78,10 +79,15 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
 
   // Per-turn translate-to-English (specs/traces-v2/message-translation
   // .feature): the separator's action row toggles it, and both bubbles
-  // swap between original and translated text.
+  // swap between original and translated text. Sliced to the translate
+  // endpoint's payload cap so a pathological turn can't become one
+  // giant prompt.
   const translation = useTextTranslation({
     texts: useMemo(
-      () => ({ user: originalUserText, assistant: originalAssistantText }),
+      () => ({
+        user: originalUserText.slice(0, TRANSLATE_TEXT_MAX_CHARS),
+        assistant: originalAssistantText.slice(0, TRANSLATE_TEXT_MAX_CHARS),
+      }),
       [originalUserText, originalAssistantText],
     ),
   });

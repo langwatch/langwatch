@@ -173,6 +173,90 @@ export function coerceToChatMessages(data: unknown): ChatMessage[] | null {
 }
 
 /**
+ * Translatable text leaves of a chat conversation: per-message plain prose
+ * and `{type:"text"}` part texts — exactly the pieces the chat renderer
+ * displays as natural language. Roles, tool calls, thinking blocks and
+ * structured payloads are left alone; translating those would corrupt the
+ * transcript (and its chat coercion). Keys are `${msgIdx}` for string
+ * content and `${msgIdx}.${partIdx}` for array parts, consumed by
+ * `applyChatTextLeaves`.
+ */
+export function collectChatTextLeaves(
+  messages: ChatMessage[],
+): Record<string, string> {
+  const leaves: Record<string, string> = {};
+  messages.forEach((message, msgIdx) => {
+    const content = message.content;
+    if (typeof content === "string") {
+      // Only string content the renderer shows as plain prose — a string
+      // that parses into typed blocks (thinking/tool JSON) stays intact.
+      const blocks = parseContentBlocks(content);
+      if (blocks.length === 1 && blocks[0]!.kind === "text") {
+        leaves[`${msgIdx}`] = content;
+      }
+      return;
+    }
+    if (!Array.isArray(content)) return;
+    content.forEach((part, partIdx) => {
+      if (typeof part === "string") {
+        if (part.length > 0) leaves[`${msgIdx}.${partIdx}`] = part;
+        return;
+      }
+      if (!part || typeof part !== "object") return;
+      if (part.type === "text" && typeof part.text === "string") {
+        if (part.text.length > 0) {
+          leaves[`${msgIdx}.${partIdx}`] = part.text;
+        }
+      }
+    });
+  });
+  return leaves;
+}
+
+/**
+ * Rebuild the conversation with translated leaves spliced back into the
+ * positions `collectChatTextLeaves` took them from; everything else is
+ * carried over untouched, so the result coerces to chat exactly like the
+ * original.
+ */
+export function applyChatTextLeaves(
+  messages: ChatMessage[],
+  texts: Record<string, string>,
+): ChatMessage[] {
+  return messages.map((message, msgIdx) => {
+    if (typeof message.content === "string") {
+      const whole = texts[`${msgIdx}`];
+      return whole !== undefined && whole !== message.content
+        ? { ...message, content: whole }
+        : message;
+    }
+    if (!Array.isArray(message.content)) return message;
+    let changed = false;
+    const parts = message.content.map((part, partIdx) => {
+      const text = texts[`${msgIdx}.${partIdx}`];
+      if (text === undefined) return part;
+      if (typeof part === "string") {
+        if (text === part) return part;
+        changed = true;
+        return text;
+      }
+      if (
+        part &&
+        typeof part === "object" &&
+        part.type === "text" &&
+        typeof part.text === "string" &&
+        part.text !== text
+      ) {
+        changed = true;
+        return { ...part, text };
+      }
+      return part;
+    });
+    return changed ? { ...message, content: parts } : message;
+  });
+}
+
+/**
  * Find the position of the matching closing `}` for the JSON object that
  * starts at `start`. String-literal aware so escaped quotes don't fool it.
  */

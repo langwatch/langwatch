@@ -151,7 +151,12 @@ export function ThreadedTurnView({
             {summary}
           </Text>
         </HStack>
-        <Icon as={LuChevronDown} boxSize={3.5} color="fg.subtle" flexShrink={0} />
+        <Icon
+          as={LuChevronDown}
+          boxSize={3.5}
+          color="fg.subtle"
+          flexShrink={0}
+        />
       </chakra.button>
     </Box>
   );

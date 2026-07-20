@@ -44,17 +44,16 @@ const TIPS: Tip[] = [
   {
     body: (
       <>
-        Click <Kbd>AND</Kbd> or <Kbd>OR</Kbd> in the query to flip the
-        operator in place.
+        Click <Kbd>AND</Kbd> or <Kbd>OR</Kbd> in the query to flip the operator
+        in place.
       </>
     ),
   },
   {
     body: (
       <>
-        Hold <Kbd>⇧</Kbd> or <Kbd>Ctrl</Kbd>/<Kbd>⌘</Kbd> while clicking a
-        facet to combine it with <Kbd>OR</Kbd> instead of the default{" "}
-        <Kbd>AND</Kbd>.
+        Hold <Kbd>⇧</Kbd> or <Kbd>Ctrl</Kbd>/<Kbd>⌘</Kbd> while clicking a facet
+        to combine it with <Kbd>OR</Kbd> instead of the default <Kbd>AND</Kbd>.
       </>
     ),
   },
@@ -69,8 +68,8 @@ const TIPS: Tip[] = [
   {
     body: (
       <>
-        Press <Kbd>/</Kbd> from anywhere on the page to jump straight
-        into the search bar.
+        Press <Kbd>/</Kbd> from anywhere on the page to jump straight into the
+        search bar.
       </>
     ),
   },
@@ -120,12 +119,7 @@ export const SearchTipsPopover: React.FC = () => {
             </HStack>
             <VStack align="stretch" gap={2}>
               {TIPS.map((tip, i) => (
-                <Text
-                  key={i}
-                  textStyle="xs"
-                  color="fg.muted"
-                  lineHeight="1.55"
-                >
+                <Text key={i} textStyle="xs" color="fg.muted" lineHeight="1.55">
                   {tip.body}
                 </Text>
               ))}

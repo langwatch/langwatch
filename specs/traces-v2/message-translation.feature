@@ -33,6 +33,24 @@ Feature: Message translation in the trace details drawer
       When they toggle back to the original and translate again
       Then no second network request is made
 
+    Scenario: Chat-shaped content is translated per message
+      Given the Input panel shows a chat-shaped conversation
+      When the user clicks "Translate"
+      Then each message's prose is translated on its own
+      And roles, tool calls and structured payloads are left untouched
+      And the panel still renders as the same conversation
+
+    Scenario: Stepping to different content resets the translation
+      Given a panel is showing translated content
+      When the panel's content changes to another trace's
+      Then the new original content is shown
+      And the action reads "Translate" again
+
+    Scenario: A second click mid-translation does not start another request
+      Given a translation request is in flight for a panel
+      When the user clicks the action again before it finishes
+      Then no additional translation requests are made
+
   Rule: Conversation tab turns
 
     Scenario: Per-turn Translate action in the hover action row

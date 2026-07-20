@@ -34,7 +34,19 @@ export function useTextTranslation({
 }): UseTextTranslationResult {
   const { project } = useOrganizationTeamProject();
   const translateAPI = api.translate.translate.useMutation();
-  const [isActive, setIsActive] = useState(false);
+  // Active state is keyed to the source signature rather than a boolean:
+  // when the content changes under the same mounted hook (e.g. stepping
+  // to the next trace re-renders the same memoized viewer), a stale
+  // boolean would keep the button on "Show original" while the screen
+  // already shows the new original — the key comparison resets it
+  // automatically.
+  const [activeFor, setActiveFor] = useState<string | null>(null);
+  // react-query v4's shared MutationObserver only tracks the LAST
+  // `mutateAsync`, so `translateAPI.isLoading` under-reports when several
+  // per-text calls run concurrently — and without a guard a second click
+  // mid-flight would fire a duplicate set of billed LLM calls. Track the
+  // in-flight state locally instead.
+  const [inFlight, setInFlight] = useState(false);
   const [translations, setTranslations] = useState<Record<
     string,
     string
@@ -42,14 +54,16 @@ export function useTextTranslation({
   const cachedForRef = useRef<string | null>(null);
 
   const sourceKey = JSON.stringify(texts);
+  const isActive = activeFor === sourceKey;
 
   const toggle = useCallback(() => {
+    if (inFlight) return;
     if (isActive) {
-      setIsActive(false);
+      setActiveFor(null);
       return;
     }
     if (cachedForRef.current === sourceKey) {
-      setIsActive(true);
+      setActiveFor(sourceKey);
       return;
     }
     const entries = Object.entries(texts).filter(
@@ -57,6 +71,7 @@ export function useTextTranslation({
     );
     if (entries.length === 0 || !project?.id) return;
 
+    setInFlight(true);
     Promise.all(
       entries.map(([key, value]) =>
         translateAPI
@@ -66,8 +81,11 @@ export function useTextTranslation({
     )
       .then((pairs) => {
         setTranslations(Object.fromEntries(pairs));
+        // Key the cache and the active flag to the texts this request was
+        // made for — if the content changed while the request was in
+        // flight, the result is cached but not shown.
         cachedForRef.current = sourceKey;
-        setIsActive(true);
+        setActiveFor(sourceKey);
       })
       .catch((error: unknown) => {
         // The typed-error toasts (missing model / provider disabled /
@@ -83,8 +101,11 @@ export function useTextTranslation({
             meta: { closable: true },
           });
         }
+      })
+      .finally(() => {
+        setInFlight(false);
       });
-  }, [isActive, project?.id, sourceKey, texts, translateAPI]);
+  }, [inFlight, isActive, project?.id, sourceKey, texts, translateAPI]);
 
   // Only overlay translations that belong to the CURRENT source texts —
   // when the content changes while active, fall back to originals until
@@ -100,7 +121,7 @@ export function useTextTranslation({
   return {
     displayTexts,
     isActive,
-    isLoading: translateAPI.isLoading,
+    isLoading: inFlight,
     toggle,
   };
 }

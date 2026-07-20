@@ -18,6 +18,7 @@ import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDi
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
+import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useTextTranslation } from "../../hooks/useTextTranslation";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
@@ -25,11 +26,13 @@ import { IOViewerBody } from "./IOViewerBody";
 import { safePrettyJson } from "./JsonHighlight";
 import { SegmentedToggle } from "./SegmentedToggle";
 import {
+  applyChatTextLeaves,
   asMarkdownBody,
   type ChatLayout,
   type ChatMessage,
   type ConversationTurn,
   coerceToChatMessages,
+  collectChatTextLeaves,
   extractInlineBlocks,
   groupMessagesIntoTurns,
   parseContentBlocks,
@@ -284,11 +287,50 @@ export const IOViewer = memo(function IOViewer({
 }: IOViewerProps) {
   // Translate-to-English swaps the content feeding the whole viewer
   // pipeline, so every format (pretty/chat/json/markdown) renders the
-  // translated variant; Copy follows what's displayed.
+  // translated variant; Copy follows what's displayed. Chat-shaped
+  // payloads are translated per text leaf (message prose and text parts)
+  // and re-serialized, so the translated variant still parses and renders
+  // as the same conversation — translating the raw transcript JSON as one
+  // blob would come back as prose and collapse the chat view to a
+  // monospace dump. The translated view renders the conversation itself;
+  // envelope keys around it are structure, not language. Each leaf is
+  // capped at the display truncation bound so text the viewer never shows
+  // is not sent to the model.
+  const originalChatMessages = useMemo(
+    () => coerceToChatMessages(tryParseJSON(originalContent)),
+    [originalContent],
+  );
+  const chatLeaves = useMemo(() => {
+    if (!originalChatMessages) return null;
+    const leaves = collectChatTextLeaves(originalChatMessages);
+    return Object.keys(leaves).length > 0 ? leaves : null;
+  }, [originalChatMessages]);
   const translation = useTextTranslation({
-    texts: useMemo(() => ({ content: originalContent }), [originalContent]),
+    texts: useMemo(() => {
+      const source = chatLeaves ?? { content: originalContent };
+      return Object.fromEntries(
+        Object.entries(source).map(([key, value]) => [
+          key,
+          value.slice(0, TRANSLATE_TEXT_MAX_CHARS),
+        ]),
+      );
+    }, [chatLeaves, originalContent]),
   });
-  const content = translation.displayTexts.content ?? originalContent;
+  const content = useMemo(() => {
+    if (!translation.isActive) return originalContent;
+    if (originalChatMessages && chatLeaves) {
+      return JSON.stringify(
+        applyChatTextLeaves(originalChatMessages, translation.displayTexts),
+      );
+    }
+    return translation.displayTexts.content ?? originalContent;
+  }, [
+    translation.isActive,
+    translation.displayTexts,
+    originalChatMessages,
+    chatLeaves,
+    originalContent,
+  ]);
 
   const parsed = useMemo(() => tryParseJSON(content), [content]);
   // Coerce parsed into a chat message array — handles top-level arrays,

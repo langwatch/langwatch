@@ -57,8 +57,7 @@ export function EvalCard({
   const hasErrorMessage = !!eval_.errorMessage;
   const hasStacktrace =
     !!eval_.errorStacktrace && eval_.errorStacktrace.length > 0;
-  const hasListInputs =
-    !!eval_.inputs && Object.keys(eval_.inputs).length > 0;
+  const hasListInputs = !!eval_.inputs && Object.keys(eval_.inputs).length > 0;
   // Inputs load lazily per-card (see useEvalInputs): the verdict list drops
   // the heavy `Inputs` blob under ClickHouse memory pressure, and even when
   // it's present we don't ship it until a card is expanded. Evals that
@@ -371,11 +370,7 @@ function EvalCardFooter({
         >
           {hasLabel && (
             <DetailRow label="Label">
-              <Text
-                textStyle="xs"
-                color="fg"
-                fontWeight="medium"
-              >
+              <Text textStyle="xs" color="fg" fontWeight="medium">
                 {eval_.label}
                 {eval_.passed != null && (
                   <Text
@@ -415,11 +410,7 @@ function EvalCardFooter({
                     >
                       evaluation
                     </Text>
-                    <Text
-                      textStyle="2xs"
-                      color="fg"
-                      wordBreak="break-all"
-                    >
+                    <Text textStyle="2xs" color="fg" wordBreak="break-all">
                       {eval_.evaluationId}
                     </Text>
                   </HStack>
@@ -434,11 +425,7 @@ function EvalCardFooter({
                     >
                       evaluator
                     </Text>
-                    <Text
-                      textStyle="2xs"
-                      color="fg"
-                      wordBreak="break-all"
-                    >
+                    <Text textStyle="2xs" color="fg" wordBreak="break-all">
                       {eval_.evaluatorId}
                     </Text>
                   </HStack>
