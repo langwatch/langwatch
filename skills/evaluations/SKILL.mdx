@@ -23,10 +23,13 @@ Then hand off:
 
 1. If the correct companion skill is available, load it and follow it instead of continuing here.
 2. If `experiments` is missing, tell the user to install it with:
+
    ```bash
    npx skills@1.5.19 add langwatch/skills/experiments
    ```
+
 3. If `online-evaluations` is missing, tell the user to install it with:
+
    ```bash
    npx skills@1.5.19 add langwatch/skills/online-evaluations
    ```

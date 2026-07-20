@@ -10,13 +10,13 @@ export type OnlineEvaluationPerformance = {
 type PerformanceRow = {
   name: string;
   performance?: OnlineEvaluationPerformance;
-  performanceError?: boolean;
+  hasPerformanceError?: boolean;
 };
 
 export const PerformancePreview = ({ row }: { row: PerformanceRow }) => {
   const performance = row.performance;
 
-  if (row.performanceError) {
+  if (row.hasPerformanceError) {
     return (
       <Text textStyle="sm" color="fg.muted">
         Performance unavailable
@@ -103,6 +103,7 @@ const Sparkline = ({
   const min = finitePoints.length > 0 ? Math.min(...finitePoints) : 0;
   const max = finitePoints.length > 0 ? Math.max(...finitePoints) : 1;
   const range = max - min || 1;
+  const isFlat = finitePoints.length > 0 && max === min;
   const polyline = finitePoints
     .map((point, index) => {
       const x =
@@ -110,8 +111,9 @@ const Sparkline = ({
           ? width / 2
           : padding +
             (index / (finitePoints.length - 1)) * (width - padding * 2);
-      const y =
-        height - padding - ((point - min) / range) * (height - padding * 2);
+      const y = isFlat
+        ? height / 2
+        : height - padding - ((point - min) / range) * (height - padding * 2);
       return `${x},${y}`;
     })
     .join(" ");

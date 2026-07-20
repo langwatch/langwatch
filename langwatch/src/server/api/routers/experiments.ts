@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import {
   EvaluationExecutionMode,
@@ -19,7 +20,6 @@ import {
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
 import { getApp } from "../../app-layer/app";
-import { HandledError } from "@langwatch/handled-error";
 import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
 import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
@@ -515,18 +515,17 @@ export const experimentsRouter = createTRPCRouter({
       const allExperiments = await experimentService().listForEvaluationsBoard({
         projectId: input.projectId,
       });
-      const totalHits = allExperiments.filter(
+      const nonLegacyExperiments = allExperiments.filter(
         (experiment) =>
           !isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState),
-      ).length;
+      );
+      const totalHits = nonLegacyExperiments.length;
 
-      // Filter out real_time evaluations and apply pagination
-      const experiments = allExperiments
-        .filter(
-          (experiment) =>
-            !isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState),
-        )
-        .slice(pageOffset, pageOffset + pageSize);
+      // Apply pagination after excluding legacy online evaluations.
+      const experiments = nonLegacyExperiments.slice(
+        pageOffset,
+        pageOffset + pageSize,
+      );
 
       const getDatasetId = (dsl: JsonValue | undefined) => {
         return (

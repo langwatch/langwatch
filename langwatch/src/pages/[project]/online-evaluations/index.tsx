@@ -89,7 +89,7 @@ function OnlineEvaluationsPage() {
       enabled: monitor.enabled,
       executionMode: monitor.executionMode,
       performance: performanceByMonitor.get(monitor.id),
-      performanceError: performance.isError,
+      hasPerformanceError: performance.isError,
     })) ?? [];
 
   const toggleMonitor = api.monitors.toggle.useMutation({

@@ -37,7 +37,7 @@ export type OnlineEvaluationRow = {
   enabled: boolean;
   executionMode: string;
   performance?: OnlineEvaluationPerformance;
-  performanceError?: boolean;
+  hasPerformanceError?: boolean;
 };
 
 type OnlineEvaluationsTableProps = {

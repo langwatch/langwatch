@@ -184,12 +184,40 @@ describe("<OnlineEvaluationsTable />", () => {
     render(
       <OnlineEvaluationsTable
         {...defaultProps}
-        rows={[{ ...rows[0]!, performance: undefined, performanceError: true }]}
+        rows={[
+          { ...rows[0]!, performance: undefined, hasPerformanceError: true },
+        ]}
       />,
       { wrapper: Wrapper },
     );
 
     expect(screen.getByText("Performance unavailable")).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("centers a flat performance trend", () => {
+    render(
+      <OnlineEvaluationsTable
+        {...defaultProps}
+        rows={[
+          {
+            ...rows[0]!,
+            performance: {
+              metric: "score",
+              points: [0.8, 0.8, 0.8],
+              current: 0.8,
+              previous: 0.8,
+            },
+          },
+        ]}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    expect(
+      screen
+        .getByRole("img", { name: "Performance trend for Answer quality" })
+        .querySelector("polyline"),
+    ).toHaveAttribute("points", "3,19 56,19 109,19");
   });
 });

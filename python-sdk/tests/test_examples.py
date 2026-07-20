@@ -1,8 +1,9 @@
-import json
-import os
 import importlib
 import inspect
-from typing import Optional, Sequence
+import json
+import os
+from collections.abc import Sequence
+from typing import Optional
 import httpx
 import pytest
 import asyncio
