@@ -228,7 +228,7 @@ If the user wants to score live traces or threads, monitor production quality, o
 1. If the `online-evaluations` skill is available, load it and follow it now.
 2. Otherwise, tell the user to install it with:
    ```bash
-   npx skills add langwatch/skills/online-evaluations
+   npx skills@1.5.19 add langwatch/skills/online-evaluations
    ```
 
 Do not configure a monitor or guardrail from this skill.
@@ -256,10 +256,10 @@ LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments,
 
 How to handle:
 
-- Work within the limits — if 3 scenarios are allowed, create 3 meaningful ones, not 10.
+- Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
-- Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
+- Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
 
@@ -470,7 +470,7 @@ If the user wants to test a dataset, compare prompts or models, benchmark, or cr
 1. If the `experiments` skill is available, load it and follow it now.
 2. Otherwise, tell the user to install it with:
    ```bash
-   npx skills add langwatch/skills/experiments
+   npx skills@1.5.19 add langwatch/skills/experiments
    ```
 
 Do not create a batch experiment from this skill.
@@ -489,10 +489,10 @@ LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments,
 
 How to handle:
 
-- Work within the limits — if 3 scenarios are allowed, create 3 meaningful ones, not 10.
+- Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
-- Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
+- Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
 
@@ -709,7 +709,7 @@ If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **C
 
 ## The Agent Testing Pyramid
 
-Scenarios sit at the **top of the testing pyramid** and test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use the `experiments` skill instead for single input/output benchmarking with many examples. If it is not installed, use `npx skills add langwatch/skills/experiments`.
+Scenarios sit at the **top of the testing pyramid** and test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use the `experiments` skill instead for single input/output benchmarking with many examples. If it is not installed, use `npx skills@1.5.19 add langwatch/skills/experiments`.
 
 Best practices:
 
@@ -723,10 +723,10 @@ LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments,
 
 How to handle:
 
-- Work within the limits — if 3 scenarios are allowed, create 3 meaningful ones, not 10.
+- Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
-- Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
+- Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
 
@@ -1537,10 +1537,10 @@ LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments,
 
 How to handle:
 
-- Work within the limits — if 3 scenarios are allowed, create 3 meaningful ones, not 10.
+- Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
-- Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
+- Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
 
@@ -2370,10 +2370,10 @@ LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments,
 
 How to handle:
 
-- Work within the limits — if 3 scenarios are allowed, create 3 meaningful ones, not 10.
+- Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
-- Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
+- Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
 
@@ -2516,7 +2516,7 @@ If the user wants to score live traces or threads, monitor production quality, o
 1. If the `online-evaluations` skill is available, load it and follow it now.
 2. Otherwise, tell the user to install it with:
    ```bash
-   npx skills add langwatch/skills/online-evaluations
+   npx skills@1.5.19 add langwatch/skills/online-evaluations
    ```
 
 Do not configure a monitor or guardrail from this skill.
@@ -2657,6 +2657,139 @@ Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask g
 
 ---
 
+# Set Up Online Evaluations and Guardrails
+
+Online evaluations apply reusable evaluators to production traffic:
+
+- An online evaluation measures live traces or threads asynchronously.
+- A guardrail runs synchronously and can stop or replace unsafe traffic.
+
+## Hand Off Batch Testing Requests
+
+If the user wants to test a dataset, compare prompts or models, benchmark, or create a CI quality gate, this is the wrong workflow.
+
+1. If the `experiments` skill is available, load it and follow it now.
+2. Otherwise, tell the user to install it with:
+   ```bash
+   npx skills@1.5.19 add langwatch/skills/experiments
+   ```
+
+Do not create a batch experiment from this skill.
+
+## Choose the Production Workflow
+
+Use an online evaluation when the user wants continuous scoring, quality trends, sampling, or evaluation by trace or thread.
+
+Use a guardrail when the result must affect the request or response immediately, such as jailbreak detection, PII blocking, or policy enforcement.
+
+If the user's wording is broad, inspect the application and choose the safer non-blocking online evaluation unless they explicitly require synchronous enforcement.
+
+## Plan Limits
+
+(see "PlanLimits" above)
+
+## Prerequisites
+
+(see "CliSetup" above)
+
+(see "ProjectsAndApiKeys" above)
+
+Read the relevant documentation before changing configuration or code:
+
+```bash
+langwatch docs evaluations/online-evaluation/overview
+langwatch docs evaluations/online-evaluation/setup-monitors
+langwatch docs evaluations/guardrails/overview
+langwatch docs evaluations/evaluators/list
+```
+
+## Inspect the Existing Setup
+
+Use JSON output and inspect what already exists before creating duplicates:
+
+```bash
+langwatch monitor list --format json
+langwatch evaluator list --format json
+```
+
+Read recent traces only when they are needed to determine mappings, level, sampling, or realistic evaluator inputs. Do not send production data to a different project.
+
+## Create an Online Evaluation
+
+Discover the installed CLI contract first:
+
+```bash
+langwatch monitor create --help
+```
+
+Then create the monitor with a descriptive name, a valid evaluator type or saved evaluator, and the correct level:
+
+- Use `trace` for per-interaction quality.
+- Use `thread` for multi-message outcomes and configure an appropriate idle timeout in the platform when needed.
+- Start with a conservative sample rate for expensive evaluators on high-volume traffic.
+- Use `ON_MESSAGE` for asynchronous online evaluation.
+
+Do not guess evaluator parameters. Read the evaluator docs and the installed CLI help. If an LLM evaluator is used, verify that the target project has a model provider configured.
+
+After creation, verify the saved resource:
+
+```bash
+langwatch monitor list --format json
+langwatch monitor get <monitor-id> --format json
+```
+
+The task is complete only when the created monitor appears with the intended evaluator, execution mode, level, sample rate, and enabled state.
+
+## Add a Guardrail
+
+For platform-managed guardrails, create or edit the monitor with `AS_GUARDRAIL` after reading `langwatch monitor create --help` or `langwatch monitor update --help`.
+
+For an in-code guardrail, follow the language-specific documentation. A Python integration has this general shape:
+
+```python
+import langwatch
+
+@langwatch.trace()
+def my_agent(user_input):
+    result = langwatch.evaluation.evaluate(
+        "azure/jailbreak",
+        name="Jailbreak detection",
+        as_guardrail=True,
+        data={"input": user_input},
+    )
+    if not result.passed:
+        return "I cannot help with that request."
+
+    return generate_response(user_input)
+```
+
+Treat the snippet as a shape, not a substitute for the installed docs. Preserve the application's existing error handling and decide explicitly what happens if the guardrail service is unavailable.
+
+## Verify Real Behavior
+
+For an online evaluation:
+
+1. Send or reuse a representative traced interaction in the target project.
+2. Confirm the monitor is enabled.
+3. Confirm a real evaluation result appears in Online Evaluations analytics.
+
+For a guardrail:
+
+1. Run one allowed input and one input that should be blocked.
+2. Verify the allowed path still works.
+3. Verify the blocked path does not reach the protected operation.
+4. Verify both outcomes are traced without exposing sensitive content.
+
+## Common Mistakes
+
+- Do not create a batch experiment from this skill.
+- Do not describe a synchronous guardrail as asynchronous monitoring.
+- Do not enable an expensive evaluator on all traffic without considering sampling and cost.
+- Do not create duplicate monitors without inspecting the project first.
+- Do not claim success after saving configuration. Verify a real monitor or guardrail behavior.
+
+---
+
 # Test Your Agent with Scenarios
 
 NEVER invent your own agent testing framework. Use `@langwatch/scenario` (Python: `langwatch-scenario`) for code-based tests, or the `langwatch` CLI for no-code platform scenarios. The Scenario framework provides user simulation, judge-based evaluation, multi-turn conversation testing, and adversarial red teaming out of the box.
@@ -2690,7 +2823,7 @@ If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **C
 
 ## The Agent Testing Pyramid
 
-Scenarios sit at the **top of the testing pyramid** and test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use the `experiments` skill instead for single input/output benchmarking with many examples. If it is not installed, use `npx skills add langwatch/skills/experiments`.
+Scenarios sit at the **top of the testing pyramid** and test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use the `experiments` skill instead for single input/output benchmarking with many examples. If it is not installed, use `npx skills@1.5.19 add langwatch/skills/experiments`.
 
 Best practices:
 
