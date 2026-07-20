@@ -395,6 +395,38 @@ export class ModelProviderRepository {
   // ─────────────────────────────────────────────────────────────────
 
   /**
+   * One provider row by id with decrypted customKeys, or null. Serves the
+   * internal token-refresh path, which addresses the row directly (the
+   * gateway hands back the row id it was configured with) — tenant scoping
+   * happened when the row id entered the gateway config.
+   */
+  async findByIdWithDecryptedKeys(
+    id: string,
+  ): Promise<ModelProviderWithScopes | null> {
+    const provider = await this.prisma.modelProvider.findUnique({
+      where: { id },
+      include: { scopes: true },
+    });
+    return provider ? this.withDecryptedKeys(provider) : null;
+  }
+
+  /**
+   * Replace a provider row's credential keys (encrypted at rest). Used by
+   * the token-refresh path only — user-driven edits go through update().
+   */
+  async replaceCustomKeys(args: {
+    id: string;
+    customKeys: Record<string, unknown>;
+  }): Promise<void> {
+    // A required object always encrypts to a string; `?? undefined` only
+    // narrows the helper's wider nullable signature for Prisma's Json input.
+    await this.prisma.modelProvider.update({
+      where: { id: args.id },
+      data: { customKeys: this.encryptCustomKeys(args.customKeys) ?? undefined },
+    });
+  }
+
+  /**
    * Encrypts customKeys before storing in the database.
    * Serializes the object to JSON, then encrypts the JSON string.
    *

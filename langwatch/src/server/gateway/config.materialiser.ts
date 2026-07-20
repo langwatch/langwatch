@@ -476,6 +476,18 @@ function buildCredentials(mp: ModelProvider): Record<string, unknown> {
           pick("VERTEXAI_SERVICE_ACCOUNT_JSON"),
       };
     }
+    case "openai_codex": {
+      // OAuth session, not an API key: the gateway sends the access token as
+      // the bearer and the ChatGPT account id as a header, and calls back to
+      // the control plane (by row id) to refresh a 401'd token once. See
+      // services/aigateway codex dispatch + /api/gateway/internal codex
+      // refresh route.
+      return {
+        access_token: pick("CODEX_ACCESS_TOKEN"),
+        account_id: pick("CODEX_ACCOUNT_ID"),
+        provider_row_id: mp.id,
+      };
+    }
     case "anthropic":
       return { api_key: pick("ANTHROPIC_API_KEY") };
     case "gemini":

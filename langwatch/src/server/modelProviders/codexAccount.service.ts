@@ -3,6 +3,7 @@ import {
   CODEX_OAUTH_CLIENT_ID,
   CODEX_OAUTH_ISSUER,
   CODEX_VERIFICATION_URL,
+  codexTokenKeysSchema,
   type CodexTokenKeys,
 } from "./codexAccount.schema";
 
@@ -259,6 +260,80 @@ export class CodexAccountService {
     } catch {
       throw new CodexAuthError("malformed", "non-JSON auth response");
     }
+  }
+}
+
+/**
+ * The gateway's 401 recovery: refresh a provider row's stored tokens and
+ * hand back a fresh access token, persisting the rotation. A row refreshed
+ * within the last few seconds is returned as-is instead of refreshed again,
+ * so a burst of concurrent 401s (one per in-flight request) collapses into
+ * one issuer round-trip and can't burn a one-time refresh token twice.
+ */
+export class CodexGatewayRefreshService {
+  /** A token this fresh is the one we just minted — don't refresh again. */
+  static readonly JUST_REFRESHED_WINDOW_MS = 30_000;
+
+  constructor(
+    private readonly repository: {
+      findByIdWithDecryptedKeys: (
+        id: string,
+      ) => Promise<{ provider: string; customKeys: unknown } | null>;
+      replaceCustomKeys: (args: {
+        id: string;
+        customKeys: Record<string, unknown>;
+      }) => Promise<void>;
+    },
+    private readonly engine: CodexAccountService = new CodexAccountService(),
+  ) {}
+
+  async refreshForGateway(providerRowId: string): Promise<
+    | { status: "refreshed"; accessToken: string; accountId: string }
+    | { status: "not_connected" }
+    | { status: "session_expired" }
+  > {
+    const row = await this.repository.findByIdWithDecryptedKeys(providerRowId);
+    if (!row || row.provider !== "openai_codex") {
+      return { status: "not_connected" };
+    }
+    const parsed = codexTokenKeysSchema.safeParse(row.customKeys ?? {});
+    if (!parsed.success) return { status: "not_connected" };
+    const keys = parsed.data;
+
+    const savedAtMs = Date.parse(keys.CODEX_TOKENS_SAVED_AT);
+    if (
+      Number.isFinite(savedAtMs) &&
+      Date.now() - savedAtMs <
+        CodexGatewayRefreshService.JUST_REFRESHED_WINDOW_MS
+    ) {
+      return {
+        status: "refreshed",
+        accessToken: keys.CODEX_ACCESS_TOKEN,
+        accountId: keys.CODEX_ACCOUNT_ID,
+      };
+    }
+
+    let refreshed: CodexTokenKeys;
+    try {
+      refreshed = await this.engine.refresh(keys);
+    } catch (error) {
+      if (
+        error instanceof CodexAuthError &&
+        error.kind === "refresh_rejected"
+      ) {
+        return { status: "session_expired" };
+      }
+      throw error;
+    }
+    await this.repository.replaceCustomKeys({
+      id: providerRowId,
+      customKeys: refreshed,
+    });
+    return {
+      status: "refreshed",
+      accessToken: refreshed.CODEX_ACCESS_TOKEN,
+      accountId: refreshed.CODEX_ACCOUNT_ID,
+    };
   }
 }
 
