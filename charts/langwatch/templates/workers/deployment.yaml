@@ -121,6 +121,11 @@ spec:
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
 
+            # See the app deployment — named per role so worker telemetry is
+            # separable from the app's.
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.workers.otel.serviceName | default "langwatch-workers" | quote }}
+
             - name: LANGWATCH_ENDPOINT
               value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
 
