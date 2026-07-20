@@ -1,11 +1,12 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
+import type { Currency, PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import {
   CustomerCreationRaceError,
   OrganizationNotFoundError,
   UserEmailRequiredError,
 } from "../errors";
+import { getStripeCustomerFixedCurrency } from "../utils/stripeCustomerCurrency";
 
 const logger = createLogger("langwatch:billing:customerService");
 
@@ -16,6 +17,9 @@ export type CustomerService = {
     user: { email?: string | null };
     organizationId: string;
   }): Promise<string>;
+  getFixedBillingCurrency(params: {
+    organizationId: string;
+  }): Promise<Currency | null>;
 };
 
 export const createCustomerService = ({
@@ -85,6 +89,19 @@ export const createCustomerService = ({
       }
 
       return customer.id;
+    },
+
+    async getFixedBillingCurrency({ organizationId }) {
+      const organization = await db.organization.findUnique({
+        where: { id: organizationId },
+      });
+
+      if (!organization?.stripeCustomerId) return null;
+
+      return getStripeCustomerFixedCurrency({
+        stripe,
+        customerId: organization.stripeCustomerId,
+      });
     },
   };
 };

@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { Currency, type OrganizationUserRole, type PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import type Stripe from "stripe";
@@ -13,12 +14,15 @@ import {
   SubscriptionItemNotFoundError,
 } from "../errors";
 import type { BillingInterval } from "../utils/growthSeatEvent";
+import { getStripeCustomerFixedCurrency } from "../utils/stripeCustomerCurrency";
 
 type InviteInput = {
   email: string;
   role: OrganizationUserRole;
   teamIds: string;
 };
+
+const logger = createLogger("langwatch:billing:seatEventSubscription");
 
 export type SeatEventSubscriptionFns = ReturnType<
   typeof createSeatEventSubscriptionFns
@@ -50,6 +54,22 @@ export const createSeatEventSubscriptionFns = ({
     isUpgradeFromTiered?: boolean;
     invites?: InviteInput[];
   }) {
+    const fixedCurrency = await getStripeCustomerFixedCurrency({
+      stripe,
+      customerId,
+    });
+    const checkoutCurrency = fixedCurrency ?? currency;
+    if (fixedCurrency && fixedCurrency !== currency) {
+      logger.warn(
+        {
+          organizationId,
+          requestedCurrency: currency,
+          customerCurrency: fixedCurrency,
+        },
+        "[billing] Requested checkout currency differs from Stripe customer currency, using customer currency",
+      );
+    }
+
     // Find stale PENDING subs so we can clean up their PAYMENT_PENDING invites too
     const staleSubs = await db.subscription.findMany({
       where: {
@@ -90,7 +110,7 @@ export const createSeatEventSubscriptionFns = ({
     // doesn't leave orphaned pending records in the database.
     const lineItems = createCheckoutLineItems({
       coreMembers: membersToAdd,
-      currency,
+      currency: checkoutCurrency,
       interval: billingInterval,
     });
 
@@ -100,7 +120,10 @@ export const createSeatEventSubscriptionFns = ({
         data: {
           organizationId,
           status: SubscriptionStatus.PENDING,
-          plan: resolveGrowthSeatPlanType({ currency, interval: billingInterval }),
+          plan: resolveGrowthSeatPlanType({
+            currency: checkoutCurrency,
+            interval: billingInterval,
+          }),
           maxMembers: membersToAdd,
         },
       });
@@ -138,7 +161,7 @@ export const createSeatEventSubscriptionFns = ({
     });
 
     const selectedOptionsMetadata = {
-      selectedCurrency: currency,
+      selectedCurrency: checkoutCurrency,
       selectedBillingInterval: billingInterval,
     };
 
@@ -161,7 +184,7 @@ export const createSeatEventSubscriptionFns = ({
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
-      currency: currency.toLowerCase(),
+      currency: checkoutCurrency.toLowerCase(),
       ...({ adaptive_pricing: { enabled: false } } as Record<string, unknown>),
       customer: customerId,
       customer_update: {

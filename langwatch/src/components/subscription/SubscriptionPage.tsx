@@ -89,7 +89,20 @@ export function SubscriptionPage() {
     enabled: !!organization,
   });
 
-  const currency = selectedCurrency ?? detectedCurrency.data?.currency ?? PrismaCurrency.EUR;
+  // Stripe fixes a customer's currency after their first subscription/invoice
+  // and rejects checkouts in any other currency, so an existing billing
+  // currency overrides both the user's selection and geoip detection.
+  const billingCurrency = api.subscription.getBillingCurrency.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization },
+  );
+  const fixedBillingCurrency = billingCurrency.data?.fixedCurrency ?? null;
+
+  const currency =
+    fixedBillingCurrency ??
+    selectedCurrency ??
+    detectedCurrency.data?.currency ??
+    PrismaCurrency.EUR;
 
   useEffect(() => {
     setSelectedCurrency(null);
@@ -388,30 +401,32 @@ export function SubscriptionPage() {
                   value={billingPeriod}
                   onChange={setBillingPeriod}
                 />
-                <Select.Root
-                  data-testid="currency-selector"
-                  collection={currencyCollection}
-                  size="xs"
-                  width="100px"
-                  value={[currency]}
-                  onValueChange={(details) => {
-                    const selected = details.value[0];
-                    if (selected) {
-                      setSelectedCurrency(selected as Currency);
-                    }
-                  }}
-                >
-                  <Select.Trigger>
-                    <Select.ValueText />
-                  </Select.Trigger>
-                  <Select.Content paddingY={2}>
-                    {currencyOptions.map((option) => (
-                      <Select.Item key={option.value} item={option}>
-                        {option.label}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
+                {!fixedBillingCurrency && (
+                  <Select.Root
+                    data-testid="currency-selector"
+                    collection={currencyCollection}
+                    size="xs"
+                    width="100px"
+                    value={[currency]}
+                    onValueChange={(details) => {
+                      const selected = details.value[0];
+                      if (selected) {
+                        setSelectedCurrency(selected as Currency);
+                      }
+                    }}
+                  >
+                    <Select.Trigger>
+                      <Select.ValueText />
+                    </Select.Trigger>
+                    <Select.Content paddingY={2}>
+                      {currencyOptions.map((option) => (
+                        <Select.Item key={option.value} item={option}>
+                          {option.label}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
+                )}
               </>
             )}
             <Link href="/settings/plans">
