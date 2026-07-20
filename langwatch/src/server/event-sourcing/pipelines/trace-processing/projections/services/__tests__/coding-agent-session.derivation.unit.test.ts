@@ -7,10 +7,7 @@
  * the spec describes.
  */
 import { describe, expect, it } from "vitest";
-import type {
-  LogRecordReceivedEventData,
-  MetricRecordReceivedEventData,
-} from "../../../schemas/events";
+import type { LogRecordReceivedEventData } from "../../../schemas/events";
 import {
   type NormalizedSpan,
   NormalizedStatusCode,
@@ -21,6 +18,7 @@ import {
   applySpanToCodingAgentSession,
   CODING_AGENT_LOG_SCOPES,
   CODING_AGENT_SPAN_NAMES,
+  type CodingAgentMetricRecord,
   type CodingAgentSessionData,
   cacheHitRate,
   createInitCodingAgentSession,
@@ -80,18 +78,18 @@ function metric(
   metricName: string,
   value: number,
   attributes: Record<string, string> = {},
-): MetricRecordReceivedEventData {
+): CodingAgentMetricRecord {
   return {
     metricName,
     value,
     attributes,
-  } as unknown as MetricRecordReceivedEventData;
+  };
 }
 
 type Item =
   | { span: NormalizedSpan }
   | { log: LogRecordReceivedEventData }
-  | { metric: MetricRecordReceivedEventData };
+  | { metric: CodingAgentMetricRecord };
 
 function fold(items: Item[]): CodingAgentSessionData {
   let state = createInitCodingAgentSession();

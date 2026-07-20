@@ -6,6 +6,7 @@
  * sibling traces must stay bounded.
  */
 import { describe, expect, it } from "vitest";
+import type { SeriesTotalByPointAttribute } from "~/server/app-layer/metrics/repositories/metric-data-point.repository";
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionService } from "../coding-agent-session.service";
 import { sessionRow } from "./coding-agent-session-row.fixture";
@@ -132,7 +133,9 @@ describe("CodingAgentSessionService.getByTraceId", () => {
         listConversationTraces: async () => [
           { traceId: "trace-a", startedAtMs: 1_000 },
         ],
-        getSessionMetricTotals: async () => [
+        getSessionMetricTotals: async (): Promise<
+          SeriesTotalByPointAttribute[]
+        > => [
           {
             metricName: "claude_code.lines_of_code.count",
             total: 120,
