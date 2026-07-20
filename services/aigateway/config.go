@@ -23,6 +23,20 @@ type Config struct {
 	AuthCache                     AuthCacheConfig           `env:"LW_GATEWAY_AUTH_CACHE"`
 	CustomerTraceBridge           CustomerTraceBridgeConfig `env:"CUSTOMER_TRACE_BRIDGE"`
 	OTel                          config.OTel               `env:"OTEL"`
+	// NonStreamingHeartbeatIntervalSeconds sets how often (in seconds) a
+	// non-streaming response writes a keep-alive byte while dispatch is
+	// still in flight. 0 falls back to config.DefaultNonStreamingHeartbeatInterval;
+	// negative disables heartbeating entirely. Plain seconds, not a Go
+	// duration string ("45s") — config.Hydrate parses time.Duration fields
+	// as raw nanosecond integers, not via time.ParseDuration, so "45s"
+	// would fail to parse. Plain seconds sidesteps that trap entirely.
+	//
+	// Lives on Config directly rather than the shared config.Server (unlike
+	// MaxRequestBodyBytes, which every config.Server-embedding service
+	// wires up) because this concept is specific to the gateway's
+	// non-streaming HTTP surface — services/langyagent and services/nlpgo
+	// both embed config.Server too but have no use for this field.
+	NonStreamingHeartbeatIntervalSeconds int64 `env:"NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS"`
 }
 
 // ControlPlaneConfig holds control plane connection settings.
@@ -68,6 +82,7 @@ func defaultConfig() Config {
 			GracefulSeconds:     10,
 			MaxRequestBodyBytes: config.DefaultMaxRequestBodyBytes,
 		},
+		NonStreamingHeartbeatIntervalSeconds: int64(config.DefaultNonStreamingHeartbeatInterval / time.Second),
 		ControlPlane: ControlPlaneConfig{
 			BaseURL: "http://localhost:5560",
 		},
