@@ -365,10 +365,10 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
     });
 
     it("breaks same-tier ties deterministically (older row wins), not by DB row order", async () => {
-      // Two ORGANIZATION-tier rows both serving the model: multi-instance
-      // explicitly supports this, and routing must not depend on
-      // findMany's unspecified order. With no fallbackPriorityGlobal set,
-      // createdAt ASC decides.
+      // One ORGANIZATION-tier row, then two TEAM-tier rows both serving
+      // the model: multi-instance explicitly supports this, and routing
+      // must not depend on findMany's unspecified order. With no
+      // fallbackPriorityGlobal set, createdAt ASC decides the TEAM tie.
       await service().updateModelProvider(
         {
           projectId,

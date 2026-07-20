@@ -1013,14 +1013,7 @@ export class ModelProviderService {
       if (config.customKeys) {
         masked[providerKey] = {
           ...config,
-          customKeys: Object.fromEntries(
-            Object.entries(config.customKeys).map(([key, value]) => [
-              key,
-              KEY_CHECK.some((k) => key.includes(k))
-                ? MASKED_KEY_PLACEHOLDER
-                : value,
-            ]),
-          ),
+          customKeys: this.maskRowCustomKeys(config.customKeys),
         };
       }
     }
