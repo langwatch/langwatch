@@ -654,13 +654,12 @@ function renderPanel() {
 }
 
 /**
- * The recents dropdown is re-parented onto the header title button. Chakra's
- * combobox supplies that trigger's accessible name ("Toggle suggestions"), so
- * tests address the control by that name instead of its changing visible title.
- * Conversations are only in the DOM while the menu is open.
+ * History is its own icon control in the header rail, the labelled
+ * RecentChatsMenu trigger. Conversations are only in the DOM while the
+ * popover is open.
  */
 const recentsTrigger = () =>
-  screen.findByRole("button", { name: "Toggle suggestions" });
+  screen.findByRole("button", { name: "Recent chats" });
 
 async function openHistory() {
   await userEvent.click(await recentsTrigger());

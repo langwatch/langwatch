@@ -28,6 +28,7 @@ import { OnboardingProgress } from "./OnboardingProgress";
 import { RecentItemsSection } from "./RecentItemsSection";
 import { TimeOfDayAura } from "./TimeOfDayAura";
 import { TracesOverview } from "./TracesOverview";
+import { useShowSignalFocusedHome } from "./useShowSignalFocusedHome";
 import { useTimeOfDay, WelcomeHeader } from "./WelcomeHeader";
 
 /**
@@ -36,16 +37,22 @@ import { useTimeOfDay, WelcomeHeader } from "./WelcomeHeader";
  * lists the feature areas, so home never repeats it as cards. Onboarding
  * shows only while incomplete; resources are a quiet footer.
  *
- * Exactly two compositions, decided by the Langy gate (useShowLangy):
+ * Exactly two compositions, decided by the signal-focused-home rollout
+ * (useShowSignalFocusedHome) — NOT by Langy access:
  *
- *   - WITH Langy: the generated briefing sheet leads — LangWatch's read of
- *     the project's agentic signals, with the status figures folded in —
+ *   - SIGNAL-FOCUSED: the generated briefing sheet leads — LangWatch's read
+ *     of the project's agentic signals, with the status figures folded in —
  *     then the announcement note, recent work, and setup as a hairline.
- *   - WITHOUT Langy: the classic home — announcements, the traces overview,
- *     recent work, and the onboarding checklist (whose steps don't assume a
- *     panel the user doesn't have).
+ *   - CLASSIC: announcements, the traces overview, recent work, and the
+ *     onboarding checklist.
+ *
+ * Langy access (useShowLangy) decides only the Langy affordances within
+ * either composition: the sheet's hand-to-Langy controls gate themselves
+ * (HomeBriefingSection / QuietHeadline), and the classic traces overview
+ * shows its investigate signal only for Langy users.
  */
 export function HomePage() {
+  const showSignalFocusedHome = useShowSignalFocusedHome();
   const showLangy = useShowLangy();
   const timeOfDay = useTimeOfDay();
 
@@ -104,7 +111,7 @@ export function HomePage() {
               </HStack>
             </HStack>
 
-            {showLangy ? (
+            {showSignalFocusedHome ? (
               <>
                 <HomeBriefingSection />
                 {/* The chrome grid: two equal-height columns whose interior

@@ -8,24 +8,24 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { type UIMessage } from "ai";
+import type { UIMessage } from "ai";
 import {
   AppWindow,
   ArrowDown,
   Braces,
   Check,
-  ChevronDown,
   LayoutGrid,
   type LucideIcon,
   MoreHorizontal,
   PanelRight,
+  PictureInPicture2,
   Square,
   SquarePen,
   Waves,
   X,
 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import {
-  forwardRef,
   Profiler,
   useCallback,
   useEffect,
@@ -33,96 +33,92 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "motion/react";
 import { allModelOptions } from "~/components/ModelSelector";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { Menu } from "~/components/ui/menu";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
-import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
-import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
-import { langyThinkingShimmerStyles } from "./langyShimmer";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
-import { Composer } from "./Composer";
-import {
-  type LangyRevealableKind,
-  useLangyContextTargetStore,
-} from "../stores/langyContextTargetStore";
-import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
-import { SURFACE_PATH_FOR_KIND } from "../logic/langyContextKindIntent";
-import { useRouter } from "~/utils/compat/next-router";
-import { LangyCardGallery } from "./LangyCardGallery";
-import { EmptyState } from "./EmptyState";
-import { LangyWave } from "./LangyWave";
-import { deriveWaveActivity } from "../logic/langyWaveMotion";
-import { useLangyDevMode } from "../hooks/useLangyDevMode";
-import { LangyFoundryMenu } from "./LangyFoundryMenu";
-import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
-import {
-  type LangyProposal,
-  MessageContent,
-  type ProposalHandlers,
-} from "./MessageContent";
-import { RecentChatsMenu } from "./RecentChatsMenu";
-import { useGlobalLangyShortcut } from "../hooks/useGlobalLangyShortcut";
-import { useLangyOrbProximity } from "../hooks/useLangyOrbProximity";
-import { useLangyConversationList } from "../data/useLangyConversationList";
-import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
-import { useLangyMessages } from "../data/useLangyMessages";
-import type { LangyMessageDto } from "../data/langy.dtos";
-import { useLangyFreshness } from "../hooks/useLangyFreshness";
-import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydration";
-import {
-  createLangyChatTransport,
-  type LangyTurnRequestContext,
-} from "../logic/langyChatTransport";
-import { useLangyStickToBottom } from "../hooks/useLangyStickToBottom";
-import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
-import {
-  attachedContextToChip,
-  type LangyPanelEffect,
-  type LangyPanelMode,
-  useLangyStore,
-} from "../stores/langyStore";
-import { mergeContextChips } from "../logic/langyContextChips";
-import {
-  LangySidebarContext,
-  type SidebarContextEntry,
-} from "./LangySidebarContext";
-import { Menu } from "~/components/ui/menu";
-import { useLangyPageContext } from "../hooks/useLangyPageContext";
-// ONE definition of the wire shape, server-side, imported by both ends — the
+// ONE definition of the wire shape, server-side, imported by both ends, the
 // route spreads `langyTurnContextSchema.shape` into its body schema, and this
 // types the payload against the same source. If the route stops accepting a
 // field, this stops compiling. That is the whole point: the last time these two
 // drifted, `safeParse` silently dropped `pageContext` on every single turn and
 // nobody found out for weeks.
 import type { LangyResourceContext } from "~/server/app-layer/langy/langyTurnContext.schema";
-import { LangyError } from "./LangyError";
-import { LangyRecoveringLine } from "./LangyRecoveringLine";
-import { LangyThinkingLine } from "./LangyThinkingLine";
-import { StreamingStatusLine } from "./StreamingStatusLine";
-import { toPendingCapabilities } from "./LangyToolActivity";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
+import type { LangyMessageDto } from "../data/langy.dtos";
+import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
+import { useLangyConversationList } from "../data/useLangyConversationList";
+import { useLangyMessages } from "../data/useLangyMessages";
+import { useGlobalLangyShortcut } from "../hooks/useGlobalLangyShortcut";
+import { useLangyDevMode } from "../hooks/useLangyDevMode";
+import { useLangyFreshness } from "../hooks/useLangyFreshness";
+import { useLangyOrbProximity } from "../hooks/useLangyOrbProximity";
+import { useLangyPageContext } from "../hooks/useLangyPageContext";
+import { useLangyStickToBottom } from "../hooks/useLangyStickToBottom";
+import {
+  turnHadSideEffects,
+  useLangyTurnRecovery,
+} from "../hooks/useLangyTurnRecovery";
+import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
+import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydration";
 import { resolveLangyActivityOwnership } from "../logic/langyActivityOwnership";
 import {
-  FLOATING_PANEL_CSS_WIDTH,
-  resolveFloatingPanelWidth,
-} from "../logic/langyPanelLayout";
+  createLangyChatTransport,
+  type LangyTurnRequestContext,
+} from "../logic/langyChatTransport";
+import { mergeContextChips } from "../logic/langyContextChips";
+import { SURFACE_PATH_FOR_KIND } from "../logic/langyContextKindIntent";
 import {
   explainLangyError,
   readLangyStreamError,
   readLangyTrpcError,
 } from "../logic/langyErrorExplainer";
-import {
-  turnHadSideEffects,
-  useLangyTurnRecovery,
-} from "../hooks/useLangyTurnRecovery";
 import { shouldAskFeedback } from "../logic/langyFeedbackDirective";
+import {
+  APP_HEADER_HEIGHT,
+  FLOATING_PANEL_CSS_WIDTH,
+  resolveFloatingPanelWidth,
+  SIDEBAR_PANEL_WIDTH,
+} from "../logic/langyPanelLayout";
+import { deriveWaveActivity } from "../logic/langyWaveMotion";
+import {
+  type LangyRevealableKind,
+  useLangyContextTargetStore,
+} from "../stores/langyContextTargetStore";
+import {
+  attachedContextToChip,
+  type LangyPanelEffect,
+  type LangyPanelMode,
+  useLangyStore,
+} from "../stores/langyStore";
+import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
+import { Composer } from "./Composer";
+import { EmptyState } from "./EmptyState";
+import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
+import { LangyCardGallery } from "./LangyCardGallery";
+import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
+import { LangyError } from "./LangyError";
+import { LangyFoundryMenu } from "./LangyFoundryMenu";
+import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
+import { LangyRecoveringLine } from "./LangyRecoveringLine";
+import { LangyThinkingLine } from "./LangyThinkingLine";
+import { toPendingCapabilities } from "./LangyToolActivity";
+import { LangyWave } from "./LangyWave";
+import {
+  type LangyProposal,
+  MessageContent,
+  type ProposalHandlers,
+} from "./MessageContent";
+import { RecentChatsMenu } from "./RecentChatsMenu";
+import { StreamingStatusLine } from "./StreamingStatusLine";
 // Langy's own skin: scoped warm/cream palette + serif display face. The
 // `.langy-root` class (below) is where the Chakra semantic-token overrides land.
 import "../langyTheme.css";
@@ -133,55 +129,9 @@ import "../langyTheme.css";
 // THAT model, not on an unrelated branch-primary pick.
 const LANGY_GATE_FEATURE_KEY = "prompt.create_default";
 
-// A lean default: slim enough to read as a quiet companion rather than a second
-// pane, still wide enough that a trace table, a diff or a capability card can
-// breathe (the 380px sidecar forced everything into a column of two-word lines,
-// so we stay clear of that floor). Still a sidecar, not a split view: the page
-// keeps the majority of the viewport. The panel is expected to GROW with its
-// content later (a wide card can widen the card); this is the resting width.
-// The docked sidebar runs narrower than the floating card: floating OVERLAYS
-// the page, so its width is free; the dock takes its width FROM the page for
-// as long as it is open, and at 432px a 13" laptop (~1280–1440px viewport)
-// loses a big slice of its working room. 392px keeps cards readable (still clear
-// of the 380px two-word-lines floor) while giving the page back 40px.
-// Spec: specs/langy/langy-panel-layout.feature
-const SIDEBAR_PANEL_WIDTH = 392;
-
-// The sidecar FLOATS: a rounded card with a small, SYMMETRIC inset on every
-// side (a soft brand glow + shadow behind it). Page content reserves exactly
-// the card + one inset of breathing room — NOT an extra handle-width band,
-// which is what left the awful always-there gutter. The collapse handle rides
-// on the card's left edge (a tab) rather than in a reserved gutter.
-//
-// NOTE: the whole open/close/dock model is under review (a Notion-AI-style
-// bottom-right launcher that pins to the side, and how it coexists with the app
-// drawer) — see LANGY_UI_STREAMING_PLAN.md. This is the interim.
+// The floating card's symmetric viewport inset: a rounded card with a small,
+// SYMMETRIC inset on every side (a soft brand glow + shadow behind it).
 const PANEL_INSET = 12;
-
-/** The docked panel's rounded left edge. */
-const DOCK_RADIUS = 0;
-
-/**
- * How far the docked panel OVERLAPS the page content.
- *
- * The dock is full-height with a rounded left edge, so its corners curve away
- * from the content. Reserve exactly `PANEL_WIDTH` and those two arcs expose a
- * sliver of bare page between the content's edge and the panel — a gap that
- * reads as a rendering glitch.
- *
- * Overlapping by precisely the corner radius closes it: the curve now sits ON
- * TOP of content rather than over a void, so there is nothing to see through.
- * It is deliberately no larger than the radius — an overlap is a clip, and 18px
- * of a page's right margin is a price worth paying where 40px of live content
- * would not be.
- */
-const DOCK_OVERLAP = 0;
-
-// Sidebar mode pushes page content left by the dock width MINUS the overlap
-// above; Floating mode overlays and reserves nothing (see LangyShiftedRoot,
-// which pads only in sidebar mode).
-export const LANGY_DOCKED_OFFSET = SIDEBAR_PANEL_WIDTH - DOCK_OVERLAP;
-export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 
 // A Chakra Box that also takes framer-motion props — used for the thinking
 // line's blur-crossfade when its text changes. `css` still routes through
@@ -269,13 +219,9 @@ function onLangyProfilerRender(
 
 interface LangySidecarProps {
   proposalHandlersRef?: React.RefObject<ProposalHandlers>;
-  experimentSlug?: string;
 }
 
-export function LangySidecar({
-  proposalHandlersRef,
-  experimentSlug,
-}: LangySidecarProps) {
+export function LangySidecar({ proposalHandlersRef }: LangySidecarProps) {
   const isOpen = useLangyStore((s) => s.isOpen);
   const toggle = useLangyStore((s) => s.togglePanel);
   useGlobalLangyShortcut(toggle);
@@ -285,10 +231,7 @@ export function LangySidecar({
       <LangyMarkGradientDefs />
       <LangyLauncher isOpen={isOpen} onOpen={toggle} />
       <LangyContextTargetLayer />
-      <LangyPanel
-        proposalHandlersRef={proposalHandlersRef}
-        experimentSlug={experimentSlug}
-      />
+      <LangyPanel proposalHandlersRef={proposalHandlersRef} />
     </>
   );
 }
@@ -308,6 +251,11 @@ function LangyLauncher({
   onOpen: () => void;
 }) {
   const reduceMotion = useReducedMotion();
+  // A right-anchored drawer fills the right edge while the panel is closed, so
+  // the bottom-right launcher would sit on top of it (and the table pager).
+  // Dodge to the bottom-LEFT corner while a drawer is open.
+  const { currentDrawer } = useDrawer();
+  const dodgeLeft = !!currentDrawer;
   // The orb leans + glows toward the cursor as it approaches (the one place a
   // Langy surface reacts to the pointer — a hover affordance on the target
   // itself, not ambient chrome). Disabled under reduced motion. `transform` is
@@ -345,7 +293,11 @@ function LangyLauncher({
         aria-keyshortcuts="Meta+I Control+I"
         position="fixed"
         bottom="20px"
-        right="20px"
+        // Bottom-right by default; hops to bottom-left while a drawer holds the
+        // right edge so it never sits on the drawer or the table pager. (The
+        // proximity hook owns `transform`, and left/right can't cross-fade, so
+        // this repositions rather than slides.)
+        {...(dodgeLeft ? { left: "20px" } : { right: "20px" })}
         // Keep modal/dialog layers above Langy. Chakra's modal stack starts at
         // the modal layer, while Langy remains a persistent app companion.
         zIndex={1200}
@@ -382,10 +334,8 @@ function LangyLauncher({
 
 function LangyPanel({
   proposalHandlersRef,
-  experimentSlug,
 }: {
   proposalHandlersRef?: React.RefObject<ProposalHandlers>;
-  experimentSlug?: string;
 }) {
   const { organization, project } = useOrganizationTeamProject();
   const projectId = project?.id;
@@ -446,6 +396,9 @@ function LangyPanel({
   const detachContext = useLangyStore((s) => s.detachContext);
   const panelMode = useLangyStore((s) => s.panelMode);
   const floating = panelMode === "floating";
+  // An app shell (DashboardLayout) is mounted and places the dock as a second
+  // content card; zero claims means a full-screen page and the flush dock.
+  const dockShellClaimed = useLangyStore((s) => s.dockShellClaims > 0);
   const panelEffect = useLangyStore((s) => s.panelEffect);
   const reduceMotion = useReducedMotion();
   // The panel's own DOM node. The "fold" wave (<LangyWave>) reads its size off
@@ -454,40 +407,34 @@ function LangyPanel({
   const [devMode] = useLangyDevMode();
   const cardGalleryOpen = useLangyStore((s) => s.cardGalleryOpen);
 
-  // ── Getting out of the drawer's way ───────────────────────────────────────
-  // Drawers (the trace view among them) are right-anchored overlays, and the
-  // floating panel is a right-anchored overlay. They were fighting for the same
-  // corner: open a trace and the panel sat on top of it.
+  // ── Opening a drawer beside the panel ─────────────────────────────────────
+  // Two different moves, one per layout, so docked and floating stay visibly
+  // distinct:
   //
-  // So while a drawer is open, the floating card CROSSES TO THE OTHER SIDE —
-  // it slides to the left edge and the drawer gets the right. Both are then
-  // fully visible, which is the whole point of asking Langy about the thing you
-  // just opened.
+  //  - DOCKED (sidebar): the panel becomes the drawer's COMPANION. It morphs
+  //    (framer `layout`) to hold the right edge as a floating card wearing the
+  //    drawer's chrome; the drawer yields left (see DrawerContent) and slides
+  //    in from BEHIND the panel (Langy at a higher z-index). The dock's page
+  //    reservation releases while it rides (see LangyShiftedRoot).
+  //  - FLOATING: the panel DODGES. It keeps floating but hops to the LEFT so it
+  //    is out of the drawer's way; the drawer opens full-width on the right,
+  //    exactly as it does with Langy closed. This reads as a window getting
+  //    out of the way, which is the whole point of floating.
   //
-  // The shift is computed from the viewport rather than measured off the
-  // drawer's DOM: drawers vary in width and are rendered by a registry this
-  // panel has no business reaching into, and a measurement would be a race with
-  // the drawer's own open animation. Translating to the left EDGE is correct for
-  // any drawer narrower than the space it leaves — which is all of them at a
-  // normal viewport — and degrades gracefully rather than wrongly when it isn't
-  // (the panel keeps its higher z-index, so it still floats ABOVE the drawer,
-  // which is the behaviour originally asked for).
+  // Spec: specs/langy/langy-panel-layout.feature
   const { currentDrawer } = useDrawer();
-  const isDrawerOpen = !!currentDrawer;
+  const hasDrawer = isOpen && !!currentDrawer;
+  const isDrawerCompanion = hasDrawer && !floating;
+  const floatingDodgesDrawer = hasDrawer && floating;
   const viewportWidth = useViewportWidth();
   const floatingPanelWidth = resolveFloatingPanelWidth(viewportWidth);
 
-  const drawerShiftX =
-    floating && isDrawerOpen
-      ? -Math.max(0, viewportWidth - floatingPanelWidth - PANEL_INSET * 2)
-      : 0;
-
   const variants = useMemo(
     () => ({
-      open: { opacity: 1, scale: 1, x: drawerShiftX, y: 0 },
+      open: { opacity: 1, scale: 1, x: 0, y: 0 },
       closed: floating ? FLOATING_CLOSED : SIDEBAR_CLOSED,
     }),
-    [drawerShiftX, floating],
+    [floating],
   );
 
   // Conversation-scoped client state belongs to the active project only; the
@@ -498,13 +445,6 @@ function LangyPanel({
     useLangyStore.getState().resetForProject();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Follow-the-stream scrolling, driven by a ResizeObserver on the content
-  // rather than a dep list — Stream B's optimistic tokens and the turn signals
-  // never pass through `messages`, so the old `[messages, status]` effect never
-  // fired for them and the answer streamed off the bottom of the panel.
-  const { scrollRef, contentRef, endRef, isPinned, canScroll, jumpToLatest } =
-    useLangyStickToBottom();
 
   // The turn's request inputs, read at SEND time from a ref the render keeps
   // fresh (populated below, once the chips are resolved). The transport owns
@@ -864,6 +804,25 @@ function LangyPanel({
   // survive a dev-mode toggle-off (the store clears it too; belt and braces).
   const showCardGallery = devMode && cardGalleryOpen;
 
+  // Follow-the-stream scrolling, driven by a ResizeObserver on the content
+  // rather than a dep list — Stream B's optimistic tokens and the turn signals
+  // never pass through `messages`, so the old `[messages, status]` effect never
+  // fired for them and the answer streamed off the bottom of the panel.
+  // Disabled while the column is a top-down DOCUMENT (the inline model setup,
+  // the card gallery): auto-follow there scrolled the heading straight out of
+  // view as the form mounted.
+  const { scrollRef, contentRef, endRef, isPinned, canScroll, jumpToLatest } =
+    useLangyStickToBottom({ enabled: !langyNeedsModel && !showCardGallery });
+
+  // The setup verdict arrives ASYNC (the resolved-default query): between the
+  // panel opening and `langyNeedsModel` flipping true, auto-follow is still
+  // armed and the mounting grid can drag the column to the bottom. Snap back
+  // to the top the moment the column becomes a document, so the heading is
+  // where reading starts.
+  useEffect(() => {
+    if (langyNeedsModel && scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [langyNeedsModel, scrollRef]);
+
   // Page context (task #14): the experiment / trace / dataset / project the
   // user is viewing, surfaced as removable composer chips and forwarded with
   // the turn.
@@ -882,24 +841,19 @@ function LangyPanel({
     [contextChips, attachedChips],
   );
 
-  // What the sidebar renders: every held chip tagged by source, so removing one
-  // routes to the right store action (dismiss a derived chip / detach an
-  // attached one).
-  const sidebarContextEntries = useMemo<SidebarContextEntry[]>(() => {
-    const seen = new Set<string>();
-    const entries: SidebarContextEntry[] = [];
-    for (const chip of contextChips) {
-      if (seen.has(chip.id)) continue;
-      seen.add(chip.id);
-      entries.push({ chip, source: "page" });
-    }
-    for (const chip of attachedChips) {
-      if (seen.has(chip.id)) continue;
-      seen.add(chip.id);
-      entries.push({ chip, source: "attached" });
-    }
-    return entries;
-  }, [contextChips, attachedChips]);
+  // The composer is the ONE remove affordance for context (the dock's old
+  // banner restated these chips and is gone). A chip can be page-derived,
+  // explicitly attached, or both (deduped above), clear every source it has,
+  // or it reappears from the other one.
+  const removeContextChip = useCallback(
+    (id: string) => {
+      if (useLangyStore.getState().attachedContext.some((c) => c.id === id)) {
+        detachContext(id);
+      }
+      dismissChip(id);
+    },
+    [detachContext, dismissChip],
+  );
 
   // Keep the transport's request context fresh every render; it is read at send
   // time (including on regenerate, which carries no per-send body). This is the
@@ -1324,12 +1278,6 @@ function LangyPanel({
     retryTurn();
   }, [utils, organizationId, retryTurn]);
 
-  const subtitle = experimentSlug
-    ? `On: ${experimentSlug}`
-    : isEmpty
-      ? "Your AI copilot"
-      : "Working in this project";
-
   // The generated title for the open conversation, read off the recents list —
   // the SAME server state, kept fresh by the useLangyFreshness SSE coordinator,
   // so the title-generation reactor's `conversation_title_generated` event
@@ -1349,17 +1297,28 @@ function LangyPanel({
       <MotionBox
         ref={panelRef}
         className="langy-root"
-        // `layout` turns the same mounted surface from a full-height dock into a
-        // floating card (and back) without a teleport. It also picks up the
-        // drawer-clearance x shift, so all placement changes share one motion
-        // language rather than competing CSS transitions.
+        // `layout` morphs the same mounted surface between placements without a
+        // teleport: dock to floating card, and dock/floating to the drawer
+        // companion. The panel grows taller and lifts above content in place,
+        // rather than sliding off-screen and back.
         layout
         position="fixed"
         // The dock is deliberately slimmer than the floating card — see
-        // SIDEBAR_PANEL_WIDTH.
-        width={floating ? FLOATING_PANEL_CSS_WIDTH : `${SIDEBAR_PANEL_WIDTH}px`}
+        // SIDEBAR_PANEL_WIDTH. The drawer companion keeps the dock width.
+        width={
+          isDrawerCompanion || !floating
+            ? `${SIDEBAR_PANEL_WIDTH}px`
+            : FLOATING_PANEL_CSS_WIDTH
+        }
         // Dialogs, drawers, and command surfaces must be able to cover Langy.
-        zIndex={1200}
+        // Riding beside a drawer, the panel sits ABOVE the drawer CARD (Chakra's
+        // drawer positioner is z 1500) so the drawer slides IN from behind the
+        // companion rather than over it. 1600 stays BELOW the overlay layer
+        // (menus/popovers/dialogs are z 2000+, including Langy's own header
+        // menus), so those still open above the panel. Equal z-index alone
+        // isn't enough: the drawer portal is later in the DOM and would win the
+        // paint on a tie.
+        zIndex={isDrawerCompanion ? 1600 : 1200}
         background="bg.surface"
         borderStyle="solid"
         // The brand's workhorse hairline (white/10 on dark, a warm paper line on
@@ -1402,7 +1361,7 @@ function LangyPanel({
         // Any change in the floating card's resolved size eases instead of
         // snapping — chiefly the min-height floor stepping up as the conversation
         // grows (send: 340 → 410 → 520), but also the 80dvh cap. Transform-driven
-        // open/close and the drawer cross-shift are motion's own inline transform;
+        // open/close is motion's own inline transform;
         // this CSS transition names only the size floor/cap, so the two never
         // fight. Off under reduced motion.
         css={
@@ -1426,50 +1385,100 @@ function LangyPanel({
               }
             : undefined
         }
-        {...(floating
+        {...(isDrawerCompanion
           ? {
-              // Anchored bottom-right, growing UPWARD. The 80vh cap (never cover
-              // the top fifth of the page) is the rule. The resting floor is
-              // deliberately short — a compact card at rest that GROWS with its
-              // conversation up to the cap, rather than opening as a tall stub over
-              // an empty thread. (Dynamic content-driven sizing is the next step.)
-              right: `${PANEL_INSET}px`,
-              bottom: `${PANEL_INSET}px`,
-              height: "auto",
-              minHeight: floatingMinHeight,
-              maxHeight: "calc(80dvh - 12px)",
-              // Floating reads as glass: a touch translucent over a blur of the
-              // page behind it. (Sidebar stays fully opaque — it's docked, not
-              // floating over content.)
-              background: "bg.surface/88",
-              backdropFilter: "blur(16px) saturate(1.1)",
+              // Riding beside the open drawer: the panel HOLDS the right
+              // edge as another floating card and the drawer sits to its
+              // left. EXACTLY the drawer's chrome (the app drawer recipe:
+              // surface at alpha over the drawer blur, the same hairline,
+              // radius and shadow) so the pair reads as two of one thing.
+              top: "8px",
+              right: "8px",
+              bottom: "8px",
+              background: "bg.surface/80",
+              backdropFilter: "blur(25px)",
               borderWidth: "1px",
-              borderRadius: "20px",
-              boxShadow:
-                "0 1px 2px rgba(20,20,23,0.04), 0 12px 28px rgba(20,20,23,0.10), 0 32px 64px rgba(20,20,23,0.10)",
-              _dark: {
-                // The stacked drop shadows give depth from OUTSIDE; the inset
-                // hairline gives the top edge a lit rim from INSIDE, so the panel
-                // reads as a raised object catching light rather than a flat cut-
-                // out. white/12 — one notch above the border's white/10.
-                boxShadow:
-                  "0 1px 2px rgba(0,0,0,0.4), 0 12px 28px rgba(0,0,0,0.5), 0 32px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
-              },
+              borderColor: "border",
+              borderRadius: "lg",
+              boxShadow: "lg",
             }
-          : {
-              top: 0,
-              right: 0,
-              bottom: 0,
-              borderLeftWidth: "1px",
-              borderTopLeftRadius: 0,
-              borderBottomLeftRadius: 0,
-              boxShadow: "none",
-            })}
+          : floating
+            ? {
+                // Anchored bottom corner, growing UPWARD. The 80vh cap (never cover
+                // the top fifth of the page) is the rule. The resting floor is
+                // deliberately short — a compact card at rest that GROWS with its
+                // conversation up to the cap, rather than opening as a tall stub over
+                // an empty thread. (Dynamic content-driven sizing is the next step.)
+                // While a drawer is open it DODGES to the left corner so the
+                // drawer keeps the full right edge — a floating window getting out
+                // of the way. Otherwise it rests bottom-right as usual.
+                ...(floatingDodgesDrawer
+                  ? { left: `${PANEL_INSET}px` }
+                  : { right: `${PANEL_INSET}px` }),
+                bottom: `${PANEL_INSET}px`,
+                height: "auto",
+                minHeight: floatingMinHeight,
+                maxHeight: "calc(80dvh - 12px)",
+                // Floating reads as glass: a touch translucent over a blur of the
+                // page behind it. (Sidebar stays fully opaque — it's docked, not
+                // floating over content.) Light uses the platform's standard
+                // glass recipe (surface at alpha over an 8px blur); dark keeps
+                // the heavier ink glass, whose ground needs the stronger blur
+                // to stay legible.
+                background: "bg.surface/85",
+                backdropFilter: "blur(8px)",
+                borderWidth: "1px",
+                borderRadius: "20px",
+                boxShadow:
+                  "0 1px 2px rgba(20,20,23,0.04), 0 12px 28px rgba(20,20,23,0.10), 0 32px 64px rgba(20,20,23,0.10)",
+                _dark: {
+                  background: "bg.surface/88",
+                  backdropFilter: "blur(16px) saturate(1.1)",
+                  // The stacked drop shadows give depth from OUTSIDE; the inset
+                  // hairline gives the top edge a lit rim from INSIDE, so the panel
+                  // reads as a raised object catching light rather than a flat cut-
+                  // out. white/12 — one notch above the border's white/10.
+                  boxShadow:
+                    "0 1px 2px rgba(0,0,0,0.4), 0 12px 28px rgba(0,0,0,0.5), 0 32px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
+                },
+              }
+            : dockShellClaimed
+              ? {
+                  // An app shell is mounted: the dock joins it as a SECOND
+                  // content card. It starts below the full-width header,
+                  // aligned with the content card's top edge, and wears the
+                  // card's own language: the same top-left radius, the same
+                  // muted hairline on the two edges that meet the page ground,
+                  // and (dark) the same faint lit top rim. The strip of page
+                  // ground between the two cards is reserved by the shell, see
+                  // DashboardLayout. Spec: specs/langy/langy-panel-layout.feature
+                  top: `${APP_HEADER_HEIGHT}px`,
+                  right: 0,
+                  bottom: 0,
+                  borderTopWidth: "1px",
+                  borderLeftWidth: "1px",
+                  borderColor: "border.muted",
+                  borderTopLeftRadius: "xl",
+                  borderBottomLeftRadius: 0,
+                  boxShadow: "none",
+                  _dark: { boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" },
+                }
+              : {
+                  // No shell on this page (a full-screen tool like the studio):
+                  // the dock stays a flush full-height pane on the viewport edge.
+                  top: 0,
+                  right: 0,
+                  bottom: 0,
+                  borderLeftWidth: "1px",
+                  borderTopLeftRadius: 0,
+                  borderBottomLeftRadius: 0,
+                  boxShadow: "none",
+                })}
       >
-        {/* Texture, under the content (which stacks at zIndex 1) and inert to the
-          pointer. Exactly one of these is ever visible: grain on paper, the
-          site's signal grid on ink. CSS does the switch — see langyTheme.css. */}
-        {floating ? <Box className="langy-grain" aria-hidden /> : null}
+        {/* Texture, under the content (which stacks at zIndex 1) and inert to
+          the pointer. Two gates on purpose: the JSX renders it in the FLOATING
+          card only (the docked card stays plain), and langyTheme.css shows it
+          on the dark ground only (light is the app's own clean surface). */}
         {floating ? <Box className="langy-signal-grid" aria-hidden /> : null}
         {/* A whisper of the brand rising from the top of the panel, so the ink
           ground has depth and a hint of identity instead of reading flat. Dark
@@ -1500,10 +1509,14 @@ function LangyPanel({
           zIndex={1}
         >
           <PanelHeader
-            subtitle={subtitle}
             conversationTitle={conversationTitle}
             onNewChat={handleNewChat}
             onClose={closePanel}
+            // Riding beside a drawer, the drawer owns the only close affordance
+            // on screen; a second X on the companion read as "close the drawer"
+            // and kept dismissing Langy instead. Closing the drawer returns
+            // Langy to its dock, where its own X is back.
+            hideClose={isDrawerCompanion}
             conversations={conversations}
             isLoadingConversations={isLoadingConversations}
             hasListError={hasListError}
@@ -1512,19 +1525,9 @@ function LangyPanel({
             onForkConversation={handleForkConversation}
             onRenameConversation={handleRenameConversation}
           />
-          {/* Docked only: the context Langy is holding, shown loud with remove
-            affordances. The floating card keeps its compact composer summary
-            (it floats over the page and must stay small); the dock has the room
-            and the "working alongside you" job, so it makes context explicit. */}
-          {!floating ? (
-            <LangySidebarContext
-              entries={sidebarContextEntries}
-              addableChips={addableChips}
-              onRemovePage={dismissChip}
-              onDetach={detachContext}
-              onAdd={restoreChip}
-            />
-          ) : null}
+          {/* The context Langy is holding lives in ONE place, the composer's
+            own summary row (both layouts). A second banner above the
+            conversation restated the same chips and read as duplication. */}
           {/* The message column and, BEHIND it, the ambient wash. The wash is a
             sibling of the scroller (not a child) so it never scrolls, never
             repaints on scroll, and never reaches the composer below.
@@ -1639,10 +1642,9 @@ function LangyPanel({
                     <Text fontSize="sm" fontWeight="semibold">
                       Langy needs a model to get started
                     </Text>
-                    <Text fontSize="xs" color="fg.muted">
-                      Add a provider key and pick a default model — Langy starts
-                      working the moment you save.
-                    </Text>
+                    {/* The one subtitle under this heading is the provider
+                        grid's own description; a second line here read as a
+                        double title. */}
                     <ModelProviderScreen
                       variant="langy"
                       onComplete={() => void resolvedDefaultQuery.refetch()}
@@ -1800,7 +1802,7 @@ function LangyPanel({
             // investigate/attach) — so the `#` palette can reference everything
             // the conversation will actually be given.
             contextChips={allContextChips}
-            onRemoveChip={dismissChip}
+            onRemoveChip={removeContextChip}
             addableChips={addableChips}
             onAddChip={restoreChip}
             onKindIntent={onKindIntent}
@@ -1875,10 +1877,10 @@ function JumpToLatest({
 }
 
 function PanelHeader({
-  subtitle,
   conversationTitle,
   onNewChat,
   onClose,
+  hideClose,
   conversations,
   isLoadingConversations,
   hasListError,
@@ -1887,11 +1889,12 @@ function PanelHeader({
   onForkConversation,
   onRenameConversation,
 }: {
-  subtitle: string;
   /** The conversation's GENERATED title, or null while it has none yet. */
   conversationTitle: string | null;
   onNewChat: () => void;
   onClose: () => void;
+  /** Hide the Close control (drawer companion: the drawer owns the only X). */
+  hideClose: boolean;
   conversations: React.ComponentProps<typeof RecentChatsMenu>["conversations"];
   isLoadingConversations: boolean;
   hasListError: boolean;
@@ -1902,47 +1905,42 @@ function PanelHeader({
 }) {
   const panelMode = useLangyStore((s) => s.panelMode);
   const setPanelMode = useLangyStore((s) => s.setPanelMode);
-  const dockedToSide = panelMode === "sidebar";
-
   return (
     <>
-      {/* A chat app's header, not a toolbar. Identity LEADS: the title doubles
-          as the recents dropdown and TRUNCATES, so a long title can never shove
-          the controls off the edge (it used to). Then the actions — compose,
-          Foundry, dock, more — and finally the exit, held apart by a divider so
-          Close is unmistakably the last control and never lost in a row of
-          look-alike ghost icons. No avatar (the mark lives on the launcher and
-          above the empty state), no permanent GitHub icon (that connect lives
-          in the conversation, where it matters). */}
+      {/* ONE line, at the trace explorer search bar's height, a chat app's
+          header, not a masthead. Identity leads: the generated conversation
+          title (the wordmark until one lands), as a LABEL, not a control; it
+          truncates so it can never shove the rail off the edge. Then the
+          actions, compose, history (its own icon, with the searchable
+          popover), Foundry, more, and finally the exit, held apart by a
+          divider so Close is unmistakably the last control. Layout switching
+          lives in the overflow menu only.
+          Spec: specs/langy/langy-panel-header.feature */}
       <HStack
-        paddingTop="13px"
-        paddingBottom="12px"
+        minHeight="38px"
         paddingLeft="12px"
         paddingRight="10px"
         gap={1}
         flexShrink={0}
       >
-        {/* The TITLE IS the history control — the pattern every chat app uses,
-            and it retires a whole icon from the rail. RecentChatsMenu is
-            re-parented onto it (same list, same select, same delete); when
-            there is nothing to list it renders the title bare, so an empty
-            account never gets a dropdown that opens onto nothing. */}
-        <RecentChatsMenu
-          conversations={conversations}
-          isLoading={isLoadingConversations}
-          hasError={hasListError}
-          onSelect={onSelectConversation}
-          onDelete={onDeleteConversation}
-          onFork={onForkConversation}
-          onRename={onRenameConversation}
-          placement="bottom-start"
-          trigger={
-            <HeaderTitleTrigger
-              conversationTitle={conversationTitle}
-              subtitle={subtitle}
-            />
-          }
-        />
+        <Box
+          flex={1}
+          minWidth={0}
+          textStyle="sm"
+          fontWeight="600"
+          letterSpacing="-0.01em"
+          lineHeight="1.25"
+          color="fg"
+          whiteSpace="nowrap"
+          overflow="hidden"
+          textOverflow="ellipsis"
+        >
+          {conversationTitle ? (
+            <AnimatedConversationTitle title={conversationTitle} />
+          ) : (
+            "Langy"
+          )}
+        </Box>
 
         <HStack gap={0.5} flexShrink={0}>
           <Tooltip content="New chat" positioning={{ placement: "bottom" }}>
@@ -1957,161 +1955,88 @@ function PanelHeader({
             </IconButton>
           </Tooltip>
 
+          {/* No trigger prop: RecentChatsMenu renders its own History icon
+              button. An empty account gets a calm "No conversations yet"
+              popover rather than a dead control. */}
+          <RecentChatsMenu
+            conversations={conversations}
+            isLoading={isLoadingConversations}
+            hasError={hasListError}
+            onSelect={onSelectConversation}
+            onDelete={onDeleteConversation}
+            onFork={onForkConversation}
+            onRename={onRenameConversation}
+            placement="bottom-end"
+          />
+
           <LangyFoundryMenu />
 
-          {/* Dock ⇄ pop-out: the "minimize"/place control, now a real button in
-              the rail instead of buried in the overflow menu. */}
-          <Tooltip
-            content={dockedToSide ? "Pop out" : "Dock to side"}
-            positioning={{ placement: "bottom" }}
-          >
-            <IconButton
-              size="xs"
-              variant="ghost"
-              aria-label={
-                dockedToSide
-                  ? "Pop out into a floating panel"
-                  : "Dock to the side"
-              }
-              color="fg.muted"
-              onClick={() =>
-                setPanelMode(dockedToSide ? "floating" : "sidebar")
-              }
+          {/* One-click layout toggle, present in BOTH modes: floating offers
+              "Dock to side", docked offers "Float" (the reverse). The overflow
+              menu still lists both explicitly. */}
+          {panelMode === "floating" ? (
+            <Tooltip
+              content="Dock to side"
+              positioning={{ placement: "bottom" }}
             >
-              {dockedToSide ? (
-                <AppWindow size={15} />
-              ) : (
+              <IconButton
+                size="xs"
+                variant="ghost"
+                aria-label="Dock to the side"
+                color="fg.muted"
+                onClick={() => setPanelMode("sidebar")}
+              >
                 <PanelRight size={15} />
-              )}
-            </IconButton>
-          </Tooltip>
+              </IconButton>
+            </Tooltip>
+          ) : (
+            <Tooltip content="Float" positioning={{ placement: "bottom" }}>
+              <IconButton
+                size="xs"
+                variant="ghost"
+                aria-label="Float the panel"
+                color="fg.muted"
+                onClick={() => setPanelMode("floating")}
+              >
+                <PictureInPicture2 size={15} />
+              </IconButton>
+            </Tooltip>
+          )}
 
           <LangyOverflowMenu />
 
-          {/* The exit stands apart — Close is always the rightmost control. */}
-          <Box
-            width="1px"
-            alignSelf="stretch"
-            marginY="4px"
-            marginX="3px"
-            background="border"
-          />
+          {/* The exit stands apart — Close is always the rightmost control.
+              Hidden while riding beside a drawer: the drawer's own X is the
+              single close, so Langy doesn't offer a confusable twin. */}
+          {hideClose ? null : (
+            <>
+              <Box
+                width="1px"
+                alignSelf="stretch"
+                marginY="4px"
+                marginX="3px"
+                background="border"
+              />
 
-          <Tooltip content="Close" positioning={{ placement: "bottom" }}>
-            <IconButton
-              size="xs"
-              variant="ghost"
-              aria-label="Close Langy"
-              color="fg.muted"
-              onClick={onClose}
-            >
-              <X size={15} />
-            </IconButton>
-          </Tooltip>
+              <Tooltip content="Close" positioning={{ placement: "bottom" }}>
+                <IconButton
+                  size="xs"
+                  variant="ghost"
+                  aria-label="Close Langy"
+                  color="fg.muted"
+                  onClick={onClose}
+                >
+                  <X size={15} />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
         </HStack>
       </HStack>
       <Separator />
     </>
   );
 }
-
-/**
- * The header's title block, doubling as the recents dropdown trigger.
- *
- * Idle it is TEXT — no border, no background, no button chrome; the chevron is
- * invisible. On hover, on `:focus-visible`, and while the menu is open it grows
- * a faint surface and reveals the chevron, so the affordance is discoverable
- * without the header permanently looking like a row of buttons.
- *
- * It is a real `<button>`, so it is tabbable and Enter/Space open the menu.
- * `forwardRef` + prop-spreading matter here: Chakra's `Menu.Trigger asChild`
- * clones this element and needs to land its ref and its aria/data attributes on
- * the DOM node.
- */
-const HeaderTitleTrigger = forwardRef<
-  HTMLButtonElement,
-  {
-    conversationTitle: string | null;
-    subtitle: string;
-  } & React.ButtonHTMLAttributes<HTMLButtonElement>
->(function HeaderTitleTrigger({ conversationTitle, subtitle, ...rest }, ref) {
-  return (
-    <chakra.button
-      ref={ref}
-      type="button"
-      // Sans, deliberately. Sentient is a DISPLAY face — it belongs on the empty
-      // state's one big line, not on chrome. Once the title reactor lands a
-      // generated title it REPLACES the wordmark, written in with the same
-      // blur-reveal the recents list uses. Until then there is no title at all —
-      // no skeleton, no id, no "New chat" stand-in. Absent, then present.
-      {...rest}
-      display="flex"
-      alignItems="center"
-      gap={1}
-      flex={1}
-      minWidth={0}
-      textAlign="left"
-      paddingX={1.5}
-      paddingY={1}
-      borderRadius="8px"
-      background="transparent"
-      cursor="pointer"
-      transition="background 130ms ease"
-      _hover={{ background: "bg.subtle" }}
-      _focusVisible={{ outline: "none", background: "bg.subtle" }}
-      css={{
-        "&:hover .title-chev, &:focus-visible .title-chev, &[data-state='open'] .title-chev":
-          { opacity: 1 },
-      }}
-    >
-      <VStack align="start" gap={0} flex={1} minWidth={0}>
-        <Box
-          textStyle="sm"
-          fontWeight="600"
-          letterSpacing="-0.01em"
-          lineHeight="1.25"
-          color="fg"
-          width="full"
-          // minWidth:0 lets this shrink below the title's intrinsic width so the
-          // ellipsis engages instead of the title pushing the header controls
-          // off the panel's edge — the whole point of the truncation chain here
-          // and inside AnimatedConversationTitle.
-          minWidth={0}
-          whiteSpace="nowrap"
-          overflow="hidden"
-          textOverflow="ellipsis"
-        >
-          {conversationTitle ? (
-            <AnimatedConversationTitle title={conversationTitle} />
-          ) : (
-            "Langy"
-          )}
-        </Box>
-        <Text
-          textStyle="2xs"
-          color="fg.muted"
-          lineHeight="1.3"
-          marginTop="1px"
-          truncate
-          width="full"
-        >
-          {subtitle}
-        </Text>
-      </VStack>
-      <Box
-        className="title-chev"
-        color="fg.subtle"
-        opacity={0}
-        flexShrink={0}
-        transition="opacity 130ms ease"
-        display="grid"
-        placeItems="center"
-      >
-        <ChevronDown size={14} />
-      </Box>
-    </chakra.button>
-  );
-});
 
 /**
  * The header's overflow — one `⋯` for everything that is a SETTING rather than

@@ -22,6 +22,8 @@ import { useOnboardingStore } from "../store/onboardingStore";
 import {
   type AnchorRect,
   HighlightRing,
+  isAnchorParkedOffscreen,
+  isAnchorSettled,
   measureAnchor,
   SpotlightPopover,
 } from "./SpotlightOverlay";
@@ -86,17 +88,42 @@ export function DrawerSpotlights({
     setAnchorRect(current ? measureAnchor(current.anchor) : null);
   }, [current]);
 
+  // Place the ring only once the anchor has SETTLED. On open the drawer
+  // slides in, and when Langy rides alongside as the companion the drawer
+  // is parked fully off-screen during the ride's entrance delay. A single
+  // rAF-after-mount can catch the anchor mid-slide (or parked off-screen)
+  // and the fixed ring plus its full-viewport scrim would stick there. So
+  // poll each frame until the anchor is on-screen and holds still for two
+  // consecutive frames, capped — robust against any entrance animation.
   useEffect(() => {
     if (!current) {
       setAnchorRect(null);
       return;
     }
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(remeasure);
+    let previous: AnchorRect | null = null;
+    let frames = 0;
+    const MAX_FRAMES = 90; // ~1.5s ceiling so a perpetual animation still resolves
+    const settle = () => {
+      const next = measureAnchor(current.anchor);
+      const parked =
+        next !== null &&
+        isAnchorParkedOffscreen(next, window.innerWidth, window.scrollX);
+      if (
+        isAnchorSettled(next, previous, window.innerWidth, window.scrollX) ||
+        frames >= MAX_FRAMES
+      ) {
+        setAnchorRect(next);
+        return;
+      }
+      previous = parked ? null : next;
+      frames += 1;
+      rafRef.current = requestAnimationFrame(settle);
+    };
+    rafRef.current = requestAnimationFrame(settle);
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [current, remeasure]);
+  }, [current]);
 
   useEffect(() => {
     if (!current) return;

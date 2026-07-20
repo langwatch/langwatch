@@ -5,12 +5,12 @@ Feature: Langy persists across in-project navigation
 
   # Companion to specs/assistant/langy-baseline.feature ("Mounting and visibility").
   #
-  # Today Langy is mounted inside the per-page DashboardLayout, so navigating
-  # between project pages tears it down and rebuilds it — closing the panel,
-  # dropping the draft, and aborting any in-flight response. This spec pins the
-  # intended lifecycle: mount Langy once per project, above the swapping page,
-  # so it survives navigation *within* a project and resets only when the
-  # project (the URL :project segment) changes. Visibility itself is unchanged.
+  # Langy mounts once per project, above the swapping page, so it survives
+  # navigation *within* a project and resets only when the AMBIENT project
+  # changes. The ambient project (not the URL :project segment) is the reset
+  # boundary on purpose: settings pages carry no project segment but still
+  # resolve the project the user is working in, so the panel travels with them
+  # into settings and back. Visibility itself is unchanged.
 
   Background:
     Given I am signed in with Langy enabled for project "demo"
@@ -26,6 +26,14 @@ Feature: Langy persists across in-project navigation
     Then the Langy panel is still open
     And it shows the same conversation it had on the traces page
     And the panel was not remounted or reloaded
+
+  @unit
+  Scenario: The open state survives a full page reload
+    Given the Langy panel is open
+    When I reload the window
+    Then the panel is restored open
+    And had I closed it first, a reload would restore it closed
+    But the conversation is not restored (per-session state starts clean)
 
   @integration @unimplemented
   Scenario: A half-typed message survives navigation
@@ -59,13 +67,12 @@ Feature: Langy persists across in-project navigation
   # Visibility is unchanged by the move
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
-  Scenario: Langy is absent outside project routes
-    # Tracked: ProjectLangyLayout only mounts under /:project/*, but the
-    # negative case (non-project route) isn't pinned by a router test yet.
-    When I navigate to a non-project route such as "/settings"
-    Then Langy is not mounted
-    And no Langy handle or panel is visible
+  @integration
+  Scenario: Langy travels into settings and back
+    When I navigate to "/settings" while "demo" is my ambient project
+    Then the Langy panel is still available
+    And returning to a "demo" page keeps the same conversation
+    # The panel is not remounted on the way: the ambient project never changed.
 
   @integration
   Scenario: The visibility gate is not widened

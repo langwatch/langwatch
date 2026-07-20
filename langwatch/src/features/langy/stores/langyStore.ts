@@ -167,6 +167,34 @@ interface LangyState {
   panelEffect: LangyPanelEffect;
   setPanelEffect: (effect: LangyPanelEffect) => void;
 
+  /**
+   * How many mounted app shells have claimed the docked panel's placement.
+   *
+   * The app shell (DashboardLayout) draws the page as a rounded content card
+   * on the gray page ground. When such a shell is mounted it CLAIMS the dock:
+   * it reserves the panel's room inside its own content row (keeping the
+   * header full-width) and the docked panel renders as a second rounded card
+   * below the header. Pages without a shell (full-screen tools like the
+   * studio) leave the count at zero and keep the flush full-height dock with
+   * the page-level width reservation. A count, not a boolean, so nested or
+   * twin mounts (StrictMode) stay correct. Never persisted: it mirrors what
+   * is mounted right now. Spec: specs/langy/langy-panel-layout.feature
+   */
+  dockShellClaims: number;
+  claimDockShell: () => void;
+  releaseDockShell: () => void;
+
+  /**
+   * The docked panel is open and reserving room right now, the one truth the
+   * page wrapper computes (visibility gate + open + sidebar mode, see
+   * LangyShiftedRoot) and the app shell consumes to reserve the dock's room
+   * inside its content row. Kept in the store so the shell never re-derives
+   * Langy's visibility gating (which needs session hooks a public shell must
+   * not run). Never persisted.
+   */
+  dockShifted: boolean;
+  setDockShifted: (shifted: boolean) => void;
+
   // Active conversation (a pointer into React Query server state)
   activeConversationId: string | null;
   /**
@@ -344,10 +372,24 @@ export const useLangyStore = create<LangyState>()(
         }),
       consumePendingPrompt: () => set({ pendingPrompt: null }),
 
-      panelMode: "floating",
+      // Sidebar by default: docked inside the app shell as a second content
+      // card, working alongside the page. Floating stays one toggle away in
+      // the overflow menu (user-picked, persisted).
+      panelMode: "sidebar",
       setPanelMode: (panelMode) => set({ panelMode }),
       panelEffect: "plain",
       setPanelEffect: (panelEffect) => set({ panelEffect }),
+
+      dockShellClaims: 0,
+      claimDockShell: () =>
+        set((state) => ({ dockShellClaims: state.dockShellClaims + 1 })),
+      releaseDockShell: () =>
+        set((state) => ({
+          dockShellClaims: Math.max(0, state.dockShellClaims - 1),
+        })),
+
+      dockShifted: false,
+      setDockShifted: (dockShifted) => set({ dockShifted }),
 
       activeConversationId: null,
       historyLoadConversationId: null,
@@ -535,10 +577,14 @@ export const useLangyStore = create<LangyState>()(
     }),
     {
       name: "langy:store",
-      // Durable across sessions: developer mode + the layout mode. Everything
-      // else is per-session client state that must start clean (the panel opens
-      // empty by default).
+      // Durable across sessions: whether the panel is open, developer mode, and
+      // the layout mode. `isOpen` persists so a page reload restores the panel
+      // exactly as the user left it (open stays open, closed stays closed) —
+      // the visibility gate (useShowLangy) still decides whether it renders at
+      // all, so this never forces the panel onto a surface without Langy.
+      // Everything else is per-session conversation state that must start clean.
       partialize: (state) => ({
+        isOpen: state.isOpen,
         devMode: state.devMode,
         panelMode: state.panelMode,
         panelEffect: state.panelEffect,
