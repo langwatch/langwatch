@@ -9,6 +9,7 @@ import {
   ApiKeyNotFoundError,
   ApiKeyNotOwnedError,
   ApiKeyAlreadyRevokedError,
+  ApiKeyReservedNameError,
   ApiKeyScopeViolationError,
 } from "~/server/api-key/errors";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
@@ -157,6 +158,12 @@ secured
           return c.json(
             { error: "Forbidden", message: error.message },
             403,
+          );
+        }
+        if (error instanceof ApiKeyReservedNameError) {
+          return c.json(
+            { error: "Unprocessable Entity", message: error.message },
+            422,
           );
         }
         throw error;

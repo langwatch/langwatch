@@ -23,6 +23,7 @@ import {
   ApiKeyAlreadyRevokedError,
   ApiKeyNotFoundError,
   ApiKeyNotOwnedError,
+  ApiKeyReservedNameError,
   ApiKeyScopeViolationError,
 } from "./errors";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
@@ -114,6 +115,7 @@ export class ApiKeyService {
     ingestSourceType,
     ingestionTemplateId,
     createdByDeviceLabel,
+    systemManaged = false,
   }: {
     name: string;
     description?: string | null;
@@ -127,7 +129,19 @@ export class ApiKeyService {
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
+    /**
+     * Only the product's own minting paths (e.g. the Langy session key) may
+     * claim a HIDDEN_SYSTEM_KEY_NAMES name. Customer entry points leave this
+     * unset: a customer-created key with a reserved name would vanish from
+     * every listing and the system-managed guard would refuse to ever rename
+     * or revoke it — a stealth, permanent credential.
+     */
+    systemManaged?: boolean;
   }): Promise<{ token: string; apiKey: ApiKey }> {
+    if (!systemManaged && HIDDEN_SYSTEM_KEY_NAMES.includes(name)) {
+      throw new ApiKeyReservedNameError(name);
+    }
+
     const hasCustomBinding = bindings.some((b) => b.role === TeamUserRole.CUSTOM);
     const hasPermissions = !!permissions && permissions.length > 0;
     const isRestricted = permissionMode === "restricted";
@@ -281,6 +295,12 @@ export class ApiKeyService {
     // Reported as not-found, like the tenancy mismatch above, so the response
     // doesn't confirm the id exists.
     if (isSystemManaged(existing)) throw new ApiKeyNotFoundError(id);
+    // Renaming a customer key TO a reserved name is the same squat as
+    // creating one: the key would drop out of every listing and this very
+    // guard would then refuse to rename or revoke it.
+    if (name !== undefined && HIDDEN_SYSTEM_KEY_NAMES.includes(name)) {
+      throw new ApiKeyReservedNameError(name);
+    }
 
     if (!callerIsAdmin) {
       if (!existing.userId || existing.userId !== callerUserId) {

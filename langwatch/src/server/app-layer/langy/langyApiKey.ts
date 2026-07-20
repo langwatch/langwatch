@@ -343,7 +343,10 @@ export async function mintLangySessionApiKey({
     async () =>
       service.create({
         // Reserved name — hidden from the API-keys UI so per-session keys don't
-        // clutter the list (see HIDDEN_SYSTEM_KEY_NAMES).
+        // clutter the list (see HIDDEN_SYSTEM_KEY_NAMES). `systemManaged` is
+        // what lets this path claim the name customer entry points are
+        // refused.
+        systemManaged: true,
         name: LANGY_SESSION_API_KEY_NAME,
         description:
           "Ephemeral per-session key for the Langy assistant. Mirrors your own " +
