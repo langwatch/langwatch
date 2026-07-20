@@ -3,13 +3,13 @@ import {
   extractAssistantTextFromResponseBody,
   isConversationalQuerySource,
 } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
+import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
   serializeMediaRefs,
-} from "~/server/app-layer/traces/media-refs";
-import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+} from "~/shared/traces/media-refs";
 import type { LogRecordReceivedEventData } from "../../schemas/events";
 import type { NormalizedSpan } from "../../schemas/spans";
 

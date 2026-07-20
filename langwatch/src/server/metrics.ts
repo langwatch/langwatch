@@ -219,7 +219,16 @@ const edgeMediaExtractFailOpenCounter = new Counter({
 });
 
 export const getEdgeMediaExtractFailOpenCounter = (
-  reason: "flag_store" | "privacy_probe" | "storage",
+  reason:
+    | "flag_store"
+    | "privacy_probe"
+    | "storage"
+    // Budget drops: parts left inline because the per-span cap or the
+    // extraction deadline was hit, or because one part's store failed while
+    // the rest of the span proceeded. Not errors of the hook itself.
+    | "part_cap"
+    | "deadline"
+    | "part_store",
 ) => edgeMediaExtractFailOpenCounter.labels(reason);
 
 // Online-evaluator loop guard counter (post-2026-05-11 incident). A healthy

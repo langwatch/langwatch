@@ -9,6 +9,7 @@ import {
 import type { ReactJsonViewProps } from "@microlink/react-json-view";
 import React, { useMemo, useState } from "react";
 import type { SpanInputOutput } from "~/server/tracer/types";
+import { collectMediaParts } from "~/shared/traces/mediaParts";
 import dynamic from "~/utils/compat/next-dynamic";
 import {
   isPythonRepr,
@@ -18,8 +19,7 @@ import { CopyIcon } from "../icons/Copy";
 import { useColorMode } from "../ui/color-mode";
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
-import { collectMediaParts } from "./mediaParts";
-import { TraceMediaPart } from "./TraceMediaPart";
+import { TraceMediaStrip } from "./TraceMediaStrip";
 
 // Must be outside the component — React.lazy creates a new type on each call,
 // so calling dynamic() inside render causes infinite suspend loops.
@@ -176,13 +176,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
 
   return (
     <Box position="relative" width="full">
-      {mediaParts.length > 0 && (
-        <VStack align="flex-start" gap={2} marginBottom={2}>
-          {mediaParts.map((p, i) => (
-            <TraceMediaPart key={`trace-media-${i}`} part={p} />
-          ))}
-        </VStack>
-      )}
+      <TraceMediaStrip parts={mediaParts} />
       {typeof document !== "undefined" &&
       (json ?? (typeof value === "string" && isPythonRepr(value))) ? (
         renderJson(json ?? (value as any))

@@ -1,4 +1,4 @@
-import type { TraceMediaRef } from "~/server/app-layer/traces/media-refs";
+import type { TraceMediaRef } from "~/shared/traces/media-refs";
 
 export type TraceStatus = "ok" | "error" | "warning";
 

@@ -4,10 +4,15 @@ import { z } from "zod";
 // Scoped output models – one per drawer use-case
 // ---------------------------------------------------------------------------
 
-/** Compact media reference riding a trace summary (see media-refs.ts). */
+/**
+ * Compact media reference riding a trace summary (see media-refs.ts). The
+ * url is contractually a stored-objects reference — the list cell mounts it
+ * straight into an <img src>, so anything else must fail loudly here rather
+ * than reach a renderer.
+ */
 const traceMediaRefSchema = z.object({
   kind: z.enum(["audio", "image", "video", "file"]),
-  url: z.string(),
+  url: z.string().startsWith("/api/files/"),
   filename: z.string().optional(),
   mimeType: z.string().optional(),
 });

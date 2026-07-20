@@ -1,7 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
 import { LuCalendarClock, LuFileText, LuFlaskConical } from "react-icons/lu";
-import { mediaRefToMediaData } from "~/components/traces/mediaParts";
 import { TraceMediaPart } from "~/components/traces/TraceMediaPart";
 import { PrivacyDroppedNotice } from "~/components/ui/PrivacyDroppedNotice";
 import { RedactedField } from "~/components/ui/RedactedField";
@@ -14,7 +13,8 @@ import {
   parseMediaRefs,
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
-} from "~/server/app-layer/traces/media-refs";
+} from "~/shared/traces/media-refs";
+import { mediaRefToMediaData } from "~/shared/traces/mediaParts";
 import { useTraceEvaluations } from "../../../hooks/useTraceEvaluations";
 import { useTraceEvents } from "../../../hooks/useTraceEvents";
 import { useTraceResources } from "../../../hooks/useTraceResources";
@@ -52,12 +52,7 @@ export function TraceSummaryAccordions({
   // the media strips below and the table's preview column) — as metadata
   // rows they are two long JSON blobs that drown the real attributes.
   const traceAttributes = useMemo(
-    () =>
-      Object.fromEntries(
-        Object.entries(trace.attributes ?? {}).filter(
-          ([key]) => !key.startsWith("langwatch.reserved.media_refs."),
-        ),
-      ),
+    () => filterReservedMediaRefAttributes(trace.attributes ?? {}),
     [trace.attributes],
   );
   // Trace-level events are read as their own query (like evaluations), not off
@@ -255,7 +250,9 @@ export function TraceSummaryAccordions({
                       <MissingIORow label="Input" mode="input" />
                     )}
                     <SummaryMediaStrip
-                      refsJson={trace.attributes[RESERVED_INPUT_MEDIA_REFS]}
+                      refsJson={
+                        (trace.attributes ?? {})[RESERVED_INPUT_MEDIA_REFS]
+                      }
                     />
                   </RedactedField>
                   <RedactedField
@@ -274,7 +271,9 @@ export function TraceSummaryAccordions({
                       <MissingIORow label="Output" mode="output" />
                     )}
                     <SummaryMediaStrip
-                      refsJson={trace.attributes[RESERVED_OUTPUT_MEDIA_REFS]}
+                      refsJson={
+                        (trace.attributes ?? {})[RESERVED_OUTPUT_MEDIA_REFS]
+                      }
                     />
                   </RedactedField>
                 </VStack>
@@ -526,7 +525,21 @@ export function TraceSummaryAccordions({
  * (align="flex-start" — stretching would blow a small image up to panel
  * width).
  */
-function SummaryMediaStrip({
+/**
+ * Drops the reserved media-refs entries from a summary attribute map so the
+ * metadata table shows real attributes, not the strips' plumbing JSON.
+ */
+export function filterReservedMediaRefAttributes(
+  attributes: Record<string, string>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(attributes).filter(
+      ([key]) => !key.startsWith("langwatch.reserved.media_refs."),
+    ),
+  );
+}
+
+export function SummaryMediaStrip({
   refsJson,
 }: {
   refsJson: string | undefined;

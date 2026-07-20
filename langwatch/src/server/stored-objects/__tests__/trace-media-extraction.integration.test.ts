@@ -100,7 +100,10 @@ vi.mock("~/env.mjs", () => ({
 let ch: ClickHouseClient;
 let tmpDir: string;
 
-const PROJECT = `test-tme-proj-${nanoid(6)}`;
+// Reassigned per test (see beforeEach): storage is content-addressed per
+// project, so a shared project would couple tests through dedup hits on
+// earlier tests' bytes. Helpers read this at call time, inside the test.
+let PROJECT = `test-tme-proj-${nanoid(6)}`;
 
 const testLogger = { info: vi.fn(), warn: vi.fn() };
 
@@ -262,6 +265,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  PROJECT = `test-tme-proj-${nanoid(6)}`;
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "tme-int-test-"));
   testLogger.info.mockClear();
   testLogger.warn.mockClear();
@@ -568,9 +572,6 @@ describe("trace media extraction at the ingestion edge", () => {
         mintUri,
       );
 
-      // Unique bytes: reusing another test's audio would dedup-hit the CH row
-      // stored earlier and skip the PUT entirely — never reaching the broken
-      // storage this test exists to exercise.
       const audio = makeAudioBytes(4444);
       const span = makeSpan([
         {
@@ -586,10 +587,13 @@ describe("trace media extraction at the ingestion edge", () => {
         logger: testLogger,
       });
 
+      // Per-part fail-open: the failed part stays inline (no rewrite at all
+      // here, so the command data passes through by identity) and the drop is
+      // logged and counted — never silent, never blocking ingestion.
       expect(result).toBe(data);
       expect(testLogger.warn).toHaveBeenCalledWith(
-        expect.objectContaining({ reason: "storage" }),
-        expect.stringContaining("fail-open"),
+        expect.objectContaining({ failedParts: 1 }),
+        expect.stringContaining("stay inline"),
       );
     });
   });

@@ -8,13 +8,15 @@
  * reserved attributes, giving the trace list and the drawer summary a way to
  * show thumbnails and players without reloading span payloads.
  *
- * Only URL references are kept (post-extraction media is always a
- * `/api/files/{projectId}/{id}` reference): inline base64 would re-bloat the
- * summary row the extraction just slimmed. Capped to a handful per side —
- * enough for a preview, never a payload.
+ * Refs are STRICTLY `/api/files/{projectId}/{id}` references — the shape the
+ * extraction pipeline mints. Inline base64 would re-bloat the summary row the
+ * extraction just slimmed, and an arbitrary URL here would hand every list
+ * viewer's browser to whoever controls span content, so both the collector
+ * and the defensive parser reject anything else. Capped to a handful per
+ * side — enough for a preview, never a payload.
  */
 
-import { collectMediaParts } from "~/components/traces/mediaParts";
+import { collectMediaParts } from "~/shared/traces/mediaParts";
 
 export interface TraceMediaRef {
   kind: "audio" | "image" | "video" | "file";
@@ -39,17 +41,27 @@ function kindFromMime(mimeType: string): TraceMediaRef["kind"] {
 }
 
 /**
+ * Trace-summary refs only ever point at our own stored-objects read route.
+ * Anything else — external http(s), `data:` payloads (bloat), `javascript:`
+ * (XSS), protocol-relative — is dropped both when folding refs in and when
+ * parsing them back out.
+ */
+function isStoredObjectRefUrl(url: string): boolean {
+  return url.startsWith("/api/files/") && !url.includes("..");
+}
+
+/**
  * Walks a span IO value (typed envelope, messages, nested JSON strings — the
  * same shapes `collectMediaParts` handles) and returns the compact reference
  * list. `collectMediaParts` is React-free and isomorphic by design; this is
- * its server-side consumer.
+ * its fold-side consumer.
  */
 export function collectMediaRefs(value: unknown): TraceMediaRef[] {
   const refs: TraceMediaRef[] = [];
   for (const part of collectMediaParts(value)) {
     if (refs.length >= MAX_TRACE_MEDIA_REFS) break;
     if (part.type === "binary") {
-      if (!part.url) continue;
+      if (!part.url || !isStoredObjectRefUrl(part.url)) continue;
       const kind = kindFromMime(part.mimeType);
       refs.push({
         kind,
@@ -57,7 +69,10 @@ export function collectMediaRefs(value: unknown): TraceMediaRef[] {
         ...(part.filename ? { filename: part.filename } : {}),
         ...(kind === "file" ? { mimeType: part.mimeType } : {}),
       });
-    } else if (part.source.type === "url") {
+    } else if (
+      part.source.type === "url" &&
+      isStoredObjectRefUrl(part.source.value)
+    ) {
       refs.push({ kind: part.type, url: part.source.value });
     }
   }
@@ -72,7 +87,13 @@ export function serializeMediaRefs(value: unknown): string | null {
 
 const VALID_KINDS = new Set(["audio", "image", "video", "file"]);
 
-/** Defensive parse of a reserved media-refs attribute value. */
+/**
+ * Defensive parse of a reserved media-refs attribute value. The attribute
+ * namespace is not writable by SDKs in the normal flow, but nothing in this
+ * parser assumes that: kinds are allowlisted and every url must be a
+ * stored-objects reference, so a crafted attribute cannot smuggle an
+ * external or scripted URL to a renderer.
+ */
 export function parseMediaRefs(
   serialized: string | null | undefined,
 ): TraceMediaRef[] {
@@ -89,7 +110,7 @@ export function parseMediaRefs(
         typeof candidate.kind === "string" &&
         VALID_KINDS.has(candidate.kind) &&
         typeof candidate.url === "string" &&
-        candidate.url.length > 0
+        isStoredObjectRefUrl(candidate.url)
       ) {
         refs.push({
           kind: candidate.kind as TraceMediaRef["kind"],

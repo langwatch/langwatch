@@ -34,14 +34,14 @@ import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { resolveRawPcmFormat, wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
+import {
+  parseBase64DataUri,
+  visitContentPartAsync,
+} from "~/shared/content-parts/visit-content-part";
 import { binaryInputPartSchema } from "./binary-part";
 import { coerceContentToArray } from "./coerce-content-to-array";
 import { isReadbackSafe } from "./safe-media-types";
 import type { StoredObjectsService } from "./stored-objects.service";
-import {
-  parseBase64DataUri,
-  visitContentPartAsync,
-} from "./visit-content-part";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.content-extractor");
 

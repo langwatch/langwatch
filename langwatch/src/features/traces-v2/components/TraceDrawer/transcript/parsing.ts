@@ -1,4 +1,4 @@
-import { mediaPartToMediaData } from "~/components/traces/mediaParts";
+import { mediaPartToMediaData } from "~/shared/traces/mediaParts";
 import type { ChatMessage, ContentBlock } from "./types";
 
 /**

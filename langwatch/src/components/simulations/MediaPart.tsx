@@ -14,34 +14,9 @@ import { Badge, Box, Icon, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink, File, FileText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { resolveRawPcmFormat, wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
+import { isSafeMediaUrl, type MediaPartData } from "~/shared/traces/mediaParts";
 import { api } from "~/utils/api";
 import type { AudioPlaybackProps } from "./useSequentialAudioPlayback";
-
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
-
-/**
- * A single AG-UI media content part, as produced after content-extraction.
- * This matches the subset of InputContentPart shapes we render.
- */
-export type MediaPartData =
-  | {
-      type: "image" | "audio" | "video";
-      source: { type: "url"; value: string; mimeType?: string };
-    }
-  | {
-      type: "image" | "audio" | "video";
-      source: { type: "data"; value: string; mimeType: string };
-    }
-  | {
-      type: "binary";
-      mimeType: string;
-      id?: string;
-      url?: string;
-      data?: string;
-      filename?: string;
-    };
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -135,6 +110,13 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
     !src.startsWith("data:") &&
     (part.type === "binary" ? !!part.url : part.source.type === "url");
 
+  // Part URLs come from span content, which is attacker-controllable by
+  // anyone who can send traces. A src outside the allowlist (`javascript:`,
+  // `blob:`, protocol-relative, ...) must never reach an element src or
+  // anchor href — it renders as the error badge instead, after the hooks
+  // below (which all no-op on it).
+  const unsafeSrc = src !== "" && !isSafeMediaUrl(src);
+
   const [status, setStatus] = useState<LoadStatus>(
     isUrlBased ? "loading" : "ok",
   );
@@ -202,7 +184,7 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
   // WAV container client-side, and play from a blob URL. New objects are
   // wrapped at store time and never take this path.
   const rawUrlFormat =
-    isUrlBased && category === "audio"
+    isUrlBased && !unsafeSrc && category === "audio"
       ? resolveRawPcmFormat(undefined, mimeType)
       : null;
   const [wrappedSrc, setWrappedSrc] = useState<string | null>(null);
@@ -244,6 +226,10 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
       cancelled = true;
       controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
+      // Also drop the published state: a rapid src swap would otherwise
+      // briefly point the <audio> at the just-revoked URL and fire a
+      // spurious error before the new wrap resolves.
+      setWrappedSrc(null);
     };
     // handleError is a stable-in-practice component function; src/format are
     // the real inputs of this effect.
@@ -251,7 +237,7 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
   }, [src, rawUrlFormat]);
 
   // Missing or error placeholder
-  if (status === "missing" || (status === "error" && src === "")) {
+  if (unsafeSrc || status === "missing" || (status === "error" && src === "")) {
     return (
       <Box
         data-testid="media-part-missing"

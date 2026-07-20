@@ -1,8 +1,6 @@
-import {
-  MediaPart,
-  type MediaPartData,
-} from "~/components/simulations/MediaPart";
+import { MediaPart } from "~/components/simulations/MediaPart";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { MediaPartData } from "~/shared/traces/mediaParts";
 
 /**
  * Render one media content part (audio, image, video, attachment chip) via

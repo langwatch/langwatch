@@ -77,9 +77,27 @@ function jsonResponse(body: unknown, status: number): Response {
 }
 
 /**
- * Checks that the caller (API key or session user) is allowed to read a file
- * owned by `ownerProjectId`. Throws HTTPException(403) or HTTPException(401)
- * on failure; returns void on success.
+ * Stored objects are shared by several features, and which permission guards
+ * a read depends on what the object IS: trace media requires `traces:view`,
+ * scenario media requires `scenarios:view` — the two are separate permission
+ * categories and a custom role can hold one without the other.
+ */
+const FILE_VIEW_PERMISSIONS = ["traces:view", "scenarios:view"] as const;
+
+export function requiredPermissionForPurpose(
+  purpose: string,
+): (typeof FILE_VIEW_PERMISSIONS)[number] {
+  return purpose === "trace_content" ? "traces:view" : "scenarios:view";
+}
+
+/**
+ * Checks that the caller (API key or session user) is allowed to read files
+ * owned by `ownerProjectId` AT ALL. Runs BEFORE the row is read so a foreign
+ * claim is always 403 regardless of row existence (no 403-vs-404 oracle);
+ * because the object's purpose is not known yet, a session user passes with
+ * ANY of the file-view permissions — the purpose-specific gate runs after
+ * the read (`authorizeFilePurpose`). Throws HTTPException(403)/(401) on
+ * failure; returns void on success.
  */
 async function authorizeFileRead({
   apiKeyProjectId,
@@ -95,18 +113,51 @@ async function authorizeFileRead({
       throw new HTTPException(403, { message: "forbidden" });
     }
   } else if (userId) {
-    try {
-      await requireProjectPermission({
-        userId,
-        projectId: ownerProjectId,
-        permission: "scenarios:view",
-        prisma,
-      });
-    } catch {
-      throw new HTTPException(403, { message: "forbidden" });
+    for (const permission of FILE_VIEW_PERMISSIONS) {
+      try {
+        await requireProjectPermission({
+          userId,
+          projectId: ownerProjectId,
+          permission,
+          prisma,
+        });
+        return;
+      } catch {
+        // try the next category
+      }
     }
+    throw new HTTPException(403, { message: "forbidden" });
   } else {
     throw new HTTPException(401, { message: "unauthenticated" });
+  }
+}
+
+/**
+ * Purpose-specific authorization, applied once the row (and so its purpose)
+ * is known: `trace_content` objects require `traces:view`, everything else
+ * (the scenario purposes) requires `scenarios:view`. API-key callers are
+ * project-scoped full readers on this legacy-key surface and were already
+ * pinned to the owning project in `authorizeFileRead`.
+ */
+async function authorizeFilePurpose({
+  userId,
+  ownerProjectId,
+  purpose,
+}: {
+  userId: string | undefined;
+  ownerProjectId: string;
+  purpose: string;
+}): Promise<void> {
+  if (!userId) return;
+  try {
+    await requireProjectPermission({
+      userId,
+      projectId: ownerProjectId,
+      permission: requiredPermissionForPurpose(purpose),
+      prisma,
+    });
+  } catch {
+    throw new HTTPException(403, { message: "forbidden" });
   }
 }
 
@@ -301,6 +352,14 @@ async function handleFileRead(
   if (!result) {
     return jsonResponse({ status: "not_found" }, 404);
   }
+
+  // Step 4.5: purpose gate — now that the row is known, enforce the
+  // permission category the object's purpose maps to.
+  await authorizeFilePurpose({
+    userId,
+    ownerProjectId: authorizedProjectId,
+    purpose: result.row.purpose,
+  });
 
   if (!("stream" in result)) {
     return jsonResponse({ status: "missing" }, 404);

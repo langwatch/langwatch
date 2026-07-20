@@ -11,9 +11,13 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { containsMediaMarkers } from "../media-markers";
+import { containsMediaMarkers } from "~/shared/content-parts/media-markers";
 import type { StoredObjectsService } from "../stored-objects.service";
-import { extractInlineMediaFromValue } from "../value-media-extractor";
+import {
+  createExtractionBudget,
+  extractInlineMediaFromValue,
+  MAX_MEDIA_PARTS_PER_SPAN,
+} from "../value-media-extractor";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -363,6 +367,205 @@ describe("extractInlineMediaFromValue", () => {
       expect((result.value as { image: string }).image).toBe(
         "/api/files/proj-1/so-1",
       );
+    });
+  });
+});
+
+describe("extraction budget", () => {
+  const imagePart = (i: number) => ({
+    type: "image_url",
+    image_url: { url: `data:image/png;base64,QUJD${i}A` },
+  });
+  const contentWith = (count: number) => [
+    {
+      role: "user",
+      content: Array.from({ length: count }, (_, i) => imagePart(i)),
+    },
+  ];
+
+  describe("given more inline parts than the per-span cap", () => {
+    /** @scenario Extraction cost inside the collector request is bounded */
+    it("externalizes at most the cap and leaves the rest inline, counted", async () => {
+      const { service, calls } = makeFakeService();
+      const budget = createExtractionBudget();
+      const value = contentWith(MAX_MEDIA_PARTS_PER_SPAN + 4);
+
+      const result = await extractInlineMediaFromValue({
+        value,
+        service,
+        budget,
+        ...PARAMS,
+      });
+
+      expect(calls).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);
+      expect(result.refs).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);
+      expect(budget.droppedByCap).toBe(4);
+      const parts = (
+        result.value as Array<{
+          content: Array<{ image_url: { url: string } }>;
+        }>
+      )[0]!.content;
+      const externalized = parts.filter((p) =>
+        p.image_url.url.startsWith("/api/files/"),
+      );
+      const inline = parts.filter((p) => p.image_url.url.startsWith("data:"));
+      expect(externalized).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);
+      expect(inline).toHaveLength(4);
+    });
+  });
+
+  describe("given the deadline has already passed", () => {
+    it("stores nothing and returns the value unchanged by identity", async () => {
+      const { service, calls } = makeFakeService();
+      const budget = createExtractionBudget();
+      budget.deadlineAt = Date.now() - 1;
+      const value = contentWith(3);
+
+      const result = await extractInlineMediaFromValue({
+        value,
+        service,
+        budget,
+        ...PARAMS,
+      });
+
+      expect(calls).toHaveLength(0);
+      expect(result.value).toBe(value);
+      expect(budget.droppedByDeadline).toBe(3);
+    });
+  });
+
+  describe("given the deadline expires between store waves", () => {
+    it("keeps references for parts already stored (no orphaned bytes)", async () => {
+      const calls: number[] = [];
+      const service = {
+        storeFromBytes: async () => {
+          calls.push(calls.length);
+          // Each wave takes ~40ms; the deadline lands inside the first wave.
+          await new Promise((resolve) => setTimeout(resolve, 40));
+          return { id: `so-${calls.length}`, isDuplicate: false };
+        },
+      } as unknown as StoredObjectsService;
+      const budget = createExtractionBudget();
+      budget.deadlineAt = Date.now() + 20;
+      // 8 parts = two waves of 4: wave one launches before the deadline,
+      // wave two is checked after it and dropped.
+      const value = contentWith(8);
+
+      const result = await extractInlineMediaFromValue({
+        value,
+        service,
+        budget,
+        ...PARAMS,
+      });
+
+      expect(calls).toHaveLength(4);
+      expect(result.refs).toHaveLength(4);
+      expect(budget.droppedByDeadline).toBe(4);
+      const parts = (
+        result.value as Array<{
+          content: Array<{ image_url: { url: string } }>;
+        }>
+      )[0]!.content;
+      // The stored four are referenced in the rewritten value — a deadline
+      // never orphans bytes that were already written.
+      expect(
+        parts.filter((p) => p.image_url.url.startsWith("/api/files/")),
+      ).toHaveLength(4);
+    });
+  });
+
+  describe("given one part's store fails", () => {
+    it("keeps that part inline and every other part's reference", async () => {
+      let call = 0;
+      const service = {
+        storeFromBytes: async () => {
+          call += 1;
+          if (call === 2) throw new Error("S3 hiccup");
+          return { id: `so-${call}`, isDuplicate: false };
+        },
+      } as unknown as StoredObjectsService;
+      const budget = createExtractionBudget();
+      const value = contentWith(3);
+
+      const result = await extractInlineMediaFromValue({
+        value,
+        service,
+        budget,
+        ...PARAMS,
+      });
+
+      expect(budget.failedParts).toBe(1);
+      expect(result.refs).toHaveLength(2);
+      const parts = (
+        result.value as Array<{
+          content: Array<{ image_url: { url: string } }>;
+        }>
+      )[0]!.content;
+      expect(
+        parts.filter((p) => p.image_url.url.startsWith("/api/files/")),
+      ).toHaveLength(2);
+      expect(
+        parts.filter((p) => p.image_url.url.startsWith("data:")),
+      ).toHaveLength(1);
+    });
+  });
+
+  describe("given one budget shared across several attribute values", () => {
+    it("applies the part cap to the span, not to each attribute", async () => {
+      const { service, calls } = makeFakeService();
+      const budget = createExtractionBudget();
+
+      const first = await extractInlineMediaFromValue({
+        value: contentWith(MAX_MEDIA_PARTS_PER_SPAN - 2),
+        service,
+        budget,
+        ...PARAMS,
+      });
+      const second = await extractInlineMediaFromValue({
+        value: contentWith(6),
+        service,
+        budget,
+        ...PARAMS,
+      });
+
+      expect(first.refs).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN - 2);
+      expect(second.refs).toHaveLength(2);
+      expect(calls).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);
+      expect(budget.droppedByCap).toBe(4);
+    });
+  });
+
+  describe("given a whole-attribute bare data URI", () => {
+    it("externalizes it to a bare reference string", async () => {
+      const { service, calls } = makeFakeService();
+      const value = `data:application/pdf;base64,${AUDIO_B64}`;
+
+      const result = await extractInlineMediaFromValue({
+        value,
+        service,
+        ...PARAMS,
+      });
+
+      expect(result.refs).toHaveLength(1);
+      expect(result.value).toBe("/api/files/proj-1/so-1");
+      expect(calls[0]!.mediaType).toBe("application/pdf");
+    });
+
+    it("wraps a bare raw-audio data URI into playable WAV at store time", async () => {
+      const { service, calls } = makeFakeService();
+      const pcm = Buffer.from([0x00, 0x00, 0x10, 0x20]);
+      const value = `data:audio/pcm16;base64,${pcm.toString("base64")}`;
+
+      const result = await extractInlineMediaFromValue({
+        value,
+        service,
+        ...PARAMS,
+      });
+
+      expect(result.refs).toHaveLength(1);
+      expect(result.value).toBe("/api/files/proj-1/so-1");
+      expect(calls[0]!.mediaType).toBe("audio/wav");
+      expect(calls[0]!.bytes.subarray(0, 4).toString("ascii")).toBe("RIFF");
     });
   });
 });

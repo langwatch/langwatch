@@ -17,9 +17,9 @@ import React, {
   useState,
 } from "react";
 import { CornerDownRight } from "react-feather";
-import { collectMediaParts } from "~/components/traces/mediaParts";
-import { TraceMediaPart } from "~/components/traces/TraceMediaPart";
+import { TraceMediaStrip } from "~/components/traces/TraceMediaStrip";
 import { BlurredContentGate } from "~/features/traces-v2/components/BlurredContentGate";
+import { collectMediaParts } from "~/shared/traces/mediaParts";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
 import { Annotations } from "../../components/Annotations";
@@ -189,13 +189,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
             >
               <Box paddingY="6px" marginBottom="38px">
                 <RedactedField field="input">
-                  {inputMedia.length > 0 && (
-                    <VStack align="flex-start" gap={2} marginBottom={2}>
-                      {inputMedia.map((part, i) => (
-                        <TraceMediaPart key={`input-media-${i}`} part={part} />
-                      ))}
-                    </VStack>
-                  )}
+                  <TraceMediaStrip parts={inputMedia} />
                   <Markdown>
                     {translationState.translatedTextInput &&
                     translationState.translationActive
@@ -220,11 +214,9 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
               }
             >
               {outputMedia.length > 0 && (
-                <VStack align="flex-start" gap={2} paddingTop={2}>
-                  {outputMedia.map((part, i) => (
-                    <TraceMediaPart key={`output-media-${i}`} part={part} />
-                  ))}
-                </VStack>
+                <Box paddingTop={2}>
+                  <TraceMediaStrip parts={outputMedia} />
+                </Box>
               )}
               {trace.error && !trace.output?.value ? (
                 <VStack alignItems="flex-start" gap={2} paddingY={2}>

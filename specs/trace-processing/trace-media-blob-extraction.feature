@@ -39,6 +39,12 @@ Feature: Trace media blob extraction at the ingestion edge
   #   skips extraction entirely when any drop rule is configured — those
   #   projects keep today's behavior end to end.
   #
+  # Retention: stored_objects is content-addressed and currently GC-free — it
+  #   is not in RETENTION_TABLE_CATEGORY_MAP and not counted by the storage
+  #   meter, so extracted media outlives the trace's retention TTL. Until
+  #   stored-objects retention lands, the feature flag ships default OFF and
+  #   enabling it is an explicit per-project / per-deployment opt-in.
+  #
   # Related: specs/features/scenarios/externalize-event-byte-content.feature
   #   (scenario edge extraction), specs/event-sourcing/large-trace-blob-offload.feature
   #   (ADR-022 spool + previews), specs/trace-processing/audio-player-in-traces.feature.
@@ -155,3 +161,22 @@ Feature: Trace media blob extraction at the ingestion edge
     When the staged command is retried by the group queue
     Then the command still carries only the stored-object references
     And re-running extraction over it is a no-op (parts already reference urls)
+
+  @unit
+  Scenario: Redacted trace content never leaks its media references
+    Given a viewer whose protections hide captured input or output
+    When a trace summary carrying media refs is redacted for that viewer
+    Then the redacted payload carries no ref fields and no reserved ref attributes
+      for the hidden category, so the stored bytes stay unfetchable from it
+    And the refs of a still-visible category remain intact
+
+  @unit
+  Scenario: Extraction cost inside the collector request is bounded
+    Given a span carrying more inline media parts than the per-span cap,
+      or a storage backend responding slower than the extraction deadline
+    When the span is ingested
+    Then at most the capped number of parts is externalized, stored in bounded
+      concurrent batches, and the rest stay inline
+    And once the deadline passes no further parts are stored, parts already
+      externalized keep their references (no orphaned bytes), and the drop is
+      logged and counted rather than silent

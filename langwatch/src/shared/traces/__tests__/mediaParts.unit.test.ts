@@ -3,8 +3,34 @@ import {
   audioPartToMediaData,
   collectAudioParts,
   collectMediaParts,
+  isSafeMediaUrl,
   mediaPartToMediaData,
 } from "../mediaParts";
+
+describe("isSafeMediaUrl", () => {
+  /** @scenario A scripted URL in span content never reaches an anchor or element */
+  it("rejects scripted, protocol-relative, and traversal urls", () => {
+    expect(isSafeMediaUrl("javascript:alert(1)")).toBe(false);
+    expect(isSafeMediaUrl("JavaScript:alert(1)")).toBe(false);
+    // Browsers strip control chars when parsing an href, so a split scheme
+    // still executes — the check must survive that.
+    expect(isSafeMediaUrl("java\tscript:alert(1)")).toBe(false);
+    expect(isSafeMediaUrl("java\nscript:alert(1)")).toBe(false);
+    expect(isSafeMediaUrl(" javascript:alert(1)")).toBe(false);
+    expect(isSafeMediaUrl("vbscript:msgbox(1)")).toBe(false);
+    expect(isSafeMediaUrl("blob:https://app/id")).toBe(false);
+    expect(isSafeMediaUrl("//attacker.example/x.png")).toBe(false);
+    expect(isSafeMediaUrl("/api/files/../../auth/session")).toBe(false);
+    expect(isSafeMediaUrl("relative/path.png")).toBe(false);
+  });
+
+  it("accepts stored-object references, data URIs, and absolute http(s)", () => {
+    expect(isSafeMediaUrl("/api/files/p1/obj1")).toBe(true);
+    expect(isSafeMediaUrl("data:image/png;base64,QUJD")).toBe(true);
+    expect(isSafeMediaUrl("https://cdn.example/i.png")).toBe(true);
+    expect(isSafeMediaUrl("http://cdn.example/i.png")).toBe(true);
+  });
+});
 
 describe("audioPartToMediaData", () => {
   describe("given an OpenAI input_audio part", () => {
@@ -377,10 +403,12 @@ describe("collectMediaParts", () => {
     });
   });
 
-  describe("given an external http image_url", () => {
-    it("does not surface it as collected inline media", () => {
+  describe("given external http media of every category", () => {
+    /** @scenario External http(s) media is not auto-mounted from collected content */
+    it("does not surface any of them as collected inline media", () => {
       // External links stay links — collecting them would auto-fetch
-      // third-party content on every trace open.
+      // third-party content on every trace open, for players and chips just
+      // as much as for <img>.
       const value = [
         {
           role: "user",
@@ -389,10 +417,112 @@ describe("collectMediaParts", () => {
               type: "image_url",
               image_url: { url: "https://cdn.example/i.png" },
             },
+            {
+              type: "binary",
+              mimeType: "image/png",
+              url: "https://attacker.example/beacon.png",
+            },
+            {
+              type: "audio",
+              source: { type: "url", value: "https://attacker.example/a.wav" },
+            },
+            {
+              type: "video",
+              source: { type: "url", value: "https://attacker.example/v.mp4" },
+            },
           ],
         },
       ];
       expect(collectMediaParts(value)).toEqual([]);
+    });
+  });
+
+  describe("given a scripted url smuggled as an attachment part", () => {
+    /** @scenario A scripted URL in span content never reaches an anchor or element */
+    it("drops the part instead of collecting a chip", () => {
+      const value = [
+        {
+          role: "user",
+          content: [
+            {
+              type: "binary",
+              mimeType: "application/pdf",
+              filename: "invoice.pdf",
+              url: "javascript:alert(document.cookie)",
+            },
+          ],
+        },
+      ];
+      expect(collectMediaParts(value)).toEqual([]);
+    });
+  });
+
+  describe("given a bare string that is one media reference", () => {
+    it("surfaces a whole-value data URI as renderable media", () => {
+      const parts = collectMediaParts("data:image/png;base64,QUJD");
+      expect(parts).toHaveLength(1);
+      expect(parts[0]).toMatchObject({ type: "image" });
+    });
+
+    it("surfaces a whole-value stored-object url as an attachment chip", () => {
+      const parts = collectMediaParts("/api/files/p1/obj1");
+      expect(parts).toHaveLength(1);
+      expect(parts[0]).toMatchObject({
+        type: "binary",
+        url: "/api/files/p1/obj1",
+      });
+    });
+
+    it("ignores prose that merely mentions a reference", () => {
+      expect(
+        collectMediaParts("see the file at /api/files/p1/obj1 for details"),
+      ).toEqual([]);
+    });
+  });
+
+  describe("given a binary part with only an id", () => {
+    it("returns null instead of a chip with nothing to open", () => {
+      // An id-only reference has no fetchable payload: src/href would
+      // resolve to "" — the current document URL.
+      expect(
+        mediaPartToMediaData({
+          type: "binary",
+          mimeType: "application/pdf",
+          id: "obj1",
+        }),
+      ).toBeNull();
+    });
+  });
+
+  describe("given an image part with an inline data source and no mimeType", () => {
+    it("defaults to an image mime so the data URI renders", () => {
+      const result = mediaPartToMediaData({
+        type: "image",
+        source: { type: "data", value: "QUJD" },
+      });
+      expect(result).toEqual({
+        type: "image",
+        source: { type: "data", value: "QUJD", mimeType: "image/png" },
+      });
+    });
+  });
+
+  describe("given media nested deeper than the fixed envelope keys", () => {
+    it("still finds a part under an arbitrary key (generic recursion)", () => {
+      // The collector recurses every object key like the extraction walker,
+      // not a fixed envelope list — a part the extractor externalized under
+      // an unusual key must still render.
+      const value = {
+        result: {
+          artifacts: [
+            {
+              type: "image_url",
+              image_url: { url: "/api/files/p1/i9" },
+            },
+          ],
+        },
+      };
+      expect(collectMediaParts(value)).toHaveLength(1);
     });
   });
 });

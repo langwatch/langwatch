@@ -3,13 +3,13 @@ import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
+import { TtlCache } from "~/server/utils/ttlCache";
 import {
   parseMediaRefs,
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
   type TraceMediaRef,
-} from "~/server/app-layer/traces/media-refs";
-import { TtlCache } from "~/server/utils/ttlCache";
+} from "~/shared/traces/media-refs";
 import {
   deriveTraceOrigin,
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,

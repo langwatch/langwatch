@@ -10,10 +10,17 @@ import {
   Wrench,
 } from "lucide-react";
 import type React from "react";
-import { Fragment, type ReactNode, useLayoutEffect, useRef } from "react";
-import type { MediaPartData } from "~/components/simulations/MediaPart";
-import { collectMediaParts } from "~/components/traces/mediaParts";
-import type { TraceMediaRef } from "~/server/app-layer/traces/media-refs";
+import {
+  Fragment,
+  memo,
+  type ReactNode,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from "react";
+import type { TraceMediaRef } from "~/shared/traces/media-refs";
+import type { MediaPartData } from "~/shared/traces/mediaParts";
+import { collectMediaParts } from "~/shared/traces/mediaParts";
 import { useDensityTokens } from "../../hooks/useDensityTokens";
 import { useDensityStore } from "../../stores/densityStore";
 import { formatPreview } from "../../utils/previewFormatter";
@@ -34,12 +41,15 @@ interface IOPreviewProps {
   outputMediaRefs?: TraceMediaRef[];
 }
 
-export const IOPreview: React.FC<IOPreviewProps> = ({
+// memo: the addon cell re-renders with identical props whenever the table
+// re-renders (density is read via the store INSIDE, so density flips still
+// propagate); the preview parse work is additionally cached per row below.
+export const IOPreview = memo(function IOPreview({
   input,
   output,
   inputMediaRefs,
   outputMediaRefs,
-}) => {
+}: IOPreviewProps) {
   const density = useDensityStore((s) => s.density);
   if (density === "comfortable") {
     return (
@@ -59,7 +69,7 @@ export const IOPreview: React.FC<IOPreviewProps> = ({
       outputMediaRefs={outputMediaRefs}
     />
   );
-};
+});
 
 /**
  * Build the row data once per cell. `formatPreview` runs the unified
@@ -381,18 +391,28 @@ const CompactIOPreview: React.FC<IOPreviewProps> = ({
   outputMediaRefs,
 }) => {
   const tokens = useDensityTokens();
+  // Cache the parse work per row: without this a density flip (a store
+  // subscription every visible cell holds) re-parses every row's IO.
+  const inputRow = useMemo(
+    () => (input !== null ? buildRow(input, inputMediaRefs) : null),
+    [input, inputMediaRefs],
+  );
+  const outputRow = useMemo(
+    () => (output !== null ? buildRow(output, outputMediaRefs) : null),
+    [output, outputMediaRefs],
+  );
   return (
     <VStack align="start" gap={0.5} fontFamily="mono">
-      {input !== null && (
+      {inputRow && (
         <CompactRow
-          row={buildRow(input, inputMediaRefs)}
+          row={inputRow}
           fontSize={tokens.ioFontSize}
           direction="input"
         />
       )}
-      {output !== null && (
+      {outputRow && (
         <CompactRow
-          row={buildRow(output, outputMediaRefs)}
+          row={outputRow}
           fontSize={tokens.ioFontSize}
           direction="output"
         />
@@ -483,32 +503,52 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({
   output,
   inputMediaRefs,
   outputMediaRefs,
-}) => (
-  <VStack align="stretch" gap={2} fontFamily="mono">
-    {input !== null && (
-      <ComfortableRow
-        label="Input"
-        labelColor={{ base: "blue.500", _dark: "blue.fg" }}
-        textColor="fg.muted"
-        text={
-          formatPreview(input, { maxChars: 200, newlines: "preserve" }).text
-        }
-        media={rowMediaFromRefs(inputMediaRefs) ?? collectRowMedia(input)}
-      />
-    )}
-    {output !== null && (
-      <ComfortableRow
-        label="Output"
-        labelColor={{ base: "green.solid", _dark: "green.fg" }}
-        textColor="fg"
-        text={
-          formatPreview(output, { maxChars: 200, newlines: "preserve" }).text
-        }
-        media={rowMediaFromRefs(outputMediaRefs) ?? collectRowMedia(output)}
-      />
-    )}
-  </VStack>
-);
+}) => {
+  const inputRow = useMemo(
+    () =>
+      input !== null
+        ? {
+            text: formatPreview(input, { maxChars: 200, newlines: "preserve" })
+              .text,
+            media: rowMediaFromRefs(inputMediaRefs) ?? collectRowMedia(input),
+          }
+        : null,
+    [input, inputMediaRefs],
+  );
+  const outputRow = useMemo(
+    () =>
+      output !== null
+        ? {
+            text: formatPreview(output, { maxChars: 200, newlines: "preserve" })
+              .text,
+            media: rowMediaFromRefs(outputMediaRefs) ?? collectRowMedia(output),
+          }
+        : null,
+    [output, outputMediaRefs],
+  );
+  return (
+    <VStack align="stretch" gap={2} fontFamily="mono">
+      {inputRow && (
+        <ComfortableRow
+          label="Input"
+          labelColor={{ base: "blue.500", _dark: "blue.fg" }}
+          textColor="fg.muted"
+          text={inputRow.text}
+          media={inputRow.media}
+        />
+      )}
+      {outputRow && (
+        <ComfortableRow
+          label="Output"
+          labelColor={{ base: "green.solid", _dark: "green.fg" }}
+          textColor="fg"
+          text={outputRow.text}
+          media={outputRow.media}
+        />
+      )}
+    </VStack>
+  );
+};
 
 const ComfortableRow: React.FC<{
   label: string;

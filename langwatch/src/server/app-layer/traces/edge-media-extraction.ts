@@ -45,10 +45,14 @@ import type {
 import { featureFlagService } from "~/server/featureFlag";
 import { getEdgeMediaExtractFailOpenCounter } from "~/server/metrics";
 import type { ExtractedRef } from "~/server/stored-objects/content-extractor";
-import { containsMediaMarkers } from "~/server/stored-objects/media-markers";
 import type { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
-import { extractInlineMediaFromValue } from "~/server/stored-objects/value-media-extractor";
+import {
+  createExtractionBudget,
+  type ExtractionBudget,
+  extractInlineMediaFromValue,
+} from "~/server/stored-objects/value-media-extractor";
+import { containsMediaMarkers } from "~/shared/content-parts/media-markers";
 
 /** Purpose tag for stored objects extracted from trace span content. */
 export const TRACE_MEDIA_PURPOSE = "trace_content";
@@ -71,9 +75,10 @@ export interface EdgeMediaExtractionDeps {
 
 async function defaultIsEnabled(projectId: string): Promise<boolean> {
   // Read through the layered service, NOT the raw postgres store: the store
-  // returns null when no operator row exists, and this flag ships enabled by
-  // registry default — only the service applies that default (store row →
-  // PostHog rule → registry default).
+  // returns null when no operator row exists, and only the service applies
+  // the full layering (env force-on → store row → PostHog rule → registry
+  // default). The flag ships default OFF until stored-objects retention
+  // lands (#5951), so enabling is an explicit per-project opt-in.
   return await featureFlagService.isEnabled("release_trace_media_extraction", {
     distinctId: projectId,
     projectId,
@@ -123,12 +128,14 @@ async function rewriteAttributeList({
   ownerId,
   service,
   refs,
+  budget,
 }: {
   attributes: OtlpKeyValue[];
   projectId: string;
   ownerId: string;
   service: StoredObjectsService;
   refs: ExtractedRef[];
+  budget: ExtractionBudget;
 }): Promise<OtlpKeyValue[]> {
   let changed = false;
   const out: OtlpKeyValue[] = [];
@@ -142,6 +149,7 @@ async function rewriteAttributeList({
         ownerKind: "trace",
         ownerId,
         service,
+        budget,
       });
       if (typeof result.value === "string" && result.value !== stringValue) {
         changed = true;
@@ -199,6 +207,10 @@ export async function maybeExtractSpanMedia({
     stage = "storage";
     const service = resolved.createService(projectId);
     const refs: ExtractedRef[] = [];
+    // One budget for the WHOLE span: the part cap and the deadline apply
+    // across every attribute and event-attribute value, so a span cannot
+    // multiply the cost by spreading media over many attributes.
+    const budget = createExtractionBudget();
 
     const attributes = await rewriteAttributeList({
       attributes: span.attributes,
@@ -206,6 +218,7 @@ export async function maybeExtractSpanMedia({
       ownerId: traceId,
       service,
       refs,
+      budget,
     });
 
     let eventsChanged = false;
@@ -218,11 +231,44 @@ export async function maybeExtractSpanMedia({
         ownerId: traceId,
         service,
         refs,
+        budget,
       });
       if (rewritten !== event.attributes) {
         eventsChanged = true;
         events[i] = { ...event, attributes: rewritten };
       }
+    }
+
+    // Budget drops are fail-open per part, never silent: the affected parts
+    // ride through inline (today's behavior) and the drop is logged and
+    // counted so a sustained rate is alertable.
+    if (
+      budget.droppedByCap > 0 ||
+      budget.droppedByDeadline > 0 ||
+      budget.failedParts > 0
+    ) {
+      if (budget.droppedByCap > 0)
+        getEdgeMediaExtractFailOpenCounter("part_cap").inc(budget.droppedByCap);
+      if (budget.droppedByDeadline > 0)
+        getEdgeMediaExtractFailOpenCounter("deadline").inc(
+          budget.droppedByDeadline,
+        );
+      if (budget.failedParts > 0)
+        getEdgeMediaExtractFailOpenCounter("part_store").inc(
+          budget.failedParts,
+        );
+      logger.warn(
+        {
+          projectId,
+          traceId,
+          spanId,
+          extractedParts: refs.length,
+          droppedByCap: budget.droppedByCap,
+          droppedByDeadline: budget.droppedByDeadline,
+          failedParts: budget.failedParts,
+        },
+        "span media extraction hit its budget — remaining parts stay inline",
+      );
     }
 
     if (attributes === span.attributes && !eventsChanged) return data;

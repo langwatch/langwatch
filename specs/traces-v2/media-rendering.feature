@@ -79,3 +79,29 @@ Feature: Media rendering across trace surfaces
     Given a thread whose messages carry an externalized image and audio part
     When I open the conversation view
     Then each message bubble renders its image inline and its audio with a player
+
+  # ===========================================================================
+  # URL trust
+  # ===========================================================================
+  # Span content is attacker-controllable by anyone who can send traces to a
+  # project, so every URL that reaches an element src or anchor href from
+  # collected media must pass a scheme allowlist. Auto-mounted media (players,
+  # thumbnails, chips) is stricter still: only content our own pipeline
+  # produced (/api/files references and inline data payloads) — an external
+  # http(s) src would beacon every viewer to an attacker-chosen host on open.
+
+  @unit
+  Scenario: A scripted URL in span content never reaches an anchor or element
+    Given a span content part whose url is a javascript:, vbscript:, blob:,
+      or protocol-relative // URL, in plain or control-character-split form
+    When media is collected for rendering or parsed from summary refs
+    Then the part is not collected and the ref is rejected
+    And a part rendered directly with such a url shows a placeholder, not a link
+
+  @unit
+  Scenario: External http(s) media is not auto-mounted from collected content
+    Given span content declaring media parts whose urls point at external hosts
+      (image_url, binary-with-image-mime, audio, video)
+    When media is collected for the strips, list previews, or summary refs
+    Then none of them are collected or folded into refs
+    And external links remain visible as links in the raw text view

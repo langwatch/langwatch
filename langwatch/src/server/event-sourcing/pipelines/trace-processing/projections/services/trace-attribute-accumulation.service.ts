@@ -1,9 +1,9 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
-} from "~/server/app-layer/traces/media-refs";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+} from "~/shared/traces/media-refs";
 import type { NormalizedSpan } from "../../schemas/spans";
 import type { TraceOriginService } from "./trace-origin.service";
 import { parseJsonStringArray, stringAttr } from "./trace-summary.utils";

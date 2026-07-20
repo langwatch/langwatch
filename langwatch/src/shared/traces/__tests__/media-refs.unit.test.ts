@@ -106,4 +106,51 @@ describe("serializeMediaRefs and parseMediaRefs", () => {
     expect(parseMediaRefs(`[{"kind":"nope","url":"/x"}]`)).toEqual([]);
     expect(parseMediaRefs(null)).toEqual([]);
   });
+
+  describe("given a crafted reserved attribute smuggling non-stored urls", () => {
+    /** @scenario A scripted URL in span content never reaches an anchor or element */
+    it("rejects every ref whose url is not a stored-objects reference", () => {
+      const crafted = JSON.stringify([
+        { kind: "file", url: "javascript:alert(1)" },
+        { kind: "image", url: "https://attacker.example/beacon.png" },
+        { kind: "audio", url: "//attacker.example/a.wav" },
+        { kind: "file", url: "/api/files/../../auth/session" },
+        { kind: "image", url: "/api/files/p1/legit" },
+      ]);
+      expect(parseMediaRefs(crafted)).toEqual([
+        { kind: "image", url: "/api/files/p1/legit" },
+      ]);
+    });
+  });
+
+  describe("given span content declaring external media parts", () => {
+    /** @scenario External http(s) media is not auto-mounted from collected content */
+    it("never folds external urls into refs, for any part category", () => {
+      const value = [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: { url: "https://cdn.example/i.png" },
+            },
+            {
+              type: "binary",
+              mimeType: "image/png",
+              url: "https://attacker.example/beacon.png",
+            },
+            {
+              type: "audio",
+              source: { type: "url", value: "https://attacker.example/a.wav" },
+            },
+            {
+              type: "video",
+              source: { type: "url", value: "https://attacker.example/v.mp4" },
+            },
+          ],
+        },
+      ];
+      expect(collectMediaRefs(value)).toEqual([]);
+    });
+  });
 });
