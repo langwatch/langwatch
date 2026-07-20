@@ -7,10 +7,7 @@ import {
   createIngestionPullRunHandler,
   type IngestionPullOutcomeCommands,
 } from "../ingestionPullEffects";
-import {
-  INGESTION_PULL_PROCESS_INTENT_TYPES,
-  INGESTION_PULL_PROCESS_NAME,
-} from "../ingestionPullProcess.types";
+import { INGESTION_PULL_PROCESS_NAME } from "../ingestionPullProcess.types";
 
 async function metricValue(
   name: string,
@@ -39,7 +36,6 @@ const context = (attempt: number): IntentContext => ({
   processKey: "source-1",
   tenantId: "gov-project",
   messageKey: "process:source-1:pull:run-1",
-  intentType: INGESTION_PULL_PROCESS_INTENT_TYPES.RUN,
   attempt,
 });
 
