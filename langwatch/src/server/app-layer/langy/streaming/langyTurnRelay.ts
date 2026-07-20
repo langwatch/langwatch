@@ -163,15 +163,23 @@ export type LangyRelayOutcome =
  */
 export class LangyTurnRelay {
   private runToken: string | null | undefined; // undefined = not yet loaded
-  private pinned: { conversationId: string; turnId: string } | null = null;
+  private pinned: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  } | null = null;
 
   /**
-   * The conversation+turn this connection authenticated and pinned to, or
-   * null before the first verified frame. Read by the relay route for its
-   * end-of-stream summary — the ids here are MAC-verified, unlike the claimed
-   * ids on a rejection.
+   * The project+conversation+turn this connection authenticated and pinned
+   * to, or null before the first verified frame. Read by the relay route for
+   * its end-of-stream summary — the ids here are MAC-verified, unlike the
+   * claimed ids on a rejection.
    */
-  get pinnedTurn(): { conversationId: string; turnId: string } | null {
+  get pinnedTurn(): {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  } | null {
     return this.pinned;
   }
   /**
@@ -235,12 +243,20 @@ export class LangyTurnRelay {
   private checkTurn(envelope: LangyFrameEnvelope): boolean {
     if (this.pinned === null) {
       this.pinned = {
+        projectId: envelope.projectId,
         conversationId: envelope.conversationId,
         turnId: envelope.turnId,
       };
       return true;
     }
+    // projectId is pinned too: the runToken is cached after frame 1 while
+    // apply() reads projectId off each envelope, so without this a caller
+    // holding a valid token could switch projectId on later frames and sign
+    // them with the token they already have — writing this conversation's
+    // frames under another tenant's id. Signing projectId only means
+    // something if every frame is held to the pinned value.
     return (
+      this.pinned.projectId === envelope.projectId &&
       this.pinned.conversationId === envelope.conversationId &&
       this.pinned.turnId === envelope.turnId
     );
