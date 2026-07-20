@@ -79,7 +79,10 @@ export interface CreateLangyEffectPortsOptions {
     projectId: string;
     organizationId: string;
   }) => Promise<{ token: string; apiKeyId: string }>;
-  revokeSessionKey: (args: { apiKeyId: string }) => Promise<void>;
+  revokeSessionKey: (args: {
+    apiKeyId: string;
+    projectId: string;
+  }) => Promise<void>;
   titleGenerator: LangyTitleGenerator;
   saveTitle: (params: {
     projectId: string;
