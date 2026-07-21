@@ -125,6 +125,27 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     Then the optimistic Stream B text is gone
     And Stream A replays the buffered token tail so no work is lost
 
+  # A refresh that lands just as the turn finishes can miss the worker's terminal
+  # frame (its relay connection dropped before it), so the buffer has no end/error
+  # and the reconnected Stream A used to block until the hard per-turn deadline —
+  # the UI sat on "Starting up…" for minutes though the turn had finished. Stream A
+  # now watches the durable fold + per-turn heartbeat and synthesizes the missed
+  # terminal, but ONLY once the turn is provably settled so a live or cold-starting
+  # turn is never cut off.
+  @unit
+  Scenario: Stream A synthesizes the terminal a reconnect missed once the turn has settled
+    Given I reconnect to a turn whose terminal frame never reached the buffer
+    And the turn's durable fold has settled and its heartbeat has gone stale
+    When the reconnected Stream A finds no terminal on the live edge
+    Then it yields a synthesized end (or error, carrying the failure) and closes
+    And the client reconciles the full transcript from langy.messages
+
+  Scenario: Stream A stays patient while a turn is still live or cold-starting
+    Given I am watching a turn whose durable fold still reports it in flight
+    When no tokens arrive on the live edge for a while
+    Then Stream A keeps following and does not synthesize a terminal
+    And a turn that keeps a fresh heartbeat is never cut off
+
   # ---------------------------------------------------------------------------
   # Transport honesty: streaming must actually stream, end to end
   # ---------------------------------------------------------------------------
