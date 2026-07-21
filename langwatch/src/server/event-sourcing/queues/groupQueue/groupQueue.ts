@@ -32,6 +32,7 @@ import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
+  JobDelivery,
   QueueAuditAdapter,
   QueueSendOptions,
 } from "../../queues";
@@ -231,8 +232,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   );
   private readonly queueName: string;
   private readonly jobName: string;
-  private readonly process: (payload: Payload) => Promise<void>;
-  private readonly processBatch?: (payloads: Payload[]) => Promise<void>;
+  private readonly process: (
+    payload: Payload,
+    delivery?: JobDelivery,
+  ) => Promise<void>;
+  private readonly processBatch?: (
+    payloads: Payload[],
+    delivery?: JobDelivery,
+  ) => Promise<void>;
   private readonly coalesceMaxBatch?: (payload: Payload) => number | undefined;
   private readonly spanAttributes?: (payload: Payload) => SemConvAttributes;
   private readonly processingQueue: fastq.queueAsPromised<DispatchResult, void>;
