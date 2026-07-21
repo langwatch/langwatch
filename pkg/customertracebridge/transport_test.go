@@ -231,6 +231,40 @@ func TestRouterExporter_SurfacesExporterBuildFailure(t *testing.T) {
 	assert.Empty(t, in.received(), "a failed exporter build must not report a successful delivery")
 }
 
+// Shutdown used to discard every exporter's error, so a tenant whose last spans
+// never left the process looked like a clean shutdown from the outside.
+func TestRouterExporter_ShutdownSurfacesPerProjectFailures(t *testing.T) {
+	in := newIngest(t)
+	reg := NewRegistry()
+	require.NoError(t, reg.Set("proj-1", in.URL, map[string]string{"X-Auth-Token": "tok"}))
+
+	router := newRouterExporter(context.Background(), reg)
+	require.NoError(t, router.ExportSpans(context.Background(), spansFor(t, "proj-1")))
+
+	// A caller whose shutdown budget is already spent is the cheap, deterministic
+	// stand-in for an ingest that will not answer in time.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := router.Shutdown(ctx)
+
+	require.Error(t, err, "a tenant that failed to flush must not report a clean shutdown")
+	assert.Contains(t, err.Error(), "proj-1", "the failure must name the project that lost its spans")
+}
+
+// The cache must still be emptied on shutdown — the closing flag suppresses the
+// eviction callback's detached shutdown, not the purge itself.
+func TestRouterExporter_ShutdownEmptiesTheExporterCache(t *testing.T) {
+	in := newIngest(t)
+	reg := NewRegistry()
+	require.NoError(t, reg.Set("proj-1", in.URL, map[string]string{"X-Auth-Token": "tok"}))
+
+	router := newRouterExporter(context.Background(), reg)
+	require.NoError(t, router.ExportSpans(context.Background(), spansFor(t, "proj-1")))
+	require.NoError(t, router.Shutdown(context.Background()))
+
+	assert.Zero(t, router.byProject.Len(), "no exporter may outlive shutdown")
+}
+
 func TestHeadersEqual(t *testing.T) {
 	assert.True(t, headersEqual(map[string]string{"a": "1"}, map[string]string{"a": "1"}))
 	assert.False(t, headersEqual(map[string]string{"a": "1"}, map[string]string{"a": "2"}))

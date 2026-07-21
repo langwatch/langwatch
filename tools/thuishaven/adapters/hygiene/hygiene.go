@@ -7,11 +7,14 @@ package hygiene
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
@@ -81,6 +84,64 @@ func (Hygiene) DirSize(path string) (int64, bool) {
 		return nil
 	})
 	return total, true
+}
+
+// LastActivity reports when a worktree was last worked on: the committer date of
+// its checked-out HEAD (the clearest "how long has this branch sat" signal),
+// falling back to the worktree directory's own mtime when there is no commit to
+// read — a fresh checkout, or a detached/unborn HEAD. The bool is false only when
+// neither can be established.
+func (Hygiene) LastActivity(worktreeDir string) (time.Time, bool) {
+	out, err := exec.Command("git", "-C", worktreeDir, "log", "-1", "--format=%ct", "HEAD").Output()
+	if err == nil {
+		if secs, perr := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64); perr == nil && secs > 0 {
+			return time.Unix(secs, 0), true
+		}
+	}
+	if fi, serr := os.Stat(worktreeDir); serr == nil {
+		return fi.ModTime(), true
+	}
+	return time.Time{}, false
+}
+
+// DiskUsage returns how much disk a path occupies, via `du -sk` — far faster than
+// a Go tree-walk on a big worktree (node_modules), which is what the prune picker
+// sizes across every worktree at once. It reports allocated blocks (KiB), the
+// "space you'd actually get back". The exit code is deliberately ignored: du exits
+// non-zero when it hits an unreadable subdirectory (permission denied, or a file
+// that vanished mid-walk) yet still prints a usable grand total to stdout — so the
+// verdict is "did it print a number", not "did it exit 0". ok=false only when
+// there is nothing to parse (the path is gone, du is missing, or ctx was cancelled
+// mid-walk — CommandContext kills the du process, and a killed du prints nothing).
+func (Hygiene) DiskUsage(ctx context.Context, path string) (int64, bool) {
+	out, _ := exec.CommandContext(ctx, "du", "-sk", path).Output()
+	fields := strings.Fields(string(out))
+	if len(fields) == 0 {
+		return 0, false
+	}
+	kb, perr := strconv.ParseInt(fields[0], 10, 64)
+	if perr != nil {
+		return 0, false
+	}
+	return kb * 1024, true
+}
+
+// UpstreamGone reports whether branch tracks an upstream whose remote-tracking
+// ref is gone (`git fetch --prune` removed it after the remote branch was
+// deleted). It reads the ref state with for-each-ref rather than `git status`, so
+// it does not scan the working tree — cheap enough to run across every worktree.
+// The %(upstream:track) field is git's own "[gone]" verdict; nobracket strips the
+// brackets. Empty branch (detached HEAD) or no upstream reads as not-gone.
+func (Hygiene) UpstreamGone(worktreeDir, branch string) bool {
+	if branch == "" {
+		return false
+	}
+	out, err := exec.Command("git", "-C", worktreeDir,
+		"for-each-ref", "--format=%(upstream:track,nobracket)", "refs/heads/"+branch).Output()
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(out)) == "gone"
 }
 
 // Remove deletes a path tree.

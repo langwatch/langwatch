@@ -49,6 +49,7 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -58,7 +59,10 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/pkg/contexts"
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/pkg/otelsetup"
 	langyotel "github.com/langwatch/langwatch/services/langyagent/otel"
 )
 
@@ -244,7 +248,7 @@ func New(ctx context.Context, opts Options) (*Relay, error) {
 	mux.HandleFunc("/w/{token}/llm/", r.handleLLM)
 
 	r.srv = &http.Server{
-		Handler:           mux,
+		Handler:           r.logRequests(ctx, mux),
 		ReadHeaderTimeout: 10 * time.Second,
 		// No WriteTimeout: the LLM proxy streams SSE for as long as the model
 		// generates.
@@ -310,6 +314,67 @@ func (r *Relay) Unregister(token string) {
 	r.mu.Unlock()
 }
 
+// ForwardTurnSpan emits the platform-owned TURN span into the customer's
+// project: the real root every re-parented worker span and every
+// gateway-retold LLM span already names as parent. Without it the customer
+// trace hangs off a span id that exists only in LangWatch's internal store.
+// The span id is the internal langy.turn span's — the SAME id in both
+// stores is the deliberate cross-store correlation key.
+//
+// Detached and best-effort like every other telemetry leg: a failed forward
+// warns and bumps the same counter, never the turn.
+func (r *Relay) ForwardTurnSpan(token string, sc trace.SpanContext, start, end time.Time) {
+	entry := r.lookup(token)
+	if entry == nil || !sc.IsValid() {
+		return
+	}
+
+	td := ptrace.NewTraces()
+	rs := td.ResourceSpans().AppendEmpty()
+	stampResource(rs.Resource().Attributes(), entry.info.ConversationID, entry.info.ActorUserID)
+	ss := rs.ScopeSpans().AppendEmpty()
+	// The instrumentation scope names WHO produced this span — the agent
+	// manager, not the worker (whose own scope rides its re-parented spans).
+	ss.Scope().SetName("langy-agent")
+	if info := contexts.GetServiceInfo(r.baseCtx); info != nil {
+		ss.Scope().SetVersion(info.Version)
+	}
+	span := ss.Spans().AppendEmpty()
+	span.SetName("langy.turn")
+	span.SetKind(ptrace.SpanKindServer)
+	// Span-level origin is the strongest signal the product's trace-origin
+	// resolution accepts — the root span carrying it makes the whole trace
+	// resolve to Langy deterministically.
+	span.Attributes().PutStr(otelsetup.AttrLangWatchOrigin, originLangy)
+	span.SetTraceID(pcommon.TraceID(sc.TraceID()))
+	span.SetSpanID(pcommon.SpanID(sc.SpanID()))
+	span.SetStartTimestamp(pcommon.NewTimestampFromTime(start))
+	span.SetEndTimestamp(pcommon.NewTimestampFromTime(end))
+	applyCustomerTracePolicy(td, customerTracePolicy)
+	// The customer-facing identity of the turn itself — stamped AFTER the
+	// policy pass, which reserves platform names precisely so a WORKER can
+	// never claim them; this span is the platform speaking, the one place
+	// the reserved name is legitimate.
+	rs.Resource().Attributes().PutStr("service.name", "langy")
+
+	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
+	if err != nil {
+		return
+	}
+	info := entry.info
+	go func() {
+		defer clog.HandlePanic(r.baseCtx, false)
+		ctx, cancel := context.WithTimeout(r.baseCtx, 10*time.Second)
+		defer cancel()
+		if err := r.forwardTraces(ctx, info, payload); err != nil && r.baseCtx.Err() == nil {
+			r.forwardFailures.Add(r.baseCtx, 1)
+			clog.Get(r.baseCtx).Warn("otelrelay turn span forward failed",
+				zap.String("conversation", info.ConversationID),
+				zap.Error(err))
+		}
+	}()
+}
+
 // SetTurnContext records the conversation's current turn trace context —
 // the parent every subsequently exported worker span is stitched under, and
 // the traceparent injected on mediated LLM calls. Called by the app at each
@@ -355,10 +420,75 @@ func (r *Relay) lookup(token string) *workerEntry {
 func (r *Relay) entryFor(w http.ResponseWriter, req *http.Request) *workerEntry {
 	e := r.lookup(req.PathValue("token"))
 	if e == nil {
+		// The one silent failure mode worth a line of its own: a worker (or its
+		// exporter's shutdown flush) submitting after Unregister, or a token
+		// that never matched. Redacted — the token is a routing credential.
+		clog.Get(r.baseCtx).Warn("otelrelay unknown or expired worker token",
+			zap.String("token_prefix", redactToken(req.PathValue("token"))),
+			zap.String("path_suffix", pathSignal(req.URL.Path)))
 		http.Error(w, "unknown telemetry token", http.StatusNotFound)
 		return nil
 	}
 	return e
+}
+
+// redactToken keeps enough of a routing token to correlate log lines without
+// disclosing the credential.
+func redactToken(token string) string {
+	if len(token) <= 6 {
+		return "…"
+	}
+	return token[:6] + "…"
+}
+
+// pathSignal reduces a relay path to its signal suffix (v1/traces, llm/…)
+// so logs never carry the full token-bearing path.
+func pathSignal(p string) string {
+	// /llm/ first: LLM proxy paths (/w/{token}/llm/v1/chat/completions)
+	// contain /v1/ AFTER /llm/, and the highest-volume traffic through the
+	// relay must not log under the wrong signal.
+	if strings.Contains(p, "/llm/") {
+		return "llm"
+	}
+	if i := strings.LastIndex(p, "/v1/"); i >= 0 {
+		return p[i+1:]
+	}
+	return "?"
+}
+
+// logRequests is the relay's request line — the surface is low-volume
+// (per-worker OTLP batches + LLM calls), and this hop was completely dark:
+// a worker exporting into a 404 was indistinguishable from a worker not
+// exporting at all. Tokens are redacted; paths are reduced to their signal.
+func (r *Relay) logRequests(ctx context.Context, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(sw, req)
+		clog.Get(ctx).Info("otelrelay request",
+			zap.String("method", req.Method),
+			zap.String("signal", pathSignal(req.URL.Path)),
+			zap.String("token_prefix", redactToken(req.PathValue("token"))),
+			zap.Int("status", sw.status),
+			zap.Int64("bytes_in", req.ContentLength))
+	})
+}
+
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusWriter) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
+}
+
+// Flush keeps SSE streaming working through the wrapper (the LLM proxy
+// streams responses; losing Flusher would buffer them to death).
+func (s *statusWriter) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 // handleDropSignal accepts-and-drops a non-trace OTLP signal (logs, metrics).
@@ -387,7 +517,13 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	td, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(body)
+	// Content-type-aware decode. opencode's native exporter ships OTLP/HTTP
+	// JSON and IGNORES OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf — a
+	// proto-only parse 400'd every worker batch this relay ever received,
+	// which is exactly why worker spans never reached anyone. Everything
+	// downstream (the internal copy and the customer forward) is normalized
+	// to protobuf regardless of what arrived.
+	td, err := unmarshalTraces(req.Header.Get("Content-Type"), body)
 	if err != nil {
 		http.Error(w, "invalid OTLP payload", http.StatusBadRequest)
 		return
@@ -397,9 +533,22 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 	// LangWatch's own copy, content-stripped, built from the batch BEFORE it is
 	// re-parented in place for the customer. Best-effort and detached: our
 	// observability must never delay or fail the customer's telemetry.
-	r.exportInternal(conversationID, entry.info.Model, turn, body)
+	// Marshaled here (not the raw body) so the internal leg always carries
+	// protobuf, whatever encoding the worker chose.
+	if internalBody, imErr := (&ptrace.ProtoMarshaler{}).MarshalTraces(td); imErr == nil {
+		r.exportInternal(conversationID, entry.info.Model, turn, internalBody)
+	}
 
+	FilterCustomerSpans(td)
+	if td.SpanCount() == 0 {
+		// Nothing customer-meaningful in this batch (pure plumbing). The
+		// internal copy above already took what it wanted.
+		w.Header().Set("Content-Type", "application/x-protobuf")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	ReparentTraces(td, conversationID, entry.info.ActorUserID, turn)
+	applyCustomerTracePolicy(td, customerTracePolicy)
 	out, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
 	if err != nil {
 		http.Error(w, "invalid OTLP payload", http.StatusBadRequest)
@@ -580,6 +729,15 @@ func (r *Relay) postInternal(ctx context.Context, payload []byte) error {
 	return nil
 }
 
+// unmarshalTraces decodes an OTLP trace payload by its content type:
+// application/json → the OTLP JSON encoding, anything else → protobuf.
+func unmarshalTraces(contentType string, body []byte) (ptrace.Traces, error) {
+	if strings.HasPrefix(strings.TrimSpace(strings.ToLower(contentType)), "application/json") {
+		return (&ptrace.JSONUnmarshaler{}).UnmarshalTraces(body)
+	}
+	return (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(body)
+}
+
 // forwardTraces POSTs the re-parented protobuf batch to the customer's
 // LangWatch OTLP ingest, authenticated with the session key.
 func (r *Relay) forwardTraces(ctx context.Context, info WorkerInfo, payload []byte) error {
@@ -600,4 +758,66 @@ func (r *Relay) forwardTraces(ctx context.Context, info WorkerInfo, payload []by
 		return fmt.Errorf("ingest answered %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// originLangy is the langwatch.origin value for this service's relayed
+// worker telemetry — service identity, declared here rather than in the
+// shared policy package.
+const originLangy = "langy"
+
+// customerTracePolicy is the allowlist for resource attributes on worker
+// telemetry bound for the customer's project. It runs AFTER ReparentTraces,
+// so the allowed keys are the ones that carry customer meaning: the relay's
+// own stamps (thread, acting user, tags) and the worker's telemetry identity
+// (service.name). Everything else — sdk metadata, environment identity, and
+// whatever a future opencode version starts emitting — fails closed. The
+// origin stamp replaces any worker-supplied value: the worker is a
+// model-driven, prompt-injectable process and must not brand its spans with
+// LangWatch's provenance marker; the platform says these spans are Langy's.
+var customerTracePolicy = customertracebridge.Policy{
+	Allow: []attribute.Key{
+		attrThreadID,
+		attrUserID,
+		attrTags,
+		"service.name",
+	},
+	Stamp: []attribute.KeyValue{
+		attribute.String(otelsetup.AttrLangWatchOrigin, originLangy),
+	},
+}
+
+// isPlatformServiceName reports whether a worker-supplied service.name claims
+// a platform identity (any langwatch-* variant, or the relay's own "langy"
+// turn-span surface), under case folding and -/_ normalization.
+func isPlatformServiceName(name string) bool {
+	n := strings.ReplaceAll(strings.ToLower(strings.TrimSpace(name)), "_", "-")
+	return strings.HasPrefix(n, "langwatch") || n == "langy"
+}
+
+// applyCustomerTracePolicy applies the allowlist to every resource in the
+// batch — the pdata twin of the policy's SDK-level ApplyResource, living here
+// because this module already carries the collector pdata dependency.
+func applyCustomerTracePolicy(td ptrace.Traces, p customertracebridge.Policy) {
+	for i := 0; i < td.ResourceSpans().Len(); i++ {
+		attrs := td.ResourceSpans().At(i).Resource().Attributes()
+		attrs.RemoveIf(func(k string, v pcommon.Value) bool {
+			key := attribute.Key(k)
+			if !p.Allows(key) || p.Stamps(key) {
+				return true
+			}
+			// service.name passes the allowlist so the customer can tell the
+			// worker's telemetry apart — but its VALUE is worker-supplied, and
+			// a prompt-injectable process must not impersonate the platform.
+			// Case-folded and separator-normalized so LangWatch-App /
+			// LANGWATCH_APP variants don't slip past, and the relay's own
+			// turn-span identity is reserved too.
+			if key == "service.name" && isPlatformServiceName(v.Str()) {
+				return true
+			}
+			return false
+		})
+		for _, kv := range p.Stamp {
+			attrs.PutStr(string(kv.Key), kv.Value.AsString())
+		}
+	}
 }

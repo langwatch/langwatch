@@ -15,7 +15,7 @@ function identity(requestSuffix: string, turnSuffix = requestSuffix) {
   return {
     projectId,
     userId,
-    requestId: `${namespace}-request-${requestSuffix}`,
+    idempotencyKey: `${namespace}-request-${requestSuffix}`,
     conversationId,
     turnId: `${namespace}-turn-${turnSuffix}`,
   };
@@ -47,17 +47,28 @@ describe("PrismaLangyTurnAdmissionRepository", () => {
       repository.commit({ ...request, claimToken: claim.claimToken }),
     ).resolves.toBeUndefined();
 
+    // A true retry re-derives the SAME turn id (it is a hash of
+    // who+key+content); only the speculative conversation id may differ.
     await expect(
       repository.claim({
         ...request,
         conversationId: `${namespace}-speculative-other-conversation`,
-        turnId: `${namespace}-speculative-other-turn`,
       }),
     ).resolves.toEqual({
       kind: "replay",
       conversationId,
       turnId: request.turnId,
     });
+
+    // A different turn id under the same key means different content —
+    // never replay the original send over it.
+    await expect(
+      repository.claim({
+        ...request,
+        conversationId: `${namespace}-speculative-other-conversation`,
+        turnId: `${namespace}-speculative-other-turn`,
+      }),
+    ).resolves.toEqual({ kind: "mismatch" });
   });
 
   it("refuses a commit that does not own the preparation lease", async () => {

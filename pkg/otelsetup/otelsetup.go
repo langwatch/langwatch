@@ -175,6 +175,14 @@ type Options struct {
 	// admin token. When true, OTLPHeaders is ignored (the per-tenant
 	// processors set their own auth).
 	MultiTenant bool
+	// OpsEndpoint is the OPTIONAL internal-collector base URL for the
+	// multi-tenant path's OPERATIONAL spans — the ones that never acquire a
+	// tenant api_key (startup, health, background work). Without it those
+	// spans are dropped, which made the service look like it exported no
+	// telemetry of its own. Ignored unless MultiTenant.
+	OpsEndpoint string
+	// OpsHeaders carries optional auth headers for the ops exporter.
+	OpsHeaders map[string]string
 	// SyncExport=true swaps each tenant's BatchSpanProcessor for a
 	// SimpleSpanProcessor (sync OnEnd → exporter). Only honored when
 	// MultiTenant=true. Purpose: deterministic test mode. The default
@@ -359,6 +367,25 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 			router := NewTenantRouter(opts.OTLPEndpoint)
 			if opts.SyncExport {
 				router.newProcessor = newSyncTenantProcessor
+			}
+			if opts.OpsEndpoint != "" {
+				opsOpts := []otlptracehttp.Option{
+					otlptracehttp.WithEndpointURL(withSignalPath(opts.OpsEndpoint, "/v1/traces")),
+				}
+				if len(opts.OpsHeaders) > 0 {
+					opsOpts = append(opsOpts, otlptracehttp.WithHeaders(opts.OpsHeaders))
+				}
+				opsExp, opsErr := otlptracehttp.New(ctx, opsOpts...)
+				if opsErr != nil {
+					return nil, opsErr
+				}
+				// Ops spans carry the FULL internal identity — including the
+				// internal-origin marker the shared multi-tenant resource
+				// deliberately omits.
+				router.WithOpsFallback(
+					sdktrace.NewBatchSpanProcessor(opsExp),
+					buildResource(serviceName, serviceVersion, environment, opts.NodeID, true),
+				)
 			}
 			tpOpts = append(tpOpts, sdktrace.WithSpanProcessor(router))
 		} else {

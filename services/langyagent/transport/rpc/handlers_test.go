@@ -30,9 +30,11 @@ func (w *stubWorker) ClaimTurn(string) app.ClaimOutcome {
 	}
 	return app.ClaimBusy
 }
-func (w *stubWorker) Release()                                                  {}
-func (w *stubWorker) Touch()                                                    {}
-func (w *stubWorker) HasServedTurn() bool                                       { return false }
+func (w *stubWorker) Release()                                              {}
+func (w *stubWorker) Touch()                                                {}
+func (w *stubWorker) HasServedTurn() bool                                   { return false }
+func (*stubWorker) ForwardTurnSpan(trace.SpanContext, time.Time, time.Time) {}
+
 func (w *stubWorker) SetTurnTraceContext(trace.SpanContext)                     {}
 func (w *stubWorker) LastLLMError() (herr.E, bool)                              { return herr.E{}, false }
 func (w *stubWorker) PostMessage(context.Context, string, string, string) error { return nil }
@@ -133,12 +135,12 @@ func TestChat_ValidationErrors(t *testing.T) {
 		wantType string
 	}{
 		{"invalid json", `{not-json`, http.StatusBadRequest, string(httprpc.CodeBadRequest)},
-		{"missing conversationId", `{"projectId":"project-1","userId":"user-a","prompt":"hi","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusBadRequest, string(httprpc.CodeBadRequest)},
-		{"missing projectId", `{"conversationId":"c1","userId":"user-a","prompt":"hi","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusBadRequest, string(httprpc.CodeBadRequest)},
-		{"missing userId", `{"conversationId":"c1","projectId":"project-1","prompt":"hi","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusBadRequest, string(httprpc.CodeBadRequest)},
-		{"missing prompt", `{"conversationId":"c1","projectId":"project-1","userId":"user-a","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusBadRequest, string(httprpc.CodeBadRequest)},
-		{"path-escaping conversationId", `{"conversationId":"../etc","projectId":"project-1","userId":"user-a","prompt":"hi","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusBadRequest, string(domain.ErrInvalidConversationID)},
-		{"incomplete credentials", `{"conversationId":"c1","projectId":"project-1","userId":"user-a","prompt":"hi","credentials":{"langwatchApiKey":"k"}}`, http.StatusBadRequest, string(httprpc.CodeBadRequest)},
+		{"missing conversationId", `{"projectId":"project-1","userId":"user-a","prompt":"hi","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusUnprocessableEntity, string(httprpc.CodeUnprocessable)},
+		{"missing projectId", `{"conversationId":"c1","userId":"user-a","prompt":"hi","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusUnprocessableEntity, string(httprpc.CodeUnprocessable)},
+		{"missing userId", `{"conversationId":"c1","projectId":"project-1","prompt":"hi","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusUnprocessableEntity, string(httprpc.CodeUnprocessable)},
+		{"missing prompt", `{"conversationId":"c1","projectId":"project-1","userId":"user-a","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusUnprocessableEntity, string(httprpc.CodeUnprocessable)},
+		{"path-escaping conversationId", `{"conversationId":"../etc","projectId":"project-1","userId":"user-a","prompt":"hi","credentials":{"langwatchApiKey":"k","llmVirtualKey":"vk","gatewayBaseUrl":"g","langwatchEndpoint":"e"}}`, http.StatusUnprocessableEntity, string(domain.ErrInvalidConversationID)},
+		{"incomplete credentials", `{"conversationId":"c1","projectId":"project-1","userId":"user-a","prompt":"hi","credentials":{"langwatchApiKey":"k"}}`, http.StatusUnprocessableEntity, string(httprpc.CodeUnprocessable)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -171,8 +173,8 @@ func TestChat_ValidationNamesOffendingField(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := postChat(t, router, auth, tc.body)
-			if rec.Code != http.StatusBadRequest {
-				t.Fatalf("status = %d, want 400", rec.Code)
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Fatalf("status = %d, want 422", rec.Code)
 			}
 			var env struct {
 				Error struct {
@@ -186,8 +188,8 @@ func TestChat_ValidationNamesOffendingField(t *testing.T) {
 			if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
 				t.Fatalf("decode envelope: %v (%q)", err, rec.Body.String())
 			}
-			if env.Error.Type != string(httprpc.CodeBadRequest) {
-				t.Errorf("error.type = %q, want bad_request", env.Error.Type)
+			if env.Error.Type != string(httprpc.CodeUnprocessable) {
+				t.Errorf("error.type = %q, want the error code", env.Error.Type)
 			}
 			// The user message must NOT echo the raw field name.
 			if strings.Contains(env.Error.Message, tc.wantField) {

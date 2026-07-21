@@ -1,12 +1,9 @@
 /**
- * Shared sizing constants for the GQ2 content-addressed blob lifecycle
- * (ADR-029 / ADR-030). Hoisted into one module so the blob and its holder set
- * derive their TTL from a single source — the holder set must outlive the blob
- * it guards, so a two-literal drift would be a correctness bug.
+ * Shared sizing constants for the GQ2 content-addressed blob lifecycle.
  */
 
 /**
- * Backstop TTL for a GQ1 (randomUUID / no-refcount) offloaded blob. GQ1 blobs
+ * Backstop TTL for a GQ1 (randomUUID / unshared) offloaded blob. GQ1 blobs
  * are refreshed on the DISPATCHED read only — a staged-but-not-yet-dispatched
  * job (long retry backoff chain, paused pipeline, delayed schedule) has no
  * intervening read between put and TTL tick-down, so this MUST comfortably
@@ -17,25 +14,29 @@
 export const GQ1_BLOB_BACKSTOP_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 /**
- * Backstop TTL for a GQ2 (content-addressed, refcounted) offloaded blob,
- * refreshed on access. The holder-set TTL is set to at least this (see
- * {@link BlobHolders}); both reclaim eagerly on the happy path, so this only
- * bounds genuine orphans — sized at 4 days so a Friday-evening incident still
- * has its blobs on Monday plus a day of catch-up. The GQ2 blob has an
- * accompanying holder set (per-stage tokens with atomic reclaim in Lua), so
- * the window here is the safety net for missed releases (crash mid-
- * completion), not the primary reclaim mechanism.
+ * Backstop TTL for a GQ2 content-addressed blob, refreshed on access.
+ * Redis expiry is the lazy reclaim mechanism, so a crashed holder that stops
+ * renewing cannot leak the blob beyond this window. Four days is the 3-day
+ * lease plus a 1-day lazy-reclaim interval, and preserves the existing
+ * Friday-to-Monday incident buffer plus a day of catch-up.
  */
 export const BLOB_BACKSTOP_TTL_SECONDS = 4 * 24 * 60 * 60;
 
 /**
- * TTL on a blob's holder set — deliberately longer than the blob TTL so the
- * holder set always outlives the blob it guards. A holder set that expired
- * first would drop its members and let a still-referenced blob be reclaimed.
- * Both are refreshed on access, so this margin only has to cover the small skew
- * between the two refreshes (ADR-030 §3).
+ * Per-holder lease duration. The blob backstop deliberately outlives this by a
+ * day, so command latency can never leave an unexpired lease pointing at a
+ * Redis blob whose TTL expired first.
  */
-export const BLOB_HOLDER_TTL_SECONDS = BLOB_BACKSTOP_TTL_SECONDS + 24 * 60 * 60;
+export const BLOB_LEASE_TTL_SECONDS = 3 * 24 * 60 * 60;
+
+/**
+ * Lease-set key retention. The extra day lets diagnostics observe recently
+ * expired deadlines while every liveness query still prunes them by score.
+ */
+export const BLOB_LEASE_SET_TTL_SECONDS = BLOB_LEASE_TTL_SECONDS + 24 * 60 * 60;
+
+/** Sentinel that prevents previous-release code from observing a last holder. */
+export const LEGACY_HOLDER_LEASE_GUARD = "__gq2_lease_guard__";
 
 /**
  * Hard ceiling on a single job's serialized payload. A payload over this is

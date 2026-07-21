@@ -202,6 +202,14 @@ func (w *Worker) SetTurnTraceContext(sc trace.SpanContext) {
 	}
 }
 
+// ForwardTurnSpan emits the turn's customer-facing root span via the relay.
+// No relay (mediation off) is a no-op, like SetTurnTraceContext.
+func (w *Worker) ForwardTurnSpan(sc trace.SpanContext, start, end time.Time) {
+	if w.otelRelay != nil {
+		w.otelRelay.ForwardTurnSpan(w.otelToken, sc, start, end)
+	}
+}
+
 // LastLLMError is the typed gateway herr this worker's most recent mediated
 // LLM call failed with, if any — reset at each turn start. Read by the app
 // when the agent reports a turn error so the terminal frame carries the real

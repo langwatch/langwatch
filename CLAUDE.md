@@ -172,6 +172,11 @@ specs/               # BDD feature specs
 | Shared types in `types.ts` | Colocate unless truly shared |
 | Duplicating Zod + TS types | When you need both validation AND types, use Zod only with `infer`. For internal constants (no external input), `as const` is sufficient |
 | Skipping test run after edits | Always run tests after any code change to catch regressions immediately |
+| Running `npx vitest` / `npm exec vitest` directly | Always go through the package scripts: `pnpm test:unit run <path>`, `pnpm test:integration run <path>`. Only they carry the repo's RAM guardrails (`pool: "vmThreads"`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) |
+| Hand-rolling a throwaway `vitest.*.config.ts` (in `/tmp` or a worktree) | Never. A bare config inherits none of the guardrails above, so vitest defaults to the `forks` pool at `availableParallelism - 1` workers (10 on an 11-core laptop) at ~200-500MB each — several GB per run, multiplied by every parallel agent worktree. Use an existing config |
+| Writing a jsdom config because the repo "has no jsdom environment" | It is per-file on purpose — neither config declares a global `environment`; 515 test files set `// @vitest-environment jsdom` in a docblock. Add the docblock to your test file |
+| Reaching for `--maxWorkers=1` to be gentle on RAM | It serializes the run so it stays resident far longer, overlapping every other agent's run. Scope the run down instead — pass a narrower path |
+| Leaving a killed vitest run behind | Interrupting vitest orphans its forked workers (they reparent to `ppid 1` and keep holding RAM). After an interrupted run, sweep with `pkill -f "vitest/dist/workers"` |
 | Writing tests in the incorrect order | Outside-In TDD: integration tests first, then unit tests |
 | Defining BDD specs on the end of the TODO list | BDD specs should come before any other tasks to guide them, not the other way around |
 | `gh pr edit --body` | Use `gh api repos/OWNER/REPO/pulls/N -X PATCH -f body="..."` (avoids Projects classic deprecation warning) |

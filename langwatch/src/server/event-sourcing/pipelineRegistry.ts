@@ -601,6 +601,8 @@ export class PipelineRegistry {
         }).then(() => undefined),
       titleGenerator: this.deps.langy.titleGenerator,
       saveTitle: (args) => saveTitle.fn(args),
+      failTurn: { failTurn: (args) => failTurn.fn(args) },
+      markError: (args) => this.deps.langy.buffer.markError(args),
     });
     const conversationReader = {
       read: async ({
