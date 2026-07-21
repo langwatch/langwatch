@@ -4,7 +4,6 @@ import {
   Code,
   HStack,
   SimpleGrid,
-  Spacer,
   Table,
   Text,
   VStack,
@@ -17,7 +16,6 @@ import {
   Eye,
   Filter,
   MoreVertical,
-  Plus,
   Trash,
   TrendingUp,
   Zap,
@@ -62,7 +60,7 @@ type AutomationSection = "overview" | "automations" | "alerts" | "schedules";
 
 const sectionDetails: Record<
   AutomationSection,
-  { title: string; description: string; newLabel?: string }
+  { title: string; description: string }
 > = {
   overview: {
     title: "Overview",
@@ -72,19 +70,16 @@ const sectionDetails: Record<
   automations: {
     title: "Automations",
     description: "Act on every incoming trace that matches your filters.",
-    newLabel: "New automation",
   },
   alerts: {
     title: "Alerts",
     description:
       "Get told when a metric crosses a threshold and when it recovers.",
-    newLabel: "New alert",
   },
   schedules: {
     title: "Schedules",
     description:
       "Send a dashboard, graph, or trace table on a recurring cadence.",
-    newLabel: "New schedule",
   },
 };
 
@@ -503,25 +498,6 @@ function AutomationsPage() {
     >
       <PageLayout.Header>
         <PageLayout.Heading>{details.title}</PageLayout.Heading>
-        <Spacer />
-        {section !== "overview" && (
-          <Button
-            colorPalette="orange"
-            size="sm"
-            onClick={() =>
-              openDrawer(
-                "automation",
-                section === "alerts"
-                  ? { initialSource: "customGraph" }
-                  : section === "schedules"
-                    ? { initialSource: "report" }
-                    : {},
-              )
-            }
-          >
-            <Plus size={16} /> {details.newLabel}
-          </Button>
-        )}
       </PageLayout.Header>
       <Box padding={6} width="full">
         <VStack align="stretch" gap={6} width="full">

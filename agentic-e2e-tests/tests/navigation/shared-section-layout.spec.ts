@@ -103,6 +103,22 @@ test("complex product areas share one local navigation layout", async ({
     expect(borderColor).not.toBe("rgba(0, 0, 0, 0)");
   }
 
+  const governanceNavigation = page.getByRole("navigation", {
+    name: "AI Governance navigation",
+  });
+  await governanceNavigation
+    .getByRole("link", { name: "Ingestion Sources", exact: true })
+    .click();
+  await expect(page).toHaveURL("/settings/governance/ingestion-sources");
+
+  const overviewBackground = await governanceNavigation
+    .getByRole("link", { name: "Overview", exact: true })
+    .evaluate((element) => getComputedStyle(element).backgroundColor);
+  const activeBackground = await governanceNavigation
+    .getByRole("link", { name: "Ingestion Sources", exact: true })
+    .evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(overviewBackground).not.toBe(activeBackground);
+
   await page.goto(sections[0]!.path(projectSlug));
   await page.getByRole("radio", { name: "Set theme to dark" }).click();
   await expect(

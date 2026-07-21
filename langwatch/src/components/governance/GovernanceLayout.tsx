@@ -37,7 +37,6 @@ export default function GovernanceLayout({
         {
           label: "Overview",
           href: "/governance",
-          includePath: "/governance",
           icon: <Eye size={14} />,
         },
         {
