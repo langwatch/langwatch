@@ -23,6 +23,7 @@ import { datasetTableCss } from "~/components/datasets/editor/datasetTableStyles
 import type { ColumnType } from "~/components/datasets/editor/TableCell";
 import { useTableKeyboardNavigation } from "~/components/datasets/editor/useTableKeyboardNavigation";
 import { VirtualizedTableBody } from "~/components/datasets/editor/VirtualizedTableBody";
+import { toaster } from "~/components/ui/toaster";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import {
   getFlowCallbacks,
@@ -235,6 +236,15 @@ export function EvaluationsV3Table({
   // (Router is `workflow` singular, matching the rest of the codebase —
   // see api/root.ts.)
   const publishWorkflow = api.workflow.publish.useMutation();
+  // Best-effort rollback on post-copy failure: if publish or addTarget
+  // throws after `agents.copy` has already created the forked Agent (and,
+  // for workflow-type agents, the forked Workflow/Version), we delete the
+  // orphaned Agent so it doesn't keep counting against the license
+  // `agents` quota (`enforceLicenseLimit`) with no target referencing it.
+  // `agents.delete` is soft-delete; the orphaned workflow rows (if any)
+  // are out of scope here — they have no enforcement cost and are cleaned
+  // up separately by the existing workflow GC.
+  const deleteAgent = api.agents.delete.useMutation();
 
   // Sync saved dataset changes to DB
   useDatasetSync();
@@ -832,25 +842,46 @@ export function EvaluationsV3Table({
             projectId,
             sourceProjectId: projectId,
           });
-          if (copied.workflowId && copied.workflowVersionId) {
-            await publishWorkflow.mutateAsync({
-              projectId,
-              workflowId: copied.workflowId,
-              versionId: copied.workflowVersionId,
-            });
+          try {
+            if (copied.workflowId && copied.workflowVersionId) {
+              await publishWorkflow.mutateAsync({
+                projectId,
+                workflowId: copied.workflowId,
+                versionId: copied.workflowVersionId,
+              });
+            }
+            addTarget(
+              applyForkedAgentToTarget({
+                baseTarget: target,
+                forked: copied,
+                newTargetId,
+              }),
+            );
+          } catch (postCopyErr) {
+            // Best-effort rollback: don't leave an orphaned Agent/Workflow
+            // counted against the license quota with no target referencing
+            // it. Swallow rollback errors — the post-copy failure is the
+            // primary signal and we don't want to mask it with a secondary
+            // rollback failure.
+            await deleteAgent
+              .mutateAsync({ id: copied.id, projectId })
+              .catch((rollbackErr) => {
+                logger.error(
+                  { rollbackErr, orphanedAgentId: copied.id },
+                  "Rollback failed after post-copy failure; orphaned Agent row remains",
+                );
+              });
+            throw postCopyErr;
           }
-          addTarget(
-            applyForkedAgentToTarget({
-              baseTarget: target,
-              forked: copied,
-              newTargetId,
-            }),
-          );
         } catch (err) {
           logger.error(
             { err, sourceAgentId: plan.sourceAgentId },
             "Failed to fork agent target on duplicate; not adding the column",
           );
+          toaster.create({
+            title: "Failed to duplicate target",
+            type: "error",
+          });
         }
         return;
       }
@@ -866,6 +897,7 @@ export function EvaluationsV3Table({
       openTargetEditor,
       copyAgent,
       publishWorkflow,
+      deleteAgent,
       project?.id,
     ],
   );
