@@ -36,21 +36,16 @@
 			}
 		]
 	},
-	// NOTE: no `references` here, and this project is checked with `-p`
-	// (not `tsgo --build`). Under `--build`, the referenced-project output
-	// redirection changed how `vite/client`'s ambient declarations
-	// (import.meta.env, *.css, *?raw) resolve at full-program scale — a
-	// handful of files silently lost them. Resolving @langwatch/* to source
-	// via the pnpm workspace symlink (as the app already did for cli-cards /
-	// handled-error) is the historically-green behavior. Packages get their
-	// own composite build via `pnpm typecheck:packages`.
-	// Broad include (matches the historically-green config) so ambient
-	// declarations resolve identically — a narrowed src-only include silently
-	// changed how `vite/client`'s asset/import.meta ambients apply at
-	// full-program scale. The RAM win (keeping vitest/vite/playwright/rolldown
-	// types out) is kept by EXCLUDING the tooling below, not by omitting it
-	// from the include. Those same files are the root set of
-	// tsconfig.tooling.json.
+	// This project's include/exclude intentionally mirrors the historically
+	// green config (no tooling exclusions). Excluding the vite/vitest config
+	// files broke how `vite/client`'s ambient declarations (import.meta.env,
+	// *.css, *?raw) apply to a handful of files at full-program scale — a
+	// subtle interaction not worth chasing here. The @langwatch/* workspace
+	// packages moved OUT of langwatch/ (to repo-root /packages), so the
+	// `**/*.ts` glob no longer sweeps them; they are validated separately by
+	// `pnpm typecheck:packages`. Checked with `-p` (not `tsgo --build`):
+	// @langwatch/* resolves to source via the pnpm workspace symlink, exactly
+	// as the app already resolved cli-cards / handled-error.
 	"include": [
 		"./src/**/*",
 		"./ee/**/*",
@@ -76,22 +71,6 @@
 		"**/*.spec.tsx",
 		"**/__tests__/**",
 		"**/__mocks__/**",
-		"e2e/**",
-		// Tooling — checked by tsconfig.tooling.json, kept out here so their
-		// deps' types (vitest, vite, playwright, rolldown) stay off the app graph.
-		"scripts/**",
-		"vite/**",
-		"prisma/**",
-		"vite.config.ts",
-		"vitest.config.ts",
-		"vitest.browser.config.ts",
-		"vitest.integration.config.ts",
-		"vitest.mcp.config.ts",
-		"vitest.pg-integration.config.ts",
-		"vitest.prisma-integration.config.ts",
-		"vitest.stress.config.ts",
-		"vitest.stripe-integration.config.ts",
-		"test-setup.ts",
-		"test-setup.browser.ts"
+		"e2e/**"
 	]
 }
