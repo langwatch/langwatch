@@ -9,7 +9,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-const findUniqueMock = vi.fn();
+const { findUniqueMock } = vi.hoisted(() => ({ findUniqueMock: vi.fn() }));
 vi.mock("../../db", () => ({
   prisma: {
     workflow: { findUnique: (...args: unknown[]) => findUniqueMock(...args) },
