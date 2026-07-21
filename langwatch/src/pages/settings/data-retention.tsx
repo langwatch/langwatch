@@ -563,11 +563,18 @@ function DataRetentionPage({
                     error: Error;
                   } => !r.ok,
                 );
+                // The partial count is an outcome, not an error headline: a
+                // recognised code overrides `fallbackTitle`, which would erase
+                // "Saved 7 of 9". Report the two things separately.
+                if (failed.length < pairs.length) {
+                  toaster.create({
+                    title: `Saved ${pairs.length - failed.length} of ${pairs.length} updates`,
+                    type: "warning",
+                    meta: { closable: true },
+                  });
+                }
                 showErrorToast(firstError?.error, {
-                  fallbackTitle:
-                    failed.length === pairs.length
-                      ? "Couldn't save the retention policy"
-                      : `Saved ${pairs.length - failed.length} of ${pairs.length} updates`,
+                  fallbackTitle: "Couldn't save the retention policy",
                 });
                 return {
                   success: failed.length === 0,
