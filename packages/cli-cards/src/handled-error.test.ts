@@ -239,6 +239,101 @@ describe("parseHandledError, given dialect 3 (the new framework envelope)", () =
   });
 });
 
+/**
+ * The remediation channel (ADR-045). The platform spells it `tips`/`docsUrl`;
+ * the CLI had only ever read `suggestions`/`docUrl`, names the platform never
+ * emits, so every one of the centrally-authored tips in
+ * `server/app-layer/error-remediation.ts` was dropped on the floor and the CLI
+ * fell back to its own handful of generic codes.
+ * `specs/features/domain-error-contract.feature` names the CLI as a consumer
+ * that must be able to self-diagnose from these.
+ */
+describe("parseHandledError, given the platform's remediation channel", () => {
+  it("reads `tips` and `docsUrl`, the names the platform actually emits", () => {
+    const parsed = parseHandledError({
+      status: 404,
+      body: {
+        code: "trace_not_found",
+        kind: "trace_not_found",
+        message: "trace_not_found",
+        meta: { traceId: "abc" },
+        tips: [
+          "Check the trace id — traces are deleted after the retention window",
+          "If you just sent this trace, retry in a few seconds — ingestion is asynchronous",
+        ],
+        docsUrl: "https://docs.langwatch.ai/platform/data-retention",
+      },
+    });
+
+    expect(parsed.suggestions).toEqual([
+      "Check the trace id — traces are deleted after the retention window",
+      "If you just sent this trace, retry in a few seconds — ingestion is asynchronous",
+    ]);
+    expect(parsed.docUrl).toBe("https://docs.langwatch.ai/platform/data-retention");
+  });
+
+  it("keeps the remediation copy out of meta — it is not domain context", () => {
+    const parsed = parseHandledError({
+      status: 404,
+      body: {
+        error: "trace_not_found",
+        message: "Trace not found",
+        traceId: "abc",
+        tips: ["Check the trace id"],
+        docsUrl: "https://docs.langwatch.ai/platform/data-retention",
+        fault: "customer",
+      },
+    });
+
+    expect(parsed.meta).not.toHaveProperty("tips");
+    expect(parsed.meta).not.toHaveProperty("docsUrl");
+    expect(parsed.meta).not.toHaveProperty("fault");
+    expect(parsed.suggestions).toEqual(["Check the trace id"]);
+  });
+
+  it("reads them off the serialised error too (dialect 2)", () => {
+    const parsed = parseHandledError({
+      status: 429,
+      body: {
+        error: "Rate limited",
+        domainError: {
+          code: "rate_limited",
+          kind: "rate_limited",
+          meta: {},
+          tips: ["Query in smaller windows and paginate through the results"],
+          docsUrl: "https://docs.langwatch.ai/platform/rate-limits",
+        },
+      },
+    });
+
+    expect(parsed.suggestions).toEqual([
+      "Query in smaller windows and paginate through the results",
+    ]);
+    expect(parsed.docUrl).toBe("https://docs.langwatch.ai/platform/rate-limits");
+  });
+
+  it("still reads a document written under the CLI's own older names", () => {
+    // The CLI's `{ok:false}` error document has always written
+    // `suggestions`/`docUrl`, and older ones must keep parsing.
+    const parsed = parseHandledError({
+      status: 404,
+      body: {
+        code: "dataset_not_found",
+        kind: "dataset_not_found",
+        message: "Dataset not found",
+        meta: {},
+        suggestions: ["Run `lw dataset list` to see what exists"],
+        docUrl: "https://docs.langwatch.ai/datasets",
+      },
+    });
+
+    expect(parsed.suggestions).toEqual([
+      "Run `lw dataset list` to see what exists",
+    ]);
+    expect(parsed.docUrl).toBe("https://docs.langwatch.ai/datasets");
+  });
+});
+
 describe("parseHandledError, given the `code` ↔ `kind` transition", () => {
   it("resolves the discriminant from `code` alone (new server)", () => {
     const parsed = parseHandledError({

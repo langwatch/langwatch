@@ -80,13 +80,24 @@ export interface CliHandledError {
   /** The reason chain, when the route sent it. Same availability as `traceId`. */
   reasons?: CliHandledErrorReason[];
   /**
-   * What the user can DO about it, when the platform sent next steps. Absent
-   * until the backend grows `suggestions` on `HandledError` — the CLI's
-   * code-keyed explainer fills the gap client-side until then, and these win
-   * the moment the server sends them.
+   * What the user can DO about it — the platform's own next steps.
+   *
+   * The platform spells this `tips` (`HandledError.tips`, authored centrally in
+   * `server/app-layer/error-remediation.ts` and keyed by code, with its docs
+   * paths verified by CI). It is read here under both names: `tips` is what the
+   * wire actually carries, `suggestions` is kept because the CLI's own error
+   * document has always written that name and older documents must keep
+   * parsing.
+   *
+   * This is the remediation channel ADR-045 added for exactly this consumer —
+   * `specs/features/domain-error-contract.feature` requires that "consumers
+   * without a client-side explainer (CLI, API, MCP) can self-diagnose". When
+   * the server sends these they WIN over the CLI's own code-keyed fallback,
+   * which only knows a handful of generic codes and cannot know, say, that
+   * traces are deleted after the retention window.
    */
   suggestions?: string[];
-  /** The docs page that explains the failure, when the platform sent one. */
+  /** The docs page that explains the failure (`docsUrl` on the wire). */
   docUrl?: string;
 }
 
@@ -258,9 +269,14 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
       logsUrl:
         typeof serialized.logsUrl === "string" ? serialized.logsUrl : undefined,
       reasons: asReasons(serialized.reasons),
-      suggestions: asSuggestions(serialized.suggestions),
+      suggestions:
+        asSuggestions(serialized.tips) ?? asSuggestions(serialized.suggestions),
       docUrl:
-        typeof serialized.docUrl === "string" ? serialized.docUrl : undefined,
+        typeof serialized.docsUrl === "string"
+          ? serialized.docsUrl
+          : typeof serialized.docUrl === "string"
+            ? serialized.docUrl
+            : undefined,
     };
   }
 
@@ -319,6 +335,14 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
     logsUrl,
     suggestions,
     docUrl,
+    // The platform's own spelling of the two above. Lifted out for the same
+    // reason as the rest: dialect 1 spreads meta flat, so leaving them in would
+    // report the remediation copy back as domain context.
+    tips,
+    docsUrl,
+    // `fault` is the envelope's own ("customer" vs "platform"), not something
+    // the platform attached to this failure.
+    fault,
     ...rest
   } = record;
 
@@ -370,8 +394,13 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
           ? traceRecord.logsUrl
           : undefined,
     reasons: asReasons(reasons),
-    suggestions: asSuggestions(suggestions),
-    docUrl: typeof docUrl === "string" ? docUrl : undefined,
+    suggestions: asSuggestions(tips) ?? asSuggestions(suggestions),
+    docUrl:
+      typeof docsUrl === "string"
+        ? docsUrl
+        : typeof docUrl === "string"
+          ? docUrl
+          : undefined,
   };
 };
 
