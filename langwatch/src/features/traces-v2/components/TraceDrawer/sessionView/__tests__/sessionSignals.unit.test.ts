@@ -18,6 +18,7 @@ function session(
     agent: "claude-code",
     agentVersion: "2.0.0",
     sessionId: "session-1",
+    sessionKeySource: "provider",
     finalRequestId: "req_9",
     userId: "user-1",
     terminalType: "xterm-256color",
