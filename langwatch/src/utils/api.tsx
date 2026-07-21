@@ -26,7 +26,6 @@ import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import { type ReactNode, useEffect, useState } from "react";
 import superjson from "superjson";
 import type { AppRouter } from "~/server/api/root";
-import { tracingLink } from "@langwatch/react-rum";
 import {
   showAiCallFailedToast,
   showMissingModelToast,
@@ -118,10 +117,6 @@ function createTRPCLinks() {
         process.env.NODE_ENV === "development" ||
         (opts.direction === "down" && opts.result instanceof Error),
     }),
-    // Above the transport split so every call is timed individually, whether it
-    // ends up batched, unbatched, on the socket or on SSE. Inert until browser
-    // tracing is started, and fail-open if it ever isn't. See ADR-058.
-    tracingLink(),
     // Top layer: subscriptions ride the existing SSE link; everything else
     // goes through the WS-or-HTTP router below.
     splitLink({

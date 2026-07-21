@@ -84,28 +84,29 @@ the collector's unauthenticated logs pipeline unreachable from outside the VPC.
 
 **Instrumentation is composed, not adopted wholesale.** We take
 `@opentelemetry/sdk-trace-web` with document-load and fetch/XHR instrumentation
-for the page-level picture, and add three pieces the off-the-shelf bundle cannot
-provide for this codebase:
+for the page-level picture, and settle three things the off-the-shelf bundle
+does not answer for this codebase:
 
-1. **A tRPC link** that opens a client span per *procedure call*, not per HTTP
-   request. This is the only seam that times every call whichever transport it
-   took — batched HTTP, WebSocket, or SSE — because it sits above the transport
-   split.
+1. **Per-procedure visibility from the server side.** A tRPC call needs to be
+   attributable individually: with `httpBatchLink`, one fetch span attributed to
+   `POST /api/trpc` says a batch was slow but not which procedure in it, which
+   is precisely the question.
 
-   The link does not inject trace context. The fetch instrumentation already
-   puts `traceparent` on the batched request, and one header cannot carry a
-   distinct parent for each call inside a batch. So the server's spans hang off
-   the HTTP request rather than off the individual procedure span: everything
-   stays in one trace, which is the goal, but per-procedure client-to-server
-   parentage is approximate under batching and exact only for unbatched
-   (`skipBatch`) calls.
+   We take this from the server's own `trpc.<path>` spans, which already exist
+   and now nest under the HTTP request span. A client-side link was built first
+   and removed: with `StackContextManager` (the only context manager available
+   without adopting zone.js) an active context does not survive the batch
+   link's deferred dispatch, so every procedure span became a lone root in its
+   own trace — measured, not assumed. That is worse than nothing: it adds a
+   trace per call and correlates none of them. Client-side per-call spans are
+   possible with async context propagation and are deferred to a decision about
+   whether zone.js is worth its global patching.
 
-   The WebSocket and SSE transports carry no per-call headers at all, so calls
-   sent that way are timed in the browser but root their own trace on the
-   server. Closing that gap means carrying context in the operation itself,
-   which in tRPC v10 means putting it in each procedure's input schema. That
-   price is not worth paying for the small share of traffic on those
-   transports, so it is knowingly left open.
+   The WebSocket and SSE transports carry no per-call headers at all, so work
+   arriving that way roots its own trace on the server. Closing that means
+   putting trace context into every procedure's input schema, which is not
+   worth it for that share of traffic. Knowingly open.
+
 2. **A navigation instrumentation** driven by the React Router 8 router, so a
    route transition is a span and the fetches it triggers are its children.
 3. **A session span processor** that stamps `session.id` (per OpenTelemetry
@@ -177,13 +178,13 @@ actually one change — it is one change plus a collector hardening we would be
 doing under time pressure. The proxy costs us an app route and a hop, and buys
 same-origin simplicity, existing middleware, and no new attack surface.
 
-Choosing a tRPC link over `fetch` instrumentation is the difference between
-telemetry that looks complete and telemetry that is. With `httpBatchLink`, a
-single fetch span attributed to `POST /api/trpc` tells you a batch was slow but
-not which procedure in it, which is precisely the question. The cost is that we
-own a link, and links are load-bearing code in a request path — a bug there
-degrades the product, not just its telemetry. The link must therefore be
-fail-open: any error inside it passes the operation through untouched.
+Taking per-procedure timing from the server rather than the client keeps
+load-bearing code out of the request path entirely. A tRPC link is code every
+call passes through, where a bug degrades the product and not merely its
+telemetry; the server spans cost nothing extra and answer the same question.
+What is lost is the client's view of a call — queue time before dispatch, and
+the browser's own latency — which is a real gap and the reason to revisit this
+if async context propagation is adopted.
 
 Declining Faro is the decision most likely to be revisited, and it is worth
 being honest that we are choosing more of our own code over an infrastructure
@@ -202,28 +203,15 @@ We take on frontend telemetry volume, which is larger and spikier than backend
 telemetry and is paid for in Tempo storage and collector CPU. The sampling
 posture above is the lever, and we should expect to pull it.
 
-We take on a request-path dependency in the tRPC link. This is the main new
-risk and is mitigated by fail-open behaviour and by the link being inert when
-telemetry is disabled.
-
-Alerting needs no new machinery. Rules carrying `contact_point=prod-alerts` and
-a severity label already reach `#alerting` through the existing root route, and
-alert content is published from JSON rather than Terraform. Note that the
-authoritative alerting JSON does not live on the main checkout — editing the
-stale copy silently reverts work.
-
-For the PostHog-into-Grafana question that prompted this: with the Infinity
-datasource installed, PostHog's HogQL query API can back dashboard panels
-directly, and no export pipeline is needed for visualisation. Infinity is a poor
-*alert* source — alerting requires its JSONata or JQ backend parser returning
-numeric frames, against a rate-limited multi-second query API — so alert
-thresholds should read a Prometheus counter instead. Note also that the
-fluent-bit path into Loki is documented as deliberately lossy under pressure,
-which is correct for search and wrong for an alert that must not miss.
+No code is added to the request path: the browser's instrumentation is
+registered once at boot and the ingest route is a leaf. A failure in either
+leaves the application working and untraced.
 
 Once frontend errors carry trace context and land in Tempo natively, PostHog's
-role in error tracking becomes a question worth asking rather than an assumption.
-This ADR does not answer it.
+role in error tracking becomes a question worth asking rather than an
+assumption. This ADR does not answer it. How PostHog data is surfaced in
+Grafana, and how alerts on it are routed, is a separate decision — see
+[posthog-in-grafana.md](../best_practices/posthog-in-grafana.md).
 
 ## Rollout
 
@@ -238,18 +226,13 @@ first two are worth doing even if the rest is deferred.
    the in-cluster collector. Verifiable by posting OTLP by hand.
 4. **Browser SDK**: provider, resource, batch processor, session processor,
    document-load and fetch instrumentation, behind a flag, default off.
-5. **tRPC client link**, fail-open, carrying context across all three
-   transports.
-6. **Router navigation spans.**
-7. **Dashboards and alert rules**, published through the existing JSON pipeline
-   with `contact_point=prod-alerts`.
-8. **Infinity datasource** and PostHog-backed panels — independent of 1–7 and
-   can proceed in parallel.
+5. **Router navigation spans.**
+6. **Dashboards and alert rules** for the browser signals, published through the
+   existing JSON pipeline.
 
 ## References
 
 - Related ADRs: ADR-042 (local observability stack), ADR-054 (observability as
   code), ADR-055 (canonical OTLP pipelines), ADR-003 (logging)
 - [OpenTelemetry session semantic conventions](https://opentelemetry.io/docs/specs/semconv/general/session/)
-- [Grafana Infinity datasource](https://grafana.com/docs/plugins/yesoreyeram-infinity-datasource/latest/)
 - [Grafana Faro Web SDK](https://github.com/grafana/faro-web-sdk) (considered, not adopted)

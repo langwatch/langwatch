@@ -11,7 +11,6 @@
  * a failure leaves the app running untraced.
  */
 
-import { context, propagation, trace } from "@opentelemetry/api";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { registerInstrumentations } from "@opentelemetry/instrumentation";
@@ -87,7 +86,12 @@ export function startBrowserTracing({
         new FetchInstrumentation({
           // Only our own origin is given trace context. Sending `traceparent`
           // to a third party leaks our topology and trips their CORS anyway.
-          propagateTraceHeaderCorsUrls: [new RegExp(`^${escapeRegExp(window.location.origin)}`)],
+          // The trailing boundary matters: a bare prefix match would also
+          // accept `https://app.example.com.evil.test`, which is a lookalike
+          // host somebody else controls.
+          propagateTraceHeaderCorsUrls: [
+            new RegExp(`^${escapeRegExp(window.location.origin)}(?:/|$)`),
+          ],
           // The exporter's own requests would otherwise produce spans that
           // produce requests that produce spans.
           ignoreUrls: [new RegExp(escapeRegExp(RUM_TRACES_PATH))],
@@ -113,11 +117,3 @@ function sessionHeader(): Record<string, string> {
 
 const escapeRegExp = (value: string): string =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/** Test seam: lets a suite start tracing again with a fresh provider. */
-export function resetBrowserTracingForTesting(): void {
-  started = false;
-  trace.disable();
-  context.disable();
-  propagation.disable();
-}

@@ -25,4 +25,3 @@ export {
 export { startBrowserTracing } from "./browserTracing";
 export { currentSessionId, SESSION_INACTIVITY_MS } from "./session";
 export { SessionSpanProcessor } from "./sessionSpanProcessor";
-export { tracingLink } from "./trpcTracingLink";

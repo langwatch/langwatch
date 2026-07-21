@@ -505,7 +505,16 @@ function recordSpanError(span: Span, error: unknown): void {
  *
  * See ADR-058.
  */
-export function callerTraceContext({ req, type }: { req: any; type: string }) {
+export function callerTraceContext({
+  req,
+  type,
+}: {
+  // Only the headers are read, and callers range from the Node request to the
+  // WS handshake to nothing at all (SSG helpers), so this asks for the one
+  // thing it uses rather than for a request type it would have to lie about.
+  req: { headers?: Record<string, string | string[] | undefined> } | undefined;
+  type: string;
+}) {
   const active = otelContext.active();
   if (type === "subscription") return active;
 

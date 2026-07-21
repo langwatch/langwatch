@@ -25,16 +25,13 @@ Feature: Browser RUM and full-stack trace correlation
     Scenario: Batched calls stay individually visible
       Given several calls are dispatched together as one network request
       When the user performs an action that triggers them
-      Then each call appears as its own span
+      Then each call appears as its own span within that request
       And a slow call is attributable without inspecting the others
 
-    Scenario: Calls over the realtime transports are still timed
-      Given a call is sent over the WebSocket transport
+    Scenario: Work started over a realtime connection is still visible
+      Given the user performs an action delivered over a realtime connection
       When the server handles it
-      Then the call is still timed in the browser
-      # Those transports carry no per-call headers, so the server cannot know
-      # which trace the call belongs to and starts its own. Knowingly open.
-      But the server work starts a trace of its own
+      Then the server work is still visible as its own trace
 
     Scenario: A long-lived connection does not capture later calls
       Given a connection was opened during some earlier trace

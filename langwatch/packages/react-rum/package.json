@@ -32,17 +32,7 @@
 		"@opentelemetry/resources": "^2.0.0",
 		"@opentelemetry/sdk-trace-base": "^2.0.0",
 		"@opentelemetry/sdk-trace-web": "^2.0.0",
-		"@opentelemetry/semantic-conventions": "^1.36.0",
-		"@trpc/client": "^10.45.0",
-		"@trpc/server": "^10.45.0"
-	},
-	"peerDependenciesMeta": {
-		"@trpc/client": {
-			"optional": true
-		},
-		"@trpc/server": {
-			"optional": true
-		}
+		"@opentelemetry/semantic-conventions": "^1.36.0"
 	},
 	"devDependencies": {
 		"@types/node": "^26.0.1",

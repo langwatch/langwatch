@@ -264,13 +264,28 @@ export async function ingestBrowserTraces({
 
   stampIdentity(resourceSpans);
 
+  // Not awaited. The browser has nothing to do with the answer — the outcome is
+  // never surfaced to it (see below) — so waiting would only hold a live
+  // connection open for as long as the collector takes to fail, which during an
+  // outage is every request for the full timeout. The app is a long-running
+  // Node process, not a serverless function, so the promise keeps running after
+  // the response is sent.
+  void forwardToCollector({ forwardTo, payload });
+}
+
+async function forwardToCollector({
+  forwardTo,
+  payload,
+}: {
+  forwardTo: string;
+  payload: OtlpTraceExport;
+}): Promise<void> {
   try {
     const response = await fetch(forwardTo, {
       method: "POST",
       headers: collectorHeaders(),
       body: JSON.stringify(payload),
-      // A hung collector must not pin an app request (and its buffered body)
-      // open for the browser's whole export timeout.
+      // A hung collector must not leave the forward outstanding indefinitely.
       signal: AbortSignal.timeout(5_000),
     });
 
@@ -283,9 +298,9 @@ export async function ingestBrowserTraces({
   } catch (error) {
     logger.warn({ error }, "could not forward browser telemetry");
   }
-  // Deliberately not surfaced to the browser. A 5xx here is in the OTLP
-  // retryable set, so a collector outage would turn every open tab into a
-  // retry loop against our own app — converting an observability outage into a
-  // traffic incident. The drop is visible server-side in these logs, which is
-  // where someone can act on it.
+  // A failure is deliberately not surfaced to the browser. A 5xx would be in
+  // the OTLP retryable set, so a collector outage would turn every open tab
+  // into a retry loop against our own app — converting an observability outage
+  // into a traffic incident. The drop is visible in these logs, which is where
+  // someone can act on it.
 }
