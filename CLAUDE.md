@@ -15,6 +15,8 @@ If no feature file exists for your task, create one before writing code.
 
 **For frontend work, read the UX docs first.** Before any non-trivial frontend change (anything beyond a specific, targeted tweak the user spelled out), read the relevant pattern docs under `dev/docs/best_practices/` so you extend existing patterns instead of reinventing them. The UI ones: `react.md`, `drawers.md`, `row-actions-overflow-menu.md`, `selection-action-bar.md`, `scope-selector-and-badges.md`. If the surface you are building has no doc yet, write one as part of the change.
 
+**Error paths are part of the feature, not an afterthought.** Any code that can fail — a route, a service method, a mutation, a form submit — ships its failure modes deliberately: read `dev/docs/best_practices/error-handling.md` and [ADR-045](dev/docs/adr/045-domain-errors-handled-boundary.md). The rule in one line: throw a `HandledError` **only** when we know the cause *and* the caller can act on it; everything else stays a plain `Error` and correctly degrades to a generic "unknown" plus a trace id. When you add a feature, name its expected failures in the spec alongside the golden path, and give each one a stable `code`, customer-safe `message`, correct `fault`, and remediation copy. "Unknown error" reaching a user for a failure we could have named is a bug in the feature, not a gap in the error system.
+
 ## Development Environment
 
 `make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `langwatch/.env` is the source of truth for everything else.
@@ -149,6 +151,7 @@ specs/               # BDD feature specs
 - `dev/docs/CODING_STANDARDS.md` - clean code, SOLID + CUPID principles
 - `dev/docs/TESTING_PHILOSOPHY.md` - test hierarchy, BDD workflow
 - `dev/docs/best_practices/` - language/framework conventions
+- `dev/docs/best_practices/error-handling.md` - handled vs unhandled errors, and how they reach the user
 - `dev/docs/adr/` - Architecture Decision Records
 
 ## General
@@ -184,6 +187,15 @@ specs/               # BDD feature specs
 | Returning JSX from hooks | Hooks return state and callbacks, never JSX. If a hook needs to "render" something (dialog, tooltip), return props/state and let the consumer render the component explicitly. Use `.ts` for hooks, `.tsx` for components |
 | Using `form.watch()` in child components that receive `form` as a prop | Use `useWatch({ control: form.control, name: "field" })` instead — `form.watch()` doesn't trigger re-renders in child components (especially inside `useFieldArray` items). Only the form owner component should use `form.watch()` |
 | Relying solely on `gh pr checks` to assess CI status | Use `gh run list --branch <branch>` to see all workflow runs — `gh pr checks` deduplicates by check name and can mask failing runs behind passing ones from earlier commits |
+| Toasting a raw `error.message` from a mutation `onError` | Read the handled payload (`readHandledError`) and render title-from-`code` + `message` + `tips` + `docsUrl`. `error.message` is the wrong channel for handled errors and unsafe for unhandled ones. See `dev/docs/best_practices/error-handling.md` |
+| Letting a knowable failure surface as a generic "unknown error" | If we can name the cause and the caller can act on it, it gets a `HandledError` with a stable `code`. Reserve "unknown" for genuinely unanticipated failures — that path is intentional, not a fallback for laziness |
+| Inventing a `HandledError` to wrap an infra failure (`new HandledError("database_error", pgError.message)`) | Throw the plain `Error`. It degrades to "unknown" at the boundary and gets logged with the trace id. Dressing internals up as handled leaks them and promises the caller an action they don't have |
+| A `HandledError` subclass with a 5xx status and no explicit `fault` | `fault` defaults to `"customer"`, so an unannotated 5xx logs a real incident as routine noise. Set `platform` or `provider` explicitly on every 5xx subclass |
+| Interpolating upstream error text, hostnames, SQL, or Prisma model names into a `HandledError` message | The message is rendered verbatim to the customer. Keep it as authored, customer-safe copy; put the raw detail in `reasons` (auto-masked to `unknown`) or the log |
+| Stuffing debug context into `meta` | `meta` is a client contract, not a scratchpad — only fields a UI or agent actually reads. If nothing renders it, log it instead. Name the consumer before adding a field |
+| Surfacing server validation errors as a toast | Map `meta.fieldErrors` onto the offending form fields so the user sees the rejection where they're looking, and make it visually clear the submit was rejected |
+| Hand-rolling `c.json({ error: "..." }, { status })` in a Hono route | Throw a `HandledError` — `createServiceApp`'s `onError` serialises it. A generic string response bypasses the whole contract |
+| Asserting on error message prose in tests | Assert on `code` — the message is copy and will change. Use `code` equality rather than `instanceof` anywhere the error may have crossed a process, worker, or serialisation boundary |
 | Hono routes calling repositories directly | Routes must go through a service layer — never instantiate or import from repositories. Business logic (validation, guards) belongs in the service, not the route |
 | Using `list` or `get` for repository methods | Repositories use `findAll`/`findById`. Services use `getAll`/`getById`. Routes call services only |
 | Setting up a Monitor / sleep that *can* take more than 5 minutes | Anthropic's prompt cache TTL is 5min, so any wait that crosses it forces an uncached re-read of the full conversation on wake-up (slower + double-pays for tokens). Cap each poll cycle at **4.5 min (270s)** — re-check, then re-arm. If the work is obviously hours away (long deploy, overnight run), don't sit on a Monitor at all — drop it and hand control back to the user |
