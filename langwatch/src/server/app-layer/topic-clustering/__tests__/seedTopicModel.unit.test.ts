@@ -96,6 +96,69 @@ const guardedPrismaStub = ({
   return { prisma, pageArgs };
 };
 
+/**
+ * A faithful in-memory Postgres for Project/Topic: `project.findMany`
+ * implements the exact contract the seed relies on — the `topics: { some }`
+ * EXISTS filter, keyset pagination by `id`, ascending order, and `take`. Ids
+ * are compared lexically, as Postgres compares the nanoid PK. This lets a test
+ * drive the seed over the real PAGE_SIZE walk and assert it enumerates every
+ * project that owns topics, exactly once: a botched cursor (a skipped or
+ * double-counted boundary row) fails it. Every call still runs the real guard.
+ */
+const fakeDbStub = ({
+  projectsWithTopics,
+  projectsWithoutTopics = [],
+  ownedProjectIds = new Set<string>(),
+}: {
+  projectsWithTopics: string[];
+  projectsWithoutTopics?: string[];
+  ownedProjectIds?: Set<string>;
+}) => {
+  const topicsByProject = new Map<string, ReturnType<typeof topicRow>[]>(
+    projectsWithTopics.map((id) => [id, [topicRow(`t-${id}`, id)]]),
+  );
+  const allIds = [...projectsWithTopics, ...projectsWithoutTopics];
+
+  const prisma = {
+    project: {
+      findMany: async (args: any) => {
+        await guard(modelParams("Project", "findMany", args));
+        const gt: string | undefined = args?.where?.id?.gt;
+        const requireTopics = Boolean(args?.where?.topics);
+        const matched = allIds
+          .filter((id) => (requireTopics ? topicsByProject.has(id) : true))
+          .filter((id) => gt === undefined || id > gt)
+          .sort();
+        return matched
+          .slice(0, args?.take ?? matched.length)
+          .map((id) => ({ id }));
+      },
+    },
+    topic: {
+      findMany: async (args: { where: { projectId: string } }) => {
+        await guard(modelParams("Topic", "findMany", args));
+        return topicsByProject.get(args.where.projectId) ?? [];
+      },
+    },
+    topicModelProjection: {
+      findUnique: async (args: { where: { projectId: string } }) => {
+        await guard(modelParams("TopicModelProjection", "findUnique", args));
+        return ownedProjectIds.has(args.where.projectId)
+          ? { id: `cursor-${args.where.projectId}` }
+          : null;
+      },
+      findMany: async (args: { where: { projectId: { in: string[] } } }) => {
+        await guard(modelParams("TopicModelProjection", "findMany", args));
+        return args.where.projectId.in
+          .filter((projectId) => ownedProjectIds.has(projectId))
+          .map((projectId) => ({ projectId }));
+      },
+    },
+  } as unknown as PrismaClient;
+
+  return { prisma };
+};
+
 describe("seedTopicModelHistory", () => {
   describe("given projects still hold pre-ownership Topic rows", () => {
     describe("when the boot seed pass runs", () => {
@@ -184,6 +247,46 @@ describe("seedTopicModelHistory", () => {
         expect(pageArgs).toHaveLength(3);
         // The second page cursors past the last id of the first.
         expect(pageArgs[1]?.where?.id).toEqual({ gt: "p1" });
+      });
+    });
+  });
+
+  describe("given a fleet larger than one page", () => {
+    describe("when the boot seed pass walks it end to end", () => {
+      it("records every project that owns topics, exactly once, and skips the rest", async () => {
+        // 450 topic-owning projects + 50 topic-less, ids zero-padded so their
+        // lexical order is the keyset order the seed pages by. 450 > PAGE_SIZE
+        // (200), so the walk must cross page boundaries and still terminate —
+        // exactly where a botched cursor would skip or double-count a project.
+        const withTopics: string[] = [];
+        const withoutTopics: string[] = [];
+        for (let i = 0; i < 500; i++) {
+          const id = `p${String(i).padStart(4, "0")}`;
+          (i % 10 === 0 ? withoutTopics : withTopics).push(id);
+        }
+
+        const recorded: string[] = [];
+        const recordTopics = vi.fn(async (cmd: { tenantId: string }) => {
+          recorded.push(cmd.tenantId);
+        });
+        const { prisma } = fakeDbStub({
+          projectsWithTopics: withTopics,
+          projectsWithoutTopics: withoutTopics,
+        });
+
+        const summary = await seedTopicModelHistory({
+          prisma,
+          redis: null,
+          recordTopics,
+        });
+
+        // Nothing skipped: exactly the topic-owning projects, all of them.
+        expect([...recorded].sort()).toEqual([...withTopics].sort());
+        // No duplicates — a cursor that re-served a boundary row trips this.
+        expect(new Set(recorded).size).toBe(recorded.length);
+        // No topic-less project leaked in.
+        expect(recorded.filter((id) => withoutTopics.includes(id))).toEqual([]);
+        expect(summary).toEqual({ seeded: withTopics.length, skipped: 0 });
       });
     });
   });
