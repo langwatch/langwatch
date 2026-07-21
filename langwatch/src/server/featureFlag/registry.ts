@@ -48,6 +48,12 @@ export interface FeatureFlagDefinition {
    * setups to keep working.
    */
   legacyEnvVar?: string;
+  /**
+   * Set to `false` to opt the flag out of the auto-derived
+   * UPPERCASE(key) env-var override, leaving the operator store (and,
+   * for PRODUCT flags, PostHog) as the only runtime levers.
+   */
+  envOverridable?: false;
 }
 
 export interface FeatureFlagFamily {
@@ -190,12 +196,18 @@ export const FEATURE_FLAGS = [
   // NOTE: `release_es_graph_triggers_firing` (ADR-034 Phase 5) was retired —
   // the event-sourced graph-alert path is now unconditional and the K8s cron
   // was removed, so there is no longer a cron/ES choice to gate.
+  // SYSTEM on purpose despite being a product surface: the Langy rollout is
+  // decided solely by the internal flag store — never PostHog, never an env
+  // var (envOverridable: false) — so the /ops/feature-flags toggle is the one
+  // authoritative lever.
   {
     key: "release_langy_enabled",
-    scope: "PRODUCT",
+    scope: "SYSTEM",
     defaultValue: false,
+    envOverridable: false,
+    family: "Langy",
     description:
-      "Opens the Langy in-product assistant, and is the only lever that does — there is no staff or other identity bypass, so this is a true kill switch. Default off, so Langy is dark until someone is explicitly opted in. To open it for a project or organization, add an operator-store row via /ops/feature-flags; to open it for one user, use a PostHog rule keyed on the user id (the operator store matches only projectId/organizationId, never a user). For local dev use FEATURE_FLAG_FORCE_ENABLE=release_langy_enabled.",
+      "Opens the Langy in-product assistant, and is the only lever that does — there is no staff or other identity bypass, so this is a true kill switch. Default off, so Langy is dark until someone is explicitly opted in. Managed only from the internal flag store: toggle it, or add per-project/per-org targeting rules, via /ops/feature-flags. PostHog and the RELEASE_LANGY_ENABLED env var are deliberately not consulted. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_langy_enabled.",
   },
   {
     key: "release_langy_promo_enabled",
