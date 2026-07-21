@@ -16,12 +16,12 @@ vi.mock("../../db", () => ({
   },
 }));
 
-import { NotFoundError, UnprocessableEntityError } from "~/app/api/shared/errors";
+import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { runWorkflow } from "../runWorkflow";
 
 describe("runWorkflow()", () => {
   describe("when the workflow does not exist", () => {
-    it("throws NotFoundError instead of a plain Error", async () => {
+    it("throws a HandledError NotFoundError instead of a plain Error", async () => {
       findUniqueMock.mockResolvedValue(null);
 
       await expect(
@@ -31,12 +31,12 @@ describe("runWorkflow()", () => {
   });
 
   describe("when the workflow exists but has never been published", () => {
-    it("throws UnprocessableEntityError instead of a plain Error", async () => {
+    it("throws a HandledError ValidationError instead of a plain Error", async () => {
       findUniqueMock.mockResolvedValue({ id: "wf_1", publishedId: null });
 
       await expect(
         runWorkflow("wf_1", "project_123", {}),
-      ).rejects.toBeInstanceOf(UnprocessableEntityError);
+      ).rejects.toBeInstanceOf(ValidationError);
     });
   });
 });
