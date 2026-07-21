@@ -8,6 +8,8 @@
  */
 
 import {
+  context as otelContext,
+  propagation,
   trace as otelTrace,
   type Span,
   SpanKind,
@@ -479,7 +481,32 @@ function recordSpanError(span: Span, error: unknown): void {
   span.setStatus({ code: SpanStatusCode.ERROR, message: e.message });
 }
 
-export const tracerMiddleware = t.middleware(async ({ path, type, next }) => {
+/**
+ * The trace context the caller sent with this call, so a tRPC span continues
+ * the trace the browser started rather than rooting a fresh one. Without this
+ * the UI and the server work it triggers are two unrelated traces, which is the
+ * common case because most of the product talks tRPC rather than REST.
+ *
+ * Only the request-per-call transports are consulted. The WebSocket and SSE
+ * links hold one long-lived connection, so `ctx.req` there is the *handshake*
+ * request — extracting from it would parent every later call on that socket to
+ * whatever trace happened to open it. Browsers cannot set headers on a
+ * WebSocket handshake, so there is normally nothing to extract, but the rule is
+ * stated rather than relied upon.
+ *
+ * See ADR-058.
+ */
+export function callerTraceContext({ req, type }: { req: any; type: string }) {
+  const active = otelContext.active();
+  if (type === "subscription") return active;
+
+  const headers = req?.headers;
+  if (!headers) return active;
+
+  return propagation.extract(active, headers);
+}
+
+export const tracerMiddleware = t.middleware(async ({ ctx, path, type, next }) => {
   const tracer = otelTrace.getTracer("langwatch:trpc");
   const spanName = `trpc.${path}`;
 
@@ -488,32 +515,40 @@ export const tracerMiddleware = t.middleware(async ({ path, type, next }) => {
   // drown out the trace surface — but failures still need a span so
   // real errors stay visible. Capture the start time before `next()`
   // so the error span's duration matches the actual call.
+  const parentContext = callerTraceContext({ req: ctx.req, type });
+
   if (isSilencedCall(path, type)) {
     const startTime = Date.now();
     const result = await next();
     if (result.ok) return result;
 
-    const span = tracer.startSpan(spanName, {
-      kind: SpanKind.SERVER,
-      startTime,
-      attributes: spanAttributes(path, type),
-    });
+    const span = tracer.startSpan(
+      spanName,
+      {
+        kind: SpanKind.SERVER,
+        startTime,
+        attributes: spanAttributes(path, type),
+      },
+      parentContext,
+    );
     recordSpanError(span, result.error);
     span.end();
     return result;
   }
 
-  return tracer.startActiveSpan(
-    spanName,
-    { kind: SpanKind.SERVER, attributes: spanAttributes(path, type) },
-    async (span) => {
-      // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
-      // returned as { ok: false, error } result objects — NOT thrown.
-      const result = await next();
-      if (!result.ok) recordSpanError(span, result.error);
-      span.end();
-      return result;
-    },
+  return otelContext.with(parentContext, () =>
+    tracer.startActiveSpan(
+      spanName,
+      { kind: SpanKind.SERVER, attributes: spanAttributes(path, type) },
+      async (span) => {
+        // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
+        // returned as { ok: false, error } result objects — NOT thrown.
+        const result = await next();
+        if (!result.ok) recordSpanError(span, result.error);
+        span.end();
+        return result;
+      },
+    ),
   );
 });
 
