@@ -262,6 +262,7 @@ describe("BlobLeases", () => {
   describe("release grace window", () => {
     describe("given a Redis-tier blob whose only holder retires", () => {
       describe("when that holder releases its lease", () => {
+        /** @scenario "Retiring the last lease puts a Redis-tier blob on the grace window" */
         it("keeps the bytes and shortens the expiry to the grace window", async () => {
           await redis.set(BLOB_KEY, "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
           await leases.take({
@@ -290,6 +291,7 @@ describe("BlobLeases", () => {
 
     describe("given a Redis-tier blob two jobs lease", () => {
       describe("when one of them releases", () => {
+        /** @scenario "A blob a sibling still leases keeps its full backstop" */
         it("withholds the grace window and keeps the full backstop", async () => {
           await redis.set(BLOB_KEY, "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
           for (const holderId of ["staying", "leaving"]) {
@@ -321,6 +323,7 @@ describe("BlobLeases", () => {
     // its take re-arms the backstop instead of finding a hole.
     describe("given a blob already on the grace window", () => {
       describe("when a job referencing the same content takes a lease", () => {
+        /** @scenario "A job staged after the grace window began restores the full backstop" */
         it("restores the full backstop under the new holder", async () => {
           await redis.set(BLOB_KEY, "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
           await leases.take({
@@ -355,6 +358,7 @@ describe("BlobLeases", () => {
 
     describe("given a holder token written by a pre-lease release", () => {
       describe("when the last lease is released", () => {
+        /** @scenario "A holder from a pre-lease release withholds the grace window" */
         it("withholds the grace window because that holder has no deadline to read", async () => {
           await redis.set(BLOB_KEY, "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
           await leases.take({
@@ -452,6 +456,7 @@ describe("BlobLeases", () => {
 
     describe("given an S3-tier blob whose only holder retires", () => {
       describe("when that holder releases its lease", () => {
+        /** @scenario "An S3-tier release leaves the object to the durable-store sweep" */
         it("graces the bookkeeping keys without touching any object store", async () => {
           await leases.take({
             projectId: PROJECT,

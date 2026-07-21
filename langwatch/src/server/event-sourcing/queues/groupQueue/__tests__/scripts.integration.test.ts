@@ -975,6 +975,7 @@ describe("GroupStagingScripts", () => {
         // release eval does, or a displaced blob still occupies Redis for the
         // full backstop.
         describe("dedup squash grace window", () => {
+          /** @scenario "A dedup squash that retires the last lease puts the displaced blob on the grace window" */
           it("shortens a displaced blob's expiry when nothing leases it", async () => {
             const oldValue = gq2Value({ hash: "h-grace", token: "t1" });
             await scripts.stage(
