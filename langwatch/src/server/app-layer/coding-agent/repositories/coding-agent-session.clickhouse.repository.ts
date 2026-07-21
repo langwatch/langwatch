@@ -235,7 +235,7 @@ export class CodingAgentSessionClickHouseRepository
         table: TABLE_NAME,
         values: [toRecord(row, retentionDays)],
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
       logger.error(
@@ -315,11 +315,16 @@ export class CodingAgentSessionClickHouseRepository
   }
 
   /**
-   * One user's sessions in a period, newest first. StartedAt is both the
+   * A project's sessions in a period, newest first. StartedAt is both the
    * partition filter and the sort; the IN-tuple dedup keeps one version per
    * session even when a late signal shifted StartedAt between versions.
+   *
+   * `userId`, when given, narrows to the agent-reported identity — folded
+   * into BOTH the outer filter and the dedup subquery so the two agree on
+   * which rows are in scope. Omitted for personal-workspace usage, where the
+   * personal project already isolates the user.
    */
-  async findManyByUser({
+  async findManyRecent({
     tenantId,
     userId,
     fromMs,
@@ -327,36 +332,45 @@ export class CodingAgentSessionClickHouseRepository
     limit,
   }: {
     tenantId: string;
-    userId: string;
+    userId?: string;
     fromMs: number;
     toMs: number;
     limit: number;
   }): Promise<CodingAgentSessionRow[]> {
     EventUtils.validateTenantId(
       { tenantId },
-      "CodingAgentSessionClickHouseRepository.findManyByUser",
+      "CodingAgentSessionClickHouseRepository.findManyRecent",
     );
     const client = await this.resolveClient(tenantId);
+
+    const userFilter =
+      userId !== undefined ? "AND UserId = {userId:String}" : "";
 
     const result = await client.query({
       query: `
         SELECT *
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
-          AND UserId = {userId:String}
+          ${userFilter}
           AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
           AND (TenantId, SessionId, UpdatedAt) IN (
             SELECT TenantId, SessionId, max(UpdatedAt)
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
-              AND UserId = {userId:String}
+              ${userFilter}
               AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
             GROUP BY TenantId, SessionId
           )
         ORDER BY StartedAt DESC
         LIMIT {limit:UInt32}
       `,
-      query_params: { tenantId, userId, from: fromMs, to: toMs, limit },
+      query_params: {
+        tenantId,
+        from: fromMs,
+        to: toMs,
+        limit,
+        ...(userId !== undefined ? { userId } : {}),
+      },
       format: "JSONEachRow",
     });
 
@@ -394,7 +408,7 @@ export class CodingAgentSessionClickHouseRepository
           toRecord(row, retentionDays),
         ),
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
       logger.error(

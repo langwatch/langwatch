@@ -10,6 +10,18 @@ import type {
   SessionMetricTotal,
 } from "./repositories/session-metric-series.repository";
 
+/** The "at a glance" personal-usage figures over a period. */
+export interface CodingAgentUsageTotals {
+  sessionCount: number;
+  costUsd: number;
+  totalTokens: number;
+  activeTimeSec: number;
+  linesAdded: number;
+  linesRemoved: number;
+  commits: number;
+  pullRequests: number;
+}
+
 /**
  * Read side of the coding-agent session aggregate (ADR-056).
  *
@@ -81,12 +93,18 @@ export class CodingAgentSessionService {
   }
 
   /**
-   * One user's sessions in a period, newest first — the personal-usage read
-   * (specs/coding-agent/personal-usage.feature). Metric-only sessions are in
-   * the list (the fold materializes them) and their cost/tokens overlay from
-   * their converged series.
+   * A project's coding-agent sessions in a period, newest first — the read
+   * behind personal-workspace usage (specs/coding-agent/personal-usage.feature).
+   * Metric-only sessions are in the list (the fold materializes them) and
+   * their cost/tokens overlay from their converged series.
+   *
+   * Personal usage omits `userId`: the personal project already isolates the
+   * user, and the stored UserId is the AGENT's reported identity (an opaque
+   * `user.id`), not the LangWatch account — so a userId join here would be
+   * against the wrong identity space. `userId` is available for a future
+   * shared-project "just my sessions" filter once that identity is mapped.
    */
-  async listByUser({
+  async listRecent({
     projectId,
     userId,
     fromMs,
@@ -94,12 +112,12 @@ export class CodingAgentSessionService {
     limit = 50,
   }: {
     projectId: string;
-    userId: string;
+    userId?: string;
     fromMs: number;
     toMs: number;
     limit?: number;
   }): Promise<CodingAgentSessionRow[]> {
-    const rows = await this.sessions.findManyByUser({
+    const rows = await this.sessions.findManyRecent({
       tenantId: projectId,
       userId,
       fromMs,
@@ -107,6 +125,63 @@ export class CodingAgentSessionService {
       limit,
     });
     return this.withMetricTotals(projectId, rows, { fromMs, toMs });
+  }
+
+  /**
+   * Usage totals for a project's coding-agent sessions in a period — the four
+   * "at a glance" numbers the personal card shows (cost, tokens, active time,
+   * session count), plus what the session produced. Reads the same rows as
+   * {@link listRecent} (metric-only sessions included, cost/tokens overlaid),
+   * then reduces — so a metric-only session's cost counts here too.
+   */
+  async getUsageTotals({
+    projectId,
+    userId,
+    fromMs,
+    toMs,
+  }: {
+    projectId: string;
+    userId?: string;
+    fromMs: number;
+    toMs: number;
+  }): Promise<CodingAgentUsageTotals> {
+    // Bound the scan; a personal month rarely exceeds this, and the totals
+    // are "at a glance", not an exact ledger, so a cap is acceptable.
+    const rows = await this.listRecent({
+      projectId,
+      userId,
+      fromMs,
+      toMs,
+      limit: 1000,
+    });
+    return rows.reduce<CodingAgentUsageTotals>(
+      (totals, row) => ({
+        sessionCount: totals.sessionCount + 1,
+        costUsd: totals.costUsd + row.costUsd,
+        totalTokens:
+          totals.totalTokens +
+          row.inputTokens +
+          row.outputTokens +
+          row.cacheReadTokens +
+          row.cacheCreationTokens,
+        activeTimeSec:
+          totals.activeTimeSec + row.activeTimeUserSec + row.activeTimeCliSec,
+        linesAdded: totals.linesAdded + row.linesAdded,
+        linesRemoved: totals.linesRemoved + row.linesRemoved,
+        commits: totals.commits + row.commits,
+        pullRequests: totals.pullRequests + row.pullRequests,
+      }),
+      {
+        sessionCount: 0,
+        costUsd: 0,
+        totalTokens: 0,
+        activeTimeSec: 0,
+        linesAdded: 0,
+        linesRemoved: 0,
+        commits: 0,
+        pullRequests: 0,
+      },
+    );
   }
 
   /**

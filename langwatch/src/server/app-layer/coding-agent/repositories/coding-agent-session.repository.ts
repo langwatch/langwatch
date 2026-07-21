@@ -26,13 +26,18 @@ export interface CodingAgentSessionRepository {
   }): Promise<CodingAgentSessionRow | null>;
 
   /**
-   * One user's sessions in a period, newest first. The time range is
-   * required: it is the partition filter, and "my usage" is always asked
-   * about a period.
+   * A project's coding-agent sessions in a period, newest first. The time
+   * range is required — it is the partition filter, and usage is always
+   * asked about a period.
+   *
+   * `userId` narrows to sessions the AGENT reported under that id
+   * (`user.id`/`user.email` on the telemetry, which is the agent's identity
+   * space, not the LangWatch account). Omit it for personal-workspace usage,
+   * where the personal project already isolates the user's sessions.
    */
-  findManyByUser(params: {
+  findManyRecent(params: {
     tenantId: string;
-    userId: string;
+    userId?: string;
     fromMs: number;
     toMs: number;
     limit: number;
@@ -51,7 +56,7 @@ export class NullCodingAgentSessionRepository
     return null;
   }
 
-  async findManyByUser(): Promise<CodingAgentSessionRow[]> {
+  async findManyRecent(): Promise<CodingAgentSessionRow[]> {
     return [];
   }
 }

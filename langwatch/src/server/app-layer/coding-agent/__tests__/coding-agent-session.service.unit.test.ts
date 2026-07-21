@@ -119,17 +119,20 @@ function emptyState() {
 
 function makeService({
   row = null,
+  rows,
   mapping = null,
   totals = [],
 }: {
   row?: CodingAgentSessionRow | null;
+  rows?: CodingAgentSessionRow[];
   mapping?: { sessionId: string; occurredAtMs: number } | null;
   totals?: SessionMetricTotal[];
 }) {
+  const listed = rows ?? (row ? [row] : []);
   const sessions: CodingAgentSessionRepository = {
     upsert: async () => {},
     findBySessionId: async () => row,
-    findManyByUser: async () => (row ? [row] : []),
+    findManyRecent: async () => listed,
   };
   const traceSessions: CodingAgentTraceSessionRepository = {
     ensure: async () => {},
@@ -205,9 +208,8 @@ describe("CodingAgentSessionService", () => {
         ],
       });
 
-      const sessions = await service.listByUser({
+      const sessions = await service.listRecent({
         projectId: PROJECT,
-        userId: "user-1",
         fromMs: 0,
         toMs: 2_000_000_000_000,
       });
@@ -244,6 +246,97 @@ describe("CodingAgentSessionService", () => {
 
       expect(session?.inputTokens).toBe(500);
       expect(session?.costUsd).toBe(2.5);
+    });
+  });
+
+  describe("when computing usage totals over a period", () => {
+    /** @scenario my recent usage at a glance */
+    it("sums cost, tokens, active time and counts the sessions", async () => {
+      const service = makeService({
+        rows: [
+          makeRow({
+            sessionId: "s-a",
+            costUsd: 1.5,
+            inputTokens: 100,
+            outputTokens: 50,
+            cacheReadTokens: 900,
+            cacheCreationTokens: 10,
+            activeTimeUserSec: 120,
+            activeTimeCliSec: 300,
+            commits: 2,
+          }),
+          makeRow({
+            sessionId: "s-b",
+            costUsd: 0.5,
+            inputTokens: 20,
+            outputTokens: 5,
+            activeTimeCliSec: 60,
+            pullRequests: 1,
+          }),
+        ],
+      });
+
+      const totals = await service.getUsageTotals({
+        projectId: PROJECT,
+        fromMs: 0,
+        toMs: 2_000_000_000_000,
+      });
+
+      expect(totals.sessionCount).toBe(2);
+      expect(totals.costUsd).toBeCloseTo(2.0);
+      expect(totals.totalTokens).toBe(100 + 50 + 900 + 10 + 20 + 5);
+      expect(totals.activeTimeSec).toBe(120 + 300 + 60);
+      expect(totals.commits).toBe(2);
+      expect(totals.pullRequests).toBe(1);
+    });
+
+    /** @scenario usage counts metric-only sessions */
+    it("includes a metric-only session's overlaid cost in the totals", async () => {
+      const service = makeService({
+        rows: [makeRow({ sessionId: SESSION })], // no spans/logs → zero folded
+        totals: [
+          {
+            sessionId: SESSION,
+            metricName: "claude_code.cost.usage",
+            bucket: "",
+            total: 0.8,
+          },
+          {
+            sessionId: SESSION,
+            metricName: "claude_code.token.usage",
+            bucket: "input",
+            total: 1_000,
+          },
+        ],
+      });
+
+      const totals = await service.getUsageTotals({
+        projectId: PROJECT,
+        fromMs: 0,
+        toMs: 2_000_000_000_000,
+      });
+
+      expect(totals.sessionCount).toBe(1);
+      expect(totals.costUsd).toBeCloseTo(0.8);
+      expect(totals.totalTokens).toBe(1_000);
+    });
+
+    /** @scenario no usage yet */
+    it("returns zeroes when the user has no sessions", async () => {
+      const service = makeService({ rows: [] });
+
+      const totals = await service.getUsageTotals({
+        projectId: PROJECT,
+        fromMs: 0,
+        toMs: 2_000_000_000_000,
+      });
+
+      expect(totals).toMatchObject({
+        sessionCount: 0,
+        costUsd: 0,
+        totalTokens: 0,
+        activeTimeSec: 0,
+      });
     });
   });
 });
