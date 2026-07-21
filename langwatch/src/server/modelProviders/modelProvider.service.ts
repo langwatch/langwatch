@@ -1053,7 +1053,7 @@ export class ModelProviderService {
   private maskExtraHeaders(
     extraHeaders: { key: string; value: string }[] | null | undefined,
   ): { key: string; value: string }[] | null {
-    if (!extraHeaders) return extraHeaders ?? null;
+    if (extraHeaders == null) return null;
     return extraHeaders.map(({ key }) => ({
       key,
       value: MASKED_KEY_PLACEHOLDER,
