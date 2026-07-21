@@ -16,7 +16,7 @@ import { AnnotationScoreDataType } from "@prisma/client";
 import { useEffect, useState } from "react";
 import { Plus, X } from "react-feather";
 import { useForm } from "react-hook-form";
-import { showErrorToast } from "~/features/errors";
+import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { FullWidthFormControl } from "../FullWidthFormControl";
@@ -55,13 +55,7 @@ export const AddOrEditAnnotationScore = ({
 
   const queryClient = api.useContext();
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors },
-    reset,
-  } = useForm({
+  const form = useForm({
     disabled: Boolean(annotationScoreId && existingAnnotationScore.isLoading),
     defaultValues: {
       name: "",
@@ -71,6 +65,13 @@ export const AddOrEditAnnotationScore = ({
       categoryExplanation: Array(5).fill(""),
     },
   });
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+    reset,
+  } = form;
 
   useEffect(() => {
     if (!existingAnnotationScore.data) return;
@@ -197,13 +198,15 @@ export const AddOrEditAnnotationScore = ({
           void queryClient.annotationScore.getAll.invalidate();
           void queryClient.annotationScore.getById.invalidate();
         },
-        onError: (error) =>
+        onError: (error) => {
+          if (applyHandledErrorToForm({ error, form })) return;
           showErrorToast({
             error,
             fallbackTitle: annotationScoreId
               ? "Couldn't save annotation score"
               : "Couldn't create annotation score",
-          }),
+          });
+        },
       },
     );
   };

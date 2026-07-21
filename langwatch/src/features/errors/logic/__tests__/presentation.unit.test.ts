@@ -92,7 +92,7 @@ describe("explainHandledError", () => {
     });
   });
 
-  describe("when the validation error names fields", () => {
+  describe("given a validation error naming fields", () => {
     it("never names a field the customer can't see", () => {
       // zod flattens to the INPUT SCHEMA's keys, so every procedure's
       // `projectId` shows up. Naming it is the same leak as a code slug.

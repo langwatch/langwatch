@@ -14,7 +14,7 @@ import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
-import { showErrorToast } from "~/features/errors";
+import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
 import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
 import {
   getComplexProps,
@@ -82,19 +82,20 @@ export function WorkflowSelectorForEvaluatorDrawer(
 
   const [defaultIcon] = useState(getRandomWorkflowIcon());
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<FormData>({
+  const form = useForm<FormData>({
     defaultValues: {
       name: props.evaluatorName ?? "",
       icon: defaultIcon,
       description: "",
     },
   });
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = form;
 
   const icon = watch("icon");
   const name = watch("name");
@@ -109,8 +110,10 @@ export function WorkflowSelectorForEvaluatorDrawer(
         workflowId: evaluator.workflowId ?? "",
       });
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't create evaluator" }),
+    onError: (error) => {
+      if (applyHandledErrorToForm({ error, form })) return;
+      showErrorToast({ error, fallbackTitle: "Couldn't create evaluator" });
+    },
   });
 
   const isSaving =
@@ -157,6 +160,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
         );
       } catch (error) {
         console.error("Error creating workflow evaluator:", error);
+        if (applyHandledErrorToForm({ error, form })) return;
         showErrorToast({
           error,
           fallbackTitle: "Couldn't create workflow evaluator",
@@ -170,6 +174,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
       createEvaluatorMutation,
       onClose,
       router,
+      form,
     ],
   );
 
