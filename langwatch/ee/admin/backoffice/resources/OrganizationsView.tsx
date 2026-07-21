@@ -313,12 +313,8 @@ function OrganizationEditDrawer({
           onClose();
         },
         onError: (err) =>
-          toaster.create({
-            title: "Update failed",
-            description: err.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
+          showErrorToast(err, {
+            fallbackTitle: "Couldn't update the organization",
           }),
       },
     );

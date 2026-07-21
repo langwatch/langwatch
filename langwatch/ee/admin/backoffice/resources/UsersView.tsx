@@ -263,13 +263,7 @@ export function ImpersonateDialog({
       });
       window.location.href = "/";
     } catch (err) {
-      toaster.create({
-        title: "Impersonation failed",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 5000,
-        meta: { closable: true },
-      });
+      showErrorToast(err, { fallbackTitle: "Couldn't impersonate the user" });
       setLoading(false);
     }
   };
@@ -389,13 +383,7 @@ function UserEditDrawer({
           onClose();
         },
         onError: (err) =>
-          toaster.create({
-            title: "Update failed",
-            description: err.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          }),
+          showErrorToast(err, { fallbackTitle: "Couldn't update the user" }),
       },
     );
   };

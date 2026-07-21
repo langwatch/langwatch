@@ -35,8 +35,8 @@ import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "~/components/ui/menu";
-import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
@@ -92,10 +92,7 @@ function BudgetsPage() {
       });
       setArchiving(null);
     } catch (error) {
-      toaster.create({
-        title: error instanceof Error ? error.message : "Failed to archive",
-        type: "error",
-      });
+      showErrorToast(error, { fallbackTitle: "Couldn't archive the budget" });
     }
   };
 

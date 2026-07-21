@@ -38,9 +38,9 @@ import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
-import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -176,10 +176,7 @@ function VirtualKeysPage() {
       });
       setRotating(null);
     } catch (err) {
-      toaster.create({
-        title: err instanceof Error ? err.message : "Failed to rotate key",
-        type: "error",
-      });
+      showErrorToast(err, { fallbackTitle: "Couldn't rotate the key" });
     }
   };
 
@@ -192,10 +189,7 @@ function VirtualKeysPage() {
       });
       setRevoking(null);
     } catch (err) {
-      toaster.create({
-        title: err instanceof Error ? err.message : "Failed to revoke key",
-        type: "error",
-      });
+      showErrorToast(err, { fallbackTitle: "Couldn't revoke the key" });
     }
   };
 

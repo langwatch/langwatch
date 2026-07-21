@@ -377,12 +377,11 @@ function SubscriptionDrawer({
       onClose();
     };
     const onError = (err: Error) =>
-      toaster.create({
-        title: mode === "edit" ? "Update failed" : "Create failed",
-        description: err.message,
-        type: "error",
-        duration: 5000,
-        meta: { closable: true },
+      showErrorToast(err, {
+        fallbackTitle:
+          mode === "edit"
+            ? "Couldn't update the subscription"
+            : "Couldn't create the subscription",
       });
 
     if (mode === "edit" && subscription) {

@@ -7,6 +7,7 @@ import {
 } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { showErrorToast } from "~/features/errors";
 import type { CopyTargetProject } from "~/hooks/useProjectsForCopy";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { Dialog } from "./dialog";
@@ -80,17 +81,17 @@ export function ReplicateToProjectDialog({
       onSuccess?.();
       onClose();
     } catch (error) {
-      // Skip toast if the global license handler already showed the upgrade modal
+      // The guard stays even though showErrorToast repeats it: a license limit
+      // the global handler already turned into an upgrade modal is an expected
+      // outcome, not something worth a log line either.
       if (isHandledByGlobalHandler(error)) return;
 
       logError?.(
         { error, ...(sourceId && { sourceId }), projectId },
         `Error replicating ${entityLabel.toLowerCase()}`,
       );
-      toaster.create({
-        title: `Error replicating ${entityLabel.toLowerCase()}`,
-        description: error instanceof Error ? error.message : "Unknown error",
-        type: "error",
+      showErrorToast(error, {
+        fallbackTitle: `Couldn't replicate the ${entityLabel.toLowerCase()}`,
       });
     }
   };

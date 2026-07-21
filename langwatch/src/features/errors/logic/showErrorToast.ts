@@ -5,7 +5,11 @@ import {
   UNKNOWN_ERROR_PRESENTATION,
   explainHandledError,
 } from "./presentation";
-import { readErrorTraceId, readHandledError } from "./readHandledError";
+import {
+  readAuthoredMessage,
+  readErrorTraceId,
+  readHandledError,
+} from "./readHandledError";
 
 export interface ShowErrorToastOptions {
   /**
@@ -55,9 +59,12 @@ export function showErrorToast(
   if (isHandledByGlobalHandler(error)) return;
 
   const handled = readHandledError(error);
+  const authored = readAuthoredMessage(error);
   const explanation = handled
     ? explainHandledError(handled)
-    : UNKNOWN_ERROR_PRESENTATION;
+    : authored
+      ? { ...UNKNOWN_ERROR_PRESENTATION, description: authored }
+      : UNKNOWN_ERROR_PRESENTATION;
 
   // A code the registry recognises has copy written for this exact failure, so
   // it wins over the caller's generic "couldn't do the thing". Everything else
@@ -72,6 +79,10 @@ export function showErrorToast(
 
   toaster.create({
     ...(options.id ? { id: options.id } : {}),
+    // The shared default is 5s, which is not long enough to read the copy,
+    // decide, and click "Copy error ID" or "Read the docs". It stays
+    // dismissable — `closable` is set below.
+    duration: 12000,
     title,
     description: bodyCopy(explanation.description, handled?.tips),
     type: "error",

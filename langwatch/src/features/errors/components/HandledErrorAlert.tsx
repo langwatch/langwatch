@@ -4,7 +4,11 @@ import {
   UNKNOWN_ERROR_PRESENTATION,
   explainHandledError,
 } from "../logic/presentation";
-import { readErrorTraceId, readHandledError } from "../logic/readHandledError";
+import {
+  readAuthoredMessage,
+  readErrorTraceId,
+  readHandledError,
+} from "../logic/readHandledError";
 
 import { ErrorActions } from "./ErrorActions";
 
@@ -44,9 +48,12 @@ export function HandledErrorAlert({
   if (!error) return null;
 
   const handled = readHandledError(error);
+  const authored = readAuthoredMessage(error);
   const explanation = handled
     ? explainHandledError(handled)
-    : UNKNOWN_ERROR_PRESENTATION;
+    : authored
+      ? { ...UNKNOWN_ERROR_PRESENTATION, description: authored }
+      : UNKNOWN_ERROR_PRESENTATION;
 
   // The registry description and the server's tips are competing authorings of
   // the same remediation — "Narrow the time range or add a filter" is both the

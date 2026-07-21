@@ -1,4 +1,4 @@
-import { HStack, Link, Text } from "@chakra-ui/react";
+import { chakra, HStack, Link } from "@chakra-ui/react";
 import { CheckIcon, CopyIcon, ExternalLinkIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -24,6 +24,12 @@ export interface ErrorActionsProps {
  */
 export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
   const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
+  // Read the clipboard API after mount, never during render: Node defines
+  // `navigator` without `clipboard`, so a render-time check disagrees between
+  // server and client and mismatches on hydration.
+  const [canCopy, setCanCopy] = useState(false);
+  useEffect(() => setCanCopy(!!navigator?.clipboard), []);
 
   // Reset the confirmation so a second copy still reads as a fresh action.
   useEffect(() => {
@@ -34,7 +40,15 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
 
   const copy = useCallback(() => {
     if (!traceId || !navigator.clipboard) return;
-    void navigator.clipboard.writeText(traceId).then(() => setCopied(true));
+    void navigator.clipboard.writeText(traceId).then(
+      () => {
+        setFailed(false);
+        setCopied(true);
+      },
+      // Rejects when the document isn't focused or permission is denied —
+      // routine in Safari. Say so rather than leaving the label unchanged.
+      () => setFailed(true),
+    );
   }, [traceId]);
 
   if (!docsUrl && !traceId) return null;
@@ -56,9 +70,8 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
           <ExternalLinkIcon width={11} height={11} />
         </Link>
       )}
-      {traceId && navigator.clipboard && (
-        <Text
-          as="button"
+      {traceId && canCopy && (
+        <chakra.button
           type="button"
           onClick={copy}
           display="inline-flex"
@@ -67,15 +80,21 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
           opacity={0.75}
           cursor="pointer"
           _hover={{ opacity: 1 }}
-          aria-label={copied ? "Error ID copied" : "Copy error ID"}
+          aria-label={
+            failed
+              ? "Couldn't copy the error ID"
+              : copied
+                ? "Error ID copied"
+                : "Copy error ID"
+          }
         >
           {copied ? (
             <CheckIcon width={11} height={11} />
           ) : (
             <CopyIcon width={11} height={11} />
           )}
-          {copied ? "Copied" : "Copy error ID"}
-        </Text>
+          {failed ? "Couldn't copy" : copied ? "Copied" : "Copy error ID"}
+        </chakra.button>
       )}
     </HStack>
   );

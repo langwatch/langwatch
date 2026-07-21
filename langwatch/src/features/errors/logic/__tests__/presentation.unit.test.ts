@@ -88,6 +88,24 @@ describe("explainHandledError", () => {
   });
 
   describe("when the validation error names fields", () => {
+    it("never names a field the customer can't see", () => {
+      // zod flattens to the INPUT SCHEMA's keys, so every procedure's
+      // `projectId` shows up. Naming it is the same leak as a code slug.
+      const { description } = explainHandledError(
+        shape({
+          code: "validation_error",
+          httpStatus: 422,
+          meta: {
+            fieldErrors: { projectId: ["Required"], checkId: ["Required"] },
+          },
+        }),
+      );
+
+      expect(description).not.toContain("projectId");
+      expect(description).not.toContain("checkId");
+      expect(description).toBe("Some of the values aren't valid.");
+    });
+
     it("says which ones", () => {
       const { title, description } = explainHandledError(
         shape({
@@ -110,6 +128,52 @@ describe("explainHandledError", () => {
         expect(title, `${code} title`).not.toContain(code);
         expect(title, `${code} title`).not.toMatch(/^[a-z0-9]+(_[a-z0-9]+)+$/);
         expect(description, `${code} description`).not.toContain(code);
+      }
+    });
+
+    it("never renders a value the server put in meta", () => {
+      // The leak this module exists to stop can re-enter through `meta` just
+      // as easily as through `message`: a machine sub-classifier
+      // ("auth_failed"), a wire identifier ("projectId"), a connection string.
+      // Feed every code a poisoned meta and assert none of it reaches the copy.
+      const poison = {
+        reason: "auth_failed",
+        message: "connect ECONNREFUSED 10.0.0.4:5432",
+        field: "projectId",
+        query: "SELECT * FROM traces",
+        syntaxError: "at line 4: unexpected token",
+        fieldErrors: { projectId: ["Required"], organizationId: ["Required"] },
+      };
+
+      for (const code of APP_ERROR_CODES) {
+        const { title, description } = explainHandledError(
+          shape({ code, meta: poison }),
+        );
+        const rendered = `${title} ${description}`;
+
+        // Values that could only have come from the server. Deliberately not
+        // `field` — echoing back a filter field the user typed themselves is
+        // correct, and `filter_field_unknown` does exactly that.
+        for (const leaked of [
+          "auth_failed",
+          "ECONNREFUSED",
+          "10.0.0.4",
+          "SELECT",
+        ]) {
+          expect(rendered, `${code} leaked ${leaked}`).not.toContain(leaked);
+        }
+      }
+    });
+
+    it("degrades on fault for a code that resolves to an inherited property", () => {
+      // `code` is untrusted. A bare index lookup finds Object.prototype
+      // members, which are truthy — that reported itself as registered copy
+      // and rendered a blank headline.
+      for (const code of ["toString", "constructor", "hasOwnProperty"]) {
+        const { title } = explainHandledError(
+          shape({ code, fault: "platform" }),
+        );
+        expect(title, code).toBe("Something went wrong on our end");
       }
     });
 

@@ -13,6 +13,7 @@ import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -371,7 +372,8 @@ export function AddBindingForm({
       toaster.create({ title: "Binding added", type: "success" });
       onAdded();
     },
-    onError: (e) => toaster.create({ title: e.message, type: "error" }),
+    onError: (e) =>
+      showErrorToast(e, { fallbackTitle: "Couldn't add the binding" }),
   });
 
   return (

@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 type GuardrailDirectionEnum = "PRE" | "POST" | "STREAM_CHUNK";
@@ -102,12 +103,18 @@ export function GuardrailAttachmentsSection({
       onSaved();
     },
     onError: (err) => {
-      toaster.create({
-        title: err.message.includes("missing_perm")
-          ? "You don't have permission to attach guardrails in this project"
-          : err.message,
-        type: "error",
-      });
+      // The router rejects an unpermitted attach with a bare FORBIDDEN whose
+      // message is `missing_perm:gatewayGuardrails:attach` — not a handled
+      // error the registry has copy for — so this surface writes its own.
+      if (err.message.includes("missing_perm")) {
+        toaster.create({
+          title:
+            "You don't have permission to attach guardrails in this project",
+          type: "error",
+        });
+        return;
+      }
+      showErrorToast(err, { fallbackTitle: "Couldn't update the guardrails" });
     },
   });
 

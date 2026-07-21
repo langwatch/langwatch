@@ -1,7 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { showErrorToast } from "~/features/errors";
+import { describeError, showErrorToast } from "~/features/errors";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -87,6 +88,12 @@ export const usePostEvent = () => {
       setIsLoading(true);
 
       const onError = (error: Error) => {
+        // showErrorToast suppresses the duplicate toast on its own, but the
+        // state writes below must be skipped too: a license-limit rejection
+        // opens the upgrade modal, and flipping the studio into an error
+        // state behind it is not what the user is looking at.
+        if (isHandledByGlobalHandler(error)) return;
+
         showErrorToast(error, {
           fallbackTitle: "Couldn't reach the workflow engine",
         });
@@ -96,7 +103,9 @@ export const usePostEvent = () => {
           setEvaluationState({
             status: "error",
             run_id: undefined,
-            error: error.message,
+            error: describeError(error, {
+              fallbackTitle: "Couldn't reach the workflow engine",
+            }),
             timestamps: { finished_at: Date.now() },
           });
         }
@@ -104,7 +113,9 @@ export const usePostEvent = () => {
         if (event.type === "execute_component") {
           setComponentExecutionState(event.payload.node_id, {
             status: "error",
-            error: error.message,
+            error: describeError(error, {
+              fallbackTitle: "Couldn't reach the workflow engine",
+            }),
             timestamps: { finished_at: Date.now() },
           });
         }

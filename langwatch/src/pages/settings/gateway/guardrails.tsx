@@ -27,7 +27,7 @@ import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Drawer } from "~/components/ui/drawer";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -126,11 +126,7 @@ function GuardrailsPage() {
       });
       setArchiving(null);
     } catch (error) {
-      toaster.create({
-        title:
-          error instanceof Error ? error.message : "Failed to archive",
-        type: "error",
-      });
+      showErrorToast(error, { fallbackTitle: "Couldn't archive the guardrail" });
     }
   };
 
@@ -391,7 +387,7 @@ function GuardrailDrawer({
       onClose();
     },
     onError: (err) =>
-      toaster.create({ title: err.message, type: "error" }),
+      showErrorToast(err, { fallbackTitle: "Couldn't create the guardrail" }),
   });
   const updateMutation = api.gatewayGuardrails.update.useMutation({
     onSuccess: async () => {
@@ -399,7 +395,7 @@ function GuardrailDrawer({
       onClose();
     },
     onError: (err) =>
-      toaster.create({ title: err.message, type: "error" }),
+      showErrorToast(err, { fallbackTitle: "Couldn't save the guardrail" }),
   });
 
   const isPending = createMutation.isPending || updateMutation.isPending;

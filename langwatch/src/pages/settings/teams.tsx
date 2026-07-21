@@ -20,6 +20,7 @@ import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
 import {
   useDepartmentColumn,
@@ -139,9 +140,8 @@ function AddToTeamDialog({
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
       onClose();
     },
-    onError: (e) => {
-      toaster.create({ title: e.message, type: "error" });
-    },
+    onError: (e) =>
+      showErrorToast(e, { fallbackTitle: "Couldn't add the member" }),
   });
 
   const userItems = useMemo(
@@ -285,9 +285,8 @@ function AddToProjectDialog({
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
       onClose();
     },
-    onError: (e) => {
-      toaster.create({ title: e.message, type: "error" });
-    },
+    onError: (e) =>
+      showErrorToast(e, { fallbackTitle: "Couldn't add the access" }),
   });
 
   const userItems = (orgMembers.data?.members ?? []).map((m) => ({
@@ -417,7 +416,8 @@ function ProjectSection({
     onSuccess: () => {
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
     },
-    onError: (e) => toaster.create({ title: e.message, type: "error" }),
+    onError: (e) =>
+      showErrorToast(e, { fallbackTitle: "Couldn't remove the access" }),
   });
 
   const inherited = access.filter((a) => a.source === "team");
@@ -704,14 +704,16 @@ function TeamCard({
     onSuccess: () => {
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
     },
-    onError: (e) => toaster.create({ title: e.message, type: "error" }),
+    onError: (e) =>
+      showErrorToast(e, { fallbackTitle: "Couldn't remove the member" }),
   });
 
   const updateBinding = api.roleBinding.update.useMutation({
     onSuccess: () => {
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
     },
-    onError: (e) => toaster.create({ title: e.message, type: "error" }),
+    onError: (e) =>
+      showErrorToast(e, { fallbackTitle: "Couldn't update the member's role" }),
   });
 
   const existingMemberIds = team.directMembers.flatMap((m) => m.userId ? [m.userId] : []);

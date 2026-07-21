@@ -38,8 +38,12 @@ export const useRenamePromptHandle = ({
 
   const renameHandle = useCallback(() => {
     if (!promptId) {
-      showErrorToast(void 0, {
-        fallbackTitle: "Couldn't change the prompt handle",
+      // A local precondition, not a server failure.
+      toaster.create({
+        title: "Couldn't change the prompt handle",
+        description: "Save this prompt before renaming its handle.",
+        type: "error",
+        meta: { closable: true },
       });
       return;
     }
