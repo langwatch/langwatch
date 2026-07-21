@@ -29,6 +29,7 @@ import {
 import { FileText, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { describeError } from "~/features/errors";
 import { api } from "~/utils/api";
 
 interface OttlEditorProps {
@@ -106,11 +107,15 @@ export function OttlEditor({
       } catch (err) {
         // Validation infra error (gateway unreachable in a way the
         // client didn't soft-handle, network blip). Surface a single
-        // banner-style message; don't block save.
+        // banner-style message; don't block save. The status slot takes a
+        // plain string, so this reads the handled payload via `describeError`
+        // rather than `err.message` — which is the code slug since #5984.
         setValidationStatus(
           next.map(() => ({
             ok: true,
-            message: `Validation unavailable: ${(err as Error).message}`,
+            message: describeError(err, {
+              fallbackTitle: "Couldn't check these statements",
+            }),
           })),
         );
       } finally {

@@ -24,6 +24,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { docsUrl } from "~/utils/docsUrl";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
@@ -211,11 +212,7 @@ function AnomalyRulesPage() {
       toaster.create({ title: "Rule created", type: "success" });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to create rule",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast(e, { fallbackTitle: "Couldn't create the rule" }),
   });
   const updateMutation = api.anomalyRules.update.useMutation({
     onSuccess: () => {
@@ -224,11 +221,7 @@ function AnomalyRulesPage() {
       toaster.create({ title: "Rule updated", type: "success" });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to update rule",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast(e, { fallbackTitle: "Couldn't update the rule" }),
   });
   const archiveMutation = api.anomalyRules.archive.useMutation({
     onSuccess: () => {
@@ -236,11 +229,7 @@ function AnomalyRulesPage() {
       toaster.create({ title: "Rule archived", type: "success" });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to archive",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast(e, { fallbackTitle: "Couldn't archive the rule" }),
   });
 
   const grouped = useMemo(() => {
