@@ -66,7 +66,10 @@ export function DepartmentPicker({
       toaster.create({ title: "Department updated", type: "success" });
       await onAssigned();
     } catch (e) {
-      showErrorToast({ error: e, fallbackTitle: "Couldn't update the department" });
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't update the department",
+      });
     }
   };
 

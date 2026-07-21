@@ -84,7 +84,10 @@ export function CacheRuleEditDrawer({ rule, onOpenChange, onSaved }: Props) {
       onOpenChange(false);
       onSaved?.();
     } catch (e) {
-      showErrorToast({ error: e, fallbackTitle: "Couldn't save the cache rule" });
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't save the cache rule",
+      });
     }
   };
 

@@ -163,9 +163,15 @@ function RoutingPoliciesPage() {
     },
     onError: (e) => {
       setDrawerError(
-        describeError({ error: e, fallbackTitle: "Couldn't create routing policy" }),
+        describeError({
+          error: e,
+          fallbackTitle: "Couldn't create routing policy",
+        }),
       );
-      showErrorToast({ error: e, fallbackTitle: "Couldn't create routing policy" });
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't create routing policy",
+      });
     },
   });
 
@@ -179,9 +185,15 @@ function RoutingPoliciesPage() {
     },
     onError: (e) => {
       setDrawerError(
-        describeError({ error: e, fallbackTitle: "Couldn't update routing policy" }),
+        describeError({
+          error: e,
+          fallbackTitle: "Couldn't update routing policy",
+        }),
       );
-      showErrorToast({ error: e, fallbackTitle: "Couldn't update routing policy" });
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't update routing policy",
+      });
     },
   });
 
@@ -191,7 +203,10 @@ function RoutingPoliciesPage() {
       toaster.create({ title: "Default policy updated", type: "success" });
     },
     onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't set the default policy" }),
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't set the default policy",
+      }),
   });
 
   const deleteMutation = api.routingPolicy.delete.useMutation({
@@ -201,7 +216,10 @@ function RoutingPoliciesPage() {
       toaster.create({ title: "Routing policy deleted", type: "success" });
     },
     onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't delete routing policy" }),
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't delete routing policy",
+      }),
   });
 
   const grouped = useMemo(() => {

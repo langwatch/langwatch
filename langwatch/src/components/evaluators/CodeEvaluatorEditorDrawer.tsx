@@ -20,6 +20,7 @@ import {
   type Variable,
   VariablesSection,
 } from "~/components/variables";
+import { showErrorToast } from "~/features/errors";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -34,7 +35,6 @@ import {
   type CodeEvaluatorConfig,
   DEFAULT_CODE_EVALUATOR_CONFIG,
 } from "~/server/evaluators/codeEvaluator";
-import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 import { codeEvaluatorDisabledReason } from "./codeEvaluatorValidation";
@@ -177,7 +177,10 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   const createMutation = api.evaluators.create.useMutation({
     onSuccess: finishSave,
     onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't create code evaluator" }),
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't create code evaluator",
+      }),
   });
 
   const updateMutation = api.evaluators.update.useMutation({

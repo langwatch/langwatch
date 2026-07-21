@@ -23,6 +23,7 @@ import {
 } from "~/components/variables";
 import { useEvaluationMappings } from "~/experiments-v3/hooks/useEvaluationMappings";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
+import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -57,7 +58,6 @@ import {
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import type { LlmConfigInputType } from "~/types";
-import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import { localConfigToFormValues } from "./utils/localConfigToFormValues";
 

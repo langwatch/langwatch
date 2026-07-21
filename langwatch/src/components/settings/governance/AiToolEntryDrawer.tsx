@@ -2,8 +2,8 @@ import {
   Alert,
   Box,
   Button,
-  HStack,
   Heading,
+  HStack,
   Image,
   Input,
   NativeSelect,
@@ -22,11 +22,12 @@ import {
   type AssistantKind,
 } from "~/components/me/tiles/assistantIcons";
 import {
+  isToolPresetAsset,
   TOOL_KINDS,
   TOOL_PRESETS,
-  isToolPresetAsset,
   toolPresetAsset,
 } from "~/components/me/tiles/toolIcons";
+import type { AiToolEntry, AiToolTileType } from "~/components/me/tiles/types";
 import {
   ScopeChipPicker,
   type ScopeChipPickerEntry,
@@ -38,11 +39,6 @@ import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-
-import type {
-  AiToolEntry,
-  AiToolTileType,
-} from "~/components/me/tiles/types";
 
 const TILE_TYPE_OPTIONS: Array<{ value: AiToolTileType; label: string }> = [
   { value: "coding_assistant", label: "Coding assistant" },
@@ -140,7 +136,8 @@ function formFromEntry(entry: AiToolEntry): FormState {
     return typeof v === "string" ? v : "";
   };
   if (entry.type === "coding_assistant") {
-    const rawKind = typeof cfg.assistantKind === "string" ? cfg.assistantKind : "";
+    const rawKind =
+      typeof cfg.assistantKind === "string" ? cfg.assistantKind : "";
     const kind = isAssistantKind(rawKind) ? rawKind : "custom";
     const boolOr = (key: string, fallback: boolean): boolean =>
       typeof cfg[key] === "boolean" ? (cfg[key] as boolean) : fallback;
@@ -154,7 +151,8 @@ function formFromEntry(entry: AiToolEntry): FormState {
       allowVk: boolOr("allowVk", true),
       // Cursor is GUI-only - direct OTLP never applies, regardless of a
       // stored value. Force it off so the toggle reads honestly.
-      allowOtelDirect: kind === "cursor" ? false : boolOr("allowOtelDirect", true),
+      allowOtelDirect:
+        kind === "cursor" ? false : boolOr("allowOtelDirect", true),
       bundledPlan: boolOr("bundledPlan", true),
     };
   }
@@ -274,7 +272,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   );
   const [iconAsset, setIconAsset] = useState<string | null>(
     state?.mode === "edit"
-      ? state.entry.iconAsset ?? null
+      ? (state.entry.iconAsset ?? null)
       : deriveDefaultIconAsset(blankForm(state?.type ?? "coding_assistant")),
   );
 
@@ -282,7 +280,9 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   useEffect(() => {
     if (!state) return;
     const nextForm =
-      state.mode === "edit" ? formFromEntry(state.entry) : blankForm(state.type);
+      state.mode === "edit"
+        ? formFromEntry(state.entry)
+        : blankForm(state.type);
     setForm(nextForm);
     setScopes(
       state.mode === "edit"
@@ -291,7 +291,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
     );
     setIconAsset(
       state.mode === "edit"
-        ? state.entry.iconAsset ?? null
+        ? (state.entry.iconAsset ?? null)
         : deriveDefaultIconAsset(nextForm),
     );
   }, [state, organizationId]);
@@ -304,9 +304,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   // picker (collapseRedundantScopes enforces it), so this is unambiguous.
   const departmentIds = useMemo(
     () =>
-      scopes
-        .filter((s) => s.scopeType === "DEPARTMENT")
-        .map((s) => s.scopeId),
+      scopes.filter((s) => s.scopeType === "DEPARTMENT").map((s) => s.scopeId),
     [scopes],
   );
 
@@ -324,10 +322,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
     });
     if (kind !== "custom") {
       setIconAsset(`preset:${kind}`);
-    } else if (
-      iconAsset?.startsWith(PRESET_PREFIX) ||
-      iconAsset === null
-    ) {
+    } else if (iconAsset?.startsWith(PRESET_PREFIX) || iconAsset === null) {
       // Switching from preset → custom clears the preset until they upload
       setIconAsset(null);
     }
@@ -358,7 +353,10 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   };
 
   const onError = (err: unknown) => {
-    showErrorToast({ error: err, fallbackTitle: isEdit ? "Couldn't update tile" : "Couldn't publish tile" });
+    showErrorToast({
+      error: err,
+      fallbackTitle: isEdit ? "Couldn't update tile" : "Couldn't publish tile",
+    });
   };
 
   const createMutation = api.aiTools.create.useMutation({ onSuccess, onError });
@@ -532,11 +530,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
                 onClick={onSave}
                 disabled={!canSave || isPending}
               >
-                {isPending
-                  ? "Saving…"
-                  : isEdit
-                    ? "Save changes"
-                    : "Save tile"}
+                {isPending ? "Saving…" : isEdit ? "Save changes" : "Save tile"}
               </Button>
             </HStack>
           </VStack>
@@ -766,9 +760,7 @@ function CodingAssistantFields({
           size="sm"
           placeholder="e.g. langwatch claude"
           value={form.setupCommand}
-          onChange={(e) =>
-            setForm({ ...form, setupCommand: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, setupCommand: e.target.value })}
         />
       </FormSection>
       <FormSection label="Helper text (optional)">
@@ -785,9 +777,7 @@ function CodingAssistantFields({
           size="sm"
           placeholder="https://docs.example/setup"
           value={form.setupDocsUrl}
-          onChange={(e) =>
-            setForm({ ...form, setupDocsUrl: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, setupDocsUrl: e.target.value })}
         />
       </FormSection>
       <CliPathsSection form={form} setForm={setForm} />
@@ -922,9 +912,7 @@ function ModelProviderFields({
         <NativeSelect.Root size="sm">
           <NativeSelect.Field
             value={form.providerKey}
-            onChange={(e) =>
-              setForm({ ...form, providerKey: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, providerKey: e.target.value })}
           >
             <option value="">
               {providerOptionsLoading
@@ -962,9 +950,7 @@ function ModelProviderFields({
           size="sm"
           placeholder="my-app"
           value={form.defaultLabel}
-          onChange={(e) =>
-            setForm({ ...form, defaultLabel: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, defaultLabel: e.target.value })}
         />
       </FormSection>
       <FormSection
@@ -1056,7 +1042,10 @@ function ExternalToolFields({
             })}
           </HStack>
           <HStack gap={2} align="center">
-            <IconPreview iconAsset={iconAsset} fallback={<Wrench size={28} />} />
+            <IconPreview
+              iconAsset={iconAsset}
+              fallback={<Wrench size={28} />}
+            />
             <IconUploadButton
               onUploaded={onIconAssetChange}
               label={
@@ -1084,7 +1073,9 @@ function ExternalToolFields({
         <Textarea
           size="sm"
           rows={6}
-          placeholder={"Microsoft's low-code agent builder...\n\n# Getting started\n- Request access in #..."}
+          placeholder={
+            "Microsoft's low-code agent builder...\n\n# Getting started\n- Request access in #..."
+          }
           value={form.descriptionMarkdown}
           onChange={(e) =>
             setForm({ ...form, descriptionMarkdown: e.target.value })
@@ -1110,4 +1101,3 @@ function ExternalToolFields({
     </>
   );
 }
-

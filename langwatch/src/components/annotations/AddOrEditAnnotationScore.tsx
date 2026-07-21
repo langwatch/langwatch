@@ -16,8 +16,8 @@ import { AnnotationScoreDataType } from "@prisma/client";
 import { useEffect, useState } from "react";
 import { Plus, X } from "react-feather";
 import { useForm } from "react-hook-form";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { showErrorToast } from "~/features/errors";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { FullWidthFormControl } from "../FullWidthFormControl";
 import { Checkbox } from "../ui/checkbox";
@@ -198,9 +198,12 @@ export const AddOrEditAnnotationScore = ({
           void queryClient.annotationScore.getById.invalidate();
         },
         onError: (error) =>
-          showErrorToast({ error, fallbackTitle: annotationScoreId
+          showErrorToast({
+            error,
+            fallbackTitle: annotationScoreId
               ? "Couldn't save annotation score"
-              : "Couldn't create annotation score" }),
+              : "Couldn't create annotation score",
+          }),
       },
     );
   };

@@ -10,24 +10,27 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
-
 import { Drawer } from "~/components/ui/drawer";
-import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
+import { showErrorToast } from "~/features/errors";
 import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+} from "~/hooks/useDrawer";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { TypedAgent } from "~/server/agents/agent.repository";
-import { showErrorToast } from "~/features/errors";
-import { api } from "~/utils/api";
-import { trackEvent } from "~/utils/tracking";
-import type { Workflow } from "~/optimization_studio/types/dsl";
-import { blankTemplate } from "~/optimization_studio/templates/blank";
-import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
 import { EmojiPickerModal } from "~/optimization_studio/components/properties/modals/EmojiPickerModal";
+import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
+import { blankTemplate } from "~/optimization_studio/templates/blank";
+import type { Workflow } from "~/optimization_studio/types/dsl";
+import type { TypedAgent } from "~/server/agents/agent.repository";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+import { trackEvent } from "~/utils/tracking";
 
 export type WorkflowSelectorDrawerProps = {
   open?: boolean;
@@ -150,7 +153,10 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
         );
       } catch (error) {
         console.error("Error creating workflow agent:", error);
-        showErrorToast({ error, fallbackTitle: "Couldn't create workflow agent" });
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't create workflow agent",
+        });
       }
     },
     [
@@ -258,7 +264,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
                   // Check both workflows and agents limits before proceeding
                   checkCompoundLimits(
                     [workflowEnforcement, agentEnforcement],
-                    () => void handleSubmit(onSubmit)()
+                    () => void handleSubmit(onSubmit)(),
                   );
                 }}
                 disabled={!isValid || isSaving}

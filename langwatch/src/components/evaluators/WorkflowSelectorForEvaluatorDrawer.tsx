@@ -10,23 +10,26 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
-
 import { Drawer } from "~/components/ui/drawer";
-import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
+import { showErrorToast } from "~/features/errors";
 import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+} from "~/hooks/useDrawer";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { showErrorToast } from "~/features/errors";
-import { api } from "~/utils/api";
-import { trackEvent } from "~/utils/tracking";
-import type { Workflow } from "~/optimization_studio/types/dsl";
-import { customEvaluatorTemplate } from "~/optimization_studio/templates/custom_evaluator";
-import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
 import { EmojiPickerModal } from "~/optimization_studio/components/properties/modals/EmojiPickerModal";
+import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
+import { customEvaluatorTemplate } from "~/optimization_studio/templates/custom_evaluator";
+import type { Workflow } from "~/optimization_studio/types/dsl";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+import { trackEvent } from "~/utils/tracking";
 
 export type WorkflowSelectorForEvaluatorDrawerProps = {
   open?: boolean;
@@ -154,7 +157,10 @@ export function WorkflowSelectorForEvaluatorDrawer(
         );
       } catch (error) {
         console.error("Error creating workflow evaluator:", error);
-        showErrorToast({ error, fallbackTitle: "Couldn't create workflow evaluator" });
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't create workflow evaluator",
+        });
       }
     },
     [
@@ -263,7 +269,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
                   // Check both workflows and evaluators limits before proceeding
                   checkCompoundLimits(
                     [workflowEnforcement, evaluatorEnforcement],
-                    () => void handleSubmit(onSubmit)()
+                    () => void handleSubmit(onSubmit)(),
                   );
                 }}
                 disabled={!isValid || isSaving}

@@ -1,7 +1,7 @@
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { toaster } from "../ui/toaster";
 import { getUserFriendlyLicenseError } from "../../../ee/licensing/constants";
+import { toaster } from "../ui/toaster";
 
 interface UseLicenseActionsOptions {
   organizationId: string;
@@ -46,7 +46,8 @@ export function useLicenseActions({
     onSuccess: () => {
       toaster.create({
         title: "License removed",
-        description: "Your organization is now running without a license. Some features may be limited.",
+        description:
+          "Your organization is now running without a license. Some features may be limited.",
         type: "info",
       });
       onRemoveSuccess();

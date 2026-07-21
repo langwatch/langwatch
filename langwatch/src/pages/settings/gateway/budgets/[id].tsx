@@ -5,8 +5,8 @@ import {
   Button,
   Code,
   EmptyState,
-  HStack,
   Heading,
+  HStack,
   Progress,
   Separator,
   Spacer,
@@ -19,13 +19,13 @@ import { Archive, ArrowLeft, FileClock, Pencil, Receipt } from "lucide-react";
 import { useState } from "react";
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
-import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -73,7 +73,10 @@ function BudgetDetailPage() {
       });
       setArchiving(false);
     } catch (err) {
-      showErrorToast({ error: err, fallbackTitle: "Couldn't archive the budget" });
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't archive the budget",
+      });
     }
   };
 
@@ -229,9 +232,7 @@ function BudgetDetailPage() {
                           "never"
                         ) : (
                           <Tooltip
-                            content={new Date(
-                              budget.resetsAt,
-                            ).toLocaleString()}
+                            content={new Date(budget.resetsAt).toLocaleString()}
                           >
                             <span>
                               {formatTimeAgo(
@@ -267,7 +268,9 @@ function BudgetDetailPage() {
                   />
                 </DetailRow>
                 <DetailRow label="Created">
-                  <Tooltip content={new Date(budget.createdAt).toLocaleString()}>
+                  <Tooltip
+                    content={new Date(budget.createdAt).toLocaleString()}
+                  >
                     <Text fontSize="sm" color="fg.muted">
                       {formatTimeAgo(new Date(budget.createdAt).getTime())}
                     </Text>
@@ -279,9 +282,7 @@ function BudgetDetailPage() {
                       content={new Date(budget.lastResetAt).toLocaleString()}
                     >
                       <Text fontSize="sm" color="fg.muted">
-                        {formatTimeAgo(
-                          new Date(budget.lastResetAt).getTime(),
-                        )}
+                        {formatTimeAgo(new Date(budget.lastResetAt).getTime())}
                       </Text>
                     </Tooltip>
                   </DetailRow>

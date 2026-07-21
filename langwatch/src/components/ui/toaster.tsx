@@ -9,12 +9,7 @@ import {
   Stack,
   Toast,
 } from "@chakra-ui/react";
-import {
-  AlertCircle,
-  CheckCircle2,
-  Info,
-  TriangleAlert,
-} from "lucide-react";
+import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
 
 import { ErrorActions } from "~/features/errors/components/ErrorActions";
 

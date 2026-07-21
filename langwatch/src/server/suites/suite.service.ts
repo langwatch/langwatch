@@ -5,15 +5,14 @@
  * Handles CRUD, duplication, and run scheduling.
  */
 
-
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
-import type {
-  PrismaClient,
-  SimulationSuite,
-} from "@prisma/client";
+import type { PrismaClient, SimulationSuite } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import type { SuiteRunResult, SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
+import type {
+  SuiteRunResult,
+  SuiteRunService,
+} from "~/server/app-layer/suites/suite-run.service";
 import { slugify } from "~/utils/slugify";
 import { AgentRepository } from "../agents/agent.repository";
 import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
@@ -31,7 +30,11 @@ import {
   SuiteRepository,
   type UpdateSuiteInput,
 } from "./suite.repository";
-import { isSuiteAgentTargetType, parseSuiteTargets, type SuiteTarget } from "./types";
+import {
+  isSuiteAgentTargetType,
+  parseSuiteTargets,
+  type SuiteTarget,
+} from "./types";
 
 const tracer = getLangWatchTracer("langwatch.suites.service");
 const logger = createLogger("langwatch:suites:service");
@@ -104,9 +107,7 @@ export class SuiteService {
     );
   }
 
-  async getAll(params: {
-    projectId: string;
-  }): Promise<SimulationSuite[]> {
+  async getAll(params: { projectId: string }): Promise<SimulationSuite[]> {
     return tracer.withActiveSpan(
       "SuiteService.getAll",
       {
@@ -293,7 +294,12 @@ export class SuiteService {
         const targets = parseSuiteTargets(suite.targets);
         span.setAttribute("suite.target_count", targets.length);
 
-        const resolved = await this.resolveReferences({ suite, projectId, organizationId, targets });
+        const resolved = await this.resolveReferences({
+          suite,
+          projectId,
+          organizationId,
+          targets,
+        });
 
         const result = await this.suiteRunService.startRun({
           suiteId: suite.id,
@@ -324,26 +330,46 @@ export class SuiteService {
     targets: SuiteTarget[];
     projectId: string;
     organizationId: string;
-  }): Promise<{ scenarios: Record<string, string>; targets: Record<string, string> }> {
+  }): Promise<{
+    scenarios: Record<string, string>;
+    targets: Record<string, string>;
+  }> {
     const { scenarioIds, targets, projectId, organizationId } = params;
 
-    const scenarioRows = scenarioIds.length > 0
-      ? await this.scenarioRepository.findNamesByIds({ ids: scenarioIds, projectId })
-      : [];
+    const scenarioRows =
+      scenarioIds.length > 0
+        ? await this.scenarioRepository.findNamesByIds({
+            ids: scenarioIds,
+            projectId,
+          })
+        : [];
     const scenarios: Record<string, string> = Object.fromEntries(
       scenarioRows.map((r) => [r.id, r.name]),
     );
 
-    const agentIds = targets.filter((t) => isSuiteAgentTargetType(t.type)).map((t) => t.referenceId);
-    const promptIds = targets.filter((t) => t.type === "prompt").map((t) => t.referenceId);
+    const agentIds = targets
+      .filter((t) => isSuiteAgentTargetType(t.type))
+      .map((t) => t.referenceId);
+    const promptIds = targets
+      .filter((t) => t.type === "prompt")
+      .map((t) => t.referenceId);
 
-    const agentRows = agentIds.length > 0
-      ? await this.agentRepository.findNamesByIds({ ids: agentIds, projectId })
-      : [];
+    const agentRows =
+      agentIds.length > 0
+        ? await this.agentRepository.findNamesByIds({
+            ids: agentIds,
+            projectId,
+          })
+        : [];
 
-    const promptRows = promptIds.length > 0
-      ? await this.llmConfigRepository.findNamesByIds({ ids: promptIds, projectId, organizationId })
-      : [];
+    const promptRows =
+      promptIds.length > 0
+        ? await this.llmConfigRepository.findNamesByIds({
+            ids: promptIds,
+            projectId,
+            organizationId,
+          })
+        : [];
 
     const targetNames: Record<string, string> = {};
     for (const r of agentRows) targetNames[r.id] = r.name;
@@ -427,13 +453,16 @@ export class SuiteService {
     }
 
     // Fetch scenario names for display in queued job rows
-    const scenarioNameRows = scenarioResolution.active.length > 0
-      ? await this.scenarioRepository.findNamesByIds({
-          ids: scenarioResolution.active,
-          projectId,
-        })
-      : [];
-    const scenarioNameMap = new Map(scenarioNameRows.map((r) => [r.id, r.name]));
+    const scenarioNameRows =
+      scenarioResolution.active.length > 0
+        ? await this.scenarioRepository.findNamesByIds({
+            ids: scenarioResolution.active,
+            projectId,
+          })
+        : [];
+    const scenarioNameMap = new Map(
+      scenarioNameRows.map((r) => [r.id, r.name]),
+    );
 
     return {
       activeScenarioIds: scenarioResolution.active,
@@ -452,7 +481,10 @@ export class SuiteService {
   }): Promise<ResolvedScenarioReferences> {
     const { ids, projectId } = params;
 
-    const rows = await this.scenarioRepository.findManyIncludingArchived({ ids, projectId });
+    const rows = await this.scenarioRepository.findManyIncludingArchived({
+      ids,
+      projectId,
+    });
     const rowMap = new Map(rows.map((r) => [r.id, r]));
 
     const active: string[] = [];
@@ -494,22 +526,24 @@ export class SuiteService {
     const promptTargets = targets.filter((t) => t.type === "prompt");
 
     // Batch agent targets (both HTTP and code agents live in the Agent table)
-    const agentRows = agentTargets.length > 0
-      ? await this.agentRepository.findManyIncludingArchived({
-          ids: agentTargets.map((t) => t.referenceId),
-          projectId,
-        })
-      : [];
+    const agentRows =
+      agentTargets.length > 0
+        ? await this.agentRepository.findManyIncludingArchived({
+            ids: agentTargets.map((t) => t.referenceId),
+            projectId,
+          })
+        : [];
     const agentMap = new Map(agentRows.map((r) => [r.id, r]));
 
     // Batch prompt targets
-    const promptExistingIds = promptTargets.length > 0
-      ? await this.llmConfigRepository.findExistingIds({
-          ids: promptTargets.map((t) => t.referenceId),
-          projectId,
-          organizationId,
-        })
-      : new Set<string>();
+    const promptExistingIds =
+      promptTargets.length > 0
+        ? await this.llmConfigRepository.findExistingIds({
+            ids: promptTargets.map((t) => t.referenceId),
+            projectId,
+            organizationId,
+          })
+        : new Set<string>();
 
     const active: SuiteTarget[] = [];
     const archived: SuiteTarget[] = [];
@@ -536,5 +570,4 @@ export class SuiteService {
 
     return { active, archived, missing };
   }
-
 }

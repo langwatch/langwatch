@@ -112,7 +112,10 @@ describe("readHandledError", () => {
 describe("readErrorTraceId", () => {
   it("prefers the id inside the handled payload", () => {
     const traceId = readErrorTraceId(
-      trpcError({ code: "x", httpStatus: 500, traceId: "from-payload" }, "from-envelope"),
+      trpcError(
+        { code: "x", httpStatus: 500, traceId: "from-payload" },
+        "from-envelope",
+      ),
     );
 
     expect(traceId).toBe("from-payload");
@@ -133,7 +136,11 @@ describe("readErrorTraceId", () => {
 });
 
 describe("readAuthoredMessage", () => {
-  const trpcError = (httpStatus: number, message: string, error: unknown = null) => ({
+  const trpcError = (
+    httpStatus: number,
+    message: string,
+    error: unknown = null,
+  ) => ({
     message,
     data: { httpStatus, error },
   });
@@ -172,7 +179,9 @@ describe("readAuthoredMessage", () => {
     });
 
     it("declines anything shaped like a code slug", () => {
-      expect(readAuthoredMessage(trpcError(422, "validation_error"))).toBeUndefined();
+      expect(
+        readAuthoredMessage(trpcError(422, "validation_error")),
+      ).toBeUndefined();
     });
 
     it.each([

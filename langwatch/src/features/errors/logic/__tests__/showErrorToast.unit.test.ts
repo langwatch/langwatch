@@ -104,7 +104,10 @@ describe("showErrorToast", () => {
 
   describe("given an unhandled failure", () => {
     it("says nothing about what broke, but keeps the trace id", () => {
-      showErrorToast({ error: handledError(null, "4bf92f"), fallbackTitle: "Couldn't save" });
+      showErrorToast({
+        error: handledError(null, "4bf92f"),
+        fallbackTitle: "Couldn't save",
+      });
 
       const toast = create.mock.calls[0]![0];
       expect(toast.title).toBe("Couldn't save");
@@ -117,14 +120,21 @@ describe("showErrorToast", () => {
     it("shows nothing, rather than duplicating it as toast plus modal", () => {
       isHandledByGlobalHandler.mockReturnValue(true);
 
-      showErrorToast({ error: handledError({ code: "lite_member_restricted", httpStatus: 403 }) });
+      showErrorToast({
+        error: handledError({
+          code: "lite_member_restricted",
+          httpStatus: 403,
+        }),
+      });
 
       expect(create).not.toHaveBeenCalled();
     });
   });
 
   it("never renders the code slug as the title", () => {
-    showErrorToast({ error: handledError({ code: "validation_error", httpStatus: 422 }) });
+    showErrorToast({
+      error: handledError({ code: "validation_error", httpStatus: 422 }),
+    });
 
     expect(create.mock.calls[0]![0].title).not.toBe("validation_error");
   });

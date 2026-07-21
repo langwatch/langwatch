@@ -12,32 +12,28 @@ import {
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
-
+import {
+  isScenarioMappingValid,
+  ScenarioInputMappingSection,
+} from "~/components/suites/ScenarioInputMappingSection";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
-import {
-  ScenarioInputMappingSection,
-  isScenarioMappingValid,
-} from "~/components/suites/ScenarioInputMappingSection";
-import type {
-  FieldMapping,
-  Variable,
-} from "~/components/variables";
+import type { FieldMapping, Variable } from "~/components/variables";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
+import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
 import type {
   CustomComponentConfig,
   Field as DSLField,
   Workflow,
 } from "~/optimization_studio/types/dsl";
-import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
+import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
 import type {
   AgentComponentConfig,
   TypedAgent,
 } from "~/server/agents/agent.repository";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
-import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 export type AgentWorkflowEditorDrawerProps = {
@@ -49,7 +45,9 @@ export type AgentWorkflowEditorDrawerProps = {
 };
 
 /** Narrow the stored agent config into a CustomComponentConfig. */
-function getWorkflowConfig(config: AgentComponentConfig): CustomComponentConfig {
+function getWorkflowConfig(
+  config: AgentComponentConfig,
+): CustomComponentConfig {
   return config as CustomComponentConfig;
 }
 
@@ -79,11 +77,10 @@ function extractVariables(dsl: Workflow | undefined): {
   const rawOutputs: DSLField[] = Array.isArray(endNodeData?.inputs)
     ? (endNodeData.inputs as DSLField[])
     : [];
-  const normalizedOutputs: Variable[] = rawOutputs.flatMap(
-    (o): Variable[] =>
-      typeof o.identifier === "string"
-        ? [{ identifier: o.identifier, type: "str" as DSLField["type"] }]
-        : [],
+  const normalizedOutputs: Variable[] = rawOutputs.flatMap((o): Variable[] =>
+    typeof o.identifier === "string"
+      ? [{ identifier: o.identifier, type: "str" as DSLField["type"] }]
+      : [],
   );
   return { inputs: normalizedInputs, outputs: normalizedOutputs };
 }
@@ -187,7 +184,13 @@ export function AgentWorkflowEditorDrawer(
       setHasUnsavedChanges(false);
       formInitializedRef.current = true;
     }
-  }, [agentQuery.data, workflowInputs, workflowId, workflowQuery.isLoading, agentId]);
+  }, [
+    agentQuery.data,
+    workflowInputs,
+    workflowId,
+    workflowQuery.isLoading,
+    agentId,
+  ]);
 
   // Mutations
   const updateMutation = api.agents.update.useMutation({

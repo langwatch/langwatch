@@ -1,6 +1,6 @@
 import { Alert } from "@chakra-ui/react";
-import { useFormState } from "react-hook-form";
 import type { FieldValues, UseFormReturn } from "react-hook-form";
+import { useFormState } from "react-hook-form";
 
 export interface FormServerErrorProps<TFieldValues extends FieldValues> {
   form: UseFormReturn<TFieldValues>;

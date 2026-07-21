@@ -65,7 +65,10 @@ function Page() {
       });
     },
     onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't update evaluator from source" }),
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't update evaluator from source",
+      }),
   });
 
   const handleSyncFromSource = useCallback(
@@ -185,7 +188,10 @@ function Page() {
             });
           },
           onError: (error) =>
-            showErrorToast({ error, fallbackTitle: "Couldn't delete evaluator" }),
+            showErrorToast({
+              error,
+              fallbackTitle: "Couldn't delete evaluator",
+            }),
         },
       );
     }

@@ -718,7 +718,10 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             setError(err.message);
             setIsAborting(false); // Clear aborting state on error
             cleanupThisExecution();
-            showErrorToast({ error: err, fallbackTitle: "Couldn't run the evaluation" });
+            showErrorToast({
+              error: err,
+              fallbackTitle: "Couldn't run the evaluation",
+            });
           },
         });
 

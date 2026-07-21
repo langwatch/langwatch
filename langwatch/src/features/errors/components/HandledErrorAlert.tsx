@@ -2,8 +2,8 @@ import { Box, HStack, List, Stack, Text } from "@chakra-ui/react";
 import { AlertCircle } from "lucide-react";
 
 import {
-  UNKNOWN_ERROR_PRESENTATION,
   explainHandledError,
+  UNKNOWN_ERROR_PRESENTATION,
 } from "../logic/presentation";
 import {
   readAuthoredMessage,

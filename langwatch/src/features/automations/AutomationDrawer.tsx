@@ -8,9 +8,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { AlertType, TriggerAction, TriggerKind } from "@prisma/client";
-import { Mail, Send } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
   MAX_TRACE_DEBOUNCE_MS,
@@ -18,28 +15,6 @@ import {
   NOTIFICATION_CADENCES,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
-import {
-  CLIENT_PROVIDERS,
-  type NotifyPreview,
-} from "~/features/automations/providers/registry";
-import {
-  type ConfigFormCtx,
-  isNotifyEntry,
-} from "~/features/automations/providers/types";
-import { Dialog } from "~/components/ui/dialog";
-import { Drawer } from "~/components/ui/drawer";
-import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
-import { useDrawer } from "~/hooks/useDrawer";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
-import type { FilterParam } from "~/hooks/useFilterParams";
-import { useFilterParams } from "~/hooks/useFilterParams";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  type FilterField,
-  sanitizeTriggerFilters,
-  type TriggerFilterValue,
-} from "~/server/filters/types";
 import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
 import {
   EXAMPLE_MATCHES,
@@ -56,6 +31,37 @@ import {
   type ReportTemplateContext,
   type TemplateContext,
 } from "@langwatch/automations/templating/templateContext";
+import { AlertType, TriggerAction, TriggerKind } from "@prisma/client";
+import { Mail, Send } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Dialog } from "~/components/ui/dialog";
+import { Drawer } from "~/components/ui/drawer";
+import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
+import {
+  CLIENT_PROVIDERS,
+  type NotifyPreview,
+} from "~/features/automations/providers/registry";
+import {
+  type ConfigFormCtx,
+  isNotifyEntry,
+} from "~/features/automations/providers/types";
+import {
+  explainHandledError,
+  readHandledError,
+  showErrorToast,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "~/features/errors";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
+import type { FilterParam } from "~/hooks/useFilterParams";
+import { useFilterParams } from "~/hooks/useFilterParams";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+  type FilterField,
+  sanitizeTriggerFilters,
+  type TriggerFilterValue,
+} from "~/server/filters/types";
 import { api } from "~/utils/api";
 import { MainSectionList } from "./components/MainSectionList";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
@@ -76,12 +82,6 @@ import {
   subjectIsSet,
   templatesFromDraft,
 } from "./logic/draftReducer";
-import {
-  explainHandledError,
-  readHandledError,
-  showErrorToast,
-  UNKNOWN_ERROR_PRESENTATION,
-} from "~/features/errors";
 import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { useAutomationStore } from "./state/automationStore";
 import {
@@ -858,7 +858,10 @@ export function AutomationDrawer({
           closeDrawer();
         },
         onError: (err) =>
-          showErrorToast({ error: err, fallbackTitle: "Couldn't save automation" }),
+          showErrorToast({
+            error: err,
+            fallbackTitle: "Couldn't save automation",
+          }),
       },
     );
   }, [

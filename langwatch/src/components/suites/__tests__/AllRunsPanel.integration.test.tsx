@@ -172,7 +172,9 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
         });
         mockScenariosQuery.mockReturnValue({ data: [] });
 
-        render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
+        render(<RunHistoryPanel period={defaultPeriod} />, {
+          wrapper: Wrapper,
+        });
 
         expect(
           screen.getByText("This search took too long"),

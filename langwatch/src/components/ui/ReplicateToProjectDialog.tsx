@@ -90,7 +90,10 @@ export function ReplicateToProjectDialog({
         { error, ...(sourceId && { sourceId }), projectId },
         `Error replicating ${entityLabel.toLowerCase()}`,
       );
-      showErrorToast({ error, fallbackTitle: `Couldn't replicate the ${entityLabel.toLowerCase()}` });
+      showErrorToast({
+        error,
+        fallbackTitle: `Couldn't replicate the ${entityLabel.toLowerCase()}`,
+      });
     }
   };
 

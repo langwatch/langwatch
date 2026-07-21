@@ -15,7 +15,7 @@
  *     explainer ended up with a `recipient_not_in_team` branch for a code
  *     nothing throws
  */
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";

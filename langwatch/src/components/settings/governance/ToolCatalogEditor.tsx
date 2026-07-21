@@ -10,8 +10,8 @@ import {
 import {
   closestCenter,
   DndContext,
-  type DraggableAttributes,
   type DragEndEvent,
+  type DraggableAttributes,
   PointerSensor,
   useSensor,
   useSensors,
@@ -35,9 +35,8 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-
-import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import type { AiToolEntry } from "~/components/me/tiles/types";
+import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
@@ -94,7 +93,8 @@ export function ToolCatalogEditor({
       void utils.aiTools.adminList.invalidate({ organizationId });
       void utils.aiTools.list.invalidate({ organizationId });
     },
-    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't update tile" }),
+    onError: (err) =>
+      showErrorToast({ error: err, fallbackTitle: "Couldn't update tile" }),
   });
 
   const removeMutation = api.aiTools.remove.useMutation({
@@ -104,14 +104,16 @@ export function ToolCatalogEditor({
       toaster.create({ title: "Tile deleted", type: "success" });
       setPendingDelete(null);
     },
-    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't delete tile" }),
+    onError: (err) =>
+      showErrorToast({ error: err, fallbackTitle: "Couldn't delete tile" }),
   });
 
   const reorderMutation = api.aiTools.reorder.useMutation({
     onSuccess: () => {
       void utils.aiTools.list.invalidate({ organizationId });
     },
-    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't reorder tiles" }),
+    onError: (err) =>
+      showErrorToast({ error: err, fallbackTitle: "Couldn't reorder tiles" }),
   });
 
   const importStarterPackMutation = api.aiTools.importStarterPack.useMutation({
@@ -131,7 +133,10 @@ export function ToolCatalogEditor({
       });
     },
     onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't import the starter pack" }),
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't import the starter pack",
+      }),
   });
 
   const starterPackQuery = api.aiTools.starterPackCatalog.useQuery(
@@ -265,7 +270,11 @@ export function ToolCatalogEditor({
                   if (tiles.length === 0) return null;
                   return (
                     <VStack key={type} align="start" gap={1}>
-                      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                      <Text
+                        fontSize="xs"
+                        fontWeight="semibold"
+                        color="fg.muted"
+                      >
                         {SECTION_LABELS[type]}
                       </Text>
                       {tiles.map((tile) => (
@@ -513,7 +522,11 @@ function SortableCatalogRow({
 function scopeChipsFor(
   entry: AiToolEntry,
   departmentNameById: Map<string, string>,
-): { scopeType: "ORGANIZATION" | "DEPARTMENT"; scopeId: string; name?: string }[] {
+): {
+  scopeType: "ORGANIZATION" | "DEPARTMENT";
+  scopeId: string;
+  name?: string;
+}[] {
   const departmentIds = entry.departmentIds ?? [];
   if (departmentIds.length === 0) {
     return [{ scopeType: "ORGANIZATION", scopeId: "org" }];

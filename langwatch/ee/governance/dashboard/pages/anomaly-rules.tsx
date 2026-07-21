@@ -15,18 +15,17 @@ import {
 } from "@chakra-ui/react";
 import { Info, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-
-import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
-import { docsUrl } from "~/utils/docsUrl";
 import { toaster } from "~/components/ui/toaster";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
+import { docsUrl } from "~/utils/docsUrl";
 
 /**
  * Anomaly rule authoring surface, wired to api.anomalyRules.* (Sergey
@@ -39,14 +38,13 @@ import { api, type RouterOutputs } from "~/utils/api";
 
 type Rule = RouterOutputs["anomalyRules"]["list"][number];
 type Severity = "critical" | "warning" | "info";
-type Scope =
-  | "organization"
-  | "team"
-  | "project"
-  | "source_type"
-  | "source";
+type Scope = "organization" | "team" | "project" | "source_type" | "source";
 
-const SEVERITY_OPTIONS: Array<{ value: Severity; label: string; tone: string }> = [
+const SEVERITY_OPTIONS: Array<{
+  value: Severity;
+  label: string;
+  tone: string;
+}> = [
   { value: "critical", label: "Critical", tone: "red" },
   { value: "warning", label: "Warning", tone: "orange" },
   { value: "info", label: "Info", tone: "blue" },
@@ -98,7 +96,9 @@ const SPEND_SPIKE_THRESHOLD_TEMPLATE = JSON.stringify(
 function summariseThresholdConfig(
   ruleType: string,
   raw: string,
-): { kind: "ok" | "unsupported"; english: string } | { kind: "error"; message: string } {
+):
+  | { kind: "ok" | "unsupported"; english: string }
+  | { kind: "error"; message: string } {
   // Order matters: non-spend_spike rule types are persisted as
   // preview-mode (Sergey 5f416d410 — server accepts any
   // thresholdConfig shape for non-detector-wired types). So check
@@ -155,9 +155,12 @@ function summariseThresholdConfig(
     };
   }
   const fmtDuration = (sec: number): string => {
-    if (sec >= 86400) return `${Math.round((sec / 86400) * 10) / 10} day${sec === 86400 ? "" : "s"}`;
-    if (sec >= 3600) return `${Math.round((sec / 3600) * 10) / 10} hour${sec === 3600 ? "" : "s"}`;
-    if (sec >= 60) return `${Math.round((sec / 60) * 10) / 10} minute${sec === 60 ? "" : "s"}`;
+    if (sec >= 86400)
+      return `${Math.round((sec / 86400) * 10) / 10} day${sec === 86400 ? "" : "s"}`;
+    if (sec >= 3600)
+      return `${Math.round((sec / 3600) * 10) / 10} hour${sec === 3600 ? "" : "s"}`;
+    if (sec >= 60)
+      return `${Math.round((sec / 60) * 10) / 10} minute${sec === 60 ? "" : "s"}`;
     return `${sec} second${sec === 1 ? "" : "s"}`;
   };
   return {
@@ -253,16 +256,8 @@ function AnomalyRulesPage() {
       ruleType: rule.ruleType,
       scope: rule.scope as Scope,
       scopeId: rule.scopeId,
-      thresholdConfig: JSON.stringify(
-        rule.thresholdConfig ?? {},
-        null,
-        2,
-      ),
-      destinationConfig: JSON.stringify(
-        rule.destinationConfig ?? {},
-        null,
-        2,
-      ),
+      thresholdConfig: JSON.stringify(rule.thresholdConfig ?? {}, null, 2),
+      destinationConfig: JSON.stringify(rule.destinationConfig ?? {}, null, 2),
     });
 
   const onSubmit = () => {
@@ -283,9 +278,7 @@ function AnomalyRulesPage() {
       return;
     }
     const scopeId =
-      composer.scope === "organization"
-        ? orgId
-        : composer.scopeId.trim();
+      composer.scope === "organization" ? orgId : composer.scopeId.trim();
 
     if (composer.id) {
       updateMutation.mutate({
@@ -323,105 +316,105 @@ function AnomalyRulesPage() {
         featureName="Anomaly Rules"
         description="Anomaly Rules let your governance team define thresholds that page on-call when ingestion drifts. Available on Enterprise plans."
       >
-      <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <HStack alignItems="end">
-          <VStack align="start" gap={1}>
-            <HStack gap={2}>
-              <Heading size="md">Anomaly Rules</Heading>
-              <Badge colorPalette="purple" size="sm" variant="surface">
-                Preview
-              </Badge>
-            </HStack>
-            <Text color="fg.muted" fontSize="sm" maxW="3xl">
-              Define thresholds that page on-call when activity drifts.
-              Rules surface on the{" "}
-              <Link href="/governance" color="blue.600">
-                governance overview
-              </Link>{" "}
-              once they fire.
-            </Text>
-          </VStack>
-          <Spacer />
-        </HStack>
-
-        {composer && (
-          <RuleComposer
-            composer={composer}
-            setComposer={setComposer}
-            onSubmit={onSubmit}
-            onCancel={() => setComposer(null)}
-            isPending={isPending}
-            orgId={orgId}
-          />
-        )}
-
-        {rulesQuery.isLoading && <Spinner size="sm" />}
-
-        {(["critical", "warning", "info"] as const).map((sev) => {
-          const meta = SEVERITY_OPTIONS.find((o) => o.value === sev)!;
-          return (
-            <Box
-              key={sev}
-              as="section"
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="md"
-              padding={4}
-            >
-              <HStack alignItems="start" marginBottom={3}>
-                <VStack align="start" gap={0}>
-                  <HStack gap={2}>
-                    <Text fontSize="sm" fontWeight="semibold">
-                      {meta.label}
-                    </Text>
-                    <Badge size="sm" variant="surface">
-                      {grouped[sev].length}
-                    </Badge>
-                  </HStack>
-                </VStack>
-                <Spacer />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const fresh = blankComposer();
-                    fresh.severity = sev;
-                    setComposer(fresh);
-                  }}
-                  disabled={!!composer}
-                >
-                  <Plus size={14} /> New rule
-                </Button>
+        <VStack align="stretch" gap={6} width="full" maxW="container.xl">
+          <HStack alignItems="end">
+            <VStack align="start" gap={1}>
+              <HStack gap={2}>
+                <Heading size="md">Anomaly Rules</Heading>
+                <Badge colorPalette="purple" size="sm" variant="surface">
+                  Preview
+                </Badge>
               </HStack>
+              <Text color="fg.muted" fontSize="sm" maxW="3xl">
+                Define thresholds that page on-call when activity drifts. Rules
+                surface on the{" "}
+                <Link href="/governance" color="blue.600">
+                  governance overview
+                </Link>{" "}
+                once they fire.
+              </Text>
+            </VStack>
+            <Spacer />
+          </HStack>
 
-              <VStack align="stretch" gap={2}>
-                {grouped[sev].length === 0 && (
-                  <Text fontSize="sm" color="fg.muted">
-                    No {meta.label.toLowerCase()} rules.
-                  </Text>
-                )}
-                {grouped[sev].map((rule) => (
-                  <RuleRow
-                    key={rule.id}
-                    rule={rule}
-                    onEdit={() => startEdit(rule)}
-                    onArchive={() =>
-                      archiveMutation.mutate({
-                        id: rule.id,
-                        organizationId: orgId,
-                      })
-                    }
-                    isArchiving={
-                      archiveMutation.isPending &&
-                      archiveMutation.variables?.id === rule.id
-                    }
-                  />
-                ))}
-              </VStack>
-            </Box>
-          );
-        })}
-      </VStack>
+          {composer && (
+            <RuleComposer
+              composer={composer}
+              setComposer={setComposer}
+              onSubmit={onSubmit}
+              onCancel={() => setComposer(null)}
+              isPending={isPending}
+              orgId={orgId}
+            />
+          )}
+
+          {rulesQuery.isLoading && <Spinner size="sm" />}
+
+          {(["critical", "warning", "info"] as const).map((sev) => {
+            const meta = SEVERITY_OPTIONS.find((o) => o.value === sev)!;
+            return (
+              <Box
+                key={sev}
+                as="section"
+                borderWidth="1px"
+                borderColor="border.muted"
+                borderRadius="md"
+                padding={4}
+              >
+                <HStack alignItems="start" marginBottom={3}>
+                  <VStack align="start" gap={0}>
+                    <HStack gap={2}>
+                      <Text fontSize="sm" fontWeight="semibold">
+                        {meta.label}
+                      </Text>
+                      <Badge size="sm" variant="surface">
+                        {grouped[sev].length}
+                      </Badge>
+                    </HStack>
+                  </VStack>
+                  <Spacer />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const fresh = blankComposer();
+                      fresh.severity = sev;
+                      setComposer(fresh);
+                    }}
+                    disabled={!!composer}
+                  >
+                    <Plus size={14} /> New rule
+                  </Button>
+                </HStack>
+
+                <VStack align="stretch" gap={2}>
+                  {grouped[sev].length === 0 && (
+                    <Text fontSize="sm" color="fg.muted">
+                      No {meta.label.toLowerCase()} rules.
+                    </Text>
+                  )}
+                  {grouped[sev].map((rule) => (
+                    <RuleRow
+                      key={rule.id}
+                      rule={rule}
+                      onEdit={() => startEdit(rule)}
+                      onArchive={() =>
+                        archiveMutation.mutate({
+                          id: rule.id,
+                          organizationId: orgId,
+                        })
+                      }
+                      isArchiving={
+                        archiveMutation.isPending &&
+                        archiveMutation.variables?.id === rule.id
+                      }
+                    />
+                  ))}
+                </VStack>
+              </Box>
+            );
+          })}
+        </VStack>
       </EnterpriseLockedSurface>
     </GovernanceLayout>
   );
@@ -495,8 +488,14 @@ const SOURCE_TYPE_PICKER_OPTIONS = [
   { value: "claude_cowork", label: "Claude Cowork (claude_cowork)" },
   { value: "workato", label: "Workato (workato)" },
   { value: "copilot_studio", label: "Copilot Studio (copilot_studio)" },
-  { value: "openai_compliance", label: "OpenAI Compliance (openai_compliance)" },
-  { value: "claude_compliance", label: "Claude Compliance (claude_compliance)" },
+  {
+    value: "openai_compliance",
+    label: "OpenAI Compliance (openai_compliance)",
+  },
+  {
+    value: "claude_compliance",
+    label: "Claude Compliance (claude_compliance)",
+  },
   { value: "s3_custom", label: "S3 Custom (s3_custom)" },
 ];
 
@@ -515,9 +514,7 @@ function RuleComposer({
   isPending: boolean;
   orgId: string;
 }) {
-  const [scopeIdMode, setScopeIdMode] = useState<"picker" | "custom">(
-    "picker",
-  );
+  const [scopeIdMode, setScopeIdMode] = useState<"picker" | "custom">("picker");
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
     {
@@ -544,267 +541,271 @@ function RuleComposer({
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={3}>
-        <HStack gap={3}>
-          <VStack align="stretch" gap={1} flex={2}>
-            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-              Name
-            </Text>
-            <Input
-              size="sm"
-              backgroundColor="white"
-              value={composer.name}
-              onChange={(e) =>
-                setComposer({ ...composer, name: e.target.value })
-              }
-              placeholder="Display name for this rule"
-            />
-          </VStack>
-          <VStack align="stretch" gap={1} flex={1}>
-            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-              Severity
-            </Text>
-            <select
-              value={composer.severity}
-              onChange={(e) =>
-                setComposer({
-                  ...composer,
-                  severity: e.target.value as Severity,
-                })
-              }
-              style={selectStyle}
-            >
-              {SEVERITY_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </VStack>
-        </HStack>
-
-        <VStack align="stretch" gap={1}>
-          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-            Description (optional)
-          </Text>
-          <Textarea
-            size="sm"
-            backgroundColor="white"
-            rows={2}
-            value={composer.description}
-            onChange={(e) =>
-              setComposer({ ...composer, description: e.target.value })
-            }
-            placeholder="What this rule guards against and who owns it"
-          />
-        </VStack>
-
-        <HStack gap={3}>
-          <VStack align="stretch" gap={1} flex={1}>
-            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-              Rule type
-            </Text>
-            <Input
-              size="sm"
-              backgroundColor="white"
-              list="rule-type-suggestions"
-              value={composer.ruleType}
-              onChange={(e) => {
-                const nextRuleType = e.target.value;
-                setComposer({
-                  ...composer,
-                  ruleType: nextRuleType,
-                  // Auto-fill the threshold template when the user picks
-                  // spend_spike from a blank composer — saves them
-                  // grepping the reactor for the schema. If they've
-                  // already customised the JSON, leave it alone.
-                  thresholdConfig:
-                    nextRuleType === "spend_spike" &&
-                    (composer.thresholdConfig.trim() === "" ||
-                      composer.thresholdConfig.trim() === "{}")
-                      ? SPEND_SPIKE_THRESHOLD_TEMPLATE
-                      : composer.thresholdConfig,
-                });
-              }}
-              placeholder="spend_spike"
-            />
-            <datalist id="rule-type-suggestions">
-              {RULE_TYPE_SUGGESTIONS.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-            <Text fontSize="xs" color="fg.muted">
-              Only <code>spend_spike</code> is evaluated by the anomaly
-              reactor today. Other rule types (<code>rate_limit</code>,
-              <code>after_hours</code>, …) are{" "}
-              <Link
-                href="/ai-gateway/governance/anomaly-rules"
-                color="blue.600"
-              >
-                preview
-              </Link>{" "}
-              — persisted as active but not yet detected.
-            </Text>
-          </VStack>
-          <VStack align="stretch" gap={1} flex={1}>
-            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-              Scope
-            </Text>
-            <select
-              value={composer.scope}
-              onChange={(e) =>
-                setComposer({ ...composer, scope: e.target.value as Scope })
-              }
-              style={selectStyle}
-            >
-              {SCOPE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </VStack>
-          {composer.scope !== "organization" && (
-            <VStack align="stretch" gap={1} flex={1}>
-              <HStack gap={2} alignItems="center">
+            <HStack gap={3}>
+              <VStack align="stretch" gap={1} flex={2}>
                 <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  {composer.scope === "source"
-                    ? "Ingestion source"
-                    : composer.scope === "source_type"
-                      ? "Source type"
-                      : "Scope ID"}
+                  Name
                 </Text>
-                <Spacer />
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  fontSize="xs"
-                  color="blue.600"
-                  onClick={() =>
-                    setScopeIdMode((m) =>
-                      m === "picker" ? "custom" : "picker",
-                    )
-                  }
-                >
-                  {scopeIdMode === "picker" ? "type a custom ID" : "use picker"}
-                </Button>
-              </HStack>
-              {scopeIdMode === "picker" && composer.scope === "source" ? (
-                <select
-                  value={composer.scopeId}
+                <Input
+                  size="sm"
+                  backgroundColor="white"
+                  value={composer.name}
                   onChange={(e) =>
-                    setComposer({ ...composer, scopeId: e.target.value })
+                    setComposer({ ...composer, name: e.target.value })
                   }
-                  style={selectStyle}
-                  disabled={sourcesQuery.isLoading}
-                >
-                  <option value="">
-                    {sourcesQuery.isLoading
-                      ? "Loading sources…"
-                      : "— select an ingestion source —"}
-                  </option>
-                  {(sourcesQuery.data ?? []).map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.sourceType})
-                    </option>
-                  ))}
-                </select>
-              ) : scopeIdMode === "picker" && composer.scope === "source_type" ? (
+                  placeholder="Display name for this rule"
+                />
+              </VStack>
+              <VStack align="stretch" gap={1} flex={1}>
+                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                  Severity
+                </Text>
                 <select
-                  value={composer.scopeId}
+                  value={composer.severity}
                   onChange={(e) =>
-                    setComposer({ ...composer, scopeId: e.target.value })
+                    setComposer({
+                      ...composer,
+                      severity: e.target.value as Severity,
+                    })
                   }
                   style={selectStyle}
                 >
-                  <option value="">— select a source type —</option>
-                  {SOURCE_TYPE_PICKER_OPTIONS.map((o) => (
+                  {SEVERITY_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>
                   ))}
                 </select>
-              ) : (
+              </VStack>
+            </HStack>
+
+            <VStack align="stretch" gap={1}>
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                Description (optional)
+              </Text>
+              <Textarea
+                size="sm"
+                backgroundColor="white"
+                rows={2}
+                value={composer.description}
+                onChange={(e) =>
+                  setComposer({ ...composer, description: e.target.value })
+                }
+                placeholder="What this rule guards against and who owns it"
+              />
+            </VStack>
+
+            <HStack gap={3}>
+              <VStack align="stretch" gap={1} flex={1}>
+                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                  Rule type
+                </Text>
                 <Input
                   size="sm"
                   backgroundColor="white"
-                  value={composer.scopeId}
-                  onChange={(e) =>
-                    setComposer({ ...composer, scopeId: e.target.value })
-                  }
-                  placeholder={
-                    composer.scope === "source_type"
-                      ? "otel_generic, workato, ..."
-                      : composer.scope === "source"
-                        ? "ingestion source ID"
-                        : `${composer.scope} ID`
-                  }
+                  list="rule-type-suggestions"
+                  value={composer.ruleType}
+                  onChange={(e) => {
+                    const nextRuleType = e.target.value;
+                    setComposer({
+                      ...composer,
+                      ruleType: nextRuleType,
+                      // Auto-fill the threshold template when the user picks
+                      // spend_spike from a blank composer — saves them
+                      // grepping the reactor for the schema. If they've
+                      // already customised the JSON, leave it alone.
+                      thresholdConfig:
+                        nextRuleType === "spend_spike" &&
+                        (composer.thresholdConfig.trim() === "" ||
+                          composer.thresholdConfig.trim() === "{}")
+                          ? SPEND_SPIKE_THRESHOLD_TEMPLATE
+                          : composer.thresholdConfig,
+                    });
+                  }}
+                  placeholder="spend_spike"
                 />
+                <datalist id="rule-type-suggestions">
+                  {RULE_TYPE_SUGGESTIONS.map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+                <Text fontSize="xs" color="fg.muted">
+                  Only <code>spend_spike</code> is evaluated by the anomaly
+                  reactor today. Other rule types (<code>rate_limit</code>,
+                  <code>after_hours</code>, …) are{" "}
+                  <Link
+                    href="/ai-gateway/governance/anomaly-rules"
+                    color="blue.600"
+                  >
+                    preview
+                  </Link>{" "}
+                  — persisted as active but not yet detected.
+                </Text>
+              </VStack>
+              <VStack align="stretch" gap={1} flex={1}>
+                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                  Scope
+                </Text>
+                <select
+                  value={composer.scope}
+                  onChange={(e) =>
+                    setComposer({ ...composer, scope: e.target.value as Scope })
+                  }
+                  style={selectStyle}
+                >
+                  {SCOPE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </VStack>
+              {composer.scope !== "organization" && (
+                <VStack align="stretch" gap={1} flex={1}>
+                  <HStack gap={2} alignItems="center">
+                    <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                      {composer.scope === "source"
+                        ? "Ingestion source"
+                        : composer.scope === "source_type"
+                          ? "Source type"
+                          : "Scope ID"}
+                    </Text>
+                    <Spacer />
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      fontSize="xs"
+                      color="blue.600"
+                      onClick={() =>
+                        setScopeIdMode((m) =>
+                          m === "picker" ? "custom" : "picker",
+                        )
+                      }
+                    >
+                      {scopeIdMode === "picker"
+                        ? "type a custom ID"
+                        : "use picker"}
+                    </Button>
+                  </HStack>
+                  {scopeIdMode === "picker" && composer.scope === "source" ? (
+                    <select
+                      value={composer.scopeId}
+                      onChange={(e) =>
+                        setComposer({ ...composer, scopeId: e.target.value })
+                      }
+                      style={selectStyle}
+                      disabled={sourcesQuery.isLoading}
+                    >
+                      <option value="">
+                        {sourcesQuery.isLoading
+                          ? "Loading sources…"
+                          : "— select an ingestion source —"}
+                      </option>
+                      {(sourcesQuery.data ?? []).map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.sourceType})
+                        </option>
+                      ))}
+                    </select>
+                  ) : scopeIdMode === "picker" &&
+                    composer.scope === "source_type" ? (
+                    <select
+                      value={composer.scopeId}
+                      onChange={(e) =>
+                        setComposer({ ...composer, scopeId: e.target.value })
+                      }
+                      style={selectStyle}
+                    >
+                      <option value="">— select a source type —</option>
+                      {SOURCE_TYPE_PICKER_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input
+                      size="sm"
+                      backgroundColor="white"
+                      value={composer.scopeId}
+                      onChange={(e) =>
+                        setComposer({ ...composer, scopeId: e.target.value })
+                      }
+                      placeholder={
+                        composer.scope === "source_type"
+                          ? "otel_generic, workato, ..."
+                          : composer.scope === "source"
+                            ? "ingestion source ID"
+                            : `${composer.scope} ID`
+                      }
+                    />
+                  )}
+                </VStack>
               )}
-            </VStack>
-          )}
-        </HStack>
+            </HStack>
 
-        <VStack align="stretch" gap={1}>
-          <HStack gap={2} alignItems="center">
-            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-              Threshold config (rule-type-specific JSON)
-            </Text>
-            <Spacer />
-            <Link
-              href={docsUrl("/ai-governance/anomaly-rules#threshold-config")}
-              isExternal
-              color="blue.600"
-              fontSize="xs"
-              fontWeight="medium"
-            >
-              <HStack gap={1} alignItems="center">
-                <Info size={12} />
-                <Text as="span">Schema reference</Text>
+            <VStack align="stretch" gap={1}>
+              <HStack gap={2} alignItems="center">
+                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                  Threshold config (rule-type-specific JSON)
+                </Text>
+                <Spacer />
+                <Link
+                  href={docsUrl(
+                    "/ai-governance/anomaly-rules#threshold-config",
+                  )}
+                  isExternal
+                  color="blue.600"
+                  fontSize="xs"
+                  fontWeight="medium"
+                >
+                  <HStack gap={1} alignItems="center">
+                    <Info size={12} />
+                    <Text as="span">Schema reference</Text>
+                  </HStack>
+                </Link>
               </HStack>
-            </Link>
-          </HStack>
-          <Textarea
-            size="sm"
-            backgroundColor="white"
-            rows={4}
-            fontFamily="mono"
-            value={composer.thresholdConfig}
-            onChange={(e) =>
-              setComposer({ ...composer, thresholdConfig: e.target.value })
-            }
-            placeholder="{}"
-          />
-          <ThresholdPreview
-            ruleType={composer.ruleType}
-            raw={composer.thresholdConfig}
-          />
-        </VStack>
+              <Textarea
+                size="sm"
+                backgroundColor="white"
+                rows={4}
+                fontFamily="mono"
+                value={composer.thresholdConfig}
+                onChange={(e) =>
+                  setComposer({ ...composer, thresholdConfig: e.target.value })
+                }
+                placeholder="{}"
+              />
+              <ThresholdPreview
+                ruleType={composer.ruleType}
+                raw={composer.thresholdConfig}
+              />
+            </VStack>
 
-        <Box
-          borderWidth="1px"
-          borderColor="purple.300"
-          backgroundColor="purple.50"
-          padding={3}
-          borderRadius="sm"
-        >
-          <Text fontSize="xs" color="purple.900">
-            <strong>Alert destinations:</strong> alerts surface on the{" "}
-            <Link href="/governance" color="blue.600">
-              governance dashboard
-            </Link>{" "}
-            today. Slack, PagerDuty, webhook, and email destinations ship
-            in a follow-up release — the composer will gain structured
-            destination fields then. (See{" "}
-            <Link
-              href="/ai-gateway/governance/anomaly-rules"
-              color="blue.600"
+            <Box
+              borderWidth="1px"
+              borderColor="purple.300"
+              backgroundColor="purple.50"
+              padding={3}
+              borderRadius="sm"
             >
-              anomaly rules docs
-            </Link>{" "}
-            for the dispatch coverage table.)
-          </Text>
-        </Box>
-
+              <Text fontSize="xs" color="purple.900">
+                <strong>Alert destinations:</strong> alerts surface on the{" "}
+                <Link href="/governance" color="blue.600">
+                  governance dashboard
+                </Link>{" "}
+                today. Slack, PagerDuty, webhook, and email destinations ship in
+                a follow-up release — the composer will gain structured
+                destination fields then. (See{" "}
+                <Link
+                  href="/ai-gateway/governance/anomaly-rules"
+                  color="blue.600"
+                >
+                  anomaly rules docs
+                </Link>{" "}
+                for the dispatch coverage table.)
+              </Text>
+            </Box>
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -852,7 +853,12 @@ function ThresholdPreview({
     summary.kind === "ok"
       ? { bg: "blue.50", border: "blue.300", fg: "blue.900", label: "Preview" }
       : summary.kind === "unsupported"
-        ? { bg: "orange.50", border: "orange.300", fg: "orange.900", label: "Won't fire" }
+        ? {
+            bg: "orange.50",
+            border: "orange.300",
+            fg: "orange.900",
+            label: "Won't fire",
+          }
         : { bg: "red.50", border: "red.300", fg: "red.900", label: "Invalid" };
   return (
     <Box
@@ -864,7 +870,17 @@ function ThresholdPreview({
       marginTop={1}
     >
       <HStack alignItems="start" gap={2}>
-        <Badge colorPalette={palette.label === "Won't fire" ? "orange" : palette.label === "Invalid" ? "red" : "blue"} size="xs" variant="subtle">
+        <Badge
+          colorPalette={
+            palette.label === "Won't fire"
+              ? "orange"
+              : palette.label === "Invalid"
+                ? "red"
+                : "blue"
+          }
+          size="xs"
+          variant="subtle"
+        >
           {palette.label}
         </Badge>
         <Text fontSize="xs" color={palette.fg} flex={1}>
@@ -878,7 +894,7 @@ function ThresholdPreview({
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", { bypassOnboardingRedirect: true })(
-    AnomalyRulesPage,
-  ),
+  withPermissionGuard("organization:manage", {
+    bypassOnboardingRedirect: true,
+  })(AnomalyRulesPage),
 );

@@ -21,7 +21,11 @@ type WireDirection = "pre" | "post" | "stream_chunk";
 
 type GuardrailAttachment = { direction: WireDirection; guardrailIds: string[] };
 
-const DIRECTION_ORDER: GuardrailDirectionEnum[] = ["PRE", "POST", "STREAM_CHUNK"];
+const DIRECTION_ORDER: GuardrailDirectionEnum[] = [
+  "PRE",
+  "POST",
+  "STREAM_CHUNK",
+];
 
 const DIRECTION_META: Record<
   GuardrailDirectionEnum,
@@ -114,7 +118,10 @@ export function GuardrailAttachmentsSection({
         });
         return;
       }
-      showErrorToast({ error: err, fallbackTitle: "Couldn't update the guardrails" });
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't update the guardrails",
+      });
     },
   });
 

@@ -7,7 +7,13 @@ import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-import { CacheRuleForm, type CacheRuleFormState, emptyFormState, validateForm, toWire } from "./cacheRule.form";
+import {
+  CacheRuleForm,
+  type CacheRuleFormState,
+  emptyFormState,
+  toWire,
+  validateForm,
+} from "./cacheRule.form";
 
 type Props = {
   open: boolean;
@@ -15,7 +21,11 @@ type Props = {
   onCreated?: () => void;
 };
 
-export function CacheRuleCreateDrawer({ open, onOpenChange, onCreated }: Props) {
+export function CacheRuleCreateDrawer({
+  open,
+  onOpenChange,
+  onCreated,
+}: Props) {
   const { organization } = useOrganizationTeamProject();
   const utils = api.useContext();
 
@@ -53,7 +63,10 @@ export function CacheRuleCreateDrawer({ open, onOpenChange, onCreated }: Props) 
       onOpenChange(false);
       onCreated?.();
     } catch (e) {
-      showErrorToast({ error: e, fallbackTitle: "Couldn't create the cache rule" });
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't create the cache rule",
+      });
     }
   };
 

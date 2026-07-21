@@ -2,8 +2,8 @@ import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { describeError, showErrorToast } from "~/features/errors";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { BaseComponent } from "../types/dsl";
@@ -94,14 +94,20 @@ export const usePostEvent = () => {
         // state behind it is not what the user is looking at.
         if (isHandledByGlobalHandler(error)) return;
 
-        showErrorToast({ error, fallbackTitle: "Couldn't reach the workflow engine" });
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't reach the workflow engine",
+        });
 
         // Update evaluation state if relevant
         if (event.type === "execute_evaluation") {
           setEvaluationState({
             status: "error",
             run_id: undefined,
-            error: describeError({ error, fallbackTitle: "Couldn't reach the workflow engine" }),
+            error: describeError({
+              error,
+              fallbackTitle: "Couldn't reach the workflow engine",
+            }),
             timestamps: { finished_at: Date.now() },
           });
         }
@@ -109,7 +115,10 @@ export const usePostEvent = () => {
         if (event.type === "execute_component") {
           setComponentExecutionState(event.payload.node_id, {
             status: "error",
-            error: describeError({ error, fallbackTitle: "Couldn't reach the workflow engine" }),
+            error: describeError({
+              error,
+              fallbackTitle: "Couldn't reach the workflow engine",
+            }),
             timestamps: { finished_at: Date.now() },
           });
         }

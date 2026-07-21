@@ -228,7 +228,10 @@ export function useInviteActions({
             });
             performMutation(data);
           } catch (err) {
-            showErrorToast({ error: err, fallbackTitle: "Couldn't expand seats" });
+            showErrorToast({
+              error: err,
+              fallbackTitle: "Couldn't expand seats",
+            });
           }
         },
       });

@@ -153,7 +153,10 @@ export function WorkflowCard({
           });
         },
         onError: (error) =>
-          showErrorToast({ error, fallbackTitle: "Couldn't update workflow from source" }),
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't update workflow from source",
+          }),
       },
     );
   }, [syncFromSource, workflowId, project, query, name]);
@@ -206,7 +209,10 @@ export function WorkflowCard({
             });
           },
           onError: (error) =>
-            showErrorToast({ error, fallbackTitle: "Couldn't delete workflow" }),
+            showErrorToast({
+              error,
+              fallbackTitle: "Couldn't delete workflow",
+            }),
         },
       );
     } else {
@@ -223,7 +229,10 @@ export function WorkflowCard({
             });
           },
           onError: (error) =>
-            showErrorToast({ error, fallbackTitle: "Couldn't delete workflow" }),
+            showErrorToast({
+              error,
+              fallbackTitle: "Couldn't delete workflow",
+            }),
         },
       );
     }
