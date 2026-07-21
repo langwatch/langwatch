@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { api } from "~/utils/api";
-import type { Span } from "~/server/tracer/types";
+import type { Span } from "@langwatch/contracts/tracer";
 
 const PAGE_SIZE = 200;
 const BACKFILL_DELAY_MS = 200;

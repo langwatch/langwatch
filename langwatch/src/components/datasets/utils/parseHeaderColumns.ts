@@ -21,7 +21,7 @@ import Papa from "papaparse";
 import type {
   DatasetColumnType,
   DatasetConfirmColumns,
-} from "~/server/datasets/types";
+} from "@langwatch/contracts/datasets";
 import {
   dedupeHeaders,
   detectFileFormat,

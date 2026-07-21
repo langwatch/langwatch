@@ -15,13 +15,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
 import { useDebouncedCallback } from "use-debounce";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import { Checkbox } from "../../components/ui/checkbox";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
-} from "../../server/datasets/types";
+} from "@langwatch/contracts/datasets";
 import type { MappingState } from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
 import {

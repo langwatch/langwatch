@@ -4,7 +4,7 @@
 import { subDays } from "date-fns";
 import { describe, expect, it } from "vitest";
 import type { FilterParam } from "../useFilterParams";
-import type { FilterField } from "../../server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import {
   DEFAULT_VIEWS,
   filtersMatch,

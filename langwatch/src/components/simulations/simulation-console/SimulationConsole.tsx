@@ -1,7 +1,7 @@
 import { Box, Circle, Code, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioResults } from "~/server/scenarios/schemas";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
+import type { ScenarioResults } from "@langwatch/contracts/scenarios/schemas";
 import { CriteriaDetails } from "./CriteriaDetails";
 import { CONSOLE_COLORS } from "./constants";
 import { ErrorDetails } from "./ErrorDetails";

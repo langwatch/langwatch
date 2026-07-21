@@ -12,7 +12,7 @@ import {
 } from "~/server/app-layer/traces/trace-metadata.service";
 import { prisma } from "~/server/db";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
 import {
   type CompiledProjection,

@@ -13,12 +13,12 @@ import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
 import type {
   DatasetColumns,
   DatasetConfirmColumns,
-} from "../../../../server/datasets/types";
+} from "@langwatch/contracts/datasets";
 import {
   datasetColumnsSchema,
   datasetColumnTypeSchema,
   datasetConfirmColumnsSchema,
-} from "../../../../server/datasets/types";
+} from "@langwatch/contracts/datasets";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import {
   enforceResourceLimitOrRespond,

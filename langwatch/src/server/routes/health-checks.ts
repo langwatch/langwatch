@@ -24,7 +24,7 @@ import {
   publicEndpoint,
 } from "~/server/api/security";
 import { prisma } from "~/server/db";
-import type { CollectorRESTParams } from "~/server/tracer/types";
+import type { CollectorRESTParams } from "@langwatch/contracts/tracer";
 import type { DeepPartial } from "~/utils/types";
 
 const logger = createLogger("langwatch:health-checks");

@@ -9,7 +9,7 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { ScenarioRunStatus } from "../scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 import { ScenarioCancellationService } from "../cancellation";
 import type { CancellationServiceDeps } from "../cancellation";
 

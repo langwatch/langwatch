@@ -11,7 +11,7 @@ import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import type { DeepPartial } from "../../utils/types";
 import { openTelemetryTraceRequestToTracesForCollection } from "./otel.traces";
-import { spanSchema } from "./types";
+import { spanSchema } from "@langwatch/contracts/tracer";
 
 const openInferenceOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
   resourceSpans: [

@@ -1,4 +1,4 @@
-import type { FilterField } from "./types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import { availableFilters } from "./registry";
 import type { CheckPreconditionRule } from "../evaluations/types";
 

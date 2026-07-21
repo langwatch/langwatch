@@ -13,12 +13,12 @@
  * @see specs/features/scenarios/extensible-scenario-metadata.feature
  */
 import { describe, expect, it } from "vitest";
-import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioEventType } from "../../enums";
 import {
   scenarioEventSchema,
   scenarioMessageSnapshotSchema,
   scenarioRunStartedSchema,
-} from "~/server/scenarios/schemas/event-schemas";
+} from "../event-schemas";
 
 describe("extensible scenario metadata", () => {
   describe("scenarioRunStartedSchema", () => {

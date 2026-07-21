@@ -1,4 +1,4 @@
-import type { ReservedTraceMetadataMapping } from "./types";
+import type { ReservedTraceMetadataMapping } from "@langwatch/contracts/tracer";
 
 export const openTelemetryToLangWatchMetadataMapping: ReservedTraceMetadataMapping =
   {

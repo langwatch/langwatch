@@ -7,7 +7,7 @@ import {
   preconditionsNeedEvents,
   type PreconditionTraceData,
 } from "../preconditions";
-import type { Span, RAGSpan, RAGChunk } from "../../tracer/types";
+import type { Span, RAGSpan, RAGChunk } from "@langwatch/contracts/tracer";
 import type { ExecuteEvaluationCommandData } from "../../event-sourcing/pipelines/evaluation-processing/schemas/commands";
 
 // ---------------------------------------------------------------------------

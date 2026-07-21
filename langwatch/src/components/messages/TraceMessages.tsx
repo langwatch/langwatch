@@ -24,7 +24,7 @@ import {
 } from "../../components/messages/MessageCard";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { Trace } from "../../server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { isJson } from "../../utils/isJson";

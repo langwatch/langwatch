@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Span } from "../../../server/tracer/types";
+import type { Span } from "@langwatch/contracts/tracer";
 
 // Import the function we want to test
 import { generateMermaidSyntax, INVISIBLE_RETURN } from "../SequenceDiagram";

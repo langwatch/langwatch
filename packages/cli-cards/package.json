@@ -20,7 +20,7 @@
     "src"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --build",
     "test": "../../langwatch/node_modules/.bin/vitest run"
   },
   "peerDependencies": {

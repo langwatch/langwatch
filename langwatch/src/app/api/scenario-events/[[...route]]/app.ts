@@ -6,12 +6,12 @@ import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
-import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioEvent } from "~/server/scenarios/scenario-event.types";
+import { ScenarioEventType } from "@langwatch/contracts/scenarios/enums";
+import type { ScenarioEvent } from "@langwatch/contracts/scenarios/types";
 import {
   responseSchemas,
   scenarioEventSchema,
-} from "~/server/scenarios/schemas";
+} from "@langwatch/contracts/scenarios/schemas";
 import { extractInlineMediaFromEvent } from "~/server/stored-objects/content-extractor";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import {

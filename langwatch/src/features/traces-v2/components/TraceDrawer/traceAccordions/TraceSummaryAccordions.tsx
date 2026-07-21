@@ -7,7 +7,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   SpanTreeNode,
   TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+} from "@langwatch/contracts/traces-v2";
 import { useTraceEvaluations } from "../../../hooks/useTraceEvaluations";
 import { useTraceEvents } from "../../../hooks/useTraceEvents";
 import { useTraceResources } from "../../../hooks/useTraceResources";

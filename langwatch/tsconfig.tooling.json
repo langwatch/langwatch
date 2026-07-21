@@ -13,6 +13,7 @@
 	// the packages' emitted declarations.
 	"references": [
 		{ "path": "../packages/api" },
+		{ "path": "../packages/contracts" },
 		{ "path": "../packages/automations" },
 		{ "path": "../packages/observability" },
 		{ "path": "../packages/ssrf" },

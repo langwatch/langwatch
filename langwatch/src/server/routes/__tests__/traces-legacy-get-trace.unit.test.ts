@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 
 // ─── TraceService spy ─────────────────────────────────────────────────────────
 // Capture at module scope so assertions can reach them from every it() block.

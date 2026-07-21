@@ -39,7 +39,7 @@ import {
   type FilterField,
   sanitizeTriggerFilters,
   type TriggerFilterValue,
-} from "~/server/filters/types";
+} from "@langwatch/contracts/filters";
 import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
 import {
   EXAMPLE_MATCHES,

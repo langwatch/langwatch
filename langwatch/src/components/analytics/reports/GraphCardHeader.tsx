@@ -7,7 +7,7 @@ import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { deriveSeriesIdentifier } from "~/components/analytics/seriesIdentifier";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
-import type { FilterField } from "~/server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import { GraphCardMenu, type SizeOption } from "./GraphCardMenu";
 import { GraphFilterIndicator } from "./GraphFilterIndicator";
 

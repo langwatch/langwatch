@@ -17,7 +17,7 @@
     "src"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --build",
     "test": "vitest run"
   },
   "peerDependencies": {

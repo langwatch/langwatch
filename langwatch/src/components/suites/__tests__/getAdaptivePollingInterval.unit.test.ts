@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getAdaptivePollingInterval } from "../getAdaptivePollingInterval";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 import { makeScenarioRunData } from "./test-helpers";
 
 describe("getAdaptivePollingInterval()", () => {

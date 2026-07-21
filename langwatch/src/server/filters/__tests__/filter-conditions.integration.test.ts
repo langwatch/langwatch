@@ -7,7 +7,7 @@ import {
   getTestClickHouseClient,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { generateClickHouseFilterConditions } from "../clickhouse/filter-conditions";
-import type { FilterField } from "../types";
+import type { FilterField } from "@langwatch/contracts/filters";
 
 const tenantId = `test-filter-${nanoid()}`;
 // Traces with all three legacy key formats for metadata

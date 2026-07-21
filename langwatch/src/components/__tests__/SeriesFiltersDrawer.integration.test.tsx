@@ -58,7 +58,7 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
 
 import { SeriesFiltersDrawer } from "../SeriesFilterDrawer";
 import type { FilterParam } from "../../hooks/useFilterParams";
-import type { FilterField } from "../../server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 
 function renderDrawer(
   props: Partial<Parameters<typeof SeriesFiltersDrawer>[0]> = {},

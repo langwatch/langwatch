@@ -1,6 +1,6 @@
 import { Box, Flex } from "@chakra-ui/react";
 import { memo, useCallback } from "react";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/contracts/traces-v2";
 import { useSpanHoverStore } from "../../../stores/spanHoverStore";
 import { SPAN_TYPE_COLORS } from "../../../utils/formatters";
 import {

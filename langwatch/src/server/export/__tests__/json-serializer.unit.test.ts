@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { Trace, Evaluation, LLMSpan, RAGSpan } from "~/server/tracer/types";
+import type { Trace, Evaluation, LLMSpan, RAGSpan } from "@langwatch/contracts/tracer";
 import {
   serializeTraceToSummaryJson,
   serializeTraceToFullJson,

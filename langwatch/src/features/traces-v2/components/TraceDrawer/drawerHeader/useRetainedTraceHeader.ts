@@ -1,5 +1,5 @@
 import { useMemo, useRef } from "react";
-import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { TraceHeader } from "@langwatch/contracts/traces-v2";
 
 interface RetainedFields {
   traceId: string;

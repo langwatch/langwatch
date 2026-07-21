@@ -14,7 +14,7 @@ import { MessagePreview } from "./MessagePreview";
 import { buildDisplayTitle } from "./run-history-transforms";
 import { isCancellableStatus } from "./useCancelScenarioRun";
 import { usePrefetchRunState } from "./usePrefetchRunState";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
 
 type ScenarioGridCardProps = {
   scenarioRun: ScenarioRunData;

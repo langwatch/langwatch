@@ -10,7 +10,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { Settings } from "react-feather";
 import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
 
 type MessagePreviewProps = {
   messages: ScenarioRunData["messages"];

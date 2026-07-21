@@ -18,7 +18,7 @@ import {
 import type { CheckPreconditions } from "../../../../evaluations/types";
 import type { PreconditionTraceData } from "../../../../filters/precondition-matchers";
 import type { MappingState } from "../../../../tracer/tracesMapping";
-import type { ElasticSearchEvent, Span } from "../../../../tracer/types";
+import type { ElasticSearchEvent, Span } from "@langwatch/contracts/tracer";
 import type { Command, CommandHandler } from "../../../";
 import {
   createTenantId,

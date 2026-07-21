@@ -1,5 +1,5 @@
 import type { FilterParam } from "~/hooks/useFilterParams";
-import type { FilterField } from "../types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import type {
   FilterConditionBuilder,
   FilterConditionOptions,

@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import Parse from "papaparse";
-import type { Trace, Evaluation, Span, LLMSpan, RAGSpan } from "~/server/tracer/types";
+import type { Trace, Evaluation, Span, LLMSpan, RAGSpan } from "@langwatch/contracts/tracer";
 import {
   serializeTracesToSummaryCsv,
   serializeTracesToFullCsv,

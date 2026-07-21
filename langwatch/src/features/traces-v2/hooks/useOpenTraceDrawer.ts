@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { TraceHeader } from "@langwatch/contracts/traces-v2";
 import { api } from "~/utils/api";
 import {
   buildPreviewTraceDetail,

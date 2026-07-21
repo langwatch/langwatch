@@ -8,8 +8,8 @@ import {
   MessagesSnapshotEventSchema,
 } from "@ag-ui/core";
 import { z } from "zod";
-import { chatMessageSchema } from "~/server/tracer/types";
-import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../scenario-event.enums";
+import { chatMessageSchema } from "../../tracer";
+import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../enums";
 
 /**
  * AG-UI Base Event Schema

@@ -5,7 +5,7 @@
  * Feature: specs/trace-processing/audio-player-in-traces.feature
  */
 import { describe, expect, it } from "vitest";
-import { chatRichContentSchema } from "../types";
+import { chatRichContentSchema } from "@langwatch/contracts/tracer";
 
 describe("chatRichContentSchema", () => {
   describe("given an OpenAI input_audio part", () => {

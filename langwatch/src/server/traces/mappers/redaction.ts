@@ -11,7 +11,7 @@ import type {
   Trace,
   TraceInput,
   TraceOutput,
-} from "~/server/tracer/types";
+} from "@langwatch/contracts/tracer";
 import type { Protections } from "~/server/traces/protections";
 import { parsePythonInsideJson } from "~/utils/parsePythonInsideJson";
 import { redactHiddenAttributes } from "./redactAttributes";

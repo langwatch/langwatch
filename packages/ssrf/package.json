@@ -1,29 +1,29 @@
 {
-	"name": "@langwatch/ssrf",
-	"version": "0.0.1",
-	"private": true,
-	"description": "Canonical SSRF address-classification rules shared across LangWatch services (TypeScript half of the pkg/ssrf contract)",
-	"type": "module",
-	"packageManager": "pnpm@10.24.0",
-	"main": "src/index.ts",
-	"exports": {
-		".": "./src/index.ts"
-	},
-	"scripts": {
-		"typecheck": "tsc --noEmit",
-		"test": "vitest",
-		"test:unit": "vitest run"
-	},
-	"keywords": [
-		"langwatch",
-		"ssrf",
-		"security",
-		"egress"
-	],
-	"license": "MIT",
-	"devDependencies": {
-		"@types/node": "^26.0.1",
-		"typescript": "^6.0.3",
-		"vitest": "^4.1.9"
-	}
+  "name": "@langwatch/ssrf",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Canonical SSRF address-classification rules shared across LangWatch services (TypeScript half of the pkg/ssrf contract)",
+  "type": "module",
+  "packageManager": "pnpm@10.24.0",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --build",
+    "test": "vitest",
+    "test:unit": "vitest run"
+  },
+  "keywords": [
+    "langwatch",
+    "ssrf",
+    "security",
+    "egress"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
 }

@@ -12,8 +12,8 @@ import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "../../clickhouse/clickhouseClient";
-import type { FilterField } from "../../filters/types";
-import type { ElasticSearchEvent } from "../../tracer/types";
+import type { FilterField } from "@langwatch/contracts/filters";
+import type { ElasticSearchEvent } from "@langwatch/contracts/tracer";
 import type {
   FeedbacksResult,
   FilterDataResult,

@@ -16,7 +16,7 @@ import { getApp } from "~/server/app-layer/app";
 import {
   ScenarioRunStatus,
   Verdict,
-} from "~/server/scenarios/scenario-event.enums";
+} from "@langwatch/contracts/scenarios/enums";
 import {
   classifyScenarioInfraError,
   encodeScenarioError,

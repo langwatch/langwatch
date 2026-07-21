@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
+import type { LangwatchSignalBucket } from "@langwatch/contracts/traces-v2";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
 import { useSseStatusStore } from "../stores/sseStatusStore";

@@ -12,7 +12,7 @@
  * Kept pure + standalone so the rule is unit-testable and shared by the per-row
  * highlight and the global upload gate.
  */
-import type { DatasetConfirmColumns } from "~/server/datasets/types";
+import type { DatasetConfirmColumns } from "@langwatch/contracts/datasets";
 
 /**
  * The `sourceHeader`s of every column whose `name` is invalid — blank (empty or

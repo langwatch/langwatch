@@ -13,7 +13,7 @@ import {
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
-import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
+import type { ElasticSearchEvent, Span } from "@langwatch/contracts/tracer";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import type { SpanInsertData } from "../types";
 import type {

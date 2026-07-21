@@ -63,7 +63,7 @@ import type {
   DatasetConfirmColumns,
   DatasetRecordEntry,
   DatasetRecordInput,
-} from "./types";
+} from "@langwatch/contracts/datasets";
 import {
   convertRowsToColumnTypes,
   detectFileFormat,

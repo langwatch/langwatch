@@ -17,7 +17,7 @@ import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
 import { groupRunsByBatchId } from "./run-history-transforms";
 import { BatchSection } from "./BatchSection";
 import { RunMetricsSummary } from "./RunMetricsSummary";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
 import type { ViewMode } from "./useRunHistoryStore";
 
 type GroupRowProps = {

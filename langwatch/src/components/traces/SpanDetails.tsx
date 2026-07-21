@@ -22,7 +22,7 @@ import type {
   ErrorCapture,
   EvaluationResult,
   Span,
-} from "../../server/tracer/types";
+} from "@langwatch/contracts/tracer";
 import { durationColor } from "../../utils/durationColor";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import {

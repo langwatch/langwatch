@@ -12,7 +12,7 @@ import {
 } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import type { Protections } from "~/server/traces/protections";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";

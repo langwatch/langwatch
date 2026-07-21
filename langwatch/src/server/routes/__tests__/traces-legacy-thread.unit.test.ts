@@ -10,7 +10,7 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 
 const mockGetTracesByThreadId = vi.fn();
 const mockCreate = vi.fn();

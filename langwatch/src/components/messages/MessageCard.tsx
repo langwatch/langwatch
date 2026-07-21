@@ -27,7 +27,7 @@ import type {
   ElasticSearchEvaluation,
   EvaluationResult,
   Trace,
-} from "../../server/tracer/types";
+} from "@langwatch/contracts/tracer";
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";

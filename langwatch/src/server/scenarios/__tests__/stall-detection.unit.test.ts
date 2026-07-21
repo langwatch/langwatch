@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ScenarioRunStatus } from "../scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 import {
   resolveRunStatus,
   STALL_THRESHOLD_MS,

@@ -16,7 +16,7 @@ import type {
   Evaluation,
   SpanInputOutput,
   ErrorCapture,
-} from "~/server/tracer/types";
+} from "@langwatch/contracts/tracer";
 import { RESERVED_METADATA_KEYS } from "./constants";
 
 // ---------------------------------------------------------------------------

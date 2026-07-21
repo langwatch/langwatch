@@ -10,6 +10,7 @@
 	// declarations instead of re-checking their sources.
 	"references": [
 		{ "path": "../packages/api" },
+		{ "path": "../packages/contracts" },
 		{ "path": "../packages/automations" },
 		{ "path": "../packages/observability" },
 		{ "path": "../packages/ssrf" },

@@ -5,7 +5,7 @@
  *
  * @see specs/scenarios/internal-set-namespace.feature
  */
-import type { ScenarioSetData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioSetData } from "@langwatch/contracts/scenarios/types";
 import { isOnPlatformSet } from "~/server/scenarios/internal-set-id";
 
 /**

@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { getAdaptivePollingInterval } from "./getAdaptivePollingInterval";

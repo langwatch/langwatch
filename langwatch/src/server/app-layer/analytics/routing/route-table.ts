@@ -46,7 +46,7 @@ import {
   PAYLOAD_BLOCKLIST_EXACT,
   PAYLOAD_BLOCKLIST_PREFIXES,
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/analytics-attribute-trim.service";
-import type { FilterField } from "~/server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import {
   collectStringValues,
   hasFilterValues,

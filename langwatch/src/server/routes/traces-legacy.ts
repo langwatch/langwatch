@@ -24,7 +24,7 @@ import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
-import type { Span, Trace } from "~/server/tracer/types";
+import type { Span, Trace } from "@langwatch/contracts/tracer";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";

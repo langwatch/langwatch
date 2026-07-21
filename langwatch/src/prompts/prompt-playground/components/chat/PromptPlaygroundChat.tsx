@@ -19,7 +19,7 @@ import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/ut
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import type { ChatMessage } from "~/server/tracer/types";
+import type { ChatMessage } from "@langwatch/contracts/tracer";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabId } from "../prompt-browser/ui/TabContext";
 import { DeletableMessage } from "./DeletableMessage";

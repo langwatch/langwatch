@@ -1,6 +1,6 @@
 import { Icon, type IconProps } from "@chakra-ui/react";
 import type { LucideIcon } from "lucide-react";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 import {
   SCENARIO_RUN_STATUS_CONFIG,
   SCENARIO_RUN_STATUS_ICONS,

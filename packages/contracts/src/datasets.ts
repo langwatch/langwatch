@@ -5,7 +5,7 @@ import {
   lLMSpanSchema,
   rAGChunkSchema,
   rAGSpanSchema,
-} from "../tracer/types";
+} from "./tracer";
 
 // Strict type for records from database - ID is always present
 export const datasetRecordEntrySchema = z

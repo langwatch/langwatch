@@ -7,7 +7,7 @@
 
 import { differenceInCalendarDays } from "date-fns";
 import type { FilterParam } from "./useFilterParams";
-import type { FilterField } from "../server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 
 /** Maximum allowed length for a view name */
 export const MAX_VIEW_NAME_LENGTH = 50;

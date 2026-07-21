@@ -24,7 +24,7 @@ import { useFilterParams } from "../../hooks/useFilterParams";
 import { useMinimumSpinDuration } from "../../hooks/useMinimumSpinDuration";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceUpdateListener } from "../../hooks/useTraceUpdateListener";
-import type { ElasticSearchEvaluation } from "../../server/tracer/types";
+import type { ElasticSearchEvaluation } from "@langwatch/contracts/tracer";
 import { api } from "../../utils/api";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 import { FilterSidebar } from "../filters/FilterSidebar";

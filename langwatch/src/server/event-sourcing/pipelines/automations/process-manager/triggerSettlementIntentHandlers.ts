@@ -9,7 +9,7 @@ import type { EvaluationRunService } from "~/server/app-layer/evaluations/evalua
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
-import type { DatasetRecordEntry } from "~/server/datasets/types";
+import type { DatasetRecordEntry } from "@langwatch/contracts/datasets";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { IntentExecutor } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
@@ -17,7 +17,7 @@ import {
   sendRenderedTriggerEmail,
   sendTriggerEmail,
 } from "~/server/mailer/triggerEmail";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import {
   deliverWebhook,
   type WebhookDeliveryRecorder,

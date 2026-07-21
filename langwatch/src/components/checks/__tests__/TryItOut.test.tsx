@@ -15,7 +15,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { useForm } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Span } from "~/server/tracer/types";
+import type { Span } from "@langwatch/contracts/tracer";
 import type { RouterOutputs } from "~/utils/api";
 import { TryItOut } from "../TryItOut";
 import type { CheckConfigFormData } from "../CheckConfigForm";

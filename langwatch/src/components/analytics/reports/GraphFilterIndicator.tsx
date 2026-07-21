@@ -2,7 +2,7 @@ import { Box, VStack } from "@chakra-ui/react";
 import { Filter } from "lucide-react";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { Tooltip } from "~/components/ui/tooltip";
-import type { FilterField } from "~/server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 
 interface GraphFilterIndicatorProps {
   filters: Record<FilterField, string[] | Record<string, string[]>>;

@@ -1,4 +1,4 @@
-import type { LLMModeTrace, Span, Trace } from "~/server/tracer/types";
+import type { LLMModeTrace, Span, Trace } from "@langwatch/contracts/tracer";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 type SpanWithChildren = Span & { children: SpanWithChildren[] };

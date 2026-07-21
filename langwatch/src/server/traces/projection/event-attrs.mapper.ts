@@ -7,7 +7,7 @@
  * reading directly off the ClickHouse map rather than an unflattened span.
  */
 
-import type { Event } from "~/server/tracer/types";
+import type { Event } from "@langwatch/contracts/tracer";
 
 /** A stored_spans row carrying only the `event.*` attributes for one event span. */
 export interface EventSpanRow {

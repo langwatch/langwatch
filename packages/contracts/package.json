@@ -1,0 +1,37 @@
+{
+  "name": "@langwatch/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared type/schema contracts between the LangWatch app's client, server and workers: trace/span shapes, traces API schemas, dataset/filter types and scenario events",
+  "type": "module",
+  "packageManager": "pnpm@10.24.0",
+  "exports": {
+    "./tracer": "./src/tracer.ts",
+    "./traces-v2": "./src/traces-v2.ts",
+    "./datasets": "./src/datasets.ts",
+    "./filters": "./src/filters.ts",
+    "./scenarios/enums": "./src/scenarios/enums.ts",
+    "./scenarios/types": "./src/scenarios/types.ts",
+    "./scenarios/schemas": "./src/scenarios/schemas/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --build",
+    "test": "vitest",
+    "test:unit": "vitest run"
+  },
+  "keywords": [
+    "langwatch",
+    "contracts",
+    "schemas"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@ag-ui/core": "~0.0.57",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

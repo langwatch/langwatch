@@ -4,7 +4,7 @@ import type {
   ExternalSetSummary,
   ScenarioRunData,
   ScenarioSetData,
-} from "~/server/scenarios/scenario-event.types";
+} from "@langwatch/contracts/scenarios/types";
 
 export type AllSuitesRunDataResult =
   | { changed: false; lastUpdatedAt: number }

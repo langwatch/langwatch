@@ -7,7 +7,7 @@ import type {
   LLMSpan,
   Span,
   SpanTimestamps,
-} from "~/server/tracer/types";
+} from "@langwatch/contracts/tracer";
 import type { ProjectionPlan } from "./projection/types";
 
 /** Time axis that `startDate`/`endDate` and the keyset cursor apply to. */

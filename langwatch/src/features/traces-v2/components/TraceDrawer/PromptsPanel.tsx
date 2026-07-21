@@ -24,7 +24,7 @@ import type {
   SpanDetail,
   SpanTreeNode,
   TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+} from "@langwatch/contracts/traces-v2";
 import { usePromptByHandle } from "../../hooks/usePromptByHandle";
 import { useSpansFull } from "../../hooks/useSpansFull";
 import { abbreviateModel, formatDuration } from "../../utils/formatters";

@@ -109,7 +109,7 @@ import type {
   SharedFiltersInput,
 } from "../../../../server/analytics/types";
 import { filterOutEmptyFilters } from "../../../../server/analytics/utils";
-import type { FilterField } from "../../../../server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import { api } from "../../../../utils/api";
 import {
   type RotatingColorSet,

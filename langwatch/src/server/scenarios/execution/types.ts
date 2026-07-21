@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import type { Span } from "../../tracer/types";
+import type { Span } from "@langwatch/contracts/tracer";
 
 // ============================================================================
 // Field Mapping Types

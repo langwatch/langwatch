@@ -8,7 +8,7 @@ import {
   type PreconditionField,
 } from "../../server/filters/precondition-matchers";
 import { availableFilters } from "../../server/filters/registry";
-import type { FilterField } from "../../server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 
 /** Human-readable labels for precondition rules */
 export const RULE_LABELS: Record<CheckPreconditionRule, string> = {

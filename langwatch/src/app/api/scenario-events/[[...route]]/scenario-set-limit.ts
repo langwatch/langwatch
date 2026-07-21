@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { getApp } from "~/server/app-layer/app";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
-import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioEventType } from "@langwatch/contracts/scenarios/enums";
 
 const logger = createLogger("langwatch:api:scenario-events:scenario-set-limit");
 

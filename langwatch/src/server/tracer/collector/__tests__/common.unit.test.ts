@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { BaseSpan, Span, SpanInputOutput } from "../../types";
+import type { BaseSpan, Span, SpanInputOutput } from "@langwatch/contracts/tracer";
 import {
   flattenSpanTree,
   getFirstInputAsText,

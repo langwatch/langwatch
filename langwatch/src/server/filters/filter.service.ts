@@ -9,7 +9,7 @@ import {
   type FilterOption,
   type SupportedClickHouseFilterDefinition,
 } from "./clickhouse";
-import type { FilterField } from "./types";
+import type { FilterField } from "@langwatch/contracts/filters";
 
 export type GetFilterOptionsInput = {
   projectId: string;

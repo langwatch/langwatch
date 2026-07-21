@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import { redactActionParamsFor } from "~/server/app-layer/automations/providers/registry";
-import { type FilterField, filterFieldsEnum } from "../../filters/types";
+import { type FilterField, filterFieldsEnum } from "@langwatch/contracts/filters";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

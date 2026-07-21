@@ -11,7 +11,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { ProjectRepository } from "~/server/projects/project.repository";
-import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
+import type { SuiteRunSummary } from "@langwatch/contracts/scenarios/types";
 import { SuiteDomainError } from "~/server/suites/errors";
 import { SuiteService } from "~/server/suites/suite.service";
 import { extractSuiteId } from "~/server/suites/suite-set-id";

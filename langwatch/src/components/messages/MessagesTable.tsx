@@ -30,7 +30,7 @@ import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
-import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";
+import type { ElasticSearchEvaluation, Trace } from "@langwatch/contracts/tracer";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";

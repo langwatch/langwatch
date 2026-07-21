@@ -1,4 +1,4 @@
-import type { Span } from "~/server/tracer/types";
+import type { Span } from "@langwatch/contracts/tracer";
 import { isClickHouseEnabled, getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import {
   SpanStorageClickHouseRepository,

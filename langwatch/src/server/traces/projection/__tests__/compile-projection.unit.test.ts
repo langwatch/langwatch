@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import type { Protections } from "~/server/traces/protections";
 import { compileProjection } from "../compile-projection";
 import type { ProjectableTrace } from "../types";

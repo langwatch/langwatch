@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { formatMoney } from "../../utils/formatMoney";
-import { filterFieldsEnum } from "../filters/types";
+import { filterFieldsEnum } from "@langwatch/contracts/filters";
 import {
   type AggregationTypes,
   type AnalyticsGroup,

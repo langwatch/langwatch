@@ -142,6 +142,9 @@ importers:
       '@langwatch/cli-cards':
         specifier: workspace:*
         version: link:../packages/cli-cards
+      '@langwatch/contracts':
+        specifier: workspace:*
+        version: link:../packages/contracts
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../packages/handled-error
@@ -858,6 +861,25 @@ importers:
       zod:
         specifier: ^4.0.14
         version: 4.4.3
+
+  ../packages/contracts:
+    dependencies:
+      '@ag-ui/core':
+        specifier: ~0.0.57
+        version: 0.0.57
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.1.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@vitest/browser-playwright@4.1.9)(@vitest/coverage-v8@4.1.9)(@vitest/ui@4.1.9)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   ../packages/handled-error:
     devDependencies:

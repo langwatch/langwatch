@@ -11,7 +11,7 @@
  */
 import { createStore, type StoreApi } from "zustand";
 
-import type { DatasetColumnType } from "~/server/datasets/types";
+import type { DatasetColumnType } from "@langwatch/contracts/datasets";
 import type {
   AutosaveState,
   CellPosition,

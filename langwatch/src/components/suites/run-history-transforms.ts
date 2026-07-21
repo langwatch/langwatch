@@ -5,8 +5,8 @@
  * Computes pass rates and calculates totals.
  */
 
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioRunData, SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
+import type { ScenarioRunData, SuiteRunSummary } from "@langwatch/contracts/scenarios/types";
 import { isOnPlatformSet, ON_PLATFORM_DISPLAY_NAME } from "~/server/scenarios/internal-set-id";
 import { computeMetricStats, type MetricStats } from "~/components/shared/MetricStatsTooltip";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";

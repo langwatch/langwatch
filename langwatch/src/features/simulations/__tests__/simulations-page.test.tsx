@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { sortScenarioSets } from "../sort-scenario-sets";
-import type { ScenarioSetData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioSetData } from "@langwatch/contracts/scenarios/types";
 
 describe("sortScenarioSets()", () => {
 

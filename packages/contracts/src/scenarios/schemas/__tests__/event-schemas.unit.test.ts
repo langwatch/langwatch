@@ -16,11 +16,11 @@
  * accepting every previously-valid shape.
  */
 import { describe, expect, it } from "vitest";
-import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioEventType } from "../../enums";
 import {
   scenarioEventSchema,
   scenarioMessageSnapshotSchema,
-} from "~/server/scenarios/schemas";
+} from "../index";
 
 const WAV_BASE64 = Buffer.from("fake-wav-bytes").toString("base64");
 

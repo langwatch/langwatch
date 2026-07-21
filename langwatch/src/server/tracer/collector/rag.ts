@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import type { RAGChunk, RAGSpan, Span } from "../types";
+import type { RAGChunk, RAGSpan, Span } from "@langwatch/contracts/tracer";
 import {
   flattenSpanTree,
   getFirstInputAsText,

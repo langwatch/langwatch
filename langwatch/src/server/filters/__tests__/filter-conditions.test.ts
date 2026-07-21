@@ -4,7 +4,7 @@ import {
   clickHouseFilterConditions,
   generateClickHouseFilterConditions,
 } from "../clickhouse/filter-conditions";
-import type { FilterField } from "../types";
+import type { FilterField } from "@langwatch/contracts/filters";
 
 describe("clickHouseFilterConditions", () => {
   describe("topics.topics", () => {

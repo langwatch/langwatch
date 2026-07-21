@@ -7,7 +7,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Span } from "../../tracer/types";
+import type { Span } from "@langwatch/contracts/tracer";
 
 const logger = createLogger("TraceApiSpanQuery");
 

@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   SpanDetail,
   SpanTreeNode,
-} from "~/server/api/routers/tracesV2.schemas";
+} from "@langwatch/contracts/traces-v2";
 import { SpanAccordions } from "../SpanAccordions";
 
 const { mockDetailState } = vi.hoisted(() => ({

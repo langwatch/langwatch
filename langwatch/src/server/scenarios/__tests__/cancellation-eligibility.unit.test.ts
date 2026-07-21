@@ -4,7 +4,7 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature (@unit scenarios)
  */
 import { describe, expect, it } from "vitest";
-import { ScenarioRunStatus, isCancellableStatus } from "../scenario-event.enums";
+import { ScenarioRunStatus, isCancellableStatus } from "@langwatch/contracts/scenarios/enums";
 
 describe("isCancellableStatus()", () => {
   describe("when status is PENDING", () => {

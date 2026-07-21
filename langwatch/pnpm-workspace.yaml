@@ -6,6 +6,9 @@ packages:
   # links them and installs their own deps against the app's lockfile.
   # The app's API envelope/builder contract (Hono + zod peers).
   - "../packages/api"
+  # Shared client/server type + zod-schema contracts (trace/span shapes,
+  # traces API schemas, dataset/filter types, scenario events).
+  - "../packages/contracts"
   # Automation cadence/templating engine (liquidjs et al).
   - "../packages/automations"
   # Logger + tracing/context helpers (pino, OTel peer).

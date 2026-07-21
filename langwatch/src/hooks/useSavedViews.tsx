@@ -30,7 +30,7 @@ import type { FilterParam } from "./useFilterParams";
 import { useFilterParams } from "./useFilterParams";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import { availableFilters } from "../server/filters/registry";
-import type { FilterField } from "../server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import {
   DEFAULT_VIEWS,
   findMatchingView,

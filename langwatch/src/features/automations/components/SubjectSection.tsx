@@ -23,7 +23,7 @@ import {
   type FilterField,
   sanitizeTriggerFilters,
   type TriggerFilterValue,
-} from "~/server/filters/types";
+} from "@langwatch/contracts/filters";
 import { api } from "~/utils/api";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { NotificationCadence } from "@langwatch/automations/cadences";

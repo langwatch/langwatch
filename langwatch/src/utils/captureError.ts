@@ -1,4 +1,4 @@
-import type { ErrorCapture } from "../server/tracer/types";
+import type { ErrorCapture } from "@langwatch/contracts/tracer";
 
 /**
  * Extracts an error message from an unknown error value.

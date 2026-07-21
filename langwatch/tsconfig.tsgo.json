@@ -43,6 +43,7 @@
 	// `tsgo --build` handles ordering + staleness (pnpm typecheck does this).
 	"references": [
 		{ "path": "../packages/api" },
+		{ "path": "../packages/contracts" },
 		{ "path": "../packages/automations" },
 		{ "path": "../packages/observability" },
 		{ "path": "../packages/ssrf" },

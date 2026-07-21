@@ -7,7 +7,7 @@ import { HelpCircle } from "react-feather";
 import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { availableFilters } from "../../server/filters/registry";
-import type { Trace } from "../../server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import { buildMetadataFilterParams } from "../../utils/buildMetadataFilterParams";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { isNotFound } from "../../utils/trpcError";

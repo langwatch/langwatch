@@ -9,7 +9,7 @@
 import crypto from "node:crypto";
 import { getApp } from "../../app-layer/app";
 import { DEFAULT_PII_REDACTION_LEVEL } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import type { CustomMetadata, Span } from "../../tracer/types";
+import type { CustomMetadata, Span } from "@langwatch/contracts/tracer";
 import { CollectorSpanUtils } from "../../traces/collectorSpan.utils";
 
 type AuthInput = {

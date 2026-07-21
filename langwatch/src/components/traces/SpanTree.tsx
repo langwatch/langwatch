@@ -5,7 +5,7 @@ import { useEffect, useMemo } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useSpanTreeLoader } from "../../hooks/useSpanTreeLoader";
 import { useTraceUpdateListener } from "../../hooks/useTraceUpdateListener";
-import type { Span } from "../../server/tracer/types";
+import type { Span } from "@langwatch/contracts/tracer";
 
 import {
   CheckStatusIcon,

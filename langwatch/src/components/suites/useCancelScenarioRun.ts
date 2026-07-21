@@ -9,7 +9,7 @@
 
 import { useCallback } from "react";
 import { api } from "~/utils/api";
-import { isCancellableStatus } from "~/server/scenarios/scenario-event.enums";
+import { isCancellableStatus } from "@langwatch/contracts/scenarios/enums";
 
 export { isCancellableStatus };
 

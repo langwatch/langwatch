@@ -17,7 +17,7 @@ import {
   extractGraphAlertFromTriggerRow as parseGraphAlertRow,
 } from "~/server/app-layer/automations/graph-alert.builder";
 import { reportSourceSchema } from "~/server/app-layer/automations/report.builder";
-import type { FilterField } from "~/server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import { describeCron, isValidCron } from "./reportSchedule";
 
 /**

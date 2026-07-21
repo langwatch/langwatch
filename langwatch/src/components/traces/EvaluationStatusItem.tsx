@@ -18,7 +18,7 @@ import { api } from "~/utils/api";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
-import type { ElasticSearchEvaluation } from "../../server/tracer/types";
+import type { ElasticSearchEvaluation } from "@langwatch/contracts/tracer";
 import {
   evaluationPassed,
   evaluationStatusColor,

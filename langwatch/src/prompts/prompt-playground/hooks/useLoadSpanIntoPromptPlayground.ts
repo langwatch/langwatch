@@ -6,7 +6,7 @@ import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
 import { formSchema } from "~/prompts/schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
-import type { ChatMessage } from "~/server/tracer/types";
+import type { ChatMessage } from "@langwatch/contracts/tracer";
 import { api, type RouterOutputs } from "~/utils/api";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import { useRouter } from "~/utils/compat/next-router";

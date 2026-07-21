@@ -7,7 +7,7 @@ import type {
   RAGSpan,
   Span,
   SpanTypes,
-} from "../types";
+} from "@langwatch/contracts/tracer";
 
 function makeBaseSpan(overrides: Partial<BaseSpan> = {}): BaseSpan {
   return {

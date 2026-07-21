@@ -12,7 +12,7 @@ import { LuCopy, LuExternalLink, LuPencil } from "react-icons/lu";
 import { Link } from "~/components/ui/link";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
-import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanDetail } from "@langwatch/contracts/traces-v2";
 import { usePromptByHandle } from "../../hooks/usePromptByHandle";
 import {
   extractPromptReference,

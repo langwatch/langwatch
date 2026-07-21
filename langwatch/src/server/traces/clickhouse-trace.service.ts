@@ -21,7 +21,7 @@ import type {
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
-import type { Event, Span, Trace } from "~/server/tracer/types";
+import type { Event, Span, Trace } from "@langwatch/contracts/tracer";
 import type { Protections } from "~/server/traces/protections";
 import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
 import {

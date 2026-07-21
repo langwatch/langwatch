@@ -9,7 +9,7 @@ import {
   LuTriangleAlert,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
-import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
+import type { LangwatchSignalBucket } from "@langwatch/contracts/traces-v2";
 import { useSpanHoverStore } from "../../../stores/spanHoverStore";
 import { useSpanPulseStore } from "../../../stores/spanPulseStore";
 import {

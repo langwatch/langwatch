@@ -13,7 +13,7 @@ import type {
   scenarioToolCallArgsSchema,
   scenarioToolCallEndSchema,
 } from "./schemas";
-import type { ScenarioRunStatus } from "./scenario-event.enums";
+import type { ScenarioRunStatus } from "./enums";
 
 // Type exports
 export type ScenarioRunStartedEvent = z.infer<typeof scenarioRunStartedSchema>;

@@ -45,7 +45,7 @@ import {
   DuplicateRecordIdError,
 } from "./errors";
 import { stripNullBytes } from "./sanitize";
-import type { DatasetColumns, DatasetRecordEntry } from "./types";
+import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/contracts/datasets";
 import { convertRowsToColumnTypes } from "./upload-utils";
 
 const logger = createLogger("langwatch:datasets:mutations");

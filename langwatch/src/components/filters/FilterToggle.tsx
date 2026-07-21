@@ -4,7 +4,7 @@ import { X } from "react-feather";
 import { useRouter } from "~/utils/compat/next-router";
 import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";
-import type { FilterField } from "../../server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import { URL_QS_PARSE_OPTIONS } from "../../utils/qsParseOptions";
 import { Tooltip } from "../ui/tooltip";
 import { FilterIconWithBadge } from "./FilterIconWithBadge";

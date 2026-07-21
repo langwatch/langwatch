@@ -11,7 +11,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioMessageSnapshotEvent } from "@langwatch/contracts/scenarios/types";
 import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
 
 vi.mock("~/utils/api", () => ({

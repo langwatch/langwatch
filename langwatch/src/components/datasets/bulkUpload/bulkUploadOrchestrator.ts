@@ -13,7 +13,7 @@
  * Both take their collaborators as injected deps so tests drive them with fakes.
  */
 
-import type { DatasetConfirmColumns } from "~/server/datasets/types";
+import type { DatasetConfirmColumns } from "@langwatch/contracts/datasets";
 import {
   abortPendingUpload,
   DatasetNameConflictError,

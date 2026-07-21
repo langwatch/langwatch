@@ -3,7 +3,7 @@ import { Database } from "react-feather";
 
 import { Drawer } from "~/components/ui/drawer";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetColumns } from "@langwatch/contracts/datasets";
 import { DatasetPickerList } from "./DatasetPickerList";
 
 export type SelectDatasetDrawerProps = {

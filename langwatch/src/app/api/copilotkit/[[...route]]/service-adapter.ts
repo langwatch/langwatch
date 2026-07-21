@@ -18,7 +18,7 @@ import type { runtimeInputsSchema } from "~/prompts/schemas";
 import { versionMetadataToNodeFormat } from "~/prompts/schemas/version-metadata-schema";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
-import type { ChatMessage } from "~/server/tracer/types";
+import type { ChatMessage } from "@langwatch/contracts/tracer";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { generateOtelTraceId } from "~/utils/trace";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";

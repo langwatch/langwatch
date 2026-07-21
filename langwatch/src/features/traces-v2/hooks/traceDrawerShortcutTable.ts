@@ -1,7 +1,7 @@
 import type {
   SpanTreeNode,
   TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+} from "@langwatch/contracts/traces-v2";
 import type { useDrawerStore } from "../stores/drawerStore";
 import type { useTraceDrawerNavigation } from "./useTraceDrawerNavigation";
 

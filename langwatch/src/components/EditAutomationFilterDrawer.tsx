@@ -18,7 +18,7 @@ import {
   triggerFiltersPermissiveSchema,
   type TriggerFilters,
   type TriggerFilterValue,
-} from "~/server/filters/types";
+} from "@langwatch/contracts/filters";
 import { api } from "~/utils/api";
 import { Drawer } from "../components/ui/drawer";
 import { Switch } from "../components/ui/switch";

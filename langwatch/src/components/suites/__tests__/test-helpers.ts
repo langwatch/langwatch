@@ -7,8 +7,8 @@
 import {
   ScenarioRunStatus,
   Verdict,
-} from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+} from "@langwatch/contracts/scenarios/enums";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
 import type { BatchRun, BatchRunSummary } from "../run-history-transforms";
 
 export function makeScenarioRunData(

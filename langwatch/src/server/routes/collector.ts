@@ -25,7 +25,7 @@ import type {
   CustomMetadata,
   ReservedTraceMetadata,
   Span,
-} from "../tracer/types";
+} from "@langwatch/contracts/tracer";
 import {
   collectorRESTParamsValidatorSchema,
   customMetadataSchema,
@@ -33,7 +33,7 @@ import {
   spanMetricsSchema,
   spanSchema,
   spanValidatorSchema,
-} from "../tracer/types";
+} from "@langwatch/contracts/tracer";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
 
 const logger = createLogger("langwatch.collector");

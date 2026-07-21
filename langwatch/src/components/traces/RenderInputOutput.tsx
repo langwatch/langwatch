@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import type { ReactJsonViewProps } from "@microlink/react-json-view";
 import React, { useMemo, useState } from "react";
-import type { SpanInputOutput } from "~/server/tracer/types";
+import type { SpanInputOutput } from "@langwatch/contracts/tracer";
 import dynamic from "~/utils/compat/next-dynamic";
 import {
   isPythonRepr,

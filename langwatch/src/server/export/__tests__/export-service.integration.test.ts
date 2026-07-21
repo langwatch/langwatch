@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { Evaluation, LLMSpan, Trace } from "~/server/tracer/types";
+import type { Evaluation, LLMSpan, Trace } from "@langwatch/contracts/tracer";
 import type { Protections } from "~/server/traces/protections";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { TracesForProjectResult } from "~/server/traces/types";
