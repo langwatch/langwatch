@@ -32,6 +32,20 @@ export interface SessionStep {
   startedAtMs: number;
 }
 
+/**
+ * One converged metric unit, as its contribution delivered it. A cumulative
+ * series is one unit (its latest total wins); a delta point is its own unit
+ * (each sums once). Replace-not-increment per ADR-056 §5.
+ */
+export interface MetricSeriesFact {
+  metricName: string;
+  /** The bucketing attributes the overlay reads. Null when absent. */
+  type: string | null;
+  decision: string | null;
+  language: string | null;
+  value: number;
+}
+
 export interface CodingAgentSessionData {
   // ── Identity, and the ids that reach the heavy data ───────────────────
   /** Which agent produced this. Generic; the adapter names it. */
@@ -188,6 +202,14 @@ export interface CodingAgentSessionData {
   hookMs: number;
 
   // ── What came out of it ───────────────────────────────────────────────
+  /**
+   * Bookkeeping only, not projected to the row: the converged metric units
+   * behind the metric-fed fields below. Bounded; keyed by the contribution's
+   * series id so a re-observed cumulative total REPLACES its unit instead of
+   * adding to it (ADR-056 §5) — the fields below are recomputed from this
+   * map on every metric contribution.
+   */
+  metricSeries: Record<string, MetricSeriesFact>;
   linesAdded: number;
   linesRemoved: number;
   commits: number;

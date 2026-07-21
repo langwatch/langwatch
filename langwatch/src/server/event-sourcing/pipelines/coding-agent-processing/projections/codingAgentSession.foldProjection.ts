@@ -9,12 +9,15 @@ import type {
 import {
   type LogFactsContributedEvent,
   logFactsContributedEventSchema,
+  type MetricFactsContributedEvent,
+  metricFactsContributedEventSchema,
   type SpanFactsContributedEvent,
   spanFactsContributedEventSchema,
 } from "../schemas/events";
 import {
   addToBoundedSet,
   applyLogToCodingAgentSession,
+  applyMetricToCodingAgentSession,
   applySpanToCodingAgentSession,
   createInitCodingAgentSession,
 } from "../services/coding-agent-session.derivation";
@@ -30,13 +33,14 @@ import type { CodingAgentSessionData } from "../services/coding-agent-session.ty
  * coding-agent contribution; the fold only applies.
  *
  * Metric-fed fields (lines of code, commits, PRs, edit decisions, active
- * time) overlay through `metric_facts_contributed` in the next slice, with
- * replace-not-increment semantics per ADR-056 §5. The converged per-series
- * totals themselves live in `session_metric_series`.
+ * time) overlay through `metric_facts_contributed` with replace-not-increment
+ * semantics per ADR-056 §5. The converged per-series totals themselves live
+ * in `session_metric_series`.
  */
 const codingAgentSessionEvents = [
   spanFactsContributedEventSchema,
   logFactsContributedEventSchema,
+  metricFactsContributedEventSchema,
 ] as const;
 
 /** Schema-snapshot version (calendar date). Bump when the derivation changes. */
@@ -175,6 +179,27 @@ export class CodingAgentSessionFoldProjection
     return this.withContributionIdentity(
       { ...state, ...next },
       { ...data, occurredAt: data.timeUnixMs },
+    );
+  }
+
+  handleCodingAgentSessionMetricFactsContributed(
+    event: MetricFactsContributedEvent,
+    state: CodingAgentSessionState,
+  ): CodingAgentSessionState {
+    const data = event.data;
+    const next = applyMetricToCodingAgentSession({
+      state,
+      metric: {
+        seriesId: data.seriesId,
+        metricName: data.metricName,
+        attributes: data.attributes,
+        value: data.value,
+      },
+    });
+    // Metrics carry no trace context at all — the session is the only key.
+    return this.withContributionIdentity(
+      { ...state, ...next },
+      { ...data, traceId: null, occurredAt: data.asOfUnixMs },
     );
   }
 }

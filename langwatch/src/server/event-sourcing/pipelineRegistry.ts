@@ -46,6 +46,7 @@ import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/rep
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
 import type { CodingAgentSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-session.repository";
 import type { CodingAgentTraceSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
+import type { SessionMetricSeriesRepository } from "../app-layer/coding-agent/repositories/session-metric-series.repository";
 import type { CanonicalLogRecordRepository } from "../app-layer/logs/repositories/canonical-log-record.repository";
 import type { MetricDataPointRepository } from "../app-layer/metrics/repositories/metric-data-point.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
@@ -81,8 +82,12 @@ import {
 import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
 import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "./pipelines/coding-agent-processing/projections/codingAgentSession.store";
-import { CodingAgentTraceSessionAppendStore } from "./pipelines/coding-agent-processing/projections/stores";
+import {
+  CodingAgentTraceSessionAppendStore,
+  SessionMetricSeriesAppendStore,
+} from "./pipelines/coding-agent-processing/projections/stores";
 import { createCodingAgentLogFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber";
+import { createCodingAgentMetricFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentMetricFactsDispatch.subscriber";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import {
@@ -290,6 +295,8 @@ export interface PipelineRepositories {
   /** ADR-056: the session-aggregate row + the (trace → session) map. */
   codingAgentSession: CodingAgentSessionRepository;
   codingAgentTraceSession: CodingAgentTraceSessionRepository;
+  /** ADR-056 §5: converged per-series metric totals per session. */
+  sessionMetricSeries: SessionMetricSeriesRepository;
   metricDataPointStorage: MetricDataPointRepository;
   /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
   traceAnalyticsRollup: TraceAnalyticsRollupRepository;
@@ -453,11 +460,18 @@ export class PipelineRegistry {
         graphActivityHandler,
       },
     });
-    const metricPipeline = this.registerMetricPipeline();
-    // Registered BEFORE the log and trace pipelines: their coding-agent
-    // dispatch subscribers close over this pipeline's contribution commands.
+    // Registered BEFORE the metric, log and trace pipelines: their
+    // coding-agent dispatch subscribers close over this pipeline's
+    // contribution commands.
     const codingAgentPipeline = this.registerCodingAgentPipeline();
     const codingAgentCommands = mapCommands(codingAgentPipeline.commands);
+    const metricPipeline = this.registerMetricPipeline({
+      subscribers: [
+        createCodingAgentMetricFactsDispatchSubscriber({
+          contributeMetricFacts: codingAgentCommands.contributeMetricFacts,
+        }),
+      ],
+    });
     const logPipeline = this.registerLogPipeline({
       subscribers: [
         createCodingAgentLogFactsDispatchSubscriber({
@@ -714,7 +728,13 @@ export class PipelineRegistry {
     return { pipeline };
   }
 
-  private registerMetricPipeline() {
+  private registerMetricPipeline({
+    subscribers,
+  }: {
+    subscribers: Parameters<
+      typeof createMetricProcessingPipeline
+    >[0]["subscribers"];
+  }) {
     const repository = this.deps.repositories.metricDataPointStorage;
     return this.deps.eventSourcing.register(
       createMetricProcessingPipeline({
@@ -728,6 +748,7 @@ export class PipelineRegistry {
         metricCommandShardCount: resolveMetricCommandShardCount(
           process.env.METRIC_PROCESSING_SHARDS,
         ),
+        subscribers,
       }),
     );
   }
@@ -755,6 +776,9 @@ export class PipelineRegistry {
           new CodingAgentTraceSessionAppendStore(
             this.deps.repositories.codingAgentTraceSession,
           ),
+        sessionMetricSeriesAppendStore: new SessionMetricSeriesAppendStore(
+          this.deps.repositories.sessionMetricSeries,
+        ),
       }),
     );
   }

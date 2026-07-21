@@ -8,10 +8,12 @@ import { describe, expect, it } from "vitest";
 import { createTenantId } from "~/server/event-sourcing";
 import type {
   LogFactsContributedEvent,
+  MetricFactsContributedEvent,
   SpanFactsContributedEvent,
 } from "../../schemas/events";
 import {
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
+  METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
   SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
 } from "../../schemas/constants";
 import {
@@ -109,6 +111,39 @@ function logFactsEvent({
       facts,
     },
   } as unknown as LogFactsContributedEvent;
+}
+
+function metricFactsEvent({
+  seriesId,
+  metricName,
+  attributes = {},
+  value,
+  asOfMs = 1_500,
+}: {
+  seriesId: string;
+  metricName: string;
+  attributes?: Record<string, string | number | boolean>;
+  value: number;
+  asOfMs?: number;
+}): MetricFactsContributedEvent {
+  return {
+    tenantId: createTenantId("tenant-1"),
+    type: METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
+    data: {
+      tenantId: "tenant-1",
+      sessionId: SESSION_ID,
+      sessionKeySource: "provider",
+      agent: "claude_code",
+      occurredAt: asOfMs,
+      seriesId,
+      metricName,
+      unit: null,
+      attributes,
+      value,
+      dataPointCount: 1,
+      asOfUnixMs: asOfMs,
+    },
+  } as unknown as MetricFactsContributedEvent;
 }
 
 describe("CodingAgentSessionFoldProjection", () => {
@@ -258,6 +293,150 @@ describe("CodingAgentSessionFoldProjection", () => {
       );
 
       expect(state.costUsd).toBe(0.75);
+    });
+  });
+
+  describe("when a session sends only metrics", () => {
+    /** @scenario a session that sent only metrics still appears */
+    it("materializes the session from metric contributions alone", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionMetricFactsContributed(
+        metricFactsEvent({
+          seriesId: "s-lines-added",
+          metricName: "claude_code.lines_of_code.count",
+          attributes: { type: "added", "user.id": "user-1" },
+          value: 120,
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionMetricFactsContributed(
+        metricFactsEvent({
+          seriesId: "s-commits",
+          metricName: "claude_code.commit.count",
+          value: 2,
+        }),
+        state,
+      );
+
+      expect(state.sessionId).toBe(SESSION_ID);
+      expect(state.agent).toBe("claude_code");
+      expect(state.userId).toBe("user-1");
+      expect(state.linesAdded).toBe(120);
+      expect(state.commits).toBe(2);
+      expect(state.modelCalls).toBe(0);
+      expect(state.traceIds).toEqual([]);
+    });
+  });
+
+  describe("when a cumulative series is observed again", () => {
+    /** @scenario re-delivered telemetry does not inflate a session */
+    it("replaces the series' converged value instead of adding it", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionMetricFactsContributed(
+        metricFactsEvent({
+          seriesId: "s-lines-added",
+          metricName: "claude_code.lines_of_code.count",
+          attributes: { type: "added" },
+          value: 120,
+        }),
+        state,
+      );
+      // The counter converged to a bigger total — same series, newer value.
+      state = projection.handleCodingAgentSessionMetricFactsContributed(
+        metricFactsEvent({
+          seriesId: "s-lines-added",
+          metricName: "claude_code.lines_of_code.count",
+          attributes: { type: "added" },
+          value: 150,
+          asOfMs: 2_500,
+        }),
+        state,
+      );
+
+      expect(state.linesAdded).toBe(150);
+    });
+
+    it("sums distinct delta units exactly once each", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      for (const [unit, value] of [
+        ["point-1", 10],
+        ["point-2", 5],
+      ] as const) {
+        state = projection.handleCodingAgentSessionMetricFactsContributed(
+          metricFactsEvent({
+            seriesId: unit,
+            metricName: "claude_code.lines_of_code.count",
+            attributes: { type: "removed" },
+            value,
+          }),
+          state,
+        );
+      }
+
+      expect(state.linesRemoved).toBe(15);
+    });
+  });
+
+  describe("when the human accepts and rejects edits", () => {
+    it("splits the decisions and tracks the languages", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionMetricFactsContributed(
+        metricFactsEvent({
+          seriesId: "s-accept-ts",
+          metricName: "claude_code.code_edit_tool.decision",
+          attributes: { decision: "accept", language: "typescript" },
+          value: 4,
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionMetricFactsContributed(
+        metricFactsEvent({
+          seriesId: "s-reject-ts",
+          metricName: "claude_code.code_edit_tool.decision",
+          attributes: { decision: "reject", language: "typescript" },
+          value: 1,
+        }),
+        state,
+      );
+
+      expect(state.editsAccepted).toBe(4);
+      expect(state.editsRejected).toBe(1);
+      expect(state.languagesEdited).toEqual(["typescript"]);
+    });
+  });
+
+  describe("when token metrics arrive for a session that also sent spans", () => {
+    it("does not overlay them — the spans already carry the tokens", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-1",
+          facts: { input_tokens: 100 },
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionMetricFactsContributed(
+        metricFactsEvent({
+          seriesId: "s-tokens",
+          metricName: "claude_code.token.usage",
+          attributes: { type: "input" },
+          value: 100,
+        }),
+        state,
+      );
+
+      expect(state.inputTokens).toBe(100);
     });
   });
 

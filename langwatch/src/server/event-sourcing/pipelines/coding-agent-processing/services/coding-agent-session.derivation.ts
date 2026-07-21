@@ -1,6 +1,11 @@
-import { normalizeEventName, parseMcpToolName } from "./coding-agent-normalization";
+import {
+  normalizeEventName,
+  normalizeMetricName,
+  parseMcpToolName,
+} from "./coding-agent-normalization";
 import type {
   CodingAgentSessionData,
+  MetricSeriesFact,
   SessionStep,
 } from "./coding-agent-session.types";
 
@@ -193,6 +198,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     hooksCancelled: 0,
     hookMs: 0,
 
+    metricSeries: {},
     linesAdded: 0,
     linesRemoved: 0,
     commits: 0,
@@ -677,6 +683,138 @@ export function applyLogToCodingAgentSession({
     default:
       return base;
   }
+}
+
+/**
+ * Converged metric units kept per session. Well above any real session's
+ * series count (a Claude Code session emits ~10–30) while bounding a
+ * pathological delta stream.
+ */
+const MAX_METRIC_SERIES = 200;
+
+/** The compact view a metric-facts contribution carries. */
+export interface MetricFactsView {
+  /** The converged unit's id — a series for cumulative, a point for delta. */
+  seriesId: string;
+  metricName: string;
+  attributes: Record<string, unknown>;
+  /** The unit's converged value. Replaces; never increments. */
+  value: number;
+}
+
+/** A converged value may legitimately be zero — do not clamp like num(). */
+function total(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+/**
+ * Fold one METRIC contribution into the session.
+ *
+ * The metrics are the only signal that says what the session PRODUCED — lines
+ * changed, commits, pull requests — and the only one that measures the human's
+ * own time. A summary built from spans and logs alone can tell you the agent
+ * ran 192 tools and can't tell you whether anything came of it.
+ *
+ * REPLACE, NEVER INCREMENT (ADR-056 §5): the contribution's value is a
+ * converged total for its unit, so the unit's entry is overwritten and the
+ * metric-fed fields are recomputed from all units. A re-observed cumulative
+ * counter therefore updates the session instead of double-counting it, and a
+ * replay converges to the same numbers.
+ *
+ * Token and cost metrics deliberately do NOT overlay here: the session's
+ * tokens and cost come from its spans and logs, and adding the metric copy
+ * would double them. Their converged series still land in
+ * `session_metric_series` for the metric-only-session read.
+ */
+export function applyMetricToCodingAgentSession({
+  state,
+  metric,
+}: {
+  state: CodingAgentSessionData;
+  metric: MetricFactsView;
+}): CodingAgentSessionData {
+  const base = withIdentity(state, metric.attributes);
+  if (normalizeMetricName(metric.metricName) === null) return base;
+
+  const isNewUnit = state.metricSeries[metric.seriesId] === undefined;
+  if (isNewUnit && Object.keys(state.metricSeries).length >= MAX_METRIC_SERIES) {
+    return base;
+  }
+
+  const attrs = metric.attributes;
+  const fact: MetricSeriesFact = {
+    metricName: metric.metricName,
+    type: str(attrs.type),
+    decision: str(attrs.decision),
+    language: str(attrs.language),
+    value: total(metric.value),
+  };
+
+  return recomputeMetricOverlay({
+    ...base,
+    metricSeries: { ...base.metricSeries, [metric.seriesId]: fact },
+  });
+}
+
+/**
+ * The metric-fed fields, recomputed whole from the converged units. These
+ * fields are EXCLUSIVELY metric-fed (no span or log path writes them), so a
+ * full overwrite cannot clobber another signal's work.
+ */
+function recomputeMetricOverlay(
+  state: CodingAgentSessionData,
+): CodingAgentSessionData {
+  let linesAdded = 0;
+  let linesRemoved = 0;
+  let commits = 0;
+  let pullRequests = 0;
+  let editsAccepted = 0;
+  let editsRejected = 0;
+  let activeTimeUserSec = 0;
+  let activeTimeCliSec = 0;
+  let languagesEdited: string[] = [];
+
+  for (const fact of Object.values(state.metricSeries)) {
+    switch (normalizeMetricName(fact.metricName)) {
+      case "lines_of_code":
+        if (fact.type === "added") linesAdded += fact.value;
+        if (fact.type === "removed") linesRemoved += fact.value;
+        break;
+      case "commit":
+        commits += fact.value;
+        break;
+      case "pull_request":
+        pullRequests += fact.value;
+        break;
+      case "edit_decision":
+        if (fact.decision === "accept") editsAccepted += fact.value;
+        else editsRejected += fact.value;
+        if (fact.language !== null && fact.language !== "unknown") {
+          languagesEdited = addToBoundedSet(languagesEdited, fact.language);
+        }
+        break;
+      case "active_time":
+        if (fact.type === "user") activeTimeUserSec += fact.value;
+        if (fact.type === "cli") activeTimeCliSec += fact.value;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return {
+    ...state,
+    linesAdded,
+    linesRemoved,
+    commits: Math.round(commits),
+    pullRequests: Math.round(pullRequests),
+    editsAccepted: Math.round(editsAccepted),
+    editsRejected: Math.round(editsRejected),
+    activeTimeUserSec,
+    activeTimeCliSec,
+    languagesEdited,
+  };
 }
 
 export type { CodingAgentSessionData, SessionStep };

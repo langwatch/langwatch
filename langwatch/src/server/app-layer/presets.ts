@@ -178,6 +178,10 @@ import {
   CodingAgentTraceSessionClickHouseRepository,
   NullCodingAgentTraceSessionRepository,
 } from "./coding-agent/repositories/coding-agent-trace-session.repository";
+import {
+  NullSessionMetricSeriesRepository,
+  SessionMetricSeriesClickHouseRepository,
+} from "./coding-agent/repositories/session-metric-series.repository";
 import { CanonicalLogRecordClickHouseRepository } from "./logs/repositories/canonical-log-record.clickhouse.repository";
 import { NullCanonicalLogRecordRepository } from "./logs/repositories/canonical-log-record.repository";
 import { MonitorService } from "./monitors/monitor.service";
@@ -651,6 +655,9 @@ export function initializeDefaultApp(options?: {
     codingAgentTraceSession: clickhouseEnabled
       ? new CodingAgentTraceSessionClickHouseRepository(resolveClickHouseClient)
       : new NullCodingAgentTraceSessionRepository(),
+    sessionMetricSeries: clickhouseEnabled
+      ? new SessionMetricSeriesClickHouseRepository(resolveClickHouseClient)
+      : new NullSessionMetricSeriesRepository(),
     metricDataPointStorage: clickhouseEnabled
       ? new MetricDataPointClickHouseRepository({
           resolveClient: resolveClickHouseClient,
