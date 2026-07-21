@@ -108,7 +108,6 @@ export interface TraceProcessingPipelineDeps {
     ) => Promise<void>;
   };
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
-  claudeCodeSpanSyncReactor: ReactorDefinition<TraceProcessingEvent>;
   customerIoTraceSyncReactor?: ReactorDefinition<
     TraceProcessingEvent,
     TraceSummaryData
@@ -252,11 +251,6 @@ export function createTraceProcessingPipeline(
       "spanStorage",
       "spanStorageBroadcast",
       deps.spanStorageBroadcastReactor,
-    )
-    .withReactor(
-      "traceSummary",
-      "claudeCodeSpanSync",
-      deps.claudeCodeSpanSyncReactor,
     );
 
   if (deps.customerIoTraceSyncReactor) {

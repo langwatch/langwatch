@@ -22,7 +22,6 @@ import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import { resolveClaudeTurnLogCap } from "~/server/app-layer/traces/claude-code-log-to-span";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
 import {
   createDatasetNormalizeHandler,
@@ -52,10 +51,7 @@ import type { MetricDataPointRepository } from "../app-layer/metrics/repositorie
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
-import type {
-  LogRecordStorageRepository,
-  StoredLogRecordRow,
-} from "../app-layer/traces/repositories/log-record-storage.repository";
+import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
 import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
 import type { TraceAnalyticsRollupRepository } from "../app-layer/traces/repositories/trace-analytics-rollup.repository";
 import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
@@ -176,7 +172,6 @@ import type { TraceAnalyticsData } from "./pipelines/trace-processing/projection
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
 import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
-import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/reactors/claudeCodeSpanSync.reactor";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
@@ -191,10 +186,7 @@ import { createProjectMetadataReactor } from "./pipelines/trace-processing/react
 import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
 import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
-import type {
-  RecordSpanCommandData,
-  ResolveOriginCommandData,
-} from "./pipelines/trace-processing/schemas/commands";
+import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
 import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { AppendStore } from "./projections/mapProjection.types";
 import type { StateProjectionStore } from "./projections/stateProjection.types";
@@ -207,31 +199,6 @@ import { AutomationAuditAppendStore } from "./pipelines/automations/projections/
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
 
-function mergeClaudeLogRows(
-  rows: StoredLogRecordRow[],
-  limit?: number,
-): StoredLogRecordRow[] {
-  const deduped = new Map<string, StoredLogRecordRow>();
-  for (const row of rows) {
-    // Legacy rows preserve OTLP insertion order while canonical rows are
-    // key-sorted (stableStringify), so sort keys before serialising or the
-    // same record can produce two different keys and slip past dedup.
-    const key = [
-      row.traceId,
-      row.spanId,
-      row.timeUnixMs,
-      row.scopeName,
-      JSON.stringify(Object.fromEntries(Object.entries(row.attributes).sort())),
-    ].join("\0");
-    deduped.set(key, row);
-  }
-  const sorted = [...deduped.values()].sort(
-    (left, right) => left.timeUnixMs - right.timeUnixMs,
-  );
-  return typeof limit === "number" && limit > 0
-    ? sorted.slice(0, limit)
-    : sorted;
-}
 
 /**
  * Creates an in-memory setTimeout-based fallback for deferred job processing.
@@ -908,11 +875,6 @@ export class PipelineRegistry {
     const simComputeRunMetrics = new Deferred<
       CommandDispatcher<ComputeRunMetricsCommandData>
     >("simComputeRunMetrics");
-    // recordSpan is a command of the trace pipeline itself, so the claude
-    // span-sync reactor that dispatches it is wired after registration.
-    const recordSpanDispatch = new Deferred<
-      CommandDispatcher<RecordSpanCommandData>
-    >("recordSpan");
 
     const originGateReactor = createOriginGateReactor({
       scheduleDeferred: scheduleDeferred.fn,
@@ -935,49 +897,6 @@ export class PipelineRegistry {
     const spanStorageBroadcastReactor = createSpanStorageBroadcastReactor({
       broadcast: this.deps.broadcast,
       hasRedis: !!this.deps.eventSourcing.redisConnection,
-    });
-
-    const claudeCodeSpanSyncReactor = createClaudeCodeSpanSyncReactor({
-      getMarkedClaudeCodeLogs: async (
-        tenantId,
-        traceId,
-        occurredAtMs,
-        limit,
-      ) => {
-        const [canonical, legacy] = await Promise.all([
-          this.deps.repositories.canonicalLogStorage.getMarkedClaudeCodeLogsByTrace(
-            { tenantId, traceId, occurredAtMs, limit },
-          ),
-          this.deps.repositories.logRecordStorage.getMarkedClaudeCodeLogsByTrace(
-            tenantId,
-            traceId,
-            occurredAtMs,
-            limit,
-          ),
-        ]);
-        return mergeClaudeLogRows([...canonical, ...legacy], limit);
-      },
-      countMarkedClaudeCodeLogs: async (tenantId, traceId, occurredAtMs) => {
-        const [canonical, legacy] = await Promise.all([
-          this.deps.repositories.canonicalLogStorage.countMarkedClaudeCodeLogsByTrace(
-            { tenantId, traceId, occurredAtMs },
-          ),
-          this.deps.repositories.logRecordStorage.countMarkedClaudeCodeLogsByTrace(
-            tenantId,
-            traceId,
-            occurredAtMs,
-          ),
-        ]);
-        return canonical + legacy;
-      },
-      // Per-turn conversion cap (env LANGWATCH_CLAUDE_TURN_LOG_CAP, default
-      // CLAUDE_TURN_LOG_CAP). Bounds how many of a pathological turn's marked
-      // logs the span-sync reactor folds in one pass so a runaway turn can't
-      // seize the worker; the root span is marked truncated when the cap bites.
-      turnLogCap: resolveClaudeTurnLogCap(
-        process.env.LANGWATCH_CLAUDE_TURN_LOG_CAP,
-      ),
-      recordSpan: recordSpanDispatch.fn,
     });
 
     const projectMetadataReactor = createProjectMetadataReactor({
@@ -1064,7 +983,6 @@ export class PipelineRegistry {
         simulationMetricsSyncReactor,
         experimentMetricsSyncReactor,
         spanStorageBroadcastReactor,
-        claudeCodeSpanSyncReactor,
         gatewayBudgetSyncReactor,
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
@@ -1092,7 +1010,6 @@ export class PipelineRegistry {
     // Resolve self-referencing commands now that the pipeline is registered
     const traceCommands = mapCommands(tracePipeline.commands);
     resolveOrigin.resolve(traceCommands.resolveOrigin);
-    recordSpanDispatch.resolve(traceCommands.recordSpan);
 
     // Wire the deferred origin resolution queue (BullMQ-backed, survives process restart).
     // After 5 min, dispatches resolveOrigin command → OriginResolvedEvent → fold → reactor.

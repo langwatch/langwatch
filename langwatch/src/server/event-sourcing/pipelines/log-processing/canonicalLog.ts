@@ -1,9 +1,4 @@
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
-import {
-  CLAUDE_CODE_KIND_ATTR,
-  CLAUDE_CODE_PII_ATTR,
-  claudeCodeLogKind,
-} from "~/server/app-layer/traces/claude-code-log-to-span";
 import type { DeepPartial } from "~/utils/types";
 import {
   compareOrdinal,
@@ -388,14 +383,6 @@ function bodyText(body: unknown): string | null {
   return null;
 }
 
-function appendStringAttribute(
-  attributes: unknown[],
-  key: string,
-  value: string,
-) {
-  attributes.push({ key, value: { stringValue: value } });
-}
-
 function buildRecord(args: {
   tenantId: string;
   organizationId: string;
@@ -413,22 +400,6 @@ function buildRecord(args: {
   const scopeName = typeof scope.name === "string" ? scope.name : "";
   const scopeVersion = typeof scope.version === "string" ? scope.version : "";
   const logAttributes = Array.isArray(log.attributes) ? log.attributes : [];
-  const flatBeforeMarkers = normalizeOtlpAttributeMap(
-    logAttributes as OtlpKeyValue[],
-  );
-  const eventName =
-    typeof log.eventName === "string"
-      ? log.eventName
-      : (flatBeforeMarkers["event.name"] ?? "");
-  const claudeKind = claudeCodeLogKind(scopeName, eventName);
-  if (claudeKind) {
-    appendStringAttribute(logAttributes, CLAUDE_CODE_KIND_ATTR, claudeKind);
-    appendStringAttribute(
-      logAttributes,
-      CLAUDE_CODE_PII_ATTR,
-      args.piiRedactionLevel,
-    );
-  }
   log.attributes = logAttributes;
 
   const resourceAttributes = canonicalAttributes(resource.attributes);
@@ -437,6 +408,10 @@ function buildRecord(args: {
   const flatAttributes = normalizeOtlpAttributeMap(
     log.attributes as OtlpKeyValue[],
   );
+  const eventName =
+    typeof log.eventName === "string"
+      ? log.eventName
+      : (flatAttributes["event.name"] ?? "");
   const flatResourceAttributes = normalizeOtlpAttributeMap(
     resource.attributes as OtlpKeyValue[],
   );
@@ -555,7 +530,13 @@ function buildRecord(args: {
     flags,
     eventName,
     providerKind: correlation.providerKind,
-    providerEventKind: claudeKind ?? "",
+    // Deliberately empty. This once carried the claude span-kind
+    // (model/tool/turn) that the log-to-span converter classified logs by;
+    // that converter is retired (ADR-056) and agent-specific vocabulary now
+    // lives in the coding-agent pipeline's normalization, not in the generic
+    // log pipeline (§7). The column stays (migration 00050 is deployed) but
+    // has no populating source or reader.
+    providerEventKind: "",
     providerEventSequence: flatAttributes["event.sequence"] ?? "",
     providerSessionId: flatAttributes["session.id"] ?? "",
     providerConversationId: flatAttributes["conversation.id"] ?? "",
