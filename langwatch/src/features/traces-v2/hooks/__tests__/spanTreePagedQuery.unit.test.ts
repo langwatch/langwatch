@@ -1,4 +1,9 @@
 import { QueryClient } from "@tanstack/react-query";
+import {
+  createTRPCClientProxy,
+  httpBatchLink,
+  TRPCUntypedClient,
+} from "@trpc/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 
@@ -40,14 +45,26 @@ type Page = {
 const input = { projectId: "p1", traceId: "t1" };
 
 function makeUtils(pages: Page[]) {
-  // `fetchSpanTreePages` wraps `utils.client` (the old-style string-path
-  // TRPCClient) in `createTRPCClientProxy`, which forwards
-  // `….tracesV2.spanTreePaginated.query(input, opts)` to
-  // `client.query("tracesV2.spanTreePaginated", input, opts)`.
   const query = vi.fn();
   for (const page of pages) query.mockResolvedValueOnce(page);
+  // The real thing `api.useUtils().client` returns: a `createTRPCClientProxy`
+  // wrapper, NOT the client itself. That distinction is load-bearing — the
+  // proxy only resolves keys the client *owns*, so `utils.client.query` is a
+  // recursive path proxy and `.bind()`ing it produces a function that throws
+  // on call. A plain `{ query }` double resolves `query` as an own property
+  // and would let that bug through green, which is how it shipped once.
+  const untyped = new TRPCUntypedClient({
+    links: [httpBatchLink({ url: "http://localhost/api/trpc" })],
+  });
+  // Stub `query` on the prototype chain, never as an own property: the proxy
+  // resolves a key to the raw client only when the client OWNS it, so an own
+  // `query` makes `utils.client.query` the real function and papers over the
+  // bug above. Inherited — as on the real client — it stays a path proxy.
+  const proto = Object.create(TRPCUntypedClient.prototype) as object;
+  (proto as { query: typeof query }).query = query;
+  Object.setPrototypeOf(untyped, proto);
   const utils = {
-    client: { query },
+    client: createTRPCClientProxy(untyped),
   } as unknown as Parameters<typeof fetchSpanTreePages>[0]["utils"];
   return { utils, query };
 }

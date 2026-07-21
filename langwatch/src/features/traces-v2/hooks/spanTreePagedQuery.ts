@@ -1,4 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
+import { getUntypedClient } from "@trpc/client";
 import { getQueryKey } from "@trpc/react-query";
 import type {
   SpanTreeCursor,
@@ -81,12 +82,22 @@ export async function fetchSpanTreePages({
   // just between pages), and no throwaway per-page React Query cache
   // entries are created — the assembled tree lives under the spanTree key.
   //
-  // Dot-path form with a pinned signature: the typed proxy
-  // (`createTRPCClientProxy`) cannot wrap this router (its `subscription`
-  // procedure collides with the proxy's reserved method names), and
-  // `utils.client.query`'s own generic is keyed to the empty v10 legacy
+  // `utils.client` is not the vanilla client — `useUtils()` hands back
+  // `createTRPCClientProxy(client)`, and that proxy only resolves a key to the
+  // real client when the client *owns* it. `query` lives on
+  // `TRPCUntypedClient.prototype`, so `utils.client.query` is a recursive path
+  // proxy instead; binding it yields a function that throws on call
+  // (`clientCallTypeToProcedureType("bind")` is `undefined`). `getUntypedClient`
+  // unwraps the proxy back to the client the provider was built with.
+  //
+  // Dot-path form with a pinned signature: the typed proxy cannot wrap this
+  // router (its `subscription` procedure collides with the proxy's reserved
+  // method names), and `query`'s own generic is keyed to the empty v10 legacy
   // `_def.queries` interop shape, so neither types this call natively.
-  const queryPage = utils.client.query.bind(utils.client) as (
+  const client = getUntypedClient(
+    utils.client as unknown as Parameters<typeof getUntypedClient>[0],
+  );
+  const queryPage = client.query.bind(client) as (
     path: "tracesV2.spanTreePaginated",
     input: SpanTreeQueryInput & { limit: number; cursor?: SpanTreeCursor },
     opts?: { signal?: AbortSignal },
