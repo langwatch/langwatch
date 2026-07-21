@@ -178,10 +178,15 @@ actually one change — it is one change plus a collector hardening we would be
 doing under time pressure. The proxy costs us an app route and a hop, and buys
 same-origin simplicity, existing middleware, and no new attack surface.
 
-Taking per-procedure timing from the server rather than the client keeps
-load-bearing code out of the request path entirely. A tRPC link is code every
-call passes through, where a bug degrades the product and not merely its
-telemetry; the server spans cost nothing extra and answer the same question.
+Taking per-procedure timing from the server rather than the client moves the
+load-bearing code off the user's critical path. Both ends carry some: the
+server gains context extraction and span activation in `tracerMiddleware` and
+the tRPC tracer. The difference is where a failure lands. A tRPC link runs
+inside the browser on every call the user waits for, so a bug there degrades
+the product itself; the equivalent server code sits beside tracing that already
+wraps every request, where the failure mode is a bad span rather than a broken
+interaction. The server spans also cost nothing extra — they already exist.
+
 What is lost is the client's view of a call — queue time before dispatch, and
 the browser's own latency — which is a real gap and the reason to revisit this
 if async context propagation is adopted.
@@ -203,9 +208,11 @@ We take on frontend telemetry volume, which is larger and spikier than backend
 telemetry and is paid for in Tempo storage and collector CPU. The sampling
 posture above is the lever, and we should expect to pull it.
 
-No code is added to the request path: the browser's instrumentation is
-registered once at boot and the ingest route is a leaf. A failure in either
-leaves the application working and untraced.
+Nothing is added to the browser's critical path: instrumentation registers once
+at boot, and the ingest route is a leaf nothing waits on. A failure in either
+leaves the application working and untraced. On the server, context extraction
+and span activation join the tracing that already wraps every request — no new
+call path, and the same failure surface as the existing middleware.
 
 Once frontend errors carry trace context and land in Tempo natively, PostHog's
 role in error tracking becomes a question worth asking rather than an
