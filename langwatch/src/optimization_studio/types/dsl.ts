@@ -373,6 +373,10 @@ export type Workflow = {
       trace_id?: string;
       until_node_id?: string;
       error?: string;
+      /** Stable failure code — mirrors `ExecutionState.error_type`. */
+      error_type?: string;
+      /** Upstream HTTP status, when an HTTP node got a non-2xx. */
+      upstream_status?: number;
       result?: Record<string, any>;
       timestamps?: {
         started_at?: number;
