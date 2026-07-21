@@ -146,7 +146,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       ).toBeInTheDocument();
     });
 
-    describe("when the failure carries a handled payload", () => {
+    describe("given the failure carries a handled payload", () => {
       it("shows the registry's copy for the code", () => {
         mockRunDataQuery.mockReturnValue({
           data: undefined,

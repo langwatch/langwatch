@@ -121,7 +121,7 @@ describe("readErrorTraceId", () => {
     expect(traceId).toBe("from-payload");
   });
 
-  describe("when the failure was unhandled", () => {
+  describe("given the failure was unhandled", () => {
     it("still finds the id, so support has something to correlate on", () => {
       const traceId = readErrorTraceId(trpcError(null, "from-envelope"));
 
@@ -182,6 +182,14 @@ describe("readAuthoredMessage", () => {
       expect(
         readAuthoredMessage(trpcError(422, "validation_error")),
       ).toBeUndefined();
+    });
+
+    it("declines a single-word code, which has no underscore to spot it by", () => {
+      // The registry has several. Matching on shape alone let these through
+      // and rendered a slug as though it were a sentence.
+      for (const code of ["unauthorized", "not_found", "internal_error"]) {
+        expect(readAuthoredMessage(trpcError(401, code)), code).toBeUndefined();
+      }
     });
 
     it.each([

@@ -79,7 +79,7 @@ function declaredCodes(): Set<string> {
 }
 
 describe("APP_ERROR_CODES", () => {
-  describe("when compared against the codes the source actually declares", () => {
+  describe("given the codes the source actually declares", () => {
     it("lists every code a HandledError subclass raises", () => {
       const listed = new Set<string>(APP_ERROR_CODES);
       const missing = [...declaredCodes()].filter((code) => !listed.has(code));

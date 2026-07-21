@@ -116,7 +116,7 @@ describe("showErrorToast", () => {
     });
   });
 
-  describe("when a global handler already reported the error", () => {
+  describe("given a global handler already reported the error", () => {
     it("shows nothing, rather than duplicating it as toast plus modal", () => {
       isHandledByGlobalHandler.mockReturnValue(true);
 

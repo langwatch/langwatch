@@ -33,14 +33,14 @@ describe("applyHandledErrorToForm", () => {
     it("marks each field with its message", () => {
       const form = formWithFields("name", "slug");
 
-      const consumed = apply(
+      const isConsumed = apply(
         validationError({
           fieldErrors: { name: ["Required"], slug: ["Already taken"] },
         }),
         form,
       );
 
-      expect(consumed).toBe(true);
+      expect(isConsumed).toBe(true);
       expect(form.setError).toHaveBeenCalledWith(
         "name",
         { type: "server", message: "Required" },
@@ -74,12 +74,12 @@ describe("applyHandledErrorToForm", () => {
     it("puts them on the form root", () => {
       const form = formWithFields("name");
 
-      const consumed = apply(
+      const isConsumed = apply(
         validationError({ formErrors: ["Pick at least one channel."] }),
         form,
       );
 
-      expect(consumed).toBe(true);
+      expect(isConsumed).toBe(true);
       expect(form.setError).toHaveBeenCalledWith("root.serverError", {
         type: "server",
         message: "Pick at least one channel.",
@@ -98,12 +98,12 @@ describe("applyHandledErrorToForm", () => {
         setError: vi.fn(),
       };
 
-      const consumed = apply(
+      const isConsumed = apply(
         validationError({ fieldErrors: { version: ["Required"] } }),
         form,
       );
 
-      expect(consumed).toBe(false);
+      expect(isConsumed).toBe(false);
       expect(form.setError).not.toHaveBeenCalled();
     });
   });
@@ -112,7 +112,7 @@ describe("applyHandledErrorToForm", () => {
     it("marks what it can but still declines, so the rest isn't lost", () => {
       const form = formWithFields("name");
 
-      const consumed = apply(
+      const isConsumed = apply(
         validationError({
           fieldErrors: { name: ["Required"], organizationId: ["Nope"] },
         }),
@@ -126,7 +126,7 @@ describe("applyHandledErrorToForm", () => {
         expect.objectContaining({ message: "Required" }),
         expect.anything(),
       );
-      expect(consumed).toBe(false);
+      expect(isConsumed).toBe(false);
     });
   });
 
@@ -134,12 +134,12 @@ describe("applyHandledErrorToForm", () => {
     it("declines it, so it falls through to a toast instead of vanishing", () => {
       const form = formWithFields("name");
 
-      const consumed = apply(
+      const isConsumed = apply(
         validationError({ fieldErrors: { somethingElse: ["Nope"] } }),
         form,
       );
 
-      expect(consumed).toBe(false);
+      expect(isConsumed).toBe(false);
       expect(form.setError).not.toHaveBeenCalled();
     });
   });

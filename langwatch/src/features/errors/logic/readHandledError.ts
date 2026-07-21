@@ -1,7 +1,10 @@
-import type {
-  HandledErrorFault,
-  SerializedReason,
+import {
+  goErrorCodes,
+  type HandledErrorFault,
+  type SerializedReason,
 } from "@langwatch/handled-error";
+
+import { APP_ERROR_CODES } from "./codes";
 
 /**
  * The client-side view of a handled error, lifted off whatever transport
@@ -97,8 +100,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-/** Looks like `some_error_code` rather than a sentence. */
-const CODE_SLUG = /^[a-z0-9]+(_[a-z0-9]+)+$/;
+/**
+ * Every code the platform can put on the wire as a message.
+ *
+ * Checking membership beats guessing at the shape: a regex requiring an
+ * underscore lets single-word codes through, and the registry has several
+ * (`unauthorized`, `not_found`), so `"unauthorized"` would have been rendered
+ * to the customer as though it were a sentence.
+ */
+const KNOWN_CODES = new Set<string>([
+  ...APP_ERROR_CODES,
+  ...Object.keys(goErrorCodes),
+]);
+
+/** Belt and braces for a code newer than this client: still slug-shaped. */
+const SLUG_SHAPED = /^[a-z0-9]+(_[a-z0-9]+)*$/;
 
 /**
  * Prose a procedure deliberately authored for the user, on an error that isn't
@@ -124,5 +140,6 @@ export function readAuthoredMessage(err: unknown): string | undefined {
   const message = (err as { message?: unknown })?.message;
   if (typeof message !== "string" || message.length === 0) return undefined;
 
-  return CODE_SLUG.test(message) ? undefined : message;
+  if (KNOWN_CODES.has(message) || SLUG_SHAPED.test(message)) return undefined;
+  return message;
 }

@@ -14,7 +14,7 @@ import {
 import { useEffect, useState } from "react";
 import { Check, ChevronDown, Plus } from "react-feather";
 import { useForm } from "react-hook-form";
-import { showErrorToast } from "~/features/errors";
+import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -87,13 +87,7 @@ export const AddAnnotationQueueDrawer = ({
       },
     );
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-    watch,
-  } = useForm<{
+  const form = useForm<{
     name: string;
     description?: string | null;
   }>({
@@ -102,6 +96,13 @@ export const AddAnnotationQueueDrawer = ({
       description: queue.data?.description ?? "",
     },
   });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    watch,
+  } = form;
 
   type FormData = {
     name: string;
@@ -179,13 +180,15 @@ export const AddAnnotationQueueDrawer = ({
           handleClose();
           reset();
         },
-        onError: (error) =>
+        onError: (error) => {
+          if (applyHandledErrorToForm({ error, form })) return;
           showErrorToast({
             error,
             fallbackTitle: queueId
               ? "Couldn't update annotation queue"
               : "Couldn't create annotation queue",
-          }),
+          });
+        },
       },
     );
   };

@@ -14,7 +14,7 @@ import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
-import { showErrorToast } from "~/features/errors";
+import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
 import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
 import {
   getComplexProps,
@@ -77,19 +77,20 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
 
   const [defaultIcon] = useState(getRandomWorkflowIcon());
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<FormData>({
+  const form = useForm<FormData>({
     defaultValues: {
       name: props.agentName ?? "",
       icon: defaultIcon,
       description: "",
     },
   });
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = form;
 
   const icon = watch("icon");
   const name = watch("name");
@@ -100,8 +101,10 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
       void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
       onSave?.(agent);
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
+    onError: (error) => {
+      if (applyHandledErrorToForm({ error, form })) return;
+      showErrorToast({ error, fallbackTitle: "Couldn't create agent" });
+    },
   });
 
   const isSaving =
@@ -153,6 +156,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
         );
       } catch (error) {
         console.error("Error creating workflow agent:", error);
+        if (applyHandledErrorToForm({ error, form })) return;
         showErrorToast({
           error,
           fallbackTitle: "Couldn't create workflow agent",
@@ -166,6 +170,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
       createAgentMutation,
       onClose,
       router,
+      form,
     ],
   );
 

@@ -23,8 +23,8 @@ export interface ErrorActionsProps {
  * they sit, not what they let you do.
  */
 export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
-  const [copied, setCopied] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const [hasFailed, setHasFailed] = useState(false);
   // Read the clipboard API after mount, never during render: Node defines
   // `navigator` without `clipboard`, so a render-time check disagrees between
   // server and client and mismatches on hydration.
@@ -33,21 +33,21 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
 
   // Reset the confirmation so a second copy still reads as a fresh action.
   useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 2000);
+    if (!isCopied) return;
+    const timer = setTimeout(() => setIsCopied(false), 2000);
     return () => clearTimeout(timer);
-  }, [copied]);
+  }, [isCopied]);
 
   const copy = useCallback(() => {
     if (!traceId || !navigator.clipboard) return;
     void navigator.clipboard.writeText(traceId).then(
       () => {
-        setFailed(false);
-        setCopied(true);
+        setHasFailed(false);
+        setIsCopied(true);
       },
       // Rejects when the document isn't focused or permission is denied —
       // routine in Safari. Say so rather than leaving the label unchanged.
-      () => setFailed(true),
+      () => setHasFailed(true),
     );
   }, [traceId]);
 
@@ -86,19 +86,19 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
           transition="color .12s ease"
           _hover={{ color: "fg.muted" }}
           aria-label={
-            failed
+            hasFailed
               ? "Couldn't copy the error ID"
-              : copied
+              : isCopied
                 ? "Error ID copied"
                 : "Copy error ID"
           }
         >
-          {copied ? (
+          {isCopied ? (
             <CheckIcon width={10} height={10} />
           ) : (
             <CopyIcon width={10} height={10} />
           )}
-          {failed ? "Couldn't copy" : copied ? "Copied" : "Copy error ID"}
+          {hasFailed ? "Couldn't copy" : isCopied ? "Copied" : "Copy error ID"}
         </chakra.button>
       )}
     </HStack>
