@@ -1,5 +1,18 @@
 import { generate } from "@langwatch/ksuid";
 import type { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
+import {
+  LANGY_CONVERSATION_TURN_EVENT_TYPES,
+  cursorHasReachedEvent,
+  langyConversationTurnEventSchema,
+  type LangyConversationTurnWireEvent,
+  type LangyEventCursor,
+} from "@langwatch/langy";
+import {
+  createTenantId,
+  type TenantId,
+} from "~/server/event-sourcing/domain/tenantId";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import {
   langyAgentErrorFromErrorFrame,
   serializeLangyTurnError,
@@ -48,6 +61,32 @@ import {
 } from "./repositories/langy-message.repository";
 
 export type { LangyConversationRepository as LangyConversationReadRepository } from "./repositories/langy-conversation.repository";
+
+/**
+ * Narrow read port over the canonical event log, for the tail read (ADR-059).
+ * Structurally satisfied by `EventStore.getEvents` — the service never sees
+ * appends, pagination internals, or other aggregates.
+ */
+export interface LangyConversationEventsReader {
+  getEvents(
+    aggregateId: string,
+    context: { tenantId: TenantId },
+    aggregateType: "langy_conversation",
+  ): Promise<readonly LangyConversationProcessingEvent[]>;
+}
+
+/**
+ * Hard ceiling on one tail response. A conversation's whole event set is
+ * inherently small (a turn is a handful of transitions), so a tail this long
+ * means something is wrong — the client gets the truncated flag and the next
+ * fetch continues from the returned cursor, and we log rather than silently
+ * cap.
+ */
+const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
+
+const conversationServiceLogger = createLogger(
+  "langwatch:langy:conversation-service",
+);
 
 /** List-item shape the sidebar renders. Named for the domain, not the column. */
 export type ConversationListItem = {
@@ -168,6 +207,7 @@ export class LangyConversationService {
     private readonly repository: LangyConversationRepository,
     private readonly commands: LangyConversationCommands,
     private readonly messages: LangyMessageRepository = new NullLangyMessageRepository(),
+    private readonly events: LangyConversationEventsReader | null = null,
   ) {}
 
   /**
@@ -211,6 +251,90 @@ export class LangyConversationService {
       status: row.status,
       currentTurnId: row.currentTurnId,
       lastError: row.lastError,
+    };
+  }
+
+  /**
+   * The conversation's durable TURN events strictly after a cursor — the tail
+   * the browser folds locally with the shared reducer (ADR-059 §2/§3).
+   *
+   * Authorized exactly like `getById` (owner-or-shared, reported as not-found
+   * so it cannot probe), and restricted to the TURN vocabulary
+   * (`LANGY_CONVERSATION_TURN_EVENT_TYPES`): those payloads carry no
+   * server-only fields, so the wire schema is secure by construction — spine
+   * events (which carry `runToken` / handoff tokens) never enter this read.
+   *
+   * Served from the same per-conversation event read the folds use (bounded,
+   * deduplicated, `(acceptedAt, eventId)`-ordered) and filtered by the shared
+   * cursor comparator; a strict-after storage read is a drop-in optimization
+   * behind this contract if conversations ever outgrow it.
+   */
+  async getEventsAfter({
+    projectId,
+    conversationId,
+    userId,
+    after,
+  }: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+    after: LangyEventCursor;
+  }): Promise<{
+    events: LangyConversationTurnWireEvent[];
+    /** Position of the last returned event; `after` when the tail is empty. */
+    cursor: LangyEventCursor;
+    /** True when the tail was cut at the ceiling — fetch again from `cursor`. */
+    truncated: boolean;
+  }> {
+    const visible = await this.repository.findVisibleById({
+      id: conversationId,
+      projectId,
+      userId,
+    });
+    if (!visible) throw new LangyConversationNotFoundError(conversationId);
+
+    // No event store configured (event sourcing disabled) means there are no
+    // durable events at all — an empty tail is the honest answer.
+    if (!this.events) return { events: [], cursor: after, truncated: false };
+
+    const all = await this.events.getEvents(
+      conversationId,
+      { tenantId: createTenantId(projectId) },
+      "langy_conversation",
+    );
+
+    const turnTypes: readonly string[] = LANGY_CONVERSATION_TURN_EVENT_TYPES;
+    const tail = all.filter(
+      (event) =>
+        turnTypes.includes(event.type) && !cursorHasReachedEvent(after, event),
+    );
+
+    const truncated = tail.length > CONVERSATION_EVENT_TAIL_LIMIT;
+    if (truncated) {
+      conversationServiceLogger.warn(
+        { projectId, conversationId, tailLength: tail.length },
+        "Langy event tail exceeded the response ceiling — serving a truncated page",
+      );
+    }
+    const page = truncated
+      ? tail.slice(0, CONVERSATION_EVENT_TAIL_LIMIT)
+      : tail;
+
+    const events = page.map((event) =>
+      langyConversationTurnEventSchema.parse({
+        id: event.id,
+        createdAt: event.createdAt,
+        occurredAt: event.occurredAt,
+        type: event.type,
+        data: event.data,
+      }),
+    );
+
+    const last = events.at(-1);
+    return {
+      events,
+      cursor: last ? { acceptedAt: last.createdAt, eventId: last.id } : after,
+      truncated,
     };
   }
 
@@ -999,7 +1123,8 @@ export class LangyConversationService {
     commands: LangyConversationCommands,
     repository: LangyConversationRepository,
     messages?: LangyMessageRepository,
+    events?: LangyConversationEventsReader | null,
   ): LangyConversationService {
-    return new LangyConversationService(repository, commands, messages);
+    return new LangyConversationService(repository, commands, messages, events);
   }
 }

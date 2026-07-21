@@ -543,4 +543,202 @@ describe("LangyConversationService", () => {
       });
     });
   });
+
+  describe("getEventsAfter — the tail the browser folds (ADR-059)", () => {
+    // Fixtures only need to satisfy the reader port structurally.
+    const makeEvents = (events: unknown[]) => ({
+      getEvents: vi.fn(async () => events as never),
+    });
+
+    const visibleRepo = () =>
+      makeRepo({
+        findVisibleById: vi.fn().mockResolvedValue(row()),
+      });
+
+    const plainTurnEvent = (o: {
+      id: string;
+      createdAt: number;
+      type?: string;
+      data?: Record<string, unknown>;
+    }) => ({
+      id: o.id,
+      aggregateId: "c1",
+      aggregateType: "langy_conversation",
+      tenantId: "p1",
+      createdAt: o.createdAt,
+      occurredAt: o.createdAt - 10,
+      type: o.type ?? "lw.langy_conversation.tool_call_initiated",
+      version: "2026-07-10",
+      data: o.data ?? {
+        conversationId: "c1",
+        turnId: "t1",
+        toolCallId: `tc-${o.id}`,
+        toolName: "bash",
+      },
+    });
+
+    describe("when the conversation is not visible to the caller", () => {
+      it("throws not-found and never touches the event log", async () => {
+        const events = makeEvents([]);
+        const svc = new LangyConversationService(
+          makeRepo(),
+          makeCommands(),
+          undefined,
+          events,
+        );
+        await expect(
+          svc.getEventsAfter({
+            projectId: "p1",
+            conversationId: "c1",
+            userId: "alice",
+            after: { acceptedAt: 0, eventId: "" },
+          }),
+        ).rejects.toThrow(LangyConversationNotFoundError);
+        expect(events.getEvents).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when no event reader is configured", () => {
+      it("answers with an honest empty tail at the caller's own cursor", async () => {
+        const svc = new LangyConversationService(visibleRepo(), makeCommands());
+        const after = { acceptedAt: 5, eventId: "e5" };
+        expect(
+          await svc.getEventsAfter({
+            projectId: "p1",
+            conversationId: "c1",
+            userId: "alice",
+            after,
+          }),
+        ).toEqual({ events: [], cursor: after, truncated: false });
+      });
+    });
+
+    describe("given a stream with events before and after the cursor", () => {
+      it("returns only the strict tail, advances the cursor to its last event", async () => {
+        const svc = new LangyConversationService(
+          visibleRepo(),
+          makeCommands(),
+          undefined,
+          makeEvents([
+            plainTurnEvent({ id: "e1", createdAt: 100 }),
+            plainTurnEvent({ id: "e2", createdAt: 200 }),
+            plainTurnEvent({ id: "e3", createdAt: 300 }),
+          ]),
+        );
+        const result = await svc.getEventsAfter({
+          projectId: "p1",
+          conversationId: "c1",
+          userId: "alice",
+          after: { acceptedAt: 200, eventId: "e2" },
+        });
+        expect(result.events.map((e) => e.id)).toEqual(["e3"]);
+        expect(result.cursor).toEqual({ acceptedAt: 300, eventId: "e3" });
+        expect(result.truncated).toBe(false);
+      });
+
+      it("tie-breaks same-millisecond events by event id, byte-wise", async () => {
+        const svc = new LangyConversationService(
+          visibleRepo(),
+          makeCommands(),
+          undefined,
+          makeEvents([
+            plainTurnEvent({ id: "2AAa", createdAt: 100 }),
+            plainTurnEvent({ id: "2AAb", createdAt: 100 }),
+          ]),
+        );
+        const result = await svc.getEventsAfter({
+          projectId: "p1",
+          conversationId: "c1",
+          userId: "alice",
+          after: { acceptedAt: 100, eventId: "2AAa" },
+        });
+        expect(result.events.map((e) => e.id)).toEqual(["2AAb"]);
+      });
+    });
+
+    describe("given spine events mixed into the stream", () => {
+      it("serves ONLY the turn vocabulary — a runToken can never ride the tail", async () => {
+        // The security pin: conversation_started carries the server-only
+        // runToken. It must be excluded by TYPE, not by field-stripping.
+        const svc = new LangyConversationService(
+          visibleRepo(),
+          makeCommands(),
+          undefined,
+          makeEvents([
+            plainTurnEvent({
+              id: "e1",
+              createdAt: 100,
+              type: "lw.langy_conversation.conversation_started",
+              data: {
+                conversationId: "c1",
+                userId: "bob",
+                runToken: "SECRET",
+              },
+            }),
+            plainTurnEvent({ id: "e2", createdAt: 200 }),
+          ]),
+        );
+        const result = await svc.getEventsAfter({
+          projectId: "p1",
+          conversationId: "c1",
+          userId: "alice",
+          after: { acceptedAt: 0, eventId: "" },
+        });
+        expect(result.events.map((e) => e.id)).toEqual(["e2"]);
+        expect(JSON.stringify(result)).not.toContain("SECRET");
+      });
+
+      it("serves the wire envelope only — no tenant or aggregate fields", async () => {
+        const svc = new LangyConversationService(
+          visibleRepo(),
+          makeCommands(),
+          undefined,
+          makeEvents([plainTurnEvent({ id: "e1", createdAt: 100 })]),
+        );
+        const result = await svc.getEventsAfter({
+          projectId: "p1",
+          conversationId: "c1",
+          userId: "alice",
+          after: { acceptedAt: 0, eventId: "" },
+        });
+        expect(Object.keys(result.events[0]!).sort()).toEqual([
+          "createdAt",
+          "data",
+          "id",
+          "occurredAt",
+          "type",
+        ]);
+      });
+    });
+
+    describe("given a tail beyond the response ceiling", () => {
+      it("cuts at the ceiling, flags truncation, and cursors at the cut", async () => {
+        const events = Array.from({ length: 1_050 }, (_, i) =>
+          plainTurnEvent({
+            id: `e${String(i).padStart(5, "0")}`,
+            createdAt: 1_000 + i,
+          }),
+        );
+        const svc = new LangyConversationService(
+          visibleRepo(),
+          makeCommands(),
+          undefined,
+          makeEvents(events),
+        );
+        const result = await svc.getEventsAfter({
+          projectId: "p1",
+          conversationId: "c1",
+          userId: "alice",
+          after: { acceptedAt: 0, eventId: "" },
+        });
+        expect(result.truncated).toBe(true);
+        expect(result.events).toHaveLength(1_000);
+        const last = result.events.at(-1)!;
+        expect(result.cursor).toEqual({
+          acceptedAt: last.createdAt,
+          eventId: last.id,
+        });
+      });
+    });
+  });
 });

@@ -391,6 +391,34 @@ export const langyRouter = createTRPCRouter({
    * Single-conversation spine (status + counts), for the open conversation.
    * Returns null when the conversation is not visible to the user.
    */
+  /**
+   * The conversation's durable TURN events strictly after a cursor — the tail
+   * the browser folds locally with the shared @langwatch/langy reducer
+   * (ADR-059). Fired when a freshness signal's cursor is ahead of the local
+   * fold's; authorized owner-or-shared exactly like the other reads (a
+   * non-visible conversation reports not-found via the service's
+   * HandledError). The response's `cursor` is the new local position;
+   * `truncated` means fetch again from it.
+   */
+  conversationEventsAfter: langyReadProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        after: z.object({
+          acceptedAt: z.number().int().nonnegative(),
+          eventId: z.string(),
+        }),
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      return await getApp().langy.conversations.getEventsAfter({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+        after: input.after,
+      });
+    }),
+
   detail: langyReadProcedure
     .input(z.object({ conversationId: z.string() }))
     .query(
