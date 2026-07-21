@@ -34,6 +34,29 @@ Feature: Reduced local dev memory footprint
     Then the WORKERS_IN_PROCESS default is not applied
     And web and workers remain separate deployments
 
+  # Two heavy, rarely-needed dependencies are kept out of the boot graph by
+  # config, not loaded eagerly. @google-cloud/dlp (generated protos via
+  # google-gax/grpc — one of the largest single deps) only loads when a
+  # google_dlp PII check actually runs, and never when opted out. The OTel
+  # instrumentation packages only load when observability is configured, and
+  # then only the handful we actually use (not the ~41-package auto bundle).
+
+  Scenario: Google DLP loads its cloud SDK only when enabled and used
+    Given a project with no google_dlp PII check running
+    When the server boots
+    Then the @google-cloud/dlp SDK is not loaded in the process
+    When LANGWATCH_DISABLE_GOOGLE_DLP is set and a google_dlp check is requested
+    Then the check is refused and the SDK is still never loaded
+
+  Scenario: OTel instrumentation loads only when observability is configured
+    Given neither an OTLP endpoint nor a LangWatch API key is set
+    When the server or workers boot
+    Then no OpenTelemetry instrumentation package is loaded
+    When an OTLP endpoint is configured
+    Then only the aws-sdk, openai, pino, runtime-node, and ioredis instrumentations load
+    And no instrumentation for frameworks the server doesn't run (express, koa, pg, grpc) is loaded
+    And ioredis statements are still truncated to command plus first key, requiring a parent span
+
   # Separately, a guard closes a footprint-adjacent foot-gun found while
   # profiling `pnpm start`: server.mts loads .env with `override: true`, so a
   # stray `NODE_ENV=development` line in a dev machine's .env would silently

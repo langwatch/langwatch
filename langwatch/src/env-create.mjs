@@ -111,6 +111,12 @@ export function createEnvConfig() {
           .optional(),
       ),
       GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
+      // Opt out of Google Cloud DLP entirely. When set, the google_dlp PII
+      // check is refused and the heavy @google-cloud/dlp SDK (generated protos
+      // via google-gax/grpc — one of the largest single deps in the server
+      // graph) is never imported. Off by default so DLP stays available for
+      // deployments that have configured GOOGLE_APPLICATION_CREDENTIALS.
+      LANGWATCH_DISABLE_GOOGLE_DLP: z.boolean().optional(),
       AZURE_OPENAI_ENDPOINT: z.string().optional(),
       AZURE_OPENAI_KEY: z.string().optional(),
       OPENAI_API_KEY: z.string().optional(),
@@ -332,6 +338,8 @@ export function createEnvConfig() {
       REDIS_CLUSTER_ENDPOINTS: process.env.REDIS_CLUSTER_ENDPOINTS,
       REDIS_DB_INDEX: process.env.REDIS_DB_INDEX,
       GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      LANGWATCH_DISABLE_GOOGLE_DLP:
+        process.env.LANGWATCH_DISABLE_GOOGLE_DLP?.toLowerCase() === "true",
       AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
       AZURE_OPENAI_KEY: process.env.AZURE_OPENAI_KEY,
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
