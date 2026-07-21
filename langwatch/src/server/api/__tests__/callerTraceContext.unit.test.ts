@@ -8,8 +8,14 @@
  * and `Calls over the realtime transports still correlate` in
  * specs/observability/browser-rum-trace-correlation.feature. See ADR-058.
  */
-import { propagation, trace } from "@opentelemetry/api";
+import {
+  context as otelContext,
+  propagation,
+  trace,
+} from "@opentelemetry/api";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
+import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
+import { StackContextManager } from "@opentelemetry/sdk-trace-web";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { callerTraceContext } from "../trpc";
@@ -107,6 +113,37 @@ describe("callerTraceContext", () => {
     it("survives a req with no headers", () => {
       expect(spanContextOf(callerTraceContext({ req: {}, type: "query" })))
         .toBeUndefined();
+    });
+  });
+
+  describe("given the HTTP layer has already opened a span for this request", () => {
+    /**
+     * The `/api` router extracts the same `traceparent` and opens the server
+     * span that is executing this call. Extracting again would parent the
+     * procedure to the browser instead, leaving the HTTP span a childless
+     * sibling of the work it is actually running.
+     */
+    it("keeps the local span as the parent instead of re-extracting", () => {
+      otelContext.setGlobalContextManager(new StackContextManager().enable());
+      const provider = new BasicTracerProvider();
+      const httpSpan = provider.getTracer("test").startSpan("POST /api");
+
+      try {
+        otelContext.with(trace.setSpan(otelContext.active(), httpSpan), () => {
+          const parent = callerTraceContext({
+            req: { headers: { traceparent: TRACEPARENT } },
+            type: "query",
+          });
+
+          expect(spanContextOf(parent)?.spanId).toBe(
+            httpSpan.spanContext().spanId,
+          );
+          expect(spanContextOf(parent)?.spanId).not.toBe(REMOTE_SPAN_ID);
+        });
+      } finally {
+        httpSpan.end();
+        otelContext.disable();
+      }
     });
   });
 });

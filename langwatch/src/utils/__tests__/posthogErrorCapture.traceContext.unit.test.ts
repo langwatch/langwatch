@@ -24,11 +24,16 @@ import {
 import { StackContextManager } from "@opentelemetry/sdk-trace-web";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const capture = vi.fn();
+// `vi.hoisted` so the spy exists before the hoisted `vi.mock` factory and
+// before the module under test is imported below — a plain `const` would be
+// initialised after both.
+const { capture } = vi.hoisted(() => ({ capture: vi.fn() }));
 
 vi.mock("posthog-js", () => ({
   default: { __loaded: true, capture },
 }));
+
+import { captureException } from "../posthogErrorCapture";
 
 const provider = new BasicTracerProvider({
   spanProcessors: [new SimpleSpanProcessor(new InMemorySpanExporter())],
@@ -59,7 +64,6 @@ describe("captureException trace context", () => {
   describe("given an error captured inside a span", () => {
     /** @scenario An error captured in the browser carries its trace */
     it("records the trace and span it happened in", async () => {
-      const { captureException } = await import("../posthogErrorCapture");
 
       const span = trace
         .getTracer("test")
@@ -77,7 +81,6 @@ describe("captureException trace context", () => {
     });
 
     it("cannot have its trace identity overwritten by caller-supplied extras", async () => {
-      const { captureException } = await import("../posthogErrorCapture");
 
       const span = trace
         .getTracer("test")
@@ -98,7 +101,6 @@ describe("captureException trace context", () => {
   describe("given an error captured outside any span", () => {
     /** @scenario An error captured outside any call records no trace */
     it("is still recorded, and claims no trace", async () => {
-      const { captureException } = await import("../posthogErrorCapture");
 
       captureException(new Error("boom during boot"));
 

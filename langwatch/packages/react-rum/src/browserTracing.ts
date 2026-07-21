@@ -50,6 +50,9 @@ export function startBrowserTracing({
   environment?: string;
   serviceVersion?: string;
 } = {}): void {
+  // Never reset, even when the bootstrap below throws part-way. By then a
+  // provider and an exporter may already be globally registered, and a second
+  // attempt would leave the first one orphaned and exporting.
   if (started || typeof window === "undefined") return;
   started = true;
 
@@ -94,7 +97,6 @@ export function startBrowserTracing({
     });
   } catch {
     // Leave the page untraced rather than broken.
-    started = false;
   }
 }
 

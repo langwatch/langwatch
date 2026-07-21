@@ -9,6 +9,7 @@
 
 import {
   context as otelContext,
+  isSpanContextValid,
   propagation,
   trace as otelTrace,
   type Span,
@@ -487,6 +488,14 @@ function recordSpanError(span: Span, error: unknown): void {
  * the UI and the server work it triggers are two unrelated traces, which is the
  * common case because most of the product talks tRPC rather than REST.
  *
+ * A local span already on the context wins. When tRPC is served through the
+ * HTTP router, its `tracerMiddleware` has already extracted the same
+ * `traceparent` and opened the `POST /api` server span that is executing this
+ * call — re-extracting would parent the procedure to the *remote* browser span
+ * instead, leaving the HTTP span a childless sibling and losing the fact that
+ * one contains the other. Extraction is therefore only for callers that arrive
+ * with no local span at all.
+ *
  * Only the request-per-call transports are consulted. The WebSocket and SSE
  * links hold one long-lived connection, so `ctx.req` there is the *handshake*
  * request — extracting from it would parent every later call on that socket to
@@ -499,6 +508,9 @@ function recordSpanError(span: Span, error: unknown): void {
 export function callerTraceContext({ req, type }: { req: any; type: string }) {
   const active = otelContext.active();
   if (type === "subscription") return active;
+
+  const localSpan = otelTrace.getSpan(active)?.spanContext();
+  if (localSpan && isSpanContextValid(localSpan)) return active;
 
   const headers = req?.headers;
   if (!headers) return active;

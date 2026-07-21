@@ -123,14 +123,38 @@ either way.
 
 **The server will extract trace context in the tRPC tracer**, using the same
 `propagation.extract` treatment `tracer.ts` already applies, and falling back to
-the operation context for calls that arrive over WebSocket or SSE.
+the operation context for calls that arrive over WebSocket or SSE. Extraction
+only applies when no local span is already on the context: when tRPC is reached
+through the HTTP router, that router has already extracted the same header and
+opened the server span running the call, and re-extracting would parent the
+procedure to the browser instead of to the request executing it.
 
-**Browser-supplied trace context is untrusted input.** Anyone can post spans at
-a public route and assert any trace id. We accept this — the blast radius of a
-polluted trace is a confusing Tempo query, not a security boundary — but we
-bound it: the ingest route is rate-limited per session and per IP, caps body
-size below the collector's 32MB limit, and rejects payloads whose resource
-attributes claim to be a service other than the browser app.
+**Browser-supplied input is untrusted, and the caller's identity is
+unknowable.** Anyone can post spans at a public route, assert any trace id, and
+rotate whatever identity the route rate-limits on. The design follows from
+taking that seriously:
+
+- **Identity attributes are overwritten, not validated.** `service.name` and
+  `langwatch.origin` are set server-side. Validation would have to reason about
+  a repeated attribute list where the collector takes the last value and a
+  first-match check takes the first — so a second `service.name` slips a forged
+  identity past any check. Overwriting removes the question.
+- **Limits are enforced per caller *and* globally.** The per-caller bucket is
+  fairness; since it keys on self-asserted values it bounds accidents, not
+  abuse. The global bucket is what actually caps what the route can push at the
+  collector.
+- **Body size is enforced while reading, not after.** `content-length` is a
+  hint a chunked request need not send; the cap is applied to bytes as they
+  arrive so an unbounded upload is never buffered.
+- **Span count is capped separately from body size.** Minimal spans are small,
+  so a body under the size limit still carries thousands of them.
+- **A collector failure is not surfaced to the browser.** A 5xx is in the OTLP
+  retryable set, so answering an outage with one converts it into every open
+  tab retrying against us. The drop is logged server-side instead.
+
+The residual accepted risk is unchanged: a determined poster can still put
+plausible spans in our trace store. The blast radius is a confusing Tempo query,
+not a security boundary.
 
 **Sampling decisions are made in the browser and respected by the backend.**
 This is the consequence of head-based sampling that most often surprises people:

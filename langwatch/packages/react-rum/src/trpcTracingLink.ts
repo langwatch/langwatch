@@ -8,12 +8,17 @@
  * This link sits above the transport split, so every call is visible whichever
  * way it travelled.
  *
- * Trace context is *not* injected here. The fetch instrumentation already puts
- * `traceparent` on the batched request, and one header cannot carry a distinct
- * parent for each call inside a batch. So the server's spans hang off the HTTP
- * request rather than off the individual procedure span. Everything stays in
- * one trace — which is the point — but per-procedure client-to-server parentage
- * is approximate under batching. Calls sent unbatched (`skipBatch`) are exact.
+ * The span is made *active* for the duration of the call, which is what keeps
+ * everything in one trace: the fetch instrumentation picks the active span up
+ * as its parent, so the HTTP span — and through `traceparent`, every server
+ * span under it — descends from the procedure span rather than starting a trace
+ * of its own.
+ *
+ * Trace context is not injected here directly. Fetch instrumentation writes the
+ * header, and one header cannot carry a distinct parent for each call inside a
+ * batch, so under `httpBatchLink` the server's spans hang off whichever call in
+ * the batch opened the request. Per-procedure parentage is therefore exact for
+ * unbatched calls (`skipBatch`) and approximate within a batch.
  *
  * Fail-open by construction: this sits in the live request path, so any error
  * in the instrumentation passes the operation through untouched rather than
@@ -22,7 +27,12 @@
  * See ADR-058.
  */
 
-import { SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
+import {
+  context as otelContext,
+  SpanKind,
+  SpanStatusCode,
+  trace,
+} from "@opentelemetry/api";
 import type { TRPCLink } from "@trpc/client";
 import type { AnyRouter } from "@trpc/server";
 import { observable } from "@trpc/server/observable";
@@ -36,32 +46,39 @@ export function tracingLink<TRouter extends AnyRouter>(): TRPCLink<TRouter> {
         const span = startSpan(op);
         if (!span) return next(op).subscribe(observer);
 
-        const subscription = next(op).subscribe({
-          next(value) {
-            observer.next(value);
-          },
-          error(error) {
-            try {
-              span.recordException(error as unknown as Error);
-              span.setStatus({
-                code: SpanStatusCode.ERROR,
-                message: error?.message,
-              });
-              span.end();
-            } catch {
-              // An error reporting an error is not worth propagating.
-            }
-            observer.error(error);
-          },
-          complete() {
-            try {
-              span.end();
-            } catch {
-              // See above.
-            }
-            observer.complete();
-          },
-        });
+        // Active for the subscribe call, so the transport's own instrumentation
+        // (fetch, and anything else that reads the active context) parents onto
+        // this span instead of rooting a separate trace.
+        const subscription = otelContext.with(
+          trace.setSpan(otelContext.active(), span),
+          () =>
+            next(op).subscribe({
+              next(value) {
+                observer.next(value);
+              },
+              error(error) {
+                try {
+                  span.recordException(error as unknown as Error);
+                  span.setStatus({
+                    code: SpanStatusCode.ERROR,
+                    message: error?.message,
+                  });
+                  span.end();
+                } catch {
+                  // An error reporting an error is not worth propagating.
+                }
+                observer.error(error);
+              },
+              complete() {
+                try {
+                  span.end();
+                } catch {
+                  // See above.
+                }
+                observer.complete();
+              },
+            }),
+        );
 
         return () => {
           // Unsubscribing before completion — a cancelled query, an unmounted

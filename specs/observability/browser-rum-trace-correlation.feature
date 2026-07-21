@@ -41,6 +41,10 @@ Feature: Browser RUM and full-stack trace correlation
       When a later call arrives on that same connection
       Then the later call is not attributed to the trace that opened it
 
+    @pending
+    # Not built. Only the initial page load produces a span today; an in-app
+    # navigation produces none, so the calls it triggers have no parent. Needs
+    # a router integration — ADR-058 phase 6.
     Scenario: Navigating between pages is visible as work
       When the user navigates to another page
       Then the navigation appears as a span
@@ -86,13 +90,33 @@ Feature: Browser RUM and full-stack trace correlation
       Then further reports are rejected
       And previously accepted telemetry is unaffected
 
+    # A caller's claimed identity is self-asserted and freely rotated, so
+    # per-caller limits alone bound only accidents. The endpoint is bounded as a
+    # whole as well.
+    Scenario: A flood spread across many claimed identities is still bounded
+      Given clients reporting telemetry under a new identity each time
+      When their combined rate exceeds what the endpoint accepts
+      Then further reports are rejected regardless of the identity claimed
+
     Scenario: An oversized report is rejected
       When a client reports telemetry larger than the accepted size
+      Then the report is rejected before it is read into memory
+
+    Scenario: A report carrying too many spans is rejected
+      When a client reports far more spans than a browser produces
       Then the report is rejected before it reaches the collector
 
-    Scenario: Telemetry claiming to be another service is refused
+    Scenario: Telemetry cannot claim to come from another service
       When a client reports telemetry claiming to originate from a different service
-      Then the report is rejected
+      Then the telemetry that reaches the collector is attributed to the browser app
+
+    # An OTLP exporter retries a server error, so answering a collector outage
+    # with one would turn every open tab into a retry loop against the app.
+    Scenario: A collector outage does not provoke the browser into retrying
+      Given the collector is unreachable
+      When a client reports telemetry
+      Then the client is told the report was accepted
+      And the drop is recorded for operators
 
   Rule: A recorded error can be followed to its trace
 

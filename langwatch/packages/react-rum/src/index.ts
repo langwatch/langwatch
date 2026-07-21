@@ -14,14 +14,15 @@
 
 export {
   RUM_MAX_BODY_BYTES,
+  RUM_MAX_SPANS,
   RUM_SERVICE_NAME,
   RUM_SESSION_HEADER,
   RUM_TRACES_PATH,
 } from "./constants";
-export {
-  resetBrowserTracingForTesting,
-  startBrowserTracing,
-} from "./browserTracing";
+// `resetBrowserTracingForTesting` is deliberately not re-exported here: it
+// disables the global OTel API, and nothing in an application bundle should be
+// able to reach it. Tests import it from "./browserTracing" directly.
+export { startBrowserTracing } from "./browserTracing";
 export { currentSessionId, SESSION_INACTIVITY_MS } from "./session";
 export { SessionSpanProcessor } from "./sessionSpanProcessor";
 export { tracingLink } from "./trpcTracingLink";
