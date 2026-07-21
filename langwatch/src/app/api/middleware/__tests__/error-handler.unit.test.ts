@@ -142,12 +142,16 @@ describe("handleError()", () => {
 
       expect(res.status).toBe(400);
       const body = await res.json();
-      expect(body.cause).toBe("MODEL_NOT_CONFIGURED");
+      // ModelNotConfiguredError is a HandledError, so it goes through the
+      // generic HandledError branch — `error` carries the same discriminant
+      // the legacy `cause` field used to (see modelNotConfiguredError.ts).
+      expect(body.error).toBe("MODEL_NOT_CONFIGURED");
       expect(body.featureKey).toBe("evaluator.create_default");
       expect(body.role).toBe("DEFAULT");
       expect(body.featureDisplayName).toBe("Evaluator default model");
       expect(body.projectId).toBe("project_123");
       expect(body.message).toContain("No model configured");
+      expect(body.fault).toBe("customer");
     });
   });
 
