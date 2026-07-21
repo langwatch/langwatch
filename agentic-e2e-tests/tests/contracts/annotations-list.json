@@ -1,0 +1,17 @@
+{
+  "data": [
+    {
+      "id": "string",
+      "projectId": "string",
+      "traceId": "string",
+      "comment": "string",
+      "isThumbsUp": "boolean",
+      "userId": "any?",
+      "createdAt": "string",
+      "updatedAt": "string",
+      "email": "any?",
+      "scoreOptions": "any?",
+      "expectedOutput": "any?"
+    }
+  ]
+}

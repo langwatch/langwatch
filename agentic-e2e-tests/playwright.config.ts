@@ -15,6 +15,19 @@ const BASE_URL = process.env.BASE_URL ?? "http://localhost:5570";
 const AUTH_FILE = path.join(__dirname, ".auth", "user.json");
 const IS_CI = !!process.env.CI;
 
+/* `/api/auth/*` state-changing requests are gated on Origin (falling back to
+ * Referer) matching the app's own BASE_HOST — see
+ * langwatch/src/server/better-auth/originGate.ts. A browser sends that header
+ * for free; a bare HTTP client does not, so the headless projects send it
+ * explicitly or every sign-in 403s with INVALID_ORIGIN.
+ *
+ * It defaults to BASE_URL, which is correct whenever the app is reached at its
+ * own base URL (CI runs `PORT=5570 pnpm start`, and start.sh aligns BASE_HOST
+ * to PORT). Override with E2E_AUTH_ORIGIN when hitting the API on a different
+ * origin to the configured BASE_HOST — e.g. calling the API server directly on
+ * PORT+1000 while .env still pins BASE_HOST to the default port. */
+const AUTH_ORIGIN = process.env.E2E_AUTH_ORIGIN ?? BASE_URL;
+
 export default defineConfig({
   testDir: "./tests",
 
@@ -24,9 +37,11 @@ export default defineConfig({
   /* Ignore the MCP seed file - it's only for planning exploration */
   testIgnore: ["**/seed.spec.ts"],
 
-  /* Run tests sequentially - important for agentic debugging */
-  fullyParallel: false,
-  workers: 1,
+  /* Parallelism is decided per project, not globally. The headless projects
+   * provision their own tenant per test and run wide; the browser project
+   * still shares one org across its specs and stays serial (see below). */
+  fullyParallel: true,
+  workers: process.env.E2E_WORKERS ? Number(process.env.E2E_WORKERS) : undefined,
 
   /* Fail the build on CI if you accidentally left test.only in the source code */
   forbidOnly: IS_CI,
@@ -73,17 +88,51 @@ export default defineConfig({
    */
   webServer: undefined,
 
-  /* Project configurations */
+  /* Project configurations
+   *
+   * Tiers differ by cost, not by feature area — see
+   * dev/docs/adr/010-e2e-testing-strategy.md (headless-tier amendment).
+   *
+   *   api   Tier 3. No browser, no shared state: every test provisions its own
+   *         org + project over HTTP, so they run fully parallel and are
+   *         eligible to block a PR.
+   *   ui    Tier 2. The capped 5-10 browser happy paths.
+   *
+   * There is deliberately no `cli` project here. CLI e2e already has a home in
+   * `typescript-sdk/__tests__/e2e/cli/`, which spawns the compiled binary
+   * against a hermetic HOME and lives in the same package as the binary it
+   * tests. Duplicating that harness here would split CLI coverage across two
+   * suites for no gain.
+   */
   projects: [
-    /* Setup project - runs authentication once */
+    /* Headless: HTTP-level assertions against a real app, queues and DB. */
+    {
+      name: "api",
+      testDir: "./tests/api",
+      /* No browser is launched for this project — these tests never touch a
+       * `page`, only the request context. */
+      use: { extraHTTPHeaders: { Origin: AUTH_ORIGIN } },
+    },
+
+    /* Setup project - runs authentication once for the browser tier */
     {
       name: "setup",
       testMatch: /.*\.setup\.ts/,
     },
 
-    /* Main test project - uses authenticated state */
+    /* Browser tier - uses authenticated state.
+     *
+     * Still serial. Its specs share the one `auth.setup` org, and the members
+     * specs toggle an enterprise licence on it, which would leak into
+     * settings/plans-comparison.spec.ts asserting the Free plan. The per-test
+     * tenant helper in tests/support/tenant.ts is what will unblock
+     * parallelising this too, once these specs are migrated onto it. */
     {
-      name: "chromium",
+      name: "ui",
+      testDir: "./tests",
+      testIgnore: ["**/api/**", "**/*.setup.ts"],
+      fullyParallel: false,
+      workers: 1,
       use: {
         ...devices["Desktop Chrome"],
         storageState: AUTH_FILE,
