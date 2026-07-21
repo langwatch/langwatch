@@ -85,9 +85,12 @@ export function createLangyChatTransport(
     async sendMessages(options) {
       const ctx = deps.getContext();
       const turnInput = {
-        // One logical send, one identity. Any transport/proxy retry replays the
-        // same mutation body and therefore the same turn/message/admission.
-        requestId: crypto.randomUUID(),
+        // One logical send, one identity: minted fresh on every sendMessages
+        // call (each composer submit / regenerate re-arms with a new key), so
+        // a genuine re-send of the same text is a NEW turn. Transport/proxy
+        // retries replay the same mutation body — same key, same content —
+        // and collapse onto the same admitted turn.
+        idempotencyKey: crypto.randomUUID(),
         messages: options.messages,
         ...(options.trigger ? { trigger: options.trigger } : {}),
         projectId: ctx.projectId,

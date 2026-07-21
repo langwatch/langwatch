@@ -868,7 +868,7 @@ const langyTurnsTotal = new Counter({
   labelNames: ["outcome"] as const,
 });
 export const getLangyTurnsCounter = (
-  outcome: "accepted" | "replay" | "busy" | "rejected" | "error",
+  outcome: "accepted" | "replay" | "busy" | "rejected" | "mismatch" | "error",
 ) => langyTurnsTotal.labels(outcome);
 
 // One increment per dispatch attempt to the agent manager.
@@ -883,6 +883,7 @@ export const getLangyDispatchCounter = (
     | "accepted"
     | "busy"
     | "credentials_required"
+    | "rejected"
     | "unavailable"
     | "error",
 ) => langyDispatchTotal.labels(outcome);

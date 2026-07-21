@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -47,6 +48,7 @@ type routerExporter struct {
 	registry  *Registry
 	mu        sync.Mutex
 	byProject *lru.Cache[string, cachedExporter]
+	closing   atomic.Bool
 
 	spansExported metric.Int64Counter
 	spansDropped  metric.Int64Counter
@@ -56,7 +58,14 @@ func newRouterExporter(ctx context.Context, registry *Registry) *routerExporter 
 	r := &routerExporter{baseCtx: ctx, registry: registry}
 	cache, _ := lru.NewWithEvict(
 		defaultExporterCacheSize,
-		func(_ string, c cachedExporter) { shutdownDetached(c.exp) },
+		func(_ string, c cachedExporter) {
+			// During Shutdown the purge must not spawn a second, unobserved
+			// shutdown per exporter: Shutdown owns the lifecycle from there on.
+			if r.closing.Load() {
+				return
+			}
+			shutdownDetached(c.exp)
+		},
 	)
 	r.byProject = cache
 
@@ -144,16 +153,48 @@ func (r *routerExporter) dropped(ctx context.Context, reason string, n int) {
 	r.spansDropped.Add(ctx, int64(n), metric.WithAttributes(attribute.String("reason", reason)))
 }
 
+// exporterShutdownTimeout bounds each tenant's final flush. One project whose
+// OTLP ingest is unreachable must not hold the process open, and must not stall
+// the other tenants' flush behind it — the same reasoning as shutdownDetached,
+// which the eviction path already applies.
+const exporterShutdownTimeout = 5 * time.Second
+
 func (r *routerExporter) Shutdown(ctx context.Context) error {
+	r.closing.Store(true)
+
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	for _, k := range r.byProject.Keys() {
-		if c, ok := r.byProject.Peek(k); ok {
-			_ = c.exp.Shutdown(ctx)
+	pids := r.byProject.Keys()
+	exps := make([]*otlptrace.Exporter, 0, len(pids))
+	live := make([]string, 0, len(pids))
+	for _, pid := range pids {
+		if c, ok := r.byProject.Peek(pid); ok && c.exp != nil {
+			live = append(live, pid)
+			exps = append(exps, c.exp)
 		}
 	}
 	r.byProject.Purge()
-	return nil
+	r.mu.Unlock()
+
+	// Off the lock and in parallel, each bounded independently.
+	var wg sync.WaitGroup
+	errs := make([]error, len(exps))
+	for i := range exps {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			sctx, cancel := context.WithTimeout(ctx, exporterShutdownTimeout)
+			defer cancel()
+			if err := exps[i].Shutdown(sctx); err != nil {
+				// Surfaced, not swallowed, for the same reason a failed export is:
+				// a customer's last spans going missing must be visible.
+				clog.Get(r.baseCtx).Warn("customer_trace_exporter_shutdown_failed",
+					zap.String("project_id", live[i]), zap.Error(err))
+				errs[i] = fmt.Errorf("project %s: %w", live[i], err)
+			}
+		}(i)
+	}
+	wg.Wait()
+	return errors.Join(errs...)
 }
 
 // exporterFor returns the exporter for a project, rebuilding it whenever the

@@ -2,6 +2,7 @@ import { performance } from "node:perf_hooks";
 import { createLogger } from "@langwatch/observability";
 import {
   context as otelContext,
+  ROOT_CONTEXT,
   SpanKind,
   TraceFlags,
   trace,
@@ -1247,18 +1248,21 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         );
       };
 
-      // Restore parent OTEL context if available
-      if (contextMetadata?.traceId && contextMetadata?.parentSpanId) {
-        const parentContext = trace.setSpanContext(otelContext.active(), {
-          traceId: contextMetadata.traceId,
-          spanId: contextMetadata.parentSpanId,
-          traceFlags: TraceFlags.SAMPLED,
-          isRemote: true,
-        });
-        await otelContext.with(parentContext, executeWithSpan);
-      } else {
-        await executeWithSpan();
-      }
+      // A job is its own trace, associated with its producer by the span link
+      // added in `executeWithSpan` — never by parentage.
+      //
+      // Restoring the producer's span as the PARENT made every job a child of
+      // whatever enqueued it. Handlers enqueue further jobs from inside that
+      // restored context, so `getJobContextMetadata()` captured the job span
+      // and the next hop inherited the same trace id, transitively and without
+      // bound. One request's trace accreted the entire downstream fan-out; via
+      // the shared global queue that fan-out spans tenants, so a single trace
+      // id showed up on jobs for unrelated projects.
+      //
+      // ROOT_CONTEXT also detaches from whatever ambient span the dispatcher
+      // loop happens to be in, which is what previously swept unparented Redis
+      // spans into the same trace.
+      await otelContext.with(ROOT_CONTEXT, executeWithSpan);
     } finally {
       clearInterval(heartbeat);
       this.activeJobCount--;

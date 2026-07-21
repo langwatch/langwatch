@@ -136,7 +136,14 @@ const langyModelOverrideSchema = z
 
 /** Inputs shared by create + continue (the SAME turn-start operation). */
 const langyTurnInputShape = {
-  requestId: z.string().uuid(),
+  /**
+   * Client-minted identity for ONE logical send: transport retries replay the
+   * same key + content; a genuinely new send (the composer re-arming) mints a
+   * fresh key. Reusing a key with different content is a 409.
+   */
+  idempotencyKey: z.string().min(8).max(128).optional(),
+  /** @deprecated wire alias for pre-rename client bundles — same semantics. */
+  requestId: z.string().uuid().optional(),
   messages: z.array(langyTurnMessageSchema).min(1),
   modelOverride: langyModelOverrideSchema.optional(),
   /**
@@ -220,7 +227,8 @@ async function acceptTurn({
 }: {
   input: {
     projectId: string;
-    requestId: string;
+    idempotencyKey?: string | undefined;
+    requestId?: string | undefined;
     conversationId?: string | null;
     messages: LangyChatMessageInput[];
     modelOverride?: string;
@@ -230,9 +238,21 @@ async function acceptTurn({
   };
   session: Session;
 }): Promise<{ conversationId: string; turnId: string }> {
+  // Alias resolution for pre-rename client bundles; new clients send
+  // idempotencyKey. Neither present is a malformed request. Imperative
+  // rather than a schema .refine: the procedure base already carries a
+  // projectId input, and tRPC merges .input() calls — which requires plain
+  // object schemas, not the ZodEffects a refine produces.
+  const idempotencyKey = input.idempotencyKey ?? input.requestId;
+  if (!idempotencyKey) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "idempotencyKey is required.",
+    });
+  }
   return getApp().langy.turns.startConversationTurn({
     projectId: input.projectId,
-    requestId: input.requestId,
+    idempotencyKey,
     session,
     requestedConversationId: input.conversationId ?? null,
     messages: input.messages,
@@ -485,8 +505,7 @@ export const langyRouter = createTRPCRouter({
    * `LangyConversationNotOwnedError` for someone else's conversation.
    */
   continueConversation: langyTurnProcedure
-    .input(
-      z.object({
+    .input(z.object({
         conversationId: z.string().min(1),
         ...langyTurnInputShape,
       }),

@@ -10,7 +10,6 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -60,11 +59,11 @@ func TestEmitter_CachedRequest_RecordsCacheTokens(t *testing.T) {
 		CacheCreationTokens: 14,
 	})
 
-	cacheRead, ok := findIntAttr(span, gatewaytracer.AttrGenAIUsageCacheRead)
+	cacheRead, ok := findIntAttr(span, AttrGenAIUsageCacheRead)
 	require.True(t, ok, "span must carry gen_ai.usage.cache_read.input_tokens")
 	assert.Equal(t, int64(37127), cacheRead)
 
-	cacheCreate, ok := findIntAttr(span, gatewaytracer.AttrGenAIUsageCacheCreate)
+	cacheCreate, ok := findIntAttr(span, AttrGenAIUsageCacheCreate)
 	require.True(t, ok, "span must carry gen_ai.usage.cache_creation.input_tokens")
 	assert.Equal(t, int64(14), cacheCreate)
 }
@@ -79,7 +78,7 @@ func TestEmitter_FreshInputExcludesCacheTokens(t *testing.T) {
 		CacheCreationTokens: 14,
 	})
 
-	input, ok := findIntAttr(span, gatewaytracer.AttrGenAIUsageIn)
+	input, ok := findIntAttr(span, AttrGenAIUsageIn)
 	require.True(t, ok)
 	assert.Equal(t, int64(510), input,
 		"input_tokens must be the non-cached remainder: PromptTokens - cache_read - cache_creation")
@@ -93,12 +92,12 @@ func TestEmitter_NoCacheActivity_RecordsNoCacheTokens(t *testing.T) {
 		TotalTokens:      120,
 	})
 
-	_, hasRead := findIntAttr(span, gatewaytracer.AttrGenAIUsageCacheRead)
+	_, hasRead := findIntAttr(span, AttrGenAIUsageCacheRead)
 	assert.False(t, hasRead, "no cache-read attr when there is no cache activity")
-	_, hasCreate := findIntAttr(span, gatewaytracer.AttrGenAIUsageCacheCreate)
+	_, hasCreate := findIntAttr(span, AttrGenAIUsageCacheCreate)
 	assert.False(t, hasCreate, "no cache-creation attr when there is no cache activity")
 
-	input, ok := findIntAttr(span, gatewaytracer.AttrGenAIUsageIn)
+	input, ok := findIntAttr(span, AttrGenAIUsageIn)
 	require.True(t, ok)
 	assert.Equal(t, int64(100), input, "input_tokens is the full prompt when there is no cache activity")
 }

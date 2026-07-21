@@ -72,9 +72,11 @@ func (w *fakeWorker) ClaimTurn(string) ClaimOutcome {
 	}
 	return ClaimBusy
 }
-func (w *fakeWorker) Release()            { w.released++ }
-func (w *fakeWorker) Touch()              { w.touched++ }
-func (w *fakeWorker) HasServedTurn() bool { return w.servedTurn }
+func (w *fakeWorker) Release()                                                { w.released++ }
+func (w *fakeWorker) Touch()                                                  { w.touched++ }
+func (w *fakeWorker) HasServedTurn() bool                                     { return w.servedTurn }
+func (w *fakeWorker) ForwardTurnSpan(trace.SpanContext, time.Time, time.Time) {}
+
 func (w *fakeWorker) SetTurnTraceContext(sc trace.SpanContext) {
 	w.turnTraceContexts = append(w.turnTraceContexts, sc)
 }
