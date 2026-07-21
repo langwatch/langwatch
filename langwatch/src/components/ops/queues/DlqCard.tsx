@@ -11,6 +11,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
@@ -33,15 +34,15 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
 
   const replayMutation = api.ops.replayFromDlq.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Replayed ${data.jobsReplayed} jobs`, type: "success" }); setReplayTarget(null); void utils.ops.invalidate(); },
-    onError: (error) => { toaster.create({ title: "Replay failed", description: error.message, type: "error" }); },
+    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't replay the group" }),
   });
   const replayAllMutation = api.ops.replayAllFromDlq.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Replayed ${data.replayedCount} groups`, type: "success" }); setReplayAllTarget(null); void utils.ops.invalidate(); },
-    onError: (error) => { toaster.create({ title: "Replay all failed", description: error.message, type: "error" }); },
+    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't replay the groups" }),
   });
   const canaryRedriveMutation = api.ops.canaryRedrive.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Canary redrove ${data.redrivenCount}`, type: "success" }); setCanaryTarget(null); void utils.ops.invalidate(); },
-    onError: (error) => { toaster.create({ title: "Canary failed", description: error.message, type: "error" }); },
+    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't run the canary redrive" }),
   });
 
   const groups = dlqQuery.data ?? [];

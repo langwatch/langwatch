@@ -42,6 +42,7 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 const SECTION_LABELS: Record<AiToolEntry["type"], string> = {
@@ -93,13 +94,7 @@ export function ToolCatalogEditor({
       void utils.aiTools.adminList.invalidate({ organizationId });
       void utils.aiTools.list.invalidate({ organizationId });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to update tile",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) => showErrorToast(err, { fallbackTitle: "Couldn't update tile" }),
   });
 
   const removeMutation = api.aiTools.remove.useMutation({
@@ -109,26 +104,14 @@ export function ToolCatalogEditor({
       toaster.create({ title: "Tile deleted", type: "success" });
       setPendingDelete(null);
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to delete tile",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) => showErrorToast(err, { fallbackTitle: "Couldn't delete tile" }),
   });
 
   const reorderMutation = api.aiTools.reorder.useMutation({
     onSuccess: () => {
       void utils.aiTools.list.invalidate({ organizationId });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to reorder",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) => showErrorToast(err, { fallbackTitle: "Couldn't reorder tiles" }),
   });
 
   const importStarterPackMutation = api.aiTools.importStarterPack.useMutation({
@@ -147,13 +130,8 @@ export function ToolCatalogEditor({
         type: "success",
       });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to import starter pack",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast(err, { fallbackTitle: "Couldn't import the starter pack" }),
   });
 
   const starterPackQuery = api.aiTools.starterPackCatalog.useQuery(

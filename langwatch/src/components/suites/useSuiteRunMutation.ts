@@ -4,6 +4,7 @@
  * Used by both SuiteFormDrawer (Save & Run) and suites/index.tsx (sidebar Run).
  */
 
+import { readHandledError, showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import { toaster } from "../ui/toaster";
 
@@ -56,25 +57,32 @@ export function useSuiteRunMutation({
       }
     },
     onError: (err, variables) => {
-      const isAllArchived =
-        err.data?.code === "BAD_REQUEST" &&
-        (err.message.includes("All scenarios") ||
-          err.message.includes("All targets"));
+      // A run plan with nothing runnable left is a curated rejection with its
+      // own way out — the toast carries the "Edit Run Plan" action, which is
+      // the fix. Keyed off the stable code, not the prose.
+      const code = readHandledError(err)?.code;
+      const archivedKind =
+        code === "suite_all_scenarios_archived"
+          ? "scenario"
+          : code === "suite_all_targets_archived"
+            ? "target"
+            : null;
 
-      toaster.create({
-        title: isAllArchived ? "Cannot execute run plan" : "Failed to execute run plan",
-        description: err.message,
-        type: "error",
-        meta: { closable: true },
-        ...(isAllArchived
-          ? {
-              action: {
-                label: "Edit Run Plan",
-                onClick: () => onEditSuite(variables.id),
-              },
-            }
-          : {}),
-      });
+      if (archivedKind) {
+        toaster.create({
+          title: "Cannot execute run plan",
+          description: `Every ${archivedKind} in this run plan is archived. Edit the plan to include active ones.`,
+          type: "error",
+          meta: { closable: true },
+          action: {
+            label: "Edit Run Plan",
+            onClick: () => onEditSuite(variables.id),
+          },
+        });
+        return;
+      }
+
+      showErrorToast(err, { fallbackTitle: "Couldn't execute run plan" });
     },
   });
 

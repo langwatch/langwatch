@@ -2,6 +2,7 @@ import { Button, Field, Heading, HStack, Input, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useDebounce } from "use-debounce";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../../components/ui/drawer";
 import { InputGroup } from "../../components/ui/input-group";
@@ -11,7 +12,6 @@ import type { MaybeStoredLLMModelCost } from "../../server/modelProviders/llmMod
 import { api } from "../../utils/api";
 import { exactModelMatchRegex } from "../../utils/modelCostRegex";
 import { isSafeRegex } from "../../utils/safeRegex";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import {
   LLMModelCostMatchingSpans,
@@ -208,18 +208,12 @@ function LLMModelCostForm({
           closeDrawer();
           void llmModelCostsQuery.refetch();
         },
-        onError: (error) => {
-          if (isHandledByGlobalHandler(error)) return;
-          toaster.create({
-            title: "Error",
-            description: error.message || "Error creating LLM model cost",
-            type: "error",
-            duration: 5000,
-            meta: {
-              closable: true,
-            },
-          });
-        },
+        onError: (error) =>
+          showErrorToast(error, {
+            fallbackTitle: id
+              ? "Couldn't update model cost"
+              : "Couldn't create model cost",
+          }),
       },
     );
   };

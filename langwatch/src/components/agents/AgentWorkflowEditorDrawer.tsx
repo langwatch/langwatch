@@ -15,7 +15,6 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
-import { toaster } from "~/components/ui/toaster";
 import {
   ScenarioInputMappingSection,
   isScenarioMappingValid,
@@ -38,8 +37,8 @@ import type {
   TypedAgent,
 } from "~/server/agents/agent.repository";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 export type AgentWorkflowEditorDrawerProps = {
   open?: boolean;
@@ -201,14 +200,8 @@ export function AgentWorkflowEditorDrawer(
       onSave?.(agent);
       onClose();
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error updating agent",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't save agent" }),
   });
 
   const isSaving = updateMutation.isPending;

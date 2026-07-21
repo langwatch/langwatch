@@ -19,13 +19,18 @@ import { AlertCircle, ChevronDown, ChevronRight, RefreshCw } from "react-feather
  * - an expandable section showing the backend error details
  */
 export function ChartErrorState({
-  errorMessage,
+  error,
   onRetry,
 }: {
-  errorMessage: string;
+  /** The chart query's error, passed straight through — handled or not. */
+  error: unknown;
   onRetry: () => void;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const handled = readHandledError(error);
+  const explanation = handled
+    ? explainHandledError(handled)
+    : UNKNOWN_ERROR_PRESENTATION;
 
   return (
     <Box

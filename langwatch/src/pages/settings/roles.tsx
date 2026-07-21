@@ -25,6 +25,7 @@ import { RoleCard } from "../../components/settings/RoleCard";
 import { RoleFormDialog } from "../../components/settings/RoleFormDialog";
 import { Dialog } from "../../components/ui/dialog";
 import { toaster } from "../../components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useActivePlan } from "../../hooks/useActivePlan";
@@ -32,7 +33,6 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { Permission } from "../../server/api/rbac";
 import { getTeamRolePermissions } from "../../server/api/rbac";
 import { api } from "../../utils/api";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
 
 /**
  * Role Management Settings Page
@@ -154,14 +154,8 @@ function RolesManagement({
       });
       onClose();
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to create role",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't create role" }),
   });
 
   const deleteRole = api.role.delete.useMutation({
@@ -172,14 +166,8 @@ function RolesManagement({
         type: "success",
       });
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to delete role",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't delete role" }),
   });
 
   const updateRole = api.role.update.useMutation({
@@ -192,14 +180,8 @@ function RolesManagement({
       onEditClose();
       setEditingRole(null);
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to update role",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't update role" }),
   });
 
   const handleEditRole = async (roleId: string) => {
@@ -212,12 +194,8 @@ function RolesManagement({
         permissions: role.permissions as Permission[],
       });
       onEditOpen();
-    } catch {
-      toaster.create({
-        title: "Failed to load role",
-        description: "Could not load role details for editing",
-        type: "error",
-      });
+    } catch (error) {
+      showErrorToast(error, { fallbackTitle: "Couldn't load role details" });
     }
   };
 
@@ -231,12 +209,8 @@ function RolesManagement({
         permissions: role.permissions as Permission[],
       });
       onViewOpen();
-    } catch {
-      toaster.create({
-        title: "Failed to load role",
-        description: "Could not load role details for viewing",
-        type: "error",
-      });
+    } catch (error) {
+      showErrorToast(error, { fallbackTitle: "Couldn't load role details" });
     }
   };
 
@@ -473,7 +447,12 @@ function RolesManagement({
         open={viewOpen}
         onOpenChange={({ open }) => !open && onViewClose()}
       >
-        <Dialog.Content bg="bg" maxWidth="600px" maxHeight="80vh" overflowY="auto">
+        <Dialog.Content
+          bg="bg"
+          maxWidth="600px"
+          maxHeight="80vh"
+          overflowY="auto"
+        >
           <Dialog.Header>
             <Dialog.Title>View Permissions - {viewingRole?.name}</Dialog.Title>
           </Dialog.Header>
@@ -512,7 +491,12 @@ function RolesManagement({
         open={defaultViewOpen}
         onOpenChange={({ open }) => !open && onDefaultViewClose()}
       >
-        <Dialog.Content bg="bg" maxWidth="600px" maxHeight="80vh" overflowY="auto">
+        <Dialog.Content
+          bg="bg"
+          maxWidth="600px"
+          maxHeight="80vh"
+          overflowY="auto"
+        >
           <Dialog.Header>
             <Dialog.Title>
               View Permissions - {viewingDefaultRole?.name}

@@ -2,6 +2,7 @@ import { cloneDeep } from "lodash-es";
 import { useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 import { toaster } from "~/components/ui/toaster";
+import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
 import type { PromptConfigFormValues } from "~/prompts";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
@@ -12,7 +13,6 @@ import {
 } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { useTabId } from "../components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
 import {
   type TabData,
@@ -103,15 +103,8 @@ export function useHandleSavePrompt() {
      * @param error - The error that occurred during save
      */
     const onError = (error: Error) => {
-      console.error(error);
-      // Skip toast if the global license handler already showed the upgrade modal
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error saving",
-        description: error.message,
-        type: "error",
-        meta: { closable: true },
-      });
+      if (applyHandledErrorToForm({ error, form: methods })) return;
+      showErrorToast(error, { fallbackTitle: "Couldn't save the prompt" });
     };
 
     /**

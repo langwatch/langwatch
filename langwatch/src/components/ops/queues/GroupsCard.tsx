@@ -15,6 +15,7 @@ import {
 import { Search } from "lucide-react";
 import type { GroupInfo } from "~/server/app-layer/ops/types";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { formatTimeAgo } from "~/components/ops/shared/formatters";
 import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
@@ -90,11 +91,11 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   const [drainTenantTarget, setDrainTenantTarget] = useState<string | null>(null);
   const drainGroupMutation = api.ops.drainGroup.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Drained, removed ${data.jobsRemoved} jobs`, type: "success" }); setDrainTarget(null); void utils.ops.invalidate(); },
-    onError: (error) => { toaster.create({ title: "Failed to drain", description: error.message, type: "error" }); },
+    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't drain the group" }),
   });
   const unblockMutation = api.ops.unblockGroup.useMutation({
     onSuccess: () => { toaster.create({ title: "Group unblocked", type: "success" }); void utils.ops.invalidate(); },
-    onError: (error) => { toaster.create({ title: "Failed to unblock", description: error.message, type: "error" }); },
+    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't unblock the group" }),
   });
 
   // Tenant-scoped controls. Activated when the search box is a single
@@ -118,11 +119,11 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
 
   const pauseTenantMutation = api.ops.pauseTenant.useMutation({
     onSuccess: (_, vars) => { toaster.create({ title: `Paused tenant ${vars.tenantId}`, type: "success" }); void utils.ops.invalidate(); },
-    onError: (error) => { toaster.create({ title: "Failed to pause tenant", description: error.message, type: "error" }); },
+    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't pause the tenant" }),
   });
   const unpauseTenantMutation = api.ops.unpauseTenant.useMutation({
     onSuccess: (_, vars) => { toaster.create({ title: `Unpaused tenant ${vars.tenantId}`, type: "success" }); void utils.ops.invalidate(); },
-    onError: (error) => { toaster.create({ title: "Failed to unpause tenant", description: error.message, type: "error" }); },
+    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't unpause the tenant" }),
   });
   const drainTenantMutation = api.ops.drainTenant.useMutation({
     onSuccess: (data, vars) => {
@@ -133,7 +134,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
       setDrainTenantTarget(null);
       void utils.ops.invalidate();
     },
-    onError: (error) => { toaster.create({ title: "Failed to drain tenant", description: error.message, type: "error" }); setDrainTenantTarget(null); },
+    onError: (error) => { showErrorToast(error, { fallbackTitle: "Couldn't drain the tenant's groups" }); setDrainTenantTarget(null); },
   });
 
   const statusButtons: Array<{ value: StatusFilter; label: string; count: number; color: string }> = [

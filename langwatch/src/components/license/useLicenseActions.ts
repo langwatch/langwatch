@@ -1,5 +1,5 @@
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { toaster } from "../ui/toaster";
 import { getUserFriendlyLicenseError } from "../../../ee/licensing/constants";
 
@@ -25,12 +25,20 @@ export function useLicenseActions({
       window.location.reload();
     },
     onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to activate license",
-        description: getUserFriendlyLicenseError(error.message),
-        type: "error",
-      });
+      // License validation rejects with a curated, actionable message that no
+      // error code covers ("the key is invalid or has been tampered with").
+      // Keep it when we recognise it; anything else goes through the registry
+      // so an internal message never reaches the customer.
+      const friendly = getUserFriendlyLicenseError(error.message);
+      if (friendly !== error.message) {
+        toaster.create({
+          title: "Couldn't activate license",
+          description: friendly,
+          type: "error",
+        });
+        return;
+      }
+      showErrorToast(error, { fallbackTitle: "Couldn't activate license" });
     },
   });
 
@@ -44,14 +52,8 @@ export function useLicenseActions({
       onRemoveSuccess();
       window.location.reload();
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to remove license",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't remove license" }),
   });
 
   const upload = (licenseKey: string) => {

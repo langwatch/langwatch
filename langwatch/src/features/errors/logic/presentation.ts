@@ -185,6 +185,25 @@ const presentations = {
     describe: () => "Try again in a moment.",
   },
 
+  // ---- suites (run plans) ----
+  suite_error: { title: "Run plan not found" },
+  suite_all_scenarios_archived: {
+    title: "Every scenario in this run plan is archived",
+    describe: () => "Edit the plan to include active scenarios.",
+  },
+  suite_all_targets_archived: {
+    title: "Every target in this run plan is archived",
+    describe: () => "Edit the plan to include active targets.",
+  },
+  suite_invalid_scenario_references: {
+    title: "This run plan points at scenarios that no longer exist",
+    describe: () => "Edit the plan to remove them.",
+  },
+  suite_invalid_target_references: {
+    title: "This run plan points at targets that no longer exist",
+    describe: () => "Edit the plan to remove them.",
+  },
+
   // ---- automations & notifications ----
   template_validation_error: {
     title: "This template isn't valid",
@@ -508,6 +527,12 @@ export interface ErrorExplanation {
   title: string;
   /** Empty when there is nothing useful to add beyond the title. */
   description: string;
+  /**
+   * Whether this copy was written for this specific code, or fell back to
+   * `fault`. Callers use it to decide whose headline wins: registered copy
+   * describes the actual failure, so it beats a caller's generic one.
+   */
+  isRegistered: boolean;
 }
 
 /**
@@ -528,12 +553,14 @@ export function explainHandledError(error: HandledErrorShape): ErrorExplanation 
       // prose (it mirrors Go's `Meta["message"]`). It is the only place the
       // server is allowed to put a sentence, so it is the only place we look.
       description: str(error, "message", ""),
+      isRegistered: false,
     };
   }
 
   return {
     title: presentation.title,
     description: presentation.describe?.(error) ?? "",
+    isRegistered: true,
   };
 }
 
@@ -541,4 +568,5 @@ export function explainHandledError(error: HandledErrorShape): ErrorExplanation 
 export const UNKNOWN_ERROR_PRESENTATION: ErrorExplanation = {
   title: "Something went wrong",
   description: "We've been notified. Try again in a moment.",
+  isRegistered: false,
 };

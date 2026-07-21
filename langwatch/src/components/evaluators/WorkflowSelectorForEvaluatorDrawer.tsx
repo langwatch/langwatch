@@ -16,14 +16,13 @@ import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import { toaster } from "~/components/ui/toaster";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import { trackEvent } from "~/utils/tracking";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { customEvaluatorTemplate } from "~/optimization_studio/templates/custom_evaluator";
 import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
@@ -107,15 +106,8 @@ export function WorkflowSelectorForEvaluatorDrawer(
         workflowId: evaluator.workflowId ?? "",
       });
     },
-    onError: (error) => {
-      // Skip toast if error was already handled by global license modal
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error creating evaluator",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't create evaluator" }),
   });
 
   const isSaving =
@@ -161,13 +153,9 @@ export function WorkflowSelectorForEvaluatorDrawer(
           `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
         );
       } catch (error) {
-        // Skip toast if error was already handled by global license modal
-        if (isHandledByGlobalHandler(error)) return;
         console.error("Error creating workflow evaluator:", error);
-        toaster.create({
-          title: "Error",
-          description: "Failed to create workflow evaluator",
-          type: "error",
+        showErrorToast(error, {
+          fallbackTitle: "Couldn't create workflow evaluator",
         });
       }
     },

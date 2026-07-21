@@ -24,7 +24,7 @@ export const FORM_SERVER_ERROR = "root.serverError";
  * ```ts
  * onError: (error) => {
  *   if (applyHandledErrorToForm({ error, form })) return;
- *   showErrorToast(error, { title: "Couldn't save" });
+ *   showErrorToast(error, { fallbackTitle: "Couldn't save" });
  * },
  * ```
  *

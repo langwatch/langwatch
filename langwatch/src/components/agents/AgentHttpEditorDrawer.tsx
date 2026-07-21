@@ -14,7 +14,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import { toaster } from "~/components/ui/toaster";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -39,8 +38,8 @@ import type {
   AgentComponentConfig,
   TypedAgent,
 } from "~/server/agents/agent.repository";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import {
   AuthConfigSection,
   BodyTemplateEditor,
@@ -336,15 +335,8 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       onSave?.(agent);
       onClose();
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error creating agent",
-        description: error.message,
-        type: "error",
-        meta: { closable: true },
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't create agent" }),
   });
 
   const updateMutation = api.agents.update.useMutation({
@@ -357,15 +349,8 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       onSave?.(agent);
       onClose();
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error updating agent",
-        description: error.message,
-        type: "error",
-        meta: { closable: true },
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't save agent" }),
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;

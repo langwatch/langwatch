@@ -17,8 +17,8 @@ import { useEffect, useState } from "react";
 import { Plus, X } from "react-feather";
 import { useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { FullWidthFormControl } from "../FullWidthFormControl";
 import { Checkbox } from "../ui/checkbox";
 import { Radio, RadioGroup } from "../ui/radio";
@@ -197,19 +197,12 @@ export const AddOrEditAnnotationScore = ({
           void queryClient.annotationScore.getAll.invalidate();
           void queryClient.annotationScore.getById.invalidate();
         },
-        onError: (error) => {
-          if (isHandledByGlobalHandler(error)) return;
-          toaster.create({
-            title: annotationScoreId
-              ? "Error updating annotation score"
-              : "Error creating annotation score",
-            description: error.message,
-            type: "error",
-            meta: {
-              closable: true,
-            },
-          });
-        },
+        onError: (error) =>
+          showErrorToast(error, {
+            fallbackTitle: annotationScoreId
+              ? "Couldn't save annotation score"
+              : "Couldn't create annotation score",
+          }),
       },
     );
   };

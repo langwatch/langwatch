@@ -12,8 +12,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Upload, X } from "lucide-react";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { toaster } from "../ui/toaster";
 import { Radio, RadioGroup } from "~/components/ui/radio";
 import { Select } from "~/components/ui/select";
@@ -154,14 +154,8 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
           type: "success",
         });
       },
-      onError: (error) => {
-        if (isHandledByGlobalHandler(error)) return;
-        toaster.create({
-          title: "Failed to generate license",
-          description: error.message,
-          type: "error",
-        });
-      },
+      onError: (error) =>
+        showErrorToast(error, { fallbackTitle: "Couldn't generate license" }),
     });
 
     const handlePlanTypeChange = (newPlanType: PlanType) => {

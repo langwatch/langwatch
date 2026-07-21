@@ -19,7 +19,6 @@ import { z } from "zod";
 
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { Link } from "~/components/ui/link";
-import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import type {
   AvailableSource,
@@ -52,8 +51,8 @@ import {
   evaluatorsSchema,
 } from "~/server/evaluations/evaluators";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
+import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
 import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
@@ -488,12 +487,8 @@ export function useEvaluatorEditorController(
       }
     },
     onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error creating evaluator",
-        description: error.message,
-        type: "error",
-      });
+      if (applyHandledErrorToForm({ error, form })) return;
+      showErrorToast(error, { fallbackTitle: "Couldn't create evaluator" });
     },
   });
 
@@ -526,12 +521,8 @@ export function useEvaluatorEditorController(
       }
     },
     onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error saving evaluator",
-        description: error.message,
-        type: "error",
-      });
+      if (applyHandledErrorToForm({ error, form })) return;
+      showErrorToast(error, { fallbackTitle: "Couldn't save evaluator" });
     },
   });
 

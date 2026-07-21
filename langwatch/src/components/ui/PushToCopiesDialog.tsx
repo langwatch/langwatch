@@ -1,5 +1,6 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+import { HandledErrorAlert } from "~/features/errors";
 import { Checkbox } from "./checkbox";
 import { Dialog } from "./dialog";
 import { toaster } from "./toaster";
@@ -22,8 +23,8 @@ export type PushToCopiesDialogProps = {
   sourceName: string;
   copies: PushToCopiesCopyItem[];
   isLoading: boolean;
-  /** Query error (e.g. TRPCClientErrorLike or Error) */
-  error: { message: string } | null;
+  /** The replicas query's error, passed straight through — handled or not. */
+  error: unknown;
   selectedCopyIds: Set<string>;
   onToggleCopy: (id: string) => void;
   onPush: () => Promise<{ pushedTo: number; selectedCopies: number }>;
@@ -93,9 +94,10 @@ export function PushToCopiesDialog({
             {isLoading ? (
               <Text>Loading replicas...</Text>
             ) : error ? (
-              <Text color="red.fg">
-                Error loading replicas: {error.message}
-              </Text>
+              <HandledErrorAlert
+                error={error}
+                fallbackTitle="Couldn't load replicas"
+              />
             ) : copies.length === 0 ? (
               <Text color="fg.muted">
                 {emptyMessage ?? "No replicas found."}

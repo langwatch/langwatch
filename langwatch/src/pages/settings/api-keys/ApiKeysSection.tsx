@@ -22,6 +22,7 @@ import { ProviderScopeChips } from "../../../components/settings/ProviderScopeCh
 import { RegenerateApiKeyDialog } from "../../../components/settings/RegenerateApiKeyDialog";
 import { PageLayout } from "../../../components/ui/layouts/PageLayout";
 import { toaster } from "../../../components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
@@ -244,15 +245,8 @@ export function ApiKeysSection({
           setNewKeyInput(input);
           void queryClient.apiKey.list.invalidate();
         },
-        onError: (error) => {
-          toaster.create({
-            title: "Failed to create API key",
-            description: error.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast(error, { fallbackTitle: "Couldn't create API key" }),
       },
     );
   };
@@ -292,15 +286,8 @@ export function ApiKeysSection({
           });
           void queryClient.apiKey.list.invalidate();
         },
-        onError: (error) => {
-          toaster.create({
-            title: "Failed to update API key",
-            description: error.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast(error, { fallbackTitle: "Couldn't update API key" }),
       },
     );
   };
@@ -319,15 +306,8 @@ export function ApiKeysSection({
           });
           void queryClient.apiKey.list.invalidate();
         },
-        onError: (error) => {
-          toaster.create({
-            title: "Failed to revoke API key",
-            description: error.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast(error, { fallbackTitle: "Couldn't revoke API key" }),
       },
     );
   };
@@ -356,12 +336,8 @@ export function ApiKeysSection({
         },
         onError: (error) => {
           setIsRotateConfirmOpen(false);
-          toaster.create({
-            title: "Failed to rotate project API key",
-            description: error.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
+          showErrorToast(error, {
+            fallbackTitle: "Couldn't rotate the project API key",
           });
         },
       },

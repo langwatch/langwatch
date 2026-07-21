@@ -12,7 +12,6 @@ import { getApp } from "~/server/app-layer/app";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
-import { SuiteDomainError } from "~/server/suites/errors";
 import { SuiteService } from "~/server/suites/suite.service";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
 import { checkProjectPermission } from "../../rbac";
@@ -86,12 +85,9 @@ export const suiteRouter = createTRPCRouter({
       try {
         return await service.duplicate(input);
       } catch (error) {
-        if (error instanceof SuiteDomainError) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: error.message,
-          });
-        }
+        // A SuiteDomainError is a HandledError — rethrow it so the tRPC
+        // handled-error middleware maps its code and status, instead of
+        // flattening every suite failure into one NOT_FOUND with prose.
         throw error;
       }
     }),
@@ -183,12 +179,6 @@ export const suiteRouter = createTRPCRouter({
           ...result,
         };
       } catch (error) {
-        if (error instanceof SuiteDomainError) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: error.message,
-          });
-        }
         const message =
           error instanceof Error ? error.message : "Unknown error";
         throw new TRPCError({
