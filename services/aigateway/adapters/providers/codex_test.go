@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/tidwall/gjson"
 )
 
 // Spec: specs/model-providers/codex-account-provider.feature — the gateway
@@ -251,6 +252,41 @@ func TestCodex_NonStreamingAggregatesTheSSE(t *testing.T) {
 	}
 	if resp.Usage.TotalTokens != 5 {
 		t.Errorf("usage not carried: %+v", resp.Usage)
+	}
+}
+
+func TestCodexRequestBody_PinsInvariantsAndStripsSampling(t *testing.T) {
+	// A caller's body carrying sampling params and a client include: rewrite the
+	// model to bare, force stream on / store off, strip temperature and top_p
+	// (the codex backend answers 400 on them), and leave the client's include
+	// and input untouched.
+	raw := []byte(`{"model":"openai_codex/gpt-5.6-terra","temperature":0.2,"top_p":0.9,` +
+		`"input":[{"role":"user"}],"include":["reasoning.encrypted_content"]}`)
+	body, err := codexRequestBody(raw, "openai_codex/gpt-5.6-terra")
+	if err != nil {
+		t.Fatalf("codexRequestBody: %v", err)
+	}
+	if got := gjson.GetBytes(body, "model").String(); got != "gpt-5.6-terra" {
+		t.Errorf("model not rewritten to bare: %q", got)
+	}
+	if !gjson.GetBytes(body, "stream").Bool() {
+		t.Error("stream must be forced on")
+	}
+	if gjson.GetBytes(body, "store").Bool() {
+		t.Error("store must be forced off")
+	}
+	if gjson.GetBytes(body, "temperature").Exists() {
+		t.Errorf("temperature must be stripped (codex 400s on it): %s", body)
+	}
+	if gjson.GetBytes(body, "top_p").Exists() {
+		t.Errorf("top_p must be stripped: %s", body)
+	}
+	// The client's include (reasoning round-trip) and input pass through.
+	if got := gjson.GetBytes(body, "include.0").String(); got != "reasoning.encrypted_content" {
+		t.Errorf("client include must pass through: %s", body)
+	}
+	if !gjson.GetBytes(body, "input").Exists() {
+		t.Errorf("input must be preserved: %s", body)
 	}
 }
 

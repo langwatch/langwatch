@@ -260,7 +260,7 @@ func codexSessionExpiredError(ctx context.Context) error {
 
 // codexRequestBody pins the backend's invariants onto the caller's raw body:
 // the bare model name (the gateway stays in control of what lands upstream),
-// stream on, store off.
+// stream on, store off, and no sampling params the backend refuses.
 func codexRequestBody(raw []byte, model string) ([]byte, error) {
 	body := raw
 	if len(bytes.TrimSpace(body)) == 0 {
@@ -279,6 +279,19 @@ func codexRequestBody(raw []byte, model string) ([]byte, error) {
 		body, err = sjson.SetBytes(body, set.path, set.value)
 		if err != nil {
 			return nil, fmt.Errorf("rewrite %s on codex body: %w", set.path, err)
+		}
+	}
+	// The codex backend refuses the sampling params the wider Responses API
+	// accepts: a body carrying temperature or top_p comes back 400 Bad Request.
+	// Clients that set them for other providers (the title generator and the
+	// tiny assists both send temperature) would break every codex call, so
+	// strip them here where the gateway already owns the backend's invariants.
+	// DeleteBytes is a no-op when the key is absent, so this is safe for the
+	// opencode turns that never set them.
+	for _, path := range []string{"temperature", "top_p"} {
+		body, err = sjson.DeleteBytes(body, path)
+		if err != nil {
+			return nil, fmt.Errorf("strip %s from codex body: %w", path, err)
 		}
 	}
 	return body, nil

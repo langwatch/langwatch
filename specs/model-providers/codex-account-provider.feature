@@ -103,6 +103,15 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     And the tiny assists default to it as well
     And evaluations, playground and workflows keep their existing defaults
 
+  # The tiny assists set a sampling temperature the wider Responses API accepts
+  # but the codex backend refuses with a 400. The gateway drops those options so
+  # the assist produces its answer instead of silently failing.
+  Scenario: A tiny assist that asks for a temperature still runs on Codex
+    Given Codex is the default for the conversation-title assist
+    When the title assist runs its model call with a sampling temperature
+    Then the gateway drops the sampling options the codex backend refuses
+    And the assist gets its title back instead of a failed request
+
   Scenario: Langy resolves its own feature key without breaking older setups
     Given Langy resolves its model through the langy.chat feature key
     When a project configured Langy before that key existed
