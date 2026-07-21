@@ -76,6 +76,7 @@ import {
   BILLING_REPORTING_PIPELINE_NAME,
   createBillingReportingPipeline,
 } from "./pipelines/billing-reporting/pipeline";
+import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import {
   createEvaluationProcessingPipeline,
@@ -444,6 +445,7 @@ export class PipelineRegistry {
     });
     const metricPipeline = this.registerMetricPipeline();
     const logPipeline = this.registerLogPipeline();
+    const codingAgentPipeline = this.registerCodingAgentPipeline();
     const {
       pipeline: tracePipeline,
       simComputeRunMetrics,
@@ -488,6 +490,7 @@ export class PipelineRegistry {
       traces: mapCommands(tracePipeline.commands),
       metrics: mapCommands(metricPipeline.commands),
       logs: mapCommands(logPipeline.commands),
+      codingAgents: mapCommands(codingAgentPipeline.commands),
       evaluations: mapCommands(evalPipeline.commands),
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
@@ -702,6 +705,17 @@ export class PipelineRegistry {
           process.env.METRIC_PROCESSING_SHARDS,
         ),
       }),
+    );
+  }
+
+  /**
+   * ADR-056: the session-aggregate pipeline. Slice 1 mounts the write
+   * surface (the three contribution commands); projections, subscribers and
+   * the lifecycle process manager mount in later slices.
+   */
+  private registerCodingAgentPipeline() {
+    return this.deps.eventSourcing.register(
+      createCodingAgentProcessingPipeline(),
     );
   }
 

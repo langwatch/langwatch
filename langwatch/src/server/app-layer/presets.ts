@@ -1473,6 +1473,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       logs: {
         recordLogRecord: noop,
       } satisfies AppCommands["logs"],
+      codingAgents: {
+        contributeSpanFacts: noop,
+        contributeLogFacts: noop,
+        contributeMetricFacts: noop,
+      } satisfies AppCommands["codingAgents"],
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,
