@@ -17,7 +17,6 @@
 
 import { Command } from "commander";
 import { parsePromptSpec } from "./types";
-import { formatApiErrorMessage } from "../client-sdk/services/_shared/format-api-error";
 import {
   applyOutputContext,
   assertFormatIsSupported,
@@ -145,7 +144,8 @@ export function buildProgram(): Command {
     try {
       await loginCommand(options);
     } catch (error) {
-      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      const { reportCommandError } = await import("./utils/errorOutput.js");
+      reportCommandError({ error });
       process.exit(1);
     }
   });
@@ -192,7 +192,8 @@ export function buildProgram(): Command {
         const { openCommand } = await import("./commands/open.js");
         await openCommand({ path, browser: options.browser });
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -206,7 +207,8 @@ export function buildProgram(): Command {
         const { whoamiCommand } = await import("./commands/whoami.js");
         await whoamiCommand();
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -220,7 +222,8 @@ export function buildProgram(): Command {
         const { requestIncreaseCommand } = await import("./commands/request-increase.js");
         await requestIncreaseCommand(options);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -244,7 +247,8 @@ export function buildProgram(): Command {
         const { wrapClaude } = await import("./commands/wrap.js");
         await wrapClaude(cmd.args ?? []);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -260,7 +264,8 @@ export function buildProgram(): Command {
         const { wrapCodex } = await import("./commands/wrap.js");
         await wrapCodex(cmd.args ?? []);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -276,7 +281,8 @@ export function buildProgram(): Command {
         const { wrapCursor } = await import("./commands/wrap.js");
         await wrapCursor(cmd.args ?? []);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -292,7 +298,8 @@ export function buildProgram(): Command {
         const { wrapGemini } = await import("./commands/wrap.js");
         await wrapGemini(cmd.args ?? []);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -308,7 +315,8 @@ export function buildProgram(): Command {
         const { wrapOpencode } = await import("./commands/wrap.js");
         await wrapOpencode(cmd.args ?? []);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -341,7 +349,8 @@ export function buildProgram(): Command {
         const { logoutCommand } = await import("./commands/logout.js");
         await logoutCommand(options);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -355,7 +364,8 @@ export function buildProgram(): Command {
         const { initShellCommand } = await import("./commands/init-shell.js");
         await initShellCommand(shell);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -377,7 +387,8 @@ export function buildProgram(): Command {
         const { ingestListCommand } = await import("./commands/ingest/list.js");
         await ingestListCommand(options);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -393,7 +404,8 @@ export function buildProgram(): Command {
         const { ingestTailCommand } = await import("./commands/ingest/tail.js");
         await ingestTailCommand(sourceId, options);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -407,7 +419,8 @@ export function buildProgram(): Command {
         const { ingestHealthCommand } = await import("./commands/ingest/health.js");
         await ingestHealthCommand(sourceId, options);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -452,7 +465,8 @@ export function buildProgram(): Command {
         const { governanceStatusCommand } = await import("./commands/governance/status.js");
         await governanceStatusCommand(options);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -565,7 +579,8 @@ export function buildProgram(): Command {
       try {
         await initCommand();
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -580,7 +595,8 @@ export function buildProgram(): Command {
         const { createCommand: impl } = await import("./commands/create.js");
         return await impl(name);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     },
@@ -598,7 +614,8 @@ export function buildProgram(): Command {
           await addCommand(name, { version });
         }
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -610,7 +627,8 @@ export function buildProgram(): Command {
       try {
         await removeCommand(name);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -625,7 +643,8 @@ export function buildProgram(): Command {
         const { listCommand: impl } = await import("./commands/list.js");
         return await impl();
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     },
@@ -638,7 +657,8 @@ export function buildProgram(): Command {
       try {
         await syncCommand();
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -651,7 +671,8 @@ export function buildProgram(): Command {
       try {
         await pullCommand(options);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -665,7 +686,8 @@ export function buildProgram(): Command {
       try {
         await pushCommand({ forceLocal: options.forceLocal, forceRemote: options.forceRemote });
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -707,7 +729,8 @@ export function buildProgram(): Command {
         const { tagListCommand: impl } = await import("./commands/tag/list.js");
         return await impl();
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     },
@@ -722,7 +745,8 @@ export function buildProgram(): Command {
         const { tagCreateCommand: impl } = await import("./commands/tag/create.js");
         return await impl(name);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     },
@@ -737,7 +761,8 @@ export function buildProgram(): Command {
         const { tagRenameCommand: impl } = await import("./commands/tag/rename.js");
         return await impl(oldName, newName);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     },
@@ -753,7 +778,8 @@ export function buildProgram(): Command {
         const { tagAssignCommand: impl } = await import("./commands/tag/assign.js");
         return await impl(prompt, tag, options);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     },
@@ -769,7 +795,8 @@ export function buildProgram(): Command {
         const { tagDeleteCommand: impl } = await import("./commands/tag/delete.js");
         return await impl(name, options);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     },
@@ -946,7 +973,8 @@ export function buildProgram(): Command {
         const { docsCommand: impl } = await import("./commands/docs.js");
         await impl(url);
       } catch (error) {
-        console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -961,7 +989,8 @@ export function buildProgram(): Command {
         const { scenarioDocsCommand: impl } = await import("./commands/docs.js");
         await impl(url);
       } catch (error) {
-        console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     });
@@ -981,7 +1010,8 @@ export function buildProgram(): Command {
         const { listEvaluatorsCommand: impl } = await import("./commands/evaluators/list.js");
         return await impl();
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     },
@@ -997,7 +1027,8 @@ export function buildProgram(): Command {
         const { getEvaluatorCommand: impl } = await import("./commands/evaluators/get.js");
         return await impl(idOrSlug);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     },
@@ -1014,7 +1045,8 @@ export function buildProgram(): Command {
         const { createEvaluatorCommand: impl } = await import("./commands/evaluators/create.js");
         return await impl(name, options);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     },
@@ -1032,7 +1064,8 @@ export function buildProgram(): Command {
         const { updateEvaluatorCommand: impl } = await import("./commands/evaluators/update.js");
         return await impl(idOrSlug, options);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     },
@@ -1048,7 +1081,8 @@ export function buildProgram(): Command {
         const { deleteEvaluatorCommand: impl } = await import("./commands/evaluators/delete.js");
         return await impl(idOrSlug);
       } catch (error) {
-        console.error(`Error: ${formatApiErrorMessage({ error })}`);
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
         process.exit(1);
       }
     },
