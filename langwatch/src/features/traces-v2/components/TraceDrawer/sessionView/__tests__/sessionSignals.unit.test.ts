@@ -12,7 +12,7 @@ function session(
 ): CodingAgentSessionRow {
   return {
     tenantId: "project-1",
-    traceId: "trace-1",
+    traceIds: ["trace-1"],
     version: "2026-07-11",
     startedAtMs: 1_700_000_000_000,
     agent: "claude-code",
