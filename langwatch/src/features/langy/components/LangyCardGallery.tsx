@@ -107,6 +107,10 @@ function toolMessage(
       input: part.input,
       output: part.output,
     })),
+    // Fixture boundary: a runtime-assembled tool part can't satisfy the SDK's
+    // per-state discriminated union (each `state` literal demands different
+    // required fields). The gallery's whole point is feeding the REAL cards
+    // real-shaped data, and the cards narrow these parts structurally.
   } as unknown as UIMessage;
 }
 

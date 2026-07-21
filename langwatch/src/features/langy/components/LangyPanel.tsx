@@ -1,4 +1,3 @@
-import { useChat } from "@ai-sdk/react";
 import {
   Box,
   chakra,
@@ -56,11 +55,11 @@ import type { LangyResourceContext } from "~/server/app-layer/langy/langyTurnCon
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import type { LangyMessageDto } from "../data/langy.dtos";
 import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
 import { useLangyConversationList } from "../data/useLangyConversationList";
 import { useLangyMessages } from "../data/useLangyMessages";
 import { useGlobalLangyShortcut } from "../hooks/useGlobalLangyShortcut";
+import { useLangyChatEngine } from "../hooks/useLangyChatEngine";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
 import { useLangyExternalLinkGuard } from "../hooks/useLangyExternalLinkGuard";
 import { useLangyFreshness } from "../hooks/useLangyFreshness";
@@ -671,23 +670,11 @@ function LangyPanel({
     sendMessage,
     stop,
     status,
-    setMessages,
     error,
     regenerate,
-    clearError,
-  } = useChat({
-    transport,
-    onError: (error) => {
-      // Global-handled errors (license / lite-member) are owned by their own
-      // handler — leave them to it.
-      if (isHandledByGlobalHandler(error)) return;
-      // Every live turn failure is already surfaced inline — as the recovering
-      // line, the GitHub connect card, or a <LangyError> card (see turnError and
-      // the render branch below), which falls back to a generic card even for a
-      // non-structured error. A toast would double the same failure on a second
-      // surface, so we never raise one here: one calm surface only.
-    },
-  });
+    applyHistoryToEngine,
+    resetEngine,
+  } = useLangyChatEngine({ transport });
 
   // ── Server state (React Query, via the langy tRPC router) ─────────────────
   const {
@@ -812,25 +799,6 @@ function LangyPanel({
   // server's projection of a conversation we just created — never clobbers the
   // live in-flight stream. `keepPreviousData` means the query can briefly hold
   // the prior conversation's rows, so we wait for the fetch to settle.
-  // useChat's setMessages identity is not guaranteed stable across renders.
-  // Capture it in a ref so the hydrate/clear effects key on real state changes
-  // (a conversation-id transition) without re-firing every render — which would
-  // loop against setMessages and wipe the in-flight turn.
-  const setMessagesRef = useRef(setMessages);
-  setMessagesRef.current = setMessages;
-
-  const applyHistoryToEngine = useCallback((history: LangyMessageDto[]) => {
-    const uiMessages = history
-      .filter((m) => m.role === "user" || m.role === "assistant")
-      .map((m) => ({ id: m.id, role: m.role, parts: m.parts }));
-    // Cast to setMessages's own parameter type rather than `ai`'s UIMessage:
-    // useChat is typed via @ai-sdk/react's nested `ai`, a different version
-    // than the app's direct `ai`, so an `ai` UIMessage[] isn't assignable.
-    setMessagesRef.current(
-      uiMessages as unknown as Parameters<typeof setMessages>[0],
-    );
-  }, []);
-
   useEffect(() => {
     if (!historyLoadConversationId) return;
     if (historyLoadConversationId !== activeConversationId) return;
@@ -1103,31 +1071,21 @@ function LangyPanel({
   }, [setDraft]);
   /**
    * Walking away from the current conversation — New chat, switching, deleting
-   * the active one — must reset the CHAT ENGINE too, not just the store. useChat
-   * owns state Zustand cannot reach, and `setMessages([])` clears none of it:
+   * the active one — must reset the CHAT ENGINE too, not just the store. Two
+   * owned seams, composed here and nowhere else:
    *
-   *   - the ERROR. This is the bug people saw: start a new chat after a failed
-   *     turn and the red error card is still sitting under an empty panel,
-   *     because nothing ever cleared `useChat`'s error. `clearError()` is the
-   *     only thing that does. (`stop()` is a no-op once the turn has errored —
-   *     it returns early unless the status is streaming/submitted — so it was
-   *     never going to.)
-   *   - the PENDING AUTO-RETRY. The nastiest one: a recovery timer armed by the
-   *     conversation you just left would fire `regenerate()` into the one you
-   *     just opened, re-driving a turn you walked away from.
-   *   - the MESSAGES. Cleared explicitly rather than via the
-   *     `activeConversationId === null` effect, which only fires on a TRANSITION
-   *     to null — so a new chat started from an already-null conversation (a
-   *     first message that failed before the server adopted an id) left the dead
-   *     messages on screen.
+   *   - `resetEngine` — everything `useChat` owns that Zustand cannot reach
+   *     (the error, the messages; see useLangyChatEngine for the war stories).
+   *   - `recovery.reset()` — the PENDING AUTO-RETRY. The nastiest leak: a
+   *     recovery timer armed by the conversation you just left would fire
+   *     `regenerate()` into the one you just opened, re-driving a turn you
+   *     walked away from.
    *
-   * One place, so the next field added here can't be forgotten in three.
+   * One place, so the next field added to either seam can't be forgotten here.
    */
   const resetChatEngine = ({ clearMessages }: { clearMessages: boolean }) => {
-    void stop();
-    clearError();
+    resetEngine({ clearMessages });
     recovery.reset();
-    if (clearMessages) applyHistoryToEngine([]);
   };
 
   const handleNewChat = () => {
@@ -1429,9 +1387,7 @@ function LangyPanel({
     turnInFlight: isBusy || turnActive,
     isSettling: !!turnError || recovery.isRecovering,
     hasLiveReasoning: !!turnSignals.reasoning,
-    messages: messages as unknown as Parameters<
-      typeof deriveWaveActivity
-    >[0]["messages"],
+    messages,
   });
 
   // A status label (the orange-orbed "Analysing traces…" row) is showing on the
