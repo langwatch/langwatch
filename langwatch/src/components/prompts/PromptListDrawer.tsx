@@ -22,7 +22,7 @@ import {
   useDrawer,
 } from "~/hooks/useDrawer";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
-import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
+import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 
 export type PromptListDrawerProps = {
   open?: boolean;

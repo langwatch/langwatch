@@ -9,7 +9,7 @@ import {
 import { Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { modelDisplayLabel } from "../../server/modelProviders/customModelDisplayNames";
-import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
+import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import {
   isLatestAlias,
   resolveLatestAlias,

@@ -57,6 +57,27 @@ Feature: Reduced local dev memory footprint
     And no instrumentation for frameworks the server doesn't run (express, koa, pg, grpc) is loaded
     And ioredis statements are still truncated to command plus first key, requiring a parent span
 
+  # Every backend process was also holding the entire browser UI stack. A single
+  # import edge caused it: `evaluations-legacy.ts` pulled a display-name constant
+  # out of a React component, and that one edge dragged in Chakra UI, Ark UI,
+  # Emotion, react-dom and react-router — ~1,320 modules of browser-only code
+  # resident in the API, worker, and ingestion processes alike. Constants shared
+  # by the API and the UI belong beside the evaluator catalog both already
+  # import, not inside a component.
+
+  Scenario: The backend never loads the browser UI stack
+    Given the server boots its app-layer, API router, and tRPC root
+    When the loaded module graph is inspected
+    Then no Chakra UI, Ark UI, Emotion, react-dom or react-router module is resident
+    And evaluator display names still resolve for legacy evaluation responses
+
+  Scenario: Server code cannot reach browser-only UI, even transitively
+    Given a module under src/server
+    When it imports a UI toolkit, or a component that imports one
+    Then the boundary guard fails and names the offending import chain
+    But a type-only import of a component's types is allowed, since types are erased
+    And server-rendered email templates may use React, since emails are React-rendered
+
   # Separately, a guard closes a footprint-adjacent foot-gun found while
   # profiling `pnpm start`: server.mts loads .env with `override: true`, so a
   # stray `NODE_ENV=development` line in a dev machine's .env would silently

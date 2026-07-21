@@ -14,7 +14,7 @@ import { useFilterStore } from "~/features/traces-v2/stores/filterStore";
 import {
   modelProviderIcons,
   ProviderIconGlyph,
-} from "~/server/modelProviders/iconsMap";
+} from "~/components/modelProviders/iconsMap";
 import type { TraceListItem } from "../../../../../types/trace";
 import { abbreviateModel } from "../../../../../utils/formatters";
 import { MonoCell } from "../../../MonoCell";

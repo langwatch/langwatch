@@ -3,7 +3,7 @@ import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
 
 import { Link } from "~/components/ui/link";
-import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
+import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 
 import {
   buildScopeHierarchy,

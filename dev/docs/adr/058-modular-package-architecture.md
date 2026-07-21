@@ -168,7 +168,9 @@ Because cross-domain edges are type-only, each domain's **runtime** graph shrink
 
 ### 4.4 `ui` as a build-time, types-only consumer
 
-`ui` imports **only** `trpc-api`'s `AppRouter` type (via `@trpc/react-query`) and `shared` DTO types. No server value ever enters the client bundle, and — critically for footprint — **`ui` is never loaded in a Node process**. This is also the fix for the measured reverse edges (server code today transitively pulls React/Chakra/Ark UI — ~1,250 modules / ~1.8 MB — because a handful of server files import `~/components/*`; those imports become type-only or move to `shared`).
+`ui` imports **only** `trpc-api`'s `AppRouter` type (via `@trpc/react-query`) and `shared` DTO types. No server value ever enters the client bundle, and — critically for footprint — **`ui` is never loaded in a Node process**.
+
+**The reverse edges are already cut (PR #6023).** The measured leak turned out to be a single import: `routes/evaluations-legacy.ts` reached into `components/checks/EvaluatorSelection.tsx` for one display-name constant, and that hop pulled Chakra UI, Ark UI, Emotion, react-dom and react-router. Moving the constant beside the evaluator catalog both sides already import removed **2,020 modules / 212 MB RSS** from every backend process (8,525 → 6,505 modules). `server/modelProviders/iconsMap.tsx` — pure UI misfiled under `src/server/` — moved to `components/`. A transitive guard (`src/server/__tests__/frontend-boundary.unit.test.ts`) now fails CI on any chain from `src/server`, `src/app/api`, or `src/mcp` into a browser-only package, allowing `server/mailer/**` as the one principled exception (react-email renders templates server-side). This is the boundary-lint ratchet of Phase 0.3, implemented as a test for the one invariant that was actually costing memory.
 
 ### 4.5 `ee` as an optional composition seam
 
@@ -351,7 +353,7 @@ Do **not** batch domains: one PR per domain keeps the blast radius reviewable an
 - Boot graph: ~8,500 modules / ~500 MB RSS per process (unbundled tsx over `src/`).
 - Typecheck: app project 12,799 files / 1.58 GB; tests 14,118 / 1.8 GB.
 - `event-sourcing → app-layer` back-edges: 65 total, 54 via pipelines.
-- Heaviest boot packages (post-#6023 census): `zod` 252 mods, `@opentelemetry/otlp-transformer` 54/1.8 MB, `@langchain/core` 172 (via CopilotKit), `@ark-ui/react` 876 (frontend leak), `openai` 232, `stripe` 136 (SaaS-only), `@chakra-ui/react` 371 (frontend leak).
+- Heaviest boot packages (post-#6023 census): `zod` 252 mods, `@opentelemetry/otlp-transformer` 54/1.8 MB, `@langchain/core` 172 (via CopilotKit), `openai` 232, `stripe` 136 (SaaS-only). The former frontend leaks — `@ark-ui/react` 876, `@chakra-ui/react` 371, `react-router` 56 — are **gone** as of #6023 (see 4.4); backend boot is now 6,505 modules, with 4 React modules remaining, all legitimately from react-email templates.
 - `getApp()` DI seam exists; services reach each other via `getApp().{planProvider,traces,topicClustering,langy,emailSuppressions,…}`.
 - Prisma: 92 models, connected graph, irreducible; split-generator gives ~zero win (do not repeat that investigation).
 - Related memories: `type-analysis-findings`, `dev-memory-footprint`, `no-full-typecheck`, `vitest-ram-trap`.
