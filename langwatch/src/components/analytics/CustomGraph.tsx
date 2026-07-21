@@ -42,6 +42,11 @@ import type {
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
 import type { z } from "zod";
+import {
+  explainHandledError,
+  readHandledError,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "~/features/errors";
 import { availableFilters } from "~/server/filters/registry";
 import type { FilterField } from "~/server/filters/types";
 import { useRouter } from "~/utils/compat/next-router";
@@ -414,6 +419,13 @@ const CustomGraph_ = React.memo(
       { ...queryOpts, enabled: queryOpts.enabled && load },
     );
 
+    // The stale-data retry badge is a one-line `title` tooltip, so it takes the
+    // registry's words directly rather than a whole alert.
+    const timeseriesErrorHandled = readHandledError(timeseries.error);
+    const timeseriesErrorExplanation = timeseriesErrorHandled
+      ? explainHandledError(timeseriesErrorHandled)
+      : UNKNOWN_ERROR_PRESENTATION;
+
     // Monitor cards headline the value over the WHOLE period as one "full"
     // bucket, which run-weights it by construction. Averaging the daily
     // buckets instead would weigh a 1-run day the same as a 100-run day and
@@ -672,7 +684,7 @@ const CustomGraph_ = React.memo(
           )}
           {timeseries.error && !timeseries.data ? (
             <ChartErrorState
-              errorMessage={timeseries.error.message}
+              error={timeseries.error}
               onRetry={() => void timeseries.refetch()}
             />
           ) : (
@@ -692,7 +704,11 @@ const CustomGraph_ = React.memo(
                   }}
                   aria-label="Retry loading chart data"
                   onClick={() => void timeseries.refetch()}
-                  title={timeseries.error.message}
+                  title={
+                    timeseriesErrorExplanation.description
+                      ? `${timeseriesErrorExplanation.title}. ${timeseriesErrorExplanation.description}`
+                      : timeseriesErrorExplanation.title
+                  }
                 >
                   <Badge colorPalette="red" variant="solid" fontSize="xs">
                     Refresh failed — click to retry

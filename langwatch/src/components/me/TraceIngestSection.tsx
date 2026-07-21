@@ -238,10 +238,10 @@ export function TraceIngestSection() {
           installResult={installResults[openTemplate.slug] ?? null}
           isInstalling={installMutation.isPending || rotateMutation.isPending}
           installError={
-            installMutation.error?.message &&
+            installMutation.error &&
             installMutation.variables?.sourceType === openTemplate.sourceType
-              ? installMutation.error.message
-              : rotateMutation.error?.message ?? null
+              ? installMutation.error
+              : rotateMutation.error ?? null
           }
           hasExistingKey={keyBySourceType.has(openTemplate.sourceType)}
           onInstall={() =>

@@ -1,22 +1,16 @@
-import {
-  Alert,
-  Box,
-  Button,
-  Collapsible,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { useState } from "react";
-import { AlertCircle, ChevronDown, ChevronRight, RefreshCw } from "react-feather";
+import { Box, Button, HStack, VStack } from "@chakra-ui/react";
+import { RefreshCw } from "react-feather";
+
+import { HandledErrorAlert } from "~/features/errors";
 
 /**
  * Full-area error state for analytics charts.
  *
- * Replaces chart content when a query fails, providing:
- * - a prominent centered error message
- * - a retry button
- * - an expandable section showing the backend error details
+ * Replaces chart content when a query fails, providing the registry's copy for
+ * the failure (headline, what to do about it, remediation tips, docs link and
+ * a copyable error id) plus a retry button. It deliberately shows no raw
+ * backend message: since #5984 that string is the error's code slug, and
+ * anything a customer can act on already comes through the handled payload.
  */
 export function ChartErrorState({
   error,
@@ -26,12 +20,6 @@ export function ChartErrorState({
   error: unknown;
   onRetry: () => void;
 }) {
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const handled = readHandledError(error);
-  const explanation = handled
-    ? explainHandledError(handled)
-    : UNKNOWN_ERROR_PRESENTATION;
-
   return (
     <Box
       position="absolute"
@@ -41,67 +29,18 @@ export function ChartErrorState({
       justifyContent="center"
       zIndex={1}
     >
-      <Alert.Root
-        status="error"
-        borderStartWidth="4px"
-        borderStartColor="red.500"
-        maxWidth="sm"
-        width="fit-content"
-      >
-        <VStack gap={3} align="stretch" width="full">
-          <HStack gap={2}>
-            <AlertCircle size={18} />
-            <Text fontWeight="semibold" fontSize="sm">
-              Failed to load chart data
-            </Text>
-          </HStack>
-
-          <HStack gap={2}>
-            <Button size="xs" variant="outline" onClick={onRetry}>
-              <RefreshCw size={12} />
-              Retry
-            </Button>
-          </HStack>
-
-          <Collapsible.Root
-            open={detailsOpen}
-            onOpenChange={({ open }) => setDetailsOpen(open)}
-          >
-            <Collapsible.Trigger asChild>
-              <Button
-                size="xs"
-                variant="ghost"
-                justifyContent="flex-start"
-                px={0}
-                minH="unset"
-              >
-                {detailsOpen ? (
-                  <ChevronDown size={12} />
-                ) : (
-                  <ChevronRight size={12} />
-                )}
-                <Text fontSize="xs" color="fg.muted">
-                  Show details
-                </Text>
-              </Button>
-            </Collapsible.Trigger>
-            <Collapsible.Content>
-              <Box
-                marginTop={2}
-                padding={2}
-                borderRadius="sm"
-                backgroundColor="bg.subtle"
-                fontSize="xs"
-                fontFamily="mono"
-                whiteSpace="pre-wrap"
-                wordBreak="break-word"
-              >
-                {errorMessage}
-              </Box>
-            </Collapsible.Content>
-          </Collapsible.Root>
-        </VStack>
-      </Alert.Root>
+      <VStack gap={3} align="stretch" maxWidth="sm" width="fit-content">
+        <HandledErrorAlert
+          error={error}
+          fallbackTitle="Failed to load chart data"
+        />
+        <HStack gap={2}>
+          <Button size="xs" variant="outline" onClick={onRetry}>
+            <RefreshCw size={12} />
+            Retry
+          </Button>
+        </HStack>
+      </VStack>
     </Box>
   );
 }
