@@ -851,12 +851,12 @@ async function handleWorkflowRun(
     return c.json({ message: "Invalid body" }, 400);
   }
 
-  try {
-    const result = await runWorkflowFn(workflowId, project.id, body, versionId);
-    return c.json(result);
-  } catch (error) {
-    return c.json({ message: (error as Error).message }, 500);
-  }
+  // Let errors propagate to the app's onError(handleError) middleware — it
+  // already knows how to map HandledError subclasses (e.g. runWorkflow's
+  // NotFoundError/ValidationError) to the right status code. Catching here
+  // and hard-coding 500 was masking those as raw 500s regardless of type.
+  const result = await runWorkflowFn(workflowId, project.id, body, versionId);
+  return c.json(result);
 }
 
 // =============================================

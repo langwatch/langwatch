@@ -1,10 +1,7 @@
+import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
-import {
-  NotFoundError,
-  UnprocessableEntityError,
-} from "~/app/api/shared/errors";
 import { addEnvs } from "../../optimization_studio/server/addEnvs";
 import type {
   ExecutionStatus,
@@ -195,10 +192,12 @@ export async function runWorkflow(
   });
 
   if (!workflow) {
-    throw new NotFoundError("Workflow not found.");
+    throw new NotFoundError("workflow_not_found", "Workflow", workflowId);
   }
   if (!workflow.publishedId) {
-    throw new UnprocessableEntityError("Workflow not published");
+    throw new ValidationError("Workflow not published", {
+      meta: { workflowId },
+    });
   }
 
   const publishedWorkflowVersion = await prisma.workflowVersion.findUnique({
