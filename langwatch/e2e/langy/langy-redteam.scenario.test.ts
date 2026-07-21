@@ -4,8 +4,8 @@
 // RedTeamAgent generate them." Each scenario targets a distinct attack
 // category; the attacker LLM improvises the actual wording.
 //
-// totalTurns is capped at 8 (not the skill's example 30) for cost — enough
-// for crescendo escalation to matter without burning the budget 12x over.
+// totalTurns is capped at 6 (not the skill's example 30) for cost — enough
+// for crescendo escalation to matter without burning the budget 5x over.
 //
 // RUN: same env vars as langy.scenario.test.ts (see README.md).
 //

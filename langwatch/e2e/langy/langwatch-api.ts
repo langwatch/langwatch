@@ -21,7 +21,13 @@ async function lwGet(path: string): Promise<any> {
   return res.json();
 }
 
-async function lwPost(path: string, body: unknown): Promise<any> {
+async function lwPost({
+  path,
+  body,
+}: {
+  path: string;
+  body: unknown;
+}): Promise<any> {
   const res = await fetch(`${LW_BASE}${path}`, {
     method: "POST",
     headers: { "X-Auth-Token": LW_KEY, "Content-Type": "application/json" },
@@ -107,11 +113,14 @@ export async function listWorkflows(): Promise<
  * yet. Wide date range (2020 -> now+1yr) so this never itself goes empty.
  */
 export async function mostRecentTraceId(): Promise<string | null> {
-  const result = await lwPost("/api/traces/search", {
-    startDate: new Date("2020-01-01").getTime(),
-    endDate: Date.now() + 365 * 24 * 60 * 60 * 1000,
-    pageSize: 1,
-    format: "json",
+  const result = await lwPost({
+    path: "/api/traces/search",
+    body: {
+      startDate: new Date("2020-01-01").getTime(),
+      endDate: Date.now() + 365 * 24 * 60 * 60 * 1000,
+      pageSize: 1,
+      format: "json",
+    },
   });
   const traces = toArray<{ trace_id?: string }>(result?.traces ?? result);
   return traces[0]?.trace_id ?? null;

@@ -40,6 +40,7 @@ For each command, write a scenario test where an AI agent discovers and uses it:
 ```typescript
 import scenario, { type AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { openai } from "@ai-sdk/openai";
+import { describe, expect, it } from "vitest";
 
 const myAgent: AgentAdapter = {
   role: AgentRole.AGENT,
@@ -48,21 +49,26 @@ const myAgent: AgentAdapter = {
   },
 };
 
-const result = await scenario.run({
-  name: "CLI command discovery",
-  description: "Agent discovers and uses the CLI to accomplish a task",
-  agents: [
-    myAgent,
-    scenario.userSimulatorAgent({ model: openai("gpt-5-mini") }),
-    scenario.judgeAgent({
-      model: openai("gpt-5-mini"),
-      criteria: [
-        "Agent used the CLI command correctly",
-        "Agent did not get stuck on interactive prompts",
-        "Agent did not need to pipe 'yes' or use 'expect' scripting",
+describe("CLI agent usability", () => {
+  it("discovers and uses the command non-interactively", async () => {
+    const result = await scenario.run({
+      name: "CLI command discovery",
+      description: "Agent discovers and uses the CLI to accomplish a task",
+      agents: [
+        myAgent,
+        scenario.userSimulatorAgent({ model: openai("gpt-5-mini") }),
+        scenario.judgeAgent({
+          model: openai("gpt-5-mini"),
+          criteria: [
+            "Agent used the CLI command correctly",
+            "Agent did not get stuck on interactive prompts",
+            "Agent did not need to pipe 'yes' or use 'expect' scripting",
+          ],
+        }),
       ],
-    }),
-  ],
+    });
+    expect(result.success).toBe(true);
+  });
 });
 ```
 

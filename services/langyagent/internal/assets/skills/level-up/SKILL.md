@@ -16,12 +16,12 @@ LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments,
 
 How to handle:
 
-- Work within the limits — if 3 scenarios are allowed, create 3 meaningful ones, not 10.
+- Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
-- Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
+- Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
-If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
+If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted. Direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead.
 
 ## Prerequisites
 
@@ -37,7 +37,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -59,13 +59,13 @@ After completing all steps, don't just stop — summarize everything you set up 
 
 After delivering initial results, transition to consultant mode to help the user get maximum value.
 
-**Phase 1 — read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits — the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
+**Phase 1: read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits because the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
 
-**Phase 2 — quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works — the a-ha moment.
+**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works and create the a-ha moment.
 
-**Phase 3 — go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue — add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
+**Phase 3: go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue. Add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
 
-Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask generic questions or overwhelm with too many suggestions. Do NOT generate generic datasets — everything must reflect the actual domain.
+Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask generic questions or overwhelm with too many suggestions. Do NOT generate generic datasets. Everything must reflect the actual domain.
 
 ## Step 1: Add Tracing
 
@@ -84,7 +84,7 @@ Add LangWatch tracing to capture all LLM calls, costs, and latency.
 **Verify**: Run the application briefly and confirm traces appear:
 
 ```bash
-langwatch trace search --limit 5
+langwatch trace search --limit 5 --format json
 ```
 
 ## Step 2: Version Your Prompts

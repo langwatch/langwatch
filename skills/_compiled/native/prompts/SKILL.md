@@ -31,10 +31,8 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it — point to the subscription settings on the platform (license settings instead, if `LANGWATCH_ENDPOINT` is set — self-hosted).
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
-
-If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted. Direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead.
 
 ## Step 1: Read the Prompts CLI Docs
 
@@ -64,7 +62,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env` — most environments already have this provisioned. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
 Then specifically read the Prompts CLI guide:
 

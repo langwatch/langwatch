@@ -32,28 +32,39 @@ interface LangySessionState {
 
 let cachedCookie: Promise<string> | null = null;
 
-/** Sign in once (per test process) and cache the better-auth session cookie. */
+/**
+ * Sign in once (per test process) and cache the better-auth session cookie.
+ * Clears the cache on rejection — otherwise a single transient sign-in
+ * failure (a momentary network blip, the app mid-restart) would permanently
+ * poison every remaining test in the run, since `??=` only checks for
+ * null/undefined at assignment time and a rejected promise is neither.
+ */
 function getSessionCookie(): Promise<string> {
   cachedCookie ??= (async () => {
-    const res = await fetch(`${APP_BASE}/api/auth/sign-in/email`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Origin: APP_BASE },
-      body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) {
-      throw new Error(
-        `Langy test sign-in failed: ${res.status} ${await res.text()}`,
-      );
+    try {
+      const res = await fetch(`${APP_BASE}/api/auth/sign-in/email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: APP_BASE },
+        body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) {
+        throw new Error(
+          `Langy test sign-in failed: ${res.status} ${await res.text()}`,
+        );
+      }
+      const setCookie = res.headers.get("set-cookie") ?? "";
+      const match = /__Secure-better-auth\.session_token=[^;]+/.exec(setCookie);
+      if (!match) {
+        throw new Error(
+          "Langy test sign-in: no better-auth session cookie in response",
+        );
+      }
+      return match[0];
+    } catch (error) {
+      cachedCookie = null;
+      throw error;
     }
-    const setCookie = res.headers.get("set-cookie") ?? "";
-    const match = /__Secure-better-auth\.session_token=[^;]+/.exec(setCookie);
-    if (!match) {
-      throw new Error(
-        "Langy test sign-in: no better-auth session cookie in response",
-      );
-    }
-    return match[0];
   })();
   return cachedCookie;
 }

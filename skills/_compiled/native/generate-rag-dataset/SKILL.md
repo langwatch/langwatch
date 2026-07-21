@@ -81,7 +81,7 @@ Format:
 ```python
 {
     "input": "When should I irrigate apple orchards?",
-    "expected_output": "Irrigate when soil moisture exceeds 35 kPa...",
+    "expected_output": "Irrigate to maintain soil moisture between 25-35 kPa...",
     "context": "## Irrigation Management\nSoil moisture threshold for apple orchards: maintain between 25-35 kPa...",
     "question_type": "factual_recall"
 }

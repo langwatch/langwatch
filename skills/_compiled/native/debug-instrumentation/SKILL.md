@@ -30,10 +30,10 @@ If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` 
 ## Step 1: Fetch Recent Traces
 
 ```bash
-langwatch trace search --limit 25 --start-date 2026-01-01 --format json
+langwatch trace search --limit 25 --start-date "$(date -u -Iseconds -d '7 days ago')" --format json
 ```
 
-(Adjust `--start-date` to "last 24h" or "last 7d" — the CLI accepts ISO strings.)
+(Widen or narrow the window as needed — the CLI accepts ISO strings for `--start-date`.)
 
 For each trace, ask:
 

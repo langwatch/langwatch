@@ -64,7 +64,7 @@ export async function runScenarioAndLog(
     const filePath = path.join(LOG_DIR, `${slug}.md`);
     await fs.writeFile(
       filePath,
-      formatAsMarkdown(testName, result, qa),
+      formatAsMarkdown({ testName, result, qa }),
       "utf8",
     );
   } catch {
@@ -82,11 +82,15 @@ function slugify(name: string): string {
   );
 }
 
-function formatAsMarkdown(
-  testName: string,
-  result: Result,
-  qa: BrowserQAResult | null,
-): string {
+function formatAsMarkdown({
+  testName,
+  result,
+  qa,
+}: {
+  testName: string;
+  result: Result;
+  qa: BrowserQAResult | null;
+}): string {
   const out: string[] = [];
   out.push(`# ${testName}`);
   out.push("");

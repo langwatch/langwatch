@@ -20,24 +20,38 @@ const SCREENSHOT_DIR = path.resolve(__dirname, "scenario-logs", "screenshots");
 let browserPromise: Promise<Browser> | null = null;
 let contextPromise: Promise<BrowserContext> | null = null;
 
+/**
+ * Clears the corresponding cache on rejection — otherwise a single transient
+ * launch/login failure would permanently disable browser QA for every
+ * remaining scenario in the run (`??=` only checks null/undefined at
+ * assignment time, and a rejected promise is neither).
+ */
 async function getSharedContext(): Promise<BrowserContext> {
-  browserPromise ??= chromium.launch({ headless: true });
+  browserPromise ??= chromium.launch({ headless: true }).catch((error) => {
+    browserPromise = null;
+    throw error;
+  });
   const browser = await browserPromise;
   contextPromise ??= (async () => {
-    const context = await browser.newContext({ ignoreHTTPSErrors: true });
-    const page = await context.newPage();
-    await page.goto(`${APP_BASE}/auth/signin`, {
-      waitUntil: "domcontentloaded",
-      timeout: 30_000,
-    });
-    await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
-    await page.locator('input[type="password"]').fill(ADMIN_PASSWORD);
-    await page.locator('button[type="submit"]').click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/auth/signin"), {
-      timeout: 20_000,
-    });
-    await page.close();
-    return context;
+    try {
+      const context = await browser.newContext({ ignoreHTTPSErrors: true });
+      const page = await context.newPage();
+      await page.goto(`${APP_BASE}/auth/signin`, {
+        waitUntil: "domcontentloaded",
+        timeout: 30_000,
+      });
+      await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
+      await page.locator('input[type="password"]').fill(ADMIN_PASSWORD);
+      await page.locator('button[type="submit"]').click();
+      await page.waitForURL((url) => !url.pathname.startsWith("/auth/signin"), {
+        timeout: 20_000,
+      });
+      await page.close();
+      return context;
+    } catch (error) {
+      contextPromise = null;
+      throw error;
+    }
   })();
   return contextPromise;
 }
