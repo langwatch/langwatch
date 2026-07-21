@@ -177,6 +177,49 @@ test_access_ingress() {
 
   # Service type = ClusterIP (default, not NodePort)
   assert_not_contains "No NodePort" "$out" "type: NodePort"
+
+  # /api/internal is hard-blocked at the edge by default: the ingress renders a
+  # higher-priority Prefix path for it, routing to a no-endpoints blackhole
+  # Service so the private control-plane surface (langy-internal / langy-relay /
+  # gateway-internal) is never internet-reachable. Regression for the
+  # "internal routes reachable via default ingress" finding.
+  local ingress_only
+  ingress_only=$(tmpl_only "templates/ingress.yaml" --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-prod.yaml" \
+    -f "${OVERLAYS}/access-ingress.yaml")
+  assert_contains "Ingress blocks /api/internal path" "$ingress_only" "path: /api/internal"
+  assert_contains "Blocked path → blackhole Service" "$ingress_only" "name: ${RELEASE}-blackhole"
+  # Longest-prefix wins on conformant controllers, but we also emit the blocked
+  # path before the app catch-all for order-sensitive controllers (e.g. nginx).
+  local api_internal_line app_line
+  api_internal_line=$(grep -n "path: /api/internal" <<< "$ingress_only" | head -1 | cut -d: -f1)
+  app_line=$(grep -nE "path: /$" <<< "$ingress_only" | head -1 | cut -d: -f1)
+  if [[ -n "$api_internal_line" && -n "$app_line" && "$api_internal_line" -lt "$app_line" ]]; then
+    pass "Blocked path listed before app catch-all"
+  else
+    fail "Blocked path should precede app catch-all (/api/internal@${api_internal_line:-?}, /@${app_line:-?})"
+  fi
+
+  # The blackhole Service renders with no selector (no Endpoints => 502/503).
+  local blackhole_svc
+  blackhole_svc=$(tmpl_only "templates/blackhole-service.yaml" --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-prod.yaml" \
+    -f "${OVERLAYS}/access-ingress.yaml")
+  assert_contains "Blackhole Service rendered" "$blackhole_svc" "name: ${RELEASE}-blackhole"
+  assert_not_contains "Blackhole Service has no selector" "$blackhole_svc" "selector:"
+
+  # Operators can disable the block by emptying blockedPaths.
+  # --set-json, NOT --set: `--set 'x=[]'` assigns the two-character STRING "[]",
+  # which is truthy (so the blackhole Service still renders) and then blows up
+  # the ingress template with "range can't iterate over []". Only --set-json
+  # produces a real empty list — the same value an operator writing
+  # `blockedPaths: []` in a values file gets.
+  local no_block
+  no_block=$(tmpl --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-prod.yaml" \
+    -f "${OVERLAYS}/access-ingress.yaml" \
+    --set-json 'ingress.blockedPaths=[]')
+  assert_not_contains "blockedPaths=[] drops the block" "$no_block" "${RELEASE}-blackhole"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -480,11 +523,27 @@ test_install_prod_ingress() {
     -o jsonpath='{.spec.tls[0].secretName}')
   assert_eq "Ingress TLS secret" "$tls_secret" "langwatch-tls"
 
-  # Ingress backend auto-wired
+  # Ingress backend auto-wired. Select the app's catch-all path by VALUE, not by
+  # index: ingress.blockedPaths emits /api/internal first, so paths[0] is the
+  # blackhole Service, not the app.
   local backend_svc
   backend_svc=$(kc get ingress "${RELEASE}-ingress" \
-    -o jsonpath='{.spec.rules[0].http.paths[0].backend.service.name}')
+    -o jsonpath='{.spec.rules[0].http.paths[?(@.path=="/")].backend.service.name}')
   assert_eq "Ingress backend → app" "$backend_svc" "${RELEASE}-app"
+
+  # …and the blocked control-plane prefix really is wired to the no-endpoints
+  # blackhole in a live cluster, not just in the rendered template.
+  local blocked_svc
+  blocked_svc=$(kc get ingress "${RELEASE}-ingress" \
+    -o jsonpath='{.spec.rules[0].http.paths[?(@.path=="/api/internal")].backend.service.name}')
+  assert_eq "Ingress /api/internal → blackhole" "$blocked_svc" "${RELEASE}-blackhole"
+
+  # The blackhole Service exists and has no Endpoints — the property that makes
+  # the block a dead end (502/503) rather than a route to something live.
+  local blackhole_eps
+  blackhole_eps=$(kc get endpoints "${RELEASE}-blackhole" \
+    -o jsonpath='{.subsets}' 2>/dev/null || true)
+  assert_eq "Blackhole Service has no Endpoints" "$blackhole_eps" ""
 
   # Workers Deployment created (0 replicas, but resource exists)
   kc get deployment "${RELEASE}-workers" &>/dev/null \
