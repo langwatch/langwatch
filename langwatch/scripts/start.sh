@@ -96,6 +96,17 @@ START_APP_COMMAND="pnpm -s run start:app"
 # concurrently lane. When it's set we skip the standalone workers command below
 # and let start:app inherit the flag from the environment. Production never sets
 # this — it runs web and worker as separate deployments.
+#
+# Since the memory-footprint work this is the DEFAULT for plain `pnpm dev`
+# (matching the haven default): one Node server process instead of two copies
+# of the full module graph. Opt back into a standalone workers lane with
+# `pnpm dev:workers` (WORKERS_IN_PROCESS=0). Only defaulted when a workers
+# topology was requested at all (START_WORKERS), so `NODE_ENV=development
+# pnpm start` without START_WORKERS still runs web-only, as before.
+if [[ "$NODE_ENV" = "development" && -z "$WORKERS_IN_PROCESS" &&
+      ( "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ) ]]; then
+  WORKERS_IN_PROCESS=1
+fi
 START_WORKERS_COMMAND=""
 if [[ "$NODE_ENV" = "development" && ( "$WORKERS_IN_PROCESS" = "true" || "$WORKERS_IN_PROCESS" = "1" ) ]]; then
   export WORKERS_IN_PROCESS

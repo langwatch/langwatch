@@ -3,14 +3,16 @@ Feature: In-process workers for local development
   I want the option to host the background worker stack inside the app process
   So that I can run one process instead of two without giving up background jobs
 
-  # Default for plain `pnpm dev` is still two processes: it runs the app and a
-  # separate `pnpm run start:workers` lane under concurrently. This feature
-  # adds an OPT-IN single-process mode for developers who'd rather run one
-  # thing. Under haven (`pnpm dev:haven`) the default is INVERTED — single
-  # process — because a laptop juggling several worktrees can't afford a second
-  # Node process per stack; opt back out with WORKERS_IN_PROCESS=0. Production is
-  # untouched — it always runs web and worker as separate deployments
-  # (charts/langwatch/templates/{app,workers}) and never honours the flag.
+  # Default for plain `pnpm dev` is SINGLE PROCESS (since the memory-footprint
+  # work, specs/setup/memory-footprint.feature): the app hosts the worker stack
+  # in-process, saving the second full copy of the server module graph
+  # (~500 MB). This matches the haven (`pnpm dev:haven`) default. Opt back into
+  # a standalone workers lane with `pnpm dev:workers` (WORKERS_IN_PROCESS=0).
+  # The default only applies when a workers topology was requested at all
+  # (START_WORKERS) — `NODE_ENV=development pnpm start` without START_WORKERS
+  # still runs web-only. Production is untouched — it always runs web and
+  # worker as separate deployments (charts/langwatch/templates/{app,workers})
+  # and never honours the flag.
   #
   # The topology is selected by the WORKERS_IN_PROCESS env flag, read in four
   # places (all gated on NODE_ENV=development):
@@ -45,13 +47,21 @@ Feature: In-process workers for local development
     And it returns false for "web", "migration", and undefined
 
   @unimplemented
-  Scenario: pnpm dev keeps running the app and workers as two processes by default
-    Given WORKERS_IN_PROCESS is not set
+  Scenario: pnpm dev hosts the workers in-process by default
+    Given NODE_ENV is "development" and WORKERS_IN_PROCESS is not set
     When I run "pnpm dev"
+    Then start.sh does not add a separate "workers" lane
+    And the app boots with the "all" role
+    And the background worker stack starts inside the app process after it is listening
+
+  @unimplemented
+  Scenario: WORKERS_IN_PROCESS=0 opts pnpm dev back into a separate workers lane
+    Given NODE_ENV is "development" and WORKERS_IN_PROCESS is "0"
+    When I run "pnpm dev:workers"
     Then start.sh adds a separate "workers" lane running "pnpm run start:workers"
     And the app process boots with the web role (no in-process workers)
 
-  # --- Opt-in: single process ---
+  # --- Explicit single-process form (now equivalent to the default) ---
 
   @unimplemented
   Scenario: WORKERS_IN_PROCESS=1 hosts the worker stack inside the app process

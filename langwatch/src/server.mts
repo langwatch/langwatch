@@ -8,6 +8,7 @@ import Module from "module";
 // Registration only stores a function (env is read per serialize()), so a
 // static import is safe despite the dotenv dance below.
 import "./server/handled-error-wiring";
+import { keepProcessNodeEnv } from "./server/env-mode-guard";
 
 // `override: true` lets `.env` win over values that scripts/start.sh exported
 // before this entry runs. start.sh defaults LW_GATEWAY_BASE_URL,
@@ -24,6 +25,7 @@ import "./server/handled-error-wiring";
 // logger exists; dotenv has no logger hook, only quiet). Prod and tests silence
 // it: there it's a stray non-JSON stdout line on every boot.
 const quiet = process.env.NODE_ENV !== "development";
+const nodeEnvBeforeDotenv = process.env.NODE_ENV;
 dotenv.config({ override: true, quiet });
 // Portless (haven) overlay: loaded LAST with override so the resolved hostname
 // URLs + ports win over anything pinned in .env. In non-portless runs the file
@@ -35,6 +37,10 @@ dotenv.config({
   override: true,
   quiet: quiet || !existsSync(".env.portless"),
 });
+// NODE_ENV is a runtime mode, not configuration — enforce the "stays
+// shell-only" rule the comment above promises, so a NODE_ENV=development line
+// in .env can't silently de-productionize `pnpm start`.
+keepProcessNodeEnv(nodeEnvBeforeDotenv);
 setEnvironment(process.env.ENVIRONMENT ?? "local");
 
 if (process.env.NODE_ENV === "production") {

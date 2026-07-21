@@ -193,6 +193,13 @@ Add an **opt-in single-process dev mode**, off by default. The default for
 `pnpm dev` is unchanged (two processes). Setting `WORKERS_IN_PROCESS=1` (or
 running `pnpm dev:single`) hosts the worker stack inside the app process.
 
+> **2026-07 update (memory-footprint work):** single-process is now the
+> DEFAULT for plain `pnpm dev` too, matching the haven default — the second
+> worker process duplicated the entire server module graph (~500 MB). The
+> default only applies when START_WORKERS requested a workers topology; opt
+> back into a standalone lane with `pnpm dev:workers` (WORKERS_IN_PROCESS=0).
+> See `specs/setup/memory-footprint.feature`. Production is unchanged.
+
 A new process role `"all"` runs the web server AND the worker-side wiring in one
 process. The three prior `processRole === "worker"` gates now go through
 `roleRunsWorkers(role)` (`src/server/app-layer/config.ts`), which is true for

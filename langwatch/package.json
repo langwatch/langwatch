@@ -24,6 +24,7 @@
     "postinstall": "make -C .. setup-hooks 2>/dev/null || true",
     "dev": "NODE_ENV=development START_WORKERS=true ./scripts/check-ports.sh && pnpm run start:prepare:files && NODE_ENV=development START_WORKERS=true FORCE_COLOR=1 pnpm start 2>&1 | tee server.log",
     "dev:single": "WORKERS_IN_PROCESS=1 pnpm dev",
+    "dev:workers": "WORKERS_IN_PROCESS=0 pnpm dev",
     "dev:haven": "NODE_ENV=development START_WORKERS=true FORCE_COLOR=1 go run github.com/langwatch/langwatch/cmd/haven up 2>&1 | tee server.log",
     "dev:single:haven": "WORKERS_IN_PROCESS=1 pnpm dev:haven",
     "dev:workers:haven": "WORKERS_IN_PROCESS=0 pnpm dev:haven",
