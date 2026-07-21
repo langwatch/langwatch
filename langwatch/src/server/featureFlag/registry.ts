@@ -195,7 +195,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Opens the Langy in-product assistant, and is the only lever that does — there is no staff or other identity bypass, so this is a true kill switch. Default off, so Langy is dark until someone is explicitly opted in. To open it for a project or organization, add an operator-store row via /ops/feature-flags; to open it for one user, use a PostHog rule keyed on the user id (the operator store matches only projectId/organizationId, never a user). RELEASE_LANGY_ENABLED=1 is a blanket on — the env override parses ONLY 1 or 0, so RELEASE_LANGY_ENABLED=true is silently ignored. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_langy_enabled.",
+      "Opens the Langy in-product assistant, and is the only lever that does — there is no staff or other identity bypass, so this is a true kill switch. Default off, so Langy is dark until someone is explicitly opted in. To open it for a project or organization, add an operator-store row via /ops/feature-flags; to open it for one user, use a PostHog rule keyed on the user id (the operator store matches only projectId/organizationId, never a user). For local dev use FEATURE_FLAG_FORCE_ENABLE=release_langy_enabled.",
   },
   {
     key: "release_langy_promo_enabled",
