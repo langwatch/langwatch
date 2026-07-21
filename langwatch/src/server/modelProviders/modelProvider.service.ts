@@ -191,8 +191,14 @@ export class ModelProviderService {
    * Gets model providers with API keys masked for frontend display.
    *
    * Business rules:
-   * - Only masks fields matching KEY_CHECK patterns (API keys)
+   * - Only masks customKeys fields matching KEY_CHECK patterns (API keys)
+   * - Extra-header values are always masked — they routinely carry auth
+   *   secrets for azure/custom providers
    * - URLs and other values remain visible
+   *
+   * Masking runs even when `includeKeys` is false: customKeys are already
+   * nulled by that flag, but extraHeaders are returned regardless, so
+   * skipping the mask would hand view-only users plaintext header values.
    */
   async getProjectModelProvidersForFrontend(
     projectId: string,
@@ -202,10 +208,6 @@ export class ModelProviderService {
       projectId,
       includeKeys,
     );
-
-    if (!includeKeys) {
-      return providers;
-    }
 
     return this.maskApiKeys(providers);
   }
@@ -255,6 +257,9 @@ export class ModelProviderService {
       .map((mp) => ({
         ...this.toMaybeStoredProvider(mp, defaultProviders, true),
         customKeys: this.maskRowCustomKeys(mp.customKeys),
+        extraHeaders: this.maskExtraHeaders(
+          mp.extraHeaders as { key: string; value: string }[] | null,
+        ),
       }));
     return [...storedRows, ...systemRows];
   }
@@ -324,6 +329,9 @@ export class ModelProviderService {
       .map((mp) => ({
         ...this.toMaybeStoredProvider(mp, defaultProviders, true),
         customKeys: this.maskRowCustomKeys(mp.customKeys),
+        extraHeaders: this.maskExtraHeaders(
+          mp.extraHeaders as { key: string; value: string }[] | null,
+        ),
       }));
     return [...storedRows, ...systemRows];
   }
@@ -1023,15 +1031,33 @@ export class ModelProviderService {
     const masked = { ...providers };
 
     for (const [providerKey, config] of Object.entries(masked)) {
-      if (config.customKeys) {
+      if (config.customKeys || config.extraHeaders?.length) {
         masked[providerKey] = {
           ...config,
           customKeys: this.maskRowCustomKeys(config.customKeys),
+          extraHeaders: this.maskExtraHeaders(config.extraHeaders),
         };
       }
     }
 
     return masked;
+  }
+
+  /**
+   * Header values are masked wholesale — unlike customKeys there is no
+   * name pattern to distinguish secrets, and azure/custom extra headers
+   * routinely carry auth tokens. Keys stay visible so the form can be
+   * edited; `mergeExtraHeaders` restores real values when the masked
+   * placeholder comes back on save.
+   */
+  private maskExtraHeaders(
+    extraHeaders: { key: string; value: string }[] | null | undefined,
+  ): { key: string; value: string }[] | null {
+    if (!extraHeaders) return extraHeaders ?? null;
+    return extraHeaders.map(({ key }) => ({
+      key,
+      value: MASKED_KEY_PLACEHOLDER,
+    }));
   }
 
   private validateAndCleanKeys(
@@ -1106,7 +1132,11 @@ export class ModelProviderService {
   }
 
   private async updateExisting(
-    existingProvider: { id: string; customKeys: unknown },
+    existingProvider: {
+      id: string;
+      customKeys: unknown;
+      extraHeaders: unknown;
+    },
     data: {
       projectId: string;
       provider: string;
@@ -1138,7 +1168,12 @@ export class ModelProviderService {
         enabled: data.enabled,
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
-        extraHeaders: data.extraHeaders,
+        extraHeaders: this.mergeExtraHeaders(
+          data.extraHeaders,
+          existingProvider.extraHeaders as
+            | { key: string; value: string }[]
+            | null,
+        ),
         ...(data.name !== undefined && { name: data.name }),
         ...(data.scopes !== undefined && { scopes: data.scopes }),
         ...(customKeysToSave !== undefined && {
@@ -1174,7 +1209,9 @@ export class ModelProviderService {
         enabled: data.enabled,
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
-        extraHeaders: data.extraHeaders,
+        // No existing row to restore from — placeholder values are dropped
+        // instead of being stored literally.
+        extraHeaders: this.mergeExtraHeaders(data.extraHeaders, null),
         scopes: data.scopes,
         ...(customKeysProvided &&
           validatedKeys && { customKeys: validatedKeys }),
@@ -1207,5 +1244,27 @@ export class ModelProviderService {
           .map(([key, value]) => [key, value]),
       ),
     };
+  }
+
+  /**
+   * Header counterpart of `mergeCustomKeys`: the frontend receives header
+   * values as the masked placeholder, so an untouched header comes back
+   * masked on save and must be restored from the stored row. Restore by
+   * header key first; when the key was renamed, fall back to the header
+   * at the same position; a placeholder that matches nothing is dropped
+   * rather than stored as a literal value.
+   */
+  private mergeExtraHeaders(
+    incoming: { key: string; value: string }[],
+    existing: { key: string; value: string }[] | null,
+  ): { key: string; value: string }[] {
+    return incoming.flatMap((header, index) => {
+      if (header.value !== MASKED_KEY_PLACEHOLDER) return [header];
+      const restored =
+        existing?.find((h) => h.key === header.key)?.value ??
+        existing?.[index]?.value;
+      if (restored === undefined) return [];
+      return [{ key: header.key, value: restored }];
+    });
   }
 }

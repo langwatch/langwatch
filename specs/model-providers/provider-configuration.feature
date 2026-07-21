@@ -65,6 +65,36 @@ Feature: Model Provider Configuration
     Then the "OPENAI_API_KEY" field shows "HAS_KEY••••••••••••••••••••••••"
     And the actual API key value is not displayed
 
+  @unit
+  Scenario: Plaintext API keys never reach the browser through any provider query
+    Given I have "openai" provider configured with API key "sk-actual123"
+    And I have "project:update" permission
+    When the app fetches the project's model providers from any page
+    Then the API key is masked in the response
+    And the plaintext API key does not appear anywhere in the response
+    And non-secret values like the base URL remain visible
+
+  @unit
+  Scenario: A user without project view permission cannot list a project's providers
+    Given a project has "openai" provider configured with an API key
+    And I have no permissions on that project
+    When I request that project's model providers
+    Then the request is rejected as unauthorized
+
+  @unit
+  Scenario: Access to a sibling project does not grant access to this project's providers
+    Given a project has "openai" provider configured with an API key
+    And I am an admin of a different project in the same organization
+    When I request that project's model providers
+    Then the request is rejected as unauthorized
+
+  @unit
+  Scenario: Admin rights in another organization grant nothing across the tenancy boundary
+    Given a project has "openai" provider configured with an API key
+    And I am an admin of a different organization
+    When I request that project's model providers
+    Then the request is rejected as unauthorized
+
   @integration
   Scenario: Preserve original API key when saving with masked placeholder
     Given I have "openai" provider configured with API key "sk-actual123"
