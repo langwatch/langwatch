@@ -70,6 +70,45 @@ export function canonicalAnyValue(
   return { type: "empty" };
 }
 
+/**
+ * Flatten a canonical KeyValue array — the shape {@link canonicalAttributes}
+ * produces and `pointAttributesJson` stores — back into a scalar record.
+ * Ints stay as their decimal strings; structured values (bytes, arrays,
+ * kvlists) stay behind: fact-lifting consumers only ever key off scalars.
+ */
+export function scalarsFromCanonicalAttributes(
+  attributes: unknown,
+): Record<string, string | number | boolean> {
+  const scalars: Record<string, string | number | boolean> = {};
+  if (!Array.isArray(attributes)) return scalars;
+  for (const attribute of attributes) {
+    if (!isRecord(attribute) || typeof attribute.key !== "string") continue;
+    const wrapped = attribute.value;
+    if (!isRecord(wrapped)) continue;
+    switch (wrapped.type) {
+      case "string":
+      case "int":
+        if (typeof wrapped.value === "string") {
+          scalars[attribute.key] = wrapped.value;
+        }
+        break;
+      case "bool":
+        if (typeof wrapped.value === "boolean") {
+          scalars[attribute.key] = wrapped.value;
+        }
+        break;
+      case "double":
+        if (typeof wrapped.value === "number") {
+          scalars[attribute.key] = wrapped.value;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  return scalars;
+}
+
 export function canonicalAttributes(
   attributes: unknown,
 ): Array<{ key: string; value: unknown }> {

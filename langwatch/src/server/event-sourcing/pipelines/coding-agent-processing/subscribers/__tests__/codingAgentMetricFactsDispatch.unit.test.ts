@@ -8,6 +8,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "~/server/event-sourcing";
+import { canonicalAttributes } from "../../../metric-processing/canonical/attributes";
+import { stableStringify } from "../../../metric-processing/canonical/serialization";
 import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "../../../metric-processing/schemas/constants";
 import type { MetricProcessingEvent } from "../../../metric-processing/schemas/events";
 import type { ContributeMetricFactsCommandData } from "../../schemas/commands";
@@ -15,6 +17,28 @@ import { createCodingAgentMetricFactsDispatchSubscriber } from "../codingAgentMe
 
 const SERIES_ID = "a".repeat(64);
 const POINT_ID = "b".repeat(64);
+
+/**
+ * Encode attributes exactly the way buildPoint does — through
+ * canonicalAttributes + stableStringify — so this suite drives the dispatcher
+ * with the canonical KeyValue-array shape the pipeline actually stores, not a
+ * hand-rolled flat object.
+ */
+function encodeAttributes(attributes: Record<string, unknown>): string {
+  return stableStringify(
+    canonicalAttributes(
+      Object.entries(attributes).map(([key, value]) => ({
+        key,
+        value:
+          typeof value === "boolean"
+            ? { boolValue: value }
+            : typeof value === "number"
+              ? { doubleValue: value }
+              : { stringValue: String(value) },
+      })),
+    ),
+  );
+}
 
 function dataPointEvent({
   metricName,
@@ -46,7 +70,7 @@ function dataPointEvent({
       metricKind: "sum",
       aggregationTemporality: temporality,
       scopeName: "com.anthropic.claude_code",
-      pointAttributesJson: JSON.stringify(attributes),
+      pointAttributesJson: encodeAttributes(attributes),
       timeUnixMs: 1_500,
       valueType: valueDouble !== null ? "double" : valueInt !== null ? "int" : "none",
       valueDouble,

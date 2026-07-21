@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
+import { scalarsFromCanonicalAttributes } from "../../metric-processing/canonical/attributes";
 import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "../../metric-processing/schemas/constants";
 import type { MetricProcessingEvent } from "../../metric-processing/schemas/events";
 import type { ContributeMetricFactsCommandData } from "../schemas/commands";
@@ -88,29 +89,28 @@ export function createCodingAgentMetricFactsDispatchSubscriber(deps: {
 
 /** Keep the series' identity attributes; anything structured stays behind. */
 function liftScalarAttributes(
-  attributes: Record<string, unknown>,
+  attributes: Record<string, string | number | boolean>,
 ): Record<string, string | number | boolean> {
   const lifted: Record<string, string | number | boolean> = {};
   for (const [key, value] of Object.entries(attributes)) {
-    if (
-      (typeof value === "string" && value.length > 0) ||
-      typeof value === "number" ||
-      typeof value === "boolean"
-    ) {
+    if (typeof value !== "string" || value.length > 0) {
       lifted[key] = value;
     }
   }
   return lifted;
 }
 
-function parsePointAttributes(json: string): Record<string, unknown> | null {
+/**
+ * `pointAttributesJson` stores the canonical KeyValue array buildPoint
+ * writes (`[{key, value: {type, value}}]`), so parsing means flattening the
+ * typed wrappers back to scalars — never treating the JSON as a flat object.
+ */
+function parsePointAttributes(
+  json: string,
+): Record<string, string | number | boolean> | null {
   if (!json) return null;
   try {
-    const parsed: unknown = JSON.parse(json);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      return null;
-    }
-    return parsed as Record<string, unknown>;
+    return scalarsFromCanonicalAttributes(JSON.parse(json));
   } catch (error) {
     // Written by our own preparation — should be unreachable, but a
     // dispatcher must never poison the queue over one point.
