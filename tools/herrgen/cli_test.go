@@ -79,7 +79,7 @@ func TestRun(t *testing.T) {
 		}
 
 		added := filepath.Join(root, "services", "aigateway", "domain", "errors.go")
-		if err := os.MkdirAll(filepath.Dir(added), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(added), 0o750); err != nil {
 			t.Fatal(err)
 		}
 		source := `package domain
@@ -172,7 +172,7 @@ func TestDiff(t *testing.T) {
 		want   []string
 	}{
 		{
-			name:   "an added line is marked and its neighbours kept",
+			name:   "an added line is marked and its neighbors kept",
 			before: "one\ntwo\nfour\n",
 			after:  "one\ntwo\nthree\nfour\n",
 			want:   []string{" one", " two", "+three", " four"},

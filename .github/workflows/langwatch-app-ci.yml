@@ -31,8 +31,18 @@ jobs:
         id: detect
         with:
           filters: |
+            # `packages/**` is source-only and linked into the app via
+            # `workspace:*`, so its files are type-checked as part of this job
+            # and NOT by any Go workflow. Without it, a Go-only PR that adds an
+            # herr code and regenerates `packages/handled-error/codes.generated.ts`
+            # skips typecheck entirely — and that typecheck is the thing that
+            # fails when the new code has no customer-facing copy
+            # (`satisfies Record<AppErrorCode | GoErrorCode, ...>` in
+            # src/features/errors/logic/presentation.ts). Exactly the PR class
+            # the enforcement exists for would sail through.
             relevant:
               - 'langwatch/**'
+              - 'packages/**'
               - '.github/workflows/langwatch-app-ci.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'

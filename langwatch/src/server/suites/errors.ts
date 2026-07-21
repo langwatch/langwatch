@@ -12,15 +12,17 @@ import { HandledError, type HandledErrorOptions } from "@langwatch/handled-error
 /**
  * Base class for suite domain errors.
  *
- * Defaults to 404 because the original mapping in `suite.router.ts` turned any
- * `SuiteDomainError` into a NOT_FOUND; subclasses that are not "missing" say so.
+ * Defaults to `suite_not_found`/404, which is what a bare `SuiteDomainError`
+ * is raised for. Anything that is not "missing" declares its own code — a
+ * catch-all default whose copy asserts a specific cause is how a name clash
+ * ends up telling the user "Run plan not found".
  */
 export class SuiteDomainError extends HandledError {
   constructor(
     message: string,
     options: HandledErrorOptions & { code?: string; httpStatus?: number } = {},
   ) {
-    const { code = "suite_error", httpStatus = 404, ...rest } = options;
+    const { code = "suite_not_found", httpStatus = 404, ...rest } = options;
     super(code, message, { ...rest, httpStatus });
     this.name = "SuiteDomainError";
   }
@@ -81,5 +83,18 @@ export class AllTargetsArchivedError extends SuiteDomainError {
       { code: "suite_all_targets_archived", httpStatus: 422 },
     );
     this.name = "AllTargetsArchivedError";
+  }
+}
+
+/** Thrown when a suite name is already in use within the project */
+export class SuiteNameTakenError extends SuiteDomainError {
+  declare readonly code: "suite_name_taken";
+
+  constructor() {
+    super("A suite with this name already exists", {
+      code: "suite_name_taken",
+      httpStatus: 409,
+    });
+    this.name = "SuiteNameTakenError";
   }
 }

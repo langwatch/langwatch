@@ -82,14 +82,10 @@ export const suiteRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Suite not found" });
       }
       await enforceLicenseLimit(ctx, input.projectId, "experiments");
-      try {
-        return await service.duplicate(input);
-      } catch (error) {
-        // A SuiteDomainError is a HandledError — rethrow it so the tRPC
-        // handled-error middleware maps its code and status, instead of
-        // flattening every suite failure into one NOT_FOUND with prose.
-        throw error;
-      }
+      // A SuiteDomainError is a HandledError — left to propagate so the tRPC
+      // handled-error middleware maps its code and status, instead of
+      // flattening every suite failure into one NOT_FOUND with prose.
+      return await service.duplicate(input);
     }),
 
   archive: protectedProcedure
@@ -165,27 +161,23 @@ export const suiteRouter = createTRPCRouter({
         });
       }
 
-      try {
-        const result = await service.run({
-          suite,
-          projectId: input.projectId,
-          organizationId,
-          idempotencyKey: input.idempotencyKey,
-          batchRunId: input.batchRunId,
-        });
+      // No catch: a SuiteDomainError is a HandledError, so the tRPC
+      // handled-error middleware maps its code and status. Wrapping it in an
+      // INTERNAL_SERVER_ERROR here would drop the `cause` the middleware keys
+      // off, turning "every scenario is archived" — a customer-fault 422 the
+      // UI has a specific recovery action for — into an opaque 500.
+      const result = await service.run({
+        suite,
+        projectId: input.projectId,
+        organizationId,
+        idempotencyKey: input.idempotencyKey,
+        batchRunId: input.batchRunId,
+      });
 
-        return {
-          scheduled: true,
-          ...result,
-        };
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unknown error";
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message,
-        });
-      }
+      return {
+        scheduled: true,
+        ...result,
+      };
     }),
 
   getSummaries: protectedProcedure
