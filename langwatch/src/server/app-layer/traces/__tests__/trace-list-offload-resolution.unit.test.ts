@@ -50,7 +50,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
-import type { TopicService } from "~/server/app-layer/topics/topic.service";
+import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
