@@ -22,7 +22,14 @@ const renderPicker = (
   props: Partial<Parameters<typeof DeliveryPicker>[0]> = {},
 ) =>
   render(
-    <DeliveryPicker value={null} onChange={vi.fn()} source="trace" {...props} />,
+    <DeliveryPicker
+      value={null}
+      onChange={vi.fn()}
+      source="trace"
+      webhookEnabled={false}
+      preserveHiddenWebhook={false}
+      {...props}
+    />,
     { wrapper: Wrapper },
   );
 
@@ -77,6 +84,34 @@ describe("DeliveryPicker", () => {
 
         expect(onChange).toHaveBeenCalledWith(TriggerAction.ADD_TO_DATASET);
       });
+    });
+  });
+
+  describe("given webhook delivery is flag-hidden", () => {
+    it("does not mention or offer webhooks for a new automation", () => {
+      renderPicker({ webhookEnabled: false });
+
+      expect(screen.queryByText(/webhook/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /webhook/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows an existing webhook selection read-only with a clear notice", () => {
+      renderPicker({
+        value: TriggerAction.SEND_WEBHOOK,
+        webhookEnabled: false,
+        preserveHiddenWebhook: true,
+      });
+
+      expect(screen.getByRole("button", { name: /webhook/i })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+      expect(screen.getByText(/saved setup is read-only/i)).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /edit setup/i }),
+      ).not.toBeInTheDocument();
     });
   });
 });

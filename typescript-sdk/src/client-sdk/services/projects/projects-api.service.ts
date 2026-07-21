@@ -1,4 +1,5 @@
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
 export interface Project {
@@ -92,6 +93,12 @@ export class ProjectsApiService {
         operation,
         error: parsedBody,
         options: { status: response.status },
+      });
+      throwIfHandledError({
+        operation,
+        error: parsedBody,
+        status: response.status,
+        message,
       });
       throw new ProjectsApiError(message, operation, parsedBody);
     }

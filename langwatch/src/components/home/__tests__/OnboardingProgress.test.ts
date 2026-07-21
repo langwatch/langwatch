@@ -7,7 +7,7 @@ import {
 const defaultData = {
   workflows: 0,
   datasets: 0,
-  evaluations: 0,
+  onlineEvaluations: 0,
   simulations: 0,
   modelProviders: 0,
   prompts: 0,
@@ -90,9 +90,9 @@ describe("OnboardingProgress", () => {
         expect(steps[5]?.key).toBe("createSimulation");
       });
 
-      it("marks setupEvaluation complete when evaluations > 0", () => {
+      it("marks setupEvaluation complete when online evaluations exist", () => {
         const steps = buildOnboardingSteps(
-          { ...defaultData, evaluations: 1 },
+          { ...defaultData, onlineEvaluations: 1 },
           "test-project",
         );
 
@@ -127,6 +127,8 @@ describe("OnboardingProgress", () => {
         // the legacy /messages list.
         expect(steps[1]?.href).toBe("/my-project/traces");
         expect(steps[4]?.href).toBe("/my-project/prompts");
+        expect(steps[6]?.title).toBe("Set up your first online evaluation");
+        expect(steps[6]?.href).toBe("/my-project/online-evaluations");
         expect(steps[7]?.href).toBe("/my-project/workflows");
       });
     });
@@ -159,7 +161,7 @@ describe("OnboardingProgress", () => {
           {
             workflows: 1,
             datasets: 1,
-            evaluations: 1,
+            onlineEvaluations: 1,
             simulations: 1,
             modelProviders: 1,
             prompts: 1,

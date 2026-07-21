@@ -70,6 +70,10 @@ vi.mock("~/hooks/useFilterParams", () => ({
   useFilterParams: () => ({ filterParams: { filters: {} } }),
 }));
 
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false }),
+}));
+
 vi.mock("~/hooks/useRequiredSession", () => ({
   useRequiredSession: () => ({
     data: { user: { email: "me@example.com" } },
@@ -451,6 +455,17 @@ describe("AutomationDrawer", () => {
   });
 
   describe("given a use-case card prefill", () => {
+    describe("when a stale param seeds the hidden webhook action", () => {
+      it("ignores the action without exposing webhook authoring copy", async () => {
+        renderDrawer({ initialAction: "SEND_WEBHOOK" });
+
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.action).toBeNull();
+        });
+        expect(screen.queryByText(/webhook/i)).not.toBeInTheDocument();
+      });
+    });
+
     describe("when the params seed an alert", () => {
       it("seeds the name, source, action, and severity", async () => {
         renderDrawer({

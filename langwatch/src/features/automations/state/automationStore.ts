@@ -12,12 +12,15 @@ export const MAX_TEST_HISTORY = 5;
  *  come from the outbox-backed health view (ADR-037, separate stack). */
 export interface TestFireAttempt {
   at: number;
-  channel: "email" | "slack";
+  channel: "email" | "slack" | "webhook";
   status: "success" | "failure";
   recipientCount?: number;
   usedDefault?: boolean;
   errorTitle?: string;
   errorDetail?: string;
+  /** Webhook only: the HTTP status the endpoint answered a successful test
+   *  with — shown inline next to the test button (ADR-040 §1). */
+  httpStatus?: number;
 }
 
 /** Which secondary drawer is currently open on top of the main view.

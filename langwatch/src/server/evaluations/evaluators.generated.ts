@@ -899,7 +899,7 @@ export const evaluatorsSchema = z.object({
         .describe(
           "Compare each candidate against a reference answer. Turn off to have the judge compare the candidates directly on their own merits, with no reference answer involved.",
         )
-        .default(true),
+        .default(false),
       randomize_order: z
         .boolean()
         .describe(
@@ -2372,7 +2372,7 @@ candidate's position never sways the verdict.
       has_golden_answer: {
         description:
           "Compare each candidate against a reference answer. Turn off to have the judge compare the candidates directly on their own merits, with no reference answer involved.",
-        default: true,
+        default: false,
       },
       randomize_order: {
         description:

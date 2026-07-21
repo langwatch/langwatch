@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Logger } from "@langwatch/observability";
 import { computeNextRunAt } from "../nextRunAt";
 import { SchedulerRegistry } from "../scheduler.registry";
@@ -150,7 +150,16 @@ async function runOneFire({
   return { settleClaim, handlerCalls: wrapped.mock.calls.length };
 }
 
+beforeEach(() => {
+  // The lease-and-retry policy schedules from wall clock when a slot's next
+  // cron instant has already passed, so these tests only hold while "now" is
+  // between SLOT and NEXT_CRON. Pin Date (and only Date — the loop needs
+  // real timers) instead of trusting the calendar.
+  vi.useFakeTimers({ now: SLOT.getTime() + 30_000, toFake: ["Date"] });
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   captureException.mockClear();
 });
 

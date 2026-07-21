@@ -125,7 +125,11 @@ uuid
 
 # PR-body screenshots live in the github.com/langwatch/pr-screenshots repo,
 # referenced by raw URL from the PR body — never committed to the product tree.
-langwatch/pr-screenshots/
+# Match any depth and both the plain and dot-prefixed spellings: the earlier
+# path-anchored rule missed `langwatch/.pr-screenshots/`, which is how 30+ PNGs
+# reached main.
+**/pr-screenshots/
+**/.pr-screenshots/
 
 # Per-scenario LLM conversation transcripts (langy.scenario.test.ts)
 langwatch/e2e/langy/scenario-logs/
@@ -140,3 +144,4 @@ server.log
 # thuishaven (portless local dev)
 .langwatch-slug
 /bin/haven
+langwatch/dev.log

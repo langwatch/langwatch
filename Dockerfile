@@ -31,6 +31,10 @@ ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 # (via start:prepare:files → build:mcp-server).
 COPY mcp-server ./mcp-server
 COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
+COPY packages ./packages
+COPY skills ./skills
+COPY Dockerfile.langyagent ./Dockerfile.langyagent
+COPY feature-map.json ./feature-map.json
 
 COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.yaml ./langwatch/
 # The `packages/*` workspace members (e.g. @langwatch/observability, @langwatch/api)
@@ -63,9 +67,25 @@ WORKDIR /app
 # Copy built artifacts from builder.
 # mcp-server must be copied alongside langwatch because pnpm workspace
 # symlinks langwatch/node_modules/@langwatch/mcp-server -> ../../../mcp-server.
+# cli-cards and handled-error are other root workspace packages linked the same
+# way. Both are loaded by migration tasks as well as the running server —
+# handled-error is imported for side effects by the server and worker entry
+# points, so omitting it fails the boot outright.
 COPY --from=builder /app/langwatch ./langwatch
 COPY --from=builder /app/mcp-server ./mcp-server
+COPY --from=builder /app/packages/cli-cards/package.json ./packages/cli-cards/package.json
+COPY --from=builder /app/packages/cli-cards/src ./packages/cli-cards/src
+COPY --from=builder /app/packages/handled-error/package.json ./packages/handled-error/package.json
+COPY --from=builder /app/packages/handled-error/src ./packages/handled-error/src
+# cli-cards and handled-error deliberately declare zod / @opentelemetry/api as
+# peers. Because the workspace packages live outside /app/langwatch, expose the
+# app's production copies at the nearest shared node_modules boundary after dev
+# dependencies have been pruned.
+RUN mkdir -p ./node_modules/@opentelemetry \
+  && ln -s ../langwatch/node_modules/zod ./node_modules/zod \
+  && ln -s ../../langwatch/node_modules/@opentelemetry/api ./node_modules/@opentelemetry/api
 COPY --from=builder /app/langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
+COPY --from=builder /app/feature-map.json ./feature-map.json
 
 ENV NODE_ENV=production
 EXPOSE 5560

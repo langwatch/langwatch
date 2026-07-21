@@ -8,6 +8,7 @@ import {
   targetConfigSchema,
 } from "~/experiments-v3/types";
 import type { Workflow } from "~/optimization_studio/types/dsl";
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 
 // ============================================================================
@@ -200,6 +201,10 @@ export type ExecutionSummary = {
   };
 };
 
+export type EvaluationV3EvaluatorResult = SingleEvaluationResult & {
+  domainError?: SerializedHandledError;
+};
+
 /**
  * All SSE events emitted during evaluation execution.
  */
@@ -224,7 +229,7 @@ export type EvaluationV3Event =
       // Display name for evaluators that carry one without a DB record (workflow
       // evaluator nodes). DB-backed evaluators resolve their name at storage time.
       evaluatorName?: string;
-      result: SingleEvaluationResult;
+      result: EvaluationV3EvaluatorResult;
     }
   | { type: "progress"; completed: number; total: number }
   | {

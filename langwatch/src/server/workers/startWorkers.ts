@@ -41,43 +41,12 @@ async function verifyDatabaseReady(): Promise<void> {
   }
 }
 
-async function bootIngestionPuller(
-  shutdownHandles: ShutdownHandles,
-): Promise<void> {
-  const { startIngestionPullerWorker } = await import(
-    "@ee/governance/services/pullers/pullerWorker"
-  );
-  const { scheduleIngestionPullers } = await import(
-    "@ee/governance/services/pullers/pullerQueue"
-  );
-  const ingestionPullerWorker = startIngestionPullerWorker();
-  if (ingestionPullerWorker) {
-    shutdownHandles.push(() => ingestionPullerWorker.close());
-  }
-  await scheduleIngestionPullers();
-  logger.info("ingestion puller worker ready");
-}
-
-async function bootTopicClustering(
-  shutdownHandles: ShutdownHandles,
-): Promise<void> {
-  const { startTopicClusteringWorker } = await import(
-    "~/server/topicClustering/topicClusteringWorker"
-  );
-  const topicClusteringWorker = startTopicClusteringWorker();
-  if (topicClusteringWorker) {
-    shutdownHandles.push(() => topicClusteringWorker.close());
-  }
-  logger.info("topic clustering worker ready");
-}
-
 // ClickHouse storage-stats collection (feeds the Ops storage metrics).
 async function bootStorageStatsCollection(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getSharedClickHouseClient } = await import(
-    "~/server/clickhouse/clickhouseClient"
-  );
+  const { getSharedClickHouseClient } =
+    await import("~/server/clickhouse/clickhouseClient");
   const { startStorageStatsCollection, stopStorageStatsCollection } =
     await import("~/server/clickhouse/metrics");
   const clickHouseClient = getSharedClickHouseClient();
@@ -94,18 +63,14 @@ async function bootStorageStatsCollection(
 async function bootScenarioProcessor(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getScenarioExecutionHandle } = await import(
-    "~/server/app-layer/presets"
-  );
-  const { ScenarioExecutionPool } = await import(
-    "~/server/scenarios/execution/execution-pool"
-  );
-  const { startScenarioProcessor } = await import(
-    "~/server/scenarios/scenario.processor"
-  );
-  const { SCENARIO_WORKER } = await import(
-    "~/server/scenarios/scenario.constants"
-  );
+  const { getScenarioExecutionHandle } =
+    await import("~/server/app-layer/presets");
+  const { ScenarioExecutionPool } =
+    await import("~/server/scenarios/execution/execution-pool");
+  const { startScenarioProcessor } =
+    await import("~/server/scenarios/scenario.processor");
+  const { SCENARIO_WORKER } =
+    await import("~/server/scenarios/scenario.constants");
   const scenarioPool = new ScenarioExecutionPool({
     concurrency: SCENARIO_WORKER.CONCURRENCY,
   });
@@ -122,9 +87,8 @@ async function bootScenarioProcessor(
 async function bootAnomalyWorker(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { startAnomalyWorker } = await import(
-    "~/server/observability/anomalyWorker"
-  );
+  const { startAnomalyWorker } =
+    await import("~/server/observability/anomalyWorker");
   const anomalyWorker = startAnomalyWorker();
   if (anomalyWorker) {
     shutdownHandles.push(() => anomalyWorker.stop());
@@ -138,9 +102,8 @@ async function bootAnomalyWorker(
 async function bootSpendSpikeAnomalyWorker(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { startSpendSpikeAnomalyWorker } = await import(
-    "@ee/governance/services/spendSpikeAnomalyWorker"
-  );
+  const { startSpendSpikeAnomalyWorker } =
+    await import("@ee/governance/services/spendSpikeAnomalyWorker");
   const spendSpikeAnomalyWorker = startSpendSpikeAnomalyWorker();
   shutdownHandles.push(() => spendSpikeAnomalyWorker.stop());
   logger.info("spend spike anomaly worker ready");
@@ -166,9 +129,8 @@ async function bootUsageStatsWorker(
 async function bootMetricsServer(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getWorkerMetricsPort, isMetricsAuthorized } = await import(
-    "~/server/metrics"
-  );
+  const { getWorkerMetricsPort, isMetricsAuthorized } =
+    await import("~/server/metrics");
   const metricsPort = getWorkerMetricsPort();
   const metricsServer = http.createServer((req, res) => {
     if (req.url !== "/metrics") {
@@ -252,10 +214,16 @@ export async function startWorkers(
   await verifyDatabaseReady();
 
   try {
-    await bootIngestionPuller(shutdownHandles);
-    await bootTopicClustering(shutdownHandles);
+    // Ingestion pulls self-drive through durable process wakes and the
+    // transactional process outbox; there is no BullMQ worker to boot.
+    // Topic clustering self-drives (ADR-051): the process wake worker and
+    // process outbox in the event-sourcing runtime own scheduling and
+    // execution; there is no BullMQ worker to boot.
     await bootStorageStatsCollection(shutdownHandles);
     await bootScenarioProcessor(shutdownHandles);
+    // Langy turns self-drive: the process outbox dispatches to the Go manager,
+    // which pushes signed frames to the relay. No in-process pool/executor to
+    // boot; heartbeat recovery belongs to the direct liveness subscriber.
     await bootAnomalyWorker(shutdownHandles);
     await bootSpendSpikeAnomalyWorker(shutdownHandles);
     await bootUsageStatsWorker(shutdownHandles);

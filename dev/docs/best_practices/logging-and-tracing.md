@@ -107,4 +107,4 @@ updateCurrentContext({
 | `LOG_OTEL_LEVEL` | OTel export level (`PINO_OTEL_LEVEL` fallback) | "debug" |
 | `PINO_OTEL_ENABLED` | Enable OTel log export | "false" |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTel collector endpoint | - |
-| `OTEL_SERVICE_NAME` | Service name in traces | "langwatch-backend" |
+| `OTEL_SERVICE_NAME` | Service name in traces | "langwatch-app" |

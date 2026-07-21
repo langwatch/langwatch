@@ -79,6 +79,65 @@ Briefly explain WHY it's better than the others, then pick the winning
 slot label. Use "tie" only when no candidate is clearly better.
 """
 
+# A reference answer but no task context — used when the row has a golden
+# answer but no input. Drops the {input}/Task framing entirely rather than
+# leaving a "Task: " line with nothing after it.
+DEFAULT_SELECT_BEST_PROMPT_GOLDEN_NO_INPUT = """\
+Pick the best of N candidate replies.
+
+Reference:  {golden}
+
+Candidates:
+{candidates}
+
+Compare each candidate against the reference answer and decide which one
+is closest. Briefly explain WHY it's better than the others, then pick the
+winning slot label. Use "tie" only when no candidate is clearly better.
+"""
+
+# Neither a reference answer nor task context — compare on merits with no
+# framing for either, dropping both the Task and Reference lines.
+DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN_NO_INPUT = """\
+Pick the best of N candidate replies — there is no task description or
+reference answer, so compare them on their own merits.
+
+Candidates:
+{candidates}
+
+Look across the candidates and decide which one is the best reply.
+Briefly explain WHY it's better than the others, then pick the winning
+slot label. Use "tie" only when no candidate is clearly better.
+"""
+
+# Every shipped default judge prompt, one per (golden x input) presence combo.
+# Kept VERBATIM in sync with the four JUDGE_PROMPT_* constants in the frontend
+# ComparisonConfigForm.tsx. Used to detect an untouched default so the runtime
+# can swap in the one that matches what the row actually provides; a hand-tuned
+# prompt matches none of them and is passed through unchanged.
+ALL_DEFAULT_SELECT_BEST_PROMPTS = [
+    DEFAULT_SELECT_BEST_PROMPT,
+    DEFAULT_SELECT_BEST_PROMPT_GOLDEN_NO_INPUT,
+    DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN,
+    DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN_NO_INPUT,
+]
+
+
+def _pick_default_select_best_prompt(*, has_golden: bool, has_input: bool) -> str:
+    """The default judge prompt for a given (golden x input) presence combo —
+    the prompt adapts to what the row actually gives it (a reference answer,
+    task context, both, or neither)."""
+    if has_golden:
+        return (
+            DEFAULT_SELECT_BEST_PROMPT
+            if has_input
+            else DEFAULT_SELECT_BEST_PROMPT_GOLDEN_NO_INPUT
+        )
+    return (
+        DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN
+        if has_input
+        else DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN_NO_INPUT
+    )
+
 
 class CandidateInput(BaseModel):
     """One candidate output to be judged."""
@@ -111,7 +170,7 @@ class SelectBestCompareSettings(LLMEvaluatorSettings):
         ),
     )
     has_golden_answer: bool = Field(
-        default=True,
+        default=False,
         description=(
             "Compare each candidate against a reference answer. Turn off "
             "to have the judge compare the candidates directly on their "
@@ -235,17 +294,48 @@ class SelectBestCompareEvaluator(
         }
         candidates_block = self._render_candidates_block(slot_to_candidate)
 
-        # When has_golden_answer is off AND the user hasn't customized the
-        # prompt, swap in the golden-free template. Mirrors pairwise's
-        # #5378 pattern — the intent is to drop the reference framing
-        # entirely, not just leave "Reference: " with a blank slot.
+        # When the user hasn't customized the prompt (it still matches one of
+        # the four shipped defaults, trimmed), swap in the default that matches
+        # what THIS row actually provides — a reference answer (has_golden), task
+        # context (a non-empty input), both, or neither. The framing for a
+        # missing axis is dropped entirely rather than left as an empty
+        # "Reference: " / "Task: " line, which confuses the judge more. A
+        # hand-tuned prompt matches none of the defaults and passes through
+        # unchanged.
+        #
+        # BOTH axes are resolved per row. Golden is opt-in at config time, but
+        # opting in does not promise every row actually carries a reference —
+        # a dataset with a blank expected_output on some rows would otherwise
+        # render "Reference:" followed by nothing, which is the very thing the
+        # golden-aware framing exists to avoid. Config says "compare against a
+        # reference"; the row says whether there is one.
         effective_prompt = self.settings.prompt
-        prompt_is_golden_free = (
-            not self.settings.has_golden_answer
-            and effective_prompt == DEFAULT_SELECT_BEST_PROMPT
+        prompt_is_default = any(
+            effective_prompt.strip() == default.strip()
+            for default in ALL_DEFAULT_SELECT_BEST_PROMPTS
         )
-        if prompt_is_golden_free:
-            effective_prompt = DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN
+        if prompt_is_default:
+            has_input = bool(entry.input and str(entry.input).strip())
+            has_golden = self.settings.has_golden_answer and bool(
+                entry.golden and str(entry.golden).strip()
+            )
+            effective_prompt = _pick_default_select_best_prompt(
+                has_golden=has_golden,
+                has_input=has_input,
+            )
+            # The include_metrics toggles are a no-op unless the judge is
+            # actually told to weigh what they add to the candidate block —
+            # otherwise cost=$.../duration=...s just sits there as
+            # unexplained noise the judge may or may not notice. Only
+            # appended when metrics are actually on, and only for the
+            # shipped defaults; a hand-tuned prompt is never modified.
+            if self.settings.include_metrics:
+                effective_prompt += (
+                    "\n\nSome candidates above are annotated with cost "
+                    "and/or duration. Factor these into your decision, "
+                    "preferring a cheaper or faster candidate only when "
+                    "quality is comparable."
+                )
 
         # `str.format` raises KeyError on any stray brace the user's custom
         # prompt happens to contain (e.g. a pasted JSON example or a rubric

@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   CLAUDE_CODE_EVENT_SCOPE,
   CLAUDE_CODE_PII_ATTR,
+  CLAUDE_LOG_VISIBILITY_DEADLINE_MS,
   CLAUDE_TURN_LOG_CAP,
   type ClaudeCodeLogRecordInput,
   convertClaudeCodeTurnToSpans,
@@ -17,11 +18,17 @@ import {
   piiRedactionLevelSchema,
   type RecordSpanCommandData,
 } from "../schemas/commands";
-import { isLogRecordReceivedEvent, type TraceProcessingEvent } from "../schemas/events";
+import {
+  isLogContributedEvent,
+  isLogRecordReceivedEvent,
+  type TraceProcessingEvent,
+} from "../schemas/events";
 
 const logger = createLogger(
   "langwatch:trace-processing:claude-code-span-sync-reactor",
 );
+
+class CanonicalLogNotVisibleError extends Error {}
 
 export interface ClaudeCodeSpanSyncReactorDeps {
   getMarkedClaudeCodeLogs: (
@@ -50,6 +57,18 @@ export interface ClaudeCodeSpanSyncReactorDeps {
    * override from `LANGWATCH_CLAUDE_TURN_LOG_CAP`.
    */
   turnLogCap?: number;
+  /**
+   * How long (ms) to keep retrying a contribution whose canonical logs are not
+   * visible yet before giving up on it. Defaults to
+   * {@link CLAUDE_LOG_VISIBILITY_DEADLINE_MS}; the composition root resolves the
+   * operator override from `LANGWATCH_CLAUDE_LOG_VISIBILITY_DEADLINE_MS`.
+   */
+  visibilityDeadlineMs?: number;
+  /**
+   * Clock backing the visibility deadline. Injectable so tests can drive the
+   * deadline deterministically; defaults to `Date.now`.
+   */
+  now?: () => number;
 }
 
 /**
@@ -57,10 +76,11 @@ export interface ClaudeCodeSpanSyncReactorDeps {
  *
  * Claude Code logs its model calls and tool calls as OTLP log records split
  * across export batches (request body at call START, anchor + response at call
- * END), so a per-batch converter can never rejoin them. The receiver instead
- * SAVES those logs to stored_log_records (marked), and this reactor — fired
- * after the trace fold on each claude log - re-reads the turn's saved logs and
- * runs the converter over the set, dispatching the resulting spans. Because
+ * END), so a per-batch converter can never rejoin them. The receiver stores
+ * those logs canonically (with a rolling legacy-read fallback), and this
+ * reactor — fired after the trace fold on each Claude contribution — re-reads
+ * the turn's saved logs and runs the converter over the set, dispatching the
+ * resulting spans. Because
  * trace == turn (`traceId = sha256(session:prompt)`), the set is one turn's
  * worth of records.
  *
@@ -98,25 +118,66 @@ export function createClaudeCodeSpanSyncReactor(
     async handle(event: TraceProcessingEvent): Promise<void> {
       // Only claude_code LOG ingestion drives the fold. Spans the reactor
       // emits arrive as span events, which are ignored here — no feedback loop.
-      if (!isLogRecordReceivedEvent(event)) return;
+      if (!isLogRecordReceivedEvent(event) && !isLogContributedEvent(event)) {
+        return;
+      }
       if (event.data.scopeName !== CLAUDE_CODE_EVENT_SCOPE) return;
 
       const tenantId = event.tenantId;
       const traceId = String(event.aggregateId);
       const turnLogCap = deps.turnLogCap ?? CLAUDE_TURN_LOG_CAP;
+      const logOccurredAtMs = isLogContributedEvent(event)
+        ? event.data.timeUnixMs
+        : event.occurredAt;
 
       try {
-        // The triggering log event's occurredAt bounds the stored_log_records
-        // scan to the turn's partitions instead of cold-scanning S3. Fetch one
+        // The log's source timestamp bounds both the canonical and rolling
+        // legacy scans to the turn's partitions. Fetch one
         // past the cap so an overflowing turn is detectable while still bounding
         // the read; a pathological turn never materializes all of its records.
         const fetched = await deps.getMarkedClaudeCodeLogs(
           tenantId,
           traceId,
-          event.occurredAt,
+          logOccurredAtMs,
           turnLogCap + 1,
         );
-        if (fetched.length === 0) return;
+        if (fetched.length === 0) {
+          // The canonical log and its compact trace contribution travel through
+          // separate durable pipelines. A contribution can reach this reactor
+          // before the log projection is visible in ClickHouse. Throwing lets
+          // the reactor queue retry instead of permanently missing the turn.
+          if (isLogContributedEvent(event)) {
+            const deadlineMs =
+              deps.visibilityDeadlineMs ?? CLAUDE_LOG_VISIBILITY_DEADLINE_MS;
+            const nowMs = deps.now?.() ?? Date.now();
+            // event.occurredAt is the log's ingest wall-clock (the receiver's
+            // acceptedAt), so this is how long the contribution has been
+            // unfoldable — stable across retries of the same event.
+            const ageMs = nowMs - event.occurredAt;
+            if (ageMs <= deadlineMs) {
+              throw new CanonicalLogNotVisibleError(
+                `Canonical Claude logs are not visible yet for trace ${traceId}`,
+              );
+            }
+            // Past the deadline the records are never going to appear (dropped
+            // upstream, or a partition-window miss). Stop retrying: returning
+            // completes the job so the per-trace group DRAINS, instead of a
+            // poison pill that re-burns the 25-attempt retry ladder on every
+            // re-emitted contribution and starves the shared event-sourcing
+            // queue (prod incident 2026-07-20).
+            logger.warn(
+              {
+                tenantId,
+                traceId,
+                ageMs,
+                deadlineMs,
+              },
+              "Canonical Claude logs never became visible within the deadline; giving up on span sync for this contribution",
+            );
+            return;
+          }
+          return;
+        }
 
         // Bound the conversion: keep the first `turnLogCap` records (turn order).
         const overflowed = fetched.length > turnLogCap;
@@ -136,7 +197,7 @@ export function createClaudeCodeSpanSyncReactor(
             const total = await deps.countMarkedClaudeCodeLogs(
               tenantId,
               traceId,
-              event.occurredAt,
+              logOccurredAtMs,
             );
             droppedLogCount = Math.max(1, total - turnLogCap);
           } catch (countError) {
@@ -212,6 +273,7 @@ export function createClaudeCodeSpanSyncReactor(
           },
           "Failed to sync Claude Code logs into spans",
         );
+        if (error instanceof CanonicalLogNotVisibleError) throw error;
       }
     },
   };

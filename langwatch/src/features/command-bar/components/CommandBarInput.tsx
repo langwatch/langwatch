@@ -21,9 +21,9 @@ export function CommandBarInput({
   isLoading,
 }: CommandBarInputProps) {
   return (
-    <HStack px={4} py={3} gap={3}>
+    <HStack px={{ base: 4, md: 5 }} py={3.5} gap={3.5}>
       <Box color="fg.subtle" flexShrink={0}>
-        <Search size={20} />
+        <Search size={19} strokeWidth={1.8} />
       </Box>
       <Input
         ref={inputRef}
@@ -36,7 +36,9 @@ export function CommandBarInput({
         boxShadow="none"
         background="transparent"
         fontSize="15px"
+        lineHeight="1.5"
         flex={1}
+        minWidth={0}
         _placeholder={{ color: "fg.subtle" }}
         _focus={{
           boxShadow: "none",

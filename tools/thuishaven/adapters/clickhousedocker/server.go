@@ -72,8 +72,16 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 		return 0, err
 	}
 
+	// Written before the state check, not in start(): a container already running
+	// the right image is otherwise never reconfigured, so a tuning change (the
+	// system-log policy, a new memory ceiling) would reach new machines only.
+	configChanged, err := s.writeConfig()
+	if err != nil {
+		return 0, err
+	}
+
 	switch state := s.containerState(ctx, dockerHost); {
-	case state == stateRunningCorrectImage:
+	case state == stateRunningCorrectImage && !configChanged:
 		if err := s.waitHealthy(ctx, ep.HTTPPort, 5*time.Second); err == nil {
 			return ep.HTTPPort, nil
 		}
@@ -93,14 +101,52 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 	if err := s.waitHealthy(ctx, ep.HTTPPort, 40*time.Second); err != nil {
 		return 0, err
 	}
+	// Every Ensure, not just when the config changed: the statements are a
+	// handful of idempotent DDLs, and gating them on configChanged made the
+	// retrofit one-shot — any failure between writing the config file and the
+	// DDL loop (interrupted image pull, docker error, ctx cancel) left the file
+	// looking current, so no later run would ever retry the reclaim.
+	s.applySystemLogPolicy(ctx)
 	return ep.HTTPPort, nil
+}
+
+// writeConfig renders the config.d override and reports whether it differs from
+// what is already on disk (true on first write). Legacy filenames are cleared so
+// haven's home never holds a stale config that looks live but is not mounted.
+func (s *Server) writeConfig() (bool, error) {
+	if err := os.MkdirAll(s.home, 0o755); err != nil {
+		return false, err
+	}
+	for _, legacy := range domain.LegacyClickHouseConfigFiles {
+		_ = os.Remove(filepath.Join(s.home, legacy))
+	}
+	rendered := domain.RenderClickHouseConfig(s.limits)
+	existing, err := os.ReadFile(s.configPath())
+	if err == nil && string(existing) == rendered {
+		return false, nil
+	}
+	if err := os.WriteFile(s.configPath(), []byte(rendered), 0o644); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// applySystemLogPolicy retrofits the log policy onto tables that already exist.
+// The config governs table *creation*, so a server that has been running since
+// before the policy keeps its unbounded tables until they are dropped (the
+// disabled ones, which the server will simply not recreate) or given a TTL (the
+// kept ones). The statements live in domain next to the rendered config so the
+// two derive from the same lists and TTL. Best-effort by design: reclaiming
+// disk must never be what stops a stack from coming up, and every statement is
+// idempotent.
+func (s *Server) applySystemLogPolicy(ctx context.Context) {
+	for _, stmt := range domain.SystemLogRetrofitStatements(s.limits) {
+		_ = s.exec(ctx, stmt)
+	}
 }
 
 func (s *Server) start(ctx context.Context, dockerHost string, ep endpoint) error {
 	if err := os.MkdirAll(s.dataDir(), 0o755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(s.configPath(), []byte(domain.RenderClickHouseConfig(s.limits)), 0o644); err != nil {
 		return err
 	}
 	if err := s.pull(ctx, dockerHost); err != nil {

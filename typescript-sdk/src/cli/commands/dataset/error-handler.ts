@@ -9,8 +9,10 @@ import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Centralized error handler for all dataset CLI commands.
- * Maps known error types to a single spinner-fail line (plus an optional
- * detail line for plan limits) and exits with code 1.
+ * Every branch funnels through failSpinner, so a machine caller always gets
+ * the structured `{ ok: false }` document and a person gets one fail line
+ * (plus an optional detail line for plan limits) — never two disconnected
+ * lines. Exits with code 1.
  *
  * @param spinner - The ora spinner to fail. The spinner's message is the
  *   only top-level error line rendered — we never emit a separate
@@ -30,9 +32,19 @@ export function handleDatasetCommandError({
   context: string;
 }): never {
   if (error instanceof DatasetNotFoundError) {
-    spinner.fail(chalk.red(`Not found: ${error.message}`));
+    // The "Not found:" prefix stays inside the message so the failSpinner
+    // headline keeps it: "Failed to <context>: Not found: <detail>".
+    failSpinner({
+      spinner,
+      error: new Error(`Not found: ${error.message}`),
+      action: context,
+    });
   } else if (error instanceof DatasetPlanLimitError) {
-    spinner.fail(chalk.red(`Plan limit reached: ${error.message}`));
+    failSpinner({
+      spinner,
+      error: new Error(`Plan limit reached: ${error.message}`),
+      action: context,
+    });
     if (error.current !== undefined && error.max !== undefined) {
       console.error(
         chalk.gray(

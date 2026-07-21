@@ -104,8 +104,8 @@ function SettingsForm({
   const { hasPermission } = useOrganizationTeamProject();
   const { isLiteMember } = useLiteMemberGuard();
   const { openDrawer } = useDrawer();
-  // ADR-038 ships dark: the Primary use setting only exists where the
-  // governance surface it routes to is reachable.
+  // ADR-038: the Primary use setting only exists where the governance
+  // surface it routes to is reachable (flag on, which is the default).
   const { enabled: governanceEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     { organizationId: organization.id },

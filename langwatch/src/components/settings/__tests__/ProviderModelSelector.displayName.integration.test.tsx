@@ -39,6 +39,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { resolveLatestAlias } from "~/server/modelProviders/latestAliases";
 import { ProviderModelSelector } from "../ProviderModelSelector";
 
 afterEach(() => cleanup());
@@ -125,6 +126,7 @@ describe("<ProviderModelSelector/>", () => {
 
     describe("when the user picks the item from the dropdown", () => {
       /** @scenario Selecting a renamed model stores its model id */
+      /** @scenario Selecting a custom-named model still stores the model id */
       it("calls onChange with the model id, not the display name", async () => {
         const onChange = vi.fn();
         const user = userEvent.setup();
@@ -250,6 +252,48 @@ describe("<ProviderModelSelector/>", () => {
         );
 
         expect(within(listbox()).getByText(DISPLAY_NAME)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a provider with registry models and a 'latest' alias entry", () => {
+    const REGISTRY_ID = `${PROVIDER}/gpt-4o-mini`;
+    const ALIAS_ID = "openai/latest";
+    const options = [FULL_ID, REGISTRY_ID, ALIAS_ID];
+
+    describe("when the dropdown lists its options", () => {
+      /** @scenario Registry and alias labels are unchanged by the resolution fix */
+      it("still shows the registry model by its id-derived label", () => {
+        renderSelector(
+          <ProviderModelSelector
+            model=""
+            options={options}
+            onChange={vi.fn()}
+            displayNames={DISPLAY_NAMES}
+          />,
+        );
+
+        expect(within(listbox()).getByText("gpt-4o-mini")).toBeInTheDocument();
+      });
+
+      /** @scenario Registry and alias labels are unchanged by the resolution fix */
+      it("shows the alias entry by its alias label with the resolved model as subtitle", () => {
+        const resolvedLatest = resolveLatestAlias(ALIAS_ID);
+        expect(resolvedLatest).toBeTruthy();
+
+        renderSelector(
+          <ProviderModelSelector
+            model=""
+            options={options}
+            onChange={vi.fn()}
+            displayNames={DISPLAY_NAMES}
+          />,
+        );
+
+        expect(within(listbox()).getByText("Latest")).toBeInTheDocument();
+        expect(
+          within(listbox()).getByText(resolvedLatest!),
+        ).toBeInTheDocument();
       });
     });
   });

@@ -1,4 +1,4 @@
-import type { VariableInfo } from "~/shared/templating/exampleContext";
+import type { VariableInfo } from "@langwatch/automations/templating/exampleContext";
 
 /**
  * Variable surface for scheduled-report templates (`draft.source ===

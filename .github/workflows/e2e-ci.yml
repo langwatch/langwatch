@@ -52,6 +52,23 @@ jobs:
       NEXTAUTH_SECRET: "test-secret-for-e2e-testing"
       NEXTAUTH_URL: "http://localhost:5570"
       API_TOKEN_JWT_SECRET: "test-jwt-secret-for-e2e"
+      # Trust the in-repo TEST license keypair so the members suite
+      # (agentic-e2e-tests/tests/members/steps.ts withEnterpriseLicense()) can
+      # activate a test ENTERPRISE license and exercise member-invitation flows
+      # above the free-tier maxMembers=1 cap. Public key only (safe to commit) — matches
+      # TEST_PUBLIC_KEY in langwatch/ee/licensing/__tests__/fixtures/testKeys.ts.
+      # Must be on the app process env before `pnpm start` boots — constants.ts
+      # resolves PUBLIC_KEY from this var once at module load. gitleaks:allow
+      LANGWATCH_LICENSE_PUBLIC_KEY: |
+        -----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApmJ61eRR1wxrapjipSmN
+        IqYMJPmbonA1d6XV51kdnVs/MdNrrdoWIal6TDt2lHvbAbrEalqR7h+vQzBBZ4St
+        ZPqBzTIHQwu3Wjlj7Fj7IeVUiJnRg60W+u9DmYXUeFBlZFMHxV3nNVqedwDcFpV/
+        IrAMmSe3QeTqBztcDMBxu5luA4DMU5Hi6kp4qcHDoCCiEH4a6ZZkPdNC+xpFdW41
+        75BwdKBKnyOZrUvyPaKrxInra7z+9YQKiggRciQvCNxc76Ef4DLGkTIf36Cvm7XL
+        m0gqlJm89dYcRBaDVGFTnb98BM7SrAIg117yjuuw5o/RmSlKq9/Klkz0QsXYF9Zj
+        iQIDAQAB
+        -----END PUBLIC KEY-----
       # AI Gateway data-plane secrets (shared by control plane + Go gateway).
       # The gateway validates these as required; without them `make service
       # svc=aigateway` crash-loops. Test-only values, 32+ chars.
@@ -121,6 +138,27 @@ jobs:
           --health-timeout 30s
           --health-retries 3
 
+      # NOTE: langwatch_nlp is intentionally NOT a service container here.
+      # The langwatch app auto-starts its own nlpgo binary on :5563
+      # (visible as "✓ nlpgo: auto-start on :5563" in startup logs).
+      # Adding a Docker service container on port 5563 causes an
+      # "address already in use" conflict that crash-loops the app.
+      # LANGWATCH_NLP_SERVICE=http://localhost:5563 is set in the env
+      # section above and the app's own nlpgo binary satisfies it.
+
+      langevals:
+        image: langwatch/langevals:latest
+        ports:
+          - 5564:5562
+        env:
+          DISABLE_EVALUATORS_PRELOAD: "true"
+        options: >-
+          --health-cmd "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5562/healthcheck')\" || exit 1"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 12
+          --health-start-period 30s
+
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
@@ -139,6 +177,23 @@ jobs:
             langwatch/pnpm-lock.yaml
             agentic-e2e-tests/pnpm-lock.yaml
             mcp-server/pnpm-lock.yaml
+
+      # start.sh auto-starts the aigateway + nlpgo Go services via
+      # `go run ./cmd/service`. Without a Go toolchain + warm caches, both
+      # lanes cold-download the toolchain and the full module graph while
+      # tsx is booting the API server — starving it past global-setup's
+      # 60s readiness window on the 2-core runner (intermittent
+      # "API not ready ... backend never served publicEnv" failures).
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # Compile the service dispatcher (imports both aigateway and nlpgo)
+      # up front so the auto-start lanes' `go run` during `pnpm start` is a
+      # warm-cache no-op and the API lane keeps the CPU while it boots.
+      - name: Pre-build Go services
+        run: go build -o /dev/null ./cmd/service
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
       # its postinstall always falls back to `node-gyp rebuild`. With

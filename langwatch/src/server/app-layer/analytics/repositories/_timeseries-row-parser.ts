@@ -11,7 +11,10 @@
  */
 
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
-import type { SeriesInputType } from "~/server/analytics/registry";
+import {
+  isZeroWhenAbsentSeries,
+  type SeriesInputType,
+} from "~/server/analytics/registry";
 import type {
   TimeseriesBucket,
   TimeseriesResult,
@@ -133,7 +136,7 @@ export function parseTimeseriesRows(
     Math.max(0, previousPeriod.length - currentPeriod.length),
   );
 
-  normalizeMetricKeys(correctedPrevious, currentPeriod, groupBy);
+  normalizeMetricKeys(correctedPrevious, currentPeriod, series, groupBy);
 
   return { previousPeriod: correctedPrevious, currentPeriod };
 }
@@ -147,7 +150,10 @@ export function parseTimeseriesRows(
  * buckets are keyed `{queryIndex}/{metric}/{aggregation}[/{key}]` with
  * `terms` rewritten to `cardinality`.
  */
-export function buildSeriesName(series: SeriesInputType, index: number): string {
+export function buildSeriesName(
+  series: SeriesInputType,
+  index: number,
+): string {
   const aggregation =
     series.aggregation === "terms" ? "cardinality" : series.aggregation;
   if (series.pipeline) {
@@ -161,8 +167,11 @@ export function buildSeriesName(series: SeriesInputType, index: number): string 
 
 /**
  * Normalise metric keys across both periods. Ensures every bucket carries
- * every metric (with a 0 default) so the frontend can compute % change for
- * series that ClickHouse returned NULL for in one of the periods.
+ * every ADDITIVE metric (with a 0 default) so the frontend can compute %
+ * change for series that ClickHouse returned NULL for in one of the periods.
+ * Non-additive series (avg / min / max / percentiles) are only ever absent
+ * when there was no data, so they are left absent rather than defaulted to a
+ * fabricated 0 — see `isZeroWhenAbsentSeries`.
  *
  * Grouped: only fill in missing metric sub-keys for groups already present in
  * a bucket — do NOT spawn new groups from the other period, that would bleed
@@ -171,8 +180,14 @@ export function buildSeriesName(series: SeriesInputType, index: number): string 
 function normalizeMetricKeys(
   previousPeriod: TimeseriesBucket[],
   currentPeriod: TimeseriesBucket[],
+  series: readonly SeriesInputType[],
   groupBy?: string,
 ): void {
+  const zeroFillableKeys = new Set<string>();
+  series.forEach((s, i) => {
+    if (isZeroWhenAbsentSeries(s)) zeroFillableKeys.add(buildSeriesName(s, i));
+  });
+
   const allMetricKeys = new Set<string>();
   const allGroupedMetricSubKeys = new Set<string>();
 
@@ -198,9 +213,23 @@ function normalizeMetricKeys(
     }
   }
 
+  // Additive keys default even when the value was NULL in every row — the
+  // observed-key sets alone would leave such a series absent everywhere. On a
+  // grouped query the series values live inside the group sub-objects, so the
+  // top level only fills what was observed there.
+  const topLevelFillKeys = groupBy
+    ? allMetricKeys
+    : new Set([...allMetricKeys, ...zeroFillableKeys]);
+  const groupedFillKeys = new Set([
+    ...allGroupedMetricSubKeys,
+    ...zeroFillableKeys,
+  ]);
+
   for (const bucket of [...previousPeriod, ...currentPeriod]) {
-    for (const key of allMetricKeys) {
-      if (bucket[key] === undefined) bucket[key] = 0;
+    for (const key of topLevelFillKeys) {
+      if (bucket[key] === undefined && zeroFillableKeys.has(key)) {
+        bucket[key] = 0;
+      }
     }
     if (groupBy && bucket[groupBy] && typeof bucket[groupBy] === "object") {
       const groupData = bucket[groupBy] as Record<
@@ -208,8 +237,11 @@ function normalizeMetricKeys(
         Record<string, number>
       >;
       for (const groupKey of Object.keys(groupData)) {
-        for (const metricKey of allGroupedMetricSubKeys) {
-          if (groupData[groupKey]![metricKey] === undefined) {
+        for (const metricKey of groupedFillKeys) {
+          if (
+            groupData[groupKey]![metricKey] === undefined &&
+            zeroFillableKeys.has(metricKey)
+          ) {
             groupData[groupKey]![metricKey] = 0;
           }
         }

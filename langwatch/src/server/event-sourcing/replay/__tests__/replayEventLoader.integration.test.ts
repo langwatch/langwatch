@@ -226,8 +226,7 @@ describe("replayEventLoader", () => {
         tenantId,
         aggregateIds: ["agg-1"],
         eventTypes: ["test.event"],
-        maxCutoffEventId: "evt-002",
-        cursorEventId: "",
+        maxCutoff: { timestamp: 1700000001000, eventId: "evt-002" },
         batchSize: 100,
       });
 
@@ -245,8 +244,7 @@ describe("replayEventLoader", () => {
         tenantId,
         aggregateIds: ["agg-2"],
         eventTypes: ["test.event"],
-        maxCutoffEventId: "evt-003",
-        cursorEventId: "",
+        maxCutoff: { timestamp: 1700000002000, eventId: "evt-003" },
         batchSize: 100,
       });
 
@@ -264,8 +262,8 @@ describe("replayEventLoader", () => {
           tenantId,
           aggregateIds: ["agg-1"],
           eventTypes: ["test.event"],
-          maxCutoffEventId: "evt-002",
-          cursorEventId: "evt-001",
+          maxCutoff: { timestamp: 1700000001000, eventId: "evt-002" },
+          cursor: { timestamp: 1700000000000, eventId: "evt-001" },
           batchSize: 100,
         });
 
@@ -282,14 +280,80 @@ describe("replayEventLoader", () => {
           tenantId,
           aggregateIds: ["agg-1"],
           eventTypes: ["test.event"],
-          maxCutoffEventId: "evt-002",
-          cursorEventId: "",
+          maxCutoff: { timestamp: 1700000001000, eventId: "evt-002" },
           batchSize: 1,
         });
 
         expect(events).toHaveLength(1);
         expect(events[0]!.id).toBe("evt-001");
       });
+    });
+
+    it("pages by accepted timestamp when event IDs sort in the opposite order", async () => {
+      const client = getTestClickHouseClient()!;
+      const aggregateId = "agg-reverse-event-ids";
+      await client.insert({
+        table: "event_log",
+        values: [
+          {
+            TenantId: tenantId,
+            AggregateType: "test",
+            AggregateId: aggregateId,
+            IdempotencyKey: "z-accepted-first",
+            EventId: "z-accepted-first",
+            EventType: "test.event",
+            EventTimestamp: 1700000010000,
+            EventOccurredAt: 1700000010000,
+            EventVersion: "2025-01-01",
+            EventPayload: JSON.stringify({ sequence: 1 }),
+            _retention_days: 0,
+          },
+          {
+            TenantId: tenantId,
+            AggregateType: "test",
+            AggregateId: aggregateId,
+            IdempotencyKey: "a-accepted-second",
+            EventId: "a-accepted-second",
+            EventType: "test.event",
+            EventTimestamp: 1700000011000,
+            EventOccurredAt: 1700000011000,
+            EventVersion: "2025-01-01",
+            EventPayload: JSON.stringify({ sequence: 2 }),
+            _retention_days: 0,
+          },
+        ],
+        format: "JSONEachRow",
+      });
+
+      const maxCutoff = {
+        timestamp: 1700000011000,
+        eventId: "a-accepted-second",
+      };
+      const firstPage = await batchLoadAggregateEvents({
+        client,
+        tenantId,
+        aggregateIds: [aggregateId],
+        eventTypes: ["test.event"],
+        maxCutoff,
+        batchSize: 1,
+      });
+      const secondPage = await batchLoadAggregateEvents({
+        client,
+        tenantId,
+        aggregateIds: [aggregateId],
+        eventTypes: ["test.event"],
+        maxCutoff,
+        cursor: {
+          timestamp: firstPage[0]!.timestamp,
+          eventId: firstPage[0]!.id,
+        },
+        batchSize: 1,
+      });
+
+      expect(firstPage.map((event) => event.id)).toEqual(["z-accepted-first"]);
+      expect(secondPage.map((event) => event.id)).toEqual([
+        "a-accepted-second",
+      ]);
     });
 
     describe("when another tenant has the same aggregateId", () => {
@@ -300,8 +364,7 @@ describe("replayEventLoader", () => {
           tenantId,
           aggregateIds: ["agg-1"],
           eventTypes: ["test.event"],
-          maxCutoffEventId: "zzz",
-          cursorEventId: "",
+          maxCutoff: { timestamp: 1800000000000, eventId: "zzz" },
           batchSize: 100,
         });
 
@@ -388,7 +451,10 @@ describe("replayEventLoader", () => {
         eventTypes: ["test.event"],
       });
 
-      expect(occurredAtBounds).toEqual({ minMs: 1700000000000, maxMs: 1700000002000 });
+      expect(occurredAtBounds).toEqual({
+        minMs: 1700000000000,
+        maxMs: 1700000002000,
+      });
       expect(cutoffs.size).toBe(2);
       expect(cutoffs.get(`${tenantId}:test:agg-1`)).toEqual({
         timestamp: 1700000001000,
@@ -536,8 +602,7 @@ describe("replayEventLoader", () => {
         tenantId,
         aggregateIds: ["agg-1"],
         eventTypes: ["test.event"],
-        maxCutoffEventId: "evt-002",
-        cursorEventId: "",
+        maxCutoff: { timestamp: 1700000001000, eventId: "evt-002" },
         batchSize: 100,
         occurredAtBounds: bounds!,
       });

@@ -102,11 +102,17 @@ describe("EvaluatorListDrawer", () => {
     cleanup();
   });
 
-  const renderDrawer = (props: Partial<{ filterEvaluatorType: string }> = {}) =>
-    render(
-      <EvaluatorListDrawer open={true} onSelect={onSelect} {...props} />,
-      { wrapper: Wrapper },
-    );
+  const renderDrawer = (
+    props: Partial<{
+      filterEvaluatorType: string;
+      title: string;
+      createLabel: string;
+      itemLabel: string;
+    }> = {},
+  ) =>
+    render(<EvaluatorListDrawer open={true} onSelect={onSelect} {...props} />, {
+      wrapper: Wrapper,
+    });
 
   describe("when keyboard keys come from the nested actions menu", () => {
     it("does not select the card on Enter from the menu trigger", async () => {
@@ -227,9 +233,7 @@ describe("EvaluatorListDrawer", () => {
       ];
       renderDrawer({ filterEvaluatorType: "langevals/select_best_compare" });
 
-      await screen.findByTestId(
-        `evaluator-card-${mockComparisonEvaluator.id}`,
-      );
+      await screen.findByTestId(`evaluator-card-${mockComparisonEvaluator.id}`);
 
       expect(
         screen.queryByTestId(`evaluator-card-${mockEvaluator.id}`),
@@ -239,6 +243,51 @@ describe("EvaluatorListDrawer", () => {
           `evaluator-card-${mockLegacyPairwiseEvaluator.id}`,
         ),
       ).not.toBeInTheDocument();
+    });
+
+    it("uses comparison language in the empty state", async () => {
+      evaluatorsData = [];
+      renderDrawer({
+        filterEvaluatorType: "langevals/select_best_compare",
+        title: "Choose Comparison",
+        createLabel: "New Comparison",
+        itemLabel: "comparison",
+      });
+
+      expect(await screen.findByText("No comparisons yet")).toBeInTheDocument();
+      expect(
+        screen.getByText("Create your first comparison to get started"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /create your first comparison/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  // The empty state's heading is fixed ("Create your first X to get started"),
+  // so its button must agree with it no matter how the caller worded the header
+  // button — otherwise a createLabel like "Add comparison" renders verbatim on a
+  // button sitting directly under a heading that says something else.
+  describe("when the create label does not follow the default New <Item> shape", () => {
+    it("keeps the empty-state button wording aligned with the empty-state heading", async () => {
+      evaluatorsData = [];
+      renderDrawer({ createLabel: "Add comparison", itemLabel: "comparison" });
+
+      expect(
+        await screen.findByText("Create your first comparison to get started"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("create-first-evaluator-button"),
+      ).toHaveTextContent("Create your first comparison");
+    });
+
+    it("leaves the header create button on the caller's wording", async () => {
+      evaluatorsData = [];
+      renderDrawer({ createLabel: "Add comparison", itemLabel: "comparison" });
+
+      expect(await screen.findByTestId("new-evaluator-button")).toHaveTextContent(
+        "Add comparison",
+      );
     });
   });
 });

@@ -30,6 +30,7 @@ interface CreateNextContextOptions {
   res: any;
 }
 
+import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import type { OrganizationUserRole } from "@prisma/client";
@@ -37,7 +38,6 @@ import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
 import superjson from "superjson";
 import { ZodError } from "zod";
-import { HandledError } from "~/server/app-layer/handled-error";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -132,7 +132,7 @@ export function errorFormatterForTesting({
   error,
 }: {
   shape: any;
-  error: { cause?: unknown; message?: string };
+  error: { cause?: unknown; message?: string; code?: string };
 }) {
   const cause = error.cause as
     | { limitType?: string; current?: number; max?: number }
@@ -145,8 +145,19 @@ export function errorFormatterForTesting({
       }
     : null;
 
-  const domainError =
-    error.cause instanceof HandledError ? error.cause.serialize() : null;
+  // Input validation arrives as a ZodError cause. Promote it to the shared
+  // ValidationError so it travels the one handled-error channel like every
+  // other failure: `fromZodError` flattens the issues into
+  // `meta.fieldErrors` / `meta.formErrors`, which is where the contents of the
+  // old sidecar `data.zodError` field now live. Mirrors what the Hono handler
+  // already does (packages/api/src/errors.ts::validationErrorFromZod).
+  const handled = HandledError.isHandled(error.cause)
+    ? error.cause
+    : error.cause instanceof ZodError
+      ? ValidationError.fromZodError(error.cause)
+      : null;
+
+  const domainError = handled?.serialize() ?? null;
 
   // Surface ModelNotConfiguredError on the wire so the frontend
   // interceptor in `utils/trpcError.ts::extractMissingModelInfo` can
@@ -188,17 +199,46 @@ export function errorFormatterForTesting({
       ? error.cause.toResponseBody()
       : null;
 
+  // Free-text error messages never cross the tRPC boundary. `data.error` (code,
+  // meta, tips, docsUrl — see SerializedHandledError, which deliberately has no
+  // message field) is the entire client contract for handled errors, and
+  // presentation is decided client-side by the code-keyed explainers. A
+  // HandledError's message is server copy — it can name env vars or internal
+  // services — so the wire carries only its stable code. Unhandled 5xx messages
+  // can contain Prisma models, SQL, or hostnames and collapse to a generic
+  // string. The original error remains on the TRPCError for loggerMiddleware,
+  // exception capture, and OTel span recording.
+  //
+  // `message` and `code` stay at the top level because they are JSON-RPC
+  // envelope fields the tRPC client itself runtime-checks (`isTRPCErrorResponse`
+  // requires a string message and a numeric code, and discards `data` entirely
+  // when either is missing) — not fields we chose.
+  const isInternalServerError =
+    error.code === "INTERNAL_SERVER_ERROR" ||
+    shape?.data?.code === "INTERNAL_SERVER_ERROR";
+  const message = handled
+    ? handled.code
+    : isInternalServerError
+      ? HandledError.toUserMessage(error.cause)
+      : shape.message;
+  const shapeData = { ...shape.data };
+  if (isInternalServerError || handled) {
+    // tRPC includes stacks in development error shapes. Local callers should
+    // exercise the same safe wire contract as production callers.
+    delete shapeData.stack;
+  }
+
   return {
     ...shape,
+    message,
     data: {
-      ...shape.data,
-      zodError: error.cause instanceof ZodError ? error.cause.flatten() : null,
+      ...shapeData,
       cause:
         missingModelCause ??
         providerDisabledCause ??
         aiCallFailedCause ??
         limitInfo,
-      domainError,
+      error: domainError,
     },
   };
 }
@@ -395,11 +435,7 @@ function isAuditLogExempt(path: string): boolean {
 
 const auditLogMutations = t.middleware(
   async ({ ctx, next, type, path, input }) => {
-    if (
-      type !== "mutation" ||
-      !ctx.session?.user ||
-      isAuditLogExempt(path)
-    ) {
+    if (type !== "mutation" || !ctx.session?.user || isAuditLogExempt(path)) {
       return next();
     }
 
@@ -501,7 +537,7 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
  */
 const handledErrorMiddleware = t.middleware(async ({ next }) => {
   const result = await next();
-  if (!result.ok && result.error.cause instanceof HandledError) {
+  if (!result.ok && HandledError.isHandled(result.error.cause)) {
     const domainError = result.error.cause;
     throw new TRPCError({
       code: handledErrorToTRPCCode(domainError),
@@ -587,20 +623,34 @@ export function handleTrpcCallLogging({
         : 500;
     logData.statusCode = resolvedStatus;
 
-    // Include handled error code in log data for structured filtering
-    if (
-      result.error instanceof TRPCError &&
-      result.error.cause instanceof HandledError
-    ) {
-      logData.handledErrorCode = result.error.cause.code;
+    const cause =
+      result.error instanceof TRPCError ? result.error.cause : undefined;
+    // isHandled also matches an instance from a second copy of the package,
+    // which bare `instanceof` misses — see its brand check.
+    const handledCause = HandledError.isHandled(cause) ? cause : undefined;
+
+    // Include handled error code + fault in log data for structured
+    // filtering (and spike alerting on handledErrorCode).
+    if (handledCause) {
+      logData.handledErrorCode = handledCause.code;
+      logData.handledErrorFault = handledCause.fault;
     }
 
-    // Only capture 5xx errors (actual bugs)
-    if (resolvedStatus >= 500) {
+    // Only unhandled 5xx errors are captured as exceptions: handled errors
+    // are expected failure modes with typed causes, not bugs.
+    if (resolvedStatus >= 500 && !handledCause) {
       capture(toError(result.error));
     }
 
-    const logLevel = getLogLevelFromStatusCode(resolvedStatus);
+    // Handled errors log by fault attribution, not status: customer-fault
+    // errors are expected (warn — watched for spikes), while platform and
+    // provider failures are incidents worth an error line. Unhandled errors
+    // stay status-based.
+    const logLevel = handledCause
+      ? handledCause.fault === "customer"
+        ? "warn"
+        : "error"
+      : getLogLevelFromStatusCode(resolvedStatus);
     log[logLevel](logData, "trpc call");
   } else {
     log.info(logData, "trpc call");

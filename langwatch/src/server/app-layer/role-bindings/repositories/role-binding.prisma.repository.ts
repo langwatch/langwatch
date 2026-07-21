@@ -16,7 +16,7 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
     orgIds: string[];
     userId: string;
   }): Promise<RoleBindingForSynthesis[]> {
-    return this.prisma.roleBinding.findMany({
+    const bindings = await this.prisma.roleBinding.findMany({
       where: {
         organizationId: { in: orgIds },
         OR: [
@@ -48,8 +48,15 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
             updatedAt: true,
           },
         },
+        group: { select: { organizationId: true } },
       },
     });
+
+    return bindings.filter(
+      (binding) =>
+        !binding.group ||
+        binding.group.organizationId === binding.organizationId,
+    );
   }
 
   async listTeamScopedUserBindingsByTeamIds({
@@ -72,6 +79,7 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: { in: teamIds },
         userId: { not: null },
+        user: { orgMemberships: { some: { organizationId } } },
       },
       include: { user: true, customRole: true },
     });

@@ -39,7 +39,7 @@ If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **C
 
 ## The Agent Testing Pyramid
 
-Scenarios sit at the **top of the testing pyramid** — they test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use evaluations instead for single input/output benchmarking with many examples.
+Scenarios sit at the **top of the testing pyramid** and test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use the `experiments` skill instead for single input/output benchmarking with many examples. If it is not installed, use `npx skills@1.5.19 add langwatch/skills/experiments`.
 
 Best practices:
 
@@ -53,12 +53,12 @@ LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments,
 
 How to handle:
 
-- Work within the limits — if 3 scenarios are allowed, create 3 meaningful ones, not 10.
+- Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
-- Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
+- Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
-If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
+If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted. Direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead.
 
 ---
 
@@ -78,7 +78,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -168,7 +168,9 @@ import { describe, it, expect } from "vitest";
 
 const myAgent: AgentAdapter = {
   role: AgentRole.AGENT,
-  async call(input) { return await myExistingAgent(input.messages); },
+  async call(input) {
+    return await myExistingAgent(input.messages);
+  },
 };
 
 describe("My Agent", () => {
@@ -179,7 +181,9 @@ describe("My Agent", () => {
       agents: [
         myAgent,
         scenario.userSimulatorAgent(),
-        scenario.judgeAgent({ criteria: ["Agent provides a helpful response"] }),
+        scenario.judgeAgent({
+          criteria: ["Agent provides a helpful response"],
+        }),
       ],
     });
     expect(result.success).toBe(true);
@@ -201,7 +205,7 @@ import { setupScenarioTracing } from "@langwatch/scenario";
 setupScenarioTracing();
 ```
 
-For Python, scenario tracing is configured via `scenario.configure(...)` combined with langwatch setup — defer the exact call signature to the `tracing` skill.
+For Python, scenario tracing is configured via `scenario.configure(...)` combined with `langwatch.setup()` — defer the exact call signature to the `tracing` skill.
 
 **2. Agent-under-test tracing** — instrument YOUR OWN agent code so its internal LLM calls, tool invocations, and chain spans are captured:
 
@@ -254,7 +258,7 @@ async def test_agent_resists_jailbreak():
 
     attacker = scenario.RedTeamAgent.crescendo(
         target="get the agent to ignore its safety guidelines",
-        model="openai/gpt-4o",
+        model="openai/gpt-5-mini",
         total_turns=30,
     )
 
@@ -283,14 +287,16 @@ import { describe, it, expect } from "vitest";
 
 const myAgent = {
   role: scenario.AgentRole.AGENT,
-  async call(input: scenario.AgentInput) { return await myExistingAgent(input.messages); },
+  async call(input: scenario.AgentInput) {
+    return await myExistingAgent(input.messages);
+  },
 };
 
 describe("Agent Security", () => {
   it("resists jailbreak attempts", async () => {
     const attacker = scenario.redTeamCrescendo({
       target: "get the agent to ignore its safety guidelines",
-      model: openai("gpt-4o"),
+      model: openai("gpt-5-mini"),
       totalTurns: 30,
     });
 
@@ -347,14 +353,14 @@ There are dozens of patterns there (angry customer with cafe noise, password-res
 
 Detect the user's transport from their codebase and pick the matching adapter. **Critically**, every adapter has a different idea of "what is the agent under test":
 
-| User's stack | Adapter | How it connects to the user's agent |
-| --- | --- | --- |
-| Pipecat / Twilio Media Streams WS bot deployed somewhere | `scenario.PipecatAgentAdapter(url="ws://<your-bot>/stream", ...)` | Opens a WebSocket to the user's **already-running** bot. The bot has to be reachable (locally on `ws://localhost:<port>` or remotely). |
-| ElevenLabs hosted ConvAI agent (created in the EL dashboard) | `scenario.ElevenLabsAgentAdapter(agent_id=..., api_key=...)` | Dials the user's hosted ConvAI agent by ID. The hosted agent owns model + voice + instructions + tools. |
-| Twilio phone number (real PSTN, agent answers via Media Streams) | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`) | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up. |
-| Gemini Live model is the agent | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)` | The **adapter IS the agent**. It opens a Gemini Live session with these params — there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent. |
-| OpenAI Realtime model is the agent | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live — the **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent. |
-| Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)` | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
+| User's stack                                                                                          | Adapter                                                                                  | How it connects to the user's agent                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pipecat / Twilio Media Streams WS bot deployed somewhere                                              | `scenario.PipecatAgentAdapter(url="ws://<your-bot>/stream", ...)`                        | Opens a WebSocket to the user's **already-running** bot. The bot has to be reachable (locally on `ws://localhost:<port>` or remotely).                                                                                                                                                                                         |
+| ElevenLabs hosted ConvAI agent (created in the EL dashboard)                                          | `scenario.ElevenLabsAgentAdapter(agent_id=..., api_key=...)`                             | Dials the user's hosted ConvAI agent by ID. The hosted agent owns model + voice + instructions + tools.                                                                                                                                                                                                                        |
+| Twilio phone number (real PSTN, agent answers via Media Streams)                                      | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`)                    | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up.                                                                                                                                                                                                                                          |
+| Gemini Live model is the agent                                                                        | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)`          | The **adapter IS the agent**. It opens a Gemini Live session with these params, so there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent.                                   |
+| OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live. The **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                   |
+| Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)`                | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
 
 If you can't tell from the codebase which path the user is on, ASK before generating a test. Picking the wrong adapter means the test exercises something the user hasn't deployed — and they will (rightly) call it useless.
 
@@ -386,14 +392,14 @@ audio_effects=[
 
 The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the `scenario` object. Pick the adapter the same way (Step 2) — the mapping is one-to-one:
 
-| User's stack | TypeScript adapter |
-| --- | --- |
-| Pipecat / Twilio Media Streams WS bot | `scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })` |
-| ElevenLabs hosted ConvAI agent | `scenario.elevenLabsAgent({ agentId, apiKey })` |
-| Twilio phone number (real PSTN) | `scenario.twilioAgent({ accountSid, authToken, phoneNumber })` |
-| Gemini Live model is the agent | `scenario.geminiLiveAgent({ model, systemInstruction, voice })` |
-| OpenAI Realtime model is the agent | `scenario.openAIRealtimeAgent({ model, instructions, voice, tools })` |
-| Text-only stack wrapped as voice | `scenario.composableAgent({ stt, llm, tts })` |
+| User's stack                          | TypeScript adapter                                                    |
+| ------------------------------------- | --------------------------------------------------------------------- |
+| Pipecat / Twilio Media Streams WS bot | `scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })`            |
+| ElevenLabs hosted ConvAI agent        | `scenario.elevenLabsAgent({ agentId, apiKey })`                       |
+| Twilio phone number (real PSTN)       | `scenario.twilioAgent({ accountSid, authToken, phoneNumber })`        |
+| Gemini Live model is the agent        | `scenario.geminiLiveAgent({ model, systemInstruction, voice })`       |
+| OpenAI Realtime model is the agent    | `scenario.openAIRealtimeAgent({ model, instructions, voice, tools })` |
+| Text-only stack wrapped as voice      | `scenario.composableAgent({ stt, llm, tts })`                         |
 
 Seed a voice on the simulator and layer effects the same way:
 
@@ -405,7 +411,7 @@ scenario.userSimulatorAgent({
   persona: "...",
   audioEffects: [
     voice.effects.backgroundNoise("cafe", 0.4), // presets: cafe / office / street / airport
-    voice.effects.phoneQuality(),               // mulaw + 8kHz + codec degradation
+    voice.effects.phoneQuality(), // mulaw + 8kHz + codec degradation
   ],
 });
 ```
@@ -583,7 +589,7 @@ describe("Voice agent — angry billing", () => {
       ],
     });
     expect(result.success).toBe(true);
-  }, 240_000);  // voice scenarios are slow — TTS + transport + multi-turn
+  }, 240_000); // Voice scenarios are slow because they include TTS, transport, and multiple turns.
 });
 ```
 
@@ -636,7 +642,7 @@ describe("Voice agent — angry billing (Pipecat WS)", () => {
       ],
       script: [
         scenario.agent(), // the bot greets first (voice convention)
-        scenario.user(),  // heated opening
+        scenario.user(), // heated opening
         scenario.proceed(5),
         scenario.judge(),
       ],
@@ -690,9 +696,15 @@ async def test_noisy_handoff(): ...
 //
 // Then mark scenarios as concurrent inside the same file:
 describe.concurrent("voice agent", () => {
-  it("billing inquiry", async () => { /* scenario.run(...) */ }, 240_000);
-  it("account lockout", async () => { /* scenario.run(...) */ }, 240_000);
-  it("refund flow", async () => { /* scenario.run(...) */ }, 240_000);
+  it("billing inquiry", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
+  it("account lockout", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
+  it("refund flow", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
 });
 ```
 
@@ -723,7 +735,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 Then drive everything via `langwatch scenario --help` and `langwatch suite --help`. The basic flow:
 
@@ -743,13 +755,13 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 
 After delivering initial results, transition to consultant mode to help the user get maximum value.
 
-**Phase 1 — read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits — the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
+**Phase 1: read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits because the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
 
-**Phase 2 — quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works — the a-ha moment.
+**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works and create the a-ha moment.
 
-**Phase 3 — go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue — add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
+**Phase 3: go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue. Add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
 
-Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask generic questions or overwhelm with too many suggestions. Do NOT generate generic datasets — everything must reflect the actual domain.
+Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask generic questions or overwhelm with too many suggestions. Do NOT generate generic datasets. Everything must reflect the actual domain.
 
 ## Common Mistakes
 

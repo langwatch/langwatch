@@ -1,0 +1,132 @@
+[
+  {
+    "id": "agent-best-practices",
+    "label": "Agent best practices",
+    "description": "Expert AI engineering consultant for your agent development practices. Audits your codebase, traces, evaluations, and scenarios against best practices, then guides you to close the gaps, starting from low-hanging fruit and going deeper. Use when you want to level up your agent's engineering quality.",
+    "category": "recipe",
+    "userPrompt": "Where can I improve our agent development best practices?"
+  },
+  {
+    "id": "agent-improve",
+    "label": "Agent improve",
+    "description": "Turns production evidence into tested improvements for your AI agent. Forms hypotheses from real traces and analytics, explains the reasoning behind each one, then executes with the user: scenario tests that reproduce production failures, prompt and code changes as reviewable PRs, new evaluators and monitors that capture production signals, and experiments that settle open questions. Use when you want to know what to do next to improve your agent.",
+    "category": "skill",
+    "userPrompt": "What should I do next to improve my agent?"
+  },
+  {
+    "id": "agent-performance",
+    "label": "Agent performance",
+    "description": "Deep-dive diagnosis of how your AI agent behaves in production. Explores LangWatch analytics and traces end to end to map failure patterns, dissatisfied users, token cost hotspots, edge cases, behavior changes, and outliers, then delivers an HTML report where every finding links to real example traces. Use when you want to truly understand what your agent is doing in production.",
+    "category": "skill",
+    "userPrompt": "How is my agent performing?"
+  },
+  {
+    "id": "datasets",
+    "label": "Datasets",
+    "description": "Generate realistic synthetic evaluation datasets by analyzing the user's codebase, prompts, production traces, and reference materials. Interactive, consultant-style — asks clarifying questions, proposes a plan, generates a preview for approval, then delivers a complete dataset uploaded to LangWatch. Use when user asks to generate, create, or build a dataset for evaluation, testing, or benchmarking.",
+    "category": "skill"
+  },
+  {
+    "id": "debug-instrumentation",
+    "label": "Debug instrumentation",
+    "description": "Debug and improve your LangWatch traces. Inspects production traces for missing input/output, disconnected spans, unlabeled traces, and missing metadata. Use when traces look broken or incomplete.",
+    "category": "recipe"
+  },
+  {
+    "id": "debug-with-langwatch",
+    "label": "Debug with langwatch",
+    "description": "Root-cause production errors and misbehaving agent runs with LangWatch. Finds errored traces, inspects spans, checks monitor and evaluator scores, then narrows to a root cause. Use when something is failing or misbehaving in production — errors, bad answers, latency spikes.",
+    "category": "recipe"
+  },
+  {
+    "id": "eval-triage",
+    "label": "Eval triage",
+    "description": "Investigate failing experiments and evaluations with LangWatch. Triage a failing experiment run to the exact rows and evaluator scores that regressed, then to a root cause. Use when an experiment fails, scores drop, or evaluations regress.",
+    "category": "recipe"
+  },
+  {
+    "id": "evaluate-multimodal",
+    "label": "Evaluate multimodal",
+    "description": "Evaluate multimodal AI agents that process images, audio, PDFs, or other files. Sets up evaluations using LangWatch's LLM-as-judge with image inputs, Scenario's multimodal testing, and document parsing evaluation patterns. Use when your agent handles non-text inputs.",
+    "category": "recipe"
+  },
+  {
+    "id": "evaluations",
+    "label": "Evaluations",
+    "description": "Compatibility router for LangWatch evaluation requests. Use only when the user asks for evaluations without making it clear whether they mean pre-deployment experiments or production online evaluations. Routes the request to the focused companion skill and does not implement either workflow itself.",
+    "category": "skill",
+    "userPrompt": "Help me evaluate my agent"
+  },
+  {
+    "id": "experiments",
+    "label": "Experiments",
+    "description": "Create and run LangWatch experiments for pre-deployment batch testing. Use when the user wants to test an agent against a dataset, compare prompts or models, benchmark quality, detect regressions, or add a CI quality gate. Do not use for production monitoring or guardrails.",
+    "category": "skill",
+    "userPrompt": "Set up experiments for my agent"
+  },
+  {
+    "id": "generate-rag-dataset",
+    "label": "Generate RAG dataset",
+    "description": "Generate a synthetic evaluation dataset from your RAG knowledge base. Creates diverse Q&A pairs with expected answers and relevant context, ready for LangWatch experiments and platform import. Use when you need test data for your RAG pipeline.",
+    "category": "recipe"
+  },
+  {
+    "id": "github",
+    "label": "GitHub",
+    "description": "Open a real pull request — clone a repo, branch, commit, push, and open a PR authored by the LangWatch app on behalf of the requesting user. Use when the user asks to open a PR, fix something in a repo and submit it, send a patch, raise a pull request, or otherwise land a code change on GitHub.",
+    "category": "skill"
+  },
+  {
+    "id": "level-up",
+    "label": "Level up",
+    "description": "Take your AI agent to the next level with full LangWatch integration. Adds tracing, prompt versioning, evaluation experiments, and simulation tests in one go. Use when the user wants comprehensive observability, testing, and prompt management for their agent.",
+    "category": "skill",
+    "userPrompt": "Take my agent to the next level"
+  },
+  {
+    "id": "online-evaluations",
+    "label": "Online evaluations",
+    "description": "Configure LangWatch online evaluations and guardrails for production traffic. Use when the user wants to score live traces or threads, monitor production quality, sample incoming traffic, or synchronously block unsafe requests and responses. Do not use for batch experiments.",
+    "category": "skill",
+    "userPrompt": "Set up online evaluations for my agent"
+  },
+  {
+    "id": "prompts",
+    "label": "Prompts",
+    "description": "Version and manage your agent's prompts with LangWatch Prompts CLI. Use for both onboarding (set up prompt versioning for an entire codebase) and targeted operations (version a specific prompt, create a new prompt version). Supports Python and TypeScript.",
+    "category": "skill",
+    "userPrompt": "Version my prompts with LangWatch"
+  },
+  {
+    "id": "scenarios",
+    "label": "Scenarios",
+    "description": "Test your AI agent with simulation-based scenarios. Covers writing scenario test code (Scenario SDK), creating platform scenarios via the `langwatch` CLI, and red teaming for security vulnerabilities. Auto-detects whether to use code or platform approach based on context.",
+    "category": "skill",
+    "userPrompt": "Add scenario tests for my agent"
+  },
+  {
+    "id": "setup-lw",
+    "label": "Setup lw",
+    "description": "Set up and troubleshoot the LangWatch CLI — login (cloud and self-hosted), endpoint configuration, project selection, and connection problems. Use when the CLI isn't authenticated, can't reach LangWatch, or talks to the wrong project.",
+    "category": "recipe"
+  },
+  {
+    "id": "test-cli-usability",
+    "label": "Test CLI usability",
+    "description": "Write scenario tests that verify your CLI tool is usable by AI agents. Ensures commands work non-interactively, provide clear output, and don't hang on prompts. Use when you want to prove your CLI is agent-friendly.",
+    "category": "recipe"
+  },
+  {
+    "id": "test-compliance",
+    "label": "Test compliance",
+    "description": "Test that your AI agent stays observational and doesn't give prescriptive advice in regulated domains (healthcare, finance, legal). Creates scenario tests for boundary enforcement and red team tests for adversarial probing. Use when your agent advises but must not prescribe.",
+    "category": "recipe"
+  },
+  {
+    "id": "tracing",
+    "label": "Tracing",
+    "description": "Add LangWatch tracing and observability to your code. Use for both onboarding (instrument an entire codebase) and targeted operations (add tracing to a specific function or module). Supports Python and TypeScript with all major frameworks.",
+    "category": "skill",
+    "userPrompt": "Instrument my code with LangWatch"
+  }
+]

@@ -1,11 +1,24 @@
-import type { MouseEvent } from "react";
-import { Box, HStack, Icon, Popover, Text, VStack } from "@chakra-ui/react";
-import { CircleAlert, Equal, Trophy } from "lucide-react";
+import {
+  Box,
+  HStack,
+  Icon,
+  IconButton,
+  Popover,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { CircleAlert, Equal, Play, Trophy } from "lucide-react";
+import type { MouseEvent, ReactNode } from "react";
+import { Markdown } from "~/components/Markdown";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { scrollToTargetColumn } from "../hooks/useOpenTargetEditor";
 import { useTargetName } from "../hooks/useTargetName";
 import type { TargetConfig } from "../types";
+import {
+  explainEvaluatorDomainError,
+  MISSING_MODEL_API_KEY_EXPLANATION,
+} from "../utils/explainEvaluatorDomainError";
 import {
   labelNamesVariant,
   resolveVerdictLabel,
@@ -36,6 +49,7 @@ type ComparisonCellProps = {
   result: unknown;
   isLoading?: boolean;
   variantTargets: (TargetConfig | undefined)[];
+  onRun?: () => void;
 };
 
 /**
@@ -63,11 +77,7 @@ function friendlyError(details: string | undefined): {
     lower.includes("api key") ||
     lower.includes("api_key")
   ) {
-    return {
-      headline: "Missing or invalid model API key",
-      hint: "Add the provider key in Settings → AI Gateway, then re-run.",
-      raw,
-    };
+    return { ...MISSING_MODEL_API_KEY_EXPLANATION, raw };
   }
   if (
     lower.includes("rate limit") ||
@@ -146,7 +156,9 @@ function WinnerLabel({
   label: string | undefined;
   onClickPreview: (targetId: string) => void;
 }) {
-  const resolved = useTargetName(target ?? (PLACEHOLDER_TARGET as TargetConfig));
+  const resolved = useTargetName(
+    target ?? (PLACEHOLDER_TARGET as TargetConfig),
+  );
   const isWinner =
     !!target &&
     !!label &&
@@ -184,6 +196,7 @@ export function ComparisonCell({
   result,
   isLoading = false,
   variantTargets,
+  onRun,
 }: ComparisonCellProps) {
   const parsed = parseEvaluationResult(result);
 
@@ -213,6 +226,29 @@ export function ComparisonCell({
     }, CLICK_HIGHLIGHT_DURATION_MS);
   };
 
+  const withRunAction = (content: ReactNode) => {
+    if (!onRun || isLoading || parsed.status === "running") return content;
+    return (
+      <HStack align="start" justify="space-between" gap={2}>
+        <Box minWidth={0} flex="1">
+          {content}
+        </Box>
+        <IconButton
+          aria-label="Run comparison for this row"
+          size="2xs"
+          variant="ghost"
+          flexShrink={0}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRun();
+          }}
+        >
+          <Play size={12} />
+        </IconButton>
+      </HStack>
+    );
+  };
+
   if (isLoading || parsed.status === "running") {
     return (
       <Text fontSize="13px" color="fg.muted">
@@ -222,16 +258,24 @@ export function ComparisonCell({
   }
 
   if (parsed.status === "pending") {
-    return (
+    return withRunAction(
       <Text fontSize="13px" color="fg.subtle">
         No verdict yet
-      </Text>
+      </Text>,
     );
   }
 
   if (parsed.status === "error") {
-    const { headline, hint, raw } = friendlyError(parsed.details);
-    return (
+    const domainExplanation = parsed.domainError
+      ? explainEvaluatorDomainError(parsed.domainError)
+      : null;
+    const { headline, hint, raw } = domainExplanation
+      ? {
+          ...domainExplanation,
+          raw: parsed.details?.trim(),
+        }
+      : friendlyError(parsed.details);
+    return withRunAction(
       <Box
         p={2}
         bg="red.subtle"
@@ -264,7 +308,11 @@ export function ComparisonCell({
                 <Popover.Positioner>
                   <Popover.Content maxWidth="460px">
                     <Popover.Arrow />
-                    <Popover.Body fontSize="12px" whiteSpace="pre-wrap">
+                    <Popover.Body
+                      fontSize="12px"
+                      whiteSpace="pre-wrap"
+                      data-testid="comparison-error-details"
+                    >
                       {raw}
                     </Popover.Body>
                   </Popover.Content>
@@ -273,7 +321,7 @@ export function ComparisonCell({
             ) : null}
           </VStack>
         </HStack>
-      </Box>
+      </Box>,
     );
   }
 
@@ -288,9 +336,10 @@ export function ComparisonCell({
       })
     : parsed.label;
   const reasoning = stripBiasPreamble(parsed.details);
+  const reasoningPreview = reasoning ? truncateReasoning(reasoning) : undefined;
 
   if (label === "tie") {
-    return (
+    return withRunAction(
       <VStack align="stretch" gap={1.5}>
         <HStack gap={1.5} fontSize="13px" flexWrap="wrap">
           <Icon as={Equal} color="fg.muted" boxSize="14px" />
@@ -306,33 +355,37 @@ export function ComparisonCell({
                 _hover={{ color: "fg" }}
               >
                 <Text fontSize="12px" lineClamp={2} wordBreak="break-word">
-                  {reasoning}
+                  {reasoningPreview}
                 </Text>
               </Box>
             </Popover.Trigger>
             <Popover.Positioner>
-              <Popover.Content maxWidth="460px">
+              <Popover.Content
+                maxWidth="560px"
+                maxHeight="420px"
+                overflowY="auto"
+              >
                 <Popover.Arrow />
-                <Popover.Body fontSize="13px" whiteSpace="pre-wrap">
-                  {reasoning}
+                <Popover.Body fontSize="13px">
+                  <Markdown>{reasoning}</Markdown>
                 </Popover.Body>
               </Popover.Content>
             </Popover.Positioner>
           </Popover.Root>
         ) : null}
-      </VStack>
+      </VStack>,
     );
   }
 
   if (!label) {
-    return (
+    return withRunAction(
       <Text fontSize="13px" color="fg.subtle">
         No verdict yet
-      </Text>
+      </Text>,
     );
   }
 
-  return (
+  return withRunAction(
     <VStack align="stretch" gap={1.5}>
       <HStack gap={1.5} fontSize="13px" flexWrap="wrap">
         <Icon as={Trophy} color="yellow.fg" boxSize="14px" />
@@ -356,20 +409,31 @@ export function ComparisonCell({
               _hover={{ color: "fg" }}
             >
               <Text fontSize="12px" lineClamp={2} wordBreak="break-word">
-                {reasoning}
+                {reasoningPreview}
               </Text>
             </Box>
           </Popover.Trigger>
           <Popover.Positioner>
-            <Popover.Content maxWidth="460px">
+            <Popover.Content
+              maxWidth="560px"
+              maxHeight="420px"
+              overflowY="auto"
+            >
               <Popover.Arrow />
-              <Popover.Body fontSize="13px" whiteSpace="pre-wrap">
-                {reasoning}
+              <Popover.Body fontSize="13px">
+                <Markdown>{reasoning}</Markdown>
               </Popover.Body>
             </Popover.Content>
           </Popover.Positioner>
         </Popover.Root>
       ) : null}
-    </VStack>
+    </VStack>,
   );
+}
+
+function truncateReasoning(reasoning: string): string {
+  const normalized = reasoning.replace(/\s+/g, " ").trim();
+  return normalized.length > 220
+    ? `${normalized.slice(0, 217).trimEnd()}...`
+    : normalized;
 }

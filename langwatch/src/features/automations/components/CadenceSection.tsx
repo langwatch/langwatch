@@ -8,12 +8,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { CADENCE_LABELS } from "~/automations/cadences";
+import { CADENCE_LABELS } from "@langwatch/automations/cadences";
 import {
   GRAPH_ALERT_TIME_PERIODS,
   type GraphAlertOperator,
   type GraphAlertTimePeriod,
-} from "~/server/app-layer/triggers/graph-alert.builder";
+} from "~/server/app-layer/automations/graph-alert.builder";
 import {
   type AutomationDraft,
   cadenceIsSet,

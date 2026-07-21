@@ -115,11 +115,28 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       query.filterWhere,
     );
 
-    const sortExpression =
+    const rawSortExpression =
       query.sort.column === "TotalTokens"
         ? "(coalesce(TotalPromptTokenCount, 0) + coalesce(TotalCompletionTokenCount, 0))"
         : query.sort.column;
+    // Every supported list sort is numeric (OccurredAt is normalized to epoch
+    // milliseconds). Coalescing nullable metrics makes the keyset comparison
+    // use exactly the same value as ORDER BY and as the service-side cursor.
+    const sortExpression =
+      query.sort.column === "OccurredAt"
+        ? "toFloat64(toUnixTimestamp64Milli(OccurredAt))"
+        : `toFloat64(coalesce(${rawSortExpression}, 0))`;
     const sortDir = query.sort.direction === "asc" ? "ASC" : "DESC";
+    const cursorComparison = query.sort.direction === "asc" ? ">" : "<";
+    const cursorClause = query.cursor
+      ? `AND (
+              ${sortExpression} ${cursorComparison} {cursorSortValue:Float64}
+              OR (
+                ${sortExpression} = {cursorSortValue:Float64}
+                AND TraceId > {cursorTraceId:String}
+              )
+            )`
+      : "";
 
     const client = await this.resolveClient(query.tenantId);
 
@@ -257,19 +274,31 @@ export class TraceListClickHouseRepository implements TraceListRepository {
               FROM ${TABLE_NAME}
               WHERE ${whereClause}
                 AND ${dedupFilter}
-              ORDER BY ${sortExpression} ${sortDir}
+                ${cursorClause}
+              -- Offset pagination needs a total order. Many traces legitimately
+              -- share timestamps, costs, token counts, and durations; without
+              -- a unique tie-breaker ClickHouse may return tied rows in a
+              -- different order on adjacent requests, causing duplicates and
+              -- omissions between pages.
+              ORDER BY ${sortExpression} ${sortDir}, TraceId ASC
               LIMIT {limit:UInt32}
               OFFSET {offset:UInt32}
             )
             AND ${dedupFilter}
-          ORDER BY ${sortExpression} ${sortDir}
+          ORDER BY ${sortExpression} ${sortDir}, TraceId ASC
           LIMIT {limit:UInt32}
         )
       `,
         query_params: {
           ...params,
           limit: query.limit,
-          offset: query.offset,
+          offset: query.offset ?? 0,
+          ...(query.cursor
+            ? {
+                cursorSortValue: query.cursor.sortValue,
+                cursorTraceId: query.cursor.traceId,
+              }
+            : {}),
         },
         format: "JSONEachRow",
       }),

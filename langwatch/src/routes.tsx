@@ -105,237 +105,250 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/onboarding/welcome")),
   },
 
-  // Settings
-  { path: "/settings", ...page(() => import("./pages/settings")) },
+  // Settings, wrapped in the same Langy layout as the project routes
+  // (keyed by the AMBIENT project), so the panel survives hopping between
+  // a project page and settings instead of vanishing.
   {
-    path: "/settings/role-bindings",
-    ...page(() => import("./pages/settings/role-bindings")),
-  },
-  {
-    path: "/settings/annotation-scores",
-    ...page(() => import("./pages/settings/annotation-scores")),
-  },
-  {
-    path: "/settings/data-retention",
-    ...page(() => import("./pages/settings/data-retention")),
-  },
-  {
-    path: "/settings/integrations",
-    ...page(() => import("./pages/settings/integrations")),
-  },
-  {
-    path: "/settings/data-privacy",
-    ...page(() => import("./pages/settings/data-privacy")),
-  },
-  {
-    path: "/settings/audit-log",
-    ...page(() => import("./pages/settings/audit-log")),
-  },
-  {
-    path: "/settings/authentication",
-    ...page(() => import("./pages/settings/authentication")),
-  },
-  {
-    path: "/settings/groups",
-    ...page(() => import("./pages/settings/groups")),
-  },
-  {
-    path: "/settings/license",
-    ...page(() => import("./pages/settings/license")),
-  },
-  {
-    path: "/settings/members",
-    ...page(() => import("./pages/settings/members")),
-  },
-  {
-    path: "/settings/model-costs",
-    ...page(() => import("./pages/settings/model-costs")),
-  },
-  {
-    path: "/settings/model-providers",
-    ...page(() => import("./pages/settings/model-providers")),
-  },
-  {
-    path: "/settings/plans",
-    ...page(() => import("./pages/settings/plans")),
-  },
-  {
-    path: "/settings/roles",
-    ...page(() => import("./pages/settings/roles")),
-  },
-  {
-    path: "/settings/api-keys",
-    ...page(() => import("./pages/settings/api-keys")),
-  },
-  { path: "/settings/scim", ...page(() => import("./pages/settings/scim")) },
-  {
-    path: "/settings/secrets",
-    ...page(() => import("./pages/settings/secrets")),
-  },
-  {
-    path: "/settings/subscription",
-    ...page(() => import("./pages/settings/subscription")),
-  },
-  {
-    path: "/settings/teams",
-    ...page(() => import("./pages/settings/teams")),
-  },
-  {
-    path: "/settings/teams/:team",
-    ...page(() => import("./pages/settings/teams/[team]")),
-  },
-  {
-    path: "/settings/topic-clustering",
-    ...page(() => import("./pages/settings/topic-clustering")),
-  },
-  {
-    path: "/settings/usage",
-    ...page(() => import("./pages/settings/usage")),
-  },
-  {
-    path: "/settings/routing-policies",
-    ...page(() => import("./pages/settings/routing-policies")),
-  },
-  {
-    path: "/settings/email-suppressions",
-    ...page(() => import("./pages/settings/email-suppressions")),
-  },
-  {
-    // Top-level governance home (admin oversight dashboard).
-    // Sub-routes for admin authoring (ingestion-sources, anomaly-rules,
-    // routing-policies) stay under /settings/* per the daily-use vs
-    // admin-authoring distinction.
-    path: "/governance",
-    ...page(() => import("./pages/settings/governance")),
-  },
-  {
-    // Back-compat alias for the original path. Any existing bookmarks
-    // / docs referencing /settings/governance still land on the same
-    // dashboard. Removed in a future cleanup once nothing links here.
-    path: "/settings/governance",
-    ...page(() => import("./pages/settings/governance")),
-  },
-  {
-    path: "/settings/governance/ingestion-sources",
-    ...page(() => import("@ee/governance/dashboard/pages/ingestion-sources")),
-  },
-  {
-    path: "/settings/governance/ingestion-sources/:id",
-    ...page(
-      () => import("@ee/governance/dashboard/pages/ingestion-source-detail"),
-    ),
-  },
-  {
-    path: "/settings/governance/anomaly-rules",
-    ...page(() => import("@ee/governance/dashboard/pages/anomaly-rules")),
-  },
-  {
-    path: "/settings/governance/tool-catalog",
-    ...page(() => import("./pages/settings/governance/tool-catalog")),
-  },
-  {
-    path: "/settings/governance/departments",
-    ...page(() => import("./pages/settings/governance/departments")),
-  },
-  {
-    // Redirect the pre-rename path so old bookmarks do not 404.
-    path: "/settings/governance/cost-centers",
-    loader: () => redirect("/settings/governance/departments"),
-  },
-  {
-    // View-all teams listing - bird's-eye `View all teams →` lands here.
-    // 500-row paginated list with sort chips for spend / requests /
-    // last-activity. Per-row click-through routes to the team detail
-    // page below.
-    path: "/settings/governance/teams",
-    ...page(() => import("./pages/settings/governance/teams")),
-  },
-  {
-    // Per-team detail - single-row scoped view of `spendByTeam` filtered
-    // to the URL-encoded team id, four-stat KPI grid + breadcrumb back
-    // to the listing. Detail-data depth (per-day trend, per-user
-    // breakdown, model mix) defers to a follow-up.
-    path: "/settings/governance/teams/:id",
-    ...page(() => import("./pages/settings/governance/teams/[id]")),
-  },
-  {
-    // View-all users listing - bird's-eye `View all users →` lands here.
-    path: "/settings/governance/users",
-    ...page(() => import("./pages/settings/governance/users")),
-  },
-  {
-    // Per-user detail - single-row scoped view keyed off the
-    // URL-encoded actor id (email / sub claim).
-    path: "/settings/governance/users/:id",
-    ...page(() => import("./pages/settings/governance/users/[id]")),
-  },
+    ...page(() => import("./features/langy/ProjectLangyLayout")),
+    children: [
+      { path: "/settings", ...page(() => import("./pages/settings")) },
+      {
+        path: "/settings/role-bindings",
+        ...page(() => import("./pages/settings/role-bindings")),
+      },
+      {
+        path: "/settings/annotation-scores",
+        ...page(() => import("./pages/settings/annotation-scores")),
+      },
+      {
+        path: "/settings/data-retention",
+        ...page(() => import("./pages/settings/data-retention")),
+      },
+      {
+        path: "/settings/integrations",
+        ...page(() => import("./pages/settings/integrations")),
+      },
+      {
+        path: "/settings/data-privacy",
+        ...page(() => import("./pages/settings/data-privacy")),
+      },
+      {
+        path: "/settings/audit-log",
+        ...page(() => import("./pages/settings/audit-log")),
+      },
+      {
+        path: "/settings/authentication",
+        ...page(() => import("./pages/settings/authentication")),
+      },
+      {
+        path: "/settings/groups",
+        ...page(() => import("./pages/settings/groups")),
+      },
+      {
+        path: "/settings/license",
+        ...page(() => import("./pages/settings/license")),
+      },
+      {
+        path: "/settings/members",
+        ...page(() => import("./pages/settings/members")),
+      },
+      {
+        path: "/settings/model-costs",
+        ...page(() => import("./pages/settings/model-costs")),
+      },
+      {
+        path: "/settings/model-providers",
+        ...page(() => import("./pages/settings/model-providers")),
+      },
+      {
+        path: "/settings/plans",
+        ...page(() => import("./pages/settings/plans")),
+      },
+      {
+        path: "/settings/roles",
+        ...page(() => import("./pages/settings/roles")),
+      },
+      {
+        path: "/settings/api-keys",
+        ...page(() => import("./pages/settings/api-keys")),
+      },
+      {
+        path: "/settings/scim",
+        ...page(() => import("./pages/settings/scim")),
+      },
+      {
+        path: "/settings/secrets",
+        ...page(() => import("./pages/settings/secrets")),
+      },
+      {
+        path: "/settings/subscription",
+        ...page(() => import("./pages/settings/subscription")),
+      },
+      {
+        path: "/settings/teams",
+        ...page(() => import("./pages/settings/teams")),
+      },
+      {
+        path: "/settings/teams/:team",
+        ...page(() => import("./pages/settings/teams/[team]")),
+      },
+      {
+        path: "/settings/topic-clustering",
+        ...page(() => import("./pages/settings/topic-clustering")),
+      },
+      {
+        path: "/settings/usage",
+        ...page(() => import("./pages/settings/usage")),
+      },
+      {
+        path: "/settings/routing-policies",
+        ...page(() => import("./pages/settings/routing-policies")),
+      },
+      {
+        path: "/settings/email-suppressions",
+        ...page(() => import("./pages/settings/email-suppressions")),
+      },
+      {
+        // Top-level governance home (admin oversight dashboard).
+        // Sub-routes for admin authoring (ingestion-sources, anomaly-rules,
+        // routing-policies) stay under /settings/* per the daily-use vs
+        // admin-authoring distinction.
+        path: "/governance",
+        ...page(() => import("./pages/settings/governance")),
+      },
+      {
+        // Back-compat alias for the original path. Any existing bookmarks
+        // / docs referencing /settings/governance still land on the same
+        // dashboard. Removed in a future cleanup once nothing links here.
+        path: "/settings/governance",
+        ...page(() => import("./pages/settings/governance")),
+      },
+      {
+        path: "/settings/governance/ingestion-sources",
+        ...page(
+          () => import("@ee/governance/dashboard/pages/ingestion-sources"),
+        ),
+      },
+      {
+        path: "/settings/governance/ingestion-sources/:id",
+        ...page(
+          () =>
+            import("@ee/governance/dashboard/pages/ingestion-source-detail"),
+        ),
+      },
+      {
+        path: "/settings/governance/anomaly-rules",
+        ...page(() => import("@ee/governance/dashboard/pages/anomaly-rules")),
+      },
+      {
+        path: "/settings/governance/tool-catalog",
+        ...page(() => import("./pages/settings/governance/tool-catalog")),
+      },
+      {
+        path: "/settings/governance/departments",
+        ...page(() => import("./pages/settings/governance/departments")),
+      },
+      {
+        // Redirect the pre-rename path so old bookmarks do not 404.
+        path: "/settings/governance/cost-centers",
+        loader: () => redirect("/settings/governance/departments"),
+      },
+      {
+        // View-all teams listing - bird's-eye `View all teams →` lands here.
+        // 500-row paginated list with sort chips for spend / requests /
+        // last-activity. Per-row click-through routes to the team detail
+        // page below.
+        path: "/settings/governance/teams",
+        ...page(() => import("./pages/settings/governance/teams")),
+      },
+      {
+        // Per-team detail - single-row scoped view of `spendByTeam` filtered
+        // to the URL-encoded team id, four-stat KPI grid + breadcrumb back
+        // to the listing. Detail-data depth (per-day trend, per-user
+        // breakdown, model mix) defers to a follow-up.
+        path: "/settings/governance/teams/:id",
+        ...page(() => import("./pages/settings/governance/teams/[id]")),
+      },
+      {
+        // View-all users listing - bird's-eye `View all users →` lands here.
+        path: "/settings/governance/users",
+        ...page(() => import("./pages/settings/governance/users")),
+      },
+      {
+        // Per-user detail - single-row scoped view keyed off the
+        // URL-encoded actor id (email / sub claim).
+        path: "/settings/governance/users/:id",
+        ...page(() => import("./pages/settings/governance/users/[id]")),
+      },
 
-  // Personal-scope governance routes (must precede the /:project catch-all
-  // so "me" doesn't get treated as a project slug)
-  {
-    path: "/me",
-    ...page(() => import("./pages/me/index")),
-  },
-  {
-    path: "/me/configure",
-    ...page(() => import("./pages/me/configure")),
-  },
-  {
-    path: "/me/sessions",
-    ...page(() => import("./pages/me/sessions")),
-  },
-  {
-    // Budget-increase request page that the CLI's `langwatch request-increase`
-    // opens. The page file existed but routes.tsx is explicit (Vite migration)
-    // - without this entry the URL 404'd, breaking the per-spec
-    // budget-exceeded → request flow Ariana caught in dogfood.
-    path: "/me/budget/request",
-    ...page(() => import("./pages/me/budget/request")),
-  },
+      // Personal-scope governance routes (must precede the /:project catch-all
+      // so "me" doesn't get treated as a project slug)
+      {
+        path: "/me",
+        ...page(() => import("./pages/me/index")),
+      },
+      {
+        path: "/me/configure",
+        ...page(() => import("./pages/me/configure")),
+      },
+      {
+        path: "/me/sessions",
+        ...page(() => import("./pages/me/sessions")),
+      },
+      {
+        // Budget-increase request page that the CLI's `langwatch request-increase`
+        // opens. The page file existed but routes.tsx is explicit (Vite migration)
+        // - without this entry the URL 404'd, breaking the per-spec
+        // budget-exceeded → request flow Ariana caught in dogfood.
+        path: "/me/budget/request",
+        ...page(() => import("./pages/me/budget/request")),
+      },
 
-  // CLI device-flow approval (RFC 8628 user-facing screen)
-  {
-    path: "/cli/auth",
-    ...page(() => import("./pages/cli/auth")),
-  },
+      // CLI device-flow approval (RFC 8628 user-facing screen)
+      {
+        path: "/cli/auth",
+        ...page(() => import("./pages/cli/auth")),
+      },
 
-  // AI Gateway — org-scoped admin pages live under /settings/gateway/**
-  // alongside model-providers, routing-policies, audit-log etc. Every
-  // gateway resource (VirtualKey / GatewayBudget / ModelProvider) is
-  // org-keyed by the schema, so the chrome reflects that. Kept OUT of the
-  // project layout route below — these are /settings/* routes, not
-  // /:project/* routes, so Langy must not mount on them.
-  {
-    path: "/settings/gateway",
-    ...page(() => import("./pages/settings/gateway/index")),
-  },
-  {
-    path: "/settings/gateway/virtual-keys",
-    ...page(() => import("./pages/settings/gateway/virtual-keys")),
-  },
-  {
-    path: "/settings/gateway/virtual-keys/:id",
-    ...page(() => import("./pages/settings/gateway/virtual-keys/[id]")),
-  },
-  {
-    path: "/settings/gateway/budgets",
-    ...page(() => import("./pages/settings/gateway/budgets")),
-  },
-  {
-    path: "/settings/gateway/budgets/:id",
-    ...page(() => import("./pages/settings/gateway/budgets/[id]")),
-  },
-  {
-    path: "/settings/gateway/usage",
-    ...page(() => import("./pages/settings/gateway/usage")),
-  },
-  {
-    path: "/settings/gateway/cache-rules",
-    ...page(() => import("./pages/settings/gateway/cache-rules")),
-  },
-  {
-    path: "/settings/gateway/guardrails",
-    ...page(() => import("./pages/settings/gateway/guardrails")),
+      // AI Gateway — org-scoped admin pages live under /settings/gateway/**
+      // alongside model-providers, routing-policies, audit-log etc. Every
+      // gateway resource (VirtualKey / GatewayBudget / ModelProvider) is
+      // org-keyed by the schema, so the chrome reflects that. Kept OUT of the
+      // project layout route below — these are /settings/* routes, not
+      // /:project/* routes, so Langy must not mount on them.
+      {
+        path: "/settings/gateway",
+        ...page(() => import("./pages/settings/gateway/index")),
+      },
+      {
+        path: "/settings/gateway/virtual-keys",
+        ...page(() => import("./pages/settings/gateway/virtual-keys")),
+      },
+      {
+        path: "/settings/gateway/virtual-keys/:id",
+        ...page(() => import("./pages/settings/gateway/virtual-keys/[id]")),
+      },
+      {
+        path: "/settings/gateway/budgets",
+        ...page(() => import("./pages/settings/gateway/budgets")),
+      },
+      {
+        path: "/settings/gateway/budgets/:id",
+        ...page(() => import("./pages/settings/gateway/budgets/[id]")),
+      },
+      {
+        path: "/settings/gateway/usage",
+        ...page(() => import("./pages/settings/gateway/usage")),
+      },
+      {
+        path: "/settings/gateway/cache-rules",
+        ...page(() => import("./pages/settings/gateway/cache-rules")),
+      },
+      {
+        path: "/settings/gateway/guardrails",
+        ...page(() => import("./pages/settings/gateway/guardrails")),
+      },
+    ],
   },
 
   // Project routes — wrapped in a layout route that mounts Langy ONCE per
@@ -345,7 +358,7 @@ const routes: RouteObject[] = [
   // lazily via page() so Langy's chat bundle stays out of the initial load.
   // See ProjectLangyLayout + specs/langy/langy-navigation-persistence.feature
   {
-    ...page(() => import("./components/langy/ProjectLangyLayout")),
+    ...page(() => import("./features/langy/ProjectLangyLayout")),
     children: [
       {
         path: "/:project",
@@ -358,6 +371,22 @@ const routes: RouteObject[] = [
       {
         path: "/:project/automations",
         ...page(() => import("./pages/[project]/automations")),
+      },
+      {
+        path: "/:project/automations/automations",
+        ...page(() => import("./pages/[project]/automations/automations")),
+      },
+      {
+        path: "/:project/automations/alerts",
+        ...page(() => import("./pages/[project]/automations/alerts")),
+      },
+      {
+        path: "/:project/automations/schedules",
+        ...page(() => import("./pages/[project]/automations/schedules")),
+      },
+      {
+        path: "/:project/automations/activity",
+        ...page(() => import("./pages/[project]/automations/activity")),
       },
       {
         path: "/:project/datasets",
@@ -374,6 +403,10 @@ const routes: RouteObject[] = [
       {
         path: "/:project/evaluations",
         ...page(() => import("./pages/[project]/evaluations")),
+      },
+      {
+        path: "/:project/online-evaluations",
+        ...page(() => import("./pages/[project]/online-evaluations")),
       },
       {
         path: "/:project/evaluations/new",

@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { MiddlewareHandler } from "hono";
 import { generateSpecs } from "hono-openapi";
 import { getCurrentContext } from "@langwatch/observability/context";
+import { NotFoundError } from "@langwatch/handled-error";
 
 import { createService } from "../builder.js";
 
@@ -397,7 +398,9 @@ describe("output validation", () => {
         code: "internal_error",
         // Deprecated back-compat alias of `code` (see ErrorResponseBody.kind).
         kind: "internal_error",
-        message: "Internal server error",
+        // The Go envelope's name for the same value (see ErrorResponseBody.type).
+        type: "internal_error",
+        message: "An unknown error occurred",
       });
     });
   });
@@ -913,27 +916,12 @@ describe("error handling", () => {
     });
   });
 
-  describe("when a handler throws a HandledError-like error", () => {
+  describe("when a handler throws a HandledError", () => {
     it("serializes it correctly", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
           v.get("/fail", {}, async () => {
-            const err = Object.assign(new Error("Not found"), {
-              code: "thing_not_found",
-              httpStatus: 404,
-              meta: { id: "123" },
-              serialize() {
-                return {
-                  code: "thing_not_found",
-                  meta: { id: "123" },
-                  traceId: undefined,
-                  spanId: undefined,
-                  httpStatus: 404,
-                  reasons: [],
-                };
-              },
-            });
-            throw err;
+            throw new NotFoundError("thing_not_found", "Thing", "123");
           });
         })
         .build();
@@ -946,6 +934,35 @@ describe("error handling", () => {
       };
       expect(body.code).toBe("thing_not_found");
       expect(body.meta.id).toBe("123");
+    });
+  });
+
+  describe("when a handler throws something that merely looks handled", () => {
+    it("does not let it choose its own status", async () => {
+      // Duck-typing is gone: an object can no longer claim a 404 by growing a
+      // `serialize()`. Only real HandledError instances are trusted.
+      const app = buildTestService()
+        .version("2025-03-15", (v) => {
+          v.get("/fail", {}, async () => {
+            throw Object.assign(new Error("Not found"), {
+              code: "thing_not_found",
+              httpStatus: 404,
+              meta: { id: "123" },
+              serialize: () => ({
+                code: "thing_not_found",
+                meta: { id: "123" },
+                httpStatus: 404,
+                reasons: [],
+              }),
+            });
+          });
+        })
+        .build();
+
+      const res = await makeRequest(app, "/api/test/2025-03-15/fail");
+      expect(res.status).toBe(500);
+      const body = (await jsonBody(res)) as { code: string };
+      expect(body.code).toBe("internal_error");
     });
   });
 });

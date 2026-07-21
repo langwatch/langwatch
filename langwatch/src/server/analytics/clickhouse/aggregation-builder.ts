@@ -7,7 +7,7 @@
 
 import { snakeCase } from "../../../utils/stringCasing";
 import type { FilterField } from "../../filters/types";
-import type { SeriesInputType } from "../registry";
+import { isZeroWhenAbsentSeries, type SeriesInputType } from "../registry";
 import type { AggregationTypes } from "../types";
 import {
   buildJoinClause,
@@ -24,6 +24,7 @@ import {
   translateAllFilters,
 } from "./filter-translator";
 import {
+  buildMetricAlias,
   type MetricTranslation,
   translateMetric,
   translatePipelineAggregation,
@@ -1795,35 +1796,75 @@ function buildSubqueryTimeseriesQuery(
     });
   }
 
-  // No groupBy: use scalar subqueries wrapped in COALESCE to guarantee a row even
-  // when there is no data in one of the periods.
+  // No groupBy: use scalar subqueries to guarantee a row even when there is
+  // no data in one of the periods. Only ADDITIVE metrics coalesce the empty
+  // result (0 rows returns NULL) to 0 — for averages, extrema and percentiles
+  // an absent value means "no data", and a fabricated 0 would read as a real
+  // measurement (e.g. a 0% pass rate for an evaluator that never ran).
+  const additiveAliases = new Set(
+    input.series
+      .map((series, index) => ({ series, index }))
+      .filter(({ series }) => isZeroWhenAbsentSeries(series))
+      .map(({ series, index }) =>
+        buildMetricAlias(
+          index,
+          series.metric,
+          series.aggregation,
+          series.key,
+          series.subkey,
+        ),
+      ),
+  );
+  const scalarExpr = (
+    subquery: string,
+    alias: string,
+    quotedAlias: string,
+  ): string =>
+    additiveAliases.has(alias)
+      ? `coalesce(${subquery}, 0) AS ${quotedAlias}`
+      : `${subquery} AS ${quotedAlias}`;
+
   const currentSelectExprs: string[] = ["'current' AS period"];
   const previousSelectExprs: string[] = ["'previous' AS period"];
 
   // Add simple metrics columns (quote aliases that start with digits)
-  // Wrap entire subquery in COALESCE to handle empty result sets (0 rows returns NULL)
   for (const metric of simpleMetrics) {
     if (simpleMetrics.length > 0) {
       const quotedAlias = quoteIdentifier(metric.alias);
       currentSelectExprs.push(
-        `coalesce((SELECT ${quotedAlias} FROM simple_metrics_current), 0) AS ${quotedAlias}`,
+        scalarExpr(
+          `(SELECT ${quotedAlias} FROM simple_metrics_current)`,
+          metric.alias,
+          quotedAlias,
+        ),
       );
       previousSelectExprs.push(
-        `coalesce((SELECT ${quotedAlias} FROM simple_metrics_previous), 0) AS ${quotedAlias}`,
+        scalarExpr(
+          `(SELECT ${quotedAlias} FROM simple_metrics_previous)`,
+          metric.alias,
+          quotedAlias,
+        ),
       );
     }
   }
 
   // Add subquery metrics columns (use cte_ prefix to match CTE names, quote aliases)
-  // Wrap entire subquery in COALESCE to handle empty result sets (0 rows returns NULL)
   for (const metric of subqueryMetrics) {
     const cteName = `cte_${metric.alias}`;
     const quotedAlias = quoteIdentifier(metric.alias);
     currentSelectExprs.push(
-      `coalesce((SELECT metric_value FROM ${cteName}_current), 0) AS ${quotedAlias}`,
+      scalarExpr(
+        `(SELECT metric_value FROM ${cteName}_current)`,
+        metric.alias,
+        quotedAlias,
+      ),
     );
     previousSelectExprs.push(
-      `coalesce((SELECT metric_value FROM ${cteName}_previous), 0) AS ${quotedAlias}`,
+      scalarExpr(
+        `(SELECT metric_value FROM ${cteName}_previous)`,
+        metric.alias,
+        quotedAlias,
+      ),
     );
   }
 

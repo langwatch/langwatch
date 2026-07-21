@@ -205,20 +205,75 @@ func TestSeedPresets(t *testing.T) {
 		})
 	})
 
+	t.Run("given a managed-postgres stack whose overlay carries DATABASE_URL", func(t *testing.T) {
+		store := &fakeStore{stacks: []domain.Stack{{
+			Slug: "feat-x", WorktreeDir: "/wt/feat-x", LauncherPID: 42,
+			PostgresPort: 5433, PostgresDatabase: "lw_feat_x",
+			Services: []domain.Service{{Name: "app", Port: 5560}},
+		}}}
+
+		t.Run("when seeding with no preset, the seed run also flips the dev feature flags on", func(t *testing.T) {
+			sup := &fakeSupervisor{}
+			o := seedOrchestrator(sup, store, &fakeSystem{})
+			if err := o.Seed(context.Background(), params, SeedOptions{Preset: ""}); err != nil {
+				t.Fatalf("Seed: %v", err)
+			}
+			if len(sup.shells) != 1 {
+				t.Fatalf("want exactly one seed run, got %v", sup.shells)
+			}
+			shell := sup.shells[0]
+			if !strings.Contains(shell, "prisma:seed") {
+				t.Errorf("shell = %q, want the prisma seed", shell)
+			}
+			if !strings.Contains(shell, `INSERT INTO "FeatureFlag"`) {
+				t.Errorf("shell = %q, want the feature-flag upsert appended", shell)
+			}
+			for _, key := range domain.SeededFeatureFlags {
+				if !strings.Contains(shell, key) {
+					t.Errorf("shell = %q, want it to enable %q", shell, key)
+				}
+			}
+			// Runtime opt-out gate so HAVEN_SEED_FEATURE_FLAGS=0 skips the upsert,
+			// and best-effort so a missing psql never fails the seed.
+			if !strings.Contains(shell, `"$HAVEN_SEED_FEATURE_FLAGS" != "0"`) {
+				t.Errorf("shell = %q, want the opt-out gate", shell)
+			}
+			if !strings.Contains(shell, "|| echo") {
+				t.Errorf("shell = %q, want the upsert to be best-effort", shell)
+			}
+		})
+	})
+
+	t.Run("given a stack with no managed database (no DATABASE_URL overlay)", func(t *testing.T) {
+		t.Run("when seeding, the feature-flag upsert is not appended", func(t *testing.T) {
+			sup := &fakeSupervisor{}
+			o := seedOrchestrator(sup, &fakeStore{}, &fakeSystem{})
+			if err := o.Seed(context.Background(), params, SeedOptions{Preset: ""}); err != nil {
+				t.Fatalf("Seed: %v", err)
+			}
+			if strings.Contains(sup.shells[0], "FeatureFlag") {
+				t.Errorf("shell = %q, want no psql upsert without a managed DATABASE_URL", sup.shells[0])
+			}
+		})
+	})
+
 	t.Run("given the demo preset with a live stack", func(t *testing.T) {
 		sup := &fakeSupervisor{}
 		sys := &portSystem{fakeSystem: fakeSystem{alive: map[int]bool{42: true}}, portsUp: map[int]bool{5560: true}}
 		o := seedOrchestrator(sup, liveStackStore(), sys)
 
-		t.Run("when seeding, sample traces are ingested through the app's loopback port", func(t *testing.T) {
+		t.Run("when seeding, linked demo data is ingested through the app's loopback port", func(t *testing.T) {
 			if err := o.Seed(context.Background(), params, SeedOptions{Preset: "demo"}); err != nil {
 				t.Fatalf("Seed: %v", err)
 			}
-			if len(sup.shells) != 2 || len(sup.envs) != 2 {
-				t.Fatalf("shells = %v, want prisma:seed then seed:sample-traces", sup.shells)
+			if len(sup.shells) != 3 || len(sup.envs) != 3 {
+				t.Fatalf("shells = %v, want prisma:seed, seed:sample-traces, then seed:realistic-platform", sup.shells)
 			}
 			if !strings.Contains(sup.shells[1], "seed:sample-traces") {
 				t.Fatalf("shells = %v, want seed:sample-traces second", sup.shells)
+			}
+			if !strings.Contains(sup.shells[2], "seed:realistic-platform") {
+				t.Fatalf("shells = %v, want seed:realistic-platform third", sup.shells)
 			}
 			joined := strings.Join(sup.envs[1], " ")
 			if !strings.Contains(joined, "HAVEN_SEED_ENDPOINT=http://127.0.0.1:5560") {
@@ -226,6 +281,9 @@ func TestSeedPresets(t *testing.T) {
 			}
 			if !strings.Contains(joined, "HAVEN_SEED_LANGWATCH_API_KEY=sk-lw-local-development-key") {
 				t.Errorf("traces env should carry the local ingestion key, got %v", sup.envs[1])
+			}
+			if strings.Join(sup.envs[2], " ") != joined {
+				t.Errorf("platform seed should receive the same isolated stack overlay")
 			}
 		})
 	})

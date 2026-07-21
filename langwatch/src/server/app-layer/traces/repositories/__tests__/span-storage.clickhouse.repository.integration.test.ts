@@ -716,3 +716,165 @@ describe("SpanStorageClickHouseRepository per-span cost columns (integration)", 
     });
   });
 });
+
+// Cursor-paged span-summary walk. Own tenant/trace fixtures so page shapes
+// are deterministic and the heavy single-trace dataset above is untouched.
+const pageTenantId = `test-span-page-${nanoid()}`;
+
+function makePageSpanRow(
+  pageTraceId: string,
+  spanId: string,
+  startTime: Date,
+  overrides: Record<string, unknown> = {},
+): ReturnType<typeof makeSpanRow> {
+  return {
+    ...makeSpanRow(0, {
+      TenantId: pageTenantId,
+      TraceId: pageTraceId,
+      SpanId: spanId,
+      StartTime: startTime,
+      EndTime: new Date(startTime.getTime() + 50),
+      CreatedAt: startTime,
+      UpdatedAt: startTime,
+      SpanAttributes: { idx: spanId },
+      ...overrides,
+    }),
+  };
+}
+
+async function walkSpanSummaries(pageTraceId: string, limit: number) {
+  const pages: Awaited<
+    ReturnType<SpanStorageClickHouseRepository["findSpanSummariesPage"]>
+  >[] = [];
+  let cursor: { startTimeMs: number; spanId: string } | undefined;
+  for (;;) {
+    const page = await repo.findSpanSummariesPage({
+      tenantId: pageTenantId,
+      traceId: pageTraceId,
+      limit,
+      cursor,
+      occurredAtMs: base,
+    });
+    pages.push(page);
+    if (!page.hasMore) break;
+    const last = page.rows.at(-1);
+    if (!last) throw new Error("hasMore page returned no rows");
+    cursor = { startTimeMs: last.startTimeMs, spanId: last.spanId };
+  }
+  return pages;
+}
+
+describe("SpanStorageClickHouseRepository cursor-paged span summaries (integration)", () => {
+  const exactTraceId = `trace-${nanoid()}`;
+  const tieTraceId = `trace-${nanoid()}`;
+  const longTraceId = `trace-${nanoid()}`;
+  const EXACT_SPANS = 40;
+  const PAGE = 10;
+
+  beforeAll(async () => {
+    // Exact-multiple-of-page-size trace (40 spans / pages of 10), including a
+    // stale earlier version of one mid-trace span that dedup must not emit.
+    await insertRows(
+      Array.from({ length: EXACT_SPANS }, (_, i) =>
+        makePageSpanRow(exactTraceId, spanIdFor(i), new Date(base + i * 10)),
+      ),
+    );
+    await insertRows([
+      makePageSpanRow(exactTraceId, spanIdFor(25), new Date(base - 5_000), {
+        SpanAttributes: { idx: spanIdFor(25), stale: "yes" },
+      }),
+    ]);
+
+    // Four spans sharing one StartTime, so a page boundary falls between
+    // same-millisecond rows and only the SpanId tiebreak separates pages.
+    await insertRows(
+      ["tie-a", "tie-b", "tie-c", "tie-d"].map((spanId) =>
+        makePageSpanRow(tieTraceId, spanId, new Date(base + 500)),
+      ),
+    );
+
+    // Long-running trace: three spans near the occurredAt hint and two more
+    // three days later — past the hint's +2-day partition window.
+    await insertRows([
+      ...[0, 1, 2].map((i) =>
+        makePageSpanRow(longTraceId, `early-${i}`, new Date(base + i)),
+      ),
+      ...[0, 1].map((i) =>
+        makePageSpanRow(
+          longTraceId,
+          `late-${i}`,
+          new Date(base + 3 * 24 * 60 * 60 * 1000 + i),
+        ),
+      ),
+    ]);
+  }, 60_000);
+
+  describe("when walking a trace whose span count is an exact multiple of the page size", () => {
+    it("returns every span exactly once, in (startTimeMs, spanId) order, latest version only", async () => {
+      const pages = await walkSpanSummaries(exactTraceId, PAGE);
+
+      const all = pages.flatMap((p) => p.rows);
+      expect(all.map((r) => r.spanId)).toEqual(
+        Array.from({ length: EXACT_SPANS }, (_, i) => spanIdFor(i)),
+      );
+      // The stale version of span 25 must not surface as a duplicate or
+      // displace the live row's position.
+      expect(all.filter((r) => r.spanId === spanIdFor(25))).toHaveLength(1);
+    });
+
+    it("reports the final full page as terminal instead of requiring an empty follow-up fetch", async () => {
+      const pages = await walkSpanSummaries(exactTraceId, PAGE);
+
+      expect(pages).toHaveLength(EXACT_SPANS / PAGE);
+      expect(pages.map((p) => p.hasMore)).toEqual([true, true, true, false]);
+      expect(pages.every((p) => p.rows.length === PAGE)).toBe(true);
+    });
+  });
+
+  describe("when a page boundary falls between spans sharing a StartTime", () => {
+    it("the SpanId tiebreak neither skips nor duplicates the same-millisecond spans", async () => {
+      const pages = await walkSpanSummaries(tieTraceId, 2);
+
+      expect(pages.map((p) => p.rows.map((r) => r.spanId))).toEqual([
+        ["tie-a", "tie-b"],
+        ["tie-c", "tie-d"],
+      ]);
+    });
+  });
+
+  describe("when a long-running trace has spans past the occurredAt hint's window", () => {
+    it("the walk still reaches them instead of ending at the window edge", async () => {
+      const pages = await walkSpanSummaries(longTraceId, 2);
+
+      const all = pages.flatMap((p) => p.rows.map((r) => r.spanId));
+      expect(all).toEqual(["early-0", "early-1", "early-2", "late-0", "late-1"]);
+    });
+  });
+});
+
+describe("SpanStorageClickHouseRepository langwatch signals read (integration)", () => {
+  const signalsTraceId = `trace-${nanoid()}`;
+
+  beforeAll(async () => {
+    await insertRows([
+      makePageSpanRow(signalsTraceId, "sig-prompt", new Date(base), {
+        SpanAttributes: { "langwatch.prompt.id": "prompt-1" },
+      }),
+      makePageSpanRow(signalsTraceId, "sig-none", new Date(base + 1)),
+    ]);
+  }, 60_000);
+
+  describe("when a trace has spans carrying langwatch signal attributes", () => {
+    it("executes the capped, ordered scan and returns the signal buckets per span", async () => {
+      const rows = await repo.findLangwatchSignalsByTraceId({
+        tenantId: pageTenantId,
+        traceId: signalsTraceId,
+        occurredAtMs: base,
+      });
+
+      expect(rows).toEqual([
+        { spanId: "sig-prompt", signals: ["prompt"] },
+      ]);
+    });
+  });
+});

@@ -70,6 +70,10 @@ const AgentWorkflowEditorDrawer = lazyDefault({
   factory: () => import("./agents/AgentWorkflowEditorDrawer"),
   key: "AgentWorkflowEditorDrawer",
 });
+const AgentWorkflowTargetEditorDrawer = lazyDefault({
+  factory: () => import("./agents/AgentWorkflowTargetEditorDrawer"),
+  key: "AgentWorkflowTargetEditorDrawer",
+});
 const AgentCodeEditorDrawerFromUrl = lazyDefault({
   factory: () => import("./agents/drawerFromUrl"),
   key: "AgentCodeEditorDrawerFromUrl",
@@ -174,6 +178,10 @@ const CreateTeamDrawer = lazyDefault({
   factory: () => import("./settings/CreateTeamDrawer"),
   key: "CreateTeamDrawer",
 });
+const InviteMemberDrawer = lazyDefault({
+  factory: () => import("./settings/InviteMemberDrawer"),
+  key: "InviteMemberDrawer",
+});
 const DataPrivacyRuleDrawer = lazyDefault({
   factory: () => import("./settings/DataPrivacyRuleDrawer"),
   key: "DataPrivacyRuleDrawer",
@@ -245,6 +253,7 @@ export const drawers = {
   agentCodeEditor: AgentCodeEditorDrawerFromUrl,
   agentHttpEditor: AgentHttpEditorDrawerFromUrl,
   agentWorkflowEditor: AgentWorkflowEditorDrawer,
+  agentWorkflowTargetEditor: AgentWorkflowTargetEditorDrawer,
   workflowSelector: WorkflowSelectorDrawerFromUrl,
   evaluatorHistory: EvaluatorHistoryDrawer,
   evaluatorList: EvaluatorListDrawer,
@@ -265,6 +274,7 @@ export const drawers = {
   createProject: CreateProjectDrawer,
   editProject: EditProjectDrawer,
   createTeam: CreateTeamDrawer,
+  inviteMember: InviteMemberDrawer,
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,

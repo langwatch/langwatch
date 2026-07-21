@@ -7,9 +7,23 @@ config();
 export default defineConfig({
   test: {
     watch: false,
-    pool: "vmThreads",
+    // vmForks over vmThreads: the VM context leaks memory by design, but a
+    // forked child reclaims ALL of it on exit, whereas a worker THREAD's leak
+    // accumulates in the shared process heap. Measured on src/features/traces-v2
+    // (68 files): peak RSS 2.56GB (vmThreads) -> 573MB (vmForks), ~4.5x, for
+    // ~15% more wall-clock. vmMemoryLimit still recycles a worker before its
+    // context grows unbounded. See dev/docs/best_practices/vitest-performance.md.
+    pool: "vmForks",
     maxWorkers: "50%", // Low default for local dev; CI overrides with VITEST_MAX_WORKERS
-    vmMemoryLimit: "512MB", // Recycle workers aggressively — vmThreads leaks memory by design
+    vmMemoryLimit: "512MB", // Recycle a worker once its reused VM context hits this
+    // isolate:false reuses one VM context across the files in a worker instead
+    // of building a fresh module registry per file. Safe here because the suite
+    // resets shared state between tests (test-setup.ts + clearMocks-style
+    // cleanup), so cross-file leakage doesn't change results — verified across
+    // 172 sampled files (traces-v2 + a broad server slice) with zero failures.
+    // The full-suite CI test-unit shards are the scale check; if isolate:false
+    // ever flakes a shard, drop this line first.
+    isolate: false,
     testTimeout: 30000, // 30s default to handle slower CI runners
     // Global setup runs once before all tests. Unit needs no containers; this
     // only carries a CI-gated hard-floor that mirrors the integration

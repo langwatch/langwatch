@@ -65,6 +65,7 @@ Numbered choices; each traces to a locked question round (R1–R3) or a constrai
    - SaaS: the gate at `server/routes/auth-cli.ts:1666` consults PostHog live per org — GA = roll `release_ui_ai_governance_enabled` to 100% in PostHog; switching an org off in PostHog **re-arms the 403 for that org automatically**. Zero gate code deleted.
    - Registry `defaultValue: false → true` (`server/featureFlag/registry.ts:146`) and the auth-cli call site's hardcoded fallback `defaultValue: false → true` — this pair is what lifts the gate on **self-hosted** (memory flag service resolves from the call-site default) and during PostHog outages.
    - Residual risk, accepted and documented: with the gate open, a user who explicitly chooses AI-tools/device mode in the CLI gets a personal workspace + VK; the CLI's existing Where/How prompts (`specs/ai-governance/cli-onboarding/login-unified.feature`) are the consent step. The original silent-capture incident predates those prompts.
+   - Executed 2026-07-17 for the self-hosted pair (#5901): registry default and auth-cli fallback are both `true`; the SaaS PostHog rollout remains a separate action.
 
 8. **Org intent is editable in the organization settings page, shipped in this ADR** (R3-Q4). A "Primary use" field (org-admin only) on the existing org settings surface, so a wrong pick is self-serviceable and legacy orgs can adopt intent-based landing without support/SQL.
    Two honest limits of "self-serviceable" (red-team v2 F9, strategy S1):

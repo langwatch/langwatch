@@ -14,7 +14,9 @@ const SKELETON_BAR_HEIGHT = "16px";
 const WIDTH_VARIANTS = ["38%", "55%", "72%", "46%", "82%", "60%", "70%"];
 
 const widthFor = (rowIdx: number, colIdx: number, lineIdx: number): string =>
-  WIDTH_VARIANTS[(rowIdx * 7 + colIdx * 11 + lineIdx * 3) % WIDTH_VARIANTS.length]!;
+  WIDTH_VARIANTS[
+    (rowIdx * 7 + colIdx * 11 + lineIdx * 3) % WIDTH_VARIANTS.length
+  ]!;
 
 interface SkeletonCellContentProps {
   meta: ColumnMeta | undefined;

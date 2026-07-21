@@ -46,7 +46,7 @@ describe("PERMISSION_CATEGORIES", () => {
   });
 
   /** @scenario Permission categories include all platform resources */
-  it("includes all 14 platform resource categories with correct access levels", () => {
+  it("includes all 15 platform resource categories with correct access levels", () => {
     const result = PERMISSION_CATEGORIES.map((c) => ({
       category: c.label,
       accessLevels: c.accessLevels.join(", "),
@@ -59,6 +59,7 @@ describe("PERMISSION_CATEGORIES", () => {
       { category: "Annotations", accessLevels: "read, write" },
       { category: "Analytics", accessLevels: "read, write" },
       { category: "Evaluations", accessLevels: "read, write" },
+      { category: "Langy", accessLevels: "read, write" },
       { category: "Datasets", accessLevels: "read, write" },
       { category: "Triggers", accessLevels: "read, write" },
       { category: "Workflows", accessLevels: "read, write" },
@@ -115,6 +116,11 @@ describe("categoryPermissions()", () => {
         {
           category: "Evaluations",
           permissions: "evaluations:view, evaluations:manage",
+        },
+        {
+          category: "Langy",
+          permissions:
+            "langy:view, langy:create, langy:update, langy:delete",
         },
         {
           category: "Datasets",

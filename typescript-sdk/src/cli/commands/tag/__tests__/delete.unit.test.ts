@@ -67,7 +67,8 @@ describe("tagDeleteCommand", () => {
       setupReadlineMock("canary");
       mockDeleteTag.mockResolvedValue(undefined);
 
-      await tagDeleteCommand("canary");
+      const result = await tagDeleteCommand("canary");
+      result?.table();
 
       expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Deleted tag: canary"));
     });
@@ -111,7 +112,8 @@ describe("tagDeleteCommand", () => {
     it("prints confirmation message", async () => {
       mockDeleteTag.mockResolvedValue(undefined);
 
-      await tagDeleteCommand("canary", { force: true });
+      const result = await tagDeleteCommand("canary", { force: true });
+      result?.table();
 
       expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Deleted tag: canary"));
     });

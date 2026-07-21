@@ -1,4 +1,4 @@
-import { reportScheduleSchema } from "~/server/app-layer/triggers/report.builder";
+import { reportScheduleSchema } from "~/server/app-layer/automations/report.builder";
 
 /**
  * Pure schedule <-> cron helpers for the Report cadence facet. Kept out of

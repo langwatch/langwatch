@@ -14,14 +14,14 @@ import { useState } from "react";
 import { LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import {
+  COMPARISON_EVALUATOR_TYPE,
+  LEGACY_PAIRWISE_EVALUATOR_TYPE,
+} from "~/experiments-v3/types";
+import {
   getComplexProps,
   getFlowCallbacks,
   useDrawer,
 } from "~/hooks/useDrawer";
-import {
-  COMPARISON_EVALUATOR_TYPE,
-  LEGACY_PAIRWISE_EVALUATOR_TYPE,
-} from "~/experiments-v3/types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
@@ -49,6 +49,8 @@ export type EvaluatorListDrawerProps = {
   title?: string;
   /** Label on the create button. Defaults to "New Evaluator". */
   createLabel?: string;
+  /** Noun used by the empty state. Defaults to "evaluator". */
+  itemLabel?: string;
 };
 
 /**
@@ -82,6 +84,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const isOpen = props.open !== false && props.open !== undefined;
   const title = props.title ?? "Choose Evaluator";
   const createLabel = props.createLabel ?? "New Evaluator";
+  const itemLabel = props.itemLabel ?? "evaluator";
 
   const evaluatorsQuery = api.evaluators.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -196,7 +199,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
                   <Spinner size="md" />
                 </HStack>
               ) : evaluators?.length === 0 ? (
-                <EmptyState onCreateNew={onCreateNew} />
+                <EmptyState onCreateNew={onCreateNew} itemLabel={itemLabel} />
               ) : (
                 evaluators?.map((evaluator) => (
                   <EvaluatorCard
@@ -254,7 +257,19 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
 // Empty State Component
 // ============================================================================
 
-function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
+/**
+ * The button here deliberately ignores the header's `createLabel` and derives
+ * its own wording from `itemLabel`, so it always agrees with the heading right
+ * above it ("Create your first X to get started"). The header button is the
+ * caller's to word; this one belongs to the empty state.
+ */
+function EmptyState({
+  onCreateNew,
+  itemLabel,
+}: {
+  onCreateNew: () => void;
+  itemLabel: string;
+}) {
   return (
     <VStack paddingY={24} gap={4} textAlign="center">
       <Box padding={4} borderRadius="full" bg="green.subtle" color="green.fg">
@@ -262,10 +277,10 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
       </Box>
       <VStack gap={1}>
         <Text fontWeight="medium" color="fg">
-          No evaluators yet
+          No {itemLabel}s yet
         </Text>
         <Text fontSize="sm" color="fg.muted">
-          Create your first evaluator to get started
+          Create your first {itemLabel} to get started
         </Text>
       </VStack>
       <Button
@@ -274,7 +289,7 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
         data-testid="create-first-evaluator-button"
       >
         <Plus size={16} />
-        Create your first evaluator
+        {`Create your first ${itemLabel}`}
       </Button>
     </VStack>
   );

@@ -12,13 +12,14 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Markdown } from "~/components/Markdown";
 import { RedactedInline } from "~/components/ui/RedactedField";
 import type { RouterOutputs } from "~/utils/api";
+import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
+import { useTextTranslation } from "../../../hooks/useTextTranslation";
 import type { TraceListItem } from "../../../types/trace";
 import {
   abbreviateModel,
   formatCost,
   formatDuration,
-  formatRelativeTime,
-  formatTokens,
+  formatRelativeTimeAgo,
 } from "../../../utils/formatters";
 import {
   Bubble,
@@ -42,7 +43,9 @@ interface ChatTurnRowProps {
   userText: string;
   assistantText: string;
   assistantReasoning: string;
+  /** Wall-clock seconds between the previous turn's end and this turn's start. */
   gapSecs: number;
+  /** Whether the inter-turn gap is long enough to surface as a divider. */
   showGap: boolean;
   index: number;
   isCurrent: boolean;
@@ -59,8 +62,8 @@ interface ChatTurnRowProps {
 
 export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   turn,
-  userText,
-  assistantText,
+  userText: originalUserText,
+  assistantText: originalAssistantText,
   assistantReasoning,
   gapSecs,
   showGap,
@@ -74,6 +77,24 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
     () => onSelect(turn.traceId),
     [onSelect, turn.traceId],
   );
+
+  // Per-turn translate-to-English (specs/traces-v2/message-translation
+  // .feature): the separator's action row toggles it, and both bubbles
+  // swap between original and translated text. Sliced to the translate
+  // endpoint's payload cap so a pathological turn can't become one
+  // giant prompt.
+  const translation = useTextTranslation({
+    texts: useMemo(
+      () => ({
+        user: originalUserText.slice(0, TRANSLATE_TEXT_MAX_CHARS),
+        assistant: originalAssistantText.slice(0, TRANSLATE_TEXT_MAX_CHARS),
+      }),
+      [originalUserText, originalAssistantText],
+    ),
+  });
+  const userText = translation.displayTexts.user ?? originalUserText;
+  const assistantText =
+    translation.displayTexts.assistant ?? originalAssistantText;
 
   const annotationSummary = useMemo(() => {
     if (annotationItems.length === 0) return undefined;
@@ -124,6 +145,11 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         // no "opposite side" to anchor the inline actions to — pin them right.
         assistantSide={layout === "thread" ? "right" : assistantSide}
         annotationItems={annotationItems}
+        translation={{
+          isActive: translation.isActive,
+          isLoading: translation.isLoading,
+          onToggle: translation.toggle,
+        }}
       />
 
       {userText ? (
@@ -456,14 +482,25 @@ const TurnSeparator: React.FC<{
   onSelect: () => void;
   assistantSide: "left" | "right";
   annotationItems: AnnotationItem[];
-}> = ({ index, turn, isCurrent, onSelect, assistantSide, annotationItems }) => {
-  // Pick the bits worth showing per turn — model, duration, latency, token
-  // load, cost, error state — so the separator reads as a per-turn ledger
-  // rather than just "Turn N · Xs". Skips fields that don't apply (no cost
-  // → no `$0` chip; ok status → no error chip) to stay scannable.
-  const model = turn.models[0] ? abbreviateModel(turn.models[0]) : null;
+  translation: {
+    isActive: boolean;
+    isLoading: boolean;
+    onToggle: () => void;
+  };
+}> = ({
+  index,
+  turn,
+  isCurrent,
+  onSelect,
+  assistantSide,
+  annotationItems,
+  translation,
+}) => {
+  // Keep the separator to a scannable few fields: duration, latency, cost,
+  // relative time, error state. The model abbreviation and the raw
+  // input→output token count read as cryptic here (they live in the trace
+  // header / metrics), so they're intentionally left off.
   const hasCost = (turn.totalCost ?? 0) > 0;
-  const hasTokens = turn.totalTokens > 0;
   const isError = turn.status === "error";
 
   const Sep = () => (
@@ -500,14 +537,6 @@ const TurnSeparator: React.FC<{
         >
           Turn {index}
         </Text>
-        {model && (
-          <>
-            <Sep />
-            <Text textStyle="2xs" color="fg.muted">
-              {model}
-            </Text>
-          </>
-        )}
         <Sep />
         <Text textStyle="2xs" color="fg.subtle">
           {formatDuration(turn.durationMs)}
@@ -517,17 +546,6 @@ const TurnSeparator: React.FC<{
             <Sep />
             <Text textStyle="2xs" color="fg.subtle">
               ttft {formatDuration(turn.ttft)}
-            </Text>
-          </>
-        )}
-        {hasTokens && (
-          <>
-            <Sep />
-            <Text textStyle="2xs" color="fg.subtle">
-              {turn.inputTokens != null && turn.outputTokens != null
-                ? `${formatTokens(turn.inputTokens)}→${formatTokens(turn.outputTokens)}`
-                : `${formatTokens(turn.totalTokens)} tok`}
-              {turn.tokensEstimated ? "*" : ""}
             </Text>
           </>
         )}
@@ -541,7 +559,7 @@ const TurnSeparator: React.FC<{
         )}
         <Sep />
         <Text textStyle="2xs" color="fg.subtle">
-          {formatRelativeTime(turn.timestamp)}
+          {formatRelativeTimeAgo(turn.timestamp)}
         </Text>
         {isError && (
           <>
@@ -583,7 +601,11 @@ const TurnSeparator: React.FC<{
           output={turn.output}
           prefetchedItems={annotationItems}
         />
-        <TurnActionRow traceId={turn.traceId} output={turn.output} />
+        <TurnActionRow
+          traceId={turn.traceId}
+          output={turn.output}
+          translation={translation}
+        />
       </HStack>
     </Flex>
   );

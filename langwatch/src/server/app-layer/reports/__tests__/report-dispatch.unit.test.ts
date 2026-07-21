@@ -5,7 +5,7 @@ import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.ty
 import type {
   ReportChart,
   ReportTraceRow,
-} from "~/shared/templating/templateContext";
+} from "@langwatch/automations/templating/templateContext";
 import {
   dispatchScheduledReport,
   reportWindowMs,

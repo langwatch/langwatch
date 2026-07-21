@@ -232,6 +232,7 @@ describe("<DefaultModelOverrideDrawer/>", () => {
 
   describe("given a project whose Default role is saved as a renamed custom model", () => {
     describe("when the drawer opens editing that config", () => {
+      /** @scenario The reported production surface shows the configured display name */
       it("renders the Default role's dropdown item as the display name", () => {
         renderDrawer();
 

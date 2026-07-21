@@ -10,10 +10,11 @@
  *    raw value, so drained work can vanish while comments claim atomic
  *    durability. `deadLetterDrainedValue` closes the gap with a re-stage
  *    fallback.
- *  - Major (RaiMv): the sibling re-stage `catch` used to cover `acquire()` too,
- *    so a hold hiccup AFTER a successful `stage()` would dead-letter a job that
- *    is already back in live staging — duplicating it and double-processing
- *    after a drain. `acquire()` now sits outside that `catch`.
+ *  - Major (RaiMv): the sibling re-stage `catch` used to cover `renewLease()`
+ *    too, so a lease hiccup AFTER a successful `stage()` would dead-letter a
+ *    job that is already back in live staging — duplicating it and
+ *    double-processing after a drain. `renewLease()` now sits outside that
+ *    `catch`.
  *
  * These exercise the private seams directly because the per-site coalesced-batch
  * fault-injection harness is deferred (AC-719.5/719.7 @unimplemented); the real
@@ -72,9 +73,9 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
   };
   let blobLifecycle: {
     preserveForDlq: ReturnType<typeof vi.fn>;
-    acquire: ReturnType<typeof vi.fn>;
+    renewLease: ReturnType<typeof vi.fn>;
     decode: ReturnType<typeof vi.fn>;
-    release: ReturnType<typeof vi.fn>;
+    releaseLease: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -87,9 +88,9 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
     scripts = { stage: vi.fn(), writeJobToDlq: vi.fn() };
     blobLifecycle = {
       preserveForDlq: vi.fn(),
-      acquire: vi.fn(),
+      renewLease: vi.fn(),
       decode: vi.fn(),
-      release: vi.fn(),
+      releaseLease: vi.fn(),
     };
     (processor as any).scripts = scripts;
     (processor as any).blobLifecycle = blobLifecycle;
@@ -175,13 +176,13 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
   });
 
   describe("given a drained sibling whose re-stage stage() succeeds", () => {
-    describe("when the hold re-acquire then fails", () => {
+    describe("when the lease re-renew then fails", () => {
       it("does not dead-letter the already-re-staged sibling (RaiMv double-process guard)", async () => {
         scripts.stage.mockResolvedValue(undefined);
-        // acquire() is not supposed to throw (it degrades to the TTL backstop);
-        // if it ever does, it sits OUTSIDE the dead-letter fallback catch, so it
-        // SURFACES rather than being mistaken for a re-stage failure.
-        blobLifecycle.acquire.mockRejectedValue(new Error("hold hiccup"));
+        // renewLease() is not supposed to throw (it degrades to the TTL
+        // backstop); if it ever does, it sits OUTSIDE the dead-letter fallback
+        // catch, so it SURFACES rather than being mistaken for a re-stage failure.
+        blobLifecycle.renewLease.mockRejectedValue(new Error("lease hiccup"));
 
         // try/await/catch (not a chained `.catch`) so the rejection is handled
         // synchronously in-band — no unhandled-rejection window to flake on.
@@ -194,11 +195,11 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
           surfaced = true;
         }
 
-        // Falsifiability: with acquire() back INSIDE the try/catch (pre-fix), the
-        // hold hiccup is CAUGHT and the sibling is dead-lettered — a live job
-        // duplicated into the dead-letter — and restageDrainedSiblings resolves
-        // (surfaced stays false). Outside the catch, the throw surfaces and NO
-        // dead-letter is written.
+        // Falsifiability: with renewLease() back INSIDE the try/catch (pre-fix),
+        // the lease hiccup is CAUGHT and the sibling is dead-lettered — a live
+        // job duplicated into the dead-letter — and restageDrainedSiblings
+        // resolves (surfaced stays false). Outside the catch, the throw
+        // surfaces and NO dead-letter is written.
         expect(surfaced).toBe(true);
         expect(scripts.stage).toHaveBeenCalledTimes(1);
         expect(scripts.writeJobToDlq).not.toHaveBeenCalled();
@@ -217,7 +218,7 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
           makeSibling(),
         ]);
 
-        expect(blobLifecycle.acquire).not.toHaveBeenCalled();
+        expect(blobLifecycle.renewLease).not.toHaveBeenCalled();
         expect(scripts.writeJobToDlq).toHaveBeenCalledWith(
           expect.objectContaining({
             stagedJobId: "sib-1",
@@ -230,9 +231,9 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
 
   describe("given a drained sibling whose body is genuinely gone (missing_blob)", () => {
     describe("when parseDrainedPayload decodes it", () => {
-      it("releases the stale holder and does NOT dead-letter (nothing to preserve)", async () => {
+      it("releases the stale lease and does NOT dead-letter (nothing to preserve)", async () => {
         // Body genuinely gone → decode throws missing_blob. Unlike a body-present
-        // drop, there is nothing to dead-letter; the stale holder must be released
+        // drop, there is nothing to dead-letter; the stale lease must be released
         // here because the success-path release no longer covers dropped siblings.
         blobLifecycle.decode.mockRejectedValue(
           new DecodeFailureError({
@@ -240,7 +241,7 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
             reason: "missing_blob",
           }),
         );
-        blobLifecycle.release.mockResolvedValue(undefined);
+        blobLifecycle.releaseLease.mockResolvedValue(undefined);
 
         const result = await (processor as any).parseDrainedPayload({
           sibling: makeSibling(),
@@ -248,10 +249,10 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability", () => {
         });
 
         expect(result).toBeNull();
-        // The stale holder is dropped (blob already gone). Falsifiability: remove
-        // the missing_blob `else` release and this holder leaks — release is never
-        // called.
-        expect(blobLifecycle.release).toHaveBeenCalledWith(
+        // The stale lease is dropped (blob already gone). Falsifiability: remove
+        // the missing_blob `else` release and this lease leaks — release is
+        // never called.
+        expect(blobLifecycle.releaseLease).toHaveBeenCalledWith(
           expect.objectContaining({ values: [RAW_VALUE], groupId: GROUP_ID }),
         );
         // Nothing to preserve: no dead-letter write, no re-stage.

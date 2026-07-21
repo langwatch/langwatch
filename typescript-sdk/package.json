@@ -13,10 +13,13 @@
   },
   "files": [
     "dist",
+    "!dist/bin",
+    "!dist/cli/*.map",
     "README.md",
     "LICENSE"
   ],
   "bin": {
+    "lw": "./dist/cli/index.js",
     "langwatch": "./dist/cli/index.js"
   },
   "exports": {
@@ -56,16 +59,19 @@
     "test:governance-e2e": "vitest run -c ./vitest.governance-e2e.config.mts",
     "test:seed": "dotenv -e .env.test -- bash -c 'cd ../langwatch && pnpm prisma:seed'",
     "prebuild": "pnpm run prepare",
-    "build": "tsc --noEmit && tsup",
+    "build": "tsc --noEmit && rm -rf dist && tsup",
+    "postbuild": "node -e \"const{statSync}=require('node:fs'),{execFileSync}=require('node:child_process');const f='dist/cli/index.js',want=require('./package.json').version;const s=statSync(f);if(process.platform!=='win32'&&!(s.mode&0o111))throw new Error(f+' is not executable');const got=execFileSync(process.execPath,[f,'--version'],{encoding:'utf8',env:{...process.env,LANGWATCH_NO_DAEMON:'1'}}).trim();if(got!==want)throw new Error('version mismatch: '+f+' reports '+got+', package.json says '+want);console.log('postbuild: '+f+' ok ('+got+')')\"",
+    "build:binary": "bun run scripts/build-cli-binary.ts",
     "tarball": "pnpm build && pnpm pack",
     "typecheck": "tsc --noEmit",
     "prepublish": "pnpm run build",
-    "generate:openapi-types": "pnpx openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts",
+    "generate:openapi-types": "pnpm exec openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts",
     "generate:server-types": "./copy-types.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@langchain/core": ">=0.3.68 <0.4.0",
+    "@langwatch/cli-cards": "workspace:*",
     "@langchain/langgraph": ">=0.4.0 <1.0.0",
     "@langchain/openai": ">=0.6.0 <1.0.0",
     "@opentelemetry/sdk-node": "0.219.0",
@@ -74,6 +80,7 @@
     "@types/debug": "^4.1.12",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.1.0",
+    "@types/prompts": "^2.4.9",
     "@typescript/native-preview": "7.0.0-dev.20260705.1",
     "@vercel/otel": "^1.13.0",
     "@vitest/coverage-v8": "^4.1.0",
@@ -86,6 +93,7 @@
     "msw": "^2.10.4",
     "nock": "^14.0.8",
     "openapi-msw": "^1.2.0",
+    "openapi-typescript": "7.13.0",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.38.0",
@@ -105,7 +113,6 @@
     "@opentelemetry/sdk-metrics": "^2.0.1",
     "@opentelemetry/sdk-trace-base": "^2.0.1",
     "@opentelemetry/semantic-conventions": "^1.36.0",
-    "@types/prompts": "^2.4.9",
     "chalk": "^5.6.2",
     "commander": "^15.0.0",
     "dotenv": "^17.3.1",

@@ -86,6 +86,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   const sortFromStore = useViewStore((s) => s.sort);
   const setSortInStore = useViewStore((s) => s.setSort);
   const setVisibleColumns = useViewStore((s) => s.setVisibleColumns);
+  const resetPagination = useFilterStore((s) => s.resetPagination);
 
   const sizingKey = getColumnSizingKey(lens.id, "trace");
   const persistedSizing = useColumnSizingStore(
@@ -124,8 +125,9 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
         columnId: first.id,
         direction: first.desc ? "desc" : "asc",
       });
+      resetPagination();
     },
-    [sorting, setSortInStore],
+    [sorting, setSortInStore, resetPagination],
   );
 
   // Surface `columnOrder` as explicit Tanstack state. Without it,
@@ -237,6 +239,12 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
                 isFirstOfErrorRun={
                   !isLoading && isFirstOfErrorRun[virtualItem.index]
                 }
+                // Trace rows no longer offer themselves to Langy on hover (the
+                // per-row "Absorb context" affordance read as noise on a dense
+                // table). Adding traces to context is now an explicit,
+                // multi-select action: check the rows, then "Add to context"
+                // in the selection bar (see BulkActionBar).
+                langyTarget={null}
               />
             );
           })}

@@ -252,6 +252,9 @@ export function isGoldenFieldSatisfied(config: {
  *   includeMetrics/settings.include_metrics.
  * - goldenField: dataset field name holding the reference answer. Only
  *   meaningful when hasGoldenAnswer is true.
+ * - inputField: optional dataset field used as task/context for the judge.
+ *   When omitted, the runtime falls back to the historical auto-detected
+ *   `input` column, then the golden field for old datasets.
  * - includeMetrics: per-candidate metrics injected into the judge prompt.
  * - randomizeOrder: when true (default), candidate order is shuffled
  *   deterministically per row (seeded by rowIndex) to mitigate position bias.
@@ -274,8 +277,9 @@ export const LEGACY_PAIRWISE_EVALUATOR_TYPE = "langevals/pairwise_compare";
 export const comparisonEvaluatorConfigSchema = z.object({
   variants: z.array(z.string()).default([]),
   variantOutputPaths: z.record(z.string(), z.array(z.string())).optional(),
-  hasGoldenAnswer: z.boolean().default(true),
+  hasGoldenAnswer: z.boolean().default(false),
   goldenField: z.string().optional(),
+  inputField: z.string().optional(),
   includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),
   randomizeOrder: z.boolean().default(true),
 });

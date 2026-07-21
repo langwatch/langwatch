@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
-import type { TopicService } from "~/server/app-layer/topics/topic.service";
+import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
 import {
   deriveTraceOrigin,
@@ -24,7 +24,9 @@ import type {
   CategoricalFacetResult,
   DiscreteFacetResult,
   TraceListRepository,
+  TraceListCursor,
   TraceListSort,
+  TraceListSortColumn,
 } from "./repositories/trace-list.repository";
 import type { TraceSummaryData } from "./types";
 import { teaserOf } from "./visibility-window.service";
@@ -93,6 +95,7 @@ export interface TraceListPage {
   items: TraceListItem[];
   totalHits: number;
   evaluations: Record<string, EvalSummary[]>;
+  nextCursor: TraceListCursor | null;
 }
 
 interface FacetCounts {
@@ -111,8 +114,10 @@ interface ListParams {
   tenantId: string;
   timeRange: { from: number; to: number };
   sort: { columnId: string; direction: "asc" | "desc" };
-  page: number;
+  /** 1-based offset compatibility for non-cursor callers. */
+  page?: number;
   pageSize: number;
+  cursor?: TraceListCursor;
   filterWhere?: { sql: string; params: Record<string, unknown> };
   /**
    * Visibility gate: list items older than this cutoff get their
@@ -485,7 +490,7 @@ export class TraceListService {
   ): Promise<CategoricalFacetResult> {
     const ids = result.values.map((v) => v.value).filter(Boolean);
     if (ids.length === 0) return result;
-    const names = await this.topicService.getNamesByIds(projectId, ids);
+    const names = await this.topicService.getNamesByIds({ projectId, ids });
     return {
       ...result,
       values: result.values.map((v) => {
@@ -502,12 +507,21 @@ export class TraceListService {
       tenantId: params.tenantId,
       timeRange: params.timeRange,
       sort: { column: sortColumn, direction: params.sort.direction },
-      limit: params.pageSize,
-      offset: (params.page - 1) * params.pageSize,
+      // Read one sentinel row so `nextCursor` is exact without guessing from
+      // totalHits (which may change under a live range between requests).
+      limit: params.pageSize + 1,
+      cursor: params.cursor,
+      offset: params.cursor
+        ? 0
+        : (Math.max(params.page ?? 1, 1) - 1) * params.pageSize,
       filterWhere: params.filterWhere,
     });
 
-    const items = result.rows.map((row) => mapToTraceListItem(row));
+    const hasMore = result.rows.length > params.pageSize;
+    const visibleRows = hasMore
+      ? result.rows.slice(0, params.pageSize)
+      : result.rows;
+    const items = visibleRows.map((row) => mapToTraceListItem(row));
     const traceIds = items.map((item) => item.traceId);
 
     const evaluations = await this.evaluationRunService.findSummariesByTraceIds(
@@ -540,6 +554,10 @@ export class TraceListService {
       items: gatedItems,
       totalHits: result.totalHits,
       evaluations,
+      nextCursor:
+        hasMore && visibleRows.length > 0
+          ? cursorForTraceRow(visibleRows[visibleRows.length - 1]!, sortColumn)
+          : null,
     };
   }
 
@@ -1221,6 +1239,49 @@ export function parseLabels(raw: string | undefined): string[] {
   } catch {
     return [];
   }
+}
+
+/** Keep this normalization in lockstep with `cursorSortExpression` in the CH repository. */
+function cursorForTraceRow(
+  row: TraceSummaryData,
+  sortColumn: TraceListSortColumn,
+): TraceListCursor {
+  let sortValue: number;
+  switch (sortColumn) {
+    case "OccurredAt":
+      sortValue = row.occurredAt;
+      break;
+    case "TotalDurationMs":
+      sortValue = row.totalDurationMs;
+      break;
+    case "TotalCost":
+      sortValue = row.totalCost ?? 0;
+      break;
+    case "SpanCount":
+      sortValue = row.spanCount;
+      break;
+    case "TotalTokens":
+      sortValue =
+        (row.totalPromptTokenCount ?? 0) + (row.totalCompletionTokenCount ?? 0);
+      break;
+    case "TimeToFirstTokenMs":
+      sortValue = row.timeToFirstTokenMs ?? 0;
+      break;
+    case "TotalPromptTokenCount":
+      sortValue = row.totalPromptTokenCount ?? 0;
+      break;
+    case "TotalCompletionTokenCount":
+      sortValue = row.totalCompletionTokenCount ?? 0;
+      break;
+    case "_size_bytes":
+      sortValue = row.sizeBytes ?? 0;
+      break;
+  }
+
+  return {
+    sortValue: Number.isFinite(sortValue) ? sortValue : 0,
+    traceId: row.traceId,
+  };
 }
 
 function mapToTraceListItem(row: TraceSummaryData): TraceListItem {

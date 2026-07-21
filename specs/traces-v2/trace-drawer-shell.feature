@@ -150,7 +150,11 @@ Rule: Unified drawer model
   Scenario: Trace mode with conversation
     Given the trace belongs to a conversation with 6 turns and this trace is turn 3
     When the drawer opens in Trace mode
-    Then the header shows trace name, metrics, and "turn 3/6"
+    Then the header shows trace name, metrics, and a Conversation chip
+    # The header no longer carries a "3 / 5" turn-progress indicator — it read
+    # as a cryptic fraction. The turn position lives in the Conversation
+    # Context pane's "turn N of M" label, and the conversation itself is
+    # reachable from the Conversation chip and the Mode Switch.
     And the Mode Switch toggle is visible with Trace and Conversation options
     And the context peek is visible above the visualization
     And the visualization and accordions are shown below

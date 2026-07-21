@@ -1,62 +1,69 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatScope } from "./_shared";
+import type { CommandResult } from "../../utils/output";
 
-export const listVirtualKeysCommand = async (options?: { format?: string }): Promise<void> => {
+/**
+ * Returns the listing rather than printing it: the output port renders it in
+ * whatever format the caller asked for (utils/output.ts). The list model
+ * carries no secrets — only `prefix`/`last_four`, exactly what the human table
+ * shows — so the raw list is safe to hand to a machine caller.
+ */
+export const listVirtualKeysCommand = async (): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new VirtualKeysApiService();
-  const spinner = ora("Fetching virtual keys...").start();
+  const spinner = createSpinner("Fetching virtual keys...").start();
 
   try {
     const keys = await service.list();
 
     spinner.succeed(`Found ${keys.length} virtual key${keys.length !== 1 ? "s" : ""}`);
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(keys, null, 2));
-      return;
-    }
+    return {
+      data: keys,
+      table: () => {
+        if (keys.length === 0) {
+          console.log();
+          console.log(chalk.gray("No virtual keys yet."));
+          console.log(chalk.gray("Create one with:"));
+          console.log(chalk.cyan('  langwatch virtual-keys create --name "my-key" --scope ORG:<slug>'));
+          return;
+        }
 
-    if (keys.length === 0) {
-      console.log();
-      console.log(chalk.gray("No virtual keys yet."));
-      console.log(chalk.gray("Create one with:"));
-      console.log(chalk.cyan('  langwatch virtual-keys create --name "my-key" --scope ORG:<slug>'));
-      return;
-    }
+        console.log();
 
-    console.log();
+        const tableData = keys.map((vk) => ({
+          ID: vk.id,
+          Name: vk.name,
+          Env: vk.environment === "live" ? chalk.yellow("live") : chalk.gray("test"),
+          Status: vk.status === "ACTIVE" ? chalk.green("active") : chalk.red("revoked"),
+          Prefix: `${vk.prefix}...${vk.last_four}`,
+          Scopes: vk.scopes.map(formatScope).join(", ") || chalk.gray("—"),
+          "Last used": vk.last_used_at ? new Date(vk.last_used_at).toLocaleDateString() : chalk.gray("—"),
+        }));
 
-    const tableData = keys.map((vk) => ({
-      ID: vk.id,
-      Name: vk.name,
-      Env: vk.environment === "live" ? chalk.yellow("live") : chalk.gray("test"),
-      Status: vk.status === "ACTIVE" ? chalk.green("active") : chalk.red("revoked"),
-      Prefix: `${vk.prefix}...${vk.last_four}`,
-      Scopes: vk.scopes.map(formatScope).join(", ") || chalk.gray("—"),
-      "Last used": vk.last_used_at ? new Date(vk.last_used_at).toLocaleDateString() : chalk.gray("—"),
-    }));
+        formatTable({
+          data: tableData,
+          headers: ["ID", "Name", "Env", "Status", "Prefix", "Scopes", "Last used"],
+          colorMap: {
+            Name: chalk.cyan,
+            ID: chalk.gray,
+          },
+        });
 
-    formatTable({
-      data: tableData,
-      headers: ["ID", "Name", "Env", "Status", "Prefix", "Scopes", "Last used"],
-      colorMap: {
-        Name: chalk.cyan,
-        ID: chalk.gray,
+        console.log();
+        console.log(
+          chalk.gray(
+            `Use ${chalk.cyan("langwatch virtual-keys get <id>")} to see scopes, routing policy, and config.`,
+          ),
+        );
       },
-    });
-
-    console.log();
-    console.log(
-      chalk.gray(
-        `Use ${chalk.cyan("langwatch virtual-keys get <id>")} to see scopes, routing policy, and config.`,
-      ),
-    );
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "fetch virtual keys" });
     process.exit(1);

@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import type { DatasetRecordResponse } from "@/client-sdk/services/datasets/types";
 import { checkApiKey } from "../../utils/apiKey";
 import { createDatasetService } from "./service-factory";
@@ -67,7 +67,7 @@ export const downloadCommand = async (
   }
 
   const service = createDatasetService();
-  const spinner = ora(
+  const spinner = createSpinner(
     `Downloading dataset "${slugOrId}" as ${format.toUpperCase()}...`,
   ).start();
 

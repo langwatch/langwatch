@@ -5,38 +5,68 @@
 #   langwatch/src/features/traces-v2/onboarding/store/onboardingStore.ts     (seen flags + localStorage key)
 #   langwatch/src/features/traces-v2/hooks/useIsNewAccount.ts                 (account age)
 #
-# Motivation (round 5): two tour papercuts.
-#   1. "Seen the tour" is tracked per project (the localStorage state keys
-#      the spotlight flags by projectId), so a user who took the tour in
-#      one project gets prompted again in the next. It should be global to
-#      the user.
+# Motivation: two tour papercuts.
+#   1. Tour dismissal must follow the authenticated user across projects,
+#      browsers, and devices instead of depending on browser-local state.
 #   2. The "Show me around" control shows its full text label for too long.
 #      Established users don't need the words — just the icon.
 #
-# Decisions (round 5):
-#   - Tour-seen is per-USER, stored in localStorage with the projectId
-#     dropped from the key (global on that browser; no backend / no ADR).
+# Decisions:
+#   - Tour dismissal is persisted on the User record in Postgres.
+#   - Any explicit dismissal, including Skip tour, close, Escape, Done, or
+#     the toolbar's End tour action, suppresses automatic page and drawer
+#     spotlights for that user.
+#   - The explicit "Show me around" action can still replay the page tour.
 #   - The text label shows only when the account is < 5 days old; older
 #     accounts show the icon-only control.
 
 Feature: Trace tour visibility and persistence
 
-Rule: Tour-seen is global to the user, not per project
-  Seeing or dismissing the tour suppresses the auto-tour across every
-  project on that browser. The persisted state is not keyed by projectId.
+Rule: Tour dismissal is global to the user, not per project or browser
+  Dismissing the tour suppresses automatic page and drawer spotlights across
+  every project and device. The persisted state is not keyed by projectId.
 
   Background:
     Given the user is authenticated with "traces:view" permission
 
-  Scenario: Seeing the tour in one project suppresses it in another
-    Given the user has seen (or dismissed) the trace tour in project A
+  Scenario: Dismissing the tour in one project suppresses it in another
+    Given the user dismissed the trace tour in project A
     When the user opens the traces page in project B
     Then the tour does not auto-start in project B
 
-  Scenario: The tour seen state applies across projects on the same browser
-    Given the user has seen (or dismissed) the trace tour in project A
-    When the user opens the traces page in project B on the same browser
-    Then the tour does not auto-start in project B
+  Scenario: Tour dismissal follows the user to another browser
+    Given the user dismissed the trace tour in one browser
+    When the same user opens the traces page in another browser or device
+    Then neither the page tour nor drawer spotlights appear automatically
+
+  Scenario: Existing browser tour history is migrated to the user preference
+    Given the browser recorded a trace tour under the previous local behavior
+    And the user does not have a persisted dismissal yet
+    When the traces page loads the user preference
+    Then the existing tour history is persisted for the authenticated user
+    And newly displayed tour steps are not mistaken for old history
+
+  Scenario: Skip tour dismisses every automatic Traces Explorer tour
+    Given a page or drawer spotlight is visible
+    When the user selects "Skip tour"
+    Then the dismissal is persisted for the authenticated user
+    And all remaining automatic Traces Explorer spotlights are suppressed
+
+  Scenario: Ending an active tour from the toolbar persists dismissal
+    Given the page spotlight tour is active
+    When the user selects "End tour" in the toolbar
+    Then the dismissal is persisted for the authenticated user
+    And the active tour closes
+
+  Scenario: Preference loading never flashes an unwanted tour
+    Given the persisted dismissal has not finished loading
+    When the traces page or a trace drawer renders
+    Then automatic spotlights remain hidden until the preference is resolved
+
+  Scenario: Explicit replay remains available after dismissal
+    Given the user previously dismissed automatic Traces Explorer tours
+    When the user selects "Show me around"
+    Then the page tour starts explicitly
 
 Rule: "Show me around" collapses to an icon for established accounts
   The control always starts the tour on click; only its text label is

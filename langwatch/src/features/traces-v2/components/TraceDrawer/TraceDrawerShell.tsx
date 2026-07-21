@@ -3,6 +3,8 @@ import { useRef } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { Drawer } from "~/components/ui/drawer";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
+import { useLangyContextTarget } from "~/features/langy/hooks/useLangyContextTarget";
+import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
 import { DrawerSpotlights } from "../../onboarding/spotlights/DrawerSpotlights";
 import {
@@ -67,6 +69,21 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   // Brief refreshing overlay when switching to a *different* trace — a
   // same-trace live update leaves this false so the surface doesn't flash.
   const showSwitchOverlay = useTraceSwitchOverlay({ traceId, isLoading });
+
+  // The open trace offers itself to Langy — the drawer HEADER is the target,
+  // deliberately not the whole drawer. A drawer-wide target would swallow every
+  // click inside it while Langy was open (tabs, spans, the waterfall), turning a
+  // working surface into one big button. The header strip is the trace's name
+  // plate: a small, safe place to point at, and it leaves the body untouched.
+  //
+  // Langy already derives a `trace:<id>` chip from `drawer.traceId` in the URL,
+  // and this target mints the SAME chip id — so it renders as already-in-context
+  // the moment the drawer opens, and clicking it takes the trace back out.
+  const langyTrace = useLangyContextTarget(
+    trace
+      ? traceContextChip(trace.traceId, trace.traceName || trace.name)
+      : null,
+  );
 
   const viewMode = useDrawerStore((s) => s.viewMode);
   const widthPx = useDrawerStore((s) => s.widthPx);
@@ -232,6 +249,15 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                   // strip is translucent.
                   bg="bg.panel/70"
                   backdropFilter="blur(20px) saturate(150%)"
+                  // An `outline` follows the element's OWN border-radius. This
+                  // strip had none — it's the drawer body (radius `lg`,
+                  // overflow hidden) that rounds it — so Langy's outline drew
+                  // square corners straight across the drawer's rounded chrome.
+                  // Matching the radius here is a visual no-op when Langy is
+                  // closed (the parent already clips to exactly this shape) and
+                  // makes the outline hug the corner when it's open.
+                  borderTopRadius="lg"
+                  {...langyTrace.targetProps}
                 >
                   <IsolatedErrorBoundary
                     scope="Couldn't render this trace's header"

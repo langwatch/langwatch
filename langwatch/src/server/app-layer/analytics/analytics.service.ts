@@ -220,6 +220,8 @@ export class AnalyticsService {
       series: input.series,
       filters: input.filters,
       groupBy: input.groupBy,
+      traceIds: input.traceIds,
+      negateFilters: input.negateFilters,
     });
   }
 

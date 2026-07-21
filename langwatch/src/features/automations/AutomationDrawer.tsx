@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { AlertType, TriggerKind, type TriggerAction } from "@prisma/client";
+import { AlertType, TriggerAction, TriggerKind } from "@prisma/client";
 import { Mail, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -17,20 +17,21 @@ import {
   MIN_TRACE_DEBOUNCE_MS,
   NOTIFICATION_CADENCES,
   type NotificationCadence,
-} from "~/automations/cadences";
+} from "@langwatch/automations/cadences";
 import {
   CLIENT_PROVIDERS,
   type NotifyPreview,
-} from "~/automations/providers/client";
+} from "~/features/automations/providers/registry";
 import {
   type ConfigFormCtx,
   isNotifyEntry,
-} from "~/automations/providers/types";
+} from "~/features/automations/providers/types";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -39,15 +40,14 @@ import {
   sanitizeTriggerFilters,
   type TriggerFilterValue,
 } from "~/server/filters/types";
-import {
-  defaultsForSourceKind,
-} from "~/shared/templating/defaults";
+import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
 import {
   EXAMPLE_MATCHES,
   TEMPLATE_VARIABLES,
-} from "~/shared/templating/exampleContext";
-import { renderTriggerEmail } from "~/shared/templating/renderEmail";
-import { renderTriggerSlack } from "~/shared/templating/renderSlack";
+} from "@langwatch/automations/templating/exampleContext";
+import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
+import { renderTriggerSlack } from "@langwatch/automations/templating/renderSlack";
+import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
 import {
   buildExampleGraphAlertTemplateContext,
   buildExampleReportTemplateContext,
@@ -55,11 +55,16 @@ import {
   type GraphAlertTemplateContext,
   type ReportTemplateContext,
   type TemplateContext,
-} from "~/shared/templating/templateContext";
+} from "@langwatch/automations/templating/templateContext";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
+import {
+  errorDisplayMessage,
+  isHandledByGlobalHandler,
+} from "~/utils/trpcError";
 import { MainSectionList } from "./components/MainSectionList";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
+import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
+import { REPORT_TEMPLATE_VARIABLES } from "./editors/reportVariables";
 import {
   type AutomationDraft,
   actionParamsFromDraft,
@@ -75,8 +80,6 @@ import {
   subjectIsSet,
   templatesFromDraft,
 } from "./logic/draftReducer";
-import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
-import { REPORT_TEMPLATE_VARIABLES } from "./editors/reportVariables";
 import { explainHandledError, readHandledError } from "./logic/errorExplainer";
 import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { useAutomationStore } from "./state/automationStore";
@@ -95,12 +98,17 @@ function saveDisabledReason({
   nameSet,
   configComplete,
   actionPicked,
+  webhookReadOnly = false,
 }: {
   draft: AutomationDraft;
   nameSet: boolean;
   configComplete: boolean;
   actionPicked: boolean;
+  webhookReadOnly?: boolean;
 }): string {
+  if (webhookReadOnly) {
+    return "Webhook delivery is unavailable for this project. Choose another delivery channel to save changes.";
+  }
   const missing: string[] = [];
   if (!nameSet) missing.push("give it a name");
   if (!subjectIsSet(draft)) missing.push(subjectTodo(draft));
@@ -190,6 +198,11 @@ export function AutomationDrawer({
   const queryClient = api.useContext();
   const { filterParams } = useFilterParams();
   const projectId = project?.id ?? "";
+  const { enabled: webhookEnabled, isLoading: webhookFlagLoading } =
+    useFeatureFlag("release_webhook_automations", {
+      projectId: project?.id,
+      enabled: !!project,
+    });
 
   const draft = useDraft();
   const section = useSection();
@@ -215,6 +228,7 @@ export function AutomationDrawer({
   const hydrate = useAutomationStore((s) => s.hydrate);
   const reset = useAutomationStore((s) => s.reset);
   const pushAttempt = useAutomationStore((s) => s.pushTestAttempt);
+  const testHistory = useAutomationStore((s) => s.testHistory);
 
   // Wipe the singleton store on unmount — next open is a fresh slate.
   useEffect(() => () => reset(), [reset]);
@@ -282,6 +296,13 @@ export function AutomationDrawer({
     ) {
       return;
     }
+    // The webhook feature flag can still be loading on mount (it defaults
+    // to false while in flight). Don't latch prefilledFromParams until it
+    // resolves, or a SEND_WEBHOOK prefill on a genuinely enabled project
+    // is silently dropped and never retried.
+    if (initialAction === TriggerAction.SEND_WEBHOOK && webhookFlagLoading) {
+      return;
+    }
     if (initialSource === "customGraph") {
       dispatch({ type: "SET_SOURCE", value: "customGraph" });
       // Alerts require a severity — seed the default so the fresh draft can
@@ -294,7 +315,11 @@ export function AutomationDrawer({
     if (initialName) {
       dispatch({ type: "SET_NAME", value: initialName });
     }
-    if (initialAction && initialAction in CLIENT_PROVIDERS) {
+    if (
+      initialAction &&
+      initialAction in CLIENT_PROVIDERS &&
+      (initialAction !== TriggerAction.SEND_WEBHOOK || webhookEnabled)
+    ) {
       dispatch({
         type: "SET_ACTION",
         value: initialAction as TriggerAction,
@@ -328,7 +353,7 @@ export function AutomationDrawer({
     }
     prefilledFromParams.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [webhookFlagLoading]);
 
   // Edit prefill from the saved trigger.
   const triggerQuery = api.automation.getTriggerById.useQuery(
@@ -592,7 +617,7 @@ export function AutomationDrawer({
     // never send. Same resolver the providers and dispatch use, so the three
     // surfaces cannot drift apart.
     const previewDefaults = defaultsForSourceKind(
-      isGraphAlert ? "graphAlert" : isReport ? "report" : "trace"
+      isGraphAlert ? "graphAlert" : isReport ? "report" : "trace",
     );
     // Mirror the provider's delivery rules (Slack: modern blocks render only
     // over a bot connection) so the preview never promises more than the
@@ -616,6 +641,28 @@ export function AutomationDrawer({
               channel: "email",
               subject: rendered.subject,
               html: rendered.html,
+              usedDefault: rendered.usedDefault,
+              missingVariables: rendered.missingVariables,
+              errors: rendered.errors,
+            });
+          }
+        } else if (channel === "webhook") {
+          // The webhook's body lives in its slice (actionParams), not the
+          // template columns — read it straight off the draft.
+          const slice = draft.slices[TriggerAction.SEND_WEBHOOK];
+          const rendered = await renderWebhookBody({
+            template: slice.template.value.trim() ? slice.template.value : null,
+            context: previewContext,
+            defaultBody: previewDefaults.webhookBody,
+          });
+          if (token === previewToken.current) {
+            setPreview({
+              channel: "webhook",
+              payload: {
+                method: slice.method,
+                url: slice.url,
+                body: rendered.body,
+              },
               usedDefault: rendered.usedDefault,
               missingVariables: rendered.missingVariables,
               errors: rendered.errors,
@@ -667,6 +714,10 @@ export function AutomationDrawer({
   // Show a skeleton until the row lands, and an error state if it never does.
   const editLoading = !!automationId && triggerQuery.isLoading;
   const editError = !!automationId && triggerQuery.isError;
+  const webhookReadOnly =
+    !!automationId &&
+    draft.action === TriggerAction.SEND_WEBHOOK &&
+    !webhookEnabled;
 
   const testFire = api.automation.testFireTemplate.useMutation();
   const upsert = api.automation.upsert.useMutation();
@@ -675,7 +726,12 @@ export function AutomationDrawer({
   // "confirm the cadence" detour to gate on — subject + cadence validity is
   // folded into conditionsSet.
   const canSave =
-    nameSet && conditionsSet && configComplete && !editLoading && !editError;
+    nameSet &&
+    conditionsSet &&
+    configComplete &&
+    !editLoading &&
+    !editError &&
+    !webhookReadOnly;
 
   const onTestFire = useCallback(() => {
     if (!channel || !projectId || !draft.action) return;
@@ -694,6 +750,7 @@ export function AutomationDrawer({
         channel,
         webhook: target.webhook,
         botDestination: target.botDestination,
+        webhookDestination: target.webhookDestination,
         automationId,
         graphName,
         seriesLabel,
@@ -706,6 +763,7 @@ export function AutomationDrawer({
             status: "success",
             recipientCount: r.recipientCount,
             usedDefault: r.usedDefault,
+            httpStatus: r.httpStatus,
           });
           toaster.create({
             title: "Test fire sent",
@@ -713,7 +771,9 @@ export function AutomationDrawer({
             description:
               r.channel === "email"
                 ? "Sent to your inbox."
-                : "Posted to Slack.",
+                : r.channel === "webhook"
+                  ? `Your endpoint answered HTTP ${r.httpStatus ?? "2xx"}.`
+                  : "Posted to Slack.",
             meta: { closable: true },
           });
         },
@@ -721,18 +781,18 @@ export function AutomationDrawer({
           const domain = readHandledError(err);
           const { title, description } = domain
             ? explainHandledError(domain)
-            : { title: "Test fire failed", description: err.message };
+            : { title: "Test fire failed", description: errorDisplayMessage(err) };
           pushAttempt({
             at: Date.now(),
             channel,
             status: "failure",
             errorTitle: title,
-            errorDetail: description || err.message,
+            errorDetail: description || errorDisplayMessage(err),
           });
           toaster.create({
             title,
             type: "error",
-            description: description || err.message,
+            description: description || errorDisplayMessage(err),
             meta: { closable: true },
           });
         },
@@ -806,11 +866,14 @@ export function AutomationDrawer({
           const domain = readHandledError(err);
           const { title, description } = domain
             ? explainHandledError(domain)
-            : { title: "Could not save automation", description: err.message };
+            : {
+                title: "Could not save automation",
+                description: errorDisplayMessage(err),
+              };
           toaster.create({
             title,
             type: "error",
-            description: description || err.message,
+            description: description || errorDisplayMessage(err),
             meta: { closable: true },
           });
         },
@@ -876,6 +939,9 @@ export function AutomationDrawer({
       // Lets a notify provider offer a "Send test" button inside its config.
       onTestFire,
       testFireLoading: testFire.isLoading,
+      // The latest test outcome, so a provider can render the result (HTTP
+      // status / failure) inline next to its own test button.
+      lastTestAttempt: testHistory[0] ?? null,
     }),
     [
       projectId,
@@ -894,6 +960,7 @@ export function AutomationDrawer({
       draft.report.sourceKind,
       onTestFire,
       testFire.isLoading,
+      testHistory,
     ],
   );
 
@@ -950,7 +1017,11 @@ export function AutomationDrawer({
                 </Text>
               </Box>
             ) : editLoading ? (
-              <VStack align="stretch" gap={4} data-testid="automation-edit-loading">
+              <VStack
+                align="stretch"
+                gap={4}
+                data-testid="automation-edit-loading"
+              >
                 <Skeleton height="32px" width="60%" />
                 <Skeleton height="80px" width="full" />
                 <Skeleton height="80px" width="full" />
@@ -962,6 +1033,7 @@ export function AutomationDrawer({
                   isEdit={!!automationId}
                   sourceLocked={sourceLocked}
                   prefilledGraphId={prefilledGraphId}
+                  webhookEnabled={webhookEnabled}
                 />
               </Box>
             )}
@@ -971,7 +1043,7 @@ export function AutomationDrawer({
               <Spacer />
               {/* Send test sits next to Save (ADR-043 feedback): once a notify
                   channel is set up, fire the real message before committing. */}
-              {channel && !editLoading && !editError ? (
+              {channel && !editLoading && !editError && !webhookReadOnly ? (
                 <Tooltip
                   content="Finish the delivery setup to send a test."
                   disabled={configComplete}
@@ -992,6 +1064,7 @@ export function AutomationDrawer({
                   nameSet,
                   configComplete,
                   actionPicked: !!draft.action,
+                  webhookReadOnly,
                 })}
                 disabled={canSave}
               >

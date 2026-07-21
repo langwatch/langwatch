@@ -8,46 +8,51 @@ import {
   MIN_TRACE_DEBOUNCE_MS,
   NOTIFICATION_CADENCES,
   type NotificationCadence,
-} from "~/automations/cadences";
-import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
-import { actionParamsSchemaFor } from "~/automations/providers/server";
+} from "@langwatch/automations/cadences";
+import { EMAIL_RX } from "@langwatch/automations/providers/email";
+import {
+  actionParamsSchemaFor,
+  persistActionParamsFor,
+  redactActionParamsFor,
+} from "~/server/app-layer/automations/providers/registry";
 import { getApp } from "~/server/app-layer/app";
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
-import { listSlackChannels } from "~/server/triggers/slackWebApi";
+import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
 import {
   InvalidEmailRecipientError,
   MissingAnnotatorError,
   NotificationDeliveryError,
   ProjectNotFoundError,
-} from "~/server/app-layer/triggers/errors";
-import { isDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+} from "~/server/app-layer/automations/errors";
+import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
+import { type SlackActionParams } from "@langwatch/automations/providers/slack";
 import {
-  decryptSlackBotToken,
-  persistSlackActionParams,
-  redactSlackActionParams,
-  slackBotTokenMissing,
-} from "~/automations/providers/definitions/slack/secret";
-import {
-  type SlackActionParams,
-  slackDeliveryMethodOf,
-} from "~/automations/providers/definitions/slack/shared";
+  decryptWebhookHeaders,
+  type WebhookStoredActionParams,
+} from "~/server/app-layer/automations/providers/webhook/server";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
 import {
   buildGraphAlertTriggerData,
   type GraphAlertActionParams,
   graphAlertActionParamsSchema,
-} from "~/server/app-layer/triggers/graph-alert.builder";
+} from "~/server/app-layer/automations/graph-alert.builder";
 import {
   buildReportTriggerData,
   extractReportFromTriggerRow,
   reportActionParamsSchema,
-} from "~/server/app-layer/triggers/report.builder";
-import { TriggerFireHistoryService } from "~/server/app-layer/triggers/trigger-fire-history.service";
+} from "~/server/app-layer/automations/report.builder";
+import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
+import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
+import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import {
   type DraftProject,
   validateTemplateDraft,
-} from "~/server/app-layer/triggers/trigger-template.service";
-import { NOTIFY_TRIGGER_ACTIONS } from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
+} from "~/server/app-layer/automations/trigger-template.service";
+import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
+import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
+import { featureFlagService } from "~/server/featureFlag";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   sanitizeTriggerFilters,
@@ -61,17 +66,18 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
 import { buildRetryAfterMessage } from "./rateLimitMessage";
 
-/** Strip the encrypted Slack bot token from a trigger row before it leaves the
- *  server — the client only needs to know a token is set (ADR-041). No-op for
- *  every non-Slack action. */
+/** Strip secrets from a trigger row before it leaves the server via the
+ *  provider registry's redact hook: the encrypted Slack bot token (ADR-041)
+ *  and webhook header values (ADR-040 §3 — names echo with the kept
+ *  sentinel, values never return). Identity for every other action. */
 function redactTriggerForRead<
   T extends { action: TriggerAction; actionParams: unknown },
 >(trigger: T): T {
-  if (trigger.action !== TriggerAction.SEND_SLACK_MESSAGE) return trigger;
   return {
     ...trigger,
-    actionParams: redactSlackActionParams(
-      (trigger.actionParams ?? {}) as SlackActionParams,
+    actionParams: redactActionParamsFor(
+      trigger.action,
+      trigger.actionParams ?? {},
     ),
   };
 }
@@ -152,6 +158,12 @@ const actionParamsSchema = z.object({
   annotators: z
     .array(z.object({ id: z.string(), name: z.string() }))
     .optional(),
+  // ADR-040 SEND_WEBHOOK destination — the per-action provider schema
+  // re-validates the shape (https-only URL, sanitized headers) below.
+  url: z.string().optional(),
+  method: z.enum(["POST", "PUT", "PATCH"]).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+  bodyTemplate: z.string().nullable().optional(),
 });
 
 type TRPCErrorCode = ConstructorParameters<typeof TRPCError>[0]["code"];
@@ -180,7 +192,7 @@ function httpStatusToTRPCCode(httpStatus: number): TRPCErrorCode {
 /**
  * Wraps any thrown value as a `TRPCError` whose `cause` is preserved when the
  * value is a `HandledError`. The shared `errorFormatter` in `trpc.ts` serialises
- * that cause as `error.data.domainError = { code, meta, traceId, spanId, … }` so the
+ * that cause as `error.data.error = { code, meta, traceId, spanId, … }` so the
  * client gets the full structured payload — that is the "incredibly good error
  * handling" surface (see ADR-036 follow-up).
  */
@@ -190,7 +202,7 @@ function toTemplateTRPCError(err: unknown): TRPCError {
   // as a DispatchError with an already-actionable message — lift it onto the
   // typed HandledError channel so the UI shows a clean 4xx, not a generic 500.
   const domainError =
-    err instanceof HandledError
+    HandledError.isHandled(err)
       ? err
       : isDispatchError(err)
         ? new NotificationDeliveryError(err.message)
@@ -270,14 +282,18 @@ export const automationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await enforceLicenseLimit(ctx, input.projectId, "automations");
 
-      const project = await ctx.prisma.project.findUnique({
-        where: {
-          id: input.projectId,
-        },
-        select: {
-          id: true,
-        },
-      });
+      // This legacy mutation cannot carry the validated/encrypted webhook
+      // destination shape. Never let a direct caller create a malformed or
+      // feature-flag-bypassing SEND_WEBHOOK row; the provider-aware upsert is
+      // the sole webhook writer.
+      if (input.action === TriggerAction.SEND_WEBHOOK) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Webhook automations must be created through the provider-aware upsert API.",
+        });
+      }
+
+      const project = await getApp().projects.getById(input.projectId);
 
       if (!project) {
         throw new Error(`Project with id ${input.projectId} not found`);
@@ -323,7 +339,7 @@ export const automationRouter = createTRPCRouter({
         }
       }
 
-      const trigger = await ctx.prisma.trigger.create({
+      const trigger = await getApp().triggers.create({
         data: {
           id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
           name: input.name,
@@ -346,16 +362,10 @@ export const automationRouter = createTRPCRouter({
   deleteById: protectedProcedure
     .input(z.object({ projectId: z.string(), triggerId: z.string() }))
     .use(checkProjectPermission("triggers:delete"))
-    .mutation(async ({ ctx, input }) => {
-      await ctx.prisma.trigger.update({
-        where: {
-          id: input.triggerId,
-          projectId: input.projectId,
-        },
-        data: {
-          deleted: true,
-          active: false,
-        },
+    .mutation(async ({ input }) => {
+      await getApp().triggers.softDeleteById({
+        triggerId: input.triggerId,
+        projectId: input.projectId,
       });
 
       // Best-effort: deactivate any scheduled-report entry for this trigger
@@ -373,14 +383,8 @@ export const automationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
-      const triggers = await ctx.prisma.trigger.findMany({
-        where: {
-          projectId: input.projectId,
-          deleted: false,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
+      const triggers = await getApp().triggers.getAllForProject({
+        projectId: input.projectId,
       });
 
       const allCheckIds = triggers.flatMap((trigger) => {
@@ -392,13 +396,9 @@ export const automationRouter = createTRPCRouter({
         }
       });
 
-      const allChecks = await ctx.prisma.monitor.findMany({
-        where: {
-          id: {
-            in: allCheckIds,
-          },
-          projectId: input.projectId,
-        },
+      const allChecks = await MonitorService.create(ctx.prisma).getAllByIds({
+        monitorIds: allCheckIds,
+        projectId: input.projectId,
       });
 
       const checksMap = allChecks.reduce<
@@ -416,9 +416,11 @@ export const automationRouter = createTRPCRouter({
         .filter((id): id is string => typeof id === "string" && id.length > 0);
       const customGraphs =
         customGraphIds.length > 0
-          ? await ctx.prisma.customGraph.findMany({
-              where: { id: { in: customGraphIds }, projectId: input.projectId },
-              select: { id: true, name: true },
+          ? await AutomationCustomGraphService.create(
+              ctx.prisma,
+            ).getAllNamesByIds({
+              customGraphIds,
+              projectId: input.projectId,
             })
           : [];
       const customGraphsById = new Map(customGraphs.map((g) => [g.id, g]));
@@ -473,6 +475,26 @@ export const automationRouter = createTRPCRouter({
         limit: input.limit,
       });
     }),
+  /** ADR-040 §6: the per-attempt webhook delivery log for one automation —
+   *  the drawer's "Recent deliveries" drill-down. Header values are already
+   *  redacted at write time. */
+  getWebhookDeliveries: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        triggerId: z.string(),
+        limit: z.number().int().min(1).max(50).default(50),
+      }),
+    )
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ ctx, input }) => {
+      const deliveries = WebhookDeliveryService.create(ctx.prisma);
+      return deliveries.getRecentByTrigger({
+        projectId: input.projectId,
+        triggerId: input.triggerId,
+        limit: input.limit,
+      });
+    }),
   /** The activity feed: what every automation in the project has been doing. */
   getRecentActivity: protectedProcedure
     .input(
@@ -511,10 +533,10 @@ export const automationRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("triggers:update"))
-    .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.prisma.trigger.findUnique({
-        where: { id: input.triggerId, projectId: input.projectId },
-        select: { triggerKind: true, actionParams: true },
+    .mutation(async ({ input }) => {
+      const existing = await getApp().triggers.getById({
+        triggerId: input.triggerId,
+        projectId: input.projectId,
       });
       if (!existing) {
         throw new TRPCError({
@@ -540,11 +562,9 @@ export const automationRouter = createTRPCRouter({
         });
       }
 
-      const trigger = await ctx.prisma.trigger.update({
-        where: {
-          id: input.triggerId,
-          projectId: input.projectId,
-        },
+      const trigger = await getApp().triggers.update({
+        triggerId: input.triggerId,
+        projectId: input.projectId,
         data: {
           active: input.active,
         },
@@ -573,9 +593,10 @@ export const automationRouter = createTRPCRouter({
   getTriggerById: protectedProcedure
     .input(z.object({ triggerId: z.string(), projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
-    .query(async ({ ctx, input }) => {
-      const trigger = await ctx.prisma.trigger.findUnique({
-        where: { id: input.triggerId, projectId: input.projectId },
+    .query(async ({ input }) => {
+      const trigger = await getApp().triggers.getById({
+        triggerId: input.triggerId,
+        projectId: input.projectId,
       });
       // Never return the encrypted bot token to the browser (ADR-041).
       return trigger ? redactTriggerForRead(trigger) : trigger;
@@ -598,12 +619,12 @@ export const automationRouter = createTRPCRouter({
     // triggers:update (not :view): this endpoint decrypts and exercises the
     // stored Slack bot token — the same capability testFireTemplate gates on.
     .use(checkProjectPermission("triggers:update"))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       let token = input.botToken?.trim() || null;
       if (!token && input.automationId) {
-        const saved = await ctx.prisma.trigger.findUnique({
-          where: { id: input.automationId, projectId: input.projectId },
-          select: { actionParams: true },
+        const saved = await getApp().triggers.getById({
+          triggerId: input.automationId,
+          projectId: input.projectId,
         });
         token = decryptSlackBotToken(
           (saved?.actionParams ?? {}) as SlackActionParams,
@@ -634,8 +655,9 @@ export const automationRouter = createTRPCRouter({
         });
       }
 
-      const trigger = await ctx.prisma.trigger.update({
-        where: { id: input.triggerId, projectId: input.projectId },
+      const trigger = await getApp().triggers.update({
+        triggerId: input.triggerId,
+        projectId: input.projectId,
         data: {
           filters: JSON.stringify(sanitized),
         },
@@ -649,13 +671,26 @@ export const automationRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        channel: z.enum(["email", "slack"]),
+        channel: z.enum(["email", "slack", "webhook"]),
         trigger: triggerIdentitySchema,
         draft: templateDraftSchema,
         webhook: z
           .string()
           .url()
           .startsWith("https://hooks.slack.com/")
+          .nullable()
+          .default(null),
+        /** ADR-040 generic HTTP test fire: the full request shape, body
+         *  template included (it lives in actionParams, not the four Trigger
+         *  template columns). URL shape is re-validated by the provider
+         *  schema; the real SSRF gate runs inside the sender. */
+        webhookDestination: z
+          .object({
+            url: z.string().url(),
+            method: z.enum(["POST", "PUT", "PATCH"]).default("POST"),
+            headers: z.record(z.string(), z.string()).default({}),
+            bodyTemplate: z.string().nullable().default(null),
+          })
           .nullable()
           .default(null),
         /** Set when the Slack automation uses a bot connection. `botToken` is
@@ -708,8 +743,26 @@ export const automationRouter = createTRPCRouter({
       // and intentionally exempt from the rate limit — it fires to the
       // customer's own webhook, not our mail provider.
       try {
-        let recipients: string[] = [];
-        if (input.channel === "email") {
+        // The webhook channel ships dark (ADR-040 §7): the type picker is
+        // flag-gated client-side, and the server refuses the channel too so
+        // the flag can't be bypassed by calling the API directly.
+        if (input.channel === "webhook") {
+          const allowed = await featureFlagService.isEnabled(
+            "release_webhook_automations",
+            { distinctId: ctx.session.user.id, projectId: input.projectId },
+          );
+          if (!allowed) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Webhook automations are not enabled for this project.",
+            });
+          }
+        }
+        // Email shares the mail provider; webhook fires at an ARBITRARY
+        // customer URL from our worker IPs, so an uncapped test button would
+        // be an outbound request-flood primitive (ADR-040 §4). Slack stays
+        // exempt: its destination is host-pinned to hooks.slack.com.
+        if (input.channel === "email" || input.channel === "webhook") {
           const limit = await rateLimit({
             key: `testfire:${ctx.session.user.id}`,
             windowSeconds: 60,
@@ -724,7 +777,9 @@ export const automationRouter = createTRPCRouter({
               }),
             });
           }
-
+        }
+        let recipients: string[] = [];
+        if (input.channel === "email") {
           const email = ctx.session.user.email;
           if (!email) {
             throw new TRPCError({
@@ -742,9 +797,9 @@ export const automationRouter = createTRPCRouter({
           const channel = input.botDestination.channelId.trim();
           let token = input.botDestination.botToken?.trim() || null;
           if (!token && input.automationId) {
-            const saved = await ctx.prisma.trigger.findUnique({
-              where: { id: input.automationId, projectId: input.projectId },
-              select: { actionParams: true },
+            const saved = await getApp().triggers.getById({
+              triggerId: input.automationId,
+              projectId: input.projectId,
             });
             token = decryptSlackBotToken(
               (saved?.actionParams ?? {}) as SlackActionParams,
@@ -760,6 +815,47 @@ export const automationRouter = createTRPCRouter({
           botDestination = { token, channel };
         }
 
+        // ADR-040 §3: header secrets never reach the client, so a saved
+        // automation's test fire carries the kept sentinel — resolve it
+        // against the stored ciphertext, exactly like the Slack bot token
+        // above. Unresolvable kept values (fresh draft, renamed header) are
+        // dropped rather than sent as the literal sentinel.
+        let webhookDestination = input.webhookDestination;
+        if (
+          webhookDestination &&
+          Object.values(webhookDestination.headers).includes(
+            WEBHOOK_HEADER_VALUE_KEPT,
+          )
+        ) {
+          let saved: Record<string, string> = {};
+          if (input.automationId) {
+            const row = await getApp().triggers.getById({
+              triggerId: input.automationId,
+              projectId: input.projectId,
+            });
+            const stored = (row?.actionParams ?? {}) as WebhookStoredActionParams;
+            if (stored.url !== webhookDestination.url) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message:
+                  "Re-enter webhook header values after changing the destination URL.",
+              });
+            }
+            saved = decryptWebhookHeaders(stored);
+          }
+          const headers: Record<string, string> = {};
+          for (const [name, value] of Object.entries(
+            webhookDestination.headers,
+          )) {
+            if (value === WEBHOOK_HEADER_VALUE_KEPT) {
+              if (saved[name] !== undefined) headers[name] = saved[name];
+              continue;
+            }
+            headers[name] = value;
+          }
+          webhookDestination = { ...webhookDestination, headers };
+        }
+
         const project = await resolveProjectIdentity(input.projectId);
         return await getApp().triggerTemplates.testFire({
           channel: input.channel,
@@ -769,6 +865,7 @@ export const automationRouter = createTRPCRouter({
           recipients,
           webhook: input.webhook,
           botDestination,
+          webhookDestination,
           graphAlert: input.graphAlert,
           report: input.report,
         });
@@ -811,17 +908,28 @@ export const automationRouter = createTRPCRouter({
       let parsedActionParams: Record<string, unknown> = {};
       try {
         validateTemplateDraft(input.templates);
+        // The webhook channel ships dark (ADR-040 §7): gate the save route as
+        // well as the picker, so the flag can't be bypassed via the API.
+        if (input.action === TriggerAction.SEND_WEBHOOK) {
+          const allowed = await featureFlagService.isEnabled(
+            "release_webhook_automations",
+            { distinctId: ctx.session.user.id, projectId: input.projectId },
+          );
+          if (!allowed) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Webhook automations are not enabled for this project.",
+            });
+          }
+        }
         if (isGraphAlert) {
           // Graph alerts only support notify channels — there is no
           // "ADD_TO_DATASET on a metric crossing a threshold" UX.
-          if (
-            input.action !== TriggerAction.SEND_EMAIL &&
-            input.action !== TriggerAction.SEND_SLACK_MESSAGE
-          ) {
+          if (!NOTIFY_TRIGGER_ACTIONS.has(input.action)) {
             throw new TRPCError({
               code: "BAD_REQUEST",
               message:
-                "Graph alerts only support Email or Slack notifications.",
+                "Graph alerts only support notify channels (Email, Slack, or a webhook).",
             });
           }
           if (!input.graphAlert) {
@@ -840,14 +948,13 @@ export const automationRouter = createTRPCRouter({
           // The graph must belong to the calling project — multitenancy
           // gate. Without this a hostile client could attach a trigger to
           // a graph from another tenant.
-          const graph = await ctx.prisma.customGraph.findUnique({
-            where: {
-              id: input.customGraphId ?? "",
-              projectId: input.projectId,
-            },
-            select: { id: true },
+          const graphExists = await AutomationCustomGraphService.create(
+            ctx.prisma,
+          ).existsInProject({
+            customGraphId: input.customGraphId ?? "",
+            projectId: input.projectId,
           });
-          if (!graph) {
+          if (!graphExists) {
             throw new TRPCError({
               code: "NOT_FOUND",
               message: "Graph not found in this project.",
@@ -936,26 +1043,22 @@ export const automationRouter = createTRPCRouter({
       // keep the stored ciphertext when the field was left blank on edit), and
       // reject a bot connection saved with no token at all. The token is never
       // returned to the client, so honouring "kept" means reading the saved row.
-      let slackActionParams: SlackActionParams | null = null;
-      if (input.action === TriggerAction.SEND_SLACK_MESSAGE) {
-        const incoming = input.actionParams as SlackActionParams;
-        const existing =
-          input.triggerId && slackDeliveryMethodOf(incoming) === "bot"
-            ? ((
-                await ctx.prisma.trigger.findUnique({
-                  where: { id: input.triggerId, projectId: input.projectId },
-                  select: { actionParams: true },
+      // Provider persist hooks (ADR-041 / ADR-040 §3): encrypt secrets,
+      // resolve kept sentinels against the saved row (loaded lazily only
+      // when a provider needs it), and reject invalid payloads (missing bot
+      // token, kept headers after a URL change) as typed HandledErrors.
+      const storedActionParams = await persistActionParamsFor(input.action, {
+        incoming: parsedActionParams,
+        loadExisting: async () =>
+          input.triggerId
+            ? (
+                await getApp().triggers.getById({
+                  triggerId: input.triggerId,
+                  projectId: input.projectId,
                 })
-              )?.actionParams as SlackActionParams | undefined)
-            : undefined;
-        if (slackBotTokenMissing({ incoming, existing })) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "A Slack bot token is required for a bot connection.",
-          });
-        }
-        slackActionParams = persistSlackActionParams({ incoming, existing });
-      }
+              )?.actionParams
+            : undefined,
+      });
 
       // Annotation-queue dispatch attributes created queue items to a user
       // and skips the action when `createdByUserId` is absent. The drawer's
@@ -968,12 +1071,10 @@ export const automationRouter = createTRPCRouter({
       let actionParams: Record<string, unknown> =
         input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE
           ? {
-              ...parsedActionParams,
+              ...(storedActionParams as Record<string, unknown>),
               createdByUserId: ctx.session?.user.id,
             }
-          : slackActionParams
-            ? { ...slackActionParams }
-            : { ...parsedActionParams };
+          : { ...(storedActionParams as Record<string, unknown>) };
 
       // Graph alerts: route the row shape through the SSOT builder so it's
       // byte-identical to what `graphs.updateById` writes on the dashboard
@@ -1069,8 +1170,9 @@ export const automationRouter = createTRPCRouter({
           input.notificationCadence,
           isGraphAlert,
         );
-        trigger = await ctx.prisma.trigger.update({
-          where: { id: input.triggerId, projectId: input.projectId },
+        trigger = await getApp().triggers.update({
+          triggerId: input.triggerId,
+          projectId: input.projectId,
           data: {
             ...data,
             ...(cadenceUpdate !== undefined
@@ -1092,16 +1194,15 @@ export const automationRouter = createTRPCRouter({
         // graphs.updateById upsert-by-customGraphId behaviour.
         const existingForGraph =
           isGraphAlert && input.customGraphId
-            ? await ctx.prisma.trigger.findFirst({
-                where: {
-                  projectId: input.projectId,
-                  customGraphId: input.customGraphId,
-                },
+            ? await getApp().triggers.getByCustomGraphId({
+                projectId: input.projectId,
+                customGraphId: input.customGraphId,
               })
             : null;
         if (existingForGraph) {
-          trigger = await ctx.prisma.trigger.update({
-            where: { id: existingForGraph.id, projectId: input.projectId },
+          trigger = await getApp().triggers.update({
+            triggerId: existingForGraph.id,
+            projectId: input.projectId,
             data: {
               ...data,
               deleted: false,
@@ -1117,7 +1218,7 @@ export const automationRouter = createTRPCRouter({
             },
           });
         } else {
-          trigger = await ctx.prisma.trigger.create({
+          trigger = await getApp().triggers.create({
             data: {
               id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
               projectId: input.projectId,
