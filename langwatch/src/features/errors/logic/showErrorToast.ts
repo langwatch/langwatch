@@ -73,7 +73,7 @@ export function showErrorToast(
   toaster.create({
     ...(options.id ? { id: options.id } : {}),
     title,
-    description: describeWithTips(explanation.description, handled?.tips),
+    description: bodyCopy(explanation.description, handled?.tips),
     type: "error",
     meta: {
       closable: true,
@@ -87,19 +87,19 @@ export function showErrorToast(
 }
 
 /**
- * Folds the first remediation tip into the description.
+ * Picks the body copy: the registry's description, or the first server tip.
  *
- * Tips are authored for agents hitting the API/CLI, where a list renders fine.
- * A toast has room for one sentence, so it takes the most actionable one and
- * leaves the rest to the docs link — rather than either dropping the
- * remediation entirely or turning the toast into a wall of bullets.
+ * Never both. The two are competing authorings of the same remediation — the
+ * registry entry for `query_timeout` says "Narrow the time range or add a
+ * filter", and so does its first tip — so showing both makes the toast repeat
+ * itself. The registry wins because it is written for this surface; tips are
+ * written for agents driving the API/CLI/MCP, which have no registry to read
+ * (ADR-045). They still earn their place when the code is one this client
+ * doesn't recognise and has no copy for.
  */
-function describeWithTips(
+function bodyCopy(
   description: string,
   tips: readonly string[] | undefined,
 ): string {
-  const firstTip = tips?.[0];
-  if (!firstTip) return description;
-  if (!description) return firstTip;
-  return `${description} ${firstTip}`;
+  return description || (tips?.[0] ?? "");
 }
