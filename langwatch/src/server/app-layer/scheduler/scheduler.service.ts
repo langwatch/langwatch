@@ -197,10 +197,13 @@ export class SchedulerService {
     if (!this.redis) return;
     try {
       const sub = this.redis.duplicate();
-      sub.on("message", (channel: string) => {
+      // Narrowed to the EventEmitter surface: the Redis | Cluster union's
+      // overloaded `.on` signatures don't unify under declaration emit.
+      const subEvents = sub as NodeJS.EventEmitter;
+      subEvents.on("message", (channel: string) => {
         if (channel === WAKE_CHANNEL) this.wake();
       });
-      sub.on("error", (err: Error) => {
+      subEvents.on("error", (err: Error) => {
         this.logger.debug(
           { workerId: this.workerId, error: err.message },
           "SchedulerService: wake subscriber error (poll backstop still active)",

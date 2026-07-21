@@ -1,3 +1,4 @@
+import type { LanguageModel } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { env } from "../../env.mjs";
 import {
@@ -34,7 +35,7 @@ export const getVercelAIModel = async ({
   projectId: string;
   model?: string;
   featureKey?: string;
-}) => {
+}): Promise<LanguageModel> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });

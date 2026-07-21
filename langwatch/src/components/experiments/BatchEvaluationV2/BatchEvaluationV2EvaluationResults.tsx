@@ -16,7 +16,10 @@ import { Download, ExternalLink, MoreVertical } from "react-feather";
 import { Menu } from "../../../components/ui/menu";
 import { toaster } from "../../../components/ui/toaster";
 import type { ExperimentRunWithItems } from "../../../server/experiments-v3/services/types";
-import { api } from "../../../utils/api";
+import type { TRPCClientErrorLike } from "@trpc/client";
+import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
+import type { AppRouter } from "../../../server/api/root";
+import { api, type RouterOutputs } from "../../../utils/api";
 import { BatchEvaluationV2EvaluationResult } from "./BatchEvaluationV2EvaluationResult";
 import { getEvaluationColumns } from "./utils";
 
@@ -38,7 +41,12 @@ export const useBatchEvaluationResults = ({
     refetchingStartedAtRef.current = Date.now();
   }, [project.id, experiment.id, runId]);
 
-  const run = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  // Explicitly typed: the raw inferred hook result references
+  // @trpc/react-query internals that cannot be named in an emitted .d.ts.
+  const run: UseTRPCQueryResult<
+    RouterOutputs["experiments"]["getExperimentBatchEvaluationRun"],
+    TRPCClientErrorLike<AppRouter>
+  > = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     {
       projectId: project.id,
       experimentId: experiment.id,
