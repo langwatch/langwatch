@@ -154,7 +154,7 @@ export function EditProjectDrawer({
                 )}
               </Field.Root>
 
-              <Field.Root>
+              <Field.Root invalid={!!errors.teamId}>
                 <Field.Label>Team</Field.Label>
                 <Controller
                   control={control}
@@ -189,6 +189,9 @@ export function EditProjectDrawer({
                     </Select.Root>
                   )}
                 />
+                {errors.teamId && (
+                  <Field.ErrorText>{errors.teamId.message}</Field.ErrorText>
+                )}
               </Field.Root>
 
               <HStack width="full">

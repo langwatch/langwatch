@@ -2,7 +2,7 @@ import { Button, Field, Heading, HStack, Input, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useDebounce } from "use-debounce";
-import { showErrorToast } from "~/features/errors";
+import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../../components/ui/drawer";
 import { InputGroup } from "../../components/ui/input-group";
@@ -128,14 +128,7 @@ function LLMModelCostForm({
     return project?.id ? [{ scopeType: "PROJECT", scopeId: project.id }] : [];
   });
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    getValues,
-    setValue,
-    formState: { errors },
-  } = useForm<LLMModelCostForm>({
+  const form = useForm<LLMModelCostForm>({
     defaultValues: {
       model: currentLLMModelCost?.model ?? prefillModel,
       inputCostPerToken: currentLLMModelCost?.inputCostPerToken,
@@ -145,6 +138,14 @@ function LLMModelCostForm({
       regex: currentLLMModelCost?.regex ?? prefillRegex,
     },
   });
+  const {
+    register,
+    handleSubmit,
+    control,
+    getValues,
+    setValue,
+    formState: { errors },
+  } = form;
 
   // Live values feeding the matching-spans preview. Debounced so the
   // ClickHouse-backed preview doesn't fire on every keystroke; rates pass
@@ -208,13 +209,15 @@ function LLMModelCostForm({
           closeDrawer();
           void llmModelCostsQuery.refetch();
         },
-        onError: (error) =>
+        onError: (error) => {
+          if (applyHandledErrorToForm({ error, form })) return;
           showErrorToast({
             error,
             fallbackTitle: id
               ? "Couldn't update model cost"
               : "Couldn't create model cost",
-          }),
+          });
+        },
       },
     );
   };
