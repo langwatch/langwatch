@@ -65,7 +65,7 @@ function structuredFailureNewCli(): string {
       message: "Failed to search traces: socket hang up (ECONNRESET).",
       httpStatus: 0,
       meta: {},
-      isDomain: false,
+      isHandled: false,
       traceId: TRACE_ID,
       traceUrl: TRACE_URL,
       logsUrl: LOGS_URL,

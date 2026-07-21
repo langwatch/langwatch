@@ -1,7 +1,7 @@
 import {
   parseCliJson,
   readCliErrorDocument,
-  type CliDomainError,
+  type CliHandledError,
 } from "@langwatch/cli-cards";
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertCircle, ExternalLink, ScrollText } from "lucide-react";
@@ -35,7 +35,7 @@ function safeHttpUrl(value: unknown): string | undefined {
   }
 }
 
-function readStructuredError(errorText: unknown): CliDomainError | null {
+function readStructuredError(errorText: unknown): CliHandledError | null {
   if (typeof errorText === "string") {
     // Shell tools merge stderr with stdout. parseCliJson extracts the first
     // balanced JSON document, so a CLI error remains readable even when a
