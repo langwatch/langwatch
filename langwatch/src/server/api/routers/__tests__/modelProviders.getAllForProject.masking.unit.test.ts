@@ -183,6 +183,7 @@ describe("modelProviders.getAllForProject", () => {
       ]);
     });
 
+    /** @scenario Plaintext API keys never reach the browser through any provider query */
     it("does not include any plaintext secret anywhere in the response", async () => {
       const result = await makeCaller().getAllForProject({
         projectId: "project_123",

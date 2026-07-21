@@ -170,6 +170,7 @@ describe("modelProviders.getAllForProject authz", () => {
   });
 
   describe("when the user has no access to the project at all", () => {
+    /** @scenario A user without project view permission cannot list a project's providers */
     it("rejects with UNAUTHORIZED", async () => {
       const caller = callerForUser("user_with_nothing");
 
@@ -180,6 +181,7 @@ describe("modelProviders.getAllForProject authz", () => {
   });
 
   describe("when the user only has access to a sibling project in the same organization", () => {
+    /** @scenario Access to a sibling project does not grant access to this project's providers */
     it("rejects with UNAUTHORIZED", async () => {
       const caller = callerForUser("user_other_project_admin");
 
@@ -190,6 +192,7 @@ describe("modelProviders.getAllForProject authz", () => {
   });
 
   describe("when the user is an admin of a different organization", () => {
+    /** @scenario Admin rights in another organization grant nothing across the tenancy boundary */
     it("rejects with UNAUTHORIZED", async () => {
       const caller = callerForUser("user_other_org_admin");
 
