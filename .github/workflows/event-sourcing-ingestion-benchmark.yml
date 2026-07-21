@@ -1,0 +1,370 @@
+# Event-sourcing ingestion benchmark and stability run.
+#
+# =============================================================================
+# READ THIS BEFORE ADDING A PERFORMANCE THRESHOLD
+# =============================================================================
+# This workflow runs a 3-replica ClickHouse, its Keepers, Redis, Postgres, the
+# platform, AND the load driver on ONE ubuntu-latest runner: 4 vCPU, 16 GB RAM,
+# 14 GB SSD, shared with whatever else GitHub has on that box.
+#
+# Everything is co-resident and CPU-starved by construction. The throughput and
+# CPU numbers this produces measure CONTENTION, NOT CAPACITY. They are nothing
+# like production, and they move run to run for reasons that have nothing to do
+# with the code under test.
+#
+# Therefore:
+#
+#   * Resource measurements are INFORMATIONAL. They are reported and uploaded.
+#     They never fail the run.
+#   * CORRECTNESS assertions are the ONLY hard failures: no lost spans, no
+#     double-counted trace_summaries.SpanCount, no cross-tenant leakage.
+#
+# If you add an absolute threshold ("fail if p95 > Xms", "fail if CPU > Y"), it
+# WILL flap on a noisy runner, someone will get tired of the red, and this
+# workflow will be disabled or deleted inside a month. That has happened before
+# to benchmark jobs and it is the reason this one is written the way it is.
+#
+# If you want a regression gate, gate on a DELTA against the baseline artifact
+# from a previous run at the same scale on the same runner size — never on an
+# absolute number. If you want real capacity figures, move to a larger runner
+# (see the `runner` input below); do not try to squeeze them out of this one.
+#
+# =============================================================================
+# Why this exists at all
+# =============================================================================
+# Four fold projections accumulate state. A retried batch that re-applies can
+# double-count SpanCount while every span is still present, so a span-count
+# check alone cannot see it. Out-of-order folding caused a real re-fold storm
+# (2026-07-09; see specs/event-sourcing/hot-trace-fold-amplification.feature),
+# and unfair dispatch starved tenants for hours (2026-05-11; see
+# specs/event-sourcing/tenant-soft-cap.feature). None of those are visible in a
+# unit test or on a CPU graph. They are visible as WRONG NUMBERS IN CLICKHOUSE
+# after concurrent load, which is exactly what this asserts.
+#
+# Spec:  specs/ci/event-sourcing-ingestion-benchmark.feature
+# Docs:  dev/docs/event-sourcing-ingestion-benchmark.md
+#
+# =============================================================================
+# Why it is rare
+# =============================================================================
+# It is expensive (kind + 3 ClickHouse replicas + a full app boot) and slow. It
+# runs on manual dispatch, or on a PR that BOTH touches the ingestion path AND
+# carries the `benchmark` label. It deliberately does not run on every push.
+
+name: event-sourcing-ingestion-benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: >-
+          Runner label. Change this ONE value to get capacity-shaped numbers on
+          a bigger box; the workload scales with -scale, not with the runner.
+        required: false
+        default: ubuntu-latest
+        type: string
+      scale:
+        description: "Workload multiplier (trace counts only; payload sizes are fixed)."
+        required: false
+        default: "1"
+        type: string
+      seed:
+        description: "PRNG seed. Reuse a failing run's seed to replay it exactly."
+        required: false
+        default: "1337"
+        type: string
+      tenants:
+        description: >-
+          How many tenants to seed. Cross-tenant isolation and dispatch
+          fairness are only observable with more than one, so 2 is the floor.
+        required: false
+        default: "4"
+        type: string
+      settle_timeout:
+        description: >-
+          How long each stage waits for the pipeline to drain, as a Go
+          duration (90s, 3m, 1h). Raise it when a bigger scale outruns a small
+          runner; a timeout here means the run is inconclusive, not that the
+          code is wrong.
+        required: false
+        default: "3m"
+        type: string
+  pull_request:
+    # `labeled` is included so adding the label to an open PR triggers a run
+    # without needing an empty push.
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - "langwatch/src/server/event-sourcing/**"
+      - "charts/clickhouse-serverless/**"
+      - "tools/ingestionbench/**"
+      - "cmd/ingestionbench/**"
+      - ".github/workflows/event-sourcing-ingestion-benchmark.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  # Never run two of these at once on the same ref — they are far too heavy to
+  # overlap, and a cancelled half-run leaves a kind cluster behind.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CLUSTER_NAME: ingestion-bench
+  NAMESPACE: ingestion-bench
+  CH_IMAGE: langwatch/clickhouse-serverless:next
+  CH_PASSWORD: benchpassword
+
+jobs:
+  benchmark:
+    # The paths: filter above is necessary but NOT sufficient — the label is
+    # the opt-in. Both must hold for a pull_request run.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'benchmark')
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    timeout-minutes: 60
+
+    services:
+      # Postgres is a plain service container rather than a kind workload: the
+      # control plane needs it, but nothing about this benchmark tests it, so
+      # there is no reason to spend cluster resources on it.
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: langwatch_ci
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: langwatch_bench
+        options: >-
+          --health-cmd "PGPASSWORD=ci_password psql -U langwatch_ci -d langwatch_bench -c 'select 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      # Redis is a service container for the same reason. The event-sourcing
+      # GroupQueue lives here, and it is exercised hard by the load, but it
+      # does not need to be IN the cluster to be exercised.
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Report available disk before setup
+        # The workload is bounded to fit, but the runner's baseline free space
+        # varies. Recording it makes a disk-related failure diagnosable instead
+        # of mysterious.
+        run: df -h /
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+          install-dir: langwatch
+
+      # The driver is a Go CLI (cmd/ingestionbench). pnpm above is only for
+      # building and booting the platform it points at.
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Build the benchmark driver
+        # Built once, up front, so a compile error costs seconds here instead
+        # of surfacing 20 minutes later after the cluster and platform are up.
+        run: go build -o "${{ runner.temp }}/ingestionbench" ./cmd/ingestionbench
+
+      - name: Build ClickHouse image for kind
+        run: docker build -t "$CH_IMAGE" ./clickhouse-serverless/
+
+      - uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1
+        with:
+          cluster_name: ingestion-bench
+
+      - name: Load ClickHouse image into kind
+        run: kind load docker-image "$CH_IMAGE" --name "$CLUSTER_NAME"
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.12.0
+
+      - name: Install metrics-server
+        # kind ships no metrics-server, so `kubectl top` returns nothing
+        # without this. --kubelet-insecure-tls is required because kind's
+        # kubelet certs are self-signed. Resource sampling is informational, so
+        # this step is allowed to fail without failing the run.
+        continue-on-error: true
+        run: |
+          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+          kubectl -n kube-system patch deployment metrics-server --type=json \
+            -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+          kubectl -n kube-system rollout status deployment/metrics-server --timeout=180s
+
+      - name: Install 3-replica ClickHouse
+        # replicas: 3 is the whole point — it turns on ReplicatedMergeTree plus
+        # the embedded Keeper ensemble, which is the topology where a fold
+        # retry can actually produce a divergent projection. A single-replica
+        # `services:` container (what the rest of CI uses) cannot express this,
+        # which is why this workflow pays for kind at all.
+        #
+        # Resources are the chart's own kind-sized test values, shrunk further
+        # for CPU: 3 x ClickHouse + 3 x Keeper must coexist with the platform
+        # and the driver inside 4 vCPU / 16 GB.
+        run: |
+          kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+          helm upgrade --install ch ./charts/clickhouse-serverless \
+            --namespace "$NAMESPACE" \
+            --values ./charts/clickhouse-serverless/tests/values-replicated.yaml \
+            --set image.tag=next \
+            --set image.pullPolicy=Never \
+            --set replicas=3 \
+            --set auth.password="$CH_PASSWORD" \
+            --set memory=1Gi \
+            --set cpu=400m \
+            --set storage.size=2Gi \
+            --set keeper.storage.size=1Gi \
+            --wait --timeout 600s
+
+      - name: Port-forward ClickHouse
+        run: |
+          # Service name comes from the chart's fullname helper:
+          # "<release>-clickhouse". Release is `ch`, so `ch-clickhouse`.
+          kubectl -n "$NAMESPACE" port-forward svc/ch-clickhouse 8123:8123 &
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8123/ping | grep -q 'Ok\.'; then
+              echo "ClickHouse reachable"; exit 0
+            fi
+            sleep 2
+          done
+          echo "ClickHouse did not become reachable"; exit 1
+
+      - name: Verify the cluster really has 3 replicas
+        # Guards against silently benchmarking a standalone MergeTree. If the
+        # chart fell back to 1 replica, every replication-related conclusion
+        # from this run would be wrong, so fail loudly here instead.
+        run: |
+          replicas=$(curl -sf "http://default:${CH_PASSWORD}@localhost:8123/" \
+            --data-urlencode "query=SELECT count() FROM system.clusters WHERE cluster = 'langwatch'")
+          echo "cluster replicas: $replicas"
+          if [ "$replicas" -lt 3 ]; then
+            echo "Expected a 3-replica cluster, got $replicas"
+            exit 1
+          fi
+
+      - name: Run migrations
+        working-directory: langwatch
+        env:
+          DATABASE_URL: postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_bench
+          CLICKHOUSE_URL: http://default:${{ env.CH_PASSWORD }}@localhost:8123/langwatch_bench
+          REDIS_URL: redis://localhost:6379
+        run: |
+          pnpm prisma:migrate
+          # ClickHouse can refuse the first connection while the replicas are
+          # still settling; retry rather than failing the whole run on a race.
+          for attempt in 1 2 3; do
+            if pnpm clickhouse:migrate; then break; fi
+            echo "clickhouse:migrate attempt $attempt failed, retrying"
+            sleep 10
+          done
+
+      - name: Seed benchmark tenants
+        id: seed
+        env:
+          DATABASE_URL: postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_bench
+        run: |
+          # stdout is only the tenants JSON; progress goes to stderr.
+          tenants=$("${{ runner.temp }}/ingestionbench" seed \
+            -count "${{ inputs.tenants || '4' }}")
+          echo "tenants<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$tenants" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Start the platform
+        working-directory: langwatch
+        env:
+          NODE_ENV: production
+          DATABASE_URL: postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_bench
+          CLICKHOUSE_URL: http://default:${{ env.CH_PASSWORD }}@localhost:8123/langwatch_bench
+          REDIS_URL: redis://localhost:6379
+          # Run a REAL worker process alongside the app, exactly as production
+          # does (separate web and worker deployments).
+          #
+          # This is load-bearing, not a preference. The GroupQueue consumer loop
+          # only starts for processRole "worker" or "all" — a web-role process
+          # constructs the queue with `consumerEnabled: false` and no dispatcher,
+          # so it can enqueue but never drain. Without this the collector would
+          # accept every span into Redis, nothing would fold them, and the run
+          # would report total data loss caused entirely by the harness.
+          #
+          # Do NOT swap this for WORKERS_IN_PROCESS=1: that is gated on
+          # NODE_ENV === "development" in both start.sh and start.ts, so under
+          # NODE_ENV=production it is silently ignored and no worker runs at all.
+          START_WORKERS: "true"
+          # No self-ingest: the platform must never hold a LangWatch API key or
+          # it feeds its own traces back into the pipeline under test.
+          LANGWATCH_SKIP_NLP: "1"
+          LANGWATCH_SKIP_AIGATEWAY: "1"
+        run: |
+          pnpm build
+          pnpm start > platform.log 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -sf http://localhost:5560 >/dev/null 2>&1; then
+              echo "platform up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "platform did not start"; tail -100 platform.log; exit 1
+
+      - name: Run the benchmark
+        id: benchmark
+        env:
+          BENCHMARK_TENANTS: ${{ steps.seed.outputs.tenants }}
+          RUNNER_LABEL: ${{ inputs.runner || 'ubuntu-latest' }}
+        run: |
+          "${{ runner.temp }}/ingestionbench" run \
+            -endpoint http://localhost:5560 \
+            -clickhouse "http://default:${CH_PASSWORD}@localhost:8123/langwatch_bench" \
+            -namespace "$NAMESPACE" \
+            -scale "${{ inputs.scale || '1' }}" \
+            -seed "${{ inputs.seed || '1337' }}" \
+            -settle-timeout "${{ inputs.settle_timeout || '3m' }}" \
+            -runner-label "${RUNNER_LABEL}" \
+            -out "${GITHUB_WORKSPACE}/benchmark-output"
+
+      - name: Report available disk after the run
+        if: always()
+        run: df -h /
+
+      - name: Upload raw samples and results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ingestion-benchmark-samples
+          # results.json is the baseline for the NEXT run's comparison. Keep it
+          # with the samples so a delta can be computed without re-running.
+          path: |
+            benchmark-output/
+            langwatch/platform.log
+          retention-days: 30
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl -n "$NAMESPACE" get pods -o wide || true
+          kubectl -n "$NAMESPACE" get events --sort-by='.lastTimestamp' | tail -40 || true
+          kubectl -n "$NAMESPACE" describe pods || true
+          for pod in $(kubectl -n "$NAMESPACE" get pods -o name 2>/dev/null); do
+            echo "=== logs $pod ==="
+            kubectl -n "$NAMESPACE" logs "$pod" --tail=100 || true
+            kubectl -n "$NAMESPACE" logs "$pod" --previous --tail=50 || true
+          done
+          echo "=== platform log ==="
+          tail -200 langwatch/platform.log || true
