@@ -140,6 +140,9 @@ vi.mock("~/utils/api", () => ({
       onConversationUpdate: {
         useSubscription: () => undefined,
       },
+      stopTurn: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
       deleteConversation: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
       },
