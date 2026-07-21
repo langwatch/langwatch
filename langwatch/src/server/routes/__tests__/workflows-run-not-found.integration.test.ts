@@ -12,13 +12,17 @@
  * Requires: PostgreSQL database (Prisma)
  */
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "~/server/db";
 
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
-
-describe.skipIf(isTestcontainersOnly)(
+// This suite only needs Postgres — every harness (CI's testcontainers,
+// native local services) provides that, so it runs unconditionally. Do NOT
+// add an `isTestcontainersOnly`/`TEST_CLICKHOUSE_URL` skip guard here: CI
+// always sets TEST_CLICKHOUSE_URL for the ClickHouse-dependent suites in
+// this same integration run, so that guard would permanently skip this
+// file everywhere it matters (caught in review — see PR #5988).
+describe(
   "POST /api/workflows/:workflowId/run",
   () => {
     const testNamespace = `workflow-run-${nanoid(8)}`;
@@ -41,6 +45,10 @@ describe.skipIf(isTestcontainersOnly)(
         },
       });
       teamId = team.id;
+      // The "sk-lw-test-" shape deliberately fails the scoped-API-key regex
+      // (api-key-token.utils.ts), so auth falls back to legacyProjectKey —
+      // which bypasses the RBAC ceiling check entirely (auth-middleware.ts).
+      // A realistic sk-lw-{16}_{48} key would 401 here instead.
       apiKey = `sk-lw-test-${nanoid()}`;
       const project = await prisma.project.create({
         data: {
@@ -67,10 +75,20 @@ describe.skipIf(isTestcontainersOnly)(
     });
 
     afterAll(async () => {
-      await prisma.workflow.delete({ where: { id: unpublishedWorkflowId } });
-      await prisma.project.delete({ where: { id: projectId } });
-      await prisma.team.delete({ where: { id: teamId } });
-      await prisma.organization.delete({ where: { id: organizationId } });
+      // Each delete guarded independently: a partial beforeAll failure must
+      // not orphan the rows it did manage to create in the shared test DB.
+      if (unpublishedWorkflowId) {
+        await prisma.workflow.delete({ where: { id: unpublishedWorkflowId } });
+      }
+      if (projectId) {
+        await prisma.project.delete({ where: { id: projectId } });
+      }
+      if (teamId) {
+        await prisma.team.delete({ where: { id: teamId } });
+      }
+      if (organizationId) {
+        await prisma.organization.delete({ where: { id: organizationId } });
+      }
     });
 
     /** @scenario Running a nonexistent workflow returns 404 */
@@ -110,6 +128,41 @@ describe.skipIf(isTestcontainersOnly)(
       expect(res.status).toBe(422);
       const body = (await res.json()) as { error: string; message: string };
       expect(body.message).toBe("Workflow not published");
+    });
+
+    describe("when runWorkflow throws an untyped error", () => {
+      afterEach(() => {
+        vi.doUnmock("~/server/workflows/runWorkflow");
+        vi.resetModules();
+      });
+
+      /** @scenario An untyped runWorkflow error still returns a safe 500, not a leaked message */
+      it("returns a generic 500 without leaking the internal error message", async () => {
+        vi.resetModules();
+        vi.doMock("~/server/workflows/runWorkflow", () => ({
+          runWorkflow: vi
+            .fn()
+            .mockRejectedValue(new Error("db connection refused at 10.0.0.5")),
+        }));
+        const { app } = await import("../misc");
+
+        const res = await app.request(
+          `/api/workflows/${unpublishedWorkflowId}/run`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Auth-Token": apiKey,
+            },
+            body: JSON.stringify({}),
+          },
+        );
+
+        expect(res.status).toBe(500);
+        const body = (await res.json()) as { error: string; message: string };
+        expect(body.message).toBe("An unknown error occurred");
+        expect(JSON.stringify(body)).not.toContain("10.0.0.5");
+      });
     });
   },
 );

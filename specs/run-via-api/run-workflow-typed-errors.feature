@@ -20,3 +20,9 @@ Feature: Running a workflow via the API surfaces typed errors
     When the agent calls POST /api/workflows/:workflowId/run
     Then the response status is 422
     And the response is not a generic 500
+
+  Scenario: An untyped runWorkflow error still returns a safe 500, not a leaked message
+    Given runWorkflow throws an error that isn't one of the typed error classes
+    When the agent calls POST /api/workflows/:workflowId/run
+    Then the response status is 500
+    And the response does not contain the internal error message

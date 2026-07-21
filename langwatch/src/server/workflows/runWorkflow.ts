@@ -15,6 +15,7 @@ import { prisma } from "../db";
 import type { SingleEvaluationResult } from "../evaluations/evaluators";
 import type { MaybeStoredModelProvider } from "../modelProviders/registry";
 import { type NLPOrigin, nlpgoFetch } from "../nlpgo/nlpgoFetch";
+import { WorkflowExecutionFailedError } from "./errors";
 import { stripUnsupportedLLMParamsFromWorkflow } from "./stripUnsupportedLLMParams";
 
 const logger = createLogger("langwatch:workflows:runWorkflow");
@@ -56,7 +57,9 @@ const checkForRequiredInputs = (
 
   requiredInputs.forEach((input) => {
     if (!bodyInputs.includes(input)) {
-      throw new Error(`Missing required input: ${input}`);
+      throw new ValidationError(`Missing required input: ${input}`, {
+        meta: { input },
+      });
     }
   });
   return true;
@@ -98,8 +101,9 @@ const checkForRequiredLLMKeys = (
     llmModelsNeeded.includes(key),
   );
   if (missingKey) {
-    throw new Error(
+    throw new ValidationError(
       `Missing required LLM key: ${missingKey}. Please set the LLM key in the project settings`,
+      { meta: { missingKey } },
     );
   }
   return true;
@@ -200,15 +204,20 @@ export async function runWorkflow(
     });
   }
 
+  const resolvedVersionId = versionId ?? workflow.publishedId;
   const publishedWorkflowVersion = await prisma.workflowVersion.findUnique({
     where: {
-      id: versionId ?? workflow.publishedId,
+      id: resolvedVersionId,
       projectId,
     },
   });
 
   if (!publishedWorkflowVersion) {
-    throw new Error("Published workflow version not found.");
+    throw new NotFoundError(
+      "published_workflow_version_not_found",
+      "Published workflow version",
+      resolvedVersionId,
+    );
   }
 
   // Published versions can predate the node-owned LLM config migration
@@ -288,7 +297,11 @@ export async function runWorkflow(
   });
 
   if (!response.ok) {
-    throw new Error(`Error running workflow: ${response.statusText}`);
+    logger.error(
+      { status: response.status, statusText: response.statusText, projectId, workflowId },
+      "nlpgo execute_sync returned a non-OK response",
+    );
+    throw new WorkflowExecutionFailedError();
   }
 
   return await response.json();
