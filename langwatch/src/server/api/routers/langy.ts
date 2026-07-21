@@ -345,6 +345,13 @@ export const langyRouter = createTRPCRouter({
          * never leave the user staring at just their own message.
          */
         isTurnInFlight: boolean;
+        /**
+         * Whether the panel should ask "How did Langy do?" under the latest
+         * answer — the backend-driven cadence (never a client heuristic; see
+         * specs/langy/langy-feedback.feature). False while a turn is in
+         * flight: the answer being rated must exist first.
+         */
+        shouldAskFeedback: boolean;
       }> => {
         // Both reads go through user-scoped application services. The message
         // service performs its own visibility check; this detail read is also
@@ -367,15 +374,26 @@ export const langyRouter = createTRPCRouter({
             : [],
           createdAtMs: row.createdAt.getTime(),
         }));
+        const isTurnInFlight =
+          conversation.status === LANGY_CONVERSATION_STATUS.ACTIVE ||
+          conversation.status === LANGY_CONVERSATION_STATUS.RUNNING;
+        const shouldAskFeedback = isTurnInFlight
+          ? false
+          : await getApp().langy.feedbackPrompt.shouldAsk({
+              userId: ctx.session.user.id,
+              conversationId: input.conversationId,
+              assistantAnswerCount: messages.filter(
+                (message) => message.role === "assistant",
+              ).length,
+            });
         return {
           messages,
           lastError:
             conversation.status === LANGY_CONVERSATION_STATUS.FAILED
               ? conversation.lastError
               : null,
-          isTurnInFlight:
-            conversation.status === LANGY_CONVERSATION_STATUS.ACTIVE ||
-            conversation.status === LANGY_CONVERSATION_STATUS.RUNNING,
+          isTurnInFlight,
+          shouldAskFeedback,
         };
       },
     ),
@@ -604,6 +622,43 @@ export const langyRouter = createTRPCRouter({
           comment: input.comment,
           shareConversationConsent: input.shareConversationConsent ?? false,
         },
+      });
+    }),
+
+  /**
+   * The feedback card was SHOWN — start the quiet period (the backend-driven
+   * cadence, specs/langy/langy-feedback.feature). Showing counts as asking:
+   * without this, an ignored card would re-appear under every answer, which is
+   * exactly the nagging the cadence exists to prevent. A write, so it wants
+   * `langy:create`, same as recordFeedback.
+   */
+  feedbackPromptShown: langyCreateProcedure
+    .input(z.object({ conversationId: z.string().min(1) }))
+    .mutation(async ({ input, ctx }): Promise<void> => {
+      // Same doctrine as recordFeedback: never act on a conversation id the
+      // caller cannot actually see in this project. The visible-check runs the
+      // project + ownership/shared rules, so a forged or foreign id is a
+      // silent no-op instead of stamping the caller's cadence record with
+      // attribution they don't own.
+      const conversation = await getApp().langy.conversations.findByIdVisible({
+        id: input.conversationId,
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+      });
+      if (!conversation) {
+        logger.warn(
+          {
+            projectId: input.projectId,
+            conversationId: input.conversationId,
+            userId: ctx.session.user.id,
+          },
+          "dropping langy feedback-shown mark for a conversation the caller cannot see",
+        );
+        return;
+      }
+      await getApp().langy.feedbackPrompt.markShown({
+        userId: ctx.session.user.id,
+        conversationId: input.conversationId,
       });
     }),
 
