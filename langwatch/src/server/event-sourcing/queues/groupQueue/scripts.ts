@@ -167,14 +167,17 @@ end
 -- Move an over-cap group out of ready into its tenant's parked set, preserving
 -- its ready score so it keeps priority when restored. Registers the tenant so
 -- the dispatch-tail reconcile can find it even if no COMPLETE ever fires.
+-- Returns 1 when the group was actually moved out of ready (0 otherwise) so
+-- the dispatch scan can keep its page offset aligned with the shrinking zset.
 local function parkGroup(readyKey, groupId)
   local score = redis.call("ZSCORE", readyKey, groupId)
-  if not score then return end
+  if not score then return 0 end
   local kp = parkKeyPrefixOf(readyKey)
   local tenantId = parkTenantOf(groupId)
   redis.call("ZREM", readyKey, groupId)
   redis.call("ZADD", kp .. "parked:" .. tenantId, score, groupId)
   redis.call("SADD", kp .. "parked-tenants", tenantId)
+  return 1
 end
 
 -- Restore up to "slots" of a tenant's parked groups (lowest score = earliest
@@ -381,12 +384,16 @@ end
 `;
 
 // Reads routing metadata (pipelineName, jobType, jobName) from a stored job
-// value. Envelope values (ADR-026, "GQ1|<headerLen>|<headerJson><body>") expose
-// it in the tiny header so the payload body is never decoded on Redis's
-// thread; legacy bare-JSON values fall back to a full decode.
+// value. Envelope values (ADR-026/029, "GQ<v>|<headerLen>|<headerJson><body>")
+// expose it in the tiny header so the payload body is never decoded on Redis's
+// thread; legacy bare-JSON values fall back to a full decode. GQ1 and GQ2 share
+// the header layout (p/t/n routing fields), so one parse covers both — a
+// GQ2-blind parse here silently disabled pipeline/jobType/jobName-level pause
+// and the per-job-name failed counter for every GQ2 envelope.
 const ROUTING_META_HELPER_LUA = `
 local function gqRoutingMeta(jobDataJson)
-  if string.sub(jobDataJson, 1, 4) == "GQ1|" then
+  local prefix = string.sub(jobDataJson, 1, 4)
+  if prefix == "GQ1|" or prefix == "GQ2|" then
     local barIdx = string.find(jobDataJson, "|", 5, true)
     if barIdx then
       local headerLen = tonumber(string.sub(jobDataJson, 5, barIdx - 1))
@@ -617,7 +624,7 @@ if dedupId ~= "" and dedupTtlMs > 0 then
   end
 end
 
-redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
+local inserted = redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
 redis.call("HSET", dataKey, stagedJobId, jobDataJson)
 local stagedLease = gqParseLease(jobDataJson)
 if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == parkTenantOf(groupId) then
@@ -637,8 +644,14 @@ end
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
 
--- New job staged: increment total pending counter
-redis.call("INCR", totalPendingKey)
+-- Counter conservation (specs/event-sourcing/pending-counter-conservation
+-- .feature): INCR only when the ZADD actually inserted a member. A re-send of
+-- the same stagedJobId (at-least-once event delivery) updates the member in
+-- place; an unconditional INCR here has no compensating DECR and drifts the
+-- counter upward permanently. Mirrors RETRY_RESTAGE_LUA's inserted guard.
+if inserted == 1 then
+  redis.call("INCR", totalPendingKey)
+end
 
 -- A genuinely new stage displaces nothing; its lease was taken with the HSET.
 return {1, ""}
@@ -736,7 +749,11 @@ for i = 1, count do
   end
 
   if not isDeduped then
-    redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
+    -- Counter conservation: count only members the ZADD actually inserted
+    -- (see STAGE_LUA). A duplicate stagedJobId — re-delivered event id, or
+    -- the same payload twice in one batch — updates in place and must not
+    -- inflate newStagedCount, which feeds the total-pending INCRBY below.
+    local inserted = redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
     redis.call("HSET", dataKey, stagedJobId, jobDataJson)
     local stagedLease = gqParseLease(jobDataJson)
     if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
@@ -745,7 +762,9 @@ for i = 1, count do
     if dedupId ~= "" and dedupTtlMs > 0 then
       redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
     end
-    newStagedCount = newStagedCount + 1
+    if inserted == 1 then
+      newStagedCount = newStagedCount + 1
+    end
   end
   orphanedValues[i] = orphanedValue
 
@@ -790,227 +809,6 @@ end
 return {newStagedCount, orphanedValues}
 `;
 
-const DISPATCH_LUA =
-  PARK_HELPER_LUA +
-  WATER_LEVEL_HELPER_LUA +
-  ROUTING_META_HELPER_LUA +
-  `
-local readyKey         = KEYS[1]
-local blockedKey       = KEYS[2]
-local pausedJobKey     = KEYS[3]
-local totalPendingKey  = KEYS[4]
-
-local keyPrefix    = ARGV[1]
-local nowMs        = tonumber(ARGV[2])
-local activeTtlSec = tonumber(ARGV[3])
--- Static operator soft-cap (post-2026-05-11 incident follow-up). 0 = explicit
--- kill switch (LANGWATCH_DISPATCH_TENANT_CAP=0): no cap, no parking. > 0 is the
--- per-tenant in-flight ceiling AND the fail-protective fallback for the dynamic
--- cap below. The tenantId is the groupId prefix (segment before first '/').
-local staticCap    = tonumber(ARGV[4]) or 0
--- Global in-flight budget for the DYNAMIC water-level cap (option C). It is the
--- hard ceiling = pods x concurrency; the water-fill divides the WHOLE capacity.
--- 0 = dynamic disabled, dispatch uses the static cap unchanged (back-compat).
-local globalBudget = tonumber(ARGV[5]) or 0
-
-local hasPauses = redis.call("SCARD", pausedJobKey) > 0
-local activeUntil = nowMs + activeTtlSec * 1000
-
--- Restore parked over-cap groups + recompute the water-level on a cadence (TRAP 2
--- orphan recovery + cap=0 drain). COMPLETE-unpark handles the normal slot-freeing
--- as jobs finish; this only backstops what it can't: a crashed/timed-out tenant
--- that never fires COMPLETE (its in-flight slots lapse out of the live count as
--- their expiry scores pass = back under cap = unpark), and flipping the cap off
--- (drain everything parked). Time-gated and single-pod via reconcile-ts, so the
--- water-fill rides the same proven cadence at near-zero marginal cost.
-local reconcileTsKey = keyPrefix .. "reconcile-ts"
-local lastReconcile = tonumber(redis.call("GET", reconcileTsKey)) or 0
-if (nowMs - lastReconcile) >= ${RECONCILE_INTERVAL_MS} then
-  redis.call("SET", reconcileTsKey, nowMs)
-  -- Recompute W before reconciling so unpark uses the fresh cap. Only when the
-  -- cap is on (staticCap=0 is the kill switch) and a budget is configured.
-  if staticCap > 0 and globalBudget > 0 then
-    recomputeDynamicCap(keyPrefix, globalBudget, nowMs)
-  end
-  if redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
-    local reconcileCap = staticCap
-    if staticCap > 0 and globalBudget > 0 then
-      reconcileCap = effectiveCap(keyPrefix, staticCap)
-    end
-    reconcileParked(readyKey, keyPrefix, reconcileCap, nowMs)
-  end
-end
-
--- Effective per-tenant cap for this dispatch: the dynamic water-level when a
--- budget is configured, else the static cap. staticCap=0 (kill switch) always
--- wins and disables parking entirely.
-local tenantCap = staticCap
-if staticCap > 0 and globalBudget > 0 then
-  tenantCap = effectiveCap(keyPrefix, staticCap)
-end
-
--- Scan ready in priority order and dispatch ONE due job. effCap gates the
--- per-tenant in-flight cap (0 = cap off). bypassPark skips the over-cap PARKING
--- decision (used by the work-conserving override) while STILL recording the
--- in-flight slot, so an override dispatch is counted against its tenant.
--- Page through the ready zset so a head full of paused / blocked / legacy-drift
--- entries does not return nil while eligible work exists later.
-local function scanAndDispatch(effCap, bypassPark)
-  local pageSize = 200
-  -- Widen the scan budget when the cap is on so a head full of one tenant's
-  -- over-cap groups (correctly skipped but still counted) cannot starve tenants
-  -- deeper in the zset. The explicit cost of the cap: more work per poll.
-  local scanBudget = 1000
-  if effCap > 0 then scanBudget = 10000 end
-  local offset = 0
-  -- Cache tenant cap lookups within this scan to avoid redundant GETs.
-  local tenantCapCache = {}
-
-  while offset < scanBudget do
-    local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
-    if #groups == 0 then return nil end
-
-    for _, groupId in ipairs(groups) do
-      if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
-        -- Tenant cap check (no-op when effCap == 0). capTenantId is resolved
-        -- regardless of bypassPark so the in-flight slot is still recorded; only
-        -- the PARK decision is skipped under bypassPark.
-        local tenantOverCap = false
-        local capTenantId = nil
-        if effCap > 0 then
-          local slashPos = string.find(groupId, "/", 1, true)
-          if slashPos and slashPos > 1 then
-            capTenantId = string.sub(groupId, 1, slashPos - 1)
-            if not bypassPark then
-              local cached = tenantCapCache[capTenantId]
-              if cached == nil then
-                cached = tenantActiveCount(keyPrefix .. "tenant_active_z:", capTenantId, nowMs) >= effCap
-                tenantCapCache[capTenantId] = cached
-              end
-              if cached then
-                tenantOverCap = true
-                -- Park the over-cap group OUT of ready (once) so subsequent polls
-                -- reach other tenants without re-scanning it. Restored when the
-                -- tenant's in-flight count drops below cap (COMPLETE / reconcile).
-                parkGroup(readyKey, groupId)
-              end
-            end
-          end
-        end
-
-        -- Tenant-level pause: park the group OUT of ready (like over-cap) rather
-        -- than skip it in place. A paused tenant can hold a huge due-now backlog;
-        -- left in ready it sits at the front and the bounded scan burns its whole
-        -- budget skipping it, starving every other tenant (the 2026-05-27 stall).
-        local tenantPaused = false
-        if hasPauses then
-          if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. parkTenantOf(groupId)) == 1 then
-            tenantPaused = true
-            parkGroup(readyKey, groupId)
-          end
-        end
-
-        local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
-        -- Defensive activeKey check — covers legacy state during migration
-        -- and the small race between ZADD ready and ZADD active.
-        local activeJob = redis.call("GET", activeKey)
-        if (not activeJob) and (not tenantOverCap) and (not tenantPaused) then
-          local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
-          local results = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
-
-          if #results >= 2 then
-            local stagedJobId = results[1]
-            local originalScore = results[2]
-
-            -- Check pause status before dequeuing
-            local paused = false
-            if hasPauses then
-              local slashIdx = string.find(groupId, "/", 1, true)
-              local tenantId = slashIdx and string.sub(groupId, 1, slashIdx - 1) or groupId
-              if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. tenantId) == 1 then
-                paused = true
-              end
-
-              if not paused then
-                local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-                local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-                if jobDataJson then
-                  local p, t, n = gqRoutingMeta(jobDataJson)
-                  local pIsStr = type(p) == "string"
-                  local tIsStr = type(t) == "string"
-                  local nIsStr = type(n) == "string"
-                  if pIsStr then
-                    if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                    elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                    elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
-                    end
-                  end
-                end
-              end
-            end
-
-            if not paused then
-              redis.call("ZREM", jobsKey, stagedJobId)
-              redis.call("DECR", totalPendingKey)
-              redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
-
-              -- Mark group as actively-processing in ready zset (future score suppresses redispatch).
-              redis.call("ZADD", readyKey, activeUntil, groupId)
-
-              -- Tenant in-flight slot (self-healing ZSET; only when cap is set).
-              -- Recorded even under bypassPark so override dispatches are counted.
-              if effCap > 0 and capTenantId then
-                tenantActiveAdd(keyPrefix .. "tenant_active_z:", capTenantId, groupId, activeUntil)
-              end
-
-              local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-              local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-              redis.call("HDEL", dataKey, stagedJobId)
-
-              return {stagedJobId, groupId, jobDataJson or "", originalScore}
-            end
-          else
-            -- Group is in ready but has no due jobs — drift cleanup.
-            local pendingCount = redis.call("ZCARD", jobsKey)
-            if pendingCount == 0 then
-              redis.call("ZREM", readyKey, groupId)
-            else
-              -- All jobs are future-scheduled; re-score ready with earliest job's score
-              local nextScore = redis.call("ZRANGE", jobsKey, 0, 0, "WITHSCORES")
-              if #nextScore >= 2 then
-                redis.call("ZADD", readyKey, tonumber(nextScore[2]), groupId)
-              end
-            end
-          end
-        end
-      end
-    end
-
-    if #groups < pageSize then return nil end
-    offset = offset + pageSize
-  end
-
-  return nil
-end
-
-local r = scanAndDispatch(tenantCap, false)
-if r then return r end
-
--- Work-conserving override: nothing was admittable under the cap, but over-cap
--- work is parked while this slot would otherwise idle. Fairness binds ONLY under
--- contention; a slot free here means no contention, so exceed the per-tenant cap
--- W (never the global ceiling G — that is bounded by this pod's free slots)
--- rather than idle, which is the static-cap idle-behind-cap waste this feature
--- removes. Unpark the least-served over-cap tenant and dispatch it, parking
--- bypassed for the pass. Only when the cap is active (tenantCap>0).
-if globalBudget > 0 and tenantCap > 0 and redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
-  unparkLeastServedParked(readyKey, keyPrefix, pausedJobKey, nowMs, 1)
-  return scanAndDispatch(tenantCap, true)
-end
-
-return nil
-`;
-
 const DISPATCH_BATCH_LUA =
   PARK_HELPER_LUA +
   WATER_LEVEL_HELPER_LUA +
@@ -1025,10 +823,14 @@ local keyPrefix      = ARGV[1]
 local nowMs          = tonumber(ARGV[2])
 local activeTtlSec   = tonumber(ARGV[3])
 local maxJobs        = tonumber(ARGV[4])
--- Static operator soft-cap (0 = kill switch). See DISPATCH_LUA comment.
+-- Static operator soft-cap (post-2026-05-11 incident follow-up). 0 = explicit
+-- kill switch (LANGWATCH_DISPATCH_TENANT_CAP=0): no cap, no parking. > 0 is the
+-- per-tenant in-flight ceiling AND the fail-protective fallback for the dynamic
+-- cap below. The tenantId is the groupId prefix (segment before first '/').
 local staticCap      = tonumber(ARGV[5]) or 0
--- Global in-flight budget = hard ceiling for the dynamic water-level cap.
--- 0 = dynamic disabled, static cap unchanged (back-compat). See DISPATCH_LUA.
+-- Global in-flight budget for the DYNAMIC water-level cap (option C). It is the
+-- hard ceiling = pods x concurrency; the water-fill divides the WHOLE capacity.
+-- 0 = dynamic disabled, dispatch uses the static cap unchanged (back-compat).
 local globalBudget   = tonumber(ARGV[6]) or 0
 
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
@@ -1036,9 +838,13 @@ local activeUntil = nowMs + activeTtlSec * 1000
 local results = {}
 
 -- Restore parked over-cap groups + recompute the water-level on a cadence (TRAP 2
--- orphan recovery + cap=0 drain) — see DISPATCH_LUA for the rationale. Time- and
--- SCARD-gated so it is a no-op at the cap=0 steady state; the water-fill rides
--- the same single-pod reconcile-ts cadence at near-zero marginal cost.
+-- orphan recovery + cap=0 drain). COMPLETE-unpark handles the normal slot-freeing
+-- as jobs finish; this only backstops what it can't: a crashed/timed-out tenant
+-- that never fires COMPLETE (its in-flight slots lapse out of the live count as
+-- their expiry scores pass = back under cap = unpark), and flipping the cap off
+-- (drain everything parked). Time- and SCARD-gated so it is a no-op at the cap=0
+-- steady state and single-pod via reconcile-ts; the water-fill rides the same
+-- proven cadence at near-zero marginal cost.
 local reconcileTsKey = keyPrefix .. "reconcile-ts"
 local lastReconcile = tonumber(redis.call("GET", reconcileTsKey)) or 0
 if (nowMs - lastReconcile) >= ${RECONCILE_INTERVAL_MS} then
@@ -1076,11 +882,26 @@ local function scanBatch(effCap, bypassPark, dispatched)
   local scanBudget = pageSize * 5
   if effCap > 0 then scanBudget = pageSize * 50 end
   local offset = 0
+  -- Work bound: total entries EXAMINED this eval, independent of the offset.
+  -- The offset stalls when a whole page is parked out of ready (the zset
+  -- shifts left under it); bounding on the offset alone would then let one
+  -- eval park an unbounded backlog and block the single Redis thread.
+  local scanned = 0
   local tenantCapCache = {}
 
-  while offset < scanBudget and dispatched < maxJobs do
+  while scanned < scanBudget and dispatched < maxJobs do
     local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
     if #groups == 0 then break end
+    scanned = scanned + #groups
+
+    -- Groups this page removed from the due window (parked, dispatched, or
+    -- drift-cleaned). Removals shift the zset left under the offset-based
+    -- pagination, so the offset must advance only past entries that STAYED
+    -- (blocked / job-paused / active). Advancing by the raw pageSize skipped
+    -- the shifted entries — with a small page and a head full of one over-cap
+    -- tenant, the scan could page past a quiet tenant's only group and return
+    -- empty while eligible work existed.
+    local removed = 0
 
     for _, groupId in ipairs(groups) do
       if dispatched >= maxJobs then break end
@@ -1102,7 +923,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
             end
             if cached then
               tenantOverCap = true
-              parkGroup(readyKey, groupId)
+              removed = removed + parkGroup(readyKey, groupId)
             end
           end
         end
@@ -1114,7 +935,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
       if hasPauses then
         if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. parkTenantOf(groupId)) == 1 then
           tenantPaused = true
-          parkGroup(readyKey, groupId)
+          removed = removed + parkGroup(readyKey, groupId)
         end
       end
 
@@ -1185,9 +1006,15 @@ local function scanBatch(effCap, bypassPark, dispatched)
               results[#results + 1] = jobDataJson or ""
               results[#results + 1] = tostring(originalScore)
               dispatched = dispatched + 1
+              -- The activeUntil re-score above moved the group out of the due
+              -- window: it no longer occupies a slot in the next page read.
+              removed = removed + 1
             end
           else
-            -- Group is in ready but has no due jobs — drift cleanup.
+            -- Group is in ready but has no due jobs — drift cleanup. Both
+            -- branches take the group out of the due window (ZREM, or a
+            -- re-score to the earliest pending job which is necessarily in
+            -- the future — a due job would have dispatched above).
             local pendingCount = redis.call("ZCARD", jobsKey)
             if pendingCount == 0 then
               redis.call("ZREM", readyKey, groupId)
@@ -1198,6 +1025,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
                 redis.call("ZADD", readyKey, tonumber(nextScore[2]), groupId)
               end
             end
+            removed = removed + 1
           end
         end
       end
@@ -1205,7 +1033,9 @@ local function scanBatch(effCap, bypassPark, dispatched)
     end
 
     if #groups < pageSize then break end
-    offset = offset + pageSize
+    -- Advance only past the entries that stayed in the due window; the removed
+    -- ones shifted everything after them left by exactly that many positions.
+    offset = offset + #groups - removed
   end
 
   return dispatched
@@ -1289,12 +1119,12 @@ local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
 local jobName      = ARGV[3]
 -- Tenant in-flight ZSET key prefix. When the soft-cap is enabled in
--- DISPATCH_LUA, completing a job must remove this group's slot from the
+-- DISPATCH_BATCH_LUA, completing a job must remove this group's slot from the
 -- per-tenant ZSET so freed slots are picked up by other tenants. Passing the
 -- prefix in (not a derived tenantId) lets us keep the cap optional without
 -- breaking back-compat with older call sites.
 local tenantCountKeyPrefix = ARGV[4]
--- Static operator soft-cap (same value DISPATCH_LUA reads). When > 0, a
+-- Static operator soft-cap (same value DISPATCH_BATCH_LUA reads). When > 0, a
 -- completion frees a slot that may let one of the tenant's parked over-cap
 -- groups resume, so we unpark up to the freed headroom. 0 = cap disabled.
 local staticCap = tonumber(ARGV[5]) or 0
@@ -1548,10 +1378,16 @@ refreshGroupKeyTtl(groupJobsKey, groupDataKey, nowMs)
 local readyKey = keyPrefix .. "ready"
 addToReadyOrParked(readyKey, groupId, dispatchAfterMs, false)
 
--- 4. Set active key TTL to match backoff period.
---    While the key exists the group is locked (preserves FIFO ordering).
---    When it expires the dispatcher picks up the retry job on its next poll.
-redis.call("EXPIRE", activeKey, retryTtlSec)
+-- 4. Rotate the active key to the NEW staged-job id with a TTL matching the
+--    backoff period. While the key exists the group is locked (preserves FIFO
+--    ordering); when it expires the dispatcher picks up the retry on its next
+--    poll. Rotating the VALUE (not just EXPIRE-ing the old one) invalidates
+--    the retired job id: the worker's activeKey heartbeat interval is still
+--    armed for a few awaits after this eval returns (blob transfer, audit
+--    write), and a late REFRESH matching the old id would reset this TTL to
+--    the full activeTtlSec and push the ready score out with it — delaying
+--    the retry by up to activeTtlSec instead of the backoff.
+redis.call("SET", activeKey, newStagedJobId, "EX", retryTtlSec)
 
 -- 5. Bump this slot's expiry score in lockstep with the activeKey TTL so the
 -- soft cap stays accurate during backoff windows. XX (below) only updates an
@@ -1593,19 +1429,19 @@ export interface DrainedJob {
 /**
  * Default tenant soft-cap when LANGWATCH_DISPATCH_TENANT_CAP is unset.
  *
- * Chosen as `GLOBAL_QUEUE_CONCURRENCY` (the per-worker-pod concurrency
- * default — see groupQueue.ts), which means "no tenant can hold more
- * than one pod's worth of in-flight slots". Sizing rationale:
+ * Chosen as half a worker pod's default concurrency (GLOBAL_QUEUE_CONCURRENCY,
+ * 100 — see groupQueue.ts), so no tenant can hold more than half of one pod's
+ * in-flight slots. Sizing rationale:
  *
  *   - On a multi-pod cluster (e.g. 4 pods × 100 concurrency = 400
- *     total slots), a single tenant is capped at 25% of cluster
+ *     total slots), a single tenant is capped at 12.5% of cluster
  *     capacity. Strong protection against noisy-neighbour starvation
  *     like the 2026-05-11 incident, while leaving ample headroom for
  *     legitimate single-tenant bursts at observed peak loads.
  *
- *   - On a 1-pod self-hosted install, the cap equals total cluster
- *     capacity → effectively unlimited for normal use, but still bounds
- *     a pathological runaway loop below catastrophic.
+ *   - On a 1-pod self-hosted install, the cap is half of total
+ *     capacity → generous for normal use, but still bounds a
+ *     pathological runaway loop below catastrophic.
  *
  *   - Operators can still set LANGWATCH_DISPATCH_TENANT_CAP=0 to
  *     disable entirely (incident kill-switch), or set a different
@@ -1643,7 +1479,7 @@ function readNonNegativeIntEnv({
 
 /**
  * Read the tenant soft-cap from the environment.
- * Post-2026-05-11 incident follow-up; see DISPATCH_LUA comment for design.
+ * Post-2026-05-11 incident follow-up; see the DISPATCH_BATCH_LUA comment for design.
  * Symbol is captured in env-create.mjs for schema discoverability; we
  * read process.env directly at call time so tests can mutate it without
  * re-importing the frozen env module.
@@ -1738,7 +1574,6 @@ export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
 // 11-23 KB script body (see CachedLuaScript).
 const stageScript = new CachedLuaScript(STAGE_LUA);
 const stageBatchScript = new CachedLuaScript(STAGE_BATCH_LUA);
-const dispatchScript = new CachedLuaScript(DISPATCH_LUA);
 const dispatchBatchScript = new CachedLuaScript(DISPATCH_BATCH_LUA);
 const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
 const completeScript = new CachedLuaScript(COMPLETE_LUA);
@@ -1932,7 +1767,13 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Pick the highest-weight ready group and pop its oldest eligible job.
+   * Pick the next eligible group and pop its oldest due job.
+   *
+   * Thin wrapper over {@link dispatchBatch} with maxJobs=1. A dedicated
+   * single-dispatch Lua script used to live here as a near-duplicate of the
+   * batch body; no production caller used it (the dispatcher loop only
+   * batches) and the duplication invited drift between the two scan paths,
+   * so it was removed. One script, one behavior.
    *
    * @returns dispatch result or null if nothing to dispatch
    */
@@ -1943,39 +1784,8 @@ export class GroupStagingScripts {
     nowMs: number;
     activeTtlSec: number;
   }): Promise<DispatchResult | null> {
-    const readyKey = `${this.keyPrefix}ready`;
-    const blockedKey = `${this.keyPrefix}blocked`;
-    const pausedJobKey = `${this.keyPrefix}paused-jobs`;
-    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
-
-    // Tenant soft-cap (post-2026-05-11 follow-up). 0 = disabled.
-    // Env var lets operators flip on per-environment without redeploy.
-    const tenantCap = readTenantCap();
-
-    const result = await dispatchScript.run(
-      this.redis,
-      4,
-      readyKey,
-      blockedKey,
-      pausedJobKey,
-      totalPendingKey,
-      this.keyPrefix,
-      String(nowMs),
-      String(activeTtlSec),
-      String(tenantCap),
-      String(readGlobalBudget()),
-    );
-
-    if (!result || !Array.isArray(result) || result.length < 4) {
-      return null;
-    }
-
-    return {
-      stagedJobId: String(result[0]),
-      groupId: String(result[1]),
-      jobDataJson: String(result[2]),
-      originalScore: Number(result[3]),
-    };
+    const results = await this.dispatchBatch({ nowMs, activeTtlSec, maxJobs: 1 });
+    return results[0] ?? null;
   }
 
   /**
