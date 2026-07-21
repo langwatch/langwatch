@@ -14,6 +14,14 @@ const CANNED_TRACES_SEARCH = {
       output: { value: "I am fine, thank you!" },
       timestamps: { started_at: 1700000000000 },
       metadata: { user_id: "user-42", thread_id: "thread-1" },
+      evaluations: [
+        {
+          evaluator_id: "eval-1",
+          name: "Faithfulness",
+          score: 0.95,
+          passed: true,
+        },
+      ],
     },
   ],
   pagination: { totalHits: 1 },
@@ -974,6 +982,21 @@ describe("All MCP tools integration", () => {
         expect(parsed.filters).toEqual({
           "metadata.user_id": ["user-42"],
         });
+      });
+    });
+
+    describe("when a trace has evaluation results", () => {
+      /** @scenario Agent searches traces and sees evaluation results without a follow-up call */
+      it("includes evaluation status in the digest without a follow-up call", async () => {
+        const { handleSearchTraces } = await import(
+          "../tools/search-traces.js"
+        );
+        const result = await handleSearchTraces({
+          startDate: "24h",
+          endDate: "now",
+        });
+
+        expect(result).toContain("- **Faithfulness**: PASSED (score: 0.95)");
       });
     });
   });
