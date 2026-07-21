@@ -30,6 +30,11 @@ type Config struct {
 	ShouldStartObservability bool
 	LocalAPIKey              string // stable local dev API key seeded + injected into every stack
 	RepoRoot                 string // repo root the daemon prunes orphaned git worktrees from
+	// ShouldDisableGoogleDLP injects LANGWATCH_DISABLE_GOOGLE_DLP=true into every
+	// stack. On by default — local dev should never ship trace text to Google, and
+	// the app then never loads the @google-cloud/dlp SDK. Opt back in (to exercise
+	// DLP against real credentials) with LANGWATCH_DISABLE_GOOGLE_DLP=false.
+	ShouldDisableGoogleDLP bool
 	// ObservabilityConsoleLevel is the console log floor haven injects (as
 	// LOG_CONSOLE_LEVEL) while the observability stack is up — default "warn", so the
 	// terminal is quiet and the full detail lives in Grafana. "" opts out and leaves

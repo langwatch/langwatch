@@ -110,6 +110,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		// the workers' own group rather than the API's when they share a process.
 		HasStandaloneWorkers: opts.ShouldStartWorkers && !opts.ShouldRunWorkersInProcess,
 		LangyTier:            opts.LangyTier,
+		DisableGoogleDLP:     o.cfg.ShouldDisableGoogleDLP,
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{

@@ -48,6 +48,18 @@ Feature: Reduced local dev memory footprint
     When LANGWATCH_DISABLE_GOOGLE_DLP is set and a google_dlp check is requested
     Then the check is refused and the SDK is still never loaded
 
+  # Locally, DLP is off unless a developer deliberately turns it back on: no local
+  # workflow should ship trace text to Google, and the opt-out also keeps the SDK
+  # out of the process. It stays a default, not a lock — haven emits nothing when
+  # the developer opts back in, leaving .env to govern.
+  Scenario: Local dev opts out of Google DLP by default
+    Given a developer starts a stack with haven
+    When the environment overlay is written
+    Then Google DLP is disabled for that stack
+    And the @google-cloud/dlp SDK never loads, even with credentials present
+    When the developer sets LANGWATCH_DISABLE_GOOGLE_DLP to false
+    Then haven leaves the setting to .env, so DLP can be exercised locally
+
   Scenario: OTel instrumentation loads only when observability is configured
     Given neither an OTLP endpoint nor a LangWatch API key is set
     When the server or workers boot
