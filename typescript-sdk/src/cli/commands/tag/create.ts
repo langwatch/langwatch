@@ -2,6 +2,7 @@ import chalk from "chalk";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
 import { checkApiKey } from "../../utils/apiKey";
 import { validateTagName } from "./validation";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
 
 /**
@@ -11,7 +12,7 @@ import type { CommandResult } from "../../utils/output";
 export const tagCreateCommand = async (name: string): Promise<CommandResult | void> => {
   const validationError = validateTagName(name);
   if (validationError) {
-    console.error(chalk.red(`Error: ${validationError}`));
+    reportCommandError({ error: commandValidationError(validationError) });
     process.exit(1);
   }
 

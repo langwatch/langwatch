@@ -390,6 +390,28 @@ describe("runSuiteCommand()", () => {
     });
   });
 
+  // A run that scheduled nothing can never see a completion arrive, so the
+  // poll loop ran the full 10-minute timeout and then reported a TIMEOUT for a
+  // run that was already over. Asserting on `fetch` is what makes this a real
+  // regression test: it is the poll itself that must not happen.
+  describe("when the run scheduled no jobs and --wait was passed", () => {
+    it("returns without polling instead of waiting out the timeout", async () => {
+      mockRun.mockResolvedValue(
+        makeRunResult({
+          jobCount: 0,
+          skippedArchived: { scenarios: ["archived_scenario"], targets: [] },
+        }),
+      );
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response("{}", { status: 200 }));
+
+      await runSuiteCommand("suite_abc123", { wait: true });
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when API call fails", () => {
     it("exits with code 1", async () => {
       mockRun.mockRejectedValue(
