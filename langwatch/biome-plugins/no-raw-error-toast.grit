@@ -1,0 +1,26 @@
+language js
+
+// Error toasts must not render an error's own message.
+//
+// Since #5984 the wire message for a handled error IS its code, so
+// `description: error.message` shows the customer `validation_error`; for an
+// unhandled error the message can carry internals (Prisma models, SQL,
+// hostnames). `showErrorToast` from `~/features/errors` reads the handled
+// payload and renders the code-keyed copy instead.
+//
+// See dev/docs/best_practices/error-handling.md and ADR-045.
+`toaster.create($props)` where {
+    $props <: contains `description: $description`,
+    $description <: or {
+        `$err.message`,
+        `$err?.message`,
+        `$err.message || $_`,
+        `$err.message ?? $_`
+    },
+    $err <: or { `error`, `err`, `e` },
+    register_diagnostic(
+        span = $description,
+        message = "Don't render an error's raw message in a toast — for a handled error this is the code slug (the customer reads `validation_error`), and for an unhandled one it can leak internals. Use showErrorToast(error, { fallbackTitle }) from ~/features/errors instead. See dev/docs/best_practices/error-handling.md.",
+        severity = "error"
+    )
+}

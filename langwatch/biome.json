@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.4.14/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",
@@ -9,6 +9,7 @@
 		"ignoreUnknown": false,
 		"includes": ["**", "!src/server/modelProviders/llmModels.json"]
 	},
+	"plugins": ["./biome-plugins/no-raw-error-toast.grit"],
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "tab"
@@ -16,7 +17,7 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": false,
+			"preset": "none",
 			"complexity": {
 				"noBannedTypes": "error",
 				"noUselessThisAlias": "error",
@@ -31,14 +32,13 @@
 			},
 			"nursery": {
 				"noFloatingPromises": "error",
-				"noForIn": "error",
-				"noMisusedPromises": "error",
-				"noSyncScripts": "error"
+				"noMisusedPromises": "error"
 			},
 			"performance": {
 				"noImgElement": "off",
 				"noUnwantedPolyfillio": "warn",
-				"useGoogleFontPreconnect": "warn"
+				"useGoogleFontPreconnect": "warn",
+				"noSyncScripts": "error"
 			},
 			"style": {
 				"noHeadElement": "warn",
@@ -79,7 +79,8 @@
 				"useAdjacentOverloadSignatures": "error",
 				"useAwait": "off",
 				"useGoogleFontDisplay": "warn",
-				"useNamespaceKeyword": "error"
+				"useNamespaceKeyword": "error",
+				"noForIn": "error"
 			}
 		}
 	},
@@ -113,11 +114,10 @@
 						"noUnreachable": "off",
 						"noUnreachableSuper": "off"
 					},
-					"nursery": {
-						"useSpread": "error"
-					},
+					"nursery": {},
 					"style": {
-						"useConst": "error"
+						"useConst": "error",
+						"useSpreadOverApply": "error"
 					},
 					"suspicious": {
 						"noDuplicateClassMembers": "off",
@@ -134,7 +134,13 @@
 			}
 		},
 		{
-			"includes": ["*.test.ts", "*.test.tsx", "*.spec.ts", "*.spec.tsx", "**/__tests__/**"],
+			"includes": [
+				"*.test.ts",
+				"*.test.tsx",
+				"*.spec.ts",
+				"*.spec.tsx",
+				"**/__tests__/**"
+			],
 			"linter": {
 				"rules": {
 					"suspicious": {

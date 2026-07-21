@@ -51,12 +51,6 @@ const str = (
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
-/** Reads a number out of `meta` without trusting it. */
-const num = (error: HandledErrorShape, key: string): number | null => {
-  const value = error.meta[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-};
-
 const presentations = {
   // ---- traces & spans ----
   trace_not_found: {
