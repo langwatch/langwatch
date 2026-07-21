@@ -8,7 +8,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const create = vi.fn<(args: Record<string, unknown>) => void>();
 vi.mock("~/components/ui/toaster", () => ({ toaster: { create } }));
 
-const isHandledByGlobalHandler = vi.fn(() => false);
+const isHandledByGlobalHandler = vi.fn<(error: unknown) => boolean>(
+  () => false,
+);
 vi.mock("~/utils/trpcError", () => ({
   isHandledByGlobalHandler: (error: unknown) =>
     isHandledByGlobalHandler(error as never),
