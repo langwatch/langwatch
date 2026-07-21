@@ -1520,8 +1520,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         );
       } catch (restageErr) {
         // Both the dead-letter write AND the re-stage fallback failed (Redis
-        // unreachable). The value survives only in the structured drop log
-        // recordDrop already wrote; surface it so an operator can recover it.
+        // unreachable). The raw value is lost: recordDrop deliberately omits
+        // the body (it may carry tenant PII, and the whole point is that we
+        // could not read it anyway), so nothing here can reconstruct it.
         this.logger.error(
           {
             queueName: this.queueName,
@@ -1534,7 +1535,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 ? restageErr.message
                 : String(restageErr),
           },
-          "Dead-letter write AND re-stage fallback failed for a drained value — recoverable only from the drop log",
+          "Dead-letter write AND re-stage fallback failed for a drained value — raw value lost",
         );
       }
     }
