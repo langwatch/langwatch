@@ -382,7 +382,7 @@ describe("TraceRequestCollectionService.handleOtlpTraceRequest", () => {
   });
 
   describe("given a batch where one span's recordSpan dispatch fails", () => {
-    it("returns rejectedSpans=1 with the dispatch error and counts as queue", async () => {
+    it("returns rejectedSpans=1 with the stable queue reason and counts as queue", async () => {
       const { service, recordSpan } = makeService({ dedupAcquire: true });
       recordSpan
         .mockResolvedValueOnce(undefined) // span 0 ok
@@ -396,7 +396,45 @@ describe("TraceRequestCollectionService.handleOtlpTraceRequest", () => {
       );
 
       expect(result.rejectedSpans).toBe(1);
-      expect(result.errorMessage).toContain("redis unavailable");
+      // Public reason code is stable.
+      expect(result.errorMessage).toContain("ingestion queue error");
+      // Raw exception message is NOT reflected to the client.
+      expect(result.errorMessage).not.toContain("redis unavailable");
+    });
+  });
+
+  describe("given a batch where recordSpan throws a Redis/connection error", () => {
+    // Security contract (PR review P2): a customer holding an ingest key can
+    // intentionally trigger queue failures and would otherwise receive
+    // infrastructure/library details via `partialSuccess.errorMessage`. The
+    // raw `error.message` must stay in server logs/tracing, NOT in the OTLP
+    // response. Verifies a representative Redis connection error is not
+    // reflected to the client.
+    it("does not reflect raw exception details in partialSuccess.errorMessage", async () => {
+      const { service, recordSpan } = makeService({ dedupAcquire: true });
+      // Representative of an ioredis/bullmq connection failure — includes
+      // host/port/error-class details that should never reach a client.
+      recordSpan.mockRejectedValueOnce(
+        new Error(
+          "Redis connection failed: ECONNREFUSED 127.0.0.1:6379 (queue=span-processing)",
+        ),
+      );
+      const req = makeTraceRequest([{}]);
+
+      const result = await service.handleOtlpTraceRequest(
+        tenantId,
+        req,
+        piiRedactionLevel,
+      );
+
+      expect(result.rejectedSpans).toBe(1);
+      // Public reason code is stable.
+      expect(result.errorMessage).toContain("ingestion queue error");
+      // Raw exception details are NOT reflected to the client.
+      expect(result.errorMessage).not.toContain("Redis connection failed");
+      expect(result.errorMessage).not.toContain("ECONNREFUSED");
+      expect(result.errorMessage).not.toContain("127.0.0.1");
+      expect(result.errorMessage).not.toContain("span-processing");
     });
   });
 
