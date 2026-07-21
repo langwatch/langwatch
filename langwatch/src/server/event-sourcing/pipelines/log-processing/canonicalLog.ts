@@ -1,7 +1,7 @@
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import type { DeepPartial } from "~/utils/types";
+import { compareOrdinal } from "../../utils/compareOrdinal";
 import {
-  compareOrdinal,
   sha256,
   stableStringify,
 } from "../metric-processing/canonical/serialization";

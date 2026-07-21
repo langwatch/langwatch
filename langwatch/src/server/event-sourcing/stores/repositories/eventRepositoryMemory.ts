@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { compareOrdinal } from "../../utils/compareOrdinal";
 import type { EventRecord, EventRepository } from "./eventRepository.types";
 
 const logger = createLogger("langwatch:event-sourcing:event-repository-memory");
@@ -68,7 +69,7 @@ export class EventRepositoryMemory implements EventRepository {
       if (a.EventTimestamp !== b.EventTimestamp) {
         return a.EventTimestamp - b.EventTimestamp;
       }
-      return a.EventId.localeCompare(b.EventId);
+      return compareOrdinal(a.EventId, b.EventId);
     });
 
     // Return a copy to prevent mutation

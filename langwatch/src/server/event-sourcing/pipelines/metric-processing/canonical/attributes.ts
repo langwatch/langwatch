@@ -2,9 +2,9 @@ import type {
   OtlpAnyValue,
   OtlpKeyValue,
 } from "../../trace-processing/schemas/otlp";
+import { compareOrdinal } from "../../../utils/compareOrdinal";
 import { integerDecimal } from "./numbers";
 import {
-  compareOrdinal,
   isRecord,
   stableStringify,
   type UnknownRecord,
