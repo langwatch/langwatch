@@ -49,8 +49,9 @@ Feature: Langy in-product AI assistant — baseline (v1)
 
   # ============================================================================
   # Access and rollout gating
-  # Covered by src/server/app-layer/langy/__tests__/langyAccessGate.unit.test.ts
-  # and src/features/langy/__tests__/ProjectLangyLayout.integration.test.tsx
+  # Covered by src/server/app-layer/langy/__tests__/langyAccessGate.unit.test.ts,
+  # src/features/langy/__tests__/ProjectLangyLayout.integration.test.tsx, and
+  # src/features/langy/hooks/__tests__/useShowLangy.integration.test.tsx
   # ============================================================================
 
   Scenario: Without a rollout, Langy stays closed
@@ -62,6 +63,16 @@ Feature: Langy in-product AI assistant — baseline (v1)
     Given Langy has been rolled out to my account
     When I send a message to Langy in project "demo"
     Then the request is not rejected by the rollout gate
+
+  # A rollout can target a whole organization, not only a single project. The
+  # panel's visibility gate must honor an org-wide rollout the same way the API
+  # gate does — otherwise the org is authorized server-side but the handle never
+  # appears, because the gate resolved the flag with project context alone.
+  Scenario: An organization-wide rollout reveals the handle, not just the API
+    Given Langy has been rolled out to my whole organization
+    And no project-level rollout applies to project "demo"
+    When I navigate to any "/[project]/*" route in project "demo"
+    Then the Langy handle is visible
 
   # There is no identity that grants Langy on its own — no staff bypass, no
   # allowlisted address. The rollout is the only way in, so it also works as a
