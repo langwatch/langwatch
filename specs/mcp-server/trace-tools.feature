@@ -25,6 +25,9 @@ Feature: MCP Trace Tools
     When the agent calls search_traces with the returned scrollId
     Then the response contains the next page of results
 
+  # Implementation:
+  #   mcp-server/src/tools/search-traces.ts
+  #   mcp-server/src/utils/format-evaluations.ts  (formatEvaluationLines)
   Scenario: Agent searches traces and sees evaluation results without a follow-up call
     Given a trace exists with an evaluation result
     When the agent calls search_traces with a query matching that trace

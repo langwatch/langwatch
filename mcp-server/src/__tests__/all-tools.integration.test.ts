@@ -985,7 +985,7 @@ describe("All MCP tools integration", () => {
       });
     });
 
-    describe("when a trace has evaluation results", () => {
+    describe("given a trace has evaluation results", () => {
       /** @scenario Agent searches traces and sees evaluation results without a follow-up call */
       it("includes evaluation status in the digest without a follow-up call", async () => {
         const { handleSearchTraces } = await import(
