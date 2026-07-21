@@ -503,6 +503,14 @@ export const langyRouter = createTRPCRouter({
          * flight: the answer being rated must exist first.
          */
         shouldAskFeedback: boolean;
+        /**
+         * The projection's event cursor at this snapshot (ADR-059): the client
+         * seeds its local fold here and catches up by fetching
+         * `conversationEventsAfter` — never by replaying full history.
+         */
+        eventCursor: { acceptedAt: number; eventId: string } | null;
+        /** The turn in flight, or null — what a refresh reattaches to. */
+        currentTurnId: string | null;
       }> => {
         // Both reads go through user-scoped application services. The message
         // service performs its own visibility check; this detail read is also
@@ -548,6 +556,8 @@ export const langyRouter = createTRPCRouter({
           // must never become a Stop target.
           inFlightTurnId: isTurnInFlight ? conversation.currentTurnId : null,
           shouldAskFeedback,
+          eventCursor: conversation.eventCursor,
+          currentTurnId: isTurnInFlight ? conversation.currentTurnId : null,
         };
       },
     ),

@@ -21,6 +21,8 @@ function toRow(row: Row): LangyConversationRow {
     lastActivityAtMs: row.LastActivityAt ?? 0,
     cursorActivityAtMs: row.LastActivityAt,
     createdAtMs: row.CreatedAt,
+    currentTurnId: row.CurrentTurnId,
+    eventCursor: { acceptedAt: row.AcceptedAt, eventId: row.LastEventId },
   };
 }
 

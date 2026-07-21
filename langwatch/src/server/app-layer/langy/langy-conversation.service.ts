@@ -118,6 +118,13 @@ export type ConversationDetail = ConversationListItem & {
    * answer and no explanation at all.
    */
   lastError: string | null;
+  /** The turn in flight, or null when idle — what a refresh reattaches to. */
+  currentTurnId: string | null;
+  /**
+   * The projection's event cursor (ADR-059): the snapshot position the client
+   * seeds its local fold from before folding the durable tail.
+   */
+  eventCursor: LangyEventCursor | null;
 };
 
 export interface ConversationListPage {
@@ -251,6 +258,8 @@ export class LangyConversationService {
       status: row.status,
       currentTurnId: row.currentTurnId,
       lastError: row.lastError,
+      currentTurnId: row.currentTurnId ?? null,
+      eventCursor: row.eventCursor ?? null,
     };
   }
 
