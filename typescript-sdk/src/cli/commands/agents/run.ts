@@ -5,12 +5,18 @@ import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+/**
+ * Returns the run's response rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts). Both execution
+ * paths (direct HTTP agent, workflow-linked agent) return their own result.
+ */
 export const runAgentCommand = async (
   id: string,
-  options: { input?: string; format?: string },
-): Promise<void> => {
+  options: { input?: string },
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new AgentsApiService();
@@ -62,14 +68,15 @@ export const runAgentCommand = async (
       const result = await response.json() as Record<string, unknown>;
       runSpinner.succeed(`HTTP agent responded (${response.status})`);
 
-      if (options.format === "json") {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log();
-        console.log(chalk.bold("  Response:"));
-        console.log(`    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`);
-        console.log();
-      }
+      return {
+        data: result,
+        table: () => {
+          console.log();
+          console.log(chalk.bold("  Response:"));
+          console.log(`    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`);
+          console.log();
+        },
+      };
     } catch (error) {
       failSpinner({ spinner: runSpinner, error, action: "call HTTP agent" });
       process.exit(1);
@@ -113,22 +120,23 @@ export const runAgentCommand = async (
       const result = await response.json() as Record<string, unknown>;
       runSpinner.succeed(`Agent "${agent.name}" executed successfully`);
 
-      if (options.format === "json") {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log();
-        if (result.output !== undefined) {
-          console.log(chalk.bold("  Output:"));
-          const output = typeof result.output === "string"
-            ? result.output
-            : JSON.stringify(result.output, null, 2);
-          console.log(`    ${output.split("\n").join("\n    ")}`);
-        } else {
-          console.log(chalk.bold("  Result:"));
-          console.log(`    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`);
-        }
-        console.log();
-      }
+      return {
+        data: result,
+        table: () => {
+          console.log();
+          if (result.output !== undefined) {
+            console.log(chalk.bold("  Output:"));
+            const output = typeof result.output === "string"
+              ? result.output
+              : JSON.stringify(result.output, null, 2);
+            console.log(`    ${output.split("\n").join("\n    ")}`);
+          } else {
+            console.log(chalk.bold("  Result:"));
+            console.log(`    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`);
+          }
+          console.log();
+        },
+      };
     } catch (error) {
       failSpinner({
         spinner: runSpinner,

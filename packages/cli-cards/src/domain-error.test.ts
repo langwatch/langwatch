@@ -213,11 +213,29 @@ describe("parseDomainError, given dialect 3 (the new framework envelope)", () =>
     // context the platform attached to it.
     const parsed = parseDomainError({
       status: 404,
-      body: { type: "dataset_not_found", id: "ds_1" },
+      body: {
+        type: "dataset_not_found",
+        message: "Dataset not found: ds_1",
+        id: "ds_1",
+      },
     });
 
     expect(parsed.code).toBe("dataset_not_found");
     expect(parsed.meta).toEqual({ id: "ds_1" });
+  });
+
+  it("does not let a bare `type` on some other object name a failure", () => {
+    // `type` is a far more common field on ordinary objects than `code` is, so
+    // it clears the same envelope check: without a sentence, a meta bag or a
+    // `kind` beside it, this is not the platform speaking, and calling it a
+    // domain error would blame the user for something they did not do.
+    const parsed = parseDomainError({
+      status: 0,
+      body: { type: "csv", rows: 12 },
+    });
+
+    expect(parsed.code).toBe("network_error");
+    expect(parsed.isDomain).toBe(false);
   });
 });
 
@@ -401,5 +419,194 @@ describe("domainErrorFromThrown", () => {
     const parsed = domainErrorFromThrown(new Error("fetch failed"));
 
     expect(parsed).toMatchObject({ isDomain: false, message: "fetch failed" });
+  });
+});
+
+/**
+ * The shape `fetch` ACTUALLY throws when the transport fails: a
+ * `TypeError("fetch failed")` whose `cause` is the libuv system error. Its own
+ * enumerable keys are `{ errno, code, syscall, address, port }`, so it carries a
+ * top-level `code` — `ECONNREFUSED`, `ENOTFOUND`, a TLS cert code — that is not
+ * a discriminant the platform ever chose.
+ *
+ * A hand-rolled `new Error("fetch failed")` with no `cause` cannot stand in for
+ * this: it is the `cause` that carries the `code`, and the `code` is the whole
+ * hazard. Read as a domain error, a dead socket renders as though the USER had
+ * done something wrong, and the local address and port ride along in `meta`.
+ */
+const systemError = ({
+  message,
+  code,
+  errno,
+  syscall,
+  extra = {},
+}: {
+  message: string;
+  code: string;
+  errno: number;
+  syscall: string;
+  extra?: Record<string, unknown>;
+}) =>
+  Object.assign(new TypeError("fetch failed"), {
+    cause: Object.assign(new Error(message), {
+      errno,
+      code,
+      syscall,
+      ...extra,
+    }),
+  });
+
+describe("domainErrorFromThrown, given a transport failure fetch threw", () => {
+  describe("when the socket was refused", () => {
+    const refused = () =>
+      systemError({
+        message: "connect ECONNREFUSED 127.0.0.1:5560",
+        code: "ECONNREFUSED",
+        errno: -61,
+        syscall: "connect",
+        extra: { address: "127.0.0.1", port: 5560 },
+      });
+
+    it("classifies a refused connection as infrastructure", () => {
+      const parsed = domainErrorFromThrown(refused());
+
+      expect(parsed).toMatchObject({ code: "network_error", isDomain: false });
+    });
+
+    it("never claims the libuv code as a domain discriminant", () => {
+      const parsed = domainErrorFromThrown(refused());
+
+      expect(parsed.code).not.toBe("ECONNREFUSED");
+      expect(parsed.kind).not.toBe("ECONNREFUSED");
+    });
+
+    it("keeps the local address and port out of the rendered document", () => {
+      const rendered = JSON.stringify(
+        toCliErrorDocument(domainErrorFromThrown(refused())),
+      );
+
+      expect(rendered).not.toContain("127.0.0.1");
+      expect(rendered).not.toContain("5560");
+      expect(rendered).not.toContain("syscall");
+      expect(rendered).not.toContain("errno");
+    });
+
+    it("reports the failure with status 0, not a fabricated one", () => {
+      expect(domainErrorFromThrown(refused()).httpStatus).toBe(0);
+    });
+  });
+
+  describe("when DNS could not resolve the host", () => {
+    it("classifies an unresolvable host as infrastructure", () => {
+      const parsed = domainErrorFromThrown(
+        systemError({
+          message: "getaddrinfo ENOTFOUND app.langwatch.invalid",
+          code: "ENOTFOUND",
+          errno: -3008,
+          syscall: "getaddrinfo",
+          extra: { hostname: "app.langwatch.invalid" },
+        }),
+      );
+
+      expect(parsed).toMatchObject({ code: "network_error", isDomain: false });
+    });
+
+    it("classifies a DNS timeout as infrastructure", () => {
+      const parsed = domainErrorFromThrown(
+        systemError({
+          message: "getaddrinfo EAI_AGAIN app.langwatch.ai",
+          code: "EAI_AGAIN",
+          errno: -3001,
+          syscall: "getaddrinfo",
+        }),
+      );
+
+      expect(parsed).toMatchObject({ code: "network_error", isDomain: false });
+    });
+  });
+
+  describe("when TLS could not verify the certificate", () => {
+    it("classifies a self-signed certificate as infrastructure", () => {
+      const parsed = domainErrorFromThrown(
+        systemError({
+          message: "self signed certificate in certificate chain",
+          code: "SELF_SIGNED_CERT_IN_CHAIN",
+          errno: -1,
+          syscall: "connect",
+        }),
+      );
+
+      expect(parsed).toMatchObject({ code: "network_error", isDomain: false });
+    });
+
+    it("classifies an unverifiable leaf certificate as infrastructure", () => {
+      const parsed = domainErrorFromThrown(
+        systemError({
+          message: "unable to verify the first certificate",
+          code: "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+          errno: -1,
+          syscall: "connect",
+        }),
+      );
+
+      expect(parsed).toMatchObject({ code: "network_error", isDomain: false });
+    });
+  });
+
+  describe("when the connection died mid-flight", () => {
+    it.each([
+      ["ETIMEDOUT", -60, "connect ETIMEDOUT 10.0.0.1:443"],
+      ["ECONNRESET", -54, "read ECONNRESET"],
+      ["EPIPE", -32, "write EPIPE"],
+    ])("classifies %s as infrastructure", (code, errno, message) => {
+      const parsed = domainErrorFromThrown(
+        systemError({ message, code, errno, syscall: "connect" }),
+      );
+
+      expect(parsed).toMatchObject({ code: "network_error", isDomain: false });
+    });
+  });
+
+  it("keeps the transport's own sentence, so the user still learns what broke", () => {
+    const parsed = domainErrorFromThrown(
+      systemError({
+        message: "connect ECONNREFUSED 127.0.0.1:5560",
+        code: "ECONNREFUSED",
+        errno: -61,
+        syscall: "connect",
+      }),
+    );
+
+    expect(parsed.message).toBe("fetch failed");
+  });
+});
+
+describe("parseDomainError, given a bare `code` with nothing else", () => {
+  it("refuses to read a lone code as a domain discriminant", () => {
+    const parsed = parseDomainError({ status: 0, body: { code: "ECONNREFUSED" } });
+
+    expect(parsed).toMatchObject({ code: "network_error", isDomain: false });
+  });
+
+  it("still reads a code that arrives with the envelope's sentence", () => {
+    const parsed = parseDomainError({
+      status: 0,
+      body: { code: "dataset_not_found", message: "Dataset not found" },
+    });
+
+    expect(parsed).toMatchObject({ code: "dataset_not_found", isDomain: true });
+  });
+
+  it("still reads a code that arrives with the envelope's meta bag", () => {
+    const parsed = parseDomainError({
+      status: 404,
+      body: { code: "dataset_not_found", meta: { id: "sales-q3" } },
+    });
+
+    expect(parsed).toMatchObject({
+      code: "dataset_not_found",
+      meta: { id: "sales-q3" },
+      isDomain: true,
+    });
   });
 });

@@ -64,7 +64,18 @@ export default defineConfig([
     format: ["cjs"],
     minify: true,
     dts: false,
-    sourcemap: false,
+    // Minified WITHOUT a sourcemap, every user-reported stack trace reads
+    // `at t (bundle.js:1:284119)` and is unresolvable even for us. So the map
+    // is generated — but it is excluded from the published tarball via
+    // package.json `files` (`!dist/cli/*.map`), which keeps the npm weight win
+    // the minify+no-dts decision above was after. Node only reads maps under
+    // `--enable-source-maps`, so shipping the reference without the map costs
+    // nothing at runtime.
+    //
+    // To decode a trace from a released version: check out that tag, run
+    // `pnpm build`, and use the local dist/cli/bundle.js.map — esbuild output
+    // is deterministic for a given input, so it matches what shipped.
+    sourcemap: true,
     noExternal,
     define,
     onSuccess: async () => {

@@ -61,6 +61,13 @@ import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
  */
 const MAX_SOCKET_PATH_BYTES = 100;
 
+/**
+ * What `resolveIdentity` appends to the base directory: a separator, 16 hex
+ * characters of fingerprint and `.sock`. Known here so `daemonSocketDir` can
+ * tell whether a candidate base leaves room for the socket at all.
+ */
+const SOCKET_FILE_BYTES = 1 + 16 + ".sock".length;
+
 export interface DaemonIdentity {
   /** Full sha256 hex of the identity tuple. Presented in the handshake. */
   fingerprint: string;
@@ -87,20 +94,48 @@ export function isDaemonSupported(): boolean {
  * Base directory for daemon sockets.
  *
  * `$XDG_RUNTIME_DIR` when set (Linux; already per-user and 0700, and cleaned
- * on logout), otherwise `os.tmpdir()`. We never use a fixed world-writable
- * path like `/tmp/langwatch.sock` — this process holds credentials.
+ * on logout), otherwise `$HOME/.langwatch/run` — the same dot-directory the
+ * CLI already keeps its config in.
+ *
+ * `os.tmpdir()` is the LAST resort, and deliberately so. On Linux without
+ * `$XDG_RUNTIME_DIR` it is `/tmp`, mode 1777: any local user can PRE-CREATE
+ * `/tmp/langwatch-<uid>`, own it, and leave it 0777. Our `ensureSocketDir`
+ * then cannot chmod a directory it does not own, so the real daemon can never
+ * bind — and the squatter is free to bind the socket itself and be handed the
+ * caller's args, cwd and forwarded `LANGWATCH_*` env. A directory under `$HOME`
+ * cannot be pre-created by another user, which removes the squat for the LEAF
+ * rather than merely detecting it — on a correctly-permissioned `$HOME`. It does
+ * NOT remove it for the path's ancestors, which nothing here checks; see the
+ * boundary note on `inspectSocketTrust`. (`inspectSocketTrust` remains the only
+ * defence for `$XDG_RUNTIME_DIR`, `LANGWATCH_DAEMON_DIR` and the temp-dir
+ * fallback, where pre-creation IS possible.)
  */
 export function daemonSocketDir(): string {
   const override = process.env.LANGWATCH_DAEMON_DIR;
   if (override) return override;
 
-  const runtimeDir = process.env.XDG_RUNTIME_DIR;
-  const base =
-    runtimeDir && runtimeDir.trim() !== "" ? runtimeDir : os.tmpdir();
   // The uid is in the directory name so two users on one box never contend for
   // the same directory (whose 0700 mode would make the loser fail to enter).
   const uid = typeof process.getuid === "function" ? process.getuid() : 0;
-  return path.join(base, `langwatch-${uid}`);
+  const leaf = `langwatch-${uid}`;
+
+  const runtimeDir = process.env.XDG_RUNTIME_DIR;
+  if (runtimeDir && runtimeDir.trim() !== "") return path.join(runtimeDir, leaf);
+
+  const home = os.homedir();
+  if (home !== "") {
+    const underHome = path.join(home, ".langwatch", "run", leaf);
+    // A very long $HOME would push the socket past sockaddr_un and disable the
+    // daemon outright. The temp dir is shorter; a daemon whose directory we
+    // validate on every connect beats no daemon at all.
+    if (
+      Buffer.byteLength(underHome, "utf8") + SOCKET_FILE_BYTES <=
+      MAX_SOCKET_PATH_BYTES
+    ) {
+      return underHome;
+    }
+  }
+  return path.join(os.tmpdir(), leaf);
 }
 
 /**
@@ -197,14 +232,129 @@ export function isSocketPathUsable(socketPath: string): boolean {
 }
 
 /**
+ * Why a socket path must not be connected to. `null` means it is safe.
+ *
+ * These are the CLIENT-side half of the trust model. `ensureSocketDir` and
+ * `secureSocketFile` make the socket private when WE create it; they say
+ * nothing about a socket somebody else created first. Without this check a
+ * squatted socket is indistinguishable from our own daemon, and the client
+ * pipelines `exec` — args, cwd and the forwarded `LANGWATCH_*` env, API key
+ * included — before it has seen a single byte back.
+ */
+export type SocketTrustProblem =
+  | "socket-dir-missing"
+  | "socket-dir-not-a-directory"
+  | "socket-dir-foreign-owner"
+  | "socket-dir-loose-mode"
+  | "socket-missing"
+  | "socket-not-a-socket"
+  | "socket-foreign-owner"
+  | "socket-loose-mode";
+
+/** No group or other bits at all — the 0600/0700 half of the trust model. */
+function hasLooseMode(mode: number): boolean {
+  return (mode & 0o077) !== 0;
+}
+
+/**
+ * Decide whether this socket path may be connected to.
+ *
+ * Both the socket AND its parent directory must be owned by us and carry no
+ * group/other bits: a private socket inside a directory somebody else can
+ * write is not private, because they can unlink it and bind their own.
+ *
+ * `lstat`, never `stat`: a symlink standing in for the socket (or for the
+ * directory) must be REJECTED, not followed to whatever it points at.
+ *
+ * Every problem is soft — the caller falls back to running the command
+ * in-process. A squatted socket must degrade the CLI to its pre-daemon
+ * behaviour, never break it.
+ *
+ * THE BOUNDARY, precisely. This checks the socket and its IMMEDIATE parent, and
+ * nothing above that: `~/.langwatch`, `~/.langwatch/run`'s own ancestors and
+ * `$HOME` itself are not stat'd. So preferring `$HOME` over `/tmp` removes the
+ * squat for the LEAF — an attacker cannot create or replace the socket or its
+ * directory — but it does not remove it for the CHAIN. On a misconfigured
+ * group-writable `$HOME`, a peer can rename an ancestor and point the whole path
+ * somewhere they control.
+ *
+ * That residual case is deliberately left to fail the checks above rather than
+ * be pre-empted by an ancestor walk. The outcome is refuse-and-degrade, not
+ * disclosure: the substituted directory is theirs, so `socket-dir-foreign-owner`
+ * fires and no bytes are ever sent. A full walk to the filesystem root would add
+ * a stat per level to the hot path of every invocation and still not close the
+ * race (any ancestor can be renamed between our stat and our connect); a
+ * group-writable `$HOME` is a broken machine, and one this CLI degrades safely
+ * on rather than pretends to fix.
+ */
+export function inspectSocketTrust(
+  socketPath: string,
+): SocketTrustProblem | null {
+  // No POSIX ownership to check (and the daemon is disabled there anyway).
+  if (typeof process.getuid !== "function") return null;
+  const uid = process.getuid();
+
+  let dirStat: fs.Stats;
+  try {
+    dirStat = fs.lstatSync(path.dirname(socketPath));
+  } catch {
+    return "socket-dir-missing";
+  }
+  if (!dirStat.isDirectory()) return "socket-dir-not-a-directory";
+  if (dirStat.uid !== uid) return "socket-dir-foreign-owner";
+  if (hasLooseMode(dirStat.mode)) return "socket-dir-loose-mode";
+
+  let socketStat: fs.Stats;
+  try {
+    socketStat = fs.lstatSync(socketPath);
+  } catch {
+    // The ordinary "no daemon running" case, and by far the most common.
+    return "socket-missing";
+  }
+  if (!socketStat.isSocket()) return "socket-not-a-socket";
+  if (socketStat.uid !== uid) return "socket-foreign-owner";
+  if (hasLooseMode(socketStat.mode)) return "socket-loose-mode";
+
+  return null;
+}
+
+/** A socket directory we cannot own, and therefore cannot make private. */
+export class UntrustedSocketDirError extends Error {
+  constructor(
+    readonly socketDir: string,
+    readonly problem: string,
+  ) {
+    super(`refusing to use socket directory ${socketDir}: ${problem}`);
+    this.name = "UntrustedSocketDirError";
+  }
+}
+
+/**
  * Create the socket directory with 0700. Also repairs the mode if the
  * directory already exists with looser permissions — a world-readable
  * directory would let another user stat (though not connect to) the socket.
+ *
+ * Fails CLOSED when the directory is not ours. `mkdirSync`'s `mode` is subject
+ * to umask and ignored outright when the directory already exists, and
+ * `chmodSync` cannot repair a directory owned by somebody else — so a
+ * pre-created, attacker-owned directory (the classic 1777 `/tmp` squat) leaves
+ * us with a socket we can never make private. Callers must treat that as "no
+ * daemon", not as a warning: a daemon whose socket cannot be made private must
+ * not exist.
  */
 export function ensureSocketDir(socketDir: string): void {
   fs.mkdirSync(socketDir, { recursive: true, mode: 0o700 });
-  // mkdirSync's `mode` is subject to umask and is ignored entirely when the
-  // directory already exists, so assert the mode explicitly.
+
+  // lstat, so a symlink pointing at a directory we DO own cannot launder a
+  // path an attacker controls into one that passes this check.
+  const stat = fs.lstatSync(socketDir);
+  if (!stat.isDirectory()) {
+    throw new UntrustedSocketDirError(socketDir, "not a directory");
+  }
+  if (typeof process.getuid === "function" && stat.uid !== process.getuid()) {
+    throw new UntrustedSocketDirError(socketDir, "owned by another user");
+  }
+
   fs.chmodSync(socketDir, 0o700);
 }
 

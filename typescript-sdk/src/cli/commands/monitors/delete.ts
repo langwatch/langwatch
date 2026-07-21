@@ -2,14 +2,17 @@ import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { printResult, type RawOutputFlags } from "../../utils/output";
+import type { CommandResult } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+/**
+ * Returns the deletion outcome rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts).
+ */
 export const deleteMonitorCommand = async (
-  id: string,
-  options?: RawOutputFlags
-): Promise<void> => {
+  id: string
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
@@ -47,12 +50,10 @@ export const deleteMonitorCommand = async (
     process.exit(1);
   }
 
-  // Rendering stays OUTSIDE the delete try: a printResult rejection (invalid
-  // --jq) must not report an already-deleted monitor as a delete failure.
-  await printResult(result, {
-    ...options,
+  return {
+    data: result,
     table: () => {
       // The spinner's success line is the human output.
     },
-  });
+  };
 };

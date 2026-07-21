@@ -26,7 +26,7 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
 | 9 | Docs as markdown from the CLI (llms.txt index + pages) | ❌ | ❌ | ✅ `commands/docs.ts` (`docs`, `scenario-docs`) — ahead of both | — |
 | 10 | Non-interactive auth for agents (token/device flow) | ✅ | ✅ | ✅ device flow + `--api-key` (`utils/governance/device-flow.ts`, `commands/login.ts`) | — |
 | 11 | Fast cold start for agent shell-outs | ✅ (Go binary) | ✅ | ✅ warm daemon (`daemon/`) + bun-compiled binary (`scripts/build-cli-binary.ts`) | — |
-| 12 | Help topics (`gh help formatting`, `environment`, `exit-codes`) | ❌ | ✅ | ✅ `lw help agent` (`typescript-sdk/src/cli/commands/help.ts`) — registered as a real `help [topic]` command, which suppresses commander's implicit help command (its dispatch is internal and could never reach a topic page); `help <command>` still prints that command's help, unknown topics exit 1. The `agent` page covers: agent mode + the 7 env vars, the output contract with examples, the structured-error document, discovery (`commands`/`help-tree`/`status`/`docs`), skills, the daemon, and piping rules | ~~P5~~ done |
+| 12 | Help topics (`gh help formatting`, `environment`, `exit-codes`) | ❌ | ✅ | ✅ `lw help agent-mode` (`typescript-sdk/src/cli/commands/help.ts`) — registered as a real `help [topic]` command, which suppresses commander's implicit help command (its dispatch is internal and could never reach a topic page); `help <command>` still prints that command's help (commands are resolved before topics, so a topic can never shadow a command), unknown topics exit 1. The `agent-mode` page covers: agent mode + the 7 env vars, the output contract with examples, the structured-error document, discovery (`commands`/`help-tree`/`status`/`docs`), skills, the daemon, and piping rules | ~~P5~~ done |
 
 ## Notes per row
 
@@ -173,9 +173,11 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
 ### 12. Help topics (P5) — DONE
 - `help` is registered as a REAL command (`help [topic]`): a command named
   `help` suppresses commander's lazily-created implicit one, so
-  `lw help agent` reaches our action while `lw help` / `lw help <command>`
+  `lw help agent-mode` reaches our action while `lw help` / `lw help <command>`
   keep the stock behavior (root help / the named command's help, aliases
-  included). Added to `PLUMBING_COMMANDS` (SDK drift test + status summary)
+  included). Commands are resolved BEFORE topics, and no topic may be named
+  after a command — the topic is `agent-mode`, not `agent`, because `agent` is
+  a real top-level group. Added to `PLUMBING_COMMANDS` (SDK drift test + status summary)
   and the mirror `EXCLUDED_COMMANDS` in the app-side capabilityCatalog
   coverage test.
 

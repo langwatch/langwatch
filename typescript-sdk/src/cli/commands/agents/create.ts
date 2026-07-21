@@ -4,11 +4,16 @@ import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.servic
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
+import type { CommandResult } from "../../utils/output";
 
+/**
+ * Returns the created agent rather than printing it: the output port renders it
+ * in whatever format the caller asked for (utils/output.ts).
+ */
 export const createAgentCommand = async (
   name: string,
-  options: { type: string; config?: string; format?: string },
-): Promise<void> => {
+  options: { type: string; config?: string },
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new AgentsApiService();
@@ -29,11 +34,14 @@ export const createAgentCommand = async (
       `Created agent "${chalk.cyan(agent.name)}" ${chalk.gray(`(id: ${agent.id})`)}`,
     );
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(agent, null, 2));
-    } else if (agent.platformUrl) {
-      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(agent.platformUrl)}`);
-    }
+    return {
+      data: agent,
+      table: () => {
+        if (agent.platformUrl) {
+          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(agent.platformUrl)}`);
+        }
+      },
+    };
   } catch (error) {
     // Route BOTH failure kinds through failSpinner: a direct spinner.fail()
     // prints nothing in --json/--jq/agent mode (spinners are silent there).

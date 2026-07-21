@@ -3,12 +3,16 @@ import { createSpinner } from "../../utils/spinner";
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
-import { printResult, type RawOutputFlags } from "../../utils/output";
+import type { CommandResult } from "../../utils/output";
 
+/**
+ * Returns the created evaluator rather than printing it: the output port
+ * renders it in whatever format the caller asked for (utils/output.ts).
+ */
 export const createEvaluatorCommand = async (
   name: string,
-  options: { type: string } & RawOutputFlags,
-): Promise<void> => {
+  options: { type: string },
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new EvaluatorsApiService();
@@ -33,14 +37,12 @@ export const createEvaluatorCommand = async (
     process.exit(1);
   }
 
-  // Rendering stays OUTSIDE the create try: a printResult rejection (invalid
-  // --jq) must not report an already-created evaluator as a create failure.
-  await printResult(evaluator, {
-    ...options,
+  return {
+    data: evaluator,
     table: () => {
       if (evaluator.platformUrl) {
         console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
       }
     },
-  });
+  };
 };

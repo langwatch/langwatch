@@ -4,10 +4,14 @@ import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
-import { printResult, type RawOutputFlags } from "../../utils/output";
+import type { CommandResult } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+/**
+ * Returns the updated monitor rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts).
+ */
 export const updateMonitorCommand = async (
   id: string,
   options: {
@@ -16,8 +20,8 @@ export const updateMonitorCommand = async (
     executionMode?: string;
     sample?: string;
     parameters?: string;
-  } & RawOutputFlags
-): Promise<void> => {
+  }
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
@@ -84,10 +88,8 @@ export const updateMonitorCommand = async (
     process.exit(1);
   }
 
-  // Rendering stays OUTSIDE the update try: a printResult rejection (invalid
-  // --jq) must not report an already-updated monitor as an update failure.
-  await printResult(monitor, {
-    ...options,
+  return {
+    data: monitor,
     table: () => {
       console.log();
       console.log(`  ${chalk.gray("ID:")}      ${chalk.green(monitor.id)}`);
@@ -97,5 +99,5 @@ export const updateMonitorCommand = async (
       );
       console.log();
     },
-  });
+  };
 };

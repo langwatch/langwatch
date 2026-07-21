@@ -8,13 +8,13 @@ import {
 
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
 type ScopeKind = "project" | "team" | "organization";
 
 export interface UnsetModelDefaultOptions {
   scope?: ScopeKind;
   scopeId?: string;
-  format?: string;
 }
 
 function resolveScope(
@@ -54,11 +54,18 @@ function resolveScope(
  * If the config has no other keys left, deletes it outright — an empty
  * config doesn't carry any cascade signal and occupies the same-scope
  * tiebreak slot.
+ *
+ * Returns what it did rather than printing it: the output port renders the
+ * result in whatever format the caller asked for (utils/output.ts). The two
+ * mutating paths keep the shape the previous `--format json` branch
+ * established. The no-op path used to emit NOTHING in json mode — a silent
+ * exit 0 that a machine caller could not distinguish from a successful
+ * removal — so it now answers the same shape carrying `noop: true`.
  */
 export const unsetModelDefaultCommand = async (
   key: string,
   options: UnsetModelDefaultOptions,
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new ModelDefaultsApiService();
@@ -78,7 +85,13 @@ export const unsetModelDefaultCommand = async (
       spinner.succeed(
         `No ${chalk.cyan(key)} entry at ${target.scopeType.toLowerCase()}:${target.scopeId}; nothing to do.`,
       );
-      return;
+      return {
+        data: { id: null, key, scope: target, deleted: false, noop: true },
+        table: () => {
+          // Nothing further to print: the spinner line above was the whole
+          // human output before the migration, and stays so.
+        },
+      };
     }
 
     const sorted = [...existing].sort((a, b) =>
@@ -93,31 +106,26 @@ export const unsetModelDefaultCommand = async (
       spinner.succeed(
         `Deleted config ${chalk.green(current.id)} (no keys left) at ${target.scopeType.toLowerCase()}:${target.scopeId}`,
       );
-      if (options.format === "json") {
-        console.log(
-          JSON.stringify(
-            { id: current.id, key, scope: target, deleted: true },
-            null,
-            2,
-          ),
-        );
-      }
-      return;
+      return {
+        data: { id: current.id, key, scope: target, deleted: true, noop: false },
+        table: () => {
+          // Nothing further to print: the spinner line above was the whole
+          // human output before the migration, and stays so.
+        },
+      };
     }
 
     await service.updateConfig(current.id, { config: nextPayload });
     spinner.succeed(
       `Removed ${chalk.cyan(key)} from config ${chalk.green(current.id)} at ${target.scopeType.toLowerCase()}:${target.scopeId}`,
     );
-    if (options.format === "json") {
-      console.log(
-        JSON.stringify(
-          { id: current.id, key, scope: target, deleted: false },
-          null,
-          2,
-        ),
-      );
-    }
+    return {
+      data: { id: current.id, key, scope: target, deleted: false, noop: false },
+      table: () => {
+        // Nothing further to print: the spinner line above was the whole
+        // human output before the migration, and stays so.
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "unset default model" });
     process.exit(1);

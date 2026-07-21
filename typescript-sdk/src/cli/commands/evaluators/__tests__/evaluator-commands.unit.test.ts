@@ -294,9 +294,7 @@ describe("listEvaluatorsCommand() failure shape under machine formats", () => {
     // the same options object and must not win.
     await applyOutputContext(resolveOutputOptions({ output: "json", format: "table" }, {}));
 
-    await expect(
-      listEvaluatorsCommand({ output: "json", format: "table" }),
-    ).rejects.toThrow(ProcessExitError);
+    await expect(listEvaluatorsCommand()).rejects.toThrow(ProcessExitError);
 
     const doc = JSON.parse(printedStdout()) as { ok: boolean; error: { message: string } };
     expect(doc.ok).toBe(false);
@@ -306,9 +304,7 @@ describe("listEvaluatorsCommand() failure shape under machine formats", () => {
   it("emits the structured JSON error document under --agent, despite the -f commander default", async () => {
     await applyOutputContext(resolveOutputOptions({ agent: true, format: "table" }, {}));
 
-    await expect(
-      listEvaluatorsCommand({ agent: true, format: "table" }),
-    ).rejects.toThrow(ProcessExitError);
+    await expect(listEvaluatorsCommand()).rejects.toThrow(ProcessExitError);
 
     const doc = JSON.parse(printedStdout()) as { ok: boolean };
     expect(doc.ok).toBe(false);
@@ -317,9 +313,7 @@ describe("listEvaluatorsCommand() failure shape under machine formats", () => {
   it("still emits JSON errors when a human passes -f json explicitly", async () => {
     await applyOutputContext(resolveOutputOptions({ format: "json" }, {}));
 
-    await expect(
-      listEvaluatorsCommand({ format: "json" }),
-    ).rejects.toThrow(ProcessExitError);
+    await expect(listEvaluatorsCommand()).rejects.toThrow(ProcessExitError);
 
     const doc = JSON.parse(printedStdout()) as { ok: boolean };
     expect(doc.ok).toBe(false);
@@ -328,9 +322,7 @@ describe("listEvaluatorsCommand() failure shape under machine formats", () => {
   it("keeps the human error block when no machine format was asked for", async () => {
     await applyOutputContext(resolveOutputOptions({ format: "table" }, {}));
 
-    await expect(
-      listEvaluatorsCommand({ format: "table" }),
-    ).rejects.toThrow(ProcessExitError);
+    await expect(listEvaluatorsCommand()).rejects.toThrow(ProcessExitError);
 
     expect(() => JSON.parse(printedStdout())).toThrow();
   });

@@ -6,6 +6,12 @@ import { commandValidationError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import type { CommandResult } from "../../utils/output";
+
+/**
+ * Returns the updated trigger rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts).
+ */
 export const updateTriggerCommand = async (
   id: string,
   options: {
@@ -13,9 +19,8 @@ export const updateTriggerCommand = async (
     active?: string;
     message?: string;
     alertType?: string;
-    format?: string;
   },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
@@ -59,9 +64,13 @@ export const updateTriggerCommand = async (
     const trigger = await response.json() as { id: string; name: string; active: boolean };
     spinner.succeed(`Trigger "${trigger.name}" updated`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(trigger, null, 2));
-    }
+    return {
+      data: trigger,
+      table: () => {
+        // Nothing further to print: the spinner line above was the whole
+        // human output before the migration, and stays so.
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "update trigger" });
     process.exit(1);

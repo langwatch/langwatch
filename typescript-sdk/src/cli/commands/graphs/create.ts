@@ -5,8 +5,13 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+/**
+ * Returns the created graph rather than printing it: the output port renders it
+ * in whatever format the caller asked for (utils/output.ts).
+ */
 export const createGraphCommand = async (
   name: string,
   options: {
@@ -15,9 +20,8 @@ export const createGraphCommand = async (
     filters?: string;
     colSpan?: string;
     rowSpan?: string;
-    format?: string;
   },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
@@ -56,15 +60,15 @@ export const createGraphCommand = async (
     const graph = await response.json() as { id: string; name: string; dashboardId: string | null };
     spinner.succeed(`Graph "${graph.name}" created (${graph.id})`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(graph, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`  ${chalk.gray("ID:")}        ${chalk.green(graph.id)}`);
-    console.log(`  ${chalk.gray("Dashboard:")} ${graph.dashboardId ?? chalk.gray("—")}`);
-    console.log();
+    return {
+      data: graph,
+      table: () => {
+        console.log();
+        console.log(`  ${chalk.gray("ID:")}        ${chalk.green(graph.id)}`);
+        console.log(`  ${chalk.gray("Dashboard:")} ${graph.dashboardId ?? chalk.gray("—")}`);
+        console.log();
+      },
+    };
   } catch (error) {
     // Route BOTH failure kinds through failSpinner: a direct spinner.fail()
     // prints nothing in --json/--jq/agent mode (spinners are silent there).

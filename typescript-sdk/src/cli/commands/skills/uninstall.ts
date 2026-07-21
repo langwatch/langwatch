@@ -9,19 +9,20 @@
  * non-TTY/agent caller is NEVER prompted — without -y it gets a structured
  * error instead, because a blocked prompt reads to a script as a hang.
  */
-import * as readline from "node:readline";
-import {
-  printResult,
-  resolveOutputOptions,
-  type RawOutputFlags,
-} from "../../utils/output";
+import { printResult, type RawOutputFlags } from "../../utils/output";
 import {
   applyUninstall,
   planUninstall,
   resolveSkillsRoot,
   SKILLS_BUNDLE_VERSION,
 } from "./installer";
-import { renderSkillFileResults, resolveTargets, throwValidationError } from "./shared";
+import {
+  confirm,
+  isInteractiveConsole,
+  renderSkillFileResults,
+  resolveTargets,
+} from "./shared";
+import { throwValidationError } from "./validation";
 
 export interface SkillsUninstallOptions extends RawOutputFlags {
   /** Uninstall every skill in the bundle. */
@@ -33,19 +34,6 @@ export interface SkillsUninstallOptions extends RawOutputFlags {
   /** Skip the confirmation prompt (required in non-TTY/agent contexts). */
   yes?: boolean;
 }
-
-const confirmRemoval = async (question: string): Promise<boolean> => {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  const answer = await new Promise<string>((resolve) => {
-    rl.question(`${question} [y/N] `, (a) => resolve(a));
-  });
-  rl.close();
-  const norm = answer.trim().toLowerCase();
-  return norm === "y" || norm === "yes";
-};
 
 export const skillsUninstallCommand = async (
   names: string[],
@@ -59,24 +47,16 @@ export const skillsUninstallCommand = async (
   const results = targets.map((skill) => planUninstall(skill, root, { yes }));
   const removals = results.filter((result) => result.action === "removed");
 
-  // Interactive confirmation is for humans at a terminal ONLY. A TTY stdin
-  // does not make prompting safe: with `-o json`/`--jq`/`--agent` (or agent
-  // env vars) the caller is a machine — a prompt blocks it like a hang, and
-  // the pre-confirmation preview would corrupt the structured document it is
-  // about to read. Machine callers get the -y error instead, always.
-  const resolved = resolveOutputOptions({ ...options });
-  const interactive = process.stdin.isTTY === true && resolved.format === "table" && !resolved.agent;
-
   let confirmed = false;
   if (removals.length > 0 && !yes && !dryRun) {
-    if (!interactive) {
+    if (!isInteractiveConsole(options)) {
       return throwValidationError(
         `uninstall would remove ${removals.length} file${removals.length === 1 ? "" : "s"} and needs confirmation. Re-run with -y (non-interactive callers are never prompted).`,
         { removals: removals.map((result) => result.path) },
       );
     }
     renderSkillFileResults(results);
-    const ok = await confirmRemoval("Remove these files?");
+    const ok = await confirm("Remove these files?");
     if (!ok) {
       console.log("Aborted. Nothing was removed.");
       return;
@@ -84,17 +64,24 @@ export const skillsUninstallCommand = async (
     confirmed = true;
   }
 
-  applyUninstall(results, { dryRun });
+  const applied = applyUninstall(results, { dryRun });
+  const failures = applied.filter((result) => result.failed);
 
   await printResult(
-    { dir: root, bundleVersion: SKILLS_BUNDLE_VERSION, dryRun, results },
+    { dir: root, bundleVersion: SKILLS_BUNDLE_VERSION, dryRun, results: applied },
     {
       ...options,
       table: () => {
         // The confirmed path already printed the list as the prompt preview —
-        // rendering it again would say the same thing twice.
-        if (!confirmed) renderSkillFileResults(results, { dryRun });
+        // rendering it again would say the same thing twice. A file the
+        // filesystem then refused is news, though, so those are always shown.
+        if (!confirmed) renderSkillFileResults(applied, { dryRun });
+        else if (failures.length > 0) renderSkillFileResults(failures);
       },
     },
   );
+
+  // Non-zero only AFTER the report: the caller needs to know which files were
+  // removed even when one of them could not be.
+  if (failures.length > 0) process.exitCode = 1;
 };

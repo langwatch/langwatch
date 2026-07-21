@@ -24,6 +24,41 @@ npx langwatch --help
 
 `pnpm install -g langwatch` and `yarn global add langwatch` work the same way; the package is identical across all three package managers.
 
+### Standalone binary (no Node.js required)
+
+Each release also attaches a self-contained binary for Linux, macOS, and Windows — useful in containers, CI images, and anywhere you'd rather not install Node.js. Download the one for your platform from the [releases page](https://github.com/langwatch/langwatch/releases), then:
+
+```bash
+# Verify the download against the release's SHA256SUMS, then install it
+sha256sum --check --ignore-missing SHA256SUMS
+chmod +x langwatch-<version>-<platform>
+sudo mv langwatch-<version>-<platform> /usr/local/bin/langwatch
+```
+
+Every binary is published with a signed [build provenance attestation](https://docs.github.com/en/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds), so you can confirm it really was built by LangWatch's release workflow from this repository:
+
+```bash
+gh attestation verify langwatch-<version>-<platform> --repo langwatch/langwatch
+```
+
+#### macOS: clearing Gatekeeper
+
+<Warning>
+The macOS binaries are **not yet codesigned or notarized**. Gatekeeper will refuse to run them with *"langwatch cannot be opened because the developer cannot be verified"*.
+</Warning>
+
+macOS attaches a `com.apple.quarantine` attribute to anything downloaded from the internet. After verifying the checksum above, remove it:
+
+```bash
+xattr -d com.apple.quarantine langwatch-<version>-darwin-arm64
+```
+
+Then run the binary as normal. (If `xattr` reports *"No such xattr"*, the attribute was never set — nothing to do.)
+
+<Note>
+Only clear quarantine on a binary whose checksum you have verified against the release's `SHA256SUMS`. Signing and notarization are tracked as follow-up work; until then, `npm install -g langwatch` avoids Gatekeeper entirely and is the smoother path on macOS.
+</Note>
+
 ## Authenticate
 
 `langwatch login` is interactive by default, it asks where (cloud vs self-hosted) and how (AI tools vs project SDK), opens your browser to approve, and the credential flows back to the CLI automatically. **No copy-paste of keys**:
@@ -456,7 +491,7 @@ See the [public REST API reference](/ai-gateway/api/chat-completions) for direct
 
 ## Agent usage
 
-The CLI is human-first (tables, colour, spinners in a terminal) and agent-perfect: driven by an AI coding assistant it switches to machine output automatically. Everything an agent needs to know is also built into the CLI itself — `langwatch help agent` prints the condensed version of this section.
+The CLI is human-first (tables, colour, spinners in a terminal) and agent-perfect: driven by an AI coding assistant it switches to machine output automatically. Everything an agent needs to know is also built into the CLI itself — `langwatch help agent-mode` prints the condensed version of this section.
 
 ### Agent mode
 
@@ -499,7 +534,7 @@ An agent can learn the whole CLI without reading these docs:
 ```bash
 langwatch commands --flat --jq '.commands[].path'   # machine catalog: args, flags, hints, token costs
 langwatch help-tree                                  # compact annotated tree for context injection
-langwatch help agent                                 # the agent-mode guide, from the CLI itself
+langwatch help agent-mode                            # the agent-mode guide, from the CLI itself
 langwatch status                                     # project overview + what needs attention
 ```
 

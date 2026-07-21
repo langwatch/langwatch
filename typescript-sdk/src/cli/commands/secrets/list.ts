@@ -7,9 +7,14 @@ import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-export const listSecretsCommand = async (options?: {
-  format?: string;
-}): Promise<void> => {
+import type { CommandResult } from "../../utils/output";
+
+/**
+ * Returns the listing rather than printing it: the output port renders it in
+ * whatever format the caller asked for (utils/output.ts). The endpoint returns
+ * metadata only — never a secret VALUE — so the raw list is safe as a payload.
+ */
+export const listSecretsCommand = async (): Promise<CommandResult | void> => {
   checkApiKey();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
@@ -40,39 +45,39 @@ export const listSecretsCommand = async (options?: {
       `Found ${secrets.length} secret${secrets.length !== 1 ? "s" : ""}`
     );
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(secrets, null, 2));
-      return;
-    }
+    return {
+      data: secrets,
+      table: () => {
+        if (secrets.length === 0) {
+          console.log();
+          console.log(chalk.gray("No secrets found."));
+          console.log(chalk.gray("Create one with:"));
+          console.log(
+            chalk.cyan('  langwatch secret create MY_API_KEY --value "sk-..."')
+          );
+          return;
+        }
 
-    if (secrets.length === 0) {
-      console.log();
-      console.log(chalk.gray("No secrets found."));
-      console.log(chalk.gray("Create one with:"));
-      console.log(
-        chalk.cyan('  langwatch secret create MY_API_KEY --value "sk-..."')
-      );
-      return;
-    }
+        console.log();
 
-    console.log();
+        const tableData = secrets.map((s) => ({
+          Name: s.name,
+          ID: s.id,
+          Updated: new Date(s.updatedAt).toLocaleDateString(),
+        }));
 
-    const tableData = secrets.map((s) => ({
-      Name: s.name,
-      ID: s.id,
-      Updated: new Date(s.updatedAt).toLocaleDateString(),
-    }));
+        formatTable({
+          data: tableData,
+          headers: ["Name", "ID", "Updated"],
+          colorMap: {
+            Name: chalk.cyan,
+            ID: chalk.green,
+          },
+        });
 
-    formatTable({
-      data: tableData,
-      headers: ["Name", "ID", "Updated"],
-      colorMap: {
-        Name: chalk.cyan,
-        ID: chalk.green,
+        console.log();
       },
-    });
-
-    console.log();
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "fetch secrets" });
     process.exit(1);

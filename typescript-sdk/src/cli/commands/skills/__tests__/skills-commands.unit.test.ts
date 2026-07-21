@@ -11,6 +11,7 @@ import {
   findSkill,
   installSkill,
   MANAGED_MARKER,
+  skillFilePath,
   SKILLS_BUNDLE,
   type BundledSkill,
 } from "../installer";
@@ -31,8 +32,10 @@ describe("the skills commands", () => {
   let root: string;
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
   const savedEnv: Record<string, string | undefined> = {};
+  let savedExitCode: typeof process.exitCode;
 
   beforeEach(() => {
+    savedExitCode = process.exitCode;
     root = fs.mkdtempSync(path.join(os.tmpdir(), "lw-skills-cmd-"));
     consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -43,6 +46,7 @@ describe("the skills commands", () => {
   });
 
   afterEach(() => {
+    process.exitCode = savedExitCode;
     fs.rmSync(root, { recursive: true, force: true });
     vi.restoreAllMocks();
     for (const name of AGENT_MODE_ENV_VARS) {
@@ -161,5 +165,149 @@ describe("the skills commands", () => {
     expect(
       fs.existsSync(path.join(root, "skills", "tracing", "SKILL.md")),
     ).toBe(true);
+  });
+
+  describe("when one skill's path cannot be read during uninstall --all", () => {
+    // A directory sitting where a SKILL.md belongs makes the plan's read throw
+    // EISDIR. That must not abort the batch: the other skills still get
+    // removed, and the caller still gets a full report of what happened.
+    it("removes the readable skills, reports the failure, and exits non-zero", async () => {
+      installSkill(skill("tracing"), root, {});
+      const blocked = skillFilePath(root, skill("prompts"));
+      fs.mkdirSync(blocked, { recursive: true });
+
+      await skillsUninstallCommand([], {
+        dir: root,
+        all: true,
+        yes: true,
+        output: "json",
+      });
+
+      const parsed = JSON.parse(logged()) as {
+        results: { slug: string; action: string; reason?: string; failed?: boolean }[];
+      };
+      const tracing = parsed.results.find((r) => r.slug === "tracing")!;
+      const prompts = parsed.results.find((r) => r.slug === "prompts")!;
+
+      expect(tracing.action).toBe("removed");
+      expect(
+        fs.existsSync(path.join(root, "skills", "tracing", "SKILL.md")),
+      ).toBe(false);
+
+      expect(prompts.action).toBe("skipped");
+      expect(prompts.failed).toBe(true);
+      expect(prompts.reason).toContain("EISDIR");
+
+      expect(process.exitCode).toBe(1);
+    });
+  });
+
+  describe("when --force would overwrite content the bundle does not manage", () => {
+    // The team's hand-written skill sitting exactly where the bundle's would
+    // go — the file `install --all --force` used to truncate without a word.
+    const HAND_WRITTEN = "# the team's own tracing skill\n";
+    let target: string;
+
+    beforeEach(() => {
+      target = path.join(root, "skills", "tracing", "SKILL.md");
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, HAND_WRITTEN, "utf8");
+    });
+
+    it("refuses to clobber unmanaged content without -y, writing nothing", async () => {
+      expect(process.stdin.isTTY).toBeFalsy(); // vitest: never promptable
+      await expect(
+        skillsInstallCommand(["tracing"], { dir: root, force: true }),
+      ).rejects.toMatchObject({
+        code: "validation_error",
+        message: expect.stringContaining("-y"),
+      });
+      expect(fs.readFileSync(target, "utf8")).toBe(HAND_WRITTEN);
+    });
+
+    it("names every path it would clobber before refusing", async () => {
+      await expect(
+        skillsInstallCommand([], { dir: root, all: true, force: true }),
+      ).rejects.toMatchObject({ code: "validation_error" });
+      expect(logged()).toContain(target);
+    });
+
+    it("overwrites once -y is given", async () => {
+      await skillsInstallCommand(["tracing"], { dir: root, force: true, yes: true });
+      expect(fs.readFileSync(target, "utf8")).toContain(MANAGED_MARKER);
+    });
+
+    it("reports the clobber under --dry-run without needing -y or writing", async () => {
+      await skillsInstallCommand(["tracing"], {
+        dir: root,
+        force: true,
+        dryRun: true,
+      });
+      expect(fs.readFileSync(target, "utf8")).toBe(HAND_WRITTEN);
+    });
+
+    it("refuses update --force over unmanaged content too", async () => {
+      await expect(
+        skillsUpdateCommand(["tracing"], { dir: root, force: true }),
+      ).rejects.toMatchObject({ code: "validation_error" });
+      expect(fs.readFileSync(target, "utf8")).toBe(HAND_WRITTEN);
+    });
+  });
+
+  describe("when --force only touches files the bundle already manages", () => {
+    it("overwrites without asking for -y", async () => {
+      const installed = installSkill(skill("tracing"), root, {});
+      fs.writeFileSync(
+        installed.path,
+        `# stale\n\n<!-- managed-by: langwatch-skills v0.0.1 -->\n`,
+        "utf8",
+      );
+
+      await skillsInstallCommand(["tracing"], { dir: root, force: true, output: "json" });
+      const parsed = JSON.parse(logged()) as { results: { action: string }[] };
+      expect(parsed.results[0]!.action).toBe("updated");
+      expect(fs.readFileSync(installed.path, "utf8")).toContain(MANAGED_MARKER);
+    });
+  });
+
+  describe("when one file in a batch cannot be written", () => {
+    it("reports every file and exits non-zero after the report", async () => {
+      // A directory where tracing's SKILL.md belongs: EISDIR on read.
+      fs.mkdirSync(path.join(root, "skills", "tracing", "SKILL.md"), {
+        recursive: true,
+      });
+
+      await skillsInstallCommand(["tracing", "prompts"], {
+        dir: root,
+        output: "json",
+      });
+      const parsed = JSON.parse(logged()) as {
+        results: { slug: string; action: string; reason?: string; failed?: boolean }[];
+      };
+
+      const tracing = parsed.results.find((r) => r.slug === "tracing")!;
+      expect(tracing.action).toBe("skipped");
+      expect(tracing.failed).toBe(true);
+      expect(tracing.reason).toContain("EISDIR");
+
+      const prompts = parsed.results.find((r) => r.slug === "prompts")!;
+      expect(prompts.action).toBe("created");
+      expect(
+        fs.existsSync(path.join(root, "skills", "prompts", "SKILL.md")),
+      ).toBe(true);
+
+      expect(process.exitCode).toBe(1);
+    });
+  });
+
+  it("install echoes the resolved root before writing", async () => {
+    await skillsInstallCommand(["tracing"], { dir: root });
+    expect(logged()).toContain(`Install root: ${root}`);
+  });
+
+  it("install rejects an empty --dir instead of writing into the cwd", async () => {
+    await expect(
+      skillsInstallCommand(["tracing"], { dir: "  " }),
+    ).rejects.toMatchObject({ code: "validation_error" });
   });
 });

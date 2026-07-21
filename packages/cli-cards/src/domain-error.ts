@@ -135,6 +135,35 @@ const asReasons = (value: unknown): CliDomainErrorReason[] | undefined => {
   return reasons.length > 0 ? reasons : undefined;
 };
 
+/**
+ * A libuv/Node system error, not a platform error body.
+ *
+ * `fetch` reports a transport failure by throwing a `TypeError("fetch failed")`
+ * whose `cause` is the system error, and `domainErrorFromThrown` unwraps to that
+ * cause. Its own enumerable keys are `{ errno, code, syscall, address, port }` —
+ * so its `code` is `ECONNREFUSED`/`ENOTFOUND`/`ETIMEDOUT`/a TLS cert code, NOT a
+ * discriminant the platform ever chose. Reading one as a domain error is the
+ * worst kind of wrong: it blames the user for the network being down, and it
+ * lifts the local `address`/`port` into `meta` as though they were domain
+ * context. `errno`/`syscall` are the tell, and no platform envelope carries
+ * them, so their presence disqualifies the record outright — a transport
+ * failure is infrastructure, always.
+ */
+const isSystemError = (record: Record<string, unknown>): boolean =>
+  "errno" in record || "syscall" in record;
+
+/**
+ * Does this record look like the platform's envelope at all?
+ *
+ * Only asked of a BARE top-level `code` — the one field a system error shares
+ * with dialect 3. The platform never sends a lone `code`: its envelope always
+ * carries the sentence, the meta bag, or the deprecated `kind` alongside it. So
+ * a `code` with none of them is not the platform speaking, and is not trusted to
+ * name a domain failure.
+ */
+const looksLikeErrorEnvelope = (record: Record<string, unknown>): boolean =>
+  "message" in record || "meta" in record || "kind" in record;
+
 /** Next steps, defensively: only real strings survive. */
 const asSuggestions = (value: unknown): string[] | undefined => {
   if (!Array.isArray(value)) return undefined;
@@ -172,7 +201,7 @@ interface ErrorBody {
  *      `{ error: <sentence>, domainError: { code, kind, meta, traceId, reasons } }`.
  *
  *   3. THE FRAMEWORK ONE, from the new API framework
- *      (`packages/api/src/errors.ts`): the envelope top-level —
+ *      (`langwatch/packages/api/src/errors.ts`): the envelope top-level —
  *      `{ code, type, kind, message, meta, reasons, traceId, spanId, traceUrl }`,
  *      with `error` carrying the HTTP status text on unversioned routes. `meta`
  *      is a NESTED object here rather than spread, and `message` is usually the
@@ -181,8 +210,9 @@ interface ErrorBody {
  *      deliberately authored some, arrives as `meta.message` and wins.
  *
  * `code` is the name TypeScript uses, `type` the OpenAI-compatible name Go
- * emits; the platform sets both to the same value, so which one answers first
- * only decides anything when a writer sent just one of them.
+ * emits; the framework sets all three to the same value (`errors.ts` assigns
+ * `body.kind = body.code` and `body.type = body.code`), so which one answers
+ * first only decides anything when a writer sent just one of them.
  *
  * A route that names the code explicitly under the deprecated `kind` only (an
  * older server, mid-rename) is read correctly too: `code ?? kind` always wins,
@@ -191,6 +221,12 @@ interface ErrorBody {
 const asErrorBody = (value: unknown): ErrorBody | null => {
   const record = asRecord(value);
   if (!record) return null;
+
+  // A libuv system error is a transport failure wearing a `code`. It is never
+  // any of the three dialects, whatever else it carries, so it never gets to
+  // name a domain failure — it falls through to the status-derived reading,
+  // which calls it `network_error` and means it.
+  if (isSystemError(record)) return null;
 
   // Dialect 2: the serialised HandledError, carried whole under `domainError`.
   const serialized = asRecord(record.domainError);
@@ -236,11 +272,16 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
   // on `error` if it were read first. Dialect 3 always emits `kind` alongside
   // `code`, so a `kind` present means the envelope named itself and wins; with
   // no `kind`, `error` is the dialect-1 discriminant and a bare `code`/`type` is
-  // only trusted when nothing else named the failure.
+  // only trusted when nothing else named the failure — and only then if the
+  // record looks like the platform's envelope at all, so a stray `code`/`type`
+  // on some other object cannot pass itself off as a discriminant the platform
+  // chose.
   //
   // `type` sits at the same trust tier as `code` throughout: it is the same
   // value under the OpenAI-compatible name Go writes, so a writer that sent only
-  // `type` must still resolve to the same failure.
+  // `type` must still resolve to the same failure — and must clear the same
+  // envelope check, since `type` is a far more common field on ordinary objects
+  // than `code` is.
   const named =
     typeof record.kind === "string"
       ? typeof record.code === "string"
@@ -250,11 +291,13 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
           : record.kind
       : typeof record.error === "string"
         ? record.error
-        : typeof record.code === "string"
-          ? record.code
-          : typeof record.type === "string"
-            ? record.type
-            : null;
+        : looksLikeErrorEnvelope(record)
+          ? typeof record.code === "string"
+            ? record.code
+            : typeof record.type === "string"
+              ? record.type
+              : null
+          : null;
   if (named === null) return null;
 
   // Everything the platform did NOT put in meta gets lifted out, so the flat

@@ -84,7 +84,21 @@ function splitFrontmatter(raw) {
   const fm = {};
   for (const line of m[1].split("\n")) {
     const kv = line.match(/^(\w[\w-]*?):\s*(.+)$/);
-    if (kv) fm[kv[1]] = kv[2].trim();
+    if (!kv) continue;
+    const value = kv[2].trim();
+    // A YAML block/folded scalar (`description: >-`, `: |`, `: >2`) puts the
+    // real value on the following INDENTED lines, which this single-line
+    // reader never sees — it would capture the literal ">-" instead. The
+    // `if (!description) throw` guard downstream cannot catch that, because
+    // ">-" is perfectly truthy: the bundle would ship, with every agent
+    // reading ">-" as the skill's description. Fail here, loudly, instead.
+    if (/^[>|][-+0-9]*$/.test(value)) {
+      throw new Error(
+        `Frontmatter key "${kv[1]}" uses a YAML block scalar ("${value}"), which this minimal reader cannot parse.\n` +
+          `Rewrite it as a single-line "${kv[1]}: value" (quote the value if it contains a colon).`,
+      );
+    }
+    fm[kv[1]] = value;
   }
   return { frontmatter: fm, body: m[2] };
 }
