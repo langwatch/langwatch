@@ -14,6 +14,11 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
+import {
+  explainHandledError,
+  readHandledError,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "~/features/errors";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { queryIsStructurable } from "../logic/conditionQuery";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
@@ -511,7 +516,7 @@ function TraceQuerySubject({
         trimmed={trimmed}
         fetching={preview.isFetching}
         hasData={preview.data != null}
-        error={preview.error?.message ?? null}
+        error={preview.error}
         totalHits={preview.data?.totalHits ?? null}
         sample={preview.data?.items ?? []}
         cadence={cadence}
@@ -606,7 +611,8 @@ function TracePreview({
   trimmed: string;
   fetching: boolean;
   hasData: boolean;
-  error: string | null;
+  /** The preview query's error, passed straight through — handled or not. */
+  error: unknown;
   totalHits: number | null;
   sample: PreviewTrace[];
   cadence: NotificationCadence;
@@ -636,9 +642,18 @@ function TracePreview({
     );
   }
   if (error && !hasData) {
+    // A single xs line under the query editor — too tight for an alert, so it
+    // takes the registry's words directly.
+    const handled = readHandledError(error);
+    const explanation = handled
+      ? explainHandledError(handled)
+      : UNKNOWN_ERROR_PRESENTATION;
+
     return (
       <Text textStyle="xs" color="fg.error">
-        {error}
+        {explanation.description
+          ? `${explanation.title}. ${explanation.description}`
+          : explanation.title}
       </Text>
     );
   }

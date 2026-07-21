@@ -21,6 +21,7 @@ import {
   DrawerTitle,
 } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
+import { HandledErrorAlert } from "~/features/errors";
 
 const SECRET_MASK = "•".repeat(48);
 
@@ -172,7 +173,8 @@ export function IngestionTemplateInstallDrawer({
   /** Set by parent when onInstall resolves. Cleared on close. */
   installResult: IngestionBindingResult | null;
   isInstalling: boolean;
-  installError: string | null;
+  /** The install/rotate mutation's error, passed straight through. */
+  installError: unknown;
   /**
    * True when the user already has an ingestion key for this source. Drives
    * the CTA copy: 'Use this template' (fresh) vs 'Rotate token' (replace).
@@ -250,12 +252,11 @@ export function IngestionTemplateInstallDrawer({
               request, no change to how you call the API.
             </Text>
 
-            {installError && (
-              <Alert.Root status="error" variant="surface">
-                <Alert.Content>
-                  <Text fontSize="sm">{installError}</Text>
-                </Alert.Content>
-              </Alert.Root>
+            {!!installError && (
+              <HandledErrorAlert
+                error={installError}
+                fallbackTitle="Couldn't set up this integration"
+              />
             )}
 
             {!installResult && !isInstalling && template.credentialSchema === null && (

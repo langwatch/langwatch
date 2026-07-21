@@ -127,7 +127,7 @@ export function CreateProjectDrawer({
           <ProjectForm
             onSubmit={handleSubmit}
             isLoading={createProject.isLoading}
-            error={createProject.error?.message}
+            error={createProject.error}
             defaultTeamId={defaultTeamId}
             organizationId={effectiveOrganizationId}
           />

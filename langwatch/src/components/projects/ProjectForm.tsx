@@ -14,6 +14,7 @@ import { Plus } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Controller, type Control, type SubmitHandler, useForm } from "react-hook-form";
+import { HandledErrorAlert } from "~/features/errors";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { Select } from "../ui/select";
@@ -34,7 +35,8 @@ export interface ProjectFormProps {
     data: ProjectFormData & { language: string; framework: string },
   ) => void;
   isLoading?: boolean;
-  error?: string | null;
+  /** The submit mutation's error, passed straight through — handled or not. */
+  error?: unknown;
   defaultTeamId?: string;
   /** Required for creating projects in a different organization via the dropdown menu.
    * Ensures teams are fetched from the target organization, not the current context. */
@@ -176,7 +178,12 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
           </>
         )}
 
-        {error && <Text color="red.fg">{error}</Text>}
+        {!!error && (
+          <HandledErrorAlert
+            error={error}
+            fallbackTitle="Couldn't save this project"
+          />
+        )}
 
         <HStack width="full">
           <Spacer />
