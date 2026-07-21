@@ -25,19 +25,17 @@ import {
   UpdateConversationMetadataCommand,
   UpdatePlanCommand,
 } from "./commands";
-import {
-  type LangyMessageProjectionRecord,
-  LangyMessageOperationalMapProjection,
-} from "./projections/langyMessageOperational.mapProjection";
+import { LangyMessageOperationalMapProjection } from "./projections/langyMessageOperational.mapProjection";
 import {
   type LangyAnalyticsEventProjectionRecord,
   LangyAnalyticsEventMapProjection,
 } from "./projections/langyAnalyticsEvent.mapProjection";
-import {
-  type LangyConversationStateData,
-  LangyConversationStateFoldProjection,
-} from "./projections/langyConversationState.foldProjection";
-import type { LangyConversationTurnData } from "@langwatch/langy";
+import { LangyConversationStateFoldProjection } from "./projections/langyConversationState.foldProjection";
+import type {
+  LangyConversationStateData,
+  LangyConversationTurnData,
+  LangyMessageProjectionRecord,
+} from "@langwatch/langy";
 import { LangyConversationTurnFoldProjection } from "./projections/langyConversationTurn.foldProjection";
 import type { LangyConversationProcessingEvent } from "./schemas/events";
 
