@@ -54,7 +54,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}

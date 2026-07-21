@@ -24,6 +24,7 @@ import {
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
   SuiteDomainError,
+  SuiteNameTakenError,
 } from "./errors";
 import {
   type CreateSuiteInput,
@@ -377,7 +378,7 @@ export class SuiteService {
       projectId: params.projectId,
     });
     if (existing && existing.id !== params.excludeId) {
-      throw new SuiteDomainError("A suite with this name already exists");
+      throw new SuiteNameTakenError();
     }
   }
 

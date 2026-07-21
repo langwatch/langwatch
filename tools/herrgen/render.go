@@ -117,7 +117,7 @@ func sources(entry Entry) []string {
 	return slices.Compact(paths)
 }
 
-// escapeComment neutralises a block-comment terminator that a Go doc comment
+// escapeComment neutralizes a block-comment terminator that a Go doc comment
 // happened to contain, which would otherwise end the generated comment early.
 func escapeComment(text string) string {
 	return strings.ReplaceAll(text, "*/", "*\\/")

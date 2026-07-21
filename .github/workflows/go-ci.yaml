@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Evaluate against the queued merge commit too, so the generated-code drift
+  # check can gate the queue rather than only the PR head.
+  merge_group:
   workflow_dispatch:
 
 permissions:
@@ -26,14 +29,18 @@ jobs:
         id: filter
         with:
           filters: |
+            # herrgen walks the WHOLE repo for `herr.Code(...)` declarations
+            # (tools/herrgen/parse.go::goFiles), so this filter must be a
+            # superset of that walk — not a list of the services that happen to
+            # declare codes today. Naming services individually meant a brand
+            # new `services/<name>/` could add a code and skip the drift check.
             go:
-              - 'services/aigateway/**'
-              - 'services/nlpgo/**'
-              - 'services/langyagent/**'
+              - 'services/**'
               - 'pkg/**'
               - 'cmd/**'
-              - 'tools/migrationorder/**'
-              - 'tools/herrgen/**'
+              - 'tools/**'
+              - 'sdk-go/**'
+              - 'clickhouse-serverless/**'
               - 'packages/handled-error/**'
               - 'go.mod'
               - 'go.sum'

@@ -245,7 +245,7 @@ export function errorFormatterForTesting({
       // one thing it does carry is the id that ties the customer's "it broke"
       // to the logs. Safe to expose: an opaque id is not a detail about the
       // failure, and a handled error already ships it inside `error`.
-      traceId: otelTrace.getActiveSpan()?.spanContext().traceId,
+      traceId: traceIdForError(error),
     },
   };
 }
@@ -486,6 +486,31 @@ function recordSpanError(span: Span, error: unknown): void {
   span.setStatus({ code: SpanStatusCode.ERROR, message: e.message });
 }
 
+/**
+ * Trace id per failed call, captured while its span is still live.
+ *
+ * `errorFormatter` runs after the middleware chain has unwound and every span
+ * has ended, so `getActiveSpan()` there is not the span that saw the failure.
+ * A handled error carries its own `traceId` (captured at construction), but an
+ * unhandled one has nothing — and it is exactly the unhandled case where the
+ * id is the only thing support gets. Keyed weakly so a retained error can't
+ * pin the entry.
+ */
+const errorTraceIds = new WeakMap<object, string>();
+
+function rememberTraceId(error: unknown, span: Span): void {
+  if (error && typeof error === "object") {
+    errorTraceIds.set(error, span.spanContext().traceId);
+  }
+}
+
+/** The trace id for a failed call, or the ambient one if we never saw it. */
+function traceIdForError(error: unknown): string | undefined {
+  const remembered =
+    error && typeof error === "object" ? errorTraceIds.get(error) : undefined;
+  return remembered ?? otelTrace.getActiveSpan()?.spanContext().traceId;
+}
+
 export const tracerMiddleware = t.middleware(async ({ path, type, next }) => {
   const tracer = otelTrace.getTracer("langwatch:trpc");
   const spanName = `trpc.${path}`;
@@ -505,6 +530,7 @@ export const tracerMiddleware = t.middleware(async ({ path, type, next }) => {
       startTime,
       attributes: spanAttributes(path, type),
     });
+    rememberTraceId(result.error, span);
     recordSpanError(span, result.error);
     span.end();
     return result;
@@ -517,7 +543,10 @@ export const tracerMiddleware = t.middleware(async ({ path, type, next }) => {
       // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
       // returned as { ok: false, error } result objects — NOT thrown.
       const result = await next();
-      if (!result.ok) recordSpanError(span, result.error);
+      if (!result.ok) {
+        rememberTraceId(result.error, span);
+        recordSpanError(span, result.error);
+      }
       span.end();
       return result;
     },

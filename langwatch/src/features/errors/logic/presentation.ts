@@ -184,7 +184,11 @@ const presentations = {
   },
 
   // ---- suites (run plans) ----
-  suite_error: { title: "Run plan not found" },
+  suite_not_found: { title: "Run plan not found" },
+  suite_name_taken: {
+    title: "That name is already taken",
+    describe: () => "Pick a different name for this run plan.",
+  },
   suite_all_scenarios_archived: {
     title: "Every scenario in this run plan is archived",
     describe: () => "Edit the plan to include active scenarios.",
