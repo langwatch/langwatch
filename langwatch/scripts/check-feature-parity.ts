@@ -37,7 +37,10 @@ const SPECS_ROOT = resolve(REPO_ROOT, "specs");
 const DEFAULT_TEST_ROOTS: string[] = [
   "langwatch/src",
   "langwatch/ee",
-  "langwatch/packages",
+  // Shared workspace packages live at the repo root /packages (not
+  // langwatch/packages). @scenario-annotated tests here (e.g.
+  // @langwatch/contracts) must be scanned or their bindings read as unbound.
+  "packages",
   "langwatch/scripts",
   "mcp-server/src",
   "typescript-sdk/src",

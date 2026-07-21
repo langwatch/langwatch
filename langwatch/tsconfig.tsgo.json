@@ -50,16 +50,22 @@
 		{ "path": "../packages/cli-cards" },
 		{ "path": "../packages/handled-error" }
 	],
-	// Deliberately narrow: only app source trees are ROOT files. Tooling that
-	// used to ride in on `**/*.ts` (scripts/, vitest*.config.ts, vite/,
-	// prisma/ seeds, test-setup*) lives in tsconfig.tooling.json now, keeping
-	// vitest/vite/playwright types out of this program. Anything src imports
-	// is still pulled in transitively regardless of these globs.
+	// Broad include (matches the historically-green config) so ambient
+	// declarations resolve identically — a narrowed src-only include silently
+	// changed how `vite/client`'s asset/import.meta ambients apply at
+	// full-program scale. The RAM win (keeping vitest/vite/playwright/rolldown
+	// types out) is kept by EXCLUDING the tooling below, not by omitting it
+	// from the include. Those same files are the root set of
+	// tsconfig.tooling.json.
 	"include": [
 		"./src/**/*",
 		"./ee/**/*",
 		".eslintrc.cjs",
 		"next-env.d.ts",
+		"**/*.ts",
+		"**/*.tsx",
+		"**/*.cjs",
+		"**/*.mjs",
 		".next/types/**/*.ts",
 		".next-saas/types/**/*.ts"
 	],
@@ -76,6 +82,22 @@
 		"**/*.spec.tsx",
 		"**/__tests__/**",
 		"**/__mocks__/**",
-		"e2e/**"
+		"e2e/**",
+		// Tooling — checked by tsconfig.tooling.json, kept out here so their
+		// deps' types (vitest, vite, playwright, rolldown) stay off the app graph.
+		"scripts/**",
+		"vite/**",
+		"prisma/**",
+		"vite.config.ts",
+		"vitest.config.ts",
+		"vitest.browser.config.ts",
+		"vitest.integration.config.ts",
+		"vitest.mcp.config.ts",
+		"vitest.pg-integration.config.ts",
+		"vitest.prisma-integration.config.ts",
+		"vitest.stress.config.ts",
+		"vitest.stripe-integration.config.ts",
+		"test-setup.ts",
+		"test-setup.browser.ts"
 	]
 }
