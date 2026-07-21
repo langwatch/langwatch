@@ -12,6 +12,7 @@
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { EvaluatorExecutionError } from "~/server/app-layer/evaluations/errors";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
+import { nodeErrorToDomainError } from "./nodeErrorDomain";
 import type { EvaluationV3Event } from "./types";
 
 /**
@@ -167,6 +168,8 @@ export const mapTargetResult = (
     timestamps?: { started_at?: number; finished_at?: number };
     trace_id?: string;
     error?: string;
+    error_type?: string;
+    upstream_status?: number;
   },
   options?: { isEvaluatorAsTarget?: boolean },
 ): EvaluationV3Event => {
@@ -180,6 +183,18 @@ export const mapTargetResult = (
         executionState.timestamps.started_at
       : undefined;
 
+  // A coded engine failure travels the handled channel; the raw `error`
+  // string is kept only as a legacy fallback for engines that don't send a
+  // code. See `nodeErrorToDomainError`.
+  const domainError = executionState.error_type
+    ? nodeErrorToDomainError({
+        errorType: executionState.error_type,
+        message: executionState.error,
+        upstreamStatus: executionState.upstream_status,
+        traceId: executionState.trace_id,
+      })
+    : undefined;
+
   return {
     type: "target_result",
     rowIndex,
@@ -191,6 +206,7 @@ export const mapTargetResult = (
     duration,
     traceId: executionState.trace_id,
     error: executionState.error,
+    ...(domainError ? { domainError } : {}),
   };
 };
 
@@ -339,6 +355,8 @@ export const mapNlpEvent = (
         timestamps: execution_state.timestamps,
         trace_id: execution_state.trace_id,
         error: isError ? execution_state.error : undefined,
+        error_type: isError ? execution_state.error_type : undefined,
+        upstream_status: isError ? execution_state.upstream_status : undefined,
       },
       { isEvaluatorAsTarget },
     );

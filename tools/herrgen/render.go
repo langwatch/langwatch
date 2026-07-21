@@ -32,6 +32,23 @@ const footer = `} as const;
 export type GoErrorCode = keyof typeof goErrorCodes;
 `
 
+// nodeHeader opens the nodeErrorCodes block. Its leading blank line separates it
+// from the goErrorCodes footer it is appended after in the same file.
+const nodeHeader = `
+/**
+ * Workflow NodeError codes produced by the nlpgo engine (the ` + "`Type`" + ` field of
+ * ` + "`NodeError`" + `). Generated for the same reason as ` + "`goErrorCodes`" + `: the client
+ * presentation registry is exhaustive over them, so a new node-error type in
+ * Go fails the TypeScript build until its customer copy is written.
+ */
+export const nodeErrorCodes = {
+`
+
+const nodeFooter = `} as const;
+
+export type NodeErrorCode = keyof typeof nodeErrorCodes;
+`
+
 // Render writes the TypeScript for the parsed entries.
 func Render(entries []Entry) []byte {
 	var out strings.Builder
@@ -53,6 +70,25 @@ func Render(entries []Entry) []byte {
 		out.WriteString(" },\n")
 	}
 	out.WriteString(footer)
+	return []byte(out.String())
+}
+
+// RenderNodeCodes writes the nodeErrorCodes block that follows goErrorCodes in
+// the same generated file. There are no Go doc comments on a NodeError literal,
+// so each entry carries only the @source files it was found in — sorted, so the
+// bytes are stable across runs.
+func RenderNodeCodes(codes []NodeCode) []byte {
+	var out strings.Builder
+	out.WriteString(nodeHeader)
+	for _, code := range codes {
+		out.WriteString("  /**\n")
+		for _, source := range code.Sources {
+			fmt.Fprintf(&out, "   * @source %s\n", source)
+		}
+		out.WriteString("   */\n")
+		fmt.Fprintf(&out, "  %s: { service: %q },\n", propertyKey(code.Code), serviceOf(code.Sources[0]))
+	}
+	out.WriteString(nodeFooter)
 	return []byte(out.String())
 }
 

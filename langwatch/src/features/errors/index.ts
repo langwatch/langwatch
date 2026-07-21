@@ -20,6 +20,7 @@ export type { ErrorExplanation, ErrorPresentation } from "./logic/presentation";
 export {
   describeError,
   explainHandledError,
+  explainSerializedError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "./logic/presentation";
 export type { HandledErrorShape } from "./logic/readHandledError";

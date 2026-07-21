@@ -27,12 +27,12 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	entries, err := Parse(*root)
+	entries, nodeCodes, err := Parse(*root)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
-	generated := Render(entries)
+	generated := append(Render(entries), RenderNodeCodes(nodeCodes)...)
 	target := filepath.Join(*root, *out)
 
 	if *check {

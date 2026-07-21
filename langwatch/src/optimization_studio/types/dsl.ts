@@ -74,7 +74,22 @@ export interface ExecutionState {
   status: ExecutionStatus;
   trace_id?: string;
   span_id?: string;
+  /**
+   * The raw engineer-facing failure message. Kept for the studio's debug
+   * panel and logs, but it can name a URL or a Go net error, so it is NOT
+   * rendered to a customer — the control plane presents from `error_type`
+   * (see ADR-045, `src/features/errors`).
+   */
   error?: string;
+  /**
+   * Stable code for the failure — the nlpgo engine's `NodeError.Type`
+   * (`http_error`, `upstream_http_error`, `llm_error`, …). Generated into
+   * `nodeErrorCodes` and mapped to customer copy by the presentation
+   * registry. Absent on older engines and on non-error states.
+   */
+  error_type?: string;
+  /** The upstream HTTP status, when an HTTP node got a non-2xx response. */
+  upstream_status?: number;
   parameters?: Record<string, any>;
   inputs?: Record<string, any>;
   outputs?: Record<string, any>;

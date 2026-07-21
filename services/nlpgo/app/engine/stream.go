@@ -139,7 +139,10 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 		emit(ctx, out, workflowRunningEvent(req, traceID, started, isEval))
 		for _, layer := range plan.Layers {
 			if err := ctx.Err(); err != nil {
-				emit(ctx, out, workflowErrorEvent(req, traceID, err.Error(), isEval))
+				emit(ctx, out, workflowErrorEvent(req, traceID, &NodeError{
+					Type:    "context_canceled",
+					Message: err.Error(),
+				}, isEval))
 				emit(ctx, out, StreamEvent{
 					Type:    "error",
 					TraceID: traceID,
@@ -149,7 +152,7 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 			}
 			e.runLayerStream(ctx, req, plan, state, layer, traceID, out)
 			if state.firstError != nil {
-				emit(ctx, out, workflowErrorEvent(req, traceID, state.firstError.Message, isEval))
+				emit(ctx, out, workflowErrorEvent(req, traceID, state.firstError, isEval))
 				emit(ctx, out, doneEvent(traceID, state, started))
 				return
 			}
@@ -290,6 +293,7 @@ func stateEvent(traceID, nodeID string, ns *NodeState) StreamEvent {
 	}
 	if ns.Error != nil {
 		es["error"] = ns.Error.Message
+		addNodeErrorCode(es, ns.Error)
 	}
 	if ns.Status == string(dsl.StatusSuccess) || ns.Status == string(dsl.StatusError) {
 		// Studio's ExecutionOutputPanel renders the per-component
@@ -398,33 +402,55 @@ func workflowSuccessEvent(req ExecuteRequest, traceID string, state *runState, s
 	}
 }
 
-func workflowErrorEvent(req ExecuteRequest, traceID, message string, isEval bool) StreamEvent {
+func workflowErrorEvent(req ExecuteRequest, traceID string, nodeErr *NodeError, isEval bool) StreamEvent {
+	// `error` is the raw engineer-facing message; `error_type` is the stable
+	// code the control plane maps to customer copy, and `upstream_status`
+	// rides along for an upstream_http_error. Same contract as the per-node
+	// stateEvent — see its comment.
 	if isEval {
+		state := map[string]any{
+			"status": "error",
+			"run_id": req.RunID,
+			"error":  nodeErr.Message,
+			"timestamps": map[string]any{
+				"finished_at": time.Now().UnixMilli(),
+			},
+		}
+		addNodeErrorCode(state, nodeErr)
 		return StreamEvent{
 			Type:    "evaluation_state_change",
 			TraceID: traceID,
-			Payload: map[string]any{
-				"evaluation_state": map[string]any{
-					"status": "error",
-					"run_id": req.RunID,
-					"error":  message,
-					"timestamps": map[string]any{
-						"finished_at": time.Now().UnixMilli(),
-					},
-				},
-			},
+			Payload: map[string]any{"evaluation_state": state},
 		}
 	}
+	state := map[string]any{
+		"status":   "error",
+		"trace_id": traceID,
+		"error":    nodeErr.Message,
+	}
+	addNodeErrorCode(state, nodeErr)
 	return StreamEvent{
 		Type:    "execution_state_change",
 		TraceID: traceID,
 		Payload: map[string]any{
-			"execution_state": map[string]any{
-				"status":   "error",
-				"trace_id": traceID,
-				"error":    message,
-			},
+			"execution_state": state,
 		},
+	}
+}
+
+// addNodeErrorCode stamps the stable failure code (and upstream status, when
+// present) onto an execution-state map. `error_type` is what the control plane
+// maps to customer copy; the `error` string it sits beside is engineer-facing
+// only (it can name a URL or a Go net error) and is never rendered to a user.
+func addNodeErrorCode(state map[string]any, nodeErr *NodeError) {
+	if nodeErr == nil {
+		return
+	}
+	if nodeErr.Type != "" {
+		state["error_type"] = nodeErr.Type
+	}
+	if nodeErr.Status != 0 {
+		state["upstream_status"] = nodeErr.Status
 	}
 }
 

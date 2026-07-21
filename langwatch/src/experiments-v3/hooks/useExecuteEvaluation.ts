@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { toaster } from "~/components/ui/toaster";
-import { showErrorToast } from "~/features/errors";
+import { explainSerializedError, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import type {
@@ -265,7 +265,18 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           break;
 
         case "target_result":
-          if (event.error) {
+          if (event.domainError) {
+            // The failure carries a code, so the customer reads the registry's
+            // copy — never the raw engine string (`httpblock: … no such host`).
+            const { title, description } = explainSerializedError(
+              event.domainError,
+            );
+            updateTargetError(
+              event.rowIndex,
+              event.targetId,
+              description ? `${title}. ${description}` : title,
+            );
+          } else if (event.error) {
             updateTargetError(event.rowIndex, event.targetId, event.error);
           } else {
             updateTargetOutput(event.rowIndex, event.targetId, event.output, {

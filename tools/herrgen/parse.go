@@ -71,21 +71,23 @@ type Entry struct {
 // Primary is the declaration the doc comment and service name come from.
 func (e Entry) Primary() Declaration { return e.Declarations[0] }
 
-// Parse walks root and returns every herr code declared under it, one Entry per
-// distinct code string, sorted by code.
+// Parse walks root and returns every herr code declared under it as one Entry
+// per distinct code string, plus every workflow NodeError.Type as one NodeCode
+// per distinct code string, both sorted by code.
 //
 // It fails when two consts holding the same code string register different HTTP
 // statuses: herr's registry is keyed by the string, so one of the two would
 // silently win at runtime depending on init order.
-func Parse(root string) ([]Entry, error) {
+func Parse(root string) ([]Entry, []NodeCode, error) {
 	modulePath, err := readModulePath(root)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var (
 		declarations  []Declaration
 		registrations []Registration
+		nodeSites     []nodeErrorSite
 	)
 	// byConst resolves a RegisterStatus argument (package dir + const name) back
 	// to the code string that const holds.
@@ -93,27 +95,32 @@ func Parse(root string) ([]Entry, error) {
 
 	files, err := goFiles(root)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	fset := token.NewFileSet()
 	for _, rel := range files {
 		source, err := os.ReadFile(filepath.Join(root, rel))
 		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", rel, err)
+			return nil, nil, fmt.Errorf("read %s: %w", rel, err)
 		}
 		// Parsed under its repository-relative name, so every position we report
 		// later reads as a path someone can open.
 		file, err := parser.ParseFile(fset, rel, source, parser.ParseComments)
 		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", rel, err)
+			return nil, nil, fmt.Errorf("parse %s: %w", rel, err)
 		}
+
+		// NodeError literals need no import — they are plain composite literals
+		// in the engine package — so they are read from every file, before the
+		// herr import gate below can skip one.
+		nodeSites = append(nodeSites, fileNodeErrorSites(file, rel)...)
 
 		imports := importsOf(file)
 		herrName := localNameFor(imports, modulePath+"/"+herrImportSuffix)
 		if herrName == "" {
 			// Neither a declaration nor a registration can appear without the
-			// import, so there is nothing here to read.
+			// import, so there is nothing else here to read.
 			continue
 		}
 
@@ -129,9 +136,9 @@ func Parse(root string) ([]Entry, error) {
 
 	statuses, err := resolveStatuses(registrations, byConst)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return group(declarations, statuses), nil
+	return group(declarations, statuses), groupNodeCodes(nodeSites), nil
 }
 
 // goFiles lists the repository-relative non-test Go files under root.

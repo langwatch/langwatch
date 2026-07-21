@@ -1,8 +1,14 @@
-import type { GoErrorCode, HandledErrorFault } from "@langwatch/handled-error";
+import type {
+  GoErrorCode,
+  HandledErrorFault,
+  NodeErrorCode,
+  SerializedHandledError,
+} from "@langwatch/handled-error";
 
 import type { AppErrorCode } from "./codes";
 import {
   type HandledErrorShape,
+  handledShapeFromSerialized,
   readAuthoredMessage,
   readHandledError,
 } from "./readHandledError";
@@ -529,7 +535,145 @@ const presentations = {
     title: "Something went wrong on our end",
     describe: () => "We've been notified. Try again in a moment.",
   },
-} satisfies Record<AppErrorCode | GoErrorCode, ErrorPresentation>;
+  // ==========================================================================
+  // Workflow node failures from the nlpgo engine (generated into
+  // `nodeErrorCodes` by cmd/herrgen). These reach the customer on an
+  // experiments-v3 / optimization-studio target cell; the audience is someone
+  // building a workflow, so the copy points at the node they can fix.
+  // `invalid_dataset`, `unsupported_node_kind` and `upstream_http_error` are
+  // shared with the herr codes above and already have copy.
+  // ==========================================================================
+
+  // ---- HTTP node ----
+  http_error: {
+    title: "Couldn't reach the agent",
+    describe: () =>
+      "Check the URL is correct and the service is reachable, then run again.",
+  },
+  http_executor_unavailable: {
+    title: "HTTP requests are temporarily unavailable",
+    describe: () => "Try again in a moment.",
+  },
+
+  // ---- LLM node ----
+  llm_error: {
+    title: "The model call failed",
+    describe: () => "Try again, or check the node's model configuration.",
+  },
+  llm_executor_unavailable: {
+    title: "The model runner is temporarily unavailable",
+    describe: () => "Try again in a moment.",
+  },
+  llm_model_not_set: {
+    title: "This step has no model selected",
+    describe: () => "Open the node and choose a model.",
+  },
+
+  // ---- code node ----
+  code_runner_error: {
+    title: "The code step failed",
+    describe: () => "Check the node's code and its inputs, then run again.",
+  },
+  code_runner_unavailable: {
+    title: "The code runner is temporarily unavailable",
+    describe: () => "Try again in a moment.",
+  },
+
+  // ---- evaluator node ----
+  evaluator_error: {
+    title: "The evaluator failed to run",
+    describe: () => "Check its configuration, then run again.",
+  },
+  evaluator_executor_unavailable: {
+    title: "The evaluator runner is temporarily unavailable",
+    describe: () => "Try again in a moment.",
+  },
+  evaluator_missing_slug: {
+    title: "This evaluator isn't fully configured",
+    describe: () => "Pick an evaluator type for the node.",
+  },
+  evaluator_unauthorized: {
+    title: "Not allowed to run this evaluator",
+    describe: () => "Check your access, or ask an admin on your team.",
+  },
+  evaluator_unconfigured: {
+    title: "This evaluator isn't configured",
+    describe: () => "Finish setting it up before running.",
+  },
+
+  // ---- agent node ----
+  agent_workflow_error: {
+    title: "The agent step failed",
+    describe: () => "Check the agent's configuration, then run again.",
+  },
+  agent_workflow_executor_unavailable: {
+    title: "The agent runner is temporarily unavailable",
+    describe: () => "Try again in a moment.",
+  },
+  agent_unconfigured: {
+    title: "This agent isn't configured",
+    describe: () => "Finish setting it up before running.",
+  },
+  agent_unauthorized: {
+    title: "Not allowed to run this agent",
+    describe: () => "Check your access, or ask an admin on your team.",
+  },
+  agent_missing_type: {
+    title: "This agent step is incomplete",
+    describe: () => "Choose what the agent should do.",
+  },
+  agent_unknown_type: {
+    title: "This agent type isn't supported",
+    describe: () => "Pick a supported agent type for the node.",
+  },
+  agent_missing_workflow_id: {
+    title: "This agent isn't linked to a workflow",
+    describe: () => "Select the workflow it should run.",
+  },
+
+  // ---- custom-workflow node ----
+  custom_workflow_error: {
+    title: "The referenced workflow failed",
+    describe: () => "Open it to see what went wrong, then run again.",
+  },
+  custom_workflow_executor_unavailable: {
+    title: "The workflow runner is temporarily unavailable",
+    describe: () => "Try again in a moment.",
+  },
+  custom_unconfigured: {
+    title: "This workflow step isn't configured",
+    describe: () => "Finish setting it up before running.",
+  },
+  custom_unauthorized: {
+    title: "Not allowed to run that workflow",
+    describe: () => "Check your access, or ask an admin on your team.",
+  },
+  custom_missing_workflow_id: {
+    title: "This step isn't linked to a workflow",
+    describe: () => "Select the workflow it should run.",
+  },
+
+  // ---- other node failures ----
+  invalid_condition: {
+    title: "A condition in this workflow isn't valid",
+    describe: () => "Check the branch condition and try again.",
+  },
+  attachment_fetch_error: {
+    title: "Couldn't load an attachment",
+    describe: () => "Check the file is still available, then run again.",
+  },
+  context_canceled: {
+    title: "The run was cancelled",
+    describe: () => "Start it again when you're ready.",
+  },
+  engine_error: {
+    title: "The run couldn't be set up",
+    describe: () => "Check the workflow and its dataset, then try again.",
+  },
+} satisfies Record<
+  AppErrorCode | GoErrorCode | NodeErrorCode,
+  ErrorPresentation
+>;
 
 /**
  * Field names a customer can actually see and act on.
@@ -627,6 +771,17 @@ export function explainHandledError(
     description: presentation.describe?.(error) ?? "",
     isRegistered: true,
   };
+}
+
+/**
+ * Explains a handled error that arrived already-serialised on an event payload
+ * (a `target_result.domainError`, an evaluator `domainError`) rather than off a
+ * transport envelope — the coded counterpart to reading a raw `error` string.
+ */
+export function explainSerializedError(
+  domainError: SerializedHandledError,
+): ErrorExplanation {
+  return explainHandledError(handledShapeFromSerialized(domainError));
 }
 
 /**

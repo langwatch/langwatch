@@ -259,6 +259,42 @@ describe("resultMapper", () => {
       });
     });
 
+    it("lifts a coded engine failure onto the handled channel", () => {
+      const result = mapTargetResult("target-1", 1, {
+        error:
+          'httpblock: Post "https://api.example.com": lookup api.example.com: no such host',
+        error_type: "http_error",
+        trace_id: "trace-9",
+      });
+
+      if (result.type !== "target_result") throw new Error("wrong event");
+      // The raw string is kept as a legacy fallback, but a domainError now
+      // rides alongside it carrying the code.
+      expect(result.domainError?.code).toBe("http_error");
+      expect(result.domainError?.traceId).toBe("trace-9");
+      // The leaky message never crosses in the handled payload (#5984).
+      expect(JSON.stringify(result.domainError)).not.toContain("no such host");
+    });
+
+    it("carries the upstream status for an upstream_http_error", () => {
+      const result = mapTargetResult("target-1", 0, {
+        error: "httpblock: upstream returned 500",
+        error_type: "upstream_http_error",
+        upstream_status: 500,
+      });
+
+      if (result.type !== "target_result") throw new Error("wrong event");
+      expect(result.domainError?.meta).toEqual({ upstreamStatus: 500 });
+    });
+
+    it("leaves domainError unset when the engine sent no code", () => {
+      const result = mapTargetResult("target-1", 0, { error: "plain string" });
+
+      if (result.type !== "target_result") throw new Error("wrong event");
+      expect(result.domainError).toBeUndefined();
+      expect(result.error).toBe("plain string");
+    });
+
     it("handles missing timestamps", () => {
       const result = mapTargetResult("target-1", 0, {
         outputs: { output: "test" },

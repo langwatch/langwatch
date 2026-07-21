@@ -99,6 +99,29 @@ Feature: Handled errors — what the customer actually reads
       # the one thing an unhandled error is allowed to tell the client
 
   # ==========================================================================
+  # Workflow node failures cross the language boundary as codes
+  # ==========================================================================
+
+  @bdd @handled-errors @presentation
+  Scenario: A workflow node failure reaches the customer as a code, not a Go string
+    Given an experiment target calls an HTTP agent whose host does not resolve
+    When the nlpgo engine returns its NodeError for the failed node
+    Then the streamed execution state carries the stable code, not only the
+      raw message
+      # the message ("httpblock: … lookup …: no such host") is engineer-facing
+    And the target_result carries a handled payload built from that code
+    And the customer reads the registry copy for the code ("Couldn't reach the
+      agent"), never the Go net error
+
+  @bdd @handled-errors @presentation
+  Scenario: A node error code with no customer copy fails the build
+    Given the presentation registry is exhaustive over the generated node codes
+    When the nlpgo engine gains a new `NodeError.Type`
+    And `herrgen` regenerates the node code list
+    Then the project fails to type-check until that code's copy is written
+      # the same enforcement the herr codes get, extended to node errors
+
+  # ==========================================================================
   # Validation belongs on the form
   # ==========================================================================
 
