@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"slices"
 	"sync"
 	"time"
@@ -15,14 +16,25 @@ import (
 // branches untouched while catching the long tail that silts a machine up.
 const DefaultStaleThreshold = 5 * 24 * time.Hour
 
-// The two scan queues run at different widths on purpose. The meta queue is git
-// + in-memory lookups (cheap), so it runs wide and lands almost immediately; the
-// size queue shells out to `du` over each whole tree (node_modules dominates), so
-// it runs narrower to avoid thrashing the disk and trickles in behind the meta.
-const (
-	metaScanSlots = 16
-	sizeScanSlots = 8
-)
+// metaScanSlots is how wide the meta queue runs. It is git + in-memory lookups
+// (cheap), so it runs wide and lands almost immediately.
+const metaScanSlots = 16
+
+// sizeScanSlots is how many `du` walks run at once. du is IO-bound — it stats
+// every file and spends most of its time waiting on the disk — so it oversubscribes
+// the cores (twice NumCPU): several walks can be blocked on IO while others make
+// progress. It is bounded top and bottom so a single-core box still overlaps a few
+// and a big fleet never spawns a runaway number of processes at once.
+func sizeScanSlots() int {
+	n := runtime.NumCPU() * 2
+	if n < 4 {
+		return 4
+	}
+	if n > 32 {
+		return 32
+	}
+	return n
+}
 
 // PruneRow is one worktree as interactive prune considers it. The identity and
 // guard facts (primary / current / live) are known up front from `git worktree
@@ -140,7 +152,7 @@ func (o *Orchestrator) ScanSizes(ctx context.Context, rows []PruneRow, onSize fu
 	if onSize == nil {
 		return
 	}
-	o.scanPass(ctx, len(rows), sizeScanSlots, func(i int) {
+	o.scanPass(ctx, len(rows), sizeScanSlots(), func(i int) {
 		// Protected worktrees are never reclaimed, so their size is never shown —
 		// and the primary checkout's tree contains every other worktree (they live
 		// under its .claude/worktrees/), so sizing it would both double-count and be

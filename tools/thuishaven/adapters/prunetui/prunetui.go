@@ -68,15 +68,16 @@ type MetaResult struct {
 
 // Actions wires the picker to the world. Scan runs the two concurrent scan
 // queues, calling onMeta as each worktree's meta lands and onSize as each disk
-// size lands; it blocks until both finish and is run in its own goroutine. Delete
-// removes one worktree (stop stack, drop databases, remove directory) and is
-// called sequentially, one ticked worktree at a time. Threshold is the idle age
-// at or beyond which a worktree is pre-ticked.
+// size lands; it blocks until both finish and is run in its own goroutine.
+// DeleteAll removes the confirmed worktrees concurrently — stopping stacks,
+// dropping databases, removing directories — calling onDone once per worktree the
+// moment it finishes, so the picker streams live progress instead of freezing on a
+// slow one. Threshold is the idle age at or beyond which a worktree is pre-ticked.
 type Actions struct {
 	Rows       []Row
 	Threshold  time.Duration
 	Scan       func(ctx context.Context, onMeta func(index int, meta MetaResult), onSize func(index int, bytes int64))
-	Delete     func(ctx context.Context, dir string) error
+	DeleteAll  func(ctx context.Context, dirs []string, onDone func(dir string, err error))
 	SharedNote string
 }
 
@@ -150,7 +151,14 @@ type (
 		dir string
 		err error
 	}
+	deletesFinishedMsg struct{}
 )
+
+// deleteResult is one worktree's delete outcome, streamed over the model's channel.
+type deleteResult struct {
+	dir string
+	err error
+}
 
 type model struct {
 	ctx      context.Context
@@ -172,8 +180,8 @@ type model struct {
 	sizeCount int
 
 	// deletion progress
-	queue         []string          // dirs still to delete, in display order
-	status        map[string]string // dir -> "queued" / "deleting" / "done" / "failed: …"
+	delCh         chan deleteResult // per-worktree outcomes stream in over this
+	status        map[string]string // dir -> "deleting" / "done" / "failed: …"
 	deletingTotal int
 	deletedOK     int
 	deletedErr    int
@@ -216,6 +224,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case deleteDoneMsg:
 		return m.afterDelete(msg)
+	case deletesFinishedMsg:
+		m.mode = modeDone
+		return m, nil
 	case tea.KeyMsg:
 		switch m.mode {
 		case modeConfirm:
@@ -336,46 +347,51 @@ func (m model) updateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// startDeleting freezes the ticked set into a queue and kicks off the first
-// delete. Deletions run one at a time (sequential): each DestroyWorktree stops a
-// stack, drops databases, removes a directory, then prunes git's admin entries —
-// overlapping those on one repo would race, and deletion is not the part that
-// wants parallelism (the scan already was). The queue follows display order so the
-// per-row progress reads top to bottom.
+// startDeleting hands the ticked worktrees to DeleteAll, which tears them down
+// concurrently, and starts listening for the per-worktree outcomes. Every ticked
+// worktree is marked "deleting" up front because they all go at once; each flips to
+// "done" / "failed" as its result streams back over the channel — so the UI keeps
+// updating and never freezes on a slow teardown.
 func (m model) startDeleting() (tea.Model, tea.Cmd) {
 	m.mode = modeDeleting
-	m.queue = nil
 	m.status = map[string]string{}
+	var dirs []string
 	for _, ri := range m.order {
 		r := m.rows[ri]
 		if r.Deletable && m.selected[r.Dir] {
-			m.queue = append(m.queue, r.Dir)
-			m.status[r.Dir] = "queued"
+			dirs = append(dirs, r.Dir)
+			m.status[r.Dir] = "deleting"
 		}
 	}
-	m.deletingTotal = len(m.queue)
-	if len(m.queue) == 0 {
+	m.deletingTotal = len(dirs)
+	if len(dirs) == 0 {
 		m.mode = modeDone
 		return m, nil
 	}
-	return m.dequeue()
-}
-
-// dequeue pops the next worktree and issues its delete command.
-func (m model) dequeue() (tea.Model, tea.Cmd) {
-	next := m.queue[0]
-	m.queue = m.queue[1:]
-	m.status[next] = "deleting"
-	return m, m.deleteCmd(next)
-}
-
-func (m model) deleteCmd(dir string) tea.Cmd {
-	del, ctx := m.actions.Delete, m.ctx
-	return func() tea.Msg {
-		if del == nil {
-			return deleteDoneMsg{dir: dir, err: fmt.Errorf("no delete action wired")}
+	// Buffered to the worktree count so the workers never block reporting back even
+	// if the event loop is mid-render; the goroutine closes it when the batch is
+	// done (DeleteAll has also pruned git's admin by then), which ends the listen.
+	ch := make(chan deleteResult, len(dirs))
+	m.delCh = ch
+	deleteAll, ctx := m.actions.DeleteAll, m.ctx
+	go func() {
+		if deleteAll != nil {
+			deleteAll(ctx, dirs, func(dir string, err error) { ch <- deleteResult{dir: dir, err: err} })
 		}
-		return deleteDoneMsg{dir: dir, err: del(ctx, dir)}
+		close(ch)
+	}()
+	return m, waitDelete(ch)
+}
+
+// waitDelete blocks on the next delete outcome; a closed channel means the whole
+// batch (and its final git prune) has finished.
+func waitDelete(ch chan deleteResult) tea.Cmd {
+	return func() tea.Msg {
+		r, ok := <-ch
+		if !ok {
+			return deletesFinishedMsg{}
+		}
+		return deleteDoneMsg{dir: r.dir, err: r.err}
 	}
 }
 
@@ -388,11 +404,7 @@ func (m model) afterDelete(msg deleteDoneMsg) (tea.Model, tea.Cmd) {
 		m.deletedOK++
 		m.reclaimed += m.diskOf(msg.dir)
 	}
-	if len(m.queue) == 0 {
-		m.mode = modeDone
-		return m, nil
-	}
-	return m.dequeue()
+	return m, waitDelete(m.delCh) // keep listening until the channel closes
 }
 
 // rowAt maps a display position to its row index, or -1 when out of range.
@@ -775,9 +787,14 @@ func (m model) renderFooter() string {
 		b.WriteString(styleWarn.Render(fmt.Sprintf("  type %q to confirm: %s▏", confirmWord, m.confirm)) + "\n")
 	case modeDeleting:
 		done := m.deletedOK + m.deletedErr
+		inFlight := m.deletingTotal - done
+		spin := spinnerFrames[m.spin%len(spinnerFrames)]
 		b.WriteString("\n")
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  deleting %d/%d…", done, m.deletingTotal)) + "\n")
-		tally := fmt.Sprintf("  %d done", m.deletedOK)
+		b.WriteString(styleWarn.Render(fmt.Sprintf("  %s deleting in parallel — %d/%d done", spin, done, m.deletingTotal)) + "\n")
+		tally := fmt.Sprintf("  %d in flight", inFlight)
+		if m.deletedOK > 0 {
+			tally += fmt.Sprintf(" · %d done", m.deletedOK)
+		}
 		if m.deletedErr > 0 {
 			tally += fmt.Sprintf(" · %d failed", m.deletedErr)
 		}

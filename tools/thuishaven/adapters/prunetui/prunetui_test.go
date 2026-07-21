@@ -66,9 +66,11 @@ func testActions(deleted *[]string) Actions {
 			{Dir: "/wt/primary", Slug: "main", IsPrimary: true},
 		},
 		Threshold: 5 * day,
-		Delete: func(_ context.Context, dir string) error {
-			*deleted = append(*deleted, dir)
-			return nil
+		DeleteAll: func(_ context.Context, dirs []string, onDone func(string, error)) {
+			for _, dir := range dirs {
+				*deleted = append(*deleted, dir)
+				onDone(dir, nil)
+			}
 		},
 		SharedNote: "shared servers are never removed",
 	}

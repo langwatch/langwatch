@@ -158,7 +158,7 @@ func (b *barrierHygiene) DiskUsage(string) (int64, bool) {
 
 // @scenario "Every worktree is scanned concurrently for its footprint"
 func TestScanWorktreesRunsConcurrently(t *testing.T) {
-	const n = sizeScanSlots // as many as the size queue runs at once
+	n := sizeScanSlots() // as many as the size queue runs at once
 	entered := make(chan struct{}, n)
 	release := make(chan struct{})
 	hyg := &barrierHygiene{

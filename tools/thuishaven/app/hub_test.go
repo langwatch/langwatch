@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -103,6 +104,7 @@ func (f *fakeProxy) CACertPath() string                 { return "" }
 
 type fakeDBServer struct {
 	databases []string
+	mu        sync.Mutex // guards dropped: the bulk delete drops concurrently
 	dropped   []string
 	dropErr   error // when set, DropDatabase records the attempt then fails
 }
@@ -110,7 +112,9 @@ type fakeDBServer struct {
 func (f *fakeDBServer) Ensure(context.Context) (int, error)               { return 1, nil }
 func (f *fakeDBServer) EnsureDatabase(_ context.Context, db string) error { return nil }
 func (f *fakeDBServer) DropDatabase(_ context.Context, db string) error {
+	f.mu.Lock()
 	f.dropped = append(f.dropped, db)
+	f.mu.Unlock()
 	return f.dropErr
 }
 func (f *fakeDBServer) Databases(context.Context) ([]string, error) { return f.databases, nil }
@@ -121,8 +125,7 @@ func (f *fakeDBServer) Health(context.Context) (bool, string)       { return tru
 func (f *fakeDBServer) Stop()                                       {}
 
 type fakeHygiene struct {
-	worktrees        []Worktree
-	removedWorktrees []string
+	worktrees []Worktree
 	// The scan facts, keyed by worktree dir. All optional: a nil map yields the
 	// original always-clean / zero-size / unknown-activity behaviour the existing
 	// tests rely on, so only the prune-scan tests need to populate them.
@@ -130,6 +133,11 @@ type fakeHygiene struct {
 	dirtyDirs    map[string]bool
 	lastActivity map[string]time.Time
 	goneDirs     map[string]bool
+	// mu guards the two removal logs: DestroyWorktrees removes concurrently.
+	mu               sync.Mutex
+	removed          []string
+	removedWorktrees []string
+	pruned           int
 }
 
 func (f *fakeHygiene) Worktrees(string) ([]Worktree, error) { return f.worktrees, nil }
@@ -148,10 +156,21 @@ func (f *fakeHygiene) DiskUsage(dir string) (int64, bool) {
 	sz, ok := f.dirSizes[dir]
 	return sz, ok
 }
-func (f *fakeHygiene) Remove(string) error      { return nil }
-func (f *fakeHygiene) PruneGitWorktrees(string) {}
+func (f *fakeHygiene) Remove(path string) error {
+	f.mu.Lock()
+	f.removed = append(f.removed, path)
+	f.mu.Unlock()
+	return nil
+}
+func (f *fakeHygiene) PruneGitWorktrees(string) {
+	f.mu.Lock()
+	f.pruned++
+	f.mu.Unlock()
+}
 func (f *fakeHygiene) RemoveWorktree(_, dir string) error {
+	f.mu.Lock()
 	f.removedWorktrees = append(f.removedWorktrees, dir)
+	f.mu.Unlock()
 	return nil
 }
 func (f *fakeHygiene) LastActivity(dir string) (time.Time, bool) {

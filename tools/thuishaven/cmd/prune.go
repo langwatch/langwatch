@@ -103,8 +103,8 @@ func (d deps) pruneActions(rows []app.PruneRow, threshold time.Duration) prunetu
 				onSize,
 			)
 		},
-		Delete: func(ctx context.Context, dir string) error {
-			return d.orch.DestroyWorktree(ctx, d.worktree, dir, d.worktree)
+		DeleteAll: func(ctx context.Context, dirs []string, onDone func(dir string, err error)) {
+			d.orch.DestroyWorktrees(ctx, d.worktree, dirs, d.worktree, onDone)
 		},
 		SharedNote: sharedResourcesNote,
 	}
