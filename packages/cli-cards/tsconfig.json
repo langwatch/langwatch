@@ -6,9 +6,13 @@
     "lib": ["es2020"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "composite": true,
     "declaration": true,
+    "declarationMap": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/cli-cards.tsbuildinfo",
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true

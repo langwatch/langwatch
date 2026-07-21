@@ -36,14 +36,29 @@
 			}
 		]
 	},
+	// Workspace packages are composite projects (repo-root /packages). With
+	// these references, imports of @langwatch/* resolve to each package's
+	// emitted dist/*.d.ts instead of pulling its sources (and their deps) into
+	// this program — skipLibCheck then makes them parse-only. Build them first:
+	// `tsgo --build` handles ordering + staleness (pnpm typecheck does this).
+	"references": [
+		{ "path": "../packages/api" },
+		{ "path": "../packages/automations" },
+		{ "path": "../packages/observability" },
+		{ "path": "../packages/ssrf" },
+		{ "path": "../packages/cli-cards" },
+		{ "path": "../packages/handled-error" }
+	],
+	// Deliberately narrow: only app source trees are ROOT files. Tooling that
+	// used to ride in on `**/*.ts` (scripts/, vitest*.config.ts, vite/,
+	// prisma/ seeds, test-setup*) lives in tsconfig.tooling.json now, keeping
+	// vitest/vite/playwright types out of this program. Anything src imports
+	// is still pulled in transitively regardless of these globs.
 	"include": [
 		"./src/**/*",
+		"./ee/**/*",
 		".eslintrc.cjs",
 		"next-env.d.ts",
-		"**/*.ts",
-		"**/*.tsx",
-		"**/*.cjs",
-		"**/*.mjs",
 		".next/types/**/*.ts",
 		".next-saas/types/**/*.ts"
 	],
@@ -54,7 +69,6 @@
 		".next-saas",
 		"**/*.snippet.*",
 		"src/**/codegen/snippets/**/*",
-		"packages/insanity-check/**/*",
 		"**/*.test.ts",
 		"**/*.test.tsx",
 		"**/*.spec.ts",

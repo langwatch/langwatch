@@ -1,5 +1,15 @@
 packages:
-  - packages/*
+  # Explicit list, NOT `packages/*`: a package may belong to only one
+  # installing workspace. api/automations/observability/ssrf carry their own
+  # dependencies and are installed by the langwatch/ workspace (see
+  # langwatch/pnpm-workspace.yaml) — if the root workspace also claimed them,
+  # whichever `pnpm install` ran last would rewire packages/*/node_modules to
+  # its own virtual store and break peer resolution for the other workspace.
+  # cli-cards and handled-error are dependency-free contracts, so their dual
+  # membership (root + langwatch + typescript-sdk) is harmless.
+  - packages/server
+  - packages/cli-cards
+  - packages/handled-error
   # The langwatch/ next.js app keeps its own pnpm-workspace.yaml for its
   # internal sub-packages (saas-src, langwatch/packages/*, mcp-server). We do
   # NOT include it here — the @langwatch/server tarball ships langwatch/'s

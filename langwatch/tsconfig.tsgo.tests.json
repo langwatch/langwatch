@@ -5,6 +5,17 @@
 		// its own incremental cache instead of clobbering the app's.
 		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsgo-tests.tsbuildinfo"
 	},
+	// `references` is a top-level field and is NOT inherited via `extends` —
+	// repeat it so tests importing @langwatch/* resolve the packages' emitted
+	// declarations instead of re-checking their sources.
+	"references": [
+		{ "path": "../packages/api" },
+		{ "path": "../packages/automations" },
+		{ "path": "../packages/observability" },
+		{ "path": "../packages/ssrf" },
+		{ "path": "../packages/cli-cards" },
+		{ "path": "../packages/handled-error" }
+	],
 	"include": [
 		"./src/**/*.test.ts",
 		"./src/**/*.test.tsx",

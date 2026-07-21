@@ -3,16 +3,20 @@
 		"target": "ES2022",
 		"module": "ESNext",
 		"moduleResolution": "Bundler",
-		"lib": ["ES2022"],
+		"lib": ["ES2022", "DOM", "DOM.Iterable"],
 		"strict": true,
 		"esModuleInterop": true,
 		"skipLibCheck": true,
 		"resolveJsonModule": true,
 		"rootDir": "src",
 		"types": ["node"],
-		"noEmit": true,
+		"composite": true,
+		"declaration": true,
+		"declarationMap": true,
+		"emitDeclarationOnly": true,
+		"outDir": "./dist",
 		"incremental": true,
-		"tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/ssrf.tsbuildinfo"
+		"tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/automations.tsbuildinfo"
 	},
 	"include": ["src/**/*"]
 }

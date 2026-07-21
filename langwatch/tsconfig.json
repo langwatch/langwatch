@@ -33,6 +33,20 @@
 		},
 		"plugins": []
 	},
+	// Same composite-package references as tsconfig.tsgo.json: the editor's
+	// tsserver resolves @langwatch/* to emitted dist/*.d.ts instead of holding
+	// the package sources in the app program. (`references` is not inherited
+	// via `extends`, so each config repeats it.)
+	"references": [
+		{ "path": "../packages/api" },
+		{ "path": "../packages/automations" },
+		{ "path": "../packages/observability" },
+		{ "path": "../packages/ssrf" },
+		{ "path": "../packages/cli-cards" },
+		{ "path": "../packages/handled-error" }
+	],
+	// Deliberately broad (unlike tsconfig.tsgo.json): the editor project also
+	// covers tests, scripts and config files so every open file has a project.
 	"include": [
 		// "./src/**/*"
 		".eslintrc.cjs",

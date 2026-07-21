@@ -1,0 +1,46 @@
+{
+	// Dev/CI tooling that used to be swept into the app program by its old
+	// `**/*.ts` include: standalone scripts, the vitest/vite config files, the
+	// prisma seeds and the test-setup shims. Checking them here keeps their
+	// dependency types (vitest, vite, playwright, rolldown, ...) out of the
+	// app program. Run via `pnpm typecheck:tooling`.
+	"extends": "./tsconfig.tsgo.json",
+	"compilerOptions": {
+		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsgo-tooling.tsbuildinfo"
+	},
+	// `references` is a top-level field and is NOT inherited via `extends` —
+	// repeat it so scripts that transitively import @langwatch/* also resolve
+	// the packages' emitted declarations.
+	"references": [
+		{ "path": "../packages/api" },
+		{ "path": "../packages/automations" },
+		{ "path": "../packages/observability" },
+		{ "path": "../packages/ssrf" },
+		{ "path": "../packages/cli-cards" },
+		{ "path": "../packages/handled-error" }
+	],
+	"include": [
+		"./scripts/**/*",
+		"./vite/**/*",
+		"./prisma/**/*",
+		"vite.config.ts",
+		"vitest.config.ts",
+		"vitest.browser.config.ts",
+		"vitest.integration.config.ts",
+		"vitest.mcp.config.ts",
+		"vitest.pg-integration.config.ts",
+		"vitest.prisma-integration.config.ts",
+		"vitest.stress.config.ts",
+		"vitest.stripe-integration.config.ts",
+		"test-setup.ts",
+		"test-setup.browser.ts",
+		"next-env.d.ts"
+	],
+	"exclude": [
+		"node_modules",
+		"**/*.test.ts",
+		"**/*.spec.ts",
+		"**/__tests__/**",
+		"**/__mocks__/**"
+	]
+}

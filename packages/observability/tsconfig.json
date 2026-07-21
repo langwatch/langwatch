@@ -10,7 +10,13 @@
 		"resolveJsonModule": true,
 		"rootDir": "src",
 		"types": ["node"],
-		"noEmit": true
+		"composite": true,
+		"declaration": true,
+		"declarationMap": true,
+		"emitDeclarationOnly": true,
+		"outDir": "./dist",
+		"incremental": true,
+		"tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/observability.tsbuildinfo"
 	},
 	"include": ["src/**/*"]
 }
