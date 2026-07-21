@@ -174,8 +174,11 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 24
-          cache: pnpm
-          cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
+          # No dependency cache on purpose. These legs build the binaries that
+          # the publish job uploads to the release, so a poisoned cache entry
+          # would become a shipped artifact. Restoring a shared store into a
+          # release-triggered build is the cache-poisoning surface zizmor flags;
+          # a cold install costs seconds and removes it.
 
       - name: Install Bun
         # The pinned, checksummed release artifact — NOT `curl

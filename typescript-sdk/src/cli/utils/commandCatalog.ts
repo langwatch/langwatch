@@ -81,6 +81,9 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   "opencode",
   // The CLI's own background process management.
   "daemon",
+  // Local agent-skill installer: manages files under ~/.agents, not platform
+  // data. Excluded app-side too (capabilityCatalog.coverage.unit.test.ts).
+  "skills",
   // The catalog itself — self-referential.
   "commands",
   "help-tree",
