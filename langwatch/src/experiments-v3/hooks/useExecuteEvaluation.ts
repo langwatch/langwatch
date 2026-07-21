@@ -319,8 +319,16 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             // Fatal error
             setError(event.message);
             setResults({ status: "error" });
-            showErrorToast(event, {
-              fallbackTitle: "Couldn't finish the evaluation",
+            // `event` is a stream frame, not an error — it has no handled
+            // payload, so showErrorToast would replace the engine's own
+            // diagnostic (missing column, evaluator crash) with "we've been
+            // notified". That message is the only thing that tells the user
+            // what to change.
+            toaster.create({
+              title: "Couldn't finish the evaluation",
+              description: event.message,
+              type: "error",
+              meta: { closable: true },
             });
           }
           break;

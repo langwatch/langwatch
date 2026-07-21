@@ -11,6 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { useCallback, useMemo } from "react";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";
+import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -43,17 +44,18 @@ export function EditProjectDrawer({
     { enabled: !!organization },
   );
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isDirty },
-    control,
-  } = useForm<EditProjectFormData>({
+  const form = useForm<EditProjectFormData>({
     defaultValues: {
       name: projectName ?? "",
       teamId: currentTeamId ?? "",
     },
   });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isDirty },
+    control,
+  } = form;
 
   const updateProject = api.project.update.useMutation();
 
@@ -95,18 +97,24 @@ export function EditProjectDrawer({
             });
             closeDrawer();
           },
-          onError: (e) => {
-            toaster.create({
-              title: e.message,
-              type: "error",
-              duration: 5000,
-              meta: { closable: true },
+          onError: (error) => {
+            if (applyHandledErrorToForm({ error, form })) return;
+            showErrorToast(error, {
+              fallbackTitle: "Couldn't update the project",
             });
           },
         },
       );
     },
-    [updateProject, projectId, projectName, currentTeamId, queryClient, closeDrawer],
+    [
+      updateProject,
+      projectId,
+      projectName,
+      currentTeamId,
+      queryClient,
+      closeDrawer,
+      form,
+    ],
   );
 
   return (

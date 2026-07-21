@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -93,10 +94,7 @@ export function BudgetEditDrawer({
       onSaved();
       onOpenChange(false);
     } catch (error) {
-      toaster.create({
-        title: error instanceof Error ? error.message : "Failed to update budget",
-        type: "error",
-      });
+      showErrorToast(error, { fallbackTitle: "Couldn't update the budget" });
     }
   };
 

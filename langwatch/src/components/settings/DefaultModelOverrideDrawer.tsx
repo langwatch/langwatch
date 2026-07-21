@@ -32,6 +32,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { modelSelectorOptions } from "~/components/ModelSelector";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api, type RouterOutputs } from "~/utils/api";
 
 import { useDrawer } from "~/hooks/useDrawer";
@@ -322,12 +323,10 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       onSaved();
       onClose();
     } catch (err) {
-      toaster.create({
-        title: "Failed to save",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 6000,
-        meta: { closable: true },
+      showErrorToast(err, {
+        fallbackTitle: editing
+          ? "Couldn't update the config"
+          : "Couldn't add the config",
       });
     } finally {
       setBusy(false);

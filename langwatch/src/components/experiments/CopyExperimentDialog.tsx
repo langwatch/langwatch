@@ -12,8 +12,8 @@ import {
   hasPermissionWithHierarchy,
   teamRoleHasPermission,
 } from "../../server/api/rbac";
+import { showErrorToast } from "~/features/errors";
 import { api } from "../../utils/api";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
 import { Select } from "../ui/select";
@@ -110,12 +110,8 @@ export const CopyExperimentDialog = ({
 
       onClose();
     } catch (error) {
-      // Skip toast if the global license handler already showed the upgrade modal
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error replicating experiment",
-        description: error instanceof Error ? error.message : "Unknown error",
-        type: "error",
+      showErrorToast(error, {
+        fallbackTitle: "Couldn't replicate the experiment",
       });
     }
   };

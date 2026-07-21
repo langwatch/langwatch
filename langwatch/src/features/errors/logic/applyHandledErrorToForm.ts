@@ -45,13 +45,26 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   const fieldErrors = asFieldErrors(handled.meta.fieldErrors);
   const formErrors = asStringArray(handled.meta.formErrors);
 
-  // Only claim fields this form actually owns. A `validation_error` from a
-  // different shape (a nested payload, a server-side rule about something not
-  // on screen) must fall through to the toast rather than vanish.
-  const known = new Set(Object.keys(form.getValues()));
-  const applicable = Object.entries(fieldErrors).filter(
-    ([field, messages]) => known.has(field) && messages.length > 0,
+  // Only claim fields this form actually renders. Two traps here, both of
+  // which end with the user staring at a clean form and a save that didn't
+  // happen:
+  //
+  //   - zod's flatten() collapses a nested path (["version","configData"]) to
+  //     its head, so a top-level key check says "yes, I own `version`" and
+  //     sets an error on a container no input is registered against. Nothing
+  //     renders it and shouldFocus finds no ref.
+  //   - a field that is in the schema but not currently mounted is absent
+  //     from getValues().
+  //
+  // So test against a leaf value, not just a key.
+  const values = form.getValues() as Record<string, unknown>;
+  const ownsLeaf = (field: string) =>
+    Object.hasOwn(values, field) && !isPlainContainer(values[field]);
+
+  const nonEmpty = Object.entries(fieldErrors).filter(
+    ([, messages]) => messages.length > 0,
   );
+  const applicable = nonEmpty.filter(([field]) => ownsLeaf(field));
 
   if (applicable.length === 0 && formErrors.length === 0) return false;
 
@@ -69,11 +82,16 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
       type: "server",
       message: formErrors.join(" "),
     });
-  } else if (applicable.length === 0) {
-    return false;
   }
 
-  return true;
+  // Claim the error only if the form showed ALL of it. On a partial match the
+  // unclaimed complaints would be shown nowhere, so the caller still toasts.
+  return applicable.length === nonEmpty.length;
+}
+
+/** An object/array value — a container, not something an input binds to. */
+function isPlainContainer(value: unknown): boolean {
+  return typeof value === "object" && value !== null;
 }
 
 function asFieldErrors(value: unknown): Record<string, string[]> {

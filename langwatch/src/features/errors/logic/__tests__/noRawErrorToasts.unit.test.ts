@@ -16,15 +16,31 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const SRC_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
+const PACKAGE_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
 
 /**
- * `description:` fed directly from an error's `.message`, in any of the
- * shapes the codebase used: `error.message`, `err.message`, `e.message`,
- * `error.message || "…"`, `String(error)`.
+ * Both trees that ship UI. `ee/` was outside the original walk, so fourteen
+ * raw-message toasts in the governance and backoffice dashboards were never
+ * caught — the guard has to cover everywhere the pattern can appear, not just
+ * where the migration happened to look.
+ */
+const ROOTS = ["src", "ee"].map((dir) => join(PACKAGE_ROOT, dir));
+
+/**
+ * An error's `.message` fed into either toast field.
+ *
+ * `title:` matters as much as `description:` — the wire message for a handled
+ * error IS the code, so `title: error.message` puts `validation_error` in the
+ * headline, which is worse than putting it in the body. The first version of
+ * this guard only checked `description:` and eleven title-slug toasts sailed
+ * through it.
+ *
+ * Covers `error.message`, `err?.message`, `e.message || "…"` and
+ * `String(error)`. Scanned against the whole file rather than line-by-line so
+ * a wrapped `description:\n  error.message` can't hide.
  */
 const RAW_MESSAGE_TOAST =
-  /description:\s*(?:`?\$?\{?\s*)?(?:error|err|e)\s*(?:\?\.)?\.message/;
+  /(?:title|description|fallbackTitle)\s*:\s*[^,\n}]*(?:\b(?:error|err|e)\s*\??\.\s*message\b|String\(\s*(?:error|err|e)\s*\))/;
 
 /**
  * Files allowed to reference an error message directly.
@@ -34,7 +50,7 @@ const RAW_MESSAGE_TOAST =
  */
 const ALLOWED = new Set<string>([
   // The helper whose entire job is to read errors correctly.
-  "features/errors/logic/showErrorToast.ts",
+  "src/features/errors/logic/showErrorToast.ts",
 ]);
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -54,8 +70,8 @@ describe("error toasts", () => {
   it("never render an error's raw message", () => {
     const offenders: string[] = [];
 
-    for (const file of walk(SRC_ROOT)) {
-      const rel = relative(SRC_ROOT, file);
+    for (const file of ROOTS.flatMap((root) => walk(root))) {
+      const rel = relative(PACKAGE_ROOT, file);
       if (ALLOWED.has(rel)) continue;
 
       const source = readFileSync(file, "utf8");

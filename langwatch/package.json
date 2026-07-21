@@ -17,7 +17,7 @@
     "build": "pnpm run start:prepare:files && pnpm run build:scenario-child-process && NODE_ENV=production BUILD_TIME=1 vite build",
     "build:client": "NODE_ENV=production vite build",
     "tool:analytics-parity-check": "NODE_ENV=development pnpm --filter @langwatch/analytics-parity-check",
-    "lint": "pnpm exec biome check src/",
+    "lint": "pnpm exec biome check src/ ee/",
     "lint:fix": "pnpm exec biome check src/ --write",
     "check:feature-parity": "tsx scripts/check-feature-parity.ts",
     "format": "pnpm exec biome format src/ --write",

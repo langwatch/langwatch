@@ -96,3 +96,33 @@ export function readErrorTraceId(err: unknown): string | undefined {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
+
+/** Looks like `some_error_code` rather than a sentence. */
+const CODE_SLUG = /^[a-z0-9]+(_[a-z0-9]+)+$/;
+
+/**
+ * Prose a procedure deliberately authored for the user, on an error that isn't
+ * a HandledError.
+ *
+ * #5984 collapsed the wire message to the code for *handled* errors, and to a
+ * generic string for unhandled 5xx — but it deliberately left a plain non-5xx
+ * `TRPCError`'s message alone, because that is copy the procedure wrote to be
+ * read ("User already exists", "Too many signup attempts"). Several hundred
+ * such throw sites exist, and dropping their message in favour of "we've been
+ * notified" is worse than the slug problem this module set out to fix: it
+ * tells a user to wait for something that will never change.
+ *
+ * Returns `undefined` for anything 5xx, anything handled (the registry owns
+ * that copy), and anything that looks like a code slug.
+ */
+export function readAuthoredMessage(err: unknown): string | undefined {
+  if (readHandledError(err)) return undefined;
+
+  const status = (err as { data?: { httpStatus?: unknown } })?.data?.httpStatus;
+  if (typeof status !== "number" || status >= 500) return undefined;
+
+  const message = (err as { message?: unknown })?.message;
+  if (typeof message !== "string" || message.length === 0) return undefined;
+
+  return CODE_SLUG.test(message) ? undefined : message;
+}

@@ -24,8 +24,8 @@ import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -72,10 +72,7 @@ function BudgetDetailPage() {
       });
       setArchiving(false);
     } catch (err) {
-      toaster.create({
-        title: err instanceof Error ? err.message : "Failed to archive",
-        type: "error",
-      });
+      showErrorToast(err, { fallbackTitle: "Couldn't archive the budget" });
     }
   };
 

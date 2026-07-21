@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 type DepartmentRow = { id: string; name: string };
@@ -50,10 +51,7 @@ export function DepartmentEditDrawer({
       onSaved();
       onOpenChange(false);
     } catch (error) {
-      toaster.create({
-        title: error instanceof Error ? error.message : "Rename failed",
-        type: "error",
-      });
+      showErrorToast(error, { fallbackTitle: "Couldn't rename the department" });
     }
   };
 

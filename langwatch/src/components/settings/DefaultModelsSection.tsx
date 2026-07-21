@@ -58,6 +58,7 @@ import {
 } from "./ScopeFilter";
 import { ModelChip } from "./ModelChip";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import {
   isScopeInFilter,
   resolveScopeFilter,
@@ -143,13 +144,7 @@ export function DefaultModelsSection({
         meta: { closable: true },
       });
     } catch (err) {
-      toaster.create({
-        title: "Failed to delete",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 6000,
-        meta: { closable: true },
-      });
+      showErrorToast(err, { fallbackTitle: "Couldn't delete the config" });
     }
   };
 

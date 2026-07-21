@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
+import { showErrorToast } from "~/features/errors";
 import { toaster } from "../components/ui/toaster";
 import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
 import {
@@ -124,13 +125,7 @@ export function useProviderFormSubmit({
         onSuccess?.();
       } catch (err) {
         onError?.(err);
-        toaster.create({
-          title: "Failed to update provider",
-          description: err instanceof Error ? err.message : String(err),
-          type: "error",
-          duration: 4000,
-          meta: { closable: true },
-        });
+        showErrorToast(err, { fallbackTitle: "Couldn't update the provider" });
       }
     },
     [getFormSnapshot, onSuccess, onError, updateMutation, utils],
@@ -463,12 +458,8 @@ export function useProviderFormSubmit({
       onSuccess?.();
     } catch (err) {
       onError?.(err);
-      toaster.create({
-        title: "Failed to save settings",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 4000,
-        meta: { closable: true },
+      showErrorToast(err, {
+        fallbackTitle: "Couldn't save the provider settings",
       });
     } finally {
       setIsSaving(false);

@@ -4,7 +4,11 @@ import type {
 } from "@langwatch/handled-error";
 
 import type { AppErrorCode } from "./codes";
-import { readHandledError, type HandledErrorShape } from "./readHandledError";
+import {
+  readAuthoredMessage,
+  readHandledError,
+  type HandledErrorShape,
+} from "./readHandledError";
 
 /**
  * The customer-facing copy for every handled-error code, keyed by code.
@@ -56,7 +60,7 @@ const presentations = {
   trace_not_found: {
     title: "Trace not found",
     describe: () =>
-      "It may have been deleted, or it may still be arriving — traces take a few seconds to appear.",
+      "It may have been deleted, or it may still be arriving. Traces take a few seconds to appear.",
   },
   span_not_found: {
     title: "Span not found",
@@ -83,7 +87,7 @@ const presentations = {
   },
   filter_parse_error: {
     title: "This filter isn't valid",
-    describe: (error) => str(error, "reason", "Check the syntax and try again."),
+    describe: () => "Check the syntax and try again.",
   },
   filter_field_unknown: {
     title: "Unknown filter field",
@@ -94,7 +98,7 @@ const presentations = {
   },
   clickhouse_unavailable: {
     title: "Search is temporarily unavailable",
-    describe: () => "We're on it — try again in a moment.",
+    describe: () => "We're on it. Try again in a moment.",
   },
   broadcaster_not_active: {
     title: "Live updates disconnected",
@@ -106,19 +110,25 @@ const presentations = {
   evaluator_not_found: { title: "Evaluator not found" },
   evaluator_config_error: {
     title: "This evaluator isn't configured correctly",
-    describe: (error) =>
-      str(error, "reason", "Check its settings and try again."),
+    describe: () => "Check its settings and try again.",
   },
   evaluator_execution_error: {
     title: "The evaluator failed to run",
-    describe: (error) => str(error, "reason", "Try running it again."),
+    // `meta.reason` is a machine sub-classifier ("auth_failed") for branching,
+    // never prose — so branch on it and return authored copy, never the value.
+    describe: (error) =>
+      str(error, "reason", "") === "auth_failed"
+        ? "Check the API key for this evaluator's model provider."
+        : "Try running it again.",
   },
   evaluator_missing_field: {
     title: "The evaluator needs another field",
     describe: (error) => {
-      const field = str(error, "field", "");
-      return field
-        ? `Map a value to "${field}" before running this evaluator.`
+      // meta.field is the wire identifier ("candidate_a_id"); the error class
+      // documents it as something to translate, not to render.
+      const label = EVALUATOR_FIELD_LABELS[str(error, "field", "")];
+      return label
+        ? `Map a value to ${label} before running this evaluator.`
         : "Map all of its required fields before running it.";
     },
   },
@@ -135,7 +145,7 @@ const presentations = {
   system_prompt_conflict: {
     title: "Set one prompt, not both",
     describe: () =>
-      "This prompt has both a system prompt and a prompt — remove one.",
+      "This prompt has both a system prompt and a prompt. Remove one.",
   },
 
   // ---- API keys ----
@@ -237,8 +247,7 @@ const presentations = {
   },
   notification_delivery_error: {
     title: "We couldn't deliver that notification",
-    describe: (error) =>
-      str(error, "reason", "Check the destination and try again."),
+    describe: () => "Check the destination and try again.",
   },
   test_fire_unavailable: {
     title: "Nothing to test yet",
@@ -325,18 +334,24 @@ const presentations = {
   },
   langy_egress_misconfigured: {
     title: "Temporarily unavailable",
-    describe: () => "We're on it — try again shortly.",
+    describe: () => "We're on it. Try again shortly.",
   },
 
   // ---- validation ----
   validation_error: {
     title: "Check your input",
     describe: (error) => {
+      // Zod flattens to the INPUT SCHEMA's property names, which are wire
+      // identifiers: every procedure takes a `projectId` the customer never
+      // sees. Name only fields that exist on screen; the per-field detail has
+      // a proper home anyway (applyHandledErrorToForm).
       const fieldErrors = error.meta.fieldErrors;
       if (fieldErrors && typeof fieldErrors === "object") {
-        const fields = Object.keys(fieldErrors);
-        if (fields.length > 0) {
-          return `There's a problem with ${listFields(fields)}.`;
+        const named = Object.keys(fieldErrors).filter((field) =>
+          USER_VISIBLE_FIELDS.has(field),
+        );
+        if (named.length > 0) {
+          return `There's a problem with ${listFields(named)}.`;
         }
       }
       const formErrors = error.meta.formErrors;
@@ -346,7 +361,7 @@ const presentations = {
         );
         if (first) return first;
       }
-      return "Some of the values above aren't valid.";
+      return "Some of the values aren't valid.";
     },
   },
   // ==========================================================================
@@ -407,7 +422,7 @@ const presentations = {
   },
   circuit_open: {
     title: "Paused after repeated failures",
-    describe: () => "We'll retry automatically — try again shortly.",
+    describe: () => "We'll retry automatically. Try again shortly.",
   },
   auth_upstream_unavailable: {
     title: "Couldn't verify your access",
@@ -467,7 +482,7 @@ const presentations = {
   },
   credentials_required: {
     title: "Couldn't verify your access",
-    describe: () => "Try again — this usually resolves itself.",
+    describe: () => "Try again. This usually resolves itself.",
   },
   invalid_conversation_id: { title: "Conversation not found" },
   opencode_session_not_found: {
@@ -476,7 +491,7 @@ const presentations = {
   },
   opencode_auth_not_enforced: {
     title: "Temporarily unavailable",
-    describe: () => "We're on it — try again shortly.",
+    describe: () => "We're on it. Try again shortly.",
   },
   max_workers_reached: {
     title: "Busy right now",
@@ -519,6 +534,35 @@ const presentations = {
   },
 } satisfies Record<AppErrorCode | GoErrorCode, ErrorPresentation>;
 
+/**
+ * Field names a customer can actually see and act on.
+ *
+ * Anything not here is a wire identifier — `projectId`, `organizationId`,
+ * `checkId` — and naming it in a toast is the same leak as showing a code
+ * slug, just via `meta` instead of `message`.
+ */
+const EVALUATOR_FIELD_LABELS: Record<string, string> = {
+  candidate_a_id: "Variant A",
+  candidate_b_id: "Variant B",
+  input: "the input",
+  output: "the output",
+  expected_output: "the expected output",
+  contexts: "the contexts",
+};
+
+const USER_VISIBLE_FIELDS = new Set([
+  "name",
+  "slug",
+  "email",
+  "description",
+  "url",
+  "prompt",
+  "model",
+  "value",
+  "label",
+  "title",
+]);
+
 /** Joins field names into "a", "a and b", "a, b and c". */
 function listFields(fields: string[]): string {
   if (fields.length === 1) return `"${fields[0]}"`;
@@ -560,9 +604,13 @@ export interface ErrorExplanation {
  * degrades to fault-based copy, which is calm and true rather than precise.
  */
 export function explainHandledError(error: HandledErrorShape): ErrorExplanation {
-  const presentation = (
-    presentations as Record<string, ErrorPresentation | undefined>
-  )[error.code];
+  // `hasOwn`, not a bare index: `code` is untrusted, and `"toString"` or
+  // `"constructor"` would otherwise resolve to an inherited Object.prototype
+  // member — truthy, so it would report itself registered and render a blank
+  // headline instead of degrading on fault.
+  const presentation = Object.hasOwn(presentations, error.code)
+    ? (presentations as Record<string, ErrorPresentation>)[error.code]
+    : undefined;
 
   if (!presentation) {
     return {
@@ -596,9 +644,12 @@ export function describeError(
   options: { fallbackTitle?: string } = {},
 ): string {
   const handled = readHandledError(error);
+  const authored = readAuthoredMessage(error);
   const explanation = handled
     ? explainHandledError(handled)
-    : UNKNOWN_ERROR_PRESENTATION;
+    : authored
+      ? { ...UNKNOWN_ERROR_PRESENTATION, description: authored }
+      : UNKNOWN_ERROR_PRESENTATION;
 
   const title = explanation.isRegistered
     ? explanation.title

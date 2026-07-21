@@ -54,9 +54,19 @@ export interface LangyErrorPresentation {
  * for an engineer debugging an agent turn) rather than hiding them.
  */
 export interface LangyDomainError
-  extends Omit<HandledErrorShape, "reasons" | "traceId"> {
+  extends Omit<
+    HandledErrorShape,
+    "reasons" | "traceId" | "fault" | "tips" | "docsUrl"
+  > {
   traceId?: string;
   reasons?: LangySerializedReason[];
+  // Optional, unlike the shared shape: Langy also builds this type by hand for
+  // stream frames and for a synthesised "unknown", neither of which has a
+  // fault or remediation to report. `readLangyTrpcError` still fills them in
+  // from the shared reader when the error came over tRPC.
+  fault?: HandledErrorShape["fault"];
+  tips?: HandledErrorShape["tips"];
+  docsUrl?: HandledErrorShape["docsUrl"];
 }
 
 /**

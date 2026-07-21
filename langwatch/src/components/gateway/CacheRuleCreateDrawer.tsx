@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -52,10 +53,7 @@ export function CacheRuleCreateDrawer({ open, onOpenChange, onCreated }: Props) 
       onOpenChange(false);
       onCreated?.();
     } catch (e) {
-      toaster.create({
-        title: e instanceof Error ? e.message : "Failed to create cache rule",
-        type: "error",
-      });
+      showErrorToast(e, { fallbackTitle: "Couldn't create the cache rule" });
     }
   };
 

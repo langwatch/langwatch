@@ -15,7 +15,7 @@ import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { Dialog } from "~/components/ui/dialog";
 import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
-import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import {
   BindingInputRow,
@@ -72,8 +72,8 @@ export function CreateGroupDialog({
       void queryClient.group.listAll.invalidate();
       reset();
       onClose();
-    } catch (e: any) {
-      toaster.create({ title: e.message ?? "Failed to create group", type: "error" });
+    } catch (e) {
+      showErrorToast(e, { fallbackTitle: "Couldn't create the group" });
     }
   }
 

@@ -44,8 +44,8 @@ import { VirtualKeyUsageSnippet } from "~/components/gateway/VirtualKeyUsageSnip
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -193,10 +193,7 @@ function VirtualKeyDetailPage() {
       setRevealSecret({ name: vk.name, secret: result.secret });
       setRotating(false);
     } catch (err) {
-      toaster.create({
-        title: err instanceof Error ? err.message : "Failed to rotate key",
-        type: "error",
-      });
+      showErrorToast(err, { fallbackTitle: "Couldn't rotate the key" });
     }
   };
 
@@ -206,10 +203,7 @@ function VirtualKeyDetailPage() {
       await revokeMutation.mutateAsync({ organizationId: orgId, id: vk.id });
       setRevoking(false);
     } catch (err) {
-      toaster.create({
-        title: err instanceof Error ? err.message : "Failed to revoke key",
-        type: "error",
-      });
+      showErrorToast(err, { fallbackTitle: "Couldn't revoke the key" });
     }
   };
 

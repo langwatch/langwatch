@@ -1,4 +1,5 @@
 import { Alert } from "@chakra-ui/react";
+import { useFormState } from "react-hook-form";
 import type { FieldValues, UseFormReturn } from "react-hook-form";
 
 export interface FormServerErrorProps<TFieldValues extends FieldValues> {
@@ -17,7 +18,12 @@ export interface FormServerErrorProps<TFieldValues extends FieldValues> {
 export function FormServerError<TFieldValues extends FieldValues>({
   form,
 }: FormServerErrorProps<TFieldValues>) {
-  const message = form.formState.errors.root?.serverError?.message;
+  // `useFormState` subscribes this component to the control directly. Reading
+  // `form.formState` here works only while the parent happens to re-render —
+  // memoise this component, or move it to a sibling that doesn't own the
+  // form, and a rejected submit would silently render nothing.
+  const { errors } = useFormState({ control: form.control });
+  const message = errors.root?.serverError?.message;
   if (!message) return null;
 
   return (

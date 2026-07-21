@@ -6,7 +6,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { readErrorTraceId, readHandledError } from "../readHandledError";
+import {
+  readAuthoredMessage,
+  readErrorTraceId,
+  readHandledError,
+} from "../readHandledError";
 
 const trpcError = (error: unknown, traceId?: string) => ({
   data: { error, ...(traceId ? { traceId } : {}) },
@@ -125,5 +129,59 @@ describe("readErrorTraceId", () => {
   it("returns undefined rather than guessing when there is no id", () => {
     expect(readErrorTraceId({})).toBeUndefined();
     expect(readErrorTraceId(new Error("boom"))).toBeUndefined();
+  });
+});
+
+describe("readAuthoredMessage", () => {
+  const trpcError = (httpStatus: number, message: string, error: unknown = null) => ({
+    message,
+    data: { httpStatus, error },
+  });
+
+  describe("given a plain non-5xx TRPCError", () => {
+    it("returns the prose the procedure authored", () => {
+      // These are real: user.register throws them, and #5984 deliberately
+      // left non-5xx messages alone.
+      expect(readAuthoredMessage(trpcError(409, "User already exists"))).toBe(
+        "User already exists",
+      );
+      expect(
+        readAuthoredMessage(
+          trpcError(429, "Too many signup attempts. Please try again later."),
+        ),
+      ).toBe("Too many signup attempts. Please try again later.");
+    });
+  });
+
+  describe("given anything the registry or the generic state owns", () => {
+    it("declines a handled error — its copy comes from the registry", () => {
+      expect(
+        readAuthoredMessage(
+          trpcError(404, "trace_not_found", {
+            code: "trace_not_found",
+            httpStatus: 404,
+          }),
+        ),
+      ).toBeUndefined();
+    });
+
+    it("declines a 5xx — its message can carry internals", () => {
+      expect(
+        readAuthoredMessage(trpcError(500, "connect ECONNREFUSED 10.0.0.4")),
+      ).toBeUndefined();
+    });
+
+    it("declines anything shaped like a code slug", () => {
+      expect(readAuthoredMessage(trpcError(422, "validation_error"))).toBeUndefined();
+    });
+
+    it.each([
+      ["no data", { message: "hi" }],
+      ["no status", { message: "hi", data: {} }],
+      ["no message", { data: { httpStatus: 400 } }],
+      ["a bare Error", new Error("boom")],
+    ])("declines %s", (_label, error) => {
+      expect(readAuthoredMessage(error)).toBeUndefined();
+    });
   });
 });

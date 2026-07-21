@@ -29,7 +29,7 @@ import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "~/components/ui/menu";
-import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -93,10 +93,7 @@ function CacheRulesPage() {
       });
       setArchiving(null);
     } catch (error) {
-      toaster.create({
-        title: error instanceof Error ? error.message : "Failed to archive",
-        type: "error",
-      });
+      showErrorToast(error, { fallbackTitle: "Couldn't archive the cache rule" });
     }
   };
 
@@ -109,10 +106,7 @@ function CacheRulesPage() {
         enabled: !rule.enabled,
       });
     } catch (error) {
-      toaster.create({
-        title: error instanceof Error ? error.message : "Failed to toggle rule",
-        type: "error",
-      });
+      showErrorToast(error, { fallbackTitle: "Couldn't toggle the cache rule" });
     }
   };
 

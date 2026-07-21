@@ -87,6 +87,49 @@ describe("applyHandledErrorToForm", () => {
     });
   });
 
+  describe("given a nested field the form only owns as a container", () => {
+    it("declines it — setting an error on a container shows the user nothing", () => {
+      // zod's flatten() collapses ["version","configData","prompt"] to
+      // "version", which the form owns as an object. No input is registered
+      // against it, so marking it would leave a clean-looking form and a
+      // save that silently didn't happen.
+      const form: FormStub = {
+        getValues: () => ({ version: { configData: { prompt: "" } } }),
+        setError: vi.fn(),
+      };
+
+      const consumed = apply(
+        validationError({ fieldErrors: { version: ["Required"] } }),
+        form,
+      );
+
+      expect(consumed).toBe(false);
+      expect(form.setError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given only some of the named fields on this form", () => {
+    it("marks what it can but still declines, so the rest isn't lost", () => {
+      const form = formWithFields("name");
+
+      const consumed = apply(
+        validationError({
+          fieldErrors: { name: ["Required"], organizationId: ["Nope"] },
+        }),
+        form,
+      );
+
+      // `name` is marked so the user sees something, but the organizationId
+      // complaint has nowhere to render — the caller must still toast.
+      expect(form.setError).toHaveBeenCalledWith(
+        "name",
+        expect.objectContaining({ message: "Required" }),
+        expect.anything(),
+      );
+      expect(consumed).toBe(false);
+    });
+  });
+
   describe("given a validation error about fields this form does not have", () => {
     it("declines it, so it falls through to a toast instead of vanishing", () => {
       const form = formWithFields("name");

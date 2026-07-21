@@ -24,6 +24,7 @@ import {
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
 import SettingsLayout from "../../components/SettingsLayout";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
@@ -48,7 +49,8 @@ function GroupsSettings() {
       void queryClient.group.listAll.invalidate();
       setGroupToDelete(null);
     },
-    onError: (e) => toaster.create({ title: e.message, type: "error" }),
+    onError: (e) =>
+      showErrorToast(e, { fallbackTitle: "Couldn't delete the group" }),
   });
 
   const groups = api.group.listAll.useQuery(
