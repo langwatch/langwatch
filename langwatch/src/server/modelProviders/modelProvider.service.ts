@@ -1250,21 +1250,27 @@ export class ModelProviderService {
    * Header counterpart of `mergeCustomKeys`: the frontend receives header
    * values as the masked placeholder, so an untouched header comes back
    * masked on save and must be restored from the stored row. Restore by
-   * header key first; when the key was renamed, fall back to the header
-   * at the same position; a placeholder that matches nothing is dropped
-   * rather than stored as a literal value.
+   * header key first; when the key was renamed in place, fall back to the
+   * header at the same position — but only when that positional header
+   * isn't also claimed by name elsewhere in the submission, so a
+   * rename+reorder can never copy one header's secret under another
+   * header's name. A placeholder that matches nothing is dropped rather
+   * than stored as a literal value.
    */
   private mergeExtraHeaders(
     incoming: { key: string; value: string }[],
     existing: { key: string; value: string }[] | null,
   ): { key: string; value: string }[] {
+    const incomingKeys = new Set(incoming.map((h) => h.key));
     return incoming.flatMap((header, index) => {
       if (header.value !== MASKED_KEY_PLACEHOLDER) return [header];
-      const restored =
-        existing?.find((h) => h.key === header.key)?.value ??
-        existing?.[index]?.value;
-      if (restored === undefined) return [];
-      return [{ key: header.key, value: restored }];
+      const byKey = existing?.find((h) => h.key === header.key);
+      if (byKey) return [{ key: header.key, value: byKey.value }];
+      const positional = existing?.[index];
+      if (positional && !incomingKeys.has(positional.key)) {
+        return [{ key: header.key, value: positional.value }];
+      }
+      return [];
     });
   }
 }

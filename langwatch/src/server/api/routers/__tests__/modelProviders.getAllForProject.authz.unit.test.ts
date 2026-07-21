@@ -178,6 +178,14 @@ describe("modelProviders.getAllForProject authz", () => {
         caller.getAllForProject({ projectId: "project_a" }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
+
+    it("throws TRPCError (not a generic error) for denied access", async () => {
+      const caller = callerForUser("user_with_nothing");
+
+      await expect(
+        caller.getAllForProject({ projectId: "project_a" }),
+      ).rejects.toBeInstanceOf(TRPCError);
+    });
   });
 
   describe("when the user only has access to a sibling project in the same organization", () => {
@@ -214,13 +222,5 @@ describe("modelProviders.getAllForProject authz", () => {
         OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
       });
     });
-  });
-
-  it("throws TRPCError (not a generic error) for denied access", async () => {
-    const caller = callerForUser("user_with_nothing");
-
-    await expect(
-      caller.getAllForProject({ projectId: "project_a" }),
-    ).rejects.toBeInstanceOf(TRPCError);
   });
 });

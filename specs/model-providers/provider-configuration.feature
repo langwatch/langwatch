@@ -75,6 +75,13 @@ Feature: Model Provider Configuration
     And non-secret values like the base URL remain visible
 
   @unit
+  Scenario: Preserve original extra header values when saving with masked placeholders
+    Given I have "custom" provider configured with extra headers
+    When I save the provider with header values still masked
+    Then the stored header values are preserved
+    And a masked header that matches no stored header is not saved
+
+  @unit
   Scenario: A user without project view permission cannot list a project's providers
     Given a project has "openai" provider configured with an API key
     And I have no permissions on that project
