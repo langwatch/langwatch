@@ -11,8 +11,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/langwatch/langwatch/services/aigateway/domain"
 	"github.com/tidwall/gjson"
+
+	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 // Spec: specs/model-providers/codex-account-provider.feature — the gateway
