@@ -64,7 +64,11 @@ function makeUtils(pages: Page[]) {
   (proto as { query: typeof query }).query = query;
   Object.setPrototypeOf(untyped, proto);
   const utils = {
-    client: createTRPCClientProxy(untyped),
+    // v10 types the proxy factory against the legacy `TRPCClient` interop
+    // shape, not the `TRPCUntypedClient` it actually wraps at runtime.
+    client: createTRPCClientProxy(
+      untyped as unknown as Parameters<typeof createTRPCClientProxy>[0],
+    ),
   } as unknown as Parameters<typeof fetchSpanTreePages>[0]["utils"];
   return { utils, query };
 }
