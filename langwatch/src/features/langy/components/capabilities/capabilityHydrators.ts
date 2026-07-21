@@ -192,12 +192,13 @@ async function traceByQuery({
 // ── datasets / prompts / experiments ────────────────────────────────────────
 
 /** Match a referenced id against however the entity spells itself. */
-function matchesId(
-  entity: Record<string, unknown>,
-  id: string,
-  keys: string[],
-): boolean {
-  return keys.some((key) => entity[key] === id);
+function matchesId(entity: unknown, id: string, keys: string[]): boolean {
+  // Accepts the raw tRPC row and narrows HERE — interfaces don't carry index
+  // signatures, so typing the parameter as Record<string, unknown> would force
+  // every call site into a cast instead of this one guarded read.
+  if (typeof entity !== "object" || entity === null) return false;
+  const record = entity as Record<string, unknown>;
+  return keys.some((key) => record[key] === id);
 }
 
 async function datasetByIds({
@@ -213,7 +214,7 @@ async function datasetByIds({
   const rows: CapabilityHydratedRow[] = [];
   for (const id of ids) {
     const dataset = datasets.find((candidate) =>
-      matchesId(candidate as unknown as Record<string, unknown>, id, [
+      matchesId(candidate, id, [
         "id",
         "slug",
       ]),
@@ -244,7 +245,7 @@ async function promptByIds({
   const rows: CapabilityHydratedRow[] = [];
   for (const id of ids) {
     const prompt = prompts.find((candidate) =>
-      matchesId(candidate as unknown as Record<string, unknown>, id, [
+      matchesId(candidate, id, [
         "id",
         "handle",
       ]),
@@ -276,7 +277,7 @@ async function experimentByIds({
   const rows: CapabilityHydratedRow[] = [];
   for (const id of ids) {
     const experiment = experiments.find((candidate) =>
-      matchesId(candidate as unknown as Record<string, unknown>, id, [
+      matchesId(candidate, id, [
         "slug",
         "id",
       ]),
