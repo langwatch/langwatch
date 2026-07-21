@@ -21,7 +21,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import { useLocation, useNavigation, useParams } from "react-router";
+import { useLocation, useMatches, useNavigation } from "react-router";
 
 import {
   type NavigationSpanHandle,
@@ -46,7 +46,11 @@ export function useNavigationTracing(): void {
 
   const navigation = useNavigation();
   const location = useLocation();
-  const params = useParams();
+  // `useMatches` rather than `useParams`: this hook runs in the root layout,
+  // and `useParams` there resolves against the root's own match — which has
+  // none of the child route's params. The last match is the leaf, and its
+  // params are the accumulated set.
+  const matches = useMatches();
 
   const spanRef = useRef<NavigationSpanHandle | null>(null);
   const cancelSettleRef = useRef<(() => void) | null>(null);
@@ -113,10 +117,15 @@ export function useNavigationTracing(): void {
       });
     spanRef.current = span;
 
-    span.commit({ route: routePatternOf(location.pathname, params) });
+    span.commit({
+      route: routePatternOf(
+        location.pathname,
+        matches[matches.length - 1]?.params ?? {},
+      ),
+    });
     fromPathRef.current = location.pathname;
     settle(span);
-    // `params` and `location.pathname` are read at commit time and change
+    // `matches` and `location.pathname` are read at commit time and change
     // together with the key; depending on them would re-commit an already
     // committed navigation.
     // eslint-disable-next-line react-hooks/exhaustive-deps

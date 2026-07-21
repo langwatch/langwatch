@@ -29,5 +29,9 @@ export {
 export { startBrowserTracing } from "./browserTracing";
 export type { NavigationSpanHandle, NavigationType } from "./navigation";
 export { startNavigationSpan } from "./navigation";
+// Exported because the ambient-navigation behaviour is only in effect when
+// this manager is the registered one — an application assembling its own
+// provider, or a test asserting navigation parentage, needs it by name.
+export { NavigationContextManager } from "./navigationContextManager";
 export { currentSessionId, SESSION_INACTIVITY_MS } from "./session";
 export { SessionSpanProcessor } from "./sessionSpanProcessor";

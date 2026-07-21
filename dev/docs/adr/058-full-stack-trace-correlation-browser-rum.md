@@ -109,6 +109,28 @@ does not answer for this codebase:
 
 2. **A navigation instrumentation** driven by the React Router 8 router, so a
    route transition is a span and the fetches it triggers are its children.
+
+   Making them children is the hard half, and it is the same async-context
+   problem that killed the client-side tRPC link: with `StackContextManager`
+   the navigating stack is gone by the time the new page's queries dispatch.
+   The difference is that a navigation is a singular, page-wide state with a
+   beginning and an end the router announces, so it can be published as an
+   *ambient* context — a parent for spans that would otherwise have no parent
+   at all — instead of needing context to be threaded through arbitrary async
+   code. That is why this works without zone.js and the per-procedure link did
+   not.
+
+   The cost is over-attribution: during a navigation, an unrelated background
+   poll is adopted as its child too. It is bounded by the navigation's own
+   duration, and the alternative is a navigation span with no children, which
+   answers nothing. The span stops adopting work one frame after the route
+   commits — long enough for the page's own queries, short enough that steady
+   state is unaffected — with a timeout backstop, because
+   `requestAnimationFrame` does not fire in a background tab and a navigation
+   that never settled would adopt everything after it.
+
+   Span duration ends at commit rather than at that point: the duration should
+   be what the user waited for, not how long we kept the parent open.
 3. **A session span processor** that stamps `session.id` (per OpenTelemetry
    session semantic conventions) on every span. The web SDK has no session
    concept; without this, "show me everything this user did around the failure"
@@ -159,9 +181,24 @@ not a security boundary.
 
 **Sampling decisions are made in the browser and respected by the backend.**
 This is the consequence of head-based sampling that most often surprises people:
-an unsampled browser trace discards the backend spans too. We therefore start
-at always-on, and when volume requires it, bias retention toward sessions that
-errored or were slow rather than applying a flat ratio.
+an unsampled browser trace discards the backend spans too. The default is
+always-on, and the ratio is configuration (`RUM_SAMPLE_RATIO`) rather than a
+constant, so volume can be cut without a deploy.
+
+**What the ratio samples is sessions, not traces.** A per-trace ratio — the
+obvious `TraceIdRatioBasedSampler` — keeps a tenth of the traces from every
+visit, which is enough to pay for and never enough to read: the question RUM
+answers is "what was this person doing when it broke", and a tenth of a visit
+does not answer it. Deriving the decision from the session id instead keeps
+whole visits and drops whole visits, needs no state, and re-draws when the
+session rotates. It also means lowering the ratio reduces backend trace volume
+for browser-initiated work, since the decision propagates; server work with no
+browser parent is unaffected.
+
+Biasing retention toward sessions that errored or were slow is still the better
+answer, and it is tail sampling — it needs the collector to hold a trace until
+it is complete, which ours is not configured to do. Until that changes, the
+session ratio is the lever.
 
 Separately and independently of RUM, **PostHog exception events will carry
 `trace_id` and `span_id`** read from the active span. This is a few lines in
@@ -233,9 +270,10 @@ first two are worth doing even if the rest is deferred.
    the in-cluster collector. Verifiable by posting OTLP by hand.
 4. **Browser SDK**: provider, resource, batch processor, session processor,
    document-load and fetch instrumentation, behind a flag, default off.
-5. **Router navigation spans.**
+5. **Router navigation spans**, with the ambient-context arrangement above, and
+   the sampling ratio made configurable.
 6. **Dashboards and alert rules** for the browser signals, published through the
-   existing JSON pipeline.
+   existing JSON pipeline. Not built.
 
 ## References
 
