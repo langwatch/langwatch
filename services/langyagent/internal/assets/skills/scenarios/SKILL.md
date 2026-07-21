@@ -55,10 +55,8 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it — point to the subscription settings on the platform (license settings instead, if `LANGWATCH_ENDPOINT` is set — self-hosted).
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
-
-If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted. Direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead.
 
 ---
 
@@ -92,7 +90,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env` — most environments already have this provisioned. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
 Then read the Scenario-specific pages:
 
@@ -738,15 +736,129 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-Then drive everything via `langwatch scenario --help` and `langwatch suite --help`. The basic flow:
+Then drive everything via `langwatch scenario --help` and `langwatch suite --help`. What follows is the surface as it actually is; `--help` is the live source when in doubt.
 
-1. Create scenarios with `langwatch scenario create`, providing a situation and natural-language criteria covering happy path, edge cases, error handling, and boundary conditions.
-2. Find your agent via `langwatch agent list`.
-3. Group scenarios into a suite (run plan): `langwatch suite create`.
-4. Execute and wait: `langwatch suite run <suiteId> --wait`.
-5. Iterate by reviewing results and refining criteria with `langwatch scenario update`.
+### Three nouns, and mixing them up is what makes this API feel confusing
 
-ALWAYS run the suite — an unrun scenario is useless. Run `langwatch <subcommand> --help` first if unsure of flags.
+| Noun | What it is | Commands |
+| --- | --- | --- |
+| **scenario** | One test case: a *situation* plus natural-language *criteria*. It needs a target to run against. | `langwatch scenario …` |
+| **suite** (a *run plan*) | A reusable plan pairing scenarios × targets × repeats. Use it when the same set should run again later. | `langwatch suite …` |
+| **simulation run** | One scenario executed once against one target. Runs triggered together share a `batchRunId`. | `langwatch simulation-run …` |
+
+"Simulations" is what the product calls the results surface — the same work seen from the other end. There is no `langwatch simulation` command; results live under `langwatch simulation-run`.
+
+### The flow
+
+Steps 2 and 4 are questions **for the user**. Ask, wait for the answer, and do not guess.
+
+#### 1. Create the scenario
+
+```bash
+langwatch scenario create "Angry refund request" \
+  --situation "A customer whose order arrived broken demands a full refund and is rude about it" \
+  --criteria "Agent stays polite,Agent offers a refund or a replacement,Agent never promises a delivery date it cannot keep" \
+  --labels "support,critical" \
+  --format json
+```
+
+- `<name>` (positional) and `--situation` are the only **required** inputs.
+- `--criteria` and `--labels` each take **one comma-separated string** — not repeated flags, not space-separated. A criterion therefore cannot contain a comma; rephrase instead.
+- Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
+- `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
+
+#### 2. ASK: run it once now, or put it in a run plan?
+
+Three real answers, so name all three: run it now (one command, results immediately), add it to an existing run plan, or start a new run plan.
+
+```bash
+langwatch suite list --format json    # so "existing" can name real plans
+```
+
+**What the API cannot do:** there is no "add scenario to suite" command. `langwatch suite update <id> --scenarios …` **replaces** the whole list, so appending is a read-modify-write:
+
+```bash
+langwatch suite get <suiteId> --format json          # read .scenarioIds
+langwatch suite update <suiteId> --scenarios "<existingId1>,<existingId2>,<newScenarioId>"
+```
+
+Leaving an existing id out silently drops that scenario from the plan — no warning, no undo. `--targets` and `--labels` on `suite update` replace the same way.
+
+#### 3. List what can be tested
+
+```bash
+langwatch agent list --format json     # -> { data: [{ id, name, type }], pagination }
+langwatch prompt list --format json    # -> [{ id, handle, name, version, model }]
+```
+
+#### 4. ASK: which agent(s) or prompt(s)?
+
+Show the names (with each agent's type) and let the user choose — **multiple choice**. One target runs as a single scenario run (step 5); several targets need a run plan (step 6), because every scenario runs against each target.
+
+Never invent a target and never quietly default to the first row.
+
+#### 5. Run it — the one-command path
+
+```bash
+langwatch scenario run <scenarioId> --target http:<agentId> --format json
+```
+
+That is the whole thing. No suite to create first. Under the hood it makes a throwaway run plan, runs it, and deletes it — so the results appear under Simulations, but no run plan survives to re-run later. That is the right trade for a one-off check; reach for step 6 when the user will want it again.
+
+Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `http`, `code`, `workflow`.
+
+- For `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL** — the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
+- For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json` — not its handle, not its name.
+- `--target` is **required** and takes exactly **one** value. (`suite create` spells the same idea `--targets`, plural and variadic — see below.)
+- Bad references are caught when the run is scheduled, not when the scenario was created: `Invalid target references: …` means you invented an id. Go back to step 3 and read a real one.
+- Add `--wait` only when the caller can afford to block: it polls every 3s for up to 10 minutes and exits non-zero if any run failed — which is the point in CI. In an interactive turn, skip it, hand over the link, and let the page stream results in.
+
+#### 6. Or create a run plan — reusable, and the only way to hit several targets
+
+```bash
+langwatch suite create "Refund regression" \
+  --scenarios "<scenarioId1>,<scenarioId2>" \
+  --targets http:<agentId> prompt:<promptId> \
+  --repeat-count 1 \
+  --format json
+
+langwatch suite run <suiteId> --format json
+```
+
+- `--scenarios` and `--targets` are both **required** and take **different shapes**: `--scenarios` is one comma-separated string; `--targets` is space-separated and variadic. `--targets http:a,prompt:b` does not error — it parses as the single target `http` → `a,prompt:b` and fails later. Keep them apart.
+- Suite names must be unique in the project (the slug comes from the name); a duplicate answers `A suite with this name already exists`.
+- The run count is `scenarios × targets × repeatCount`. Three scenarios × two targets × `--repeat-count 2` is twelve real LLM conversations. Say the number before launching anything large.
+- `suite run` returns `{ scheduled, batchRunId, setId, jobCount, skippedArchived, items }`. `jobCount: 0` with entries in `skippedArchived` means everything referenced is archived and nothing ran.
+
+Either way, follow progress without blocking via:
+
+```bash
+langwatch simulation-run list --scenario-set-id <setId> --batch-run-id <batchRunId> --format json
+langwatch simulation-run get <scenarioRunId> --format json      # messages, verdict, cost
+```
+
+`--batch-run-id` only works alongside `--scenario-set-id`. `--status` and `--name` filter **client-side, after** the server has applied `--limit` — raise `--limit` if a filtered list looks suspiciously short.
+
+#### 7. Send the user to the run
+
+Hand over the link instead of narrating what the run is doing.
+
+- A run plan's batch: `/<projectSlug>/simulations/run-plans/<suiteSlug>/<batchRunId>` — the run-plan half is the suite's own `platformUrl` (`langwatch suite get <suiteId> --format json`), with `/<batchRunId>` appended.
+- A one-command `scenario run`: its plan was ephemeral and is already deleted, so link to `/<projectSlug>/simulations`, where the batch shows up in All Runs.
+
+Neither `scenario run` nor `suite run` returns a `platformUrl` of its own. If you are an in-product assistant, do not paste URLs into prose — run the command whose result carries the link and let the product render it as a navigable action.
+
+### Iterating
+
+Review the results, sharpen the scenario with `langwatch scenario update <id> --criteria "…"`, and run it again. ALWAYS run the scenario — an unrun scenario is worth nothing.
+
+### When the choice is the user's, ask
+
+One short question beats a confident wrong run.
+
+- Never choose *which* agent or prompt to test when the user has not said. That is their call, and the wrong one burns real LLM spend.
+- Never invent a target: `http:demo-agent-support` is not an agent id.
+- Never widen a vague request into a bigger investigation, or a bigger plan, than was asked for. If the instruction is two words and ambiguous, ask one question and stop.
 
 ---
 
@@ -800,3 +912,9 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - This path uses the CLI — do NOT write code files
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios — each should test one specific behavior
+- Do NOT build a suite for a one-off check — `langwatch scenario run <id> --target <type>:<refId>` runs a single scenario in one command. Suites are for sets you will run again, or for hitting several targets at once
+- Do NOT use `suite update --scenarios` to *add* a scenario — it REPLACES the list. Read `suite get --format json` first and send back the existing ids plus the new one
+- Do NOT invent a target reference. `http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
+- Do NOT comma-separate `--targets` on `suite create` — it is space-separated and variadic, and a comma silently parses into one malformed target. `--scenarios` is the comma-separated one, and `scenario run` uses `--target`, singular, exactly one value
+- Do NOT choose the agent or prompt on the user's behalf, and do NOT decide for them between a one-off run and a run plan. Ask one short question and wait
+- Do NOT `--wait` inside an interactive turn — trigger, hand over the link, let results stream in. Save `--wait` for CI, where its non-zero exit on failure is the whole point

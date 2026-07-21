@@ -172,7 +172,8 @@ There are two distinct things to wire:
 **1. Scenario-run tracing** — call `setupScenarioTracing()` once at the top of the test file so the simulator, judge, and adapter spans are captured:
 
 ```typescript
-// TypeScript — add at the very top of the test file, before any imports or setup
+// TypeScript — the import and call go at the very top of the test file,
+// before any other imports or setup that might create spans of their own
 import { setupScenarioTracing } from "@langwatch/scenario";
 setupScenarioTracing();
 ```
