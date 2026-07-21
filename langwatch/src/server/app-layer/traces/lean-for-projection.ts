@@ -43,14 +43,6 @@ export const COMMAND_INLINE_THRESHOLD = 256 * 1024;
 export const IO_PREVIEW_BYTES = 64 * 1024;
 
 /**
- * Set of span attribute keys that are considered "IO" and receive the wide IO_PREVIEW_BYTES
- * budget. Non-IO attributes stay at the existing 2 KB cap. Re-exported under this module's
- * existing name; `IO_ATTRIBUTE_KEYS` in `capOversizedAttributes.ts` is the single source of
- * truth so both caps agree on which keys are IO.
- */
-export const IO_ATTR_KEYS = IO_ATTRIBUTE_KEYS;
-
-/**
  * Server-internal namespace prefix used by `leanForProjection` to attach eventref pointers
  * (carrying `{ field }`) alongside lean attribute previews. Client-supplied attributes in
  * the `langwatch.reserved.*` namespace are stripped at command-worker ingestion.
@@ -61,7 +53,7 @@ export const EVENTREF_ATTR_PREFIX = "langwatch.reserved.eventref.";
  * Rewrites over-threshold IO attribute values to a preview (≤ IO_PREVIEW_BYTES) and attaches
  * a `langwatch.reserved.eventref.<attrKey>` pointer carrying `{ field: <attrKey> }`.
  *
- * - SpanReceived: for each IO attr in IO_ATTR_KEYS that exceeds IO_PREVIEW_BYTES bytes,
+ * - SpanReceived: for each IO attr in IO_ATTRIBUTE_KEYS that exceeds IO_PREVIEW_BYTES bytes,
  *   replaces the value with a UTF-8-safe preview and attaches an eventref.
  * - LogRecordReceived: if body exceeds IO_PREVIEW_BYTES bytes, replaces body with preview
  *   and attaches eventref.body.
@@ -118,7 +110,7 @@ function leanSpanReceivedEvent(event: Event): Event {
   let hasLargeIoAttr = false;
   for (const attr of originalAttributes) {
     if (
-      IO_ATTR_KEYS.has(attr.key) &&
+      IO_ATTRIBUTE_KEYS.has(attr.key) &&
       typeof attr.value.stringValue === "string" &&
       Buffer.byteLength(attr.value.stringValue, "utf8") > IO_PREVIEW_BYTES
     ) {
@@ -157,11 +149,14 @@ function leanSpanReceivedEvent(event: Event): Event {
 
     for (const attr of clonedSpan.attributes) {
       if (
-        IO_ATTR_KEYS.has(attr.key) &&
+        IO_ATTRIBUTE_KEYS.has(attr.key) &&
         typeof attr.value.stringValue === "string" &&
         Buffer.byteLength(attr.value.stringValue, "utf8") > IO_PREVIEW_BYTES
       ) {
-        const preview = utf8Preview(attr.value.stringValue, IO_PREVIEW_BYTES);
+        const preview = utf8Preview({
+          value: attr.value.stringValue,
+          maxBytes: IO_PREVIEW_BYTES,
+        });
         ioLeanedAttrs.push({ key: attr.key, value: { stringValue: preview } });
         // ADR-022: embed event.id so the read path can JOIN event_log by
         // EventId without guessing. The eventref carries `{field, eventId}`;
@@ -211,7 +206,7 @@ function leanLogRecordReceivedEvent(event: Event): Event {
     return event;
   }
 
-  const preview = utf8Preview(data.body, IO_PREVIEW_BYTES);
+  const preview = utf8Preview({ value: data.body, maxBytes: IO_PREVIEW_BYTES });
   const eventrefKey = `${EVENTREF_ATTR_PREFIX}body`;
 
   return {

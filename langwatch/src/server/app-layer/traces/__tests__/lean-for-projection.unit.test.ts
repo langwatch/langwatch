@@ -13,10 +13,12 @@ import { describe, it, expect } from "vitest";
 import {
   leanForProjection,
   IO_PREVIEW_BYTES,
-  IO_ATTR_KEYS,
   EVENTREF_ATTR_PREFIX,
 } from "../lean-for-projection";
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
+import {
+  DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+  IO_ATTRIBUTE_KEYS,
+} from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
 import type { Event } from "~/server/event-sourcing";
 import { createTenantId } from "~/server/event-sourcing";
 import {
@@ -321,8 +323,8 @@ describe("given a SpanReceived event with both langwatch.input and langwatch.out
 describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PREVIEW_BYTES", () => {
   describe("when leanForProjection is applied", () => {
     it("leans gen_ai.input.messages the same way as langwatch.input and attaches its eventref", () => {
-      // Verify that gen_ai.input.messages is in IO_ATTR_KEYS
-      expect(IO_ATTR_KEYS.has("gen_ai.input.messages")).toBe(true);
+      // Verify that gen_ai.input.messages is in IO_ATTRIBUTE_KEYS
+      expect(IO_ATTRIBUTE_KEYS.has("gen_ai.input.messages")).toBe(true);
 
       const event = makeSpanReceivedEvent({
         attributes: { "gen_ai.input.messages": LARGE_VALUE },
@@ -348,7 +350,7 @@ describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PRE
 
 /** A value that exceeds DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES (256 KB) but not IO_PREVIEW_BYTES is N/A:
  * DEFAULT > IO_PREVIEW, so a value > 256 KB is always > 64 KB too.
- * We make a 300 KB non-IO value — over both thresholds. IO_ATTR_KEYS won't match it,
+ * We make a 300 KB non-IO value — over both thresholds. IO_ATTRIBUTE_KEYS won't match it,
  * so it goes through the 256 KB cap path, NOT the 64 KB IO preview path. */
 const NON_IO_OVER_256KB = "z".repeat(300 * 1024);
 

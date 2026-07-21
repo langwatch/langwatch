@@ -246,9 +246,13 @@ function makeTraceContribution(
   }
   const io = extractIOFromLogRecord(legacyView);
   const input =
-    io.input === null ? null : utf8Preview(io.input, IO_PREVIEW_BYTES);
+    io.input === null
+      ? null
+      : utf8Preview({ value: io.input, maxBytes: IO_PREVIEW_BYTES });
   const output =
-    io.output === null ? null : utf8Preview(io.output, IO_PREVIEW_BYTES);
+    io.output === null
+      ? null
+      : utf8Preview({ value: io.output, maxBytes: IO_PREVIEW_BYTES });
   if (input !== io.input || output !== io.output) {
     liftedAttributes["langwatch.reserved.log_io_truncated"] = true;
   }

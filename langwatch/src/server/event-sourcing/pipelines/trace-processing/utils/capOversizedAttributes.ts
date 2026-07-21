@@ -96,7 +96,13 @@ function utf8ByteLength(value: string): number {
  * UTF-8-safe truncation to at most `maxBytes`, backing off to a codepoint
  * boundary so a multi-byte character is never split.
  */
-export function utf8Preview(value: string, maxBytes: number): string {
+export function utf8Preview({
+  value,
+  maxBytes,
+}: {
+  value: string;
+  maxBytes: number;
+}): string {
   const buf = Buffer.from(value, "utf8");
   if (buf.byteLength <= maxBytes) return value;
   let end = maxBytes;
@@ -135,12 +141,16 @@ function truncationPlaceholder(
  * much was kept and the original size, so a reader still sees real content
  * instead of only a byte count.
  */
-function truncatedTextPreview(
-  value: string,
-  byteSize: number,
-  previewBytes: number,
-): string {
-  const preview = utf8Preview(value, previewBytes);
+function truncatedTextPreview({
+  value,
+  byteSize,
+  previewBytes,
+}: {
+  value: string;
+  byteSize: number;
+  previewBytes: number;
+}): string {
+  const preview = utf8Preview({ value, maxBytes: previewBytes });
   const shownBytes = utf8ByteLength(preview);
   return `${preview}\n[truncated: showing ${shownBytes} of ${byteSize} bytes]`;
 }
@@ -154,14 +164,18 @@ function truncatedTextPreview(
  * preview — it does not apply to binary content (data URLs, raw bytesValue),
  * which always collapses to the size-only placeholder.
  */
-function capAnyValue(
-  value: OtlpAnyValue,
-  maxBytes: number,
-  previewBytes: number,
-): boolean {
+function capAnyValue({
+  value,
+  maxBytes,
+  previewBytes,
+}: {
+  value: OtlpAnyValue;
+  maxBytes: number;
+  previewBytes: number;
+}): boolean {
   if (value == null || typeof value !== "object") return false;
 
-  let capped = false;
+  let isCapped = false;
 
   if (typeof value.stringValue === "string") {
     const byteSize = utf8ByteLength(value.stringValue);
@@ -169,8 +183,8 @@ function capAnyValue(
       const mimeType = dataUrlMimeType(value.stringValue);
       value.stringValue = mimeType
         ? truncationPlaceholder(byteSize, mimeType)
-        : truncatedTextPreview(value.stringValue, byteSize, previewBytes);
-      capped = true;
+        : truncatedTextPreview({ value: value.stringValue, byteSize, previewBytes });
+      isCapped = true;
     }
   }
 
@@ -187,24 +201,27 @@ function capAnyValue(
       // readable partial preview, unlike a text stringValue above.
       value.bytesValue = null;
       value.stringValue = truncationPlaceholder(byteSize, null);
-      capped = true;
+      isCapped = true;
     }
   }
 
   if (value.arrayValue && Array.isArray(value.arrayValue.values)) {
     for (const item of value.arrayValue.values) {
-      if (capAnyValue(item, maxBytes, previewBytes)) capped = true;
+      if (capAnyValue({ value: item, maxBytes, previewBytes })) isCapped = true;
     }
   }
 
   if (value.kvlistValue && Array.isArray(value.kvlistValue.values)) {
     for (const entry of value.kvlistValue.values) {
-      if (entry?.value && capAnyValue(entry.value, maxBytes, previewBytes))
-        capped = true;
+      if (
+        entry?.value &&
+        capAnyValue({ value: entry.value, maxBytes, previewBytes })
+      )
+        isCapped = true;
     }
   }
 
-  return capped;
+  return isCapped;
 }
 
 type AttributeList = OtlpSpan["attributes"];
@@ -214,7 +231,13 @@ type AttributeList = OtlpSpan["attributes"];
  * `IO_ATTRIBUTE_KEYS` get the wider `IO_ATTRIBUTE_PREVIEW_BYTES` preview
  * budget; everything else gets `DEFAULT_ATTRIBUTE_PREVIEW_BYTES`.
  */
-function capAttributeList(attributes: AttributeList, maxBytes: number): number {
+function capAttributeList({
+  attributes,
+  maxBytes,
+}: {
+  attributes: AttributeList;
+  maxBytes: number;
+}): number {
   if (!Array.isArray(attributes)) return 0;
   let count = 0;
   for (const attr of attributes) {
@@ -222,7 +245,7 @@ function capAttributeList(attributes: AttributeList, maxBytes: number): number {
     const previewBytes = IO_ATTRIBUTE_KEYS.has(attr.key)
       ? IO_ATTRIBUTE_PREVIEW_BYTES
       : DEFAULT_ATTRIBUTE_PREVIEW_BYTES;
-    if (capAnyValue(attr.value, maxBytes, previewBytes)) count++;
+    if (capAnyValue({ value: attr.value, maxBytes, previewBytes })) count++;
   }
   return count;
 }
@@ -339,15 +362,15 @@ export function capOversizedAttributes(
 ): number {
   let count = 0;
   try {
-    count += capAttributeList(span.attributes, maxBytes);
+    count += capAttributeList({ attributes: span.attributes, maxBytes });
     for (const event of span.events ?? []) {
-      count += capAttributeList(event.attributes, maxBytes);
+      count += capAttributeList({ attributes: event.attributes, maxBytes });
     }
     for (const link of span.links ?? []) {
-      count += capAttributeList(link.attributes, maxBytes);
+      count += capAttributeList({ attributes: link.attributes, maxBytes });
     }
     if (resource) {
-      count += capAttributeList(resource.attributes, maxBytes);
+      count += capAttributeList({ attributes: resource.attributes, maxBytes });
     }
   } catch {
     // Degraded, not broken: never block ingestion on a malformed value.
