@@ -1016,13 +1016,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // completed, delivering the whole batch a second time. A blob
               // release failing on a brief S3 blip was enough to trigger it.
               try {
-                await this.blobLifecycle.releaseLease({
-                  values: [
-                    jobDataJson,
-                    ...drainedSiblings.map((sibling) => sibling.jobDataJson),
-                  ],
-                  groupId,
-                });
+                // Recorded BEFORE the lease release, and the order matters: the
+                // job is already done, so a Redis blip releasing the lease must
+                // not cost us the completion counter or the dispatch audit —
+                // that would leave the audit projection reporting a completed
+                // job as never dispatched, the exact opposite of the "audit lags
+                // but never blocks" property. An unreleased blob just waits for
+                // its backstop TTL, which is the lazy-reclaim design anyway.
                 gqJobsCompletedTotal.inc(routingLabels);
 
                 // Audit hook: onDispatched fires once per dispatched payload
@@ -1048,6 +1048,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   },
                   "Group job completed, slot freed",
                 );
+
+                await this.blobLifecycle.releaseLease({
+                  values: [
+                    jobDataJson,
+                    ...drainedSiblings.map((sibling) => sibling.jobDataJson),
+                  ],
+                  groupId,
+                });
               } catch (cleanupErr) {
                 // Worth knowing about — an unreleased blob lingers until its
                 // backstop TTL — but never worth re-running the job for.
