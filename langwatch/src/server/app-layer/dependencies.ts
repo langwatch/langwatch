@@ -34,6 +34,7 @@ import type { LangyMessageService } from "./langy/langy-message.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
+import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
 import type { TopicService } from "./topic-clustering/topic.service";
 import type { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
@@ -103,6 +104,10 @@ export interface AppDependencies {
   topicClustering: {
     status: TopicClusteringStatusService;
     topics: TopicService;
+  };
+  /** ADR-056: read side of the coding-agent session aggregate. */
+  codingAgents: {
+    sessions: CodingAgentSessionService;
   };
   /** ADR-046: Langy conversations as an event-sourced projection. */
   langy: {

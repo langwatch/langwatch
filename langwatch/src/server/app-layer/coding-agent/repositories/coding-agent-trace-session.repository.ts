@@ -15,15 +15,18 @@ const logger = createLogger(
  * Persistence for the (trace → session) map rows (ADR-056 §4, migration
  * 00051). A ReplacingMergeTree keyed (TenantId, TraceId): re-contributions
  * of the same trace simply write a newer version of the same mapping.
- *
- * The read (`getSessionIdForTrace`) lands with the read layer in a later
- * slice; the write surface is what the map projection needs.
  */
 export interface CodingAgentTraceSessionRepository {
   ensure(
     records: CodingAgentTraceSessionRecord[],
     retentionDays?: number,
   ): Promise<void>;
+
+  /** The session a trace belongs to, or null. A keyed point read. */
+  findByTraceId(params: {
+    tenantId: string;
+    traceId: string;
+  }): Promise<CodingAgentTraceSessionRecord | null>;
 }
 
 /** No-op store for deployments without ClickHouse. */
@@ -32,6 +35,10 @@ export class NullCodingAgentTraceSessionRepository
 {
   async ensure(): Promise<void> {
     // no-op
+  }
+
+  async findByTraceId(): Promise<CodingAgentTraceSessionRecord | null> {
+    return null;
   }
 }
 
@@ -98,5 +105,59 @@ export class CodingAgentTraceSessionClickHouseRepository
       );
       throw error;
     }
+  }
+
+  /**
+   * The mapping row for one trace. IN-tuple dedup (max(UpdatedAt) per key),
+   * never FINAL. No time filter: the sort key (TenantId, TraceId) makes this
+   * a keyed seek, and the caller usually has no timestamp yet — this read is
+   * how it FINDS one (the mapping's OccurredAt seeds the session read's
+   * partition hint).
+   */
+  async findByTraceId({
+    tenantId,
+    traceId,
+  }: {
+    tenantId: string;
+    traceId: string;
+  }): Promise<CodingAgentTraceSessionRecord | null> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "CodingAgentTraceSessionClickHouseRepository.findByTraceId",
+    );
+    const client = await this.resolveClient(tenantId);
+
+    const result = await client.query({
+      query: `
+        SELECT TraceId, SessionId, OccurredAt
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+          AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+            GROUP BY TenantId, TraceId
+          )
+        LIMIT 1
+      `,
+      query_params: { tenantId, traceId },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<{
+      TraceId: string;
+      SessionId: string;
+      OccurredAt: string;
+    }>();
+    const first = rows[0];
+    if (!first) return null;
+    return {
+      tenantId,
+      traceId: first.TraceId,
+      sessionId: first.SessionId,
+      occurredAtMs: new Date(first.OccurredAt).getTime(),
+    };
   }
 }

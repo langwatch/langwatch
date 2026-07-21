@@ -246,6 +246,124 @@ export class CodingAgentSessionClickHouseRepository
     }
   }
 
+  /**
+   * One session by its key.
+   *
+   * Dedups with the IN-tuple pattern (max(UpdatedAt) per key) rather than
+   * FINAL: the ReplacingMergeTree only physically collapses rows sharing the
+   * full sort key, and `StartedAt` can shift when an earlier signal arrives
+   * late, so superseded rows can persist until TTL.
+   *
+   * `startedAtMs` prunes to a handful of partitions. A session can run for
+   * hours, and a late signal can move StartedAt backwards, so the hint is
+   * widened ±7 days rather than pinned to the exact ms — the window keeps
+   * this a partition-pruned point read instead of a full-table scan.
+   */
+  async findBySessionId({
+    tenantId,
+    sessionId,
+    startedAtMs,
+  }: {
+    tenantId: string;
+    sessionId: string;
+    startedAtMs?: number;
+  }): Promise<CodingAgentSessionRow | null> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "CodingAgentSessionClickHouseRepository.findBySessionId",
+    );
+    const client = await this.resolveClient(tenantId);
+
+    const partitionFilter =
+      startedAtMs !== undefined
+        ? "AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})"
+        : "";
+
+    const result = await client.query({
+      query: `
+        SELECT *
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND SessionId = {sessionId:String}
+          ${partitionFilter}
+          AND (TenantId, SessionId, UpdatedAt) IN (
+            SELECT TenantId, SessionId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND SessionId = {sessionId:String}
+              ${partitionFilter}
+            GROUP BY TenantId, SessionId
+          )
+        LIMIT 1
+      `,
+      query_params: {
+        tenantId,
+        sessionId,
+        ...(startedAtMs !== undefined
+          ? {
+              from: startedAtMs - 7 * 24 * 60 * 60 * 1000,
+              to: startedAtMs + 7 * 24 * 60 * 60 * 1000,
+            }
+          : {}),
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<Record<string, unknown>>();
+    const first = rows[0];
+    return first ? fromRecord(first) : null;
+  }
+
+  /**
+   * One user's sessions in a period, newest first. StartedAt is both the
+   * partition filter and the sort; the IN-tuple dedup keeps one version per
+   * session even when a late signal shifted StartedAt between versions.
+   */
+  async findManyByUser({
+    tenantId,
+    userId,
+    fromMs,
+    toMs,
+    limit,
+  }: {
+    tenantId: string;
+    userId: string;
+    fromMs: number;
+    toMs: number;
+    limit: number;
+  }): Promise<CodingAgentSessionRow[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "CodingAgentSessionClickHouseRepository.findManyByUser",
+    );
+    const client = await this.resolveClient(tenantId);
+
+    const result = await client.query({
+      query: `
+        SELECT *
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND UserId = {userId:String}
+          AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
+          AND (TenantId, SessionId, UpdatedAt) IN (
+            SELECT TenantId, SessionId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND UserId = {userId:String}
+              AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
+            GROUP BY TenantId, SessionId
+          )
+        ORDER BY StartedAt DESC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { tenantId, userId, from: fromMs, to: toMs, limit },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<Record<string, unknown>>();
+    return rows.map(fromRecord);
+  }
+
   async upsertBatch(
     entries: Array<{ row: CodingAgentSessionRow; retentionDays?: number }>,
   ): Promise<void> {
@@ -286,4 +404,122 @@ export class CodingAgentSessionClickHouseRepository
       throw error;
     }
   }
+}
+
+const asNumber = (value: unknown): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const asStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((v): v is string => typeof v === "string")
+    : [];
+
+const asNumberMap = (value: unknown): Record<string, number> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+          k,
+          asNumber(v),
+        ]),
+      )
+    : {};
+
+function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
+  const steps = Array.isArray(record.Steps) ? record.Steps : [];
+  return {
+    tenantId: String(record.TenantId ?? ""),
+    sessionId: String(record.SessionId ?? ""),
+    sessionKeySource: String(record.SessionKeySource ?? ""),
+    version: String(record.Version ?? ""),
+    startedAtMs: new Date(String(record.StartedAt)).getTime(),
+
+    agent: String(record.Agent ?? ""),
+    agentVersion: String(record.AgentVersion ?? ""),
+    traceIds: asStringArray(record.TraceIds),
+    finalRequestId: String(record.FinalRequestId ?? ""),
+    userId: String(record.UserId ?? ""),
+    terminalType: String(record.TerminalType ?? ""),
+    entrypoint: String(record.Entrypoint ?? ""),
+
+    modelCalls: asNumber(record.ModelCalls),
+    toolCalls: asNumber(record.ToolCalls),
+    subAgents: asNumber(record.SubAgents),
+    prompts: asNumber(record.Prompts),
+    promptChars: asNumber(record.PromptChars),
+    responseChars: asNumber(record.ResponseChars),
+    steps: steps.map((s) => {
+      const tuple = s as [string, unknown, unknown];
+      return [String(tuple[0]), asNumber(tuple[1]), Boolean(tuple[2])] as [
+        string,
+        number,
+        boolean,
+      ];
+    }),
+
+    toolCounts: asNumberMap(record.ToolCounts),
+    toolDurationMs: asNumberMap(record.ToolDurationMs),
+    filesTouched: asStringArray(record.FilesTouched),
+    skills: asStringArray(record.Skills),
+    subAgentTypes: asStringArray(record.SubAgentTypes),
+    slashCommands: asStringArray(record.SlashCommands),
+    models: asStringArray(record.Models),
+    mcpServers: asStringArray(record.McpServers),
+    mcpTools: asStringArray(record.McpTools),
+
+    inputTokens: asNumber(record.InputTokens),
+    outputTokens: asNumber(record.OutputTokens),
+    cacheReadTokens: asNumber(record.CacheReadTokens),
+    cacheCreationTokens: asNumber(record.CacheCreationTokens),
+    costUsd: asNumber(record.CostUsd),
+
+    modelCallMs: asNumber(record.ModelCallMs),
+    toolMs: asNumber(record.ToolMs),
+    ttftMsTotal: asNumber(record.TtftMsTotal),
+    ttftSamples: asNumber(record.TtftSamples),
+    blockedOnUserMs: asNumber(record.BlockedOnUserMs),
+    activeTimeUserSec: asNumber(record.ActiveTimeUserSec),
+    activeTimeCliSec: asNumber(record.ActiveTimeCliSec),
+
+    toolResultBytes: asNumber(record.ToolResultBytes),
+    toolInputBytes: asNumber(record.ToolInputBytes),
+    compactions: asNumber(record.Compactions),
+    compactionTokensBefore: asNumber(record.CompactionTokensBefore),
+    compactionTokensAfter: asNumber(record.CompactionTokensAfter),
+    peakContextTokens: asNumber(record.PeakContextTokens),
+    cacheRebuildCount: asNumber(record.CacheRebuildCount),
+    largestCacheRebuildTokens: asNumber(record.LargestCacheRebuildTokens),
+
+    failedTools: asNumber(record.FailedTools),
+    errorTypes: asNumberMap(record.ErrorTypes),
+    apiErrors: asNumber(record.ApiErrors),
+    rateLimited: asNumber(record.RateLimited),
+    retriesExhausted: asNumber(record.RetriesExhausted),
+    retryMs: asNumber(record.RetryMs),
+    attempts: asNumber(record.Attempts),
+    refusals: asNumber(record.Refusals),
+    refusalCategories: asStringArray(record.RefusalCategories),
+    internalErrors: asNumber(record.InternalErrors),
+
+    toolsDenied: asNumber(record.ToolsDenied),
+    toolsAborted: asNumber(record.ToolsAborted),
+    permissionMode: String(record.PermissionMode ?? ""),
+    permissionChanges: asNumber(record.PermissionChanges),
+    hooksBlocked: asNumber(record.HooksBlocked),
+    hooksCancelled: asNumber(record.HooksCancelled),
+    hookMs: asNumber(record.HookMs),
+
+    linesAdded: asNumber(record.LinesAdded),
+    linesRemoved: asNumber(record.LinesRemoved),
+    commits: asNumber(record.Commits),
+    pullRequests: asNumber(record.PullRequests),
+    editsAccepted: asNumber(record.EditsAccepted),
+    editsRejected: asNumber(record.EditsRejected),
+    languagesEdited: asStringArray(record.LanguagesEdited),
+    atMentions: asNumber(record.AtMentions),
+
+    stopReason: String(record.StopReason ?? ""),
+    truncated: Boolean(record.Truncated),
+  };
 }

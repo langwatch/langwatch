@@ -23,6 +23,27 @@ export interface SessionMetricSeriesRepository {
     records: SessionMetricSeriesRecord[],
     retentionDays?: number,
   ): Promise<void>;
+
+  /**
+   * Converged totals per (session, metric, bucket) across the deduplicated
+   * units — the `SUM ... GROUP BY` read ADR-056 §5 promises. The time range
+   * prunes partitions; pass the sessions' era.
+   */
+  findTotalsBySessionIds(params: {
+    tenantId: string;
+    sessionIds: string[];
+    fromMs: number;
+    toMs: number;
+  }): Promise<SessionMetricTotal[]>;
+}
+
+/** One converged total: a metric's bucket (`type` attribute) per session. */
+export interface SessionMetricTotal {
+  sessionId: string;
+  metricName: string;
+  /** The `type` point attribute (`input`, `added`, `user`, …), or "". */
+  bucket: string;
+  total: number;
 }
 
 /** No-op store for deployments without ClickHouse. */
@@ -31,6 +52,10 @@ export class NullSessionMetricSeriesRepository
 {
   async ensure(): Promise<void> {
     // no-op
+  }
+
+  async findTotalsBySessionIds(): Promise<SessionMetricTotal[]> {
+    return [];
   }
 }
 
@@ -109,5 +134,68 @@ export class SessionMetricSeriesClickHouseRepository
       );
       throw error;
     }
+  }
+
+  /**
+   * `SUM(Value)` per (session, metric, `type` bucket) across units, deduped
+   * by the IN-tuple pattern with `max(AsOf)` per unit — never FINAL, and the
+   * sum happens strictly AFTER the dedup, so a re-observed cumulative total
+   * counts once at its newest value while delta units each count once.
+   */
+  async findTotalsBySessionIds({
+    tenantId,
+    sessionIds,
+    fromMs,
+    toMs,
+  }: {
+    tenantId: string;
+    sessionIds: string[];
+    fromMs: number;
+    toMs: number;
+  }): Promise<SessionMetricTotal[]> {
+    if (sessionIds.length === 0) return [];
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SessionMetricSeriesClickHouseRepository.findTotalsBySessionIds",
+    );
+    const client = await this.resolveClient(tenantId);
+
+    const result = await client.query({
+      query: `
+        SELECT
+          SessionId,
+          MetricName,
+          Attributes['type'] AS Bucket,
+          sum(Value) AS Total
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND SessionId IN {sessionIds:Array(String)}
+          AND AsOf BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
+          AND (TenantId, SessionId, SeriesId, AsOf) IN (
+            SELECT TenantId, SessionId, SeriesId, max(AsOf)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND SessionId IN {sessionIds:Array(String)}
+              AND AsOf BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
+            GROUP BY TenantId, SessionId, SeriesId
+          )
+        GROUP BY SessionId, MetricName, Bucket
+      `,
+      query_params: { tenantId, sessionIds, from: fromMs, to: toMs },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<{
+      SessionId: string;
+      MetricName: string;
+      Bucket: string;
+      Total: number;
+    }>();
+    return rows.map((row) => ({
+      sessionId: row.SessionId,
+      metricName: row.MetricName,
+      bucket: row.Bucket ?? "",
+      total: Number(row.Total) || 0,
+    }));
   }
 }

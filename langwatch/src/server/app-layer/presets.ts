@@ -172,6 +172,7 @@ import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/rep
 import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
 import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/evaluation-run.clickhouse.repository";
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
+import { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
 import { CodingAgentSessionClickHouseRepository } from "./coding-agent/repositories/coding-agent-session.clickhouse.repository";
 import { NullCodingAgentSessionRepository } from "./coding-agent/repositories/coding-agent-session.repository";
 import {
@@ -1203,6 +1204,16 @@ export function initializeDefaultApp(options?: {
       ),
       topics,
     },
+    codingAgents: {
+      sessions: traced(
+        new CodingAgentSessionService(
+          repositories.codingAgentSession,
+          repositories.codingAgentTraceSession,
+          repositories.sessionMetricSeries,
+        ),
+        "CodingAgentSessionService",
+      ),
+    },
     // traced() gives every service call a `ClassName.method` span, same as
     // the rest of the app bag. Per-method, not per-frame: the streaming hot
     // paths (token buffer, relay frames) stay span-free by design.
@@ -1391,6 +1402,13 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         new PrismaTopicClusteringStatusRepository(testPrisma),
       ),
       topics: new TopicService(new PrismaTopicRepository(testPrisma)),
+    },
+    codingAgents: {
+      sessions: new CodingAgentSessionService(
+        new NullCodingAgentSessionRepository(),
+        new NullCodingAgentTraceSessionRepository(),
+        new NullSessionMetricSeriesRepository(),
+      ),
     },
     langy: {
       conversations: LangyConversationService.create(
