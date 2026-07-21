@@ -52,7 +52,7 @@ Instrument my code with LangWatch
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Add LangWatch Tracing to Your Code
@@ -87,7 +87,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -214,7 +214,7 @@ Set up experiments for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Run Experiments for Your Agent
@@ -262,7 +262,7 @@ How to handle:
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
-If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
+If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted. Direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead.
 
 ## Prerequisites
 
@@ -278,7 +278,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -385,13 +385,13 @@ If the CLI supports a more specific read or run for the installed version, disco
 
 After delivering initial results, transition to consultant mode to help the user get maximum value.
 
-**Phase 1 — read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits — the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
+**Phase 1: read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits because the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
 
-**Phase 2 — quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works — the a-ha moment.
+**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works and create the a-ha moment.
 
-**Phase 3 — go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue — add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
+**Phase 3: go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue. Add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
 
-Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask generic questions or overwhelm with too many suggestions. Do NOT generate generic datasets — everything must reflect the actual domain.
+Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask generic questions or overwhelm with too many suggestions. Do NOT generate generic datasets. Everything must reflect the actual domain.
 
 ## Common Mistakes
 
@@ -454,7 +454,7 @@ Set up online evaluations for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Set Up Online Evaluations and Guardrails
@@ -495,7 +495,7 @@ How to handle:
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
-If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
+If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted. Direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead.
 
 ## Prerequisites
 
@@ -511,7 +511,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -761,7 +761,7 @@ Add scenario tests for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your Agent with Scenarios
@@ -816,7 +816,7 @@ How to handle:
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
-If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
+If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted. Direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead.
 
 ---
 
@@ -836,7 +836,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -1116,8 +1116,8 @@ Detect the user's transport from their codebase and pick the matching adapter. *
 | Pipecat / Twilio Media Streams WS bot deployed somewhere                                              | `scenario.PipecatAgentAdapter(url="ws://<your-bot>/stream", ...)`                        | Opens a WebSocket to the user's **already-running** bot. The bot has to be reachable (locally on `ws://localhost:<port>` or remotely).                                                                                                                                                                                         |
 | ElevenLabs hosted ConvAI agent (created in the EL dashboard)                                          | `scenario.ElevenLabsAgentAdapter(agent_id=..., api_key=...)`                             | Dials the user's hosted ConvAI agent by ID. The hosted agent owns model + voice + instructions + tools.                                                                                                                                                                                                                        |
 | Twilio phone number (real PSTN, agent answers via Media Streams)                                      | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`)                    | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up.                                                                                                                                                                                                                                          |
-| Gemini Live model is the agent                                                                        | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)`          | The **adapter IS the agent**. It opens a Gemini Live session with these params — there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent.                                   |
-| OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live — the **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                   |
+| Gemini Live model is the agent                                                                        | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)`          | The **adapter IS the agent**. It opens a Gemini Live session with these params, so there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent.                                   |
+| OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live. The **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                   |
 | Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)`                | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
 
 If you can't tell from the codebase which path the user is on, ASK before generating a test. Picking the wrong adapter means the test exercises something the user hasn't deployed — and they will (rightly) call it useless.
@@ -1347,7 +1347,7 @@ describe("Voice agent — angry billing", () => {
       ],
     });
     expect(result.success).toBe(true);
-  }, 240_000); // voice scenarios are slow — TTS + transport + multi-turn
+  }, 240_000); // Voice scenarios are slow because they include TTS, transport, and multiple turns.
 });
 ```
 
@@ -1501,13 +1501,13 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 
 After delivering initial results, transition to consultant mode to help the user get maximum value.
 
-**Phase 1 — read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits — the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
+**Phase 1: read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits because the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
 
-**Phase 2 — quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works — the a-ha moment.
+**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works and create the a-ha moment.
 
-**Phase 3 — go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue — add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
+**Phase 3: go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue. Add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
 
-Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask generic questions or overwhelm with too many suggestions. Do NOT generate generic datasets — everything must reflect the actual domain.
+Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask generic questions or overwhelm with too many suggestions. Do NOT generate generic datasets. Everything must reflect the actual domain.
 
 ## Common Mistakes
 
@@ -1599,7 +1599,7 @@ Version my prompts with LangWatch
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Version Your Prompts with LangWatch Prompts CLI
@@ -1630,7 +1630,7 @@ How to handle:
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
-If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
+If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted. Direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead.
 
 ## Step 1: Read the Prompts CLI Docs
 
@@ -1646,7 +1646,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -1833,7 +1833,7 @@ Run `langwatch prompt list` to confirm everything synced, or open the Prompts se
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Generate Evaluation Datasets
@@ -2324,7 +2324,7 @@ Take my agent to the next level
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Add LangWatch Tracing to Your Code
@@ -2359,7 +2359,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -2463,7 +2463,7 @@ How to handle:
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
-If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
+If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted. Direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead.
 
 ## Step 1: Read the Prompts CLI Docs
 
@@ -2728,13 +2728,13 @@ If the CLI supports a more specific read or run for the installed version, disco
 
 After delivering initial results, transition to consultant mode to help the user get maximum value.
 
-**Phase 1 — read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits — the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
+**Phase 1: read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits because the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
 
-**Phase 2 — quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works — the a-ha moment.
+**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works and create the a-ha moment.
 
-**Phase 3 — go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue — add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
+**Phase 3: go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue. Add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
 
-Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask generic questions or overwhelm with too many suggestions. Do NOT generate generic datasets — everything must reflect the actual domain.
+Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask generic questions or overwhelm with too many suggestions. Do NOT generate generic datasets. Everything must reflect the actual domain.
 
 ## Common Mistakes
 
@@ -3198,8 +3198,8 @@ Detect the user's transport from their codebase and pick the matching adapter. *
 | Pipecat / Twilio Media Streams WS bot deployed somewhere                                              | `scenario.PipecatAgentAdapter(url="ws://<your-bot>/stream", ...)`                        | Opens a WebSocket to the user's **already-running** bot. The bot has to be reachable (locally on `ws://localhost:<port>` or remotely).                                                                                                                                                                                         |
 | ElevenLabs hosted ConvAI agent (created in the EL dashboard)                                          | `scenario.ElevenLabsAgentAdapter(agent_id=..., api_key=...)`                             | Dials the user's hosted ConvAI agent by ID. The hosted agent owns model + voice + instructions + tools.                                                                                                                                                                                                                        |
 | Twilio phone number (real PSTN, agent answers via Media Streams)                                      | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`)                    | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up.                                                                                                                                                                                                                                          |
-| Gemini Live model is the agent                                                                        | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)`          | The **adapter IS the agent**. It opens a Gemini Live session with these params — there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent.                                   |
-| OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live — the **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                   |
+| Gemini Live model is the agent                                                                        | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)`          | The **adapter IS the agent**. It opens a Gemini Live session with these params, so there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent.                                   |
+| OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live. The **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                   |
 | Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)`                | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
 
 If you can't tell from the codebase which path the user is on, ASK before generating a test. Picking the wrong adapter means the test exercises something the user hasn't deployed — and they will (rightly) call it useless.
@@ -3429,7 +3429,7 @@ describe("Voice agent — angry billing", () => {
       ],
     });
     expect(result.success).toBe(true);
-  }, 240_000); // voice scenarios are slow — TTS + transport + multi-turn
+  }, 240_000); // Voice scenarios are slow because they include TTS, transport, and multiple turns.
 });
 ```
 
@@ -3694,7 +3694,7 @@ What should I do next to improve my agent?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Improve Your Agent, Hypothesis by Hypothesis
@@ -3715,7 +3715,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -3797,12 +3797,12 @@ LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments,
 
 How to handle:
 
-- Work within the limits — if 3 scenarios are allowed, create 3 meaningful ones, not 10.
+- Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
 - Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
-- Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
+- Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
-If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
+If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted. Direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead.
 
 ## Step 5: Close the Loop
 
@@ -3876,7 +3876,7 @@ How is my agent performing?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Diagnose Your Agent's Production Behavior
@@ -3897,7 +3897,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -4047,7 +4047,7 @@ Where can I improve our agent development best practices?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Improve Your Agent Development Best Practices
@@ -4183,7 +4183,7 @@ After each improvement:
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Debug Your LangWatch Instrumentation
@@ -4204,7 +4204,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 ## Step 1: Fetch Recent Traces
 
@@ -4331,7 +4331,7 @@ langwatch trace export --format jsonl --limit 50 -o traces.jsonl
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Evaluate Your Multimodal Agent
@@ -4498,7 +4498,7 @@ Run the evaluation, review results, fix issues, re-run until quality is acceptab
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Generate a RAG Evaluation Dataset
@@ -4667,7 +4667,7 @@ Before using the dataset:
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your Agent's Compliance Boundaries
@@ -4862,7 +4862,7 @@ Create reusable criteria for your domain:
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your CLI's Agent Usability
