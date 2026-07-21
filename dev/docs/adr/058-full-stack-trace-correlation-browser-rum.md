@@ -88,11 +88,24 @@ for the page-level picture, and add three pieces the off-the-shelf bundle cannot
 provide for this codebase:
 
 1. **A tRPC link** that opens a client span per *procedure call*, not per HTTP
-   request. This is the only seam that is correct across all three transports —
-   batched HTTP, WebSocket, and SSE — because it sits above the transport
-   split. It injects trace context into the request headers for the HTTP paths
-   and into the operation context for the WS and SSE paths, which cannot carry
-   per-message headers.
+   request. This is the only seam that times every call whichever transport it
+   took — batched HTTP, WebSocket, or SSE — because it sits above the transport
+   split.
+
+   The link does not inject trace context. The fetch instrumentation already
+   puts `traceparent` on the batched request, and one header cannot carry a
+   distinct parent for each call inside a batch. So the server's spans hang off
+   the HTTP request rather than off the individual procedure span: everything
+   stays in one trace, which is the goal, but per-procedure client-to-server
+   parentage is approximate under batching and exact only for unbatched
+   (`skipBatch`) calls.
+
+   The WebSocket and SSE transports carry no per-call headers at all, so calls
+   sent that way are timed in the browser but root their own trace on the
+   server. Closing that gap means carrying context in the operation itself,
+   which in tRPC v10 means putting it in each procedure's input schema. That
+   price is not worth paying for the small share of traffic on those
+   transports, so it is knowingly left open.
 2. **A navigation instrumentation** driven by the React Router 8 router, so a
    route transition is a span and the fetches it triggers are its children.
 3. **A session span processor** that stamps `session.id` (per OpenTelemetry

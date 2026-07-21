@@ -42,6 +42,10 @@ export const publicEnvRouter = publicProcedure
       SHOW_OPS_IN_MAIN_SIDEBAR: isOpsSidebarEmail(ctx.session?.user?.email),
       POSTHOG_KEY: env.POSTHOG_KEY,
       POSTHOG_HOST: env.POSTHOG_HOST,
+      // Whether the browser should trace itself (ADR-058). A flag rather than a
+      // URL: the browser always exports to this app's own origin, so there is
+      // no endpoint for the client to know.
+      RUM_ENABLED: !!env.RUM_ENABLED,
       HAS_LANGWATCH_NLP_SERVICE:
         !!env.LANGWATCH_NLP_SERVICE || !!env.LANGWATCH_NLP_LAMBDA_CONFIG,
       HAS_LANGEVALS_ENDPOINT: !!env.LANGEVALS_ENDPOINT,

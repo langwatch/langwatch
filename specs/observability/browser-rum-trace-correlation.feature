@@ -28,10 +28,18 @@ Feature: Browser RUM and full-stack trace correlation
       Then each call appears as its own span
       And a slow call is attributable without inspecting the others
 
-    Scenario: Calls over the realtime transports still correlate
+    Scenario: Calls over the realtime transports are still timed
       Given a call is sent over the WebSocket transport
       When the server handles it
-      Then the server work appears in the same trace as the browser work
+      Then the call is still timed in the browser
+      # Those transports carry no per-call headers, so the server cannot know
+      # which trace the call belongs to and starts its own. Knowingly open.
+      But the server work starts a trace of its own
+
+    Scenario: A long-lived connection does not capture later calls
+      Given a connection was opened during some earlier trace
+      When a later call arrives on that same connection
+      Then the later call is not attributed to the trace that opened it
 
     Scenario: Navigating between pages is visible as work
       When the user navigates to another page

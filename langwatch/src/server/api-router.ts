@@ -57,6 +57,7 @@ import { app as miscApp } from "./routes/misc";
 import { app as opsApp } from "./routes/ops";
 import { app as otelApp } from "./routes/otel";
 import { app as playgroundApp } from "./routes/playground";
+import { app as rumApp } from "./routes/rum";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
 import { app as scimApp } from "./routes/scim";
 import { app as sseApp } from "./routes/sse";
@@ -144,6 +145,7 @@ export function createApiRouter() {
 
   api.route("/", gatewayInternalApp);
   api.route("/", otelApp);
+  api.route("/", rumApp); // /api/rum/v1/traces — browser telemetry proxy
   api.route("/", playgroundApp);
   api.route("/", langyInternalApp);
   api.route("/", langyRelayApp);

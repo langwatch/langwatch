@@ -11,6 +11,7 @@ import { ColorModeProvider } from "./components/ui/color-mode";
 import { Toaster } from "./components/ui/toaster";
 import { CommandBarProvider } from "./features/command-bar";
 import { useAttributionCapture } from "./hooks/useAttributionCapture";
+import { useBrowserTracing } from "./hooks/useBrowserTracing";
 import { useIsGtagReady } from "./hooks/useIsGtagReady";
 import { usePostHog } from "./hooks/usePostHog";
 import { system } from "./theme";
@@ -45,6 +46,7 @@ export function InnerProviders({ children }: { children: ReactNode }) {
   const postHog = usePostHog();
   const publicEnv = usePublicEnv();
   const isGtagReady = useIsGtagReady();
+  useBrowserTracing();
 
   return (
     <>

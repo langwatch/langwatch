@@ -156,6 +156,10 @@ export function createEnvConfig() {
       EMAIL_DEFAULT_FROM: z.string().optional(),
       S3_KEY_SALT: z.string().optional(),
       IS_SAAS: z.boolean().optional(),
+      // Browser tracing (ADR-058). Off unless explicitly enabled: it adds
+      // frontend telemetry volume, and the ingest route it exports to is
+      // inert without OTEL_EXPORTER_OTLP_ENDPOINT anyway.
+      RUM_ENABLED: z.boolean().optional(),
       // Controls SSRF blocking for outbound HTTP calls (TS proxy + scenario
       // runner; mirrored on the Python NLP side via the same env name). When
       // true: private IPs, localhost, and hostnames resolving to private IPs
@@ -356,6 +360,9 @@ export function createEnvConfig() {
       IS_SAAS:
         process.env.IS_SAAS === "1" ||
         process.env.IS_SAAS?.toLowerCase() === "true",
+      RUM_ENABLED:
+        process.env.RUM_ENABLED === "1" ||
+        process.env.RUM_ENABLED?.toLowerCase() === "true",
       BLOCK_LOCAL_HTTP_CALLS:
         process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
         process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",
