@@ -73,7 +73,7 @@ describe.skipIf(isTestcontainersOnly)(
       await prisma.organization.delete({ where: { id: organizationId } });
     });
 
-    /** @scenario Running a nonexistent workflow returns 404, not a raw 500 */
+    /** @scenario Running a nonexistent workflow returns 404 */
     it("returns 404 for a nonexistent workflow id", async () => {
       const { app } = await import("../misc");
 
@@ -91,7 +91,7 @@ describe.skipIf(isTestcontainersOnly)(
       expect(body.error).toBe("workflow_not_found");
     });
 
-    /** @scenario Running a never-published workflow returns 422, not a raw 500 */
+    /** @scenario Running a workflow that has never been published returns 422 */
     it("returns 422 for a workflow that has never been published", async () => {
       const { app } = await import("../misc");
 
