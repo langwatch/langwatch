@@ -56,6 +56,16 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     Then the gateway calls OpenAI's codex Responses endpoint with my session
     And the response streams back to Langy as usual
 
+  # The codex backend keeps no server-side state between requests, so a turn
+  # that reasons, calls a tool, then reasons again about the result has to carry
+  # its own reasoning forward. This is the difference between Langy answering a
+  # one-shot question and Langy chaining tools to finish a real task.
+  Scenario: Langy chains tools across a multi-step reasoning turn on Codex
+    Given Codex is my Langy model
+    When Langy runs a turn that calls a tool, reads the result, and calls another
+    Then each step replays the earlier reasoning so the stateless backend accepts it
+    And Langy finishes the task instead of failing partway through
+
   Scenario: An expired access token refreshes transparently
     Given my Codex access token has expired
     When a request hits the provider

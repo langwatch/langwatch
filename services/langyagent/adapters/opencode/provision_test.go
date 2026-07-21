@@ -434,6 +434,12 @@ func TestProvision_WritesCLIOnlyConfig(t *testing.T) {
 		t.Errorf("config.json must request the OpenAI reasoning summary; got\n%s", raw)
 	}
 
+	// A non-codex OpenAI model keeps the default store (server-side state); the
+	// stateless store:false override is codex-only, so it must NOT appear here.
+	if strings.Contains(string(raw), `"store"`) {
+		t.Errorf("config.json set store on a non-codex model; store:false is codex-only\n%s", raw)
+	}
+
 	target, err := os.Readlink(skillsDir(home))
 	if err != nil {
 		t.Fatalf("skills symlink missing — with MCP gone, skills + CLI are the entire capability surface: %v", err)
@@ -441,6 +447,87 @@ func TestProvision_WritesCLIOnlyConfig(t *testing.T) {
 	if want := filepath.Join(workspace, "skills"); target != want {
 		t.Errorf("skills link target = %q, want %q", target, want)
 	}
+}
+
+// A codex model must run stateless: store:false in the generated config. The
+// codex backend keeps no server-side response state, so opencode's AI SDK has
+// to round-trip the encrypted reasoning content across a tool loop's steps,
+// which it only does when it knows the store is off. Without this the config
+// would carry a bare openai model and every multi-step codex turn would die.
+func TestProvision_CodexModelRunsStateless(t *testing.T) {
+	home := t.TempDir()
+	workspace := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(workspace, "skills"), 0o755); err != nil {
+		t.Fatalf("mkdir shared skills: %v", err)
+	}
+
+	err := NewAgent(0).Provision(ProvisionInput{
+		Home:          home,
+		WorkspaceRoot: workspace,
+		Creds: domain.Credentials{
+			Model:             "openai_codex/gpt-5.6-terra",
+			LangwatchAPIKey:   "sk-lw-test-key",
+			LLMVirtualKey:     "vk-test",
+			GatewayBaseURL:    "https://gateway.test",
+			LangwatchEndpoint: "https://app.test",
+		},
+		UID:            0,
+		AgentsTemplate: "# AGENTS\n",
+		Runner:         localunsafe.Runner{},
+	})
+	if err != nil {
+		t.Fatalf("Provision: %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(home, ".config", "opencode", "config.json"))
+	if err != nil {
+		t.Fatalf("read config.json: %v", err)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatalf("unmarshal config.json: %v", err)
+	}
+
+	// The codex prefix is rewritten to opencode's native openai provider on the
+	// bare model id; the gateway restores the prefix on the wire.
+	if cfg["model"] != "openai/gpt-5.6-terra" {
+		t.Errorf("codex model must map to the native openai provider, got %v", cfg["model"])
+	}
+	opts := codexModelOptions(t, cfg, "gpt-5.6-terra")
+	if opts["store"] != false {
+		t.Errorf("codex config must set store:false for the stateless backend; options=%v", opts)
+	}
+	// The reasoning summary still applies to codex turns.
+	if opts["reasoningSummary"] != "auto" {
+		t.Errorf("codex config must keep reasoningSummary:auto; options=%v", opts)
+	}
+}
+
+// codexModelOptions digs the provider.openai.models.<id>.options map out of the
+// parsed config, failing the test if the path is not shaped as expected.
+func codexModelOptions(t *testing.T, cfg map[string]any, modelID string) map[string]any {
+	t.Helper()
+	provider, ok := cfg["provider"].(map[string]any)
+	if !ok {
+		t.Fatalf("config missing provider block: %v", cfg["provider"])
+	}
+	openai, ok := provider["openai"].(map[string]any)
+	if !ok {
+		t.Fatalf("config missing provider.openai: %v", provider)
+	}
+	models, ok := openai["models"].(map[string]any)
+	if !ok {
+		t.Fatalf("config missing provider.openai.models: %v", openai)
+	}
+	model, ok := models[modelID].(map[string]any)
+	if !ok {
+		t.Fatalf("config missing model %q: %v", modelID, models)
+	}
+	opts, ok := model["options"].(map[string]any)
+	if !ok {
+		t.Fatalf("config missing options for %q: %v", modelID, model)
+	}
+	return opts
 }
 
 // EnableOpenTelemetry turns on opencode's NATIVE OTel export in the generated

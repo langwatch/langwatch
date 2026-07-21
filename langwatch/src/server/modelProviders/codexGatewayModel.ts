@@ -1,4 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
+import { defaultSettingsMiddleware, wrapLanguageModel } from "ai";
 import { env } from "../../env.mjs";
 import { ensureGatewayV1BaseUrl } from "../app-layer/langy/LangyCredentialService";
 import { provisionLangyVirtualKey } from "../app-layer/langy/langyVirtualKey";
@@ -59,7 +60,22 @@ export async function getCodexVercelAIModel({
   });
   // The FULL id ("openai_codex/...") — the gateway routes to the codex
   // provider by prefix and strips it before it reaches OpenAI.
-  return gateway.responses(model);
+  //
+  // store:false is load-bearing. The codex backend is stateless: it keeps no
+  // server-side response state, so across a tool loop's steps every reasoning
+  // item has to be replayed in full. The AI SDK only round-trips the encrypted
+  // reasoning content, and only asks the backend to return it via
+  // include:["reasoning.encrypted_content"], when it KNOWS the store is off.
+  // Without this default it replays bare reasoning ids the stateless backend
+  // rejects, and every multi-step codex turn dies with a 400. The gateway pins
+  // store:false on the wire too; this keeps the client's view of the turn in
+  // step with that.
+  return wrapLanguageModel({
+    model: gateway.responses(model),
+    middleware: defaultSettingsMiddleware({
+      settings: { providerOptions: { openai: { store: false } } },
+    }),
+  });
 }
 
 /**
