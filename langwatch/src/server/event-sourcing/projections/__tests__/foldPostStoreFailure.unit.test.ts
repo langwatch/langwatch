@@ -67,13 +67,13 @@ describe("fold failures after the state was stored", () => {
    * handle is collected and rethrown as an AggregateError — the same shape a
    * Redis blip on queue send produces, since both funnel into the same errors[].
    */
-  async function dispatchBatch({
-    batch,
-    shouldReactorFail,
+  function buildFoldQueues({
+    shouldReactorFail = false,
+    shouldStoreFail = false,
   }: {
-    batch: Event[];
-    shouldReactorFail: boolean;
-  }): Promise<unknown> {
+    shouldReactorFail?: boolean;
+    shouldStoreFail?: boolean;
+  }): ReturnType<typeof vi.fn> {
     const queueManager = createMockQueueManager({ hasReactorQueues: false });
     const router = new ProjectionRouter<Event>(
       TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -83,6 +83,12 @@ describe("fold failures after the state was stored", () => {
 
     const store = createMockFoldProjectionStore<{ count: number }>();
     (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    if (shouldStoreFail) {
+      (store.store as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error("store boom"),
+      );
+    }
+
     const fold = createMockFoldProjectionDefinition("counter", {
       store,
       init: () => ({ count: 0 }),
@@ -100,16 +106,39 @@ describe("fold failures after the state was stored", () => {
     router.registerReactor("counter", reactor);
     router.initializeFoldQueues();
 
-    const initialize = queueManager.initializeProjectionQueues as ReturnType<
-      typeof vi.fn
-    >;
-    const onEventBatch = initialize.mock.calls[0]?.[2] as (
+    return queueManager.initializeProjectionQueues as ReturnType<typeof vi.fn>;
+  }
+
+  /** The coalesced path — `processFoldProjectionBatch`. */
+  async function dispatchBatch(options: {
+    batch: Event[];
+    shouldReactorFail?: boolean;
+    shouldStoreFail?: boolean;
+  }): Promise<unknown> {
+    const onEventBatch = buildFoldQueues(options).mock.calls[0]?.[2] as (
       projectionName: string,
       events: Event[],
       context: unknown,
     ) => Promise<void>;
 
-    return await onEventBatch("counter", batch, { tenantId }).catch(
+    return await onEventBatch("counter", options.batch, { tenantId }).catch(
+      (error: unknown) => error,
+    );
+  }
+
+  /** The single-event path — `processFoldProjectionEvent`, same wrapper. */
+  async function dispatchSingle(options: {
+    event: Event;
+    shouldReactorFail?: boolean;
+    shouldStoreFail?: boolean;
+  }): Promise<unknown> {
+    const onEvent = buildFoldQueues(options).mock.calls[0]?.[1] as (
+      projectionName: string,
+      event: Event,
+      context: unknown,
+    ) => Promise<void>;
+
+    return await onEvent("counter", options.event, { tenantId }).catch(
       (error: unknown) => error,
     );
   }
@@ -132,12 +161,33 @@ describe("fold failures after the state was stored", () => {
 
       expect(error).toBeInstanceOf(Error);
     });
+
+    it("counts it on the single-event path too, not only the batch path", async () => {
+      await dispatchSingle({ event: events(1)[0]!, shouldReactorFail: true });
+
+      expect(incrementEsFoldPostStoreFailure).toHaveBeenCalledWith({
+        projectionName: "counter",
+        stage: "reactor_dispatch",
+      });
+    });
   });
 
   describe("when every reactor succeeds", () => {
     it("counts nothing, because no state was left behind a failed job", async () => {
       await dispatchBatch({ batch: events(3), shouldReactorFail: false });
 
+      expect(incrementEsFoldPostStoreFailure).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the fold throws before its state was stored", () => {
+    it("counts nothing, because the retry re-applies against unchanged state", async () => {
+      const error = await dispatchBatch({
+        batch: events(3),
+        shouldStoreFail: true,
+      });
+
+      expect(error).toBeInstanceOf(Error);
       expect(incrementEsFoldPostStoreFailure).not.toHaveBeenCalled();
     });
   });

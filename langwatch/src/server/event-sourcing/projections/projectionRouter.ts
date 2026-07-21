@@ -1444,32 +1444,54 @@ export class ProjectionRouter<
           },
         });
 
-        // After fold succeeds, dispatch to reactors for this fold.
-        //
-        // The fold state is durable by this point. Anything that throws from
-        // here on fails the job without un-writing it, so the queue redelivers
-        // events the store already contains — see recordPostStoreFailure.
-        const reactors = this.reactorsForFold.get(projectionName);
-        if (reactors && reactors.length > 0) {
-          try {
-            await this.dispatchToReactors({
-              foldName: projectionName,
-              reactors,
-              events: [event],
-              foldState,
-            });
-          } catch (error) {
-            this.recordPostStoreFailure({
-              projectionName,
-              stage: "reactor_dispatch",
-              events: [event],
-              error,
-            });
-            throw error;
-          }
-        }
+        // After fold succeeds, dispatch to reactors for this fold. The fold
+        // state is durable by this point, so a throw from here redelivers
+        // events the store already contains.
+        await this.dispatchReactorsAfterStore({
+          projectionName,
+          events: [event],
+          foldState,
+        });
       },
     );
+  }
+
+  /**
+   * Dispatches a fold's reactors once its state is already durable.
+   *
+   * Anything that throws from here fails the job without un-writing the state,
+   * so the queue redelivers events the store already holds — see
+   * {@link recordPostStoreFailure}. Shared by the single-event and batch paths
+   * so the two cannot drift on the exact path this counter measures.
+   */
+  private async dispatchReactorsAfterStore({
+    projectionName,
+    events,
+    foldState,
+  }: {
+    projectionName: string;
+    events: EventType[];
+    foldState: unknown;
+  }): Promise<void> {
+    const reactors = this.reactorsForFold.get(projectionName);
+    if (!reactors || reactors.length === 0) return;
+
+    try {
+      await this.dispatchToReactors({
+        foldName: projectionName,
+        reactors,
+        events,
+        foldState,
+      });
+    } catch (error) {
+      this.recordPostStoreFailure({
+        projectionName,
+        stage: "reactor_dispatch",
+        events,
+        error,
+      });
+      throw error;
+    }
   }
 
   /**
@@ -1617,28 +1639,15 @@ export class ProjectionRouter<
         // to one job by the queue's dedup anyway, so dispatchToReactors collapses
         // them here instead of paying N serialize+gzip+blob round-trips to reach
         // the same state. See ProjectionRouter.collapseByJobId.
-        const reactors = this.reactorsForFold.get(projectionName);
-        if (reactors && reactors.length > 0) {
-          try {
-            await this.dispatchToReactors({
-              foldName: projectionName,
-              reactors,
-              events: toApply,
-              foldState,
-            });
-          } catch (error) {
-            // Worse here than on the single-event path: the whole coalesced
-            // batch is re-applied, so one failure can double-count up to
-            // DEFAULT_FOLD_COALESCE_MAX_BATCH events against one aggregate.
-            this.recordPostStoreFailure({
-              projectionName,
-              stage: "reactor_dispatch",
-              events: toApply,
-              error,
-            });
-            throw error;
-          }
-        }
+        //
+        // A post-store failure is worse here than on the single-event path: the
+        // whole coalesced batch is re-applied, so one failure can double-count
+        // up to DEFAULT_FOLD_COALESCE_MAX_BATCH events against one aggregate.
+        await this.dispatchReactorsAfterStore({
+          projectionName,
+          events: toApply,
+          foldState,
+        });
       },
     );
   }
