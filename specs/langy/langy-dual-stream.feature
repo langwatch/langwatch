@@ -45,6 +45,35 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     Then the turn stream still ends on the terminal event
     And events for another worker's session are still not forwarded
 
+  # ---------------------------------------------------------------------------
+  # Manager: the pre-first-frame status names the true transition
+  # ---------------------------------------------------------------------------
+
+  # Between the prompt POST and the agent's first frame the worker prepares its
+  # tools and produces nothing. The manager fills that silence with a status —
+  # but the status must name what is actually happening, and it must not repeat
+  # the same line on every message of a conversation.
+
+  @unit
+  Scenario: A worker that has not served a turn yet says Langy is waking up
+    Given a turn is dispatched to a worker that has not served a turn yet
+    When the manager opens the turn
+    Then it emits a wake-up status such as "Waking Langy up…", "Giving Langy a pep talk…" or "Poking Langy…" before the first agent frame
+    And the line varies between conversations instead of repeating one phrase
+
+  @unit
+  Scenario: A warm worker gets a short reaching-Langy line that varies
+    Given a turn is dispatched to a worker that has already served a turn
+    When the manager opens the turn
+    Then it emits a short status such as "Paging Langy…" or "Pinging Langy…"
+    And the line varies between turns instead of repeating one phrase
+
+  @unit
+  Scenario: A resumed turn says it is picking up where it left off
+    Given a turn resumes from a shutdown handoff
+    When the manager opens the turn
+    Then it emits a "Picking up where it left off…" status
+
   # Reasoning (the model's thinking) is its own ephemeral stream, shown while the
   # reply is being worked out and then discarded. It is NOT the answer: it never
   # joins the durable final, never becomes a message part, and never reloads. The
@@ -125,6 +154,27 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     Then the optimistic Stream B text is gone
     And Stream A replays the buffered token tail so no work is lost
 
+  # A refresh that lands just as the turn finishes can miss the worker's terminal
+  # frame (its relay connection dropped before it), so the buffer has no end/error
+  # and the reconnected Stream A used to block until the hard per-turn deadline —
+  # the UI sat on "Starting up…" for minutes though the turn had finished. Stream A
+  # now watches the durable fold + per-turn heartbeat and synthesizes the missed
+  # terminal, but ONLY once the turn is provably settled so a live or cold-starting
+  # turn is never cut off.
+  @unit
+  Scenario: Stream A synthesizes the terminal a reconnect missed once the turn has settled
+    Given I reconnect to a turn whose terminal frame never reached the buffer
+    And the turn's durable fold has settled and its heartbeat has gone stale
+    When the reconnected Stream A finds no terminal on the live edge
+    Then it yields a synthesized end (or error, carrying the failure) and closes
+    And the client reconciles the full transcript from langy.messages
+
+  Scenario: Stream A stays patient while a turn is still live or cold-starting
+    Given I am watching a turn whose durable fold still reports it in flight
+    When no tokens arrive on the live edge for a while
+    Then Stream A keeps following and does not synthesize a terminal
+    And a turn that keeps a fresh heartbeat is never cut off
+
   # ---------------------------------------------------------------------------
   # Transport honesty: streaming must actually stream, end to end
   # ---------------------------------------------------------------------------
@@ -139,6 +189,28 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     When it pushes a frame and keeps the connection open
     Then the relay handles that frame before the next frame is even sent
     And non-streaming request bodies are still delivered whole, exactly as before
+
+  # The worker signs its relay frames with the runToken it got synchronously from
+  # the per-turn handoff at dispatch, but the relay used to VERIFY them against the
+  # async `RunToken` projection — which, on a brand-new conversation, has not landed
+  # when the first frames arrive. The relay looked the token up once, cached the
+  # null, and dropped EVERY frame of that turn as `no-run-token` (prod: a first turn
+  # showed nothing for ~5 minutes while it was actually working). The relay now
+  # reads the handoff token first, and never caches a null.
+  @unit
+  Scenario: The first frames of a new turn authenticate against the handoff before the projection lands
+    Given a brand-new conversation whose worker is pushing frames
+    And the durable runToken projection has not landed yet
+    When the worker's first frame reaches the relay
+    Then the relay authenticates it against the synchronous handoff token
+    And the frame is applied to the durable buffer instead of dropped as no-run-token
+
+  @unit
+  Scenario: A transient runToken miss does not poison the whole connection
+    Given the relay's first runToken lookup for a turn returns nothing
+    When a later frame arrives after the token has become readable
+    Then the relay re-reads the token instead of reusing the cached miss
+    And the later frame is authenticated and applied
 
   # The durable token buffer used to hold tokens until ~64 words accumulated,
   # so short answers rendered nothing until the turn was nearly over.

@@ -149,6 +149,16 @@ func (w *Worker) ClaimTurn(turnID string) app.ClaimOutcome {
 	return app.ClaimGranted
 }
 
+// HasServedTurn reports whether this worker has completed at least one turn.
+// The manager words its pre-first-frame status off it: a worker that has never
+// answered is genuinely waking up, one that has is a quick round-trip — and the
+// two must not claim to be each other.
+func (w *Worker) HasServedTurn() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return len(w.handled) > 0
+}
+
 // Release marks the worker idle again and records the turn as recently-handled so
 // a re-dispatch arriving after completion is a benign no-op.
 func (w *Worker) Release() {
@@ -189,6 +199,14 @@ func (w *Worker) rememberHandled(turnID string) {
 func (w *Worker) SetTurnTraceContext(sc trace.SpanContext) {
 	if w.otelRelay != nil {
 		w.otelRelay.SetTurnContext(w.otelToken, sc)
+	}
+}
+
+// ForwardTurnSpan emits the turn's customer-facing root span via the relay.
+// No relay (mediation off) is a no-op, like SetTurnTraceContext.
+func (w *Worker) ForwardTurnSpan(sc trace.SpanContext, start, end time.Time) {
+	if w.otelRelay != nil {
+		w.otelRelay.ForwardTurnSpan(w.otelToken, sc, start, end)
 	}
 }
 

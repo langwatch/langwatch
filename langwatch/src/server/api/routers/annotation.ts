@@ -109,6 +109,44 @@ const getEnrichedItems = <T extends { id: string }>(
     .filter((item): item is NonNullable<typeof item> => item !== undefined);
 };
 
+const annotatorReferenceSchema = z.string().transform((annotator, ctx) => {
+  if (annotator.startsWith("queue-") && annotator.length > 6) {
+    return { type: "queue" as const, id: annotator.slice(6) };
+  }
+  if (annotator.startsWith("user-") && annotator.length > 5) {
+    return { type: "user" as const, id: annotator.slice(5) };
+  }
+  ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid annotator" });
+  return z.NEVER;
+});
+
+type AnnotatorReference = z.infer<typeof annotatorReferenceSchema>;
+
+const queueItemReferenceFilter = ({
+  projectId,
+  organizationId,
+}: {
+  projectId: string;
+  organizationId: string;
+}) => ({
+  projectId,
+  AND: [
+    {
+      OR: [{ annotationQueueId: null }, { annotationQueue: { projectId } }],
+    },
+    {
+      OR: [
+        { userId: null },
+        {
+          user: {
+            orgMemberships: { some: { organizationId } },
+          },
+        },
+      ],
+    },
+  ],
+});
+
 export const annotationRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
@@ -205,7 +243,13 @@ export const annotationRouter = createTRPCRouter({
           projectId: input.projectId,
         },
         include: {
-          user: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+            },
+          },
         },
         orderBy: {
           createdAt: "asc",
@@ -320,6 +364,13 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("annotations:create"))
     .mutation(async ({ ctx, input }) => {
+      const service = AnnotationService.create({ prisma: ctx.prisma });
+      await service.assertQueueConfigurationReferences({
+        projectId: input.projectId,
+        userIds: input.userIds,
+        scoreTypeIds: input.scoreTypeIds,
+      });
+
       const slug = slugify(input.name.replace("_", "-"), {
         lower: true,
         strict: true,
@@ -411,14 +462,27 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
+      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const organizationId = await service.getProjectOrganizationId({
+        projectId: input.projectId,
+      });
       const queueItems = await ctx.prisma.annotationQueueItem.findMany({
-        where: { projectId: input.projectId },
+        where: queueItemReferenceFilter({
+          projectId: input.projectId,
+          organizationId,
+        }),
         include: {
           user: true,
           createdByUser: true,
           annotationQueue: {
             include: {
-              members: true,
+              members: {
+                where: {
+                  user: {
+                    orgMemberships: { some: { organizationId } },
+                  },
+                },
+              },
             },
           },
         },
@@ -464,6 +528,7 @@ export const annotationRouter = createTRPCRouter({
             },
             {
               annotationQueue: {
+                projectId: input.projectId,
                 members: {
                   some: {
                     userId: ctx.session.user.id,
@@ -587,6 +652,10 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
+      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const organizationId = await service.getProjectOrganizationId({
+        projectId: input.projectId,
+      });
       return ctx.prisma.annotationQueue.findUnique({
         where: input.queueId
           ? { id: input.queueId, projectId: input.projectId }
@@ -595,11 +664,17 @@ export const annotationRouter = createTRPCRouter({
             },
         include: {
           members: {
+            where: {
+              user: {
+                orgMemberships: { some: { organizationId } },
+              },
+            },
             include: {
               user: true,
             },
           },
           AnnotationQueueScores: {
+            where: { annotationScore: { projectId: input.projectId } },
             include: {
               annotationScore: true,
             },
@@ -622,6 +697,10 @@ export const annotationRouter = createTRPCRouter({
     .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
+      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const organizationId = await service.getProjectOrganizationId({
+        projectId: input.projectId,
+      });
       let userQueueIds: string[] = [];
 
       // If a queue is selected, we don't need to check for user queues
@@ -646,7 +725,10 @@ export const annotationRouter = createTRPCRouter({
 
       // Build the where condition based on the scenario
       const whereCondition: any = {
-        projectId: input.projectId,
+        ...queueItemReferenceFilter({
+          projectId: input.projectId,
+          organizationId,
+        }),
         doneAt:
           input.selectedAnnotations === "pending"
             ? null
@@ -656,20 +738,29 @@ export const annotationRouter = createTRPCRouter({
       };
 
       if (input.queueId) {
-        // Specific queue selected - only filter by annotationQueueId
-        whereCondition.annotationQueueId = input.queueId;
+        // Pin the requested queue to the caller's project so a queue id from
+        // another tenant cannot surface its items here.
+        whereCondition.AND.push({
+          annotationQueue: {
+            id: input.queueId,
+            projectId: input.projectId,
+          },
+        });
       } else if (userQueueIds.length > 0) {
-        // All annotations - check if annotationQueueId is in user's queue IDs
-        whereCondition.OR = [
-          {
-            annotationQueueId: {
-              in: userQueueIds,
+        // No specific queue requested: include items from the queues the caller
+        // belongs to, plus items assigned directly to them.
+        whereCondition.AND.push({
+          OR: [
+            {
+              annotationQueueId: {
+                in: userQueueIds,
+              },
             },
-          },
-          {
-            userId: userId,
-          },
-        ];
+            {
+              userId: userId,
+            },
+          ],
+        });
       } else {
         // Default case - just user's items
         whereCondition.userId = userId;
@@ -692,11 +783,17 @@ export const annotationRouter = createTRPCRouter({
           annotationQueue: {
             include: {
               members: {
+                where: {
+                  user: {
+                    orgMemberships: { some: { organizationId } },
+                  },
+                },
                 include: {
                   user: true,
                 },
               },
               AnnotationQueueScores: {
+                where: { annotationScore: { projectId: input.projectId } },
                 include: {
                   annotationScore: true,
                 },
@@ -726,16 +823,33 @@ export const annotationRouter = createTRPCRouter({
         },
         include: {
           members: {
+            where: {
+              user: {
+                orgMemberships: { some: { organizationId } },
+              },
+            },
             include: {
               user: true,
             },
           },
           AnnotationQueueScores: {
+            where: { annotationScore: { projectId: input.projectId } },
             include: {
               annotationScore: true,
             },
           },
           AnnotationQueueItems: {
+            where: {
+              projectId: input.projectId,
+              OR: [
+                { userId: null },
+                {
+                  user: {
+                    orgMemberships: { some: { organizationId } },
+                  },
+                },
+              ],
+            },
             include: {
               user: true,
               annotationQueue: true,
@@ -788,28 +902,48 @@ export async function createOrUpdateQueueItems({
   projectId: string;
   annotators: string[];
   userId: string;
-  prisma: any;
+  prisma: PrismaClient;
 }) {
+  const parsedAnnotators: AnnotatorReference[] = annotators.map((annotator) => {
+    const parsed = annotatorReferenceSchema.safeParse(annotator);
+    if (!parsed.success) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Invalid annotator",
+      });
+    }
+    return parsed.data;
+  });
+  const queueIds = parsedAnnotators
+    .filter((annotator) => annotator.type === "queue")
+    .map((annotator) => annotator.id);
+  const userIds = parsedAnnotators
+    .filter((annotator) => annotator.type === "user")
+    .map((annotator) => annotator.id);
+
+  const service = AnnotationService.create({ prisma });
+  await service.assertAnnotatorReferences({ projectId, queueIds, userIds });
+
   for (const traceId of traceIds) {
-    for (const annotator of annotators) {
-      if (annotator.startsWith("queue")) {
+    for (const annotator of parsedAnnotators) {
+      if (annotator.type === "queue") {
         await prisma.annotationQueueItem.upsert({
           where: {
             projectId: projectId,
             traceId_annotationQueueId_projectId: {
               traceId: traceId,
-              annotationQueueId: annotator.replace("queue-", ""),
+              annotationQueueId: annotator.id,
               projectId: projectId,
             },
           },
           create: {
-            annotationQueueId: annotator.replace("queue-", ""),
+            annotationQueueId: annotator.id,
             traceId: traceId,
             projectId: projectId,
             createdByUserId: userId,
           },
           update: {
-            annotationQueueId: annotator.replace("queue-", ""),
+            annotationQueueId: annotator.id,
             doneAt: null,
           },
         });
@@ -819,18 +953,18 @@ export async function createOrUpdateQueueItems({
             projectId: projectId,
             traceId_userId_projectId: {
               traceId: traceId,
-              userId: annotator.replace("user-", ""),
+              userId: annotator.id,
               projectId: projectId,
             },
           },
           create: {
-            userId: annotator.replace("user-", ""),
+            userId: annotator.id,
             traceId: traceId,
             projectId: projectId,
             createdByUserId: userId,
           },
           update: {
-            userId: annotator.replace("user-", ""),
+            userId: annotator.id,
             doneAt: null,
           },
         });

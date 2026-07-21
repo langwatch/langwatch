@@ -24,6 +24,7 @@ export class ShareService {
   }
 
   async getStateForResource(params: {
+    projectId: string;
     resourceType: ShareResourceType;
     resourceId: string;
   }): Promise<PublicShare | null> {

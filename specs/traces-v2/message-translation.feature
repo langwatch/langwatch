@@ -70,6 +70,23 @@ Feature: Message translation in the trace details drawer
       When the user clicks the turn's "Translate" action again
       Then the original bubbles are restored without a network request
 
+  Rule: Conversation Context panel
+
+    The compact previous / current / next strip in the trace drawer also has
+    a single Translate toggle in its header, so a reader can flip every turn
+    preview it shows to English at once.
+
+    Scenario: Translate toggle on the Conversation Context header
+      Given the trace drawer shows the Conversation Context panel expanded
+      Then its header shows a "Translate" action
+      When the user clicks it
+      Then every visible turn preview is shown translated to English
+      And a "Show original" toggle restores the untranslated previews
+
+    Scenario: The Translate toggle is hidden while the panel is collapsed
+      Given the Conversation Context panel is collapsed
+      Then no Translate action is shown in its header
+
   Rule: Failure feedback matches the legacy messages view
 
     Scenario: No FAST model configured anywhere in the cascade

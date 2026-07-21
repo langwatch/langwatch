@@ -43,7 +43,7 @@ func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelse
 	if endpoint != "" {
 		endpoint = strings.TrimRight(endpoint, "/") + "/api/otel/v1/traces"
 	} else if cfg.OTel.OTLPEndpoint != "" || cfg.OTel.ExporterEndpoint != "" || cfg.OTel.ExporterTracesEndpoint != "" {
-		clog.Get(ctx).Warn("nlpgo customer trace export is OFF: set LANGWATCH_ENDPOINT — the OTEL_* endpoints configure LangWatch's own telemetry and never route customer traces (an nlpgo ops-span pipeline is tracked as follow-up; the debug collector still applies for local development)")
+		clog.Get(ctx).Warn("nlpgo customer trace export is OFF: set LANGWATCH_ENDPOINT — the OTEL_* endpoints carry LangWatch's own operational spans and never route customer traces (the debug collector still applies for local development)")
 	}
 	// NLPGO_SPAN_SYNC=1 swaps the per-tenant BatchSpanProcessor for a
 	// SimpleSpanProcessor — every span.End() blocks on the OTLP
@@ -56,12 +56,19 @@ func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelse
 	// collector RTT.
 	syncExport := strings.TrimSpace(os.Getenv("NLPGO_SPAN_SYNC")) == "1"
 	debugEndpoint, debugHeaders := cfg.OTel.DebugCollector()
+	// The service's OWN spans (startup, health, background work — anything
+	// that never acquires a tenant api_key) go to the internal collector the
+	// official OTEL_* vars name. Customer traces keep routing per-tenant via
+	// LANGWATCH_ENDPOINT above; the two pipelines never mix.
+	opsEndpoint, opsHeaders := cfg.OTel.PrimaryOTLP()
 	return otelsetup.New(ctx, otelsetup.Options{
 		NodeID:                 nodeID,
 		OTLPEndpoint:           endpoint,
 		Sampler:                cfg.OTel.SamplerChoice(),
 		MultiTenant:            true,
 		SyncExport:             syncExport,
+		OpsEndpoint:            opsEndpoint,
+		OpsHeaders:             opsHeaders,
 		DebugCollectorEndpoint: debugEndpoint,
 		DebugCollectorHeaders:  debugHeaders,
 	})

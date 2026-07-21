@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useRef } from "react";
 import { useFilterStore } from "../stores/filterStore";
-import { useViewStore } from "../stores/viewStore";
+import { getPersistedActiveLensId, useViewStore } from "../stores/viewStore";
 import { getPresetById, matchPreset } from "../utils/timeRangePresets";
 import {
   buildFragment,
@@ -57,9 +57,18 @@ export function useURLSync(): void {
   const applyFromFragment = useCallback(() => {
     const parsed = parseFragment(readFragment());
     if (!parsed) {
-      // Fragment was cleared (e.g. user navigated to a default-state URL).
-      // Reset to the default lens so the page matches what's in the bar.
-      selectLens(DEFAULT_LENS_ID);
+      // Bare URL with no lens fragment. Restore the user's last-used lens
+      // instead of snapping to All: a built-in id is shared across projects
+      // (so the preference carries cross-project) and is present now. A
+      // persisted CUSTOM lens may not have hydrated yet — if it isn't in the
+      // list, fall back to the default WITHOUT persisting, so setUserLenses
+      // can still restore it once it arrives (see viewStore).
+      const persisted = getPersistedActiveLensId();
+      const restoreId =
+        persisted && allLenses.some((l) => l.id === persisted)
+          ? persisted
+          : DEFAULT_LENS_ID;
+      selectLens(restoreId, { persist: restoreId !== DEFAULT_LENS_ID });
       resetPagination();
       return;
     }

@@ -301,6 +301,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
   // Load pending evaluator (newly created from the flow)
   const pendingEvaluatorId = onlineEvaluationDrawerState?.pendingEvaluatorId;
+  const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const pendingEvaluatorQuery = api.evaluators.getById.useQuery(
     {
       id: pendingEvaluatorId ?? "",
@@ -317,6 +318,10 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       void utils.monitors.getAllForProject.invalidate({
         projectId: project?.id ?? "",
       });
+      void utils.monitors.getPerformanceForProject.invalidate({
+        projectId: project?.id ?? "",
+        timeZone: localTimeZone,
+      });
       // Clear persisted state after successful save
       onlineEvaluationDrawerState = null;
       onSave?.();
@@ -329,6 +334,10 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     onSuccess: () => {
       void utils.monitors.getAllForProject.invalidate({
         projectId: project?.id ?? "",
+      });
+      void utils.monitors.getPerformanceForProject.invalidate({
+        projectId: project?.id ?? "",
+        timeZone: localTimeZone,
       });
       if (monitorId) {
         void utils.monitors.getById.invalidate({

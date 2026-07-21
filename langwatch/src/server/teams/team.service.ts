@@ -15,6 +15,19 @@ export const TEAM_ROLE_PRIORITY: Record<TeamUserRole, number> = {
   [TeamUserRole.CUSTOM]: 3,
 };
 
+const principalInOrganizationWhere = (
+  organizationId: string,
+): Prisma.RoleBindingWhereInput => ({
+  OR: [
+    {
+      userId: { not: null },
+      user: { orgMemberships: { some: { organizationId } } },
+    },
+    { groupId: { not: null }, group: { organizationId } },
+    { apiKeyId: { not: null }, apiKey: { organizationId } },
+  ],
+});
+
 // Ascending, nulls last — matches Postgres `ORDER BY col ASC` (the ordering the
 // previous Prisma `orderBy` produced before members were resolved in memory).
 function compareNullsLast(a: string | null, b: string | null): number {
@@ -282,6 +295,7 @@ export class TeamService {
               organizationId,
               scopeType: RoleBindingScopeType.TEAM,
               scopeId: team.id,
+              ...principalInOrganizationWhere(organizationId),
             },
             include: {
               user: { select: { id: true, name: true, email: true } },
@@ -296,6 +310,7 @@ export class TeamService {
                   organizationId,
                   scopeType: RoleBindingScopeType.PROJECT,
                   scopeId: { in: projectIds },
+                  ...principalInOrganizationWhere(organizationId),
                 },
                 include: {
                   user: { select: { id: true, name: true, email: true } },
@@ -322,7 +337,11 @@ export class TeamService {
         );
         const groupMemberships = allGroupIds.length > 0
           ? await this.prisma.groupMembership.findMany({
-              where: { groupId: { in: allGroupIds } },
+              where: {
+                groupId: { in: allGroupIds },
+                group: { organizationId },
+                user: { orgMemberships: { some: { organizationId } } },
+              },
               include: { user: { select: { id: true, name: true, email: true } } },
             })
           : [];

@@ -1,8 +1,22 @@
 [
   {
-    "id": "analytics",
-    "label": "Analytics",
-    "description": "Analyze your AI agent's performance using LangWatch analytics. Use when the user wants to understand costs, latency, error rates, usage trends, or debug specific traces. Works with any LangWatch-instrumented agent.",
+    "id": "agent-best-practices",
+    "label": "Agent best practices",
+    "description": "Expert AI engineering consultant for your agent development practices. Audits your codebase, traces, evaluations, and scenarios against best practices, then guides you to close the gaps, starting from low-hanging fruit and going deeper. Use when you want to level up your agent's engineering quality.",
+    "category": "recipe",
+    "userPrompt": "Where can I improve our agent development best practices?"
+  },
+  {
+    "id": "agent-improve",
+    "label": "Agent improve",
+    "description": "Turns production evidence into tested improvements for your AI agent. Forms hypotheses from real traces and analytics, explains the reasoning behind each one, then executes with the user: scenario tests that reproduce production failures, prompt and code changes as reviewable PRs, new evaluators and monitors that capture production signals, and experiments that settle open questions. Use when you want to know what to do next to improve your agent.",
+    "category": "skill",
+    "userPrompt": "What should I do next to improve my agent?"
+  },
+  {
+    "id": "agent-performance",
+    "label": "Agent performance",
+    "description": "Deep-dive diagnosis of how your AI agent behaves in production. Explores LangWatch analytics and traces end to end to map failure patterns, dissatisfied users, token cost hotspots, edge cases, behavior changes, and outliers, then delivers an HTML report where every finding links to real example traces. Use when you want to truly understand what your agent is doing in production.",
     "category": "skill",
     "userPrompt": "How is my agent performing?"
   },
@@ -27,9 +41,16 @@
   {
     "id": "evaluations",
     "label": "Evaluations",
-    "description": "Set up comprehensive evaluations for your AI agent with LangWatch — experiments (batch testing), evaluators (scoring functions), datasets, online evaluation (production monitoring), and guardrails (real-time blocking). Supports both code (SDK) and platform (CLI) approaches. Use when the user wants to evaluate, test, benchmark, monitor, or safeguard their agent.",
+    "description": "Compatibility router for LangWatch evaluation requests. Use only when the user asks for evaluations without making it clear whether they mean pre-deployment experiments or production online evaluations. Routes the request to the focused companion skill and does not implement either workflow itself.",
     "category": "skill",
-    "userPrompt": "Set up evaluations for my agent"
+    "userPrompt": "Help me evaluate my agent"
+  },
+  {
+    "id": "experiments",
+    "label": "Experiments",
+    "description": "Create and run LangWatch experiments for pre-deployment batch testing. Use when the user wants to test an agent against a dataset, compare prompts or models, benchmark quality, detect regressions, or add a CI quality gate. Do not use for production monitoring or guardrails.",
+    "category": "skill",
+    "userPrompt": "Set up experiments for my agent"
   },
   {
     "id": "generate-rag-dataset",
@@ -44,17 +65,18 @@
     "category": "skill"
   },
   {
-    "id": "improve-setup",
-    "label": "Improve setup",
-    "description": "Expert AI engineering consultant for your LangWatch setup. Audits your codebase, traces, evaluations, and scenarios, then guides you to improve — starting from low-hanging fruit and going deeper. Use when you want to level up your agent's engineering quality.",
-    "category": "recipe"
-  },
-  {
     "id": "level-up",
     "label": "Level up",
     "description": "Take your AI agent to the next level with full LangWatch integration. Adds tracing, prompt versioning, evaluation experiments, and simulation tests in one go. Use when the user wants comprehensive observability, testing, and prompt management for their agent.",
     "category": "skill",
     "userPrompt": "Take my agent to the next level"
+  },
+  {
+    "id": "online-evaluations",
+    "label": "Online evaluations",
+    "description": "Configure LangWatch online evaluations and guardrails for production traffic. Use when the user wants to score live traces or threads, monitor production quality, sample incoming traffic, or synchronously block unsafe requests and responses. Do not use for batch experiments.",
+    "category": "skill",
+    "userPrompt": "Set up online evaluations for my agent"
   },
   {
     "id": "prompts",

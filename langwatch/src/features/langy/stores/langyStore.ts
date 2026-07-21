@@ -167,6 +167,34 @@ interface LangyState {
   panelEffect: LangyPanelEffect;
   setPanelEffect: (effect: LangyPanelEffect) => void;
 
+  /**
+   * How many mounted app shells have claimed the docked panel's placement.
+   *
+   * The app shell (DashboardLayout) draws the page as a rounded content card
+   * on the gray page ground. When such a shell is mounted it CLAIMS the dock:
+   * it reserves the panel's room inside its own content row (keeping the
+   * header full-width) and the docked panel renders as a second rounded card
+   * below the header. Pages without a shell (full-screen tools like the
+   * studio) leave the count at zero and keep the flush full-height dock with
+   * the page-level width reservation. A count, not a boolean, so nested or
+   * twin mounts (StrictMode) stay correct. Never persisted: it mirrors what
+   * is mounted right now. Spec: specs/langy/langy-panel-layout.feature
+   */
+  dockShellClaims: number;
+  claimDockShell: () => void;
+  releaseDockShell: () => void;
+
+  /**
+   * The docked panel is open and reserving room right now, the one truth the
+   * page wrapper computes (visibility gate + open + sidebar mode, see
+   * LangyShiftedRoot) and the app shell consumes to reserve the dock's room
+   * inside its content row. Kept in the store so the shell never re-derives
+   * Langy's visibility gating (which needs session hooks a public shell must
+   * not run). Never persisted.
+   */
+  dockShifted: boolean;
+  setDockShifted: (shifted: boolean) => void;
+
   // Active conversation (a pointer into React Query server state)
   activeConversationId: string | null;
   /**
@@ -241,10 +269,18 @@ interface LangyState {
 
   // Feedback cards the user waved away, keyed by the assistant message they sat
   // under. Conversation-scoped (see emptyConversationState) — a dismissal means
-  // "not for this answer", not "never again"; the long cross-session snooze is
-  // localStorage's job (see logic/langyFeedbackDirective).
+  // "not for this answer", not "never again"; the cross-session quiet period is
+  // the backend's job (langy.messages `shouldAskFeedback` + langy.feedbackPromptShown).
   dismissedFeedbackMessageIds: Set<string>;
   dismissFeedback: (messageId: string) => void;
+  /**
+   * The assistant message whose feedback card must stay rendered regardless of
+   * the server cadence flag. Two producers: a shown card pins itself (so the
+   * refetch that follows `feedbackPromptShown` cannot unmount it mid-look), and
+   * the `/feedback` composer command pins on demand. Conversation-scoped.
+   */
+  pinnedFeedbackMessageId: string | null;
+  pinFeedback: (messageId: string) => void;
 
   // The in-flight turn + its live status/progress signals. The ChatTransport
   // adopts the turn id and pushes signals off the `langy.onTurnStream`
@@ -252,6 +288,15 @@ interface LangyState {
   // Conversation-scoped (reset on switch / new turn), never persisted.
   activeTurnId: string | null;
   setActiveTurnId: (id: string | null) => void;
+  /**
+   * The turn whose live stream ended with a genuine end-of-turn frame. The
+   * durable fold finalizes asynchronously (projection + refetch), so the panel
+   * uses this to retire the working indicator the instant the answer is
+   * complete instead of trusting a briefly-stale in-flight flag. Cleared when
+   * a new turn is adopted.
+   */
+  settledTurnId: string | null;
+  markTurnSettled: (turnId: string | null) => void;
   /** Latest coarse status line for the turn (e.g. "Searching traces…"). */
   turnStatus: string | null;
   /** Latest progress fraction/percentage for the turn (0..1 or 0..100). */
@@ -308,7 +353,9 @@ const emptyConversationState = () => ({
   discardedProposalIds: new Set<string>(),
   applyingProposalIds: new Set<string>(),
   dismissedFeedbackMessageIds: new Set<string>(),
+  pinnedFeedbackMessageId: null as string | null,
   activeTurnId: null as string | null,
+  settledTurnId: null as string | null,
   turnStatus: null as string | null,
   turnProgress: null as number | null,
   turnProgressSample: null as LangyProgressSample | null,
@@ -344,10 +391,24 @@ export const useLangyStore = create<LangyState>()(
         }),
       consumePendingPrompt: () => set({ pendingPrompt: null }),
 
-      panelMode: "floating",
+      // Sidebar by default: docked inside the app shell as a second content
+      // card, working alongside the page. Floating stays one toggle away in
+      // the overflow menu (user-picked, persisted).
+      panelMode: "sidebar",
       setPanelMode: (panelMode) => set({ panelMode }),
       panelEffect: "plain",
       setPanelEffect: (panelEffect) => set({ panelEffect }),
+
+      dockShellClaims: 0,
+      claimDockShell: () =>
+        set((state) => ({ dockShellClaims: state.dockShellClaims + 1 })),
+      releaseDockShell: () =>
+        set((state) => ({
+          dockShellClaims: Math.max(0, state.dockShellClaims - 1),
+        })),
+
+      dockShifted: false,
+      setDockShifted: (dockShifted) => set({ dockShifted }),
 
       activeConversationId: null,
       historyLoadConversationId: null,
@@ -486,9 +547,26 @@ export const useLangyStore = create<LangyState>()(
           next.add(messageId);
           return { dismissedFeedbackMessageIds: next };
         }),
+      pinnedFeedbackMessageId: null,
+      // Pinning un-dismisses: `/feedback` after waving the card away must
+      // re-open it, and the dismissal check would otherwise win forever.
+      pinFeedback: (messageId) =>
+        set((state) => {
+          const dismissed = new Set(state.dismissedFeedbackMessageIds);
+          dismissed.delete(messageId);
+          return {
+            pinnedFeedbackMessageId: messageId,
+            dismissedFeedbackMessageIds: dismissed,
+          };
+        }),
 
       activeTurnId: null,
-      setActiveTurnId: (activeTurnId) => set({ activeTurnId }),
+      // Adopting a turn (fresh or re-driven) means it is live again, so the
+      // settled marker from the previous turn must not bleed onto it.
+      setActiveTurnId: (activeTurnId) =>
+        set({ activeTurnId, settledTurnId: null }),
+      settledTurnId: null,
+      markTurnSettled: (settledTurnId) => set({ settledTurnId }),
       turnStatus: null,
       turnProgress: null,
       turnProgressSample: null,
@@ -535,10 +613,14 @@ export const useLangyStore = create<LangyState>()(
     }),
     {
       name: "langy:store",
-      // Durable across sessions: developer mode + the layout mode. Everything
-      // else is per-session client state that must start clean (the panel opens
-      // empty by default).
+      // Durable across sessions: whether the panel is open, developer mode, and
+      // the layout mode. `isOpen` persists so a page reload restores the panel
+      // exactly as the user left it (open stays open, closed stays closed) —
+      // the visibility gate (useShowLangy) still decides whether it renders at
+      // all, so this never forces the panel onto a surface without Langy.
+      // Everything else is per-session conversation state that must start clean.
       partialize: (state) => ({
+        isOpen: state.isOpen,
         devMode: state.devMode,
         panelMode: state.panelMode,
         panelEffect: state.panelEffect,

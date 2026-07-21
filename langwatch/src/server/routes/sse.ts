@@ -46,8 +46,11 @@ export function sseErrorFrame(err: unknown): Record<string, unknown> {
   if (handled) {
     return {
       type: "error",
-      message: handled.message,
-      domainError: handled.serialize(),
+      // The code, never the handled error's own message — that is server copy
+      // and can name internal configuration (ADR-045). The client keys its
+      // presentation off `error.code` via the explainers.
+      message: handled.code,
+      error: handled.serialize(),
     };
   }
   if (err instanceof TRPCError && err.code !== "INTERNAL_SERVER_ERROR") {

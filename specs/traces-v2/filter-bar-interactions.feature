@@ -163,3 +163,52 @@ Rule: Facet rows hold their position while the pointer is in the section
     When the user types a substring that matches no values
     Then no value rows are rendered
     And the "No match" hint is shown alone
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SIDEBAR LAYOUT DEFAULTS — declutter
+# ─────────────────────────────────────────────────────────────────────────────
+# The table is the primary surface; the sidebar reads as busy alongside it.
+# So the sidebar starts closed, its facets start collapsed, and the header
+# sheds a button (the facet finder) — the same "browse what's available"
+# job is done by Configure, now also reachable from a "More…" button at the
+# bottom of the list.
+
+Rule: The filter sidebar starts closed and remembers the user's choice
+
+  Scenario: A first visit shows the table without the sidebar
+    Given the user has no stored sidebar preference
+    When the Observe page loads
+    Then the filter sidebar is collapsed
+    And a "Filters" button in the toolbar opens it
+
+  Scenario: The reopen control reads as a labelled button
+    Given the filter sidebar is collapsed
+    Then the toolbar shows a bordered "Filters" button with a panel icon
+    And it matches the time-range button's styling, not a bare chevron
+
+  Scenario: Opening the sidebar persists across navigation
+    Given the user opened the filter sidebar
+    When the user leaves the Observe page and returns
+    Then the filter sidebar is still open
+
+Rule: Facets start collapsed so the sidebar reads as a scannable list
+
+  Scenario: An opened sidebar shows facet titles, not their values
+    Given the filter sidebar is open with no active filters
+    Then every facet section is collapsed to its title row
+
+  Scenario: A facet with an active selection opens so the filter is visible
+    Given the sidebar has an active selection on the "status" facet
+    When the sidebar is open
+    Then the "status" facet is expanded and the rest stay collapsed
+
+Rule: Configure is the one place to browse facets
+
+  Scenario: The find-a-facet button is gone
+    Given the filter sidebar is open
+    Then there is no "Find a facet" button in the header
+
+  Scenario: A "More…" button at the bottom opens Configure
+    Given the filter sidebar is open
+    When the user clicks the "More…" button below the last facet
+    Then the Configure facet manager opens

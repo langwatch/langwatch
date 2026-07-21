@@ -221,11 +221,29 @@ type Hygiene interface {
 	Worktrees(gitDir string) ([]Worktree, error)
 	Dirty(worktreeDir string) bool
 	DirSize(path string) (bytes int64, exists bool)
+	// DiskUsage is a whole-worktree size for the prune picker: how much disk
+	// deleting the worktree would reclaim. Unlike DirSize (a Go tree-walk summing
+	// file sizes, used by the artefact reclaim), this shells out to `du` for speed
+	// on a big tree — the difference matters when sizing dozens of worktrees at once.
+	// It takes a context so an in-flight `du` is killed when sizing is cancelled
+	// (the picker cancels it the moment a delete starts, freeing the disk at once).
+	DiskUsage(ctx context.Context, path string) (bytes int64, ok bool)
 	Remove(path string) error
 	PruneGitWorktrees(repoRoot string)
 	// RemoveWorktree deletes a linked worktree (directory + git admin entry),
 	// forcing past uncommitted changes — the app layer owns the confirmation.
 	RemoveWorktree(gitDir, dir string) error
+	// LastActivity reports when a worktree was last worked on — the committer date
+	// of its checked-out HEAD, falling back to the directory's own mtime. It is the
+	// "how long has this sat idle" signal interactive prune ranks and default-selects
+	// by; the bool is false only when neither can be established.
+	LastActivity(worktreeDir string) (t time.Time, ok bool)
+	// UpstreamGone reports whether the branch tracks an upstream whose remote-tracking
+	// ref no longer exists — the "merged, and the remote branch was deleted" signal
+	// that marks a worktree as a prime cleanup candidate. It reflects the local
+	// remote-tracking state, so it needs a prior `git fetch --prune` to be current;
+	// false for a branch with no upstream, a detached HEAD, or when git cannot tell.
+	UpstreamGone(worktreeDir, branch string) bool
 }
 
 // Worktree is one entry from `git worktree list`.

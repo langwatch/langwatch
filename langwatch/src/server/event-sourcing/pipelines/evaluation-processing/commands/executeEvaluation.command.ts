@@ -5,6 +5,7 @@ import {
   isAzureEvaluatorType,
 } from "../../../../app-layer/evaluations/azure-safety-env";
 import { getAzureSafetyEnvFromProject } from "../../../../app-layer/evaluations/azure-safety-env.server";
+import { HandledError } from "@langwatch/handled-error";
 import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
@@ -39,6 +40,34 @@ import type {
 const logger = createLogger(
   "langwatch:evaluation-processing:execute-evaluation",
 );
+
+/**
+ * A failure the customer can resolve themselves (provider disabled, missing
+ * credentials, an oversized evaluator payload) rather than one we have to fix.
+ *
+ * Keyed on `HandledError.fault` — the repo's own classification, mirrored in
+ * `services/aigateway/adapters/httpapi/faults.go`.
+ *
+ * It is deliberately NOT `HandledError.isHandled(error)`: that is the whole
+ * base class, which also covers `EvaluatorExecutionError` (`fault: "platform"`,
+ * raised when langevals times out, is unreachable, or returns 5xx).
+ * Downgrading those would hide an outage behind a benign skip.
+ * `fault: "provider"` likewise stays an error — a third-party outage is not
+ * something the customer can act on.
+ *
+ * Know the failure mode before adding an error type under `executeForTrace`:
+ * `fault` **defaults to `"customer"`** (`HandledError`), so this predicate is
+ * opt-out, not opt-in. An error class whose author never thought about
+ * classification lands on the skip path and stops producing error telemetry.
+ * That is a deliberate trade — the alternative, a hand-kept allowlist, goes
+ * stale silently in the other direction — but it means any new
+ * `HandledError` on this path that represents *our* failure has to declare
+ * `fault: "platform"` explicitly. The base class says as much for 5xx-ish
+ * errors; this call site is what makes ignoring it expensive.
+ */
+function isCustomerFixable(error: unknown): error is HandledError {
+  return HandledError.isHandled(error) && error.fault === "customer";
+}
 
 export interface ExecuteEvaluationCommandDeps {
   monitors: MonitorService;
@@ -277,8 +306,9 @@ export class ExecuteEvaluationCommand implements CommandHandler<
       // score to fold, and a bulk re-evaluation over non-evaluatable traces
       // would otherwise emit thousands of results, each paying the heavy
       // evaluation-projection read. Config skips (monitor not found, provider
-      // not configured) are emitted earlier via their own path and still
-      // surface in the UI.
+      // not configured) are emitted earlier via their own path — or, when the
+      // failure is thrown from inside execution, by the customer-fault branch
+      // in the catch below — and still surface in the UI.
       if (result.status === "skipped") {
         logger.debug(
           {
@@ -332,6 +362,33 @@ export class ExecuteEvaluationCommand implements CommandHandler<
         this.deps.offloadInputs,
       );
     } catch (error) {
+      // Customer-fixable errors (see isCustomerFixable above) are skipped,
+      // not errored — mirrors the pre-execution config gates above.
+      if (isCustomerFixable(error)) {
+        logger.info(
+          {
+            // `meta` first so the fixed identifiers below always win: `meta`
+            // is free-form per subclass and can itself carry a `traceId`.
+            ...error.meta,
+            code: error.code,
+            tenantId,
+            evaluationId: data.evaluationId,
+            evaluatorId: data.evaluatorId,
+            traceId: data.traceId,
+            error: error.message,
+          },
+          // Neutral wording on purpose: this branch also catches oversized
+          // payloads and non-evaluatable traces, neither of which is a
+          // misconfiguration. `code` in the payload says which it was.
+          "Customer-fixable evaluator failure — skipping evaluation",
+        );
+
+        return emitReported(data, tenantId, {
+          status: "skipped",
+          details: error.message,
+        });
+      }
+
       logger.error(
         {
           tenantId: tenantId,

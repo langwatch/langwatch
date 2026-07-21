@@ -1,6 +1,5 @@
 import scenario from "@langwatch/scenario";
 import fs from "fs";
-import { execSync } from "child_process";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
 import os from "os";
@@ -8,6 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
 import {
+  copyFixtureToWorkDir,
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
@@ -51,9 +51,10 @@ describe("Scenarios Skill", () => {
         path.join(os.tmpdir(), "langwatch-skill-scenario-test-py-")
       );
 
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-openai",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -134,9 +135,10 @@ describe("Scenarios Skill", () => {
         path.join(os.tmpdir(), "langwatch-skill-scenario-test-ts-")
       );
 
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "typescript-vercel",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -199,9 +201,10 @@ describe("Scenarios Skill", () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-skill-scenarios-langgraph-")
       );
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-langgraph")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-langgraph",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -250,9 +253,10 @@ describe("Scenarios Skill", () => {
         path.join(os.tmpdir(), "langwatch-skill-scenarios-red-team-py-")
       );
 
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-openai",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -314,9 +318,10 @@ describe("Scenarios Skill", () => {
         path.join(os.tmpdir(), "langwatch-skill-scenarios-red-team-ts-")
       );
 
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "typescript-vercel",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -381,9 +386,10 @@ describe("Scenarios Skill", () => {
         path.join(os.tmpdir(), "langwatch-skill-scenarios-targeted-")
       );
 
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-openai",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -505,9 +511,10 @@ describe("Scenarios Skill", () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-skill-scenarios-mastra-")
       );
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/typescript-mastra")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "typescript-mastra",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -554,9 +561,10 @@ describe("Scenarios Skill", () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-skill-scenarios-rag-")
       );
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-rag-agent",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -623,9 +631,10 @@ describe("Scenarios Skill", () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-skill-scenarios-consultant-")
       );
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-rag-agent",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -797,9 +806,10 @@ describe("Scenarios Skill", () => {
         path.join(os.tmpdir(), "langwatch-skill-scenario-test-ts-voice-")
       );
 
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/typescript-voice")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "typescript-voice",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({

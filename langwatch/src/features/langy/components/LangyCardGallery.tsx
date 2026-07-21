@@ -552,7 +552,13 @@ export function LangyCardGallery() {
       </Section>
 
       <Section title="Feedback">
-        <LangyFeedback conversationId="gallery" messageId="gallery-feedback" />
+        {/* "preview": a fixture must never pin over a live conversation's
+            card or fire real shown-marks at the backend cadence. */}
+        <LangyFeedback
+          conversationId="gallery"
+          messageId="gallery-feedback"
+          origin="preview"
+        />
       </Section>
 
       {/* Generated from the error registry, so a new kind appears here for free

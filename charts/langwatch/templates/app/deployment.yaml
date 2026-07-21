@@ -139,6 +139,14 @@ spec:
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
 
+            # Names this process in telemetry. It becomes the OTel resource
+            # `service.name` and the `service` field on every stdout log line,
+            # which log shipping promotes to the Loki `service_name` label.
+            # Set per role so app / workers / cronjobs stay distinguishable —
+            # unset, all three collapse onto the same code default.
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.app.otel.serviceName | default "langwatch-app" | quote }}
+
             - name: NEXTAUTH_URL
               value: {{ .Values.app.http.publicUrl | default .Values.app.http.baseHost | default "http://localhost:5560" }}
             - name: NEXTAUTH_URL_INTERNAL

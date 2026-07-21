@@ -76,6 +76,10 @@ model User {
   // auto-detection. When set, wins over auto-detected persona destination.
   // Spec: specs/ai-gateway/governance/persona-home-content.feature
   lastHomePath             String?
+  // User-level dismissal for automatic Traces Explorer tours. A single
+  // dismissal applies across projects, browsers, and devices.
+  // Spec: specs/traces-v2/tour-visibility-and-persistence.feature
+  tracesExplorerTourDismissedAt DateTime?
   Annotation               Annotation[]
   publicShares             PublicShare[]
   Workflow                 Workflow[]

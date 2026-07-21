@@ -33,6 +33,14 @@ export type LangyTurnSignalEntry = Extract<
   { type: "status" | "progress" | "milestone" | "reasoning" | "plan" }
 >;
 
+/**
+ * How a turn stream terminated. "end" is the genuine end-of-turn frame — the
+ * answer is complete, so the caller may retire in-flight UI immediately.
+ * "closed" is a silent close (the subscription completed without an end frame —
+ * e.g. a quiet worker); the durable fold remains the only truth there.
+ */
+export type LangyTurnSettleReason = "end" | "error" | "closed";
+
 export interface LangyChatTransportDeps {
   /** Read the current turn inputs at send time (owns projectId → fixes regenerate). */
   getContext: () => LangyTurnRequestContext;
@@ -40,8 +48,8 @@ export interface LangyChatTransportDeps {
   onIds: (ids: { conversationId: string; turnId: string }) => void;
   /** Push a status/progress/milestone signal (drives StreamingStatusLine via the store). */
   onSignal: (signal: LangyTurnSignalEntry) => void;
-  /** Fired when a turn stream terminates (end or error) — the reconcile trigger. */
-  onTurnSettled?: () => void;
+  /** Fired when a turn stream terminates — the reconcile trigger. */
+  onTurnSettled?: (info: { reason: LangyTurnSettleReason }) => void;
 }
 
 /** The turn-start response the create/continue mutations return (ids, no stream). */
@@ -77,9 +85,12 @@ export function createLangyChatTransport(
     async sendMessages(options) {
       const ctx = deps.getContext();
       const turnInput = {
-        // One logical send, one identity. Any transport/proxy retry replays the
-        // same mutation body and therefore the same turn/message/admission.
-        requestId: crypto.randomUUID(),
+        // One logical send, one identity: minted fresh on every sendMessages
+        // call (each composer submit / regenerate re-arms with a new key), so
+        // a genuine re-send of the same text is a NEW turn. Transport/proxy
+        // retries replay the same mutation body — same key, same content —
+        // and collapse onto the same admitted turn.
+        idempotencyKey: crypto.randomUUID(),
         messages: options.messages,
         ...(options.trigger ? { trigger: options.trigger } : {}),
         projectId: ctx.projectId,
@@ -152,7 +163,7 @@ function subscribeTurnStream({
   conversationId: string;
   turnId: string;
   onSignal: (signal: LangyTurnSignalEntry) => void;
-  onSettled?: () => void;
+  onSettled?: (info: { reason: LangyTurnSettleReason }) => void;
   abortSignal?: AbortSignal;
 }): ReadableStream<UIMessageChunk> {
   let sub: Unsubscribable | undefined;
@@ -162,20 +173,20 @@ function subscribeTurnStream({
       const textId = crypto.randomUUID();
       let closed = false;
 
-      const finish = () => {
+      const finish = (reason: LangyTurnSettleReason) => {
         if (closed) return;
         closed = true;
         controller.enqueue({ type: "text-end", id: textId });
         controller.enqueue({ type: "finish" });
         controller.close();
         sub?.unsubscribe();
-        onSettled?.();
+        onSettled?.({ reason });
       };
 
       controller.enqueue({ type: "start" });
       controller.enqueue({ type: "text-start", id: textId });
 
-      // The manager emits a "Getting ready…" status into the cold window
+      // The manager emits a readiness status ("Waking Langy up…") into the cold window
       // (worker tool prep produces no frames for many seconds). It is a
       // placeholder for SILENCE, so the first real output — text, a tool, the
       // model's reasoning — retires it; without this the status line would
@@ -217,10 +228,10 @@ function subscribeTurnStream({
             return;
           case "error":
             controller.enqueue({ type: "error", errorText: entry.error });
-            finish();
+            finish("error");
             return;
           case "end":
-            finish();
+            finish("end");
             return;
         }
       };
@@ -249,9 +260,9 @@ function subscribeTurnStream({
               type: "error",
               errorText: err instanceof Error ? err.message : "Langy stream error",
             });
-            finish();
+            finish("error");
           },
-          onComplete: finish,
+          onComplete: () => finish("closed"),
         },
       );
 

@@ -37,6 +37,17 @@ vi.mock("../../../hooks/useTraceDrawerNavigation", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
+// The panel-level translate toggle dispatches through tRPC; stub it to an
+// identity passthrough so these tests don't need a tRPC client.
+vi.mock("../../../hooks/useTextTranslation", () => ({
+  useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
+    displayTexts: texts,
+    isActive: false,
+    isLoading: false,
+    toggle: () => undefined,
+  }),
+}));
+
 vi.mock("../../../hooks/useConversationContext", () => ({
   useConversationContext: (conversationId: string | null, traceId: string) => ({
     conversationId,

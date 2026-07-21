@@ -1,8 +1,8 @@
 import { chakra, HStack, Text } from "@chakra-ui/react";
 import { Sparkles } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect, useState } from "react";
-import type { MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
+import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
@@ -45,7 +45,7 @@ const ACTIONS: QuietAction[] = [
   },
   {
     phrase: "Run an experiment",
-    href: (slug) => `/${slug}/evaluations`,
+    href: (slug) => `/${slug}/experiments`,
     ask: "How do I run my first experiment here — what should I evaluate first?",
   },
   {
@@ -66,6 +66,11 @@ export function QuietHeadline() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const askLangy = useLangyStore((s) => s.askLangy);
+  // The invitation renders wherever the signal-focused home does, which no
+  // longer implies Langy (spec: specs/home/signal-focused-home-rollout.feature).
+  // Without Langy, the typed phrase opens the feature surface instead of a
+  // conversation, and the hand-to-Langy action disappears.
+  const showLangy = useShowLangy();
 
   // One tiny state machine: grow to the full phrase, hold, shrink to zero,
   // step to the next phrase. Each transition schedules exactly one timeout,
@@ -101,12 +106,25 @@ export function QuietHeadline() {
   }, [step, reduceMotion]);
 
   const action = ACTIONS[step.index % ACTIONS.length]!;
-  const typed = reduceMotion ? action.phrase : action.phrase.slice(0, step.length);
+  const typed = reduceMotion
+    ? action.phrase
+    : action.phrase.slice(0, step.length);
 
   const onLearnMore = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!project) return;
     event.preventDefault();
     void router.push(action.href(project.slug));
+  };
+
+  // The typed phrase's click: hand the suggestion to Langy when the user has
+  // it, otherwise open the surface that teaches the step — the phrase is
+  // never a dead control.
+  const onPhrase = () => {
+    if (showLangy) {
+      askLangy(action.ask);
+    } else if (project) {
+      void router.push(action.href(project.slug));
+    }
   };
 
   return (
@@ -125,8 +143,12 @@ export function QuietHeadline() {
             suggestion to Langy, question already sent. */}
         <chakra.button
           type="button"
-          onClick={() => askLangy(action.ask)}
-          aria-label={`Ask Langy: ${action.phrase}`}
+          onClick={onPhrase}
+          aria-label={
+            showLangy
+              ? `Ask Langy: ${action.phrase}`
+              : `Learn more: ${action.phrase}`
+          }
           fontFamily="inherit"
           fontSize="inherit"
           letterSpacing="inherit"
@@ -172,25 +194,27 @@ export function QuietHeadline() {
         >
           Learn more →
         </chakra.a>
-        <chakra.button
-          type="button"
-          onClick={() => askLangy(action.ask)}
-          display="inline-flex"
-          alignItems="center"
-          gap={1}
-          fontFamily="mono"
-          fontSize="12px"
-          color="orange.fg"
-          cursor="pointer"
-          whiteSpace="nowrap"
-          borderBottomWidth="1px"
-          borderColor="transparent"
-          transition="border-color 130ms ease"
-          _hover={{ borderColor: "orange.fg" }}
-        >
-          <Sparkles size={12} />
-          Do it with Langy
-        </chakra.button>
+        {showLangy ? (
+          <chakra.button
+            type="button"
+            onClick={() => askLangy(action.ask)}
+            display="inline-flex"
+            alignItems="center"
+            gap={1}
+            fontFamily="mono"
+            fontSize="12px"
+            color="orange.fg"
+            cursor="pointer"
+            whiteSpace="nowrap"
+            borderBottomWidth="1px"
+            borderColor="transparent"
+            transition="border-color 130ms ease"
+            _hover={{ borderColor: "orange.fg" }}
+          >
+            <Sparkles size={12} />
+            Do it with Langy
+          </chakra.button>
+        ) : null}
       </HStack>
     </chakra.div>
   );

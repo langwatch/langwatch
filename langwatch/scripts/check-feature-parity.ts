@@ -84,6 +84,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
 const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
   "langevals",
   "langwatch_server",
+  "python-sdk",
 ];
 
 /**

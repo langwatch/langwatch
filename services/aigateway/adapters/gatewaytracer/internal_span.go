@@ -3,6 +3,8 @@ package gatewaytracer
 import (
 	"context"
 
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
+
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -86,10 +88,10 @@ func StampInternalGenAI(ctx context.Context, params domain.AITraceParams) {
 	}
 	attrs = append(attrs, usageAttributes(params.Usage)...)
 	if params.VirtualKeyID != "" {
-		attrs = append(attrs, attribute.String(AttrVirtualKeyID, params.VirtualKeyID))
+		attrs = append(attrs, attribute.String(customertracebridge.AttrVirtualKeyID, params.VirtualKeyID))
 	}
 	if params.GatewayRequestID != "" {
-		attrs = append(attrs, attribute.String(AttrGatewayReqID, params.GatewayRequestID))
+		attrs = append(attrs, attribute.String(customertracebridge.AttrGatewayReqID, params.GatewayRequestID))
 	}
 	if params.UpstreamErrorType != "" {
 		attrs = append(attrs, attribute.String(AttrErrorType, params.UpstreamErrorType))
@@ -106,7 +108,7 @@ func StampInternalGenAI(ctx context.Context, params domain.AITraceParams) {
 func usageAttributes(usage domain.Usage) []attribute.KeyValue {
 	attrs := make([]attribute.KeyValue, 0, 7)
 	if usage.PromptTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageIn, usage.PromptTokens))
+		attrs = append(attrs, attribute.Int(customertracebridge.AttrGenAIUsageIn, usage.PromptTokens))
 	}
 	if usage.CompletionTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageOut, usage.CompletionTokens))
@@ -115,10 +117,10 @@ func usageAttributes(usage domain.Usage) []attribute.KeyValue {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageTotal, usage.TotalTokens))
 	}
 	if usage.CacheReadTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheRead, usage.CacheReadTokens))
+		attrs = append(attrs, attribute.Int(customertracebridge.AttrGenAIUsageCacheRead, usage.CacheReadTokens))
 	}
 	if usage.CacheCreationTokens > 0 {
-		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate, usage.CacheCreationTokens))
+		attrs = append(attrs, attribute.Int(customertracebridge.AttrGenAIUsageCacheCreate, usage.CacheCreationTokens))
 	}
 	if usage.CostMicroUSD > 0 {
 		attrs = append(attrs, attribute.Float64(AttrCostUSD, float64(usage.CostMicroUSD)/1_000_000))

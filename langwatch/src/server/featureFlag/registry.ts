@@ -48,6 +48,12 @@ export interface FeatureFlagDefinition {
    * setups to keep working.
    */
   legacyEnvVar?: string;
+  /**
+   * Set to `false` to opt the flag out of the auto-derived
+   * UPPERCASE(key) env-var override, leaving the operator store (and,
+   * for PRODUCT flags, PostHog) as the only runtime levers.
+   */
+  envOverridable?: false;
 }
 
 export interface FeatureFlagFamily {
@@ -190,12 +196,18 @@ export const FEATURE_FLAGS = [
   // NOTE: `release_es_graph_triggers_firing` (ADR-034 Phase 5) was retired —
   // the event-sourced graph-alert path is now unconditional and the K8s cron
   // was removed, so there is no longer a cron/ES choice to gate.
+  // SYSTEM on purpose despite being a product surface: the Langy rollout is
+  // decided solely by the internal flag store — never PostHog, never an env
+  // var (envOverridable: false) — so the /ops/feature-flags toggle is the one
+  // authoritative lever.
   {
     key: "release_langy_enabled",
-    scope: "PRODUCT",
+    scope: "SYSTEM",
     defaultValue: false,
+    envOverridable: false,
+    family: "Langy",
     description:
-      "Opens the Langy in-product assistant, and is the only lever that does — there is no staff or other identity bypass, so this is a true kill switch. Default off, so Langy is dark until someone is explicitly opted in. To open it for a project or organization, add an operator-store row via /ops/feature-flags; to open it for one user, use a PostHog rule keyed on the user id (the operator store matches only projectId/organizationId, never a user). RELEASE_LANGY_ENABLED=1 is a blanket on — the env override parses ONLY 1 or 0, so RELEASE_LANGY_ENABLED=true is silently ignored. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_langy_enabled.",
+      "Opens the Langy in-product assistant, and is the only lever that does — there is no staff or other identity bypass, so this is a true kill switch. Default off, so Langy is dark until someone is explicitly opted in. Managed only from the internal flag store: toggle it, or add per-project/per-org targeting rules, via /ops/feature-flags. PostHog and the RELEASE_LANGY_ENABLED env var are deliberately not consulted. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_langy_enabled.",
   },
   {
     key: "release_langy_promo_enabled",
@@ -203,6 +215,13 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description:
       "Shows the Langy teaser banner on the home page to users who do NOT have Langy yet (spec: specs/home/langy-home-banner.feature). Purely promotional — it never grants access; users who already have Langy (staff or release_langy_enabled) see the activation banner instead, regardless of this flag. Target the promo audience via a PostHog rule.",
+  },
+  {
+    key: "release_ui_home_signal_focused_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Switches the project home to the signal-focused composition — the briefing sheet leads, the chrome grid and recent work follow (spec: specs/home/signal-focused-home-rollout.feature). Deliberately decoupled from release_langy_enabled: this flag alone decides the home's composition, while Langy access only decides whether the sheet's hand-to-Langy affordances render. Default off = classic home. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_home_signal_focused_enabled.",
   },
   {
     key: "release_webhook_automations",

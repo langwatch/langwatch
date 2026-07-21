@@ -57,8 +57,10 @@ func TestDecode_Failures(t *testing.T) {
 		h := HandleNoContent(maxBody, func(context.Context, *body) error { return nil })
 		rec := httptest.NewRecorder()
 		h(rec, httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"name":"x"}`)))
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want 400", rec.Code)
+		// Parsed but semantically invalid — 422, distinct from the 400s for
+		// unreadable or unparseable bodies.
+		if rec.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("status = %d, want 422", rec.Code)
 		}
 		// The named field path rides in meta.fields for diagnostics.
 		var env struct {

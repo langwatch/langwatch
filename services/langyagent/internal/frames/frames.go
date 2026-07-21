@@ -244,7 +244,7 @@ func Error(message, code string) (Frame, error) {
 // that read only those.
 func ErrorFromHerr(e herr.E) (Frame, error) {
 	body := herr.Body(e)
-	return marshal(errorFrame{Type: "error", Error: body.Message, Code: body.Type, Herr: &body})
+	return marshal(errorFrame{Type: "error", Error: body.Message, Code: body.Code, Herr: &body})
 }
 
 type handoffFrame struct {

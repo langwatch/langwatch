@@ -125,7 +125,7 @@ resolve it (ADR-047). Nothing in this feature changes the Go side.
 - Traces table rows (`features/traces-v2` StatusRow/RegistryRow — hook form,
   the root is the virtualizer's `<tbody>`), the trace drawer, bulk selection
   and filter as chips.
-- Evaluation / monitor cards (`components/evaluations/MonitorsSection.tsx`).
+- Online evaluation rows (`components/evaluations/OnlineEvaluationsTable.tsx`).
 - Dataset rows (`pages/[project]/datasets.tsx`), dataset route chip.
 - Published prompts (`prompt-playground` sidebar), prompt editor drawer chip.
 - Routes and drawers derive chips with no page wiring at all
