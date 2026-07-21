@@ -59,7 +59,7 @@ describe("showErrorToast", () => {
       );
     });
 
-    it("folds the most actionable tip into the description", () => {
+    it("prefers its own copy over the server's tips, rather than saying both", () => {
       showErrorToast(
         handledError({
           code: "trace_not_found",
@@ -69,8 +69,23 @@ describe("showErrorToast", () => {
       );
 
       const { description } = create.mock.calls[0]![0];
-      expect(description).toContain("Check the trace id");
-      expect(description).not.toContain("Retry in a few seconds");
+      expect(description).toContain("may have been deleted");
+      expect(description).not.toContain("Check the trace id");
+    });
+  });
+
+  describe("given a code with no copy but server tips", () => {
+    it("falls back to the most actionable tip", () => {
+      showErrorToast(
+        handledError({
+          code: "some_future_code",
+          httpStatus: 400,
+          tips: ["Rotate the key", "Then retry"],
+        }),
+      );
+
+      const { description } = create.mock.calls[0]![0];
+      expect(description).toBe("Rotate the key");
     });
   });
 

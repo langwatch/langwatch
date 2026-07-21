@@ -47,7 +47,14 @@ export function HandledErrorAlert({
   const explanation = handled
     ? explainHandledError(handled)
     : UNKNOWN_ERROR_PRESENTATION;
-  const tips = handled?.tips ?? [];
+
+  // The registry description and the server's tips are competing authorings of
+  // the same remediation — "Narrow the time range or add a filter" is both the
+  // `query_timeout` description and its first tip — so rendering both makes
+  // the alert repeat itself. Tips are written for agents with no registry to
+  // read (ADR-045); they show here only when this client has no copy of its
+  // own for the code.
+  const tips = explanation.description ? [] : (handled?.tips ?? []);
 
   // Registry copy describes this exact failure, so it beats the caller's
   // generic headline. See `showErrorToast` for the same rule.
