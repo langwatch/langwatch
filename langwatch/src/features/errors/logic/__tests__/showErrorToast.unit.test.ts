@@ -5,7 +5,15 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const create = vi.fn<(args: Record<string, unknown>) => void>();
+/** The subset of the toast payload these tests assert on. */
+interface ToastArgs {
+  title?: string;
+  description?: string;
+  // Non-optional: `showErrorToast` always sets `meta`, so the assertions read
+  // `toast.meta.traceId` directly.
+  meta: { docsUrl?: string; traceId?: string; closable?: boolean };
+}
+const create = vi.fn<(args: ToastArgs) => void>();
 vi.mock("~/components/ui/toaster", () => ({ toaster: { create } }));
 
 const isHandledByGlobalHandler = vi.fn<(error: unknown) => boolean>(
