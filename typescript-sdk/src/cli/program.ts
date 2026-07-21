@@ -24,6 +24,7 @@ import {
   registerOutputOptions,
   resolveActionOutputOptions,
   emitsResult,
+  rendersOwnResult,
   type RawOutputFlags,
 } from "./utils/output";
 
@@ -775,37 +776,46 @@ export function buildProgram(): Command {
   );
 
   // Status command - project overview
-  program
-    .command("status")
-    .description("Show project resource counts and available commands")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (options: { format?: string }) => {
-      const { statusCommand: impl } = await import("./commands/status.js");
-      await impl(options);
-    });
+  rendersOwnResult(
+    program
+      .command("status")
+      .description("Show project resource counts and available commands")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (_options: unknown, command: Command) => {
+    const { statusCommand: impl } = await import("./commands/status.js");
+    await impl(command.optsWithGlobals());
+  });
 
   // Discoverability — the machine-readable catalog + compact help tree agents
   // use to learn the CLI without human docs (gcx `commands` / `help-tree`).
-  program
-    .command("commands")
-    .description(
-      "Machine-readable catalog of every CLI command: path, args, flags, hints, skill annotations, token costs",
-    )
-    .option("--flat", "Flatten the command tree to a single list")
-    .action(async (options: { flat?: boolean }) => {
+  emitsResult(
+    program
+      .command("commands")
+      .description(
+        "Machine-readable catalog of every CLI command: path, args, flags, hints, skill annotations, token costs",
+      )
+      .option("--flat", "Flatten the command tree to a single list"),
+    async (options: { flat?: boolean }) => {
       const { commandsCommand: impl } = await import("./commands/commands.js");
-      await impl(options);
-    });
+      return impl(options);
+    },
+  );
 
-  program
-    .command("help-tree")
-    .description(
-      "Compact indented tree of all commands with # hint:/# skill: annotations (for agent context injection)",
-    )
-    .action(async (options: RawOutputFlags) => {
+  emitsResult(
+    program
+      .command("help-tree")
+      .description(
+        "Compact indented tree of all commands with # hint:/# skill: annotations (for agent context injection)",
+      ),
+    async (_options: RawOutputFlags, command: Command) => {
       const { helpTreeCommand: impl } = await import("./commands/help-tree.js");
-      await impl(options);
-    });
+      // Merged globals, not the leaf's own opts: `lw --output json help-tree`
+      // is the root-position spelling the help text teaches, and commander puts
+      // those only on the ROOT — so reading the leaf would miss the very flag
+      // that decides tree-vs-catalog here.
+      return impl(command.optsWithGlobals());
+    },
+  );
 
   // Help TOPICS (`gh help formatting` style). Registered as a real command:
   // a command named `help` suppresses commander's implicit one (whose dispatch
@@ -833,47 +843,51 @@ export function buildProgram(): Command {
       "List, inspect, and install LangWatch's bundled agent skills (default install root: ~/.agents/skills)",
     );
 
-  skillsCmd
-    .command("list")
-    .description("List every bundled skill with its installed state")
-    .option("--dir <root>", "Install root to check (default ~/.agents)")
-    .action(async (options: { dir?: string } & RawOutputFlags) => {
-      try {
-        const { skillsListCommand: impl } = await import("./commands/skills/list.js");
-        await impl(options);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
+  rendersOwnResult(
+    skillsCmd
+      .command("list")
+      .description("List every bundled skill with its installed state")
+      .option("--dir <root>", "Install root to check (default ~/.agents)"),
+  ).action(async (_options: unknown, command: Command) => {
+    try {
+      const { skillsListCommand: impl } = await import("./commands/skills/list.js");
+      await impl(command.optsWithGlobals());
+    } catch (error) {
+      const { reportCommandError } = await import("./utils/errorOutput.js");
+      reportCommandError({ error });
+      process.exit(1);
+    }
+  });
 
-  skillsCmd
-    .command("get <name>")
-    .description("Print a skill's full body on stdout (raw markdown, for piping into agent context)")
-    .action(async (name: string, options: RawOutputFlags) => {
-      try {
-        const { skillsGetCommand: impl } = await import("./commands/skills/get.js");
-        await impl(name, options);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
+  rendersOwnResult(
+    skillsCmd
+      .command("get <name>")
+      .description("Print a skill's full body on stdout (raw markdown, for piping into agent context)"),
+  ).action(async (name: string, _options: unknown, command: Command) => {
+    try {
+      const { skillsGetCommand: impl } = await import("./commands/skills/get.js");
+      await impl(name, command.optsWithGlobals());
+    } catch (error) {
+      const { reportCommandError } = await import("./utils/errorOutput.js");
+      reportCommandError({ error });
+      process.exit(1);
+    }
+  });
 
-  skillsCmd
-    .command("install [names...]")
-    .description("Install skills into <dir>/skills/<slug>/SKILL.md (recipes nest under recipes/<slug>/)")
-    .option("--all", "Install every skill in the bundle")
-    .option("--dir <root>", "Install root (default ~/.agents)")
-    .option("--dry-run", "Report what would happen without writing anything")
-    .option("--force", "Overwrite files that differ from the bundle")
-    .option("-y, --yes", "Confirm overwriting files the bundle does not manage (required in non-TTY/agent contexts)")
-    .action(async (names: string[], options: { all?: boolean; dir?: string; dryRun?: boolean; force?: boolean; yes?: boolean } & RawOutputFlags) => {
+  rendersOwnResult(
+    skillsCmd
+      .command("install [names...]")
+      .description("Install skills into <dir>/skills/<slug>/SKILL.md (recipes nest under recipes/<slug>/)")
+      .option("--all", "Install every skill in the bundle")
+      .option("--dir <root>", "Install root (default ~/.agents)")
+      .option("--dry-run", "Report what would happen without writing anything")
+      .option("--force", "Overwrite files that differ from the bundle")
+      .option("-y, --yes", "Confirm overwriting files the bundle does not manage (required in non-TTY/agent contexts)"),
+  )
+    .action(async (names: string[], _options: unknown, command: Command) => {
       try {
         const { skillsInstallCommand: impl } = await import("./commands/skills/install.js");
-        await impl(names, options);
+        await impl(names, command.optsWithGlobals());
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
@@ -881,17 +895,19 @@ export function buildProgram(): Command {
       }
     });
 
-  skillsCmd
-    .command("uninstall [names...]")
-    .description("Remove installed skills (only files the bundle manages; never prompts non-interactively)")
-    .option("--all", "Uninstall every skill in the bundle")
-    .option("--dir <root>", "Install root (default ~/.agents)")
-    .option("--dry-run", "Report what would happen without removing anything")
-    .option("-y, --yes", "Skip the confirmation prompt (required in non-TTY/agent contexts)")
-    .action(async (names: string[], options: { all?: boolean; dir?: string; dryRun?: boolean; yes?: boolean } & RawOutputFlags) => {
+  rendersOwnResult(
+    skillsCmd
+      .command("uninstall [names...]")
+      .description("Remove installed skills (only files the bundle manages; never prompts non-interactively)")
+      .option("--all", "Uninstall every skill in the bundle")
+      .option("--dir <root>", "Install root (default ~/.agents)")
+      .option("--dry-run", "Report what would happen without removing anything")
+      .option("-y, --yes", "Skip the confirmation prompt (required in non-TTY/agent contexts)"),
+  )
+    .action(async (names: string[], _options: unknown, command: Command) => {
       try {
         const { skillsUninstallCommand: impl } = await import("./commands/skills/uninstall.js");
-        await impl(names, options);
+        await impl(names, command.optsWithGlobals());
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
@@ -899,17 +915,19 @@ export function buildProgram(): Command {
       }
     });
 
-  skillsCmd
-    .command("update [names...]")
-    .description("Refresh installed skills whose content differs from the bundle (no names: all installed)")
-    .option("--dir <root>", "Install root (default ~/.agents)")
-    .option("--dry-run", "Report what would happen without writing anything")
-    .option("--force", "Overwrite managed files that carry local edits")
-    .option("-y, --yes", "Confirm overwriting files the bundle does not manage (required in non-TTY/agent contexts)")
-    .action(async (names: string[], options: { dir?: string; dryRun?: boolean; force?: boolean; yes?: boolean } & RawOutputFlags) => {
+  rendersOwnResult(
+    skillsCmd
+      .command("update [names...]")
+      .description("Refresh installed skills whose content differs from the bundle (no names: all installed)")
+      .option("--dir <root>", "Install root (default ~/.agents)")
+      .option("--dry-run", "Report what would happen without writing anything")
+      .option("--force", "Overwrite managed files that carry local edits")
+      .option("-y, --yes", "Confirm overwriting files the bundle does not manage (required in non-TTY/agent contexts)"),
+  )
+    .action(async (names: string[], _options: unknown, command: Command) => {
       try {
         const { skillsUpdateCommand: impl } = await import("./commands/skills/update.js");
-        await impl(names, options);
+        await impl(names, command.optsWithGlobals());
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
@@ -1682,18 +1700,22 @@ export function buildProgram(): Command {
     .command("trace")
     .description("Search and inspect traces");
 
-  traceCmd
-    .command("search")
-    .description("Search traces with optional text query and date range")
-    .option("-q, --query <query>", "Text search query")
-    .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
-    .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
-    .option("--limit <n>", "Max results to return (default: 25)")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (options: { query?: string; startDate?: string; endDate?: string; limit?: string; format?: string }) => {
-      const { searchTracesCommand: impl } = await import("./commands/traces/search.js");
-      await impl(options);
-    });
+  rendersOwnResult(
+    traceCmd
+      .command("search")
+      .description("Search traces with optional text query and date range")
+      .option("-q, --query <query>", "Text search query")
+      .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
+      .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
+      .option("--limit <n>", "Max results to return (default: 25)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (_options: unknown, command: Command) => {
+    const { searchTracesCommand: impl } = await import("./commands/traces/search.js");
+    // Merged globals: `printResult` resolves the format from what it is handed,
+    // and commander puts a root-position `--output` only on the ROOT, so the
+    // leaf's own opts would silently drop the flag the caller passed.
+    await impl(command.optsWithGlobals());
+  });
 
   traceCmd
     .command("export")
@@ -1709,14 +1731,15 @@ export function buildProgram(): Command {
       await impl(options);
     });
 
-  traceCmd
-    .command("get <traceId>")
-    .description("Get full trace details by ID")
-    .option("-f, --format <format>", "Output format: digest (default, human-readable) or json", "digest")
-    .action(async (traceId: string, options: { format?: string }) => {
-      const { getTraceCommand: impl } = await import("./commands/traces/get.js");
-      await impl(traceId, options);
-    });
+  rendersOwnResult(
+    traceCmd
+      .command("get <traceId>")
+      .description("Get full trace details by ID")
+      .option("-f, --format <format>", "Output format: digest (default, human-readable) or json", "digest"),
+  ).action(async (traceId: string, _options: unknown, command: Command) => {
+    const { getTraceCommand: impl } = await import("./commands/traces/get.js");
+    await impl(traceId, command.optsWithGlobals());
+  });
 
   // Add scenario command group
   const scenarioCmd = program

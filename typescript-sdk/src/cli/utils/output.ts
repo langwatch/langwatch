@@ -192,7 +192,24 @@ export const resolveOutputOptions = (
  * subtly different meaning.
  */
 const ownsOwnJsonFlag = (command: Command): boolean =>
-  command.options.some((option) => option.long === "--json" && !option.hidden);
+  ownsOwnOptionFlag(command, "--json");
+
+/**
+ * Does the command define this long flag ITSELF, for its own purposes?
+ *
+ * `registerOutputOptions` puts the contract's flags on every command, but it
+ * refuses to overwrite one a command already owns — `trace export -o <file>`
+ * keeps meaning a file path. The reading side has to make the same distinction,
+ * or an owned flag gets read as output intent: `trace export -o traces.jsonl`
+ * would resolve `traces.jsonl` as a FORMAT, and under an agent env var the
+ * format gate then refuses the command outright for asking.
+ *
+ * Hidden options don't count: the contract's own flags are registered hidden on
+ * commands that already own the spelling, so counting them would make every
+ * command look like the owner.
+ */
+const ownsOwnOptionFlag = (command: Command, long: string): boolean =>
+  command.options.some((option) => option.long === long && !option.hidden);
 
 export const resolveActionOutputOptions = (
   actionCommand: Command,
@@ -201,6 +218,12 @@ export const resolveActionOutputOptions = (
   const raw: RawOutputFlags = actionCommand.optsWithGlobals();
   if (typeof raw.json === "string" && ownsOwnJsonFlag(actionCommand)) {
     delete raw.json;
+  }
+  // Same reasoning as `--json` above, for the flag that names the format: when
+  // the command owns `-o/--output` its value is that command's argument (a file
+  // path), never a format name.
+  if (ownsOwnOptionFlag(actionCommand, "--output")) {
+    delete raw.output;
   }
   return resolveOutputOptions(raw, env);
 };
@@ -457,6 +480,35 @@ export const emitsResult = <Args extends unknown[]>(
   });
 };
 
+/**
+ * The other half of the port: mark a command whose action renders the resolved
+ * format ITSELF, through `printResult`, instead of returning a `CommandResult`
+ * for `emitsResult` to render.
+ *
+ * These honour the entire contract — every format, `--json` fields, `--jq` —
+ * because `printResult` is the same renderer the port uses. They keep the
+ * rendering inside the action only because they have work that must follow the
+ * output: `trace search` reports telemetry completion and flushes it, and a
+ * `--jq` rejection there has to stay a rendering failure rather than a search
+ * one. Returning early would reorder both.
+ *
+ * Registering them here is what makes the format gate honest. The gate asks
+ * "can this command honour the format the caller asked for", and for these the
+ * answer has always been yes — but the WeakSet only knew about `emitsResult`,
+ * so `lw trace search -o json`, `lw commands -o json` and the whole `skills`
+ * group were refused with "does not emit structured output yet" while the code
+ * underneath demonstrably did. That refusal even pointed the caller at
+ * `lw commands`, which was refused for the same reason.
+ *
+ * Prefer `emitsResult` for anything new — it owns the rendering, so a command
+ * cannot get it wrong. This exists for the handful that genuinely cannot return
+ * before their output lands.
+ */
+export const rendersOwnResult = (command: Command): Command => {
+  OUTPUT_AWARE_COMMANDS.add(command);
+  return command;
+};
+
 /** Whether this command's action speaks the output contract. */
 export const isOutputAware = (command: Command): boolean =>
   OUTPUT_AWARE_COMMANDS.has(command);
@@ -521,8 +573,18 @@ export const assertFormatIsSupported = async (
   // rather than failing. Adding it here would harden `--agent` into a refusal
   // and break every unmigrated command for the callers most likely to pass it.
   // Pinned by a test; do not "fix" this into the list.
+  //
+  // A flag the COMMAND owns is not a format demand either. `trace export`
+  // defines its own `-o, --output <file>`, so `-o traces.jsonl` is a file path,
+  // and reading it here refused that command's own primary spelling under
+  // exactly the environment the CLI advertises for agents. Only `--output` is
+  // carved out: `--json` keeps the narrower treatment above deliberately —
+  // owning it proves the command can emit ITS json, not that it can honour
+  // every format, and widening it here would undo that.
   const requestedNewContractFlag =
-    raw.output !== undefined || raw.jq !== undefined || raw.json !== undefined;
+    (raw.output !== undefined && !ownsOwnOptionFlag(actionCommand, "--output")) ||
+    raw.jq !== undefined ||
+    raw.json !== undefined;
 
   if (requestedNewContractFlag) {
     const { commandValidationError, reportCommandError } = await import(

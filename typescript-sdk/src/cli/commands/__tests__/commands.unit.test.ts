@@ -35,28 +35,26 @@ describe("commandsCommand", () => {
   const logged = (): string =>
     consoleLogSpy.mock.calls.flat().join("\n");
 
-  it("prints the compact tree by default (human format)", async () => {
-    await commandsCommand({});
+  it("renders the compact tree as its human form", () => {
+    commandsCommand({}).table();
     const out = logged();
     expect(out).toContain("langwatch");
     expect(out).toContain("trace — Search and inspect traces");
   });
 
-  it("emits the nested catalog as JSON with -o json", async () => {
-    await commandsCommand({ output: "json" });
-    const parsed = JSON.parse(logged()) as {
-      commands: { path: string; children: unknown[] }[];
-    };
-    const trace = parsed.commands.find((entry) => entry.path === "trace");
+  it("returns the nested catalog as its payload", () => {
+    const { data } = commandsCommand({});
+    const { commands } = data as { commands: { path: string; children: unknown[] }[] };
+    const trace = commands.find((entry) => entry.path === "trace");
     expect(trace).toBeDefined();
     expect(trace!.children.length).toBeGreaterThan(0);
     // Groups are nodes, not flattened away.
-    expect(parsed.commands.every((entry) => !entry.path.includes(" "))).toBe(true);
+    expect(commands.every((entry) => !entry.path.includes(" "))).toBe(true);
   });
 
-  it("flattens with --flat, carrying hint, skill, and tokenCost per command", async () => {
-    await commandsCommand({ flat: true, output: "json" });
-    const parsed = JSON.parse(logged()) as {
+  it("flattens with --flat, carrying hint, skill, and tokenCost per command", () => {
+    const { data } = commandsCommand({ flat: true });
+    const { commands } = data as {
       commands: {
         path: string;
         hint?: string;
@@ -65,32 +63,16 @@ describe("commandsCommand", () => {
         flags: { name: string }[];
       }[];
     };
-    const paths = parsed.commands.map((entry) => entry.path);
+    const paths = commands.map((entry) => entry.path);
     expect(paths).toContain("trace search");
     expect(paths).toContain("dataset records add");
     expect(paths).toContain("virtual-keys rotate");
 
-    const traceSearch = parsed.commands.find(
-      (entry) => entry.path === "trace search",
-    )!;
+    const traceSearch = commands.find((entry) => entry.path === "trace search")!;
     expect(traceSearch.hint).toContain("langwatch trace search");
     expect(traceSearch.skill).toBe("tracing");
     expect(traceSearch.tokenCost).toBeGreaterThan(0);
     expect(traceSearch.flags.length).toBeGreaterThan(0);
-  });
-
-  it("supports --jq over the catalog", async () => {
-    await commandsCommand({ flat: true, output: "json", jq: ".commands[].path" });
-    const paths = JSON.parse(logged()) as string[];
-    expect(paths).toContain("trace search");
-    expect(paths.every((path) => typeof path === "string")).toBe(true);
-  });
-
-  it("emits compact single-line JSON in agent mode", async () => {
-    await commandsCommand({ flat: true, agent: true });
-    const out = logged();
-    expect(out).not.toContain("\n");
-    expect(JSON.parse(out)).toHaveProperty("commands");
   });
 });
 
@@ -117,26 +99,27 @@ describe("helpTreeCommand", () => {
   const logged = (): string =>
     consoleLogSpy.mock.calls.flat().join("\n");
 
-  it("prints the annotated tree as plain text by default", async () => {
-    await helpTreeCommand({});
+  it("prints the annotated tree as plain text by default", () => {
+    // No explicit format request, so it prints itself and returns nothing for
+    // the port to render — see the impl for why agent mode is deliberate here.
+    expect(helpTreeCommand({})).toBeUndefined();
     const out = logged();
     expect(out.split("\n")[0]).toBe("langwatch");
     expect(out).toContain("# hint: langwatch trace search");
     expect(out).toContain("# skill: tracing");
   });
 
-  it("stays plain text in agent mode — the tree IS the compact agent format", async () => {
-    await helpTreeCommand({ agent: true });
+  it("stays plain text in agent mode — the tree IS the compact agent format", () => {
+    expect(helpTreeCommand({ agent: true })).toBeUndefined();
     const out = logged();
     expect(out.split("\n")[0]).toBe("langwatch");
     expect(() => JSON.parse(out)).toThrow();
   });
 
-  it("emits the tree structure as JSON with -o json", async () => {
-    await helpTreeCommand({ output: "json" });
-    const parsed = JSON.parse(logged()) as {
-      commands: { path: string }[];
-    };
-    expect(parsed.commands.map((entry) => entry.path)).toContain("trace");
+  it("hands the catalog to the port when a format is explicitly requested", () => {
+    const result = helpTreeCommand({ output: "json" });
+    expect(result).toBeDefined();
+    const { commands } = result!.data as { commands: { path: string }[] };
+    expect(commands.map((entry) => entry.path)).toContain("trace");
   });
 });

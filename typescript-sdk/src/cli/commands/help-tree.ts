@@ -13,22 +13,26 @@ import { buildProgram } from "../program";
 import { buildCatalog, renderHelpTree } from "../utils/commandCatalog";
 import {
   hasExplicitFormatRequest,
-  printResult,
+  type CommandResult,
   type RawOutputFlags,
 } from "../utils/output";
 
-export const helpTreeCommand = async (
+export const helpTreeCommand = (
   options?: RawOutputFlags,
-): Promise<void> => {
+): CommandResult | void => {
   const catalog = buildCatalog(buildProgram());
 
+  // Auto-detected agent mode still gets the tree: it IS the compact agent
+  // format, so returning a result here would hand the port an `agents` format
+  // it would serialise to JSON — the one output this command deliberately does
+  // not emit unless asked. Only an EXPLICIT request goes through the port.
   if (!hasExplicitFormatRequest(options)) {
     console.log(renderHelpTree(catalog));
     return;
   }
 
-  await printResult(
-    { commands: catalog },
-    { ...options, table: () => console.log(renderHelpTree(catalog)) },
-  );
+  return {
+    data: { commands: catalog },
+    table: () => console.log(renderHelpTree(catalog)),
+  };
 };

@@ -13,22 +13,19 @@ import {
   flattenCatalog,
   renderHelpTree,
 } from "../utils/commandCatalog";
-import { printResult, type RawOutputFlags } from "../utils/output";
+import type { CommandResult, RawOutputFlags } from "../utils/output";
 
 export interface CommandsOptions extends RawOutputFlags {
   /** Flatten the command tree to a single list. */
   flat?: boolean;
 }
 
-export const commandsCommand = async (
+export const commandsCommand = (
   options?: CommandsOptions,
-): Promise<void> => {
+): CommandResult => {
   const catalog = buildCatalog(buildProgram());
-  await printResult(
-    { commands: options?.flat ? flattenCatalog(catalog) : catalog },
-    {
-      ...options,
-      table: () => console.log(renderHelpTree(catalog)),
-    },
-  );
+  return {
+    data: { commands: options?.flat ? flattenCatalog(catalog) : catalog },
+    table: () => console.log(renderHelpTree(catalog)),
+  };
 };
