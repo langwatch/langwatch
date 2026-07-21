@@ -44,6 +44,8 @@ import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-in
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
+import type { CodingAgentSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-session.repository";
+import type { CodingAgentTraceSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
 import type { CanonicalLogRecordRepository } from "../app-layer/logs/repositories/canonical-log-record.repository";
 import type { MetricDataPointRepository } from "../app-layer/metrics/repositories/metric-data-point.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
@@ -77,6 +79,11 @@ import {
   createBillingReportingPipeline,
 } from "./pipelines/billing-reporting/pipeline";
 import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
+import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import { CodingAgentSessionStore } from "./pipelines/coding-agent-processing/projections/codingAgentSession.store";
+import { CodingAgentTraceSessionAppendStore } from "./pipelines/coding-agent-processing/projections/stores";
+import { createCodingAgentLogFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber";
+import { createCodingAgentSpanFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import {
   createEvaluationProcessingPipeline,
@@ -280,6 +287,9 @@ export interface PipelineRepositories {
   traceSummaryFold: TraceSummaryRepository;
   logRecordStorage: LogRecordStorageRepository;
   canonicalLogStorage: CanonicalLogRecordRepository;
+  /** ADR-056: the session-aggregate row + the (trace → session) map. */
+  codingAgentSession: CodingAgentSessionRepository;
+  codingAgentTraceSession: CodingAgentTraceSessionRepository;
   metricDataPointStorage: MetricDataPointRepository;
   /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
   traceAnalyticsRollup: TraceAnalyticsRollupRepository;
@@ -444,8 +454,17 @@ export class PipelineRegistry {
       },
     });
     const metricPipeline = this.registerMetricPipeline();
-    const logPipeline = this.registerLogPipeline();
+    // Registered BEFORE the log and trace pipelines: their coding-agent
+    // dispatch subscribers close over this pipeline's contribution commands.
     const codingAgentPipeline = this.registerCodingAgentPipeline();
+    const codingAgentCommands = mapCommands(codingAgentPipeline.commands);
+    const logPipeline = this.registerLogPipeline({
+      subscribers: [
+        createCodingAgentLogFactsDispatchSubscriber({
+          contributeLogFacts: codingAgentCommands.contributeLogFacts,
+        }),
+      ],
+    });
     const {
       pipeline: tracePipeline,
       simComputeRunMetrics,
@@ -462,6 +481,11 @@ export class PipelineRegistry {
         }),
         graphActivityHandler,
       },
+      codingAgentSubscribers: [
+        createCodingAgentSpanFactsDispatchSubscriber({
+          contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
+        }),
+      ],
     });
     const suiteRunPipeline = this.registerSuiteRunPipeline();
     const { pipeline: simulationPipeline, scenarioExecutionHandle } =
@@ -709,17 +733,39 @@ export class PipelineRegistry {
   }
 
   /**
-   * ADR-056: the session-aggregate pipeline. Slice 1 mounts the write
-   * surface (the three contribution commands); projections, subscribers and
-   * the lifecycle process manager mount in later slices.
+   * ADR-056: the session-aggregate pipeline. Contribution commands are its
+   * write surface; the session fold and the (trace → session) map are its
+   * projections. The dispatch subscribers that feed it mount on the source
+   * pipelines and close over this pipeline's commands, so this registers
+   * first. The metric contributor and the lifecycle process manager mount in
+   * later slices.
    */
   private registerCodingAgentPipeline() {
     return this.deps.eventSourcing.register(
-      createCodingAgentProcessingPipeline(),
+      createCodingAgentProcessingPipeline({
+        // Redis cache is this fold's ONLY warm read path — its store's get()
+        // returns null by design (the row is an aggregate, not a copy), and
+        // on a cache miss the fold's refoldOnStoreMiss option rebuilds state
+        // from the event log. Same wiring as trace_summaries.
+        codingAgentSessionStore: this.cached<CodingAgentSessionState>(
+          new CodingAgentSessionStore(this.deps.repositories.codingAgentSession),
+          "coding_agent_sessions",
+        ),
+        codingAgentTraceSessionAppendStore:
+          new CodingAgentTraceSessionAppendStore(
+            this.deps.repositories.codingAgentTraceSession,
+          ),
+      }),
     );
   }
 
-  private registerLogPipeline() {
+  private registerLogPipeline({
+    subscribers,
+  }: {
+    subscribers: Parameters<
+      typeof createLogProcessingPipeline
+    >[0]["subscribers"];
+  }) {
     return this.deps.eventSourcing.register(
       createLogProcessingPipeline({
         canonicalLogAppendStore: new CanonicalLogAppendStore(
@@ -728,6 +774,7 @@ export class PipelineRegistry {
         logCommandShardCount: resolveCanonicalLogCommandShardCount(
           process.env.LOG_PROCESSING_SHARDS,
         ),
+        subscribers,
       }),
     );
   }
@@ -818,10 +865,12 @@ export class PipelineRegistry {
     evalPipeline,
     traceSummaryStore,
     automations,
+    codingAgentSubscribers,
   }: {
     evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
     automations: TraceProcessingPipelineDeps["automations"];
+    codingAgentSubscribers: TraceProcessingPipelineDeps["subscribers"];
   }) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
@@ -1012,6 +1061,7 @@ export class PipelineRegistry {
         ),
         governanceKpisSyncReactor,
         governanceOcsfEventsSyncReactor,
+        subscribers: codingAgentSubscribers,
       }),
     );
 

@@ -252,14 +252,14 @@ export function isCodingAgentMetricName(metricName: string): boolean {
 
 /**
  * The scalar coding-agent vocabulary a log contribution carries so the
- * session fold (and the trace summary's code-agent accumulation) can run
- * entirely on canonical `log_contributed` events. Content never rides here:
- * prompts and replies stay in the canonical row; these are lengths, ids,
- * names and counters. Raw key names are preserved on purpose — the fold's
- * derivation reads the same keys off a legacy raw event, so the two paths
- * cannot drift.
+ * session fold can run entirely on contribution events. Content never rides
+ * here: prompts and replies stay in the canonical row; these are lengths,
+ * ids, names and counters. Raw key names are preserved on purpose — the
+ * fold's derivation reads the same keys off every signal's contribution, so
+ * the paths cannot drift. Exported because the span dispatcher lifts the
+ * same vocabulary off span attributes.
  */
-const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
+export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "event.name",
   "session.id",
   "user.id",

@@ -1,0 +1,289 @@
+/**
+ * The coding-agent session fold, driven with the contribution events the
+ * pipeline actually delivers (ADR-056).
+ *
+ * @see specs/coding-agent/session-aggregate.feature
+ */
+import { describe, expect, it } from "vitest";
+import { createTenantId } from "~/server/event-sourcing";
+import type {
+  LogFactsContributedEvent,
+  SpanFactsContributedEvent,
+} from "../../schemas/events";
+import {
+  LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
+  SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+} from "../../schemas/constants";
+import {
+  CodingAgentSessionFoldProjection,
+  type CodingAgentSessionState,
+  projectCodingAgentSessionToRow,
+} from "../codingAgentSession.foldProjection";
+
+const SESSION_ID = "8f2c9a1e-4711-4e0f-9d2e-session";
+const TRACE_A = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
+const TRACE_B = "b1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d7";
+
+function makeProjection() {
+  return new CodingAgentSessionFoldProjection({
+    store: { store: async () => {}, get: async () => null },
+  });
+}
+
+/**
+ * `initState` is protected. Reaching it needs a cast, but the cast has to name
+ * the REAL state type — an earlier `() => never` here collapsed every downstream
+ * assertion to `never` and hid its own type errors.
+ */
+function initStateOf(
+  projection: CodingAgentSessionFoldProjection,
+): CodingAgentSessionState {
+  return (
+    projection as unknown as { initState: () => CodingAgentSessionState }
+  ).initState();
+}
+
+function spanFactsEvent({
+  name,
+  spanId,
+  traceId = TRACE_A,
+  facts = {},
+  startMs = 1_000,
+  endMs = 2_000,
+  statusCode = 0,
+}: {
+  name: string;
+  spanId: string;
+  traceId?: string;
+  facts?: Record<string, string | number | boolean>;
+  startMs?: number;
+  endMs?: number;
+  statusCode?: number;
+}): SpanFactsContributedEvent {
+  return {
+    tenantId: createTenantId("tenant-1"),
+    type: SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+    data: {
+      tenantId: "tenant-1",
+      sessionId: SESSION_ID,
+      sessionKeySource: "provider",
+      agent: "claude_code",
+      occurredAt: startMs,
+      traceId,
+      spanId,
+      name,
+      startTimeUnixMs: startMs,
+      endTimeUnixMs: endMs,
+      statusCode,
+      facts,
+      scopeName: "com.anthropic.claude_code.tracing",
+    },
+  } as unknown as SpanFactsContributedEvent;
+}
+
+function logFactsEvent({
+  facts,
+  traceId = null,
+  timeMs = 1_500,
+}: {
+  facts: Record<string, string | number | boolean>;
+  traceId?: string | null;
+  timeMs?: number;
+}): LogFactsContributedEvent {
+  return {
+    tenantId: createTenantId("tenant-1"),
+    type: LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
+    data: {
+      tenantId: "tenant-1",
+      sessionId: SESSION_ID,
+      sessionKeySource: "provider",
+      agent: "claude_code",
+      occurredAt: timeMs,
+      recordId: `rec-${timeMs}`,
+      traceId,
+      spanId: null,
+      timeUnixMs: timeMs,
+      severityNumber: 9,
+      providerKind: "claude_code",
+      scopeName: "com.anthropic.claude_code.events",
+      facts,
+    },
+  } as unknown as LogFactsContributedEvent;
+}
+
+describe("CodingAgentSessionFoldProjection", () => {
+  describe("when a model-call span contributes", () => {
+    /** @scenario a session assembles from spans, logs and metrics */
+    it("folds tokens, stop reason and the trace id into the session", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-1",
+          facts: {
+            input_tokens: 100,
+            output_tokens: 50,
+            cache_read_tokens: 900,
+            stop_reason: "end_turn",
+            request_id: "req_1",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.modelCalls).toBe(1);
+      expect(state.inputTokens).toBe(100);
+      expect(state.cacheReadTokens).toBe(900);
+      expect(state.stopReason).toBe("end_turn");
+      expect(state.finalRequestId).toBe("req_1");
+      expect(state.traceIds).toEqual([TRACE_A]);
+      expect(state.sessionId).toBe(SESSION_ID);
+      expect(state.agent).toBe("claude_code");
+    });
+  });
+
+  describe("when a tool span FAILED", () => {
+    // The contribution carries the OTLP numeric enum (ERROR = 2); PR #5708's
+    // string comparison could never be true and every failure folded as a
+    // success. The schema now forbids the string shape; the fold must still
+    // read the number correctly.
+    it("counts the failure and marks the step where it happened", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.tool",
+          spanId: "tool-err",
+          facts: { tool_name: "Bash" },
+          statusCode: 2,
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.failedTools).toBe(1);
+      expect(state.steps[0]!.failed).toBe(true);
+    });
+
+    it("leaves a successful tool alone", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.tool",
+          spanId: "tool-ok",
+          facts: { tool_name: "Read" },
+          statusCode: 1,
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.failedTools).toBe(0);
+      expect(state.steps[0]!.failed).toBe(false);
+    });
+  });
+
+  describe("when a sub-agent's trace contributes to the same session", () => {
+    /** @scenario a sub-agent run stays inside its parent session */
+    it("collects both traces on one session without double-counting", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.tool",
+          spanId: "tool-1",
+          traceId: TRACE_A,
+          facts: { tool_name: "Bash" },
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.tool",
+          spanId: "tool-2",
+          traceId: TRACE_B,
+          facts: { tool_name: "Read", agent_id: "sub-1" },
+        }),
+        state,
+      );
+
+      expect(state.traceIds).toEqual([TRACE_A, TRACE_B]);
+      expect(state.toolCalls).toBe(2);
+      expect(state.subAgents).toBe(1);
+      // The sub-agent's own reads stay out of the main step sequence.
+      expect(state.steps.map((s) => s.name)).toEqual(["Bash"]);
+    });
+  });
+
+  describe("when the human denies a tool", () => {
+    /** @scenario a denied tool is part of the session story */
+    it("records the denial from the log facts, span or no span", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.tool_decision",
+            decision: "reject",
+            source: "user_permanent",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.toolsDenied).toBe(1);
+      // No correlation on the record — the session still counted it.
+      expect(state.traceIds).toEqual([]);
+    });
+  });
+
+  describe("when the authoritative cost arrives on a log", () => {
+    it("sums it into the session", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: { "event.name": "claude_code.api_request", cost_usd: 0.25 },
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: { "event.name": "claude_code.api_request", cost_usd: 0.5 },
+          timeMs: 2_500,
+        }),
+        state,
+      );
+
+      expect(state.costUsd).toBe(0.75);
+    });
+  });
+
+  describe("when the fold state is projected to its row", () => {
+    it("keys the row by the aggregate's session id, traces as an array", () => {
+      const projection = makeProjection();
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-1",
+          facts: { input_tokens: 10 },
+        }),
+        initStateOf(projection),
+      );
+
+      const row = projectCodingAgentSessionToRow({
+        state,
+        tenantId: "tenant-1",
+        sessionId: SESSION_ID,
+        version: "2026-07-21",
+      });
+
+      expect(row.sessionId).toBe(SESSION_ID);
+      expect(row.sessionKeySource).toBe("provider");
+      expect(row.traceIds).toEqual([TRACE_A]);
+      expect(row.inputTokens).toBe(10);
+    });
+  });
+});
