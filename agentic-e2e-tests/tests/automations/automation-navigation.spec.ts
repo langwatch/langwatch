@@ -11,9 +11,7 @@ test("automation overview keeps activity and setup guidance", async ({
 
   await page.goto(basePath);
   await expect(page.locator("h1", { hasText: "Overview" })).toBeVisible();
-  await expect(
-    page.locator(`a[href="${basePath}/alerts"]`),
-  ).toBeVisible();
+  await expect(page.locator(`a[href="${basePath}/alerts"]`)).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Overview", exact: true }),
   ).toBeVisible();
@@ -24,7 +22,7 @@ test("automation overview keeps activity and setup guidance", async ({
   await expect(page.getByText("Flag failing evaluations")).toBeVisible();
   await expect(page.getByText("Build a dataset from errors")).toBeVisible();
   await expect(page.getByText("Queue for review")).toBeVisible();
-  await page.getByRole("button", { name: "Expand Library" }).click();
+  await page.getByRole("button", { name: "Expand Build" }).click();
   await expect(
     page.locator(`a[href="${basePath}"]`, { hasText: "Automations" }),
   ).toBeVisible();
@@ -49,10 +47,11 @@ test("automation overview keeps activity and setup guidance", async ({
   ).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("schedules.png") });
 
-  await page.getByRole("link", { name: "Automations", exact: true }).last().click();
+  await page
+    .getByRole("link", { name: "Automations", exact: true })
+    .last()
+    .click();
   await expect(page).toHaveURL(`${basePath}/automations`);
-  await expect(
-    page.locator("h1", { hasText: "Automations" }),
-  ).toBeVisible();
+  await expect(page.locator("h1", { hasText: "Automations" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("activity.png") });
 });
