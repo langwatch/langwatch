@@ -124,7 +124,7 @@ export async function listAnnotations(): Promise<
 }
 
 export async function listTriggers(): Promise<
-  Array<{ id: string; name?: string }>
+  Array<{ id: string; name?: string; active?: boolean }>
 > {
   return toArray(await lwGet("/api/triggers"));
 }

@@ -18,6 +18,7 @@ import {
   listAnnotations,
   listDatasets,
   listEvaluators,
+  listTriggers,
   mostRecentTraceId,
 } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
@@ -299,6 +300,53 @@ describe("Langy current-surfaces coverage", () => {
       const created = after.find((a) => !beforeIds.has(a.id));
       console.log(`Layer 2 annotation: ${created ? created.id : "NOT FOUND"}`);
       expect(created).toBeTruthy();
+    });
+  });
+
+  describe("when the user updates a trigger", () => {
+    // triggers:update has a real CLI surface (typescript-sdk/src/cli/commands/
+    // triggers/update.ts) but the 42-scenario set only covers list + create —
+    // a real gap, since triggers:create/:update are both in
+    // LANGY_CANDIDATE_PERMISSIONS.
+    it("creates a trigger then deactivates it on a follow-up turn (Layer 2: active=false)", async () => {
+      const uniqueName = `langy-trigger-${Date.now()}`;
+      const langy = makeLangyAdapter();
+
+      const result = await runScenarioAndLog({
+        name: "create then deactivate a trigger",
+        description: `The user wants a trigger named "${uniqueName}" that emails on new failing traces, then wants it turned off.`,
+        agents: [
+          langy,
+          scenario.userSimulatorAgent({ model }),
+          scenario.judgeAgent({
+            model,
+            criteria: [
+              "Langy creates the trigger with the exact requested name.",
+              "On the follow-up, Langy deactivates the specific trigger it just created (using context), rather than asking which trigger or creating a new one.",
+              ...LANGY_CORE_RULE_CRITERIA,
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            `create a trigger called "${uniqueName}" that emails me when a new trace fails`,
+          ),
+          scenario.agent(),
+          scenario.user("actually, turn that one off for now"),
+          scenario.agent(),
+          scenario.judge(),
+        ],
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+
+      const triggers = await listTriggers();
+      const created = triggers.find((t) => t.name === uniqueName);
+      console.log(
+        `Layer 2 trigger: ${created ? `${created.name} active=${created.active}` : "NOT FOUND"}`,
+      );
+      expect(created).toBeTruthy();
+      expect(created?.active).toBe(false);
     });
   });
 
