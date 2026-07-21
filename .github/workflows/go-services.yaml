@@ -21,6 +21,7 @@ jobs:
     outputs:
       service: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.service }}
       chart: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.chart }}
+      langyagent: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.langyagent }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
@@ -38,6 +39,33 @@ jobs:
               - '.github/workflows/go-services.yaml'
             chart:
               - 'charts/gateway/**'
+              - '.github/workflows/go-services.yaml'
+            langyagent:
+              # The langyagent image bakes in the langwatch CLI, and that CLI is
+              # generated AT IMAGE-BUILD TIME from inputs OUTSIDE the Go tree:
+              # typescript-sdk/ + skills/ + feature-map.json + a handful of
+              # langwatch/langevals source files (typescript-sdk/copy-types.sh +
+              # generate-skills-bundle.mjs). A change to any of those can break
+              # `docker build -f Dockerfile.langyagent` with no Go source
+              # touched — exactly the gap that shipped a broken build once
+              # (a new copy-types.sh input was never COPYed into the image).
+              # Validate the image build whenever any build input moves.
+              - 'services/langyagent/**'
+              - 'pkg/**'
+              - 'cmd/**'
+              - 'go.mod'
+              - 'go.sum'
+              - 'Dockerfile.langyagent'
+              - 'typescript-sdk/**'
+              - 'packages/cli-cards/**'
+              - 'skills/**'
+              - 'feature-map.json'
+              - 'langwatch/src/server/tracer/types.ts'
+              - 'langwatch/src/server/filters/types.ts'
+              - 'langwatch/src/server/evaluations/types.ts'
+              - 'langwatch/src/server/modelProviders/llmModels.json'
+              - 'langwatch/src/app/api/openapiLangWatch.json'
+              - 'langevals/ts-integration/evaluators.generated.ts'
               - '.github/workflows/go-services.yaml'
 
   docker:
@@ -87,6 +115,39 @@ jobs:
             ${{ steps.meta.outputs.image }}:latest
           cache-from: type=gha,scope=gateway
           cache-to: type=gha,scope=gateway,mode=max
+
+  langyagent:
+    needs: changes
+    if: ${{ needs.changes.outputs.langyagent == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        with:
+          driver-opts: image=moby/buildkit:buildx-stable-1
+
+      # Build-only guard: this image is NEVER pushed from here. The langyagent
+      # image is published solely by publish-docker-app.yml on a `langwatch@*`
+      # release; this job exists to fail a PR fast when a build input breaks the
+      # image, not to produce an artifact. amd64 only — the failure modes we're
+      # guarding (a missing copy-types.sh input, an unresolved generated import,
+      # a broken Go compile) are arch-independent, so an emulated arm64 build
+      # would triple the runtime for no extra signal. Shares the release
+      # workflow's amd64 cache scope so PR builds warm from it.
+      - name: Build langyagent image (no push)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v6
+        with:
+          context: .
+          file: Dockerfile.langyagent
+          push: false
+          platforms: linux/amd64
+          build-args: |
+            SERVICE_VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=langyagent-amd64
+          cache-to: type=gha,scope=langyagent-amd64,mode=max
 
   helm:
     needs: changes
