@@ -112,6 +112,7 @@ import { EmptyState } from "./EmptyState";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyCardGallery } from "./LangyCardGallery";
 import { LangyDevDrawer } from "./LangyDevDrawer";
+import { buildTimeTravelView } from "../logic/langyTimeTravel";
 import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
 import { LangyError } from "./LangyError";
 import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";
@@ -674,6 +675,7 @@ function LangyPanel({
     regenerate,
     applyHistoryToEngine,
     resetEngine,
+    clearError,
   } = useLangyChatEngine({ transport });
 
   // ── Server state (React Query, via the langy tRPC router) ─────────────────
@@ -1261,10 +1263,6 @@ function LangyPanel({
 
   // Granular streaming state (PR3 transport seam) + domain-error rendering.
   const turnSignals = useLangyTurnSignals(activeConversationId);
-  const hasTurnDetail =
-    !!turnSignals.status ||
-    turnSignals.progress !== null ||
-    (turnSignals.metrics?.length ?? 0) > 0;
   const turnError = useMemo(() => {
     // The LIVE failure. Two roads reach `error`, and BOTH must be classified:
     //  - a turn-START rejection from the create/continue MUTATION carries the
@@ -1384,7 +1382,7 @@ function LangyPanel({
   // own the error card / recovering line / connect card). The line we show is
   // honest by construction: it escalates "Starting up…" → "taking longer…" →
   // "it may be stuck" and never fakes progress (see logic/langyThinkingLine.ts).
-  const turnInFlight =
+  const liveTurnInFlight =
     (isBusy || turnActive) &&
     !turnError &&
     !recovery.isRecovering &&
@@ -1413,11 +1411,57 @@ function LangyPanel({
     }
   }, [turnError, restoreDraftOnFailure, utils]);
 
+  // ── TIME TRAVEL (developer mode) ──────────────────────────────────────────
+  // While the inspector's scrubber is off LIVE, the panel renders the
+  // conversation AS IT STOOD at that moment of the tape — a pure view built
+  // from the recorded lanes and the durable history (see langyTimeTravel.ts).
+  // Substitution happens HERE, at render inputs only: no store mutation, no
+  // engine writes, and every control that could act on the past (the composer)
+  // is veiled inert. Null whenever live, which makes all of this vanish.
+  const devScrubSeq = useLangyDevLog((s) => s.scrubSeq);
+  const devRecords = useLangyDevLog((s) => s.records);
+  const timeTravel = useMemo(
+    () =>
+      buildTimeTravelView({
+        records: devRecords,
+        scrubSeq: devScrubSeq,
+        historyMessages,
+      }),
+    [devRecords, devScrubSeq, historyMessages],
+  );
+  const displayMessages = timeTravel
+    ? (timeTravel.messages as unknown as typeof messages)
+    : messages;
+  const turnInFlight = timeTravel
+    ? timeTravel.isTurnInFlight
+    : liveTurnInFlight;
+  const displayBusy = timeTravel ? timeTravel.isTurnInFlight : isBusy;
+  const displaySignals = timeTravel
+    ? {
+        ...turnSignals,
+        status: timeTravel.signals.status,
+        progress: timeTravel.signals.progress,
+        progressSample: null,
+        reasoning: timeTravel.signals.reasoning,
+        metrics: null,
+        segment: null,
+      }
+    : turnSignals;
+  const hasTurnDetail =
+    !!displaySignals.status ||
+    displaySignals.progress !== null ||
+    (displaySignals.metrics?.length ?? 0) > 0;
+
   const latestAssistantMessage = [...messages]
     .reverse()
     .find((message) => message.role === "assistant");
-  const hasInlineProgressOwner = latestAssistantMessage
-    ? toPendingCapabilities(latestAssistantMessage).length > 0
+  const displayLatestAssistant = timeTravel
+    ? [...displayMessages]
+        .reverse()
+        .find((message) => message.role === "assistant")
+    : latestAssistantMessage;
+  const hasInlineProgressOwner = displayLatestAssistant
+    ? toPendingCapabilities(displayLatestAssistant).length > 0
     : false;
 
   // What the fold's motion is saying right now — Langy's own behaviour, never
@@ -1426,10 +1470,10 @@ function LangyPanel({
   // perform work that isn't happening. See logic/langyWaveMotion.ts and
   // specs/langy/langy-panel-fold-motion.feature.
   const waveActivity = deriveWaveActivity({
-    turnInFlight: isBusy || turnActive,
-    isSettling: !!turnError || recovery.isRecovering,
-    hasLiveReasoning: !!turnSignals.reasoning,
-    messages,
+    turnInFlight: timeTravel ? timeTravel.isTurnInFlight : isBusy || turnActive,
+    isSettling: !timeTravel && (!!turnError || recovery.isRecovering),
+    hasLiveReasoning: !!displaySignals.reasoning,
+    messages: displayMessages,
   });
 
   // A status label (the orange-orbed "Analysing traces…" row) is showing on the
@@ -1439,10 +1483,10 @@ function LangyPanel({
   const activityOwnership = resolveLangyActivityOwnership({
     hasInlineProgressOwner,
     turnInFlight,
-    status: turnSignals.status,
-    progress: turnSignals.progress,
-    progressSample: turnSignals.progressSample,
-    metricsCount: turnSignals.metrics?.length ?? 0,
+    status: displaySignals.status,
+    progress: displaySignals.progress,
+    progressSample: displaySignals.progressSample,
+    metricsCount: displaySignals.metrics?.length ?? 0,
   });
 
   // A double-click on the card must not fire two turns.
@@ -1943,7 +1987,7 @@ function LangyPanel({
                         // composer, which looked like messages were entering from the
                         // bottom and made history jump as it grew.
                       >
-                        {messages.map((message, index) => (
+                        {displayMessages.map((message, index) => (
                           <MessageContent
                             key={message.id}
                             message={message}
@@ -1955,8 +1999,8 @@ function LangyPanel({
                             onDiscard={discardProposalInStore}
                             conversationId={activeConversationId}
                             isStreaming={
-                              isBusy &&
-                              index === messages.length - 1 &&
+                              displayBusy &&
+                              index === displayMessages.length - 1 &&
                               message.role === "assistant"
                             }
                             // Only ever on a turn that COMPLETED. We were asking
@@ -1973,12 +2017,14 @@ function LangyPanel({
                             showFeedback={
                               !isBusy &&
                               // The durable phase too — never ask "How did Langy
-                              // do?" while a turn is still in flight.
+                              // do?" while a turn is still in flight. And never
+                              // while time-travelling: you cannot rate the past.
+                              !timeTravel &&
                               !turnActive &&
                               !turnError &&
                               !recovery.isRecovering &&
                               message.role === "assistant" &&
-                              index === messages.length - 1
+                              index === displayMessages.length - 1
                             }
                             shouldAskFeedback={shouldAskFeedback}
                             isFeedbackPinned={
@@ -2003,7 +2049,7 @@ function LangyPanel({
                             That is not a polish gap, it is input that looks
                             lost. Drawn as the real bubble, in the place the
                             real bubble will appear, so the swap is invisible. */}
-                        {pendingPrompt ? (
+                        {!timeTravel && pendingPrompt ? (
                           <QueuedPrompt
                             prompt={pendingPrompt}
                             reduceMotion={reduceMotion}
@@ -2029,13 +2075,13 @@ function LangyPanel({
                                 progressSample={
                                   activityOwnership.standaloneProgressSample
                                 }
-                                metrics={turnSignals.metrics}
-                                segment={turnSignals.segment}
+                                metrics={displaySignals.metrics}
+                                segment={displaySignals.segment}
                               />
                             ) : !hasInlineProgressOwner ? (
                               <LangyThinkingLine
-                                messages={messages}
-                                hasLiveReasoning={!!turnSignals.reasoning}
+                                messages={displayMessages}
+                                hasLiveReasoning={!!displaySignals.reasoning}
                               />
                             ) : null}
                           </VStack>
@@ -2054,8 +2100,10 @@ function LangyPanel({
                       the engine — the first send of a fresh chat, the exact case
                       a user hits — rendered the empty state and nothing else.
                       The turn 500'd and the panel said nothing at all. A failure
-                      must never be quieter than a success. */}
-                    {failureSurface}
+                      must never be quieter than a success. Suppressed while the
+                      inspector scrubs the past: a live failure is not part of
+                      the moment being replayed. */}
+                    {timeTravel ? null : failureSurface}
                     {/* The live edge. A smooth `scrollIntoView` on this sentinel is
                   what follows the stream — see useLangyStickToBottom. */}
                     <Box ref={endRef} height="1px" aria-hidden />
@@ -2107,27 +2155,66 @@ function LangyPanel({
                   </MotionNotice>
                 ) : null}
               </AnimatePresence>
+              {/* TIME TRAVEL veil. While the inspector's scrubber is off LIVE,
+                the composer is visible but inert — you cannot send into, or
+                stop, the past. The strip names the viewed moment and is the way
+                back. */}
+              {timeTravel ? (
+                <HStack
+                  paddingX={floating ? "19px" : "14px"}
+                  paddingBottom="4px"
+                  gap={2}
+                >
+                  <Text textStyle="2xs" color="orange.fg" fontWeight="600">
+                    Viewing tape @{" "}
+                    {timeTravel.atMs
+                      ? new Date(timeTravel.atMs).toLocaleTimeString()
+                      : "start"}
+                  </Text>
+                  <chakra.button
+                    type="button"
+                    onClick={() => useLangyDevLog.getState().setScrub(null)}
+                    borderWidth={0}
+                    borderRadius="sm"
+                    paddingX={1.5}
+                    paddingY={0.5}
+                    cursor="pointer"
+                    textStyle="2xs"
+                    fontWeight="600"
+                    background="orange.subtle"
+                    color="orange.fg"
+                  >
+                    back to live
+                  </chakra.button>
+                </HStack>
+              ) : null}
               {/* The composer reads the turn phase straight from the store (ADR-058):
             it shows Send when idle and Stop while a turn is in flight or
             stopping — no isBusy / serverTurnInFlight / isStopping / queue props. */}
-              <Composer
-                model={modelOverride}
-                modelOptions={modelOptions}
-                langyDefaultModel={langyDefaultModel}
-                onModelChange={setModelOverride}
-                onSend={send}
-                onStop={handleStop}
-                variant={floating ? "floating" : "sidebar"}
-                disabled={!projectId}
-                // ALL chips — page-derived AND explicitly attached (home-briefing
-                // investigate/attach) — so the `#` palette can reference everything
-                // the conversation will actually be given.
-                contextChips={allContextChips}
-                onRemoveChip={removeContextChip}
-                addableChips={addableChips}
-                onAddChip={chooseChip}
-                onKindIntent={onKindIntent}
-              />
+              <Box
+                pointerEvents={timeTravel ? "none" : undefined}
+                opacity={timeTravel ? 0.55 : undefined}
+                aria-hidden={timeTravel ? true : undefined}
+              >
+                <Composer
+                  model={modelOverride}
+                  modelOptions={modelOptions}
+                  langyDefaultModel={langyDefaultModel}
+                  onModelChange={setModelOverride}
+                  onSend={send}
+                  onStop={handleStop}
+                  variant={floating ? "floating" : "sidebar"}
+                  disabled={!projectId}
+                  // ALL chips — page-derived AND explicitly attached (home-briefing
+                  // investigate/attach) — so the `#` palette can reference everything
+                  // the conversation will actually be given.
+                  contextChips={allContextChips}
+                  onRemoveChip={removeContextChip}
+                  addableChips={addableChips}
+                  onAddChip={chooseChip}
+                  onKindIntent={onKindIntent}
+                />
+              </Box>
             </>
           )}
         </VStack>

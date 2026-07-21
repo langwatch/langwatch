@@ -88,5 +88,11 @@ export function useLangyChatEngine({
     regenerate,
     applyHistoryToEngine,
     resetEngine,
+    /**
+     * Dismiss the engine's error WITHOUT the rest of a reset — the
+     * composer-notice's X (a "one turn at a time" wait is cleared, nothing
+     * else changes). Full walk-away resets go through `resetEngine`.
+     */
+    clearError,
   };
 }
