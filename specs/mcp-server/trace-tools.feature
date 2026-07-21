@@ -25,6 +25,12 @@ Feature: MCP Trace Tools
     When the agent calls search_traces with the returned scrollId
     Then the response contains the next page of results
 
+  Scenario: Agent searches traces and sees evaluation results without a follow-up call
+    Given a trace exists with an evaluation result
+    When the agent calls search_traces with a query matching that trace
+    Then the trace summary includes evaluation pass/fail status, score, and label
+    And the agent does not need to call get_trace to see the evaluation results
+
   Scenario: Agent gets a single trace by ID in AI-readable format
     Given a trace exists with id "trace-abc-123"
     When the agent calls get_trace with traceId "trace-abc-123"
