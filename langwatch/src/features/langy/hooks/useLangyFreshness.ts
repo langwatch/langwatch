@@ -6,6 +6,7 @@ import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import type { LangyConversationUpdateSignal } from "../data/langy.dtos";
+import { useLangyDevLog } from "../stores/langyDevLog";
 import { useLangyStore } from "../stores/langyStore";
 import { useLangyConversationUpdateListener } from "./useLangyConversationUpdateListener";
 
@@ -71,6 +72,12 @@ export function useLangyFreshness(activeConversationId: string | null): void {
           conversationId,
           after,
         });
+        // The inspector's durable lane: the EVENT LOG as this client received
+        // it, recorded before the fold so the tape shows what arrived even if
+        // applying it turns out to be the bug.
+        for (const event of tail.events) {
+          useLangyDevLog.getState().recordDurableEvent(event);
+        }
         useLangyStore.getState().applyTurnEvents(tail.events);
         after = tail.cursor;
         if (!tail.truncated) break;
@@ -91,6 +98,10 @@ export function useLangyFreshness(activeConversationId: string | null): void {
       if (!projectId) return;
 
       for (const signal of signals) {
+        useLangyDevLog.getState().recordSignal({
+          conversationId: signal.conversationId,
+          cursor: signal.cursor ?? null,
+        });
         if (signal.conversationId === activeConversationId) {
           catchUpOpenConversation(
             projectId,

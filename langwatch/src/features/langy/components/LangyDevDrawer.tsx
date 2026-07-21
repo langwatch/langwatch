@@ -64,6 +64,11 @@ import {
   type DevToolCall,
   entryKindCounts,
   type LangyDevLogRecord,
+  recordKind,
+  recordSummary,
+  replayTurnProjection,
+  streamRecords,
+  tapeUpTo,
   tokenStreamText,
   toolCallsFrom,
   useLangyDevLog,
@@ -87,12 +92,17 @@ const DRAWER_WIDTH = 380;
  */
 const DRAWER_TUCK = 10;
 
-type DevTab = "tokens" | "ephemeral" | "events" | "store";
+type DevTab = "log" | "tokens" | "ephemeral" | "events" | "store";
 
-// The three wire views PARTITION the tape — deltas, signals, tool calls — so
-// every entry is visible in exactly one place and none is invisible. Store is
-// the client's own belief, which is what you compare them against.
+// LOG is the whole tape, every lane interleaved in arrival order — outbound
+// commands, the inbound stream, the durable event log, the freshness signals —
+// because "in what order, across channels?" is the question the partitioned
+// views cannot answer. The three wire views then PARTITION the stream lane —
+// deltas, signals, tool calls — so every stream entry is visible in exactly
+// one of them. Store is the client's own belief, which is what you compare
+// them all against.
 const TABS: { id: DevTab; label: string }[] = [
+  { id: "log", label: "Log" },
   { id: "tokens", label: "Tokens" },
   { id: "ephemeral", label: "Ephemeral" },
   { id: "events", label: "Events" },
@@ -110,7 +120,7 @@ export function LangyDevDrawer({
   floating: boolean;
 }) {
   const reduceMotion = useReducedMotion();
-  const [tab, setTab] = useState<DevTab>("events");
+  const [tab, setTab] = useState<DevTab>("log");
 
   // Recording is armed by the drawer being OPEN, and only then: with it shut,
   // `record()` is a boolean check per wire entry and nothing is retained. This
@@ -120,6 +130,19 @@ export function LangyDevDrawer({
   useEffect(() => {
     setRecording(open);
   }, [open, setRecording]);
+
+  // TIME TRAVEL. `scrubSeq` caps every view at one moment of the tape; null is
+  // LIVE (follow the edge). Scrubbing costs nothing to be correct: the views
+  // are pure functions of the visible records, and the fold readout is
+  // literally re-run from the recorded durable lane (replayTurnProjection) —
+  // the same reducers the live store uses, exercised on history.
+  const [scrubSeq, setScrubSeq] = useState<number | null>(null);
+  const allRecords = useLangyDevLog((s) => s.records);
+  const visibleRecords = useMemo(
+    () => tapeUpTo(allRecords, scrubSeq),
+    [allRecords, scrubSeq],
+  );
+  const live = scrubSeq === null;
 
   return (
     <AnimatePresence>
@@ -188,10 +211,25 @@ export function LangyDevDrawer({
           }}
         >
           <DrawerHeader tab={tab} onTabChange={setTab} onClose={onClose} />
+          <TimeScrubber
+            records={allRecords}
+            visibleRecords={visibleRecords}
+            scrubSeq={scrubSeq}
+            onScrub={setScrubSeq}
+          />
           <Box flex={1} minHeight={0} overflowY="auto">
-            {tab === "tokens" ? <TokensTab /> : null}
-            {tab === "ephemeral" ? <EphemeralTab /> : null}
-            {tab === "events" ? <EventsTab /> : null}
+            {tab === "log" ? (
+              <LogTab records={visibleRecords} live={live} />
+            ) : null}
+            {tab === "tokens" ? (
+              <TokensTab records={visibleRecords} live={live} />
+            ) : null}
+            {tab === "ephemeral" ? (
+              <EphemeralTab records={visibleRecords} live={live} />
+            ) : null}
+            {tab === "events" ? (
+              <EventsTab records={visibleRecords} live={live} />
+            ) : null}
             {tab === "store" ? <StoreTab /> : null}
           </Box>
         </MotionBox>
@@ -278,6 +316,245 @@ function DrawerHeader({
   );
 }
 
+/**
+ * TIME TRAVEL. A bar across the whole recorded tape: drag it and every view
+ * caps at that moment — the log, the tokens as they stood, the calls that had
+ * settled — and the readout underneath shows the TURN FOLD replayed from the
+ * recorded durable lane up to that point, through the same @langwatch/langy
+ * reducers the live store runs (ADR-059's replayability, made a control).
+ * Snapping to the right edge returns to LIVE, which follows the tape's edge.
+ */
+function TimeScrubber({
+  records,
+  visibleRecords,
+  scrubSeq,
+  onScrub,
+}: {
+  records: LangyDevLogRecord[];
+  visibleRecords: LangyDevLogRecord[];
+  scrubSeq: number | null;
+  onScrub: (seq: number | null) => void;
+}) {
+  const live = scrubSeq === null;
+  const first = records[0]?.seq ?? 0;
+  const last = records.at(-1)?.seq ?? 0;
+  const replayed = useMemo(
+    () => replayTurnProjection(visibleRecords),
+    [visibleRecords],
+  );
+  if (records.length === 0) return null;
+  const at = visibleRecords.at(-1);
+  return (
+    <VStack
+      align="stretch"
+      gap={1}
+      paddingX="12px"
+      paddingY="6px"
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+      flexShrink={0}
+    >
+      <HStack gap={2}>
+        <chakra.input
+          type="range"
+          aria-label="Scrub through the recorded tape"
+          min={first}
+          max={last}
+          step={1}
+          value={scrubSeq ?? last}
+          onChange={(event) => {
+            const seq = Number(event.currentTarget.value);
+            // The right edge IS live — snapping there re-arms following, so
+            // the scrubber never leaves you stuck one entry in the past.
+            onScrub(seq >= last ? null : seq);
+          }}
+          flex={1}
+          height="4px"
+          cursor="pointer"
+          accentColor="var(--chakra-colors-orange-solid)"
+        />
+        <chakra.button
+          type="button"
+          onClick={() => onScrub(null)}
+          borderWidth={0}
+          borderRadius="sm"
+          paddingX={1.5}
+          paddingY={0.5}
+          cursor="pointer"
+          textStyle="2xs"
+          fontWeight="600"
+          background={live ? "orange.subtle" : "bg.muted"}
+          color={live ? "orange.fg" : "fg.muted"}
+        >
+          {live ? "LIVE" : "→ live"}
+        </chakra.button>
+      </HStack>
+      <HStack gap={2} align="baseline">
+        <Text textStyle="2xs" color="fg.subtle" css={MONO} flexShrink={0}>
+          {live
+            ? `${records.length} entries`
+            : `@ ${at ? new Date(at.atMs).toLocaleTimeString() : "start"} · ${visibleRecords.length}/${records.length}`}
+        </Text>
+        <Text
+          textStyle="2xs"
+          color="fg.muted"
+          css={MONO}
+          flex={1}
+          minWidth={0}
+          whiteSpace="nowrap"
+          overflow="hidden"
+          textOverflow="ellipsis"
+        >
+          fold: {replayed.turn ? (replayed.turn.Status ?? "—") : "—"}
+          {replayed.turnId ? ` · turn ${replayed.turnId.slice(-8)}` : ""}
+          {replayed.turn ? ` · ${replayed.turn.ToolCalls.length} tools` : ""}
+          {replayed.cursor ? ` · cur ${replayed.cursor.acceptedAt}` : ""}
+        </Text>
+      </HStack>
+    </VStack>
+  );
+}
+
+/** Per-lane colors + direction, so the unified log reads at a glance. */
+const LANE_STYLE: Record<
+  LangyDevLogRecord["lane"],
+  { glyph: string; color: string }
+> = {
+  outbound: { glyph: "→", color: "blue.fg" },
+  stream: { glyph: "←", color: "orange.fg" },
+  durable: { glyph: "⇐", color: "purple.fg" },
+  signal: { glyph: "·", color: "teal.fg" },
+};
+
+/**
+ * LOG: the whole tape, every lane interleaved in arrival order. Outbound
+ * commands (→), the inbound stream (←), the durable EVENT LOG the fold is
+ * built from (⇐), and the freshness signals (·) — on one timeline, because
+ * cross-channel ordering ("did the signal beat the stream? did we send before
+ * the terminal?") is the thing no partitioned view can show.
+ */
+function LogTab({
+  records,
+  live,
+}: {
+  records: LangyDevLogRecord[];
+  live: boolean;
+}) {
+  const dropped = useLangyDevLog((s) => s.dropped);
+  const endRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (live) endRef.current?.scrollIntoView({ block: "end" });
+  }, [records.length, live]);
+
+  if (records.length === 0) {
+    return (
+      <Empty>
+        Nothing on the tape yet. Send a message — outbound commands, the
+        stream, the durable event log and freshness signals all land here in
+        arrival order.
+      </Empty>
+    );
+  }
+  return (
+    <Box padding={2}>
+      {dropped > 0 ? (
+        <Text textStyle="2xs" color="orange.fg" paddingX={1} paddingBottom={2}>
+          {dropped.toLocaleString()} earlier entries dropped — the tape keeps
+          the most recent {DEV_LOG_CAPACITY.toLocaleString()}.
+        </Text>
+      ) : null}
+      <VStack align="stretch" gap={0.5}>
+        {records.map((record) => (
+          <LogRow key={record.seq} record={record} />
+        ))}
+      </VStack>
+      <Box ref={endRef} height="1px" />
+    </Box>
+  );
+}
+
+function LogRow({ record }: { record: LangyDevLogRecord }) {
+  const [open, setOpen] = useState(false);
+  const lane = LANE_STYLE[record.lane];
+  return (
+    <Box>
+      <chakra.button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        display="flex"
+        alignItems="baseline"
+        gap={2}
+        width="full"
+        textAlign="left"
+        paddingX={1}
+        paddingY={0.5}
+        borderRadius="sm"
+        borderWidth={0}
+        background="transparent"
+        cursor="pointer"
+        aria-expanded={open}
+        _hover={{ background: "bg.subtle" }}
+      >
+        <Text
+          textStyle="2xs"
+          color="fg.subtle"
+          flexShrink={0}
+          css={MONO}
+          minWidth="34px"
+        >
+          {record.seq}
+        </Text>
+        <Text
+          textStyle="2xs"
+          color={lane.color}
+          flexShrink={0}
+          css={MONO}
+          minWidth="12px"
+        >
+          {lane.glyph}
+        </Text>
+        <Text
+          textStyle="2xs"
+          fontWeight="600"
+          color={lane.color}
+          flexShrink={0}
+          minWidth="62px"
+        >
+          {recordKind(record)}
+        </Text>
+        <Text
+          textStyle="2xs"
+          color="fg.muted"
+          flex={1}
+          minWidth={0}
+          whiteSpace="nowrap"
+          overflow="hidden"
+          textOverflow="ellipsis"
+          css={MONO}
+        >
+          {recordSummary(record)}
+        </Text>
+      </chakra.button>
+      {open ? (
+        <Box
+          marginX={1}
+          marginBottom={1}
+          padding={2}
+          borderRadius="sm"
+          background="bg.subtle"
+          textStyle="2xs"
+          color="fg.muted"
+          whiteSpace="pre-wrap"
+          wordBreak="break-word"
+          css={MONO}
+        >
+          {JSON.stringify(record, null, 2)}
+        </Box>
+      ) : null}
+    </Box>
+  );
+}
+
 /** Shared: the "nothing has happened yet" line, so all three tabs say it alike. */
 function Empty({ children }: { children: React.ReactNode }) {
   return (
@@ -292,19 +569,27 @@ const MONO = {
     "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace",
 } as const;
 
-function TokensTab() {
-  const records = useLangyDevLog((s) => s.records);
+function TokensTab({
+  records,
+  live,
+}: {
+  records: LangyDevLogRecord[];
+  live: boolean;
+}) {
   const text = useMemo(() => tokenStreamText(records), [records]);
   const deltaCount = useMemo(
-    () => records.filter((record) => record.entry.type === "delta").length,
+    () =>
+      streamRecords(records).filter((record) => record.entry.type === "delta")
+        .length,
     [records],
   );
 
-  // Follow the live edge as tokens arrive, the same reflex the conversation has.
+  // Follow the live edge as tokens arrive, the same reflex the conversation
+  // has — but never while scrubbing, where the whole point is standing still.
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [text]);
+    if (live) endRef.current?.scrollIntoView({ block: "end" });
+  }, [text, live]);
 
   if (!text) {
     return (
@@ -347,12 +632,17 @@ function TokensTab() {
  * Together with Tokens (deltas) and Events (tool calls), this accounts for
  * every entry on the tape — no kind is invisible in the inspector.
  */
-function EphemeralTab() {
-  const records = useLangyDevLog((s) => s.records);
+function EphemeralTab({
+  records,
+  live,
+}: {
+  records: LangyDevLogRecord[];
+  live: boolean;
+}) {
   const dropped = useLangyDevLog((s) => s.dropped);
   const signals = useMemo(
     () =>
-      records.filter(
+      streamRecords(records).filter(
         (record) =>
           record.entry.type !== "delta" && record.entry.type !== "tool",
       ),
@@ -362,8 +652,8 @@ function EphemeralTab() {
 
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [signals.length]);
+    if (live) endRef.current?.scrollIntoView({ block: "end" });
+  }, [signals.length, live]);
 
   if (signals.length === 0) {
     return (
@@ -400,7 +690,11 @@ function EphemeralTab() {
   );
 }
 
-function SignalRow({ record }: { record: LangyDevLogRecord }) {
+function SignalRow({
+  record,
+}: {
+  record: Extract<LangyDevLogRecord, { lane: "stream" }>;
+}) {
   const [open, setOpen] = useState(false);
   const { entry } = record;
   // One scannable line, so the list reads without expanding every row.
@@ -500,14 +794,19 @@ function SignalRow({ record }: { record: LangyDevLogRecord }) {
  * name, which is why a call rendering as a plain activity line instead of a rich
  * card is only ever visible in this view.
  */
-function EventsTab() {
-  const records = useLangyDevLog((s) => s.records);
+function EventsTab({
+  records,
+  live,
+}: {
+  records: LangyDevLogRecord[];
+  live: boolean;
+}) {
   const calls = useMemo(() => toolCallsFrom(records), [records]);
 
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [calls.length]);
+    if (live) endRef.current?.scrollIntoView({ block: "end" });
+  }, [calls.length, live]);
 
   if (calls.length === 0) {
     return <Empty>No tool calls yet.</Empty>;

@@ -112,9 +112,7 @@ import { EmptyState } from "./EmptyState";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyCardGallery } from "./LangyCardGallery";
 import { LangyDevDrawer } from "./LangyDevDrawer";
-import { useLangyDevLog } from "../stores/langyDevLog";
 import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
-import { LangyDevDrawer } from "./LangyDevDrawer";
 import { LangyError } from "./LangyError";
 import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";
 import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
@@ -762,6 +760,19 @@ function LangyPanel({
       durableTurnId: foldInFlightTurnId,
     });
 
+    // Tape the ask itself, dispatched or not — the inspector's outbound lane
+    // shows what this client TRIED, and a refused stop is exactly the kind of
+    // moment it exists for.
+    const targetTurnId =
+      target.kind === "dispatch" ? target.turnId : store.activeTurnId;
+    useLangyDevLog
+      .getState()
+      .recordOutbound("stop", `stop turn ${targetTurnId ?? "?"}`, {
+        conversationId: store.activeConversationId,
+        turnId: targetTurnId,
+        resolution: target.kind === "dispatch" ? "dispatch" : target.reason,
+      });
+
     if (target.kind !== "dispatch") {
       // Nothing to dispatch — so nothing may claim to be stopping. The old code
       // moved the phase to `stopping` BEFORE this check, which is exactly how
@@ -805,6 +816,10 @@ function LangyPanel({
   useEffect(() => {
     if (!activeConversationId) return;
     useLangyStore.getState().seedTurnProjection({
+      cursor: snapshotEventCursor,
+      currentTurnId: snapshotCurrentTurnId,
+    });
+    useLangyDevLog.getState().recordSnapshot({
       cursor: snapshotEventCursor,
       currentTurnId: snapshotCurrentTurnId,
     });
@@ -1069,6 +1084,12 @@ function LangyPanel({
       // No per-send body: the custom transport sources projectId + conversation
       // + model + page-context + skills from `turnContextRef` (getContext) at
       // send time, so both a fresh send AND regenerate() carry the full context.
+      useLangyDevLog
+        .getState()
+        .recordOutbound("send", text.length > 60 ? `${text.slice(0, 60)}…` : text, {
+          text,
+          conversationId: useLangyStore.getState().activeConversationId,
+        });
       await sendMessage({ role: "user", parts: [{ type: "text", text }] });
     } catch {
       // Belt to the effect's braces, for the paths that DO reject.
