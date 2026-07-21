@@ -97,7 +97,8 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 				return nil // capture is best-effort; the proxied response stands.
 			}
 			var envelope herr.ErrorResponse
-			if json.Unmarshal(peeked, &envelope) != nil || envelope.Error.Type == "" {
+			if json.Unmarshal(peeked, &envelope) != nil ||
+				(envelope.Error.Type == "" && envelope.Error.Code == "") {
 				return nil // not a herr envelope (e.g. a raw provider body) — skip.
 			}
 			e := herr.FromBody(envelope.Error)

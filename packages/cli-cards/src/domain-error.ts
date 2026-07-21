@@ -141,10 +141,50 @@ interface ErrorBody {
  * A route that names the kind explicitly (`{ error: <sentence>, kind, meta }`,
  * as `routes/evaluations-legacy.ts` does) is read correctly too: an explicit
  * `kind` always wins, which means `error` is free to be the sentence.
+ *
+ *   3. THE VERSIONED ONE, from `packages/api`: `{ code, type, kind,
+ *      message: <code>, meta: {…}, reasons, fault, tips, docsUrl }` — meta is a
+ *      NESTED object here, not spread, and `message` is the code rather than a
+ *      sentence (a handled error's own message is server copy and never crosses
+ *      the boundary — ADR-045). Prose, when the server deliberately authored
+ *      some, arrives as `meta.message`.
+ *
+ * The discriminant is read as `code` → `kind` → `type` → `error`. `code` is the
+ * name TypeScript uses, `type` the OpenAI-compatible name Go emits; the
+ * platform sets them to the same value, so the order only decides which one
+ * answers first.
  */
 const asErrorBody = (value: unknown): ErrorBody | null => {
   const record = asRecord(value);
   if (!record) return null;
+
+  // Dialect 3: nested `meta` means the body is already structured — read it
+  // directly instead of lifting the envelope's own fields into meta.
+  const nestedMeta = asRecord(record.meta);
+  const structuredCode =
+    typeof record.code === "string"
+      ? record.code
+      : typeof record.type === "string"
+        ? record.type
+        : null;
+  if (nestedMeta && structuredCode !== null) {
+    // `message` equal to the code carries no information; treat it as absent so
+    // callers fall through to their own copy.
+    const authored = nestedMeta.message;
+    const sentence =
+      typeof authored === "string" && authored.length > 0
+        ? authored
+        : typeof record.message === "string" && record.message !== structuredCode
+          ? record.message
+          : undefined;
+    return {
+      kind: structuredCode,
+      message: sentence,
+      meta: nestedMeta,
+      traceId: typeof record.traceId === "string" ? record.traceId : undefined,
+      reasons: asReasons(record.reasons),
+    };
+  }
 
   // Dialect 2: the serialised DomainError, carried whole under `domainError`.
   const serialized = asRecord(record.domainError);
@@ -165,25 +205,41 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
     };
   }
 
-  // Dialect 1 (and the explicit-`kind` variant). One of the two must name the
-  // failure; without either, this is not the platform's shape at all.
+  // Dialect 1 (and the explicit-`kind` variant). One of these must name the
+  // failure; without any, this is not the platform's shape at all.
   const named =
-    typeof record.kind === "string"
-      ? record.kind
-      : typeof record.error === "string"
-        ? record.error
-        : null;
+    typeof record.code === "string"
+      ? record.code
+      : typeof record.kind === "string"
+        ? record.kind
+        : typeof record.type === "string"
+          ? record.type
+          : typeof record.error === "string"
+            ? record.error
+            : null;
   if (named === null) return null;
 
   // Everything the platform did NOT put in meta gets lifted out, so the flat
   // spread does not smuggle the envelope's own fields back in as domain context.
-  const { error, message, kind, telemetry, reasons, traceId, ...rest } = record;
+  // `code`/`type` are discriminants, not context — they belong here too.
+  const {
+    error,
+    message,
+    kind,
+    code,
+    type,
+    telemetry,
+    reasons,
+    traceId,
+    ...rest
+  } = record;
 
-  // When `kind` named the failure, `error` is free to be the sentence.
+  // When the failure was named by something other than `error`, `error` is free
+  // to be the sentence. A `message` equal to the code carries no information.
   const sentence =
-    typeof message === "string"
+    typeof message === "string" && message !== named
       ? message
-      : typeof kind === "string" && typeof error === "string"
+      : typeof error === "string" && error !== named
         ? error
         : undefined;
 

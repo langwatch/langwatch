@@ -3,7 +3,7 @@ import type { UIMessage } from "ai";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import { memo } from "react";
 import type React from "react";
-import { Markdown } from "~/components/Markdown";
+import { isInternalHref, Markdown } from "~/components/Markdown";
 import { useRouter } from "~/utils/compat/next-router";
 import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "./LangyMark";
 import { githubPrsFromToolParts } from "~/shared/langy/githubPrCard";
@@ -52,6 +52,8 @@ function MessageContentImpl({
   isStreaming = false,
   conversationId,
   showFeedback = false,
+  shouldAskFeedback = false,
+  isFeedbackPinned = false,
 }: {
   message: UIMessage;
   organizationId?: string | null;
@@ -67,8 +69,16 @@ function MessageContentImpl({
   isStreaming?: boolean;
   /** Active conversation id, so feedback can attach to it. */
   conversationId?: string | null;
-  /** Show the thumbs feedback affordance under a completed assistant reply. */
+  /**
+   * Position + settled gate: this is the latest assistant reply and nothing is
+   * in flight, so a feedback card MAY sit here. Whether one does is decided by
+   * `shouldAskFeedback` / the directive / `isFeedbackPinned`.
+   */
   showFeedback?: boolean;
+  /** The backend cadence's verdict: ask under this settled answer. */
+  shouldAskFeedback?: boolean;
+  /** Pinned open — a shown card riding out refetches, or `/feedback`. */
+  isFeedbackPinned?: boolean;
 }) {
   const isUser = message.role === "user";
   const rawText = message.parts
@@ -225,9 +235,16 @@ function MessageContentImpl({
             turns appear to run backwards: answer, then the commands that found
             it. The prompt suppresses process narration, so this is the useful
             interpretation that follows the evidence/cards above. */}
+        {/* The answer wears the theme's answer tokens (langyTheme.ts): half a
+            step smaller than the user's `sm` bubble and a step dimmer than
+            `fg`, so a glance separates "what I said" from "what it said". */}
         {displayText &&
           (isStreaming ? (
-            <Box fontSize="13px" color="fg" lineHeight="1.6">
+            <Box
+              fontSize="langyAnswer"
+              color="langy.answerFg"
+              lineHeight="1.6"
+            >
               <StreamingText text={displayText} />
             </Box>
           ) : (
@@ -238,33 +255,40 @@ function MessageContentImpl({
                 "& table": { display: "block", overflowX: "auto" },
               }}
             >
-              <Markdown fontSize="13px" linkVariant="langy">
+              <Markdown
+                fontSize="langyAnswer"
+                linkVariant="langy"
+                color="langy.answerFg"
+              >
                 {text}
               </Markdown>
             </Box>
           ))}
-        {/* WHEN to ask is a model's call, not a heuristic. The canonical
-            trigger is Langy's agent-side cheap model emitting a
-            [langy:feedback] directive at a genuinely high-signal moment
-            (feedbackDirective.requested) — that's the "logical time". The
-            default path is only a conservative backstop until that timing
-            lands: a substance floor so we never rate a bare one-word ack,
-            deliberately NOT keyed on message count.
-            `showFeedback` carries the snooze (a long throttle) AND the position
-            gate (settled, last assistant), so BOTH paths respect it — even a
-            model directive won't nag if we asked recently. Renders only under
-            the FINAL, settled answer, never mid-stream.
-            TODO(agent + composer): let the fast model surface this near the end
-            of a conversation / while the next turn runs, and let `/feedback`
-            open it on demand from the composer. */}
+        {/* WHEN to ask is the backend's call (langy.messages `shouldAskFeedback` —
+            conversation depth + a per-user quiet period), or the agent's own
+            [langy:feedback] directive at a high-signal moment, or the user
+            typing /feedback. `showFeedback` is only the position + settled
+            gate; the substance floor still stops the default path from rating
+            a bare one-word ack. `isFeedbackPinned` (a pin) keeps a shown card
+            mounted across the refetch that follows the shown-mark, and powers
+            /feedback. Never renders mid-stream. */}
         {showFeedback &&
         !isStreaming &&
         text &&
-        (feedbackDirective.requested || isSubstantiveLangyAnswer(text)) ? (
+        (isFeedbackPinned ||
+          feedbackDirective.requested ||
+          (shouldAskFeedback && isSubstantiveLangyAnswer(text))) ? (
           <LangyFeedback
             conversationId={conversationId ?? undefined}
             messageId={message.id}
             sentiment={feedbackDirective.sentiment}
+            origin={
+              feedbackDirective.requested
+                ? "directive"
+                : shouldAskFeedback
+                  ? "asked"
+                  : "requested"
+            }
           />
         ) : null}
       </VStack>
@@ -517,16 +541,6 @@ function extractProposals(
     result.push({ id, proposal: output });
   }
   return result;
-}
-
-/**
- * A same-app destination we can hand to the SPA router — an absolute path like
- * `/my-project/messages/abc123`. Protocol-relative (`//host`) and absolute
- * (`https://…`) URLs are external and must get a real navigation, so a trace
- * link inside the app stays SPA while a GitHub PR link opens for real.
- */
-function isInternalHref(href: string): boolean {
-  return href.startsWith("/") && !href.startsWith("//");
 }
 
 function isLangyProposal(value: unknown): value is LangyProposal {

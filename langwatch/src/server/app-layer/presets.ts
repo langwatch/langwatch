@@ -90,6 +90,7 @@ import {
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import { LangyFeedbackPromptService } from "~/server/app-layer/langy/langy-feedback-prompt.service";
 import { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
 import {
   LangyGithubAppTokenService,
@@ -1199,6 +1200,10 @@ export function initializeDefaultApp(options?: {
         LangyCredentialService.create(prisma),
         "LangyCredentialService",
       ),
+      feedbackPrompt: traced(
+        new LangyFeedbackPromptService({ redis }),
+        "LangyFeedbackPromptService",
+      ),
     },
     organizations,
     projects,
@@ -1426,6 +1431,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         new LangyGithubAppTokenService("", "", null),
       ),
       credentials: LangyCredentialService.create(testPrisma),
+      feedbackPrompt: new LangyFeedbackPromptService({ redis: null }),
     },
     organizations: nullOrganizations,
     projects: nullProjects,

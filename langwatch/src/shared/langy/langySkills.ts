@@ -38,7 +38,12 @@ import GENERATED_SKILLS from "./langySkills.generated.json";
  */
 
 /** Where a skill's ability comes from — and therefore how to verify it. */
-export type LangySkillSource = "agent-skill" | "recipe" | "cli";
+export type LangySkillSource =
+  | "agent-skill"
+  | "recipe"
+  | "cli"
+  /** A composer-hijacked slash command; never reaches the agent. */
+  | "client-command";
 
 export interface LangySkill {
   /** opencode skill name, or feature-map feature id. */
@@ -133,14 +138,35 @@ const CLI_SKILLS: LangySkill[] = FEATURES.filter(
 }));
 
 /**
+ * CLIENT COMMANDS — slash commands the composer intercepts itself. Not agent
+ * capabilities: the message never reaches Langy (`/feedback` opens the rating
+ * card in place, see LangyPanel's send path). Hand-listed on purpose — the
+ * derivation doctrine above exists to stop the list promising what the AGENT
+ * cannot do, and these promise nothing of the agent; each one's behaviour is
+ * client code in this repo. Excluded from the wire skill-id enum
+ * (langyTurnContext.schema.ts) for the same reason.
+ */
+const CLIENT_COMMANDS: LangySkill[] = [
+  {
+    id: "feedback",
+    label: "Feedback",
+    source: "client-command",
+    summary: "Rate how Langy is doing — opens the rating card.",
+    searchText: "feedback rate rating score /feedback",
+  },
+];
+
+/**
  * Everything Langy can be pointed at. Agent skills lead — they are the verbs a
  * user reaches for on purpose ("open a PR", "instrument my code") — then the
- * recipes, then the remaining platform capabilities.
+ * recipes, then the remaining platform capabilities, then the composer's own
+ * commands.
  */
 export const LANGY_SKILLS: LangySkill[] = [
   ...AGENT_SKILLS.filter((skill) => skill.source === "agent-skill"),
   ...AGENT_SKILLS.filter((skill) => skill.source === "recipe"),
   ...CLI_SKILLS,
+  ...CLIENT_COMMANDS,
 ];
 
 export function findSkill(id: string): LangySkill | undefined {

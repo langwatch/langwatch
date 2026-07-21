@@ -26,8 +26,8 @@ Feature: Handled errors — the handled-error boundary
 
   Background:
     Given the HandledError base and its serialisation are available in the app layer
-    And tRPC attaches a serialised handled error to `data.domainError`
-    And Hono's `onError` normalises a HandledError to `{ error: code, message, ...meta }`
+    And tRPC attaches a serialised handled error to `data.error`
+    And Hono's `onError` normalises a HandledError to `{ code, message: code, ...meta }`
 
   # ==========================================================================
   # Handled: known, user-relevant failures cross the boundary with meaning
@@ -37,18 +37,56 @@ Feature: Handled errors — the handled-error boundary
   Scenario: A known failure is serialised as a handled error over tRPC
     Given a procedure throws a NotFoundError of code "evaluation_not_found" with meta { id }
     When the client calls that procedure
-    Then the tRPC error carries `data.domainError`
+    Then the tRPC error carries `data.error`
     And the handled error has code "evaluation_not_found"
     And its meta contains the requested id
     And its httpStatus is 404
+
+  @bdd @domain-errors
+  Scenario: A handled error's free-text message never crosses the tRPC boundary
+    Given a procedure throws a HandledError whose message names server configuration
+    When the client calls that procedure
+    Then the tRPC wire message is the error's stable code, not the free-text message
+    And no part of the response contains the free-text message
+    And `data.error` (code, meta, tips, docsUrl) is the entire client contract
+    So client copy comes from the code-keyed explainers, never from server-authored strings
 
   @bdd @domain-errors
   Scenario: A known failure is normalised by Hono to a client-safe body
     Given a service route throws a HandledError of code "conversation_not_owned" with httpStatus 403
     When the client calls that route
     Then the HTTP status is 403
-    And the response body is { error: "conversation_not_owned", message, ...meta }
+    And the response body carries code "conversation_not_owned" with its meta
+    And the body's message is that code, not the error's own free text
     And no stack trace or internal detail is present
+
+  @bdd @domain-errors
+  Scenario: Validation failures travel the one handled-error channel
+    Given a request fails input validation
+    When the error is serialised for any transport
+    Then it is a handled error of code "validation_error"
+    And the failing fields ride in its meta, not a separate zodError field
+    So clients read validation detail exactly where they read every other fact
+
+  @bdd @domain-errors
+  Scenario: Producers emit both names for the discriminant
+    Given a handled error is serialised by Go or by the REST layer
+    Then the body carries "type" and "code" with the same value
+    And readers resolve the discriminant as code, then kind, then type
+    So an OpenAI-compatible consumer and a LangWatch one both read it natively
+
+  @bdd @domain-errors
+  Scenario: A displayed message prefers copy that was authored to be shown
+    Given a client needs one line to show a user
+    Then it reads meta.message, then message, then code
+    And meta.message is the only channel carrying server-authored prose
+    And a handled error's own message stays server-side and is never a source
+
+  @bdd @domain-errors
+  Scenario: An external contract wins over cross-transport symmetry
+    Given published SDKs read the REST body's `error` field as a string
+    Then that body stays flat at the root rather than nesting under `error`
+    So consistency is pursued only where no caller contract forbids it
 
   @bdd @domain-errors
   Scenario: httpStatus follows the failure class
@@ -69,7 +107,7 @@ Feature: Handled errors — the handled-error boundary
   Scenario: A database crash is reported to the client as unknown
     Given a procedure throws a plain Error because the database connection dropped
     When the client calls that procedure
-    Then `data.domainError` is null
+    Then `data.error` is null
     And the caller sees a generic "unknown" / internal error, not the raw message
     And the underlying error is logged server-side with the trace id
 
@@ -113,6 +151,7 @@ Feature: Handled errors — the handled-error boundary
   Scenario: A streamed response carries the serialised handled error on its error event
     Given a streamed endpoint (e.g. the Langy chat stream) hits a known failure mid-stream
     Then its error event carries the SerializedHandledError, not a plain string
+    And the frame's message is the error's code, never its free text
     And the client applies the same handled/unknown logic as for a tRPC error
 
   # ==========================================================================
@@ -180,6 +219,6 @@ Feature: Handled errors — the handled-error boundary
 
   @bdd @domain-errors
   Scenario: A client resolves a handled error from either discriminant field
-    Given a client reads the discriminant off `data.domainError`
+    Given a client reads the discriminant off `data.error`
     When the payload carries only the deprecated `kind` (an older server)
     Then the client resolves the same handled error as if it had read `code`

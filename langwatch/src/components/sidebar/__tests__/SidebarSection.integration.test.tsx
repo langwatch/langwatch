@@ -65,7 +65,8 @@ describe("<SidebarSection />", () => {
   });
 
   /** @scenario Collapse primary navigation sections */
-  it("positions the caret immediately after the section label", () => {
+  it("shows a dim caret beside the label only while collapsed", async () => {
+    const user = userEvent.setup();
     renderSection();
 
     const label = screen.getByText("Observe");
@@ -73,7 +74,16 @@ describe("<SidebarSection />", () => {
 
     expect(heading).not.toBeNull();
     expect(heading).toHaveStyle({ justifyContent: "flex-start" });
-    expect(label.nextElementSibling?.tagName.toLowerCase()).toBe("svg");
+    // Expanded headings stay decluttered — no caret. Pinned end-to-end by
+    // documentation-link-style.spec.ts ("section carets stay dim").
+    expect(heading?.querySelector("svg")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Collapse Observe" }));
+
+    const collapsedLabel = screen.getByText("Observe");
+    const caretWrapper = collapsedLabel.nextElementSibling;
+    expect(caretWrapper?.querySelector("svg")).not.toBeNull();
+    expect(caretWrapper).toHaveStyle({ opacity: "0.5" });
   });
 
   /** @scenario Collapse primary navigation sections */
@@ -89,16 +99,16 @@ describe("<SidebarSection />", () => {
   });
 
   /** @scenario Use sensible section defaults without a saved preference */
-  it("supports Library being collapsed by default", () => {
+  it("supports Build being collapsed by default", () => {
     renderSection({
       id: "library",
-      label: "Library",
+      label: "Build",
       defaultExpanded: false,
     });
 
     expect(screen.queryByText("Section destination")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Expand Library" }),
+      screen.getByRole("button", { name: "Expand Build" }),
     ).toBeInTheDocument();
   });
 
@@ -108,13 +118,13 @@ describe("<SidebarSection />", () => {
 
     renderSection({
       id: "library",
-      label: "Library",
+      label: "Build",
       defaultExpanded: false,
     });
 
     expect(screen.getByText("Section destination")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Collapse Library" }),
+      screen.getByRole("button", { name: "Collapse Build" }),
     ).toBeInTheDocument();
   });
 });

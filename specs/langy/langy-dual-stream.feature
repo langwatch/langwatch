@@ -45,6 +45,35 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     Then the turn stream still ends on the terminal event
     And events for another worker's session are still not forwarded
 
+  # ---------------------------------------------------------------------------
+  # Manager: the pre-first-frame status names the true transition
+  # ---------------------------------------------------------------------------
+
+  # Between the prompt POST and the agent's first frame the worker prepares its
+  # tools and produces nothing. The manager fills that silence with a status —
+  # but the status must name what is actually happening, and it must not repeat
+  # the same line on every message of a conversation.
+
+  @unit
+  Scenario: A worker that has not served a turn yet says Langy is waking up
+    Given a turn is dispatched to a worker that has not served a turn yet
+    When the manager opens the turn
+    Then it emits a wake-up status such as "Waking Langy up…", "Giving Langy a pep talk…" or "Poking Langy…" before the first agent frame
+    And the line varies between conversations instead of repeating one phrase
+
+  @unit
+  Scenario: A warm worker gets a short reaching-Langy line that varies
+    Given a turn is dispatched to a worker that has already served a turn
+    When the manager opens the turn
+    Then it emits a short status such as "Paging Langy…" or "Pinging Langy…"
+    And the line varies between turns instead of repeating one phrase
+
+  @unit
+  Scenario: A resumed turn says it is picking up where it left off
+    Given a turn resumes from a shutdown handoff
+    When the manager opens the turn
+    Then it emits a "Picking up where it left off…" status
+
   # Reasoning (the model's thinking) is its own ephemeral stream, shown while the
   # reply is being worked out and then discarded. It is NOT the answer: it never
   # joins the durable final, never becomes a message part, and never reloads. The

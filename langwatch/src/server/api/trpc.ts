@@ -30,7 +30,7 @@ interface CreateNextContextOptions {
   res: any;
 }
 
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import type { OrganizationUserRole } from "@prisma/client";
@@ -145,8 +145,19 @@ export function errorFormatterForTesting({
       }
     : null;
 
-  const domainError =
-    HandledError.isHandled(error.cause) ? error.cause.serialize() : null;
+  // Input validation arrives as a ZodError cause. Promote it to the shared
+  // ValidationError so it travels the one handled-error channel like every
+  // other failure: `fromZodError` flattens the issues into
+  // `meta.fieldErrors` / `meta.formErrors`, which is where the contents of the
+  // old sidecar `data.zodError` field now live. Mirrors what the Hono handler
+  // already does (packages/api/src/errors.ts::validationErrorFromZod).
+  const handled = HandledError.isHandled(error.cause)
+    ? error.cause
+    : error.cause instanceof ZodError
+      ? ValidationError.fromZodError(error.cause)
+      : null;
+
+  const domainError = handled?.serialize() ?? null;
 
   // Surface ModelNotConfiguredError on the wire so the frontend
   // interceptor in `utils/trpcError.ts::extractMissingModelInfo` can
@@ -188,21 +199,30 @@ export function errorFormatterForTesting({
       ? error.cause.toResponseBody()
       : null;
 
-  // A 5xx is an implementation failure, not user-facing copy. tRPC defaults
-  // the response message to the thrown Error's message, which can contain
-  // Prisma models, SQL, hostnames, or other platform internals. HandledError is
-  // the only exception: its message is explicitly authored as safe domain
-  // copy. The original error remains on the TRPCError for loggerMiddleware,
+  // Free-text error messages never cross the tRPC boundary. `data.error` (code,
+  // meta, tips, docsUrl — see SerializedHandledError, which deliberately has no
+  // message field) is the entire client contract for handled errors, and
+  // presentation is decided client-side by the code-keyed explainers. A
+  // HandledError's message is server copy — it can name env vars or internal
+  // services — so the wire carries only its stable code. Unhandled 5xx messages
+  // can contain Prisma models, SQL, or hostnames and collapse to a generic
+  // string. The original error remains on the TRPCError for loggerMiddleware,
   // exception capture, and OTel span recording.
+  //
+  // `message` and `code` stay at the top level because they are JSON-RPC
+  // envelope fields the tRPC client itself runtime-checks (`isTRPCErrorResponse`
+  // requires a string message and a numeric code, and discards `data` entirely
+  // when either is missing) — not fields we chose.
   const isInternalServerError =
     error.code === "INTERNAL_SERVER_ERROR" ||
     shape?.data?.code === "INTERNAL_SERVER_ERROR";
-  const message =
-    isInternalServerError && !HandledError.isHandled(error.cause)
+  const message = handled
+    ? handled.code
+    : isInternalServerError
       ? HandledError.toUserMessage(error.cause)
       : shape.message;
   const shapeData = { ...shape.data };
-  if (isInternalServerError && !HandledError.isHandled(error.cause)) {
+  if (isInternalServerError || handled) {
     // tRPC includes stacks in development error shapes. Local callers should
     // exercise the same safe wire contract as production callers.
     delete shapeData.stack;
@@ -213,13 +233,12 @@ export function errorFormatterForTesting({
     message,
     data: {
       ...shapeData,
-      zodError: error.cause instanceof ZodError ? error.cause.flatten() : null,
       cause:
         missingModelCause ??
         providerDisabledCause ??
         aiCallFailedCause ??
         limitInfo,
-      domainError,
+      error: domainError,
     },
   };
 }

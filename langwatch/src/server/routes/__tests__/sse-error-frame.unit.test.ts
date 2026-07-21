@@ -21,8 +21,11 @@ describe("sseErrorFrame", () => {
     const frame = sseErrorFrame(new TestHandledError());
 
     expect(frame.type).toBe("error");
-    expect(frame.message).toBe("a fixable failure");
-    expect(frame.domainError).toMatchObject({
+    // The code, not the handled error's own message — server copy never
+    // reaches the stream (ADR-045).
+    expect(frame.message).toBe("test_handled");
+    expect(JSON.stringify(frame)).not.toContain("a fixable failure");
+    expect(frame.error).toMatchObject({
       code: "test_handled",
       httpStatus: 422,
       tips: ["Do the thing"],
@@ -40,8 +43,9 @@ describe("sseErrorFrame", () => {
       }),
     );
 
-    expect(frame.message).toBe("a fixable failure");
-    expect(frame.domainError).toMatchObject({ code: "test_handled" });
+    expect(frame.message).toBe("test_handled");
+    expect(JSON.stringify(frame)).not.toContain("a fixable failure");
+    expect(frame.error).toMatchObject({ code: "test_handled" });
   });
 
   it("keeps the message of a client-safe TRPCError without a domain payload", () => {
@@ -72,6 +76,6 @@ describe("sseErrorFrame", () => {
     );
 
     expect(frame.message).toBe("An unknown error occurred");
-    expect(frame.domainError).toBeUndefined();
+    expect(frame.error).toBeUndefined();
   });
 });
