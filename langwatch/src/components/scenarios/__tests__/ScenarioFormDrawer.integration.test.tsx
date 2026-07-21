@@ -435,10 +435,13 @@ describe("<ScenarioFormDrawer/>", () => {
       const saveButton = screen.getByTestId("save-button");
       await user.click(saveButton);
 
+      // The failure here is a bare Error, so there is no handled payload and
+      // no registry copy — the caller's fallback names what was being done.
+      // A recognised code would show its own title instead.
       await waitFor(() => {
         expect(mockToasterCreate).toHaveBeenCalledWith(
           expect.objectContaining({
-            title: "Failed to update scenario",
+            title: "Couldn't save scenario",
             type: "error",
           })
         );

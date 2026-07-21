@@ -43,7 +43,11 @@ describe("<ChartErrorState />", () => {
     it("displays an error heading and retry button (distinct from 'No data')", () => {
       renderChartErrorState();
 
-      expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+      // An unhandled failure has no copy of its own, so the caller's
+      // fallback names what the user was looking at.
+      expect(
+        screen.getByText("Failed to load chart data"),
+      ).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /retry/i }),
       ).toBeInTheDocument();

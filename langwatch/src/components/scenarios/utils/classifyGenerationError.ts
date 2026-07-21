@@ -4,6 +4,8 @@
  * Tier-1: known error shapes → specific, actionable copy.
  * Tier-2 (unknown): generic copy + raw backend message verbatim.
  */
+import { explainHandledError, readHandledError } from "~/features/errors";
+
 import { ScenarioGenerationError } from "../services/scenarioGeneration";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -54,9 +56,17 @@ function extractMessage(error: unknown): string {
     return describeGenerationError(error);
   }
 
+  // A handled error carries no prose — since #5984 its wire message is the
+  // code slug — so the registry is the only place its words exist. This path
+  // matters because the tier-2 fallback renders whatever comes back verbatim.
+  const handled = readHandledError(error);
+  if (handled) {
+    const { title, description } = explainHandledError(handled);
+    return description ? `${title}. ${description}` : title;
+  }
+
   if (error instanceof Error) {
-    // TRPCClientError stores the server message in error.message already,
-    // but also exposes data.message on some shapes. Prefer data.message when present.
+    // Some non-handled shapes carry authored prose on data.message; prefer it.
     const trpcLike = error as Error & {
       data?: { message?: string };
     };
