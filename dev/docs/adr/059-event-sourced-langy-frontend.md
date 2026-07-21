@@ -2,7 +2,14 @@
 
 **Date:** 2026-07-21
 
-**Status:** Proposed (forked off ADR-058's branch; incremental, turn-document-first)
+**Status:** Implemented through Phase 4's server half (branch
+`feat/langy-event-sourced-frontend`). Phases 0–3 landed in full; Phase 4's
+client half — the message list and spine folded in the browser, retiring
+signal-then-refetch for the open conversation entirely — deliberately waits on
+live validation of the Phase 3 slice, per the stop-and-review posture below.
+The pin test added in Phase 1 caught a real framework bug on its first run
+(the state-projection cursor comparator tie-broke KSUIDs with localeCompare
+while ClickHouse orders byte-wise), fixed alongside.
 
 **Builds on:** ADR-046 (event-sourced conversations), ADR-048 (dual-stream),
 ADR-049 (Postgres projections), ADR-058 (turn-phase machine — the proof of
