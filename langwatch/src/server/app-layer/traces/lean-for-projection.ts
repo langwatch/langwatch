@@ -23,6 +23,8 @@ import {
   capOversizedAttributes,
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
   hasOversizedAttribute,
+  IO_ATTRIBUTE_KEYS,
+  utf8Preview,
 } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
 
 /**
@@ -35,20 +37,18 @@ export const COMMAND_INLINE_THRESHOLD = 256 * 1024;
 /**
  * Preview budget for IO attributes. Covers a complete chat-style Claude completion at
  * the common max_tokens=8192 setting (~16K tokens × 4 chars/token ≈ 64 KB).
- * Configurable via `LANGWATCH_IO_PREVIEW_BYTES`.
+ * Configurable via `LANGWATCH_IO_PREVIEW_BYTES`. Matches `IO_ATTRIBUTE_PREVIEW_BYTES` in
+ * `capOversizedAttributes.ts`, which uses the same budget for the pre-persistence cap.
  */
 export const IO_PREVIEW_BYTES = 64 * 1024;
 
 /**
  * Set of span attribute keys that are considered "IO" and receive the wide IO_PREVIEW_BYTES
- * budget. Non-IO attributes stay at the existing 2 KB cap.
+ * budget. Non-IO attributes stay at the existing 2 KB cap. Re-exported under this module's
+ * existing name; `IO_ATTRIBUTE_KEYS` in `capOversizedAttributes.ts` is the single source of
+ * truth so both caps agree on which keys are IO.
  */
-export const IO_ATTR_KEYS = new Set([
-  "langwatch.input",
-  "langwatch.output",
-  "gen_ai.input.messages",
-  "gen_ai.output.messages",
-]);
+export const IO_ATTR_KEYS = IO_ATTRIBUTE_KEYS;
 
 /**
  * Server-internal namespace prefix used by `leanForProjection` to attach eventref pointers
@@ -56,16 +56,6 @@ export const IO_ATTR_KEYS = new Set([
  * the `langwatch.reserved.*` namespace are stripped at command-worker ingestion.
  */
 export const EVENTREF_ATTR_PREFIX = "langwatch.reserved.eventref.";
-
-/** UTF-8-safe truncation to at most `maxBytes`, backing off to a codepoint boundary. */
-export function utf8Preview(value: string, maxBytes: number): string {
-  const buf = Buffer.from(value, "utf8");
-  if (buf.byteLength <= maxBytes) return value;
-  let end = maxBytes;
-  // 0b10xxxxxx are UTF-8 continuation bytes — don't cut mid-codepoint.
-  while (end > 0 && (buf[end]! & 0xc0) === 0x80) end--;
-  return buf.subarray(0, end).toString("utf8") + "…";
-}
 
 /**
  * Rewrites over-threshold IO attribute values to a preview (≤ IO_PREVIEW_BYTES) and attaches

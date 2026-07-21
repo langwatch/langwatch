@@ -34,7 +34,17 @@
  * ---------
  * - Walks span / resource attribute values (recursively through arrayValue and
  *   kvlistValue) and replaces any `stringValue` or `bytesValue` whose byte size
- *   exceeds the threshold with a short placeholder describing what was cut.
+ *   exceeds the threshold.
+ * - Human-readable text (anything that isn't a base64 data URL) keeps a
+ *   UTF-8-safe prefix of the original content plus a marker stating how much
+ *   was kept and the original size — a reader can still see what was actually
+ *   sent instead of only a byte count. IO attributes (`langwatch.input` /
+ *   `langwatch.output` / the gen_ai message equivalents) get a wider preview
+ *   budget than other attributes, since a span carries at most a couple of IO
+ *   attributes but can carry many arbitrary custom ones.
+ * - Binary blobs (base64 data URLs, raw bytesValue) get no partial preview —
+ *   a slice of base64 or raw bytes has no readable value — so those keep a
+ *   short placeholder naming only the size (and mime type, when known).
  * - Normal traces are untouched: only values over the (generous) threshold are
  *   replaced. The walk is in place and degrades gracefully — a malformed value
  *   is left as-is rather than throwing.
@@ -48,9 +58,51 @@ import type { OtlpAnyValue, OtlpResource, OtlpSpan } from "../schemas/otlp";
  */
 export const DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES = 256 * 1024;
 
+/**
+ * Preview budget for IO attributes (see `IO_ATTRIBUTE_KEYS`). Matches
+ * `IO_PREVIEW_BYTES` in `~/server/app-layer/traces/lean-for-projection.ts`
+ * (ADR-022) — the post-persistence "lean" pass — so a reader sees the same
+ * amount of context regardless of which cap fired.
+ */
+export const IO_ATTRIBUTE_PREVIEW_BYTES = 64 * 1024;
+
+/**
+ * Preview budget for every other (non-IO) oversized attribute. Kept much
+ * smaller than `IO_ATTRIBUTE_PREVIEW_BYTES` because a span can carry many
+ * arbitrary custom attributes at once — unlike IO, which is at most a
+ * couple of fields — so the per-attribute budget must stay small for the
+ * aggregate fold-state size to stay bounded.
+ */
+export const DEFAULT_ATTRIBUTE_PREVIEW_BYTES = 2 * 1024;
+
+/**
+ * Span attribute keys treated as conversational IO and given the wider
+ * `IO_ATTRIBUTE_PREVIEW_BYTES` budget. Single source of truth — reused by
+ * `lean-for-projection.ts` (ADR-022) so both caps agree on which keys are IO.
+ */
+export const IO_ATTRIBUTE_KEYS = new Set([
+  "langwatch.input",
+  "langwatch.output",
+  "gen_ai.input.messages",
+  "gen_ai.output.messages",
+]);
+
 /** UTF-8 byte length of a string, without allocating a Buffer copy. */
 function utf8ByteLength(value: string): number {
   return Buffer.byteLength(value, "utf8");
+}
+
+/**
+ * UTF-8-safe truncation to at most `maxBytes`, backing off to a codepoint
+ * boundary so a multi-byte character is never split.
+ */
+export function utf8Preview(value: string, maxBytes: number): string {
+  const buf = Buffer.from(value, "utf8");
+  if (buf.byteLength <= maxBytes) return value;
+  let end = maxBytes;
+  // 0b10xxxxxx are UTF-8 continuation bytes — don't cut mid-codepoint.
+  while (end > 0 && (buf[end]! & 0xc0) === 0x80) end--;
+  return buf.subarray(0, end).toString("utf8") + "…";
 }
 
 /**
@@ -67,6 +119,7 @@ function dataUrlMimeType(value: string): string | null {
   return mimeType || null;
 }
 
+/** Placeholder for binary content, where no partial preview has any value. */
 function truncationPlaceholder(
   byteSize: number,
   mimeType: string | null,
@@ -77,11 +130,35 @@ function truncationPlaceholder(
 }
 
 /**
+ * Replacement for oversized human-readable text: a UTF-8-safe prefix of the
+ * original content (up to `previewBytes`) followed by a marker stating how
+ * much was kept and the original size, so a reader still sees real content
+ * instead of only a byte count.
+ */
+function truncatedTextPreview(
+  value: string,
+  byteSize: number,
+  previewBytes: number,
+): string {
+  const preview = utf8Preview(value, previewBytes);
+  const shownBytes = utf8ByteLength(preview);
+  return `${preview}\n[truncated: showing ${shownBytes} of ${byteSize} bytes]`;
+}
+
+/**
  * Caps a single OTLP AnyValue in place. Returns true when something was
  * replaced (used only for bookkeeping / tests). Recurses into arrays and
  * kvlists so blobs nested inside structured params are caught too.
+ *
+ * `previewBytes` decides how much of an oversized TEXT value survives as a
+ * preview — it does not apply to binary content (data URLs, raw bytesValue),
+ * which always collapses to the size-only placeholder.
  */
-function capAnyValue(value: OtlpAnyValue, maxBytes: number): boolean {
+function capAnyValue(
+  value: OtlpAnyValue,
+  maxBytes: number,
+  previewBytes: number,
+): boolean {
   if (value == null || typeof value !== "object") return false;
 
   let capped = false;
@@ -89,10 +166,10 @@ function capAnyValue(value: OtlpAnyValue, maxBytes: number): boolean {
   if (typeof value.stringValue === "string") {
     const byteSize = utf8ByteLength(value.stringValue);
     if (byteSize > maxBytes) {
-      value.stringValue = truncationPlaceholder(
-        byteSize,
-        dataUrlMimeType(value.stringValue),
-      );
+      const mimeType = dataUrlMimeType(value.stringValue);
+      value.stringValue = mimeType
+        ? truncationPlaceholder(byteSize, mimeType)
+        : truncatedTextPreview(value.stringValue, byteSize, previewBytes);
       capped = true;
     }
   }
@@ -106,7 +183,8 @@ function capAnyValue(value: OtlpAnyValue, maxBytes: number): boolean {
     if (byteSize > maxBytes) {
       // Replace the binary payload with a text placeholder. Downstream
       // consumers read this attribute as a value type, so a stringValue
-      // placeholder is the safe, readable substitute.
+      // placeholder is the safe, readable substitute. Raw bytes have no
+      // readable partial preview, unlike a text stringValue above.
       value.bytesValue = null;
       value.stringValue = truncationPlaceholder(byteSize, null);
       capped = true;
@@ -115,13 +193,14 @@ function capAnyValue(value: OtlpAnyValue, maxBytes: number): boolean {
 
   if (value.arrayValue && Array.isArray(value.arrayValue.values)) {
     for (const item of value.arrayValue.values) {
-      if (capAnyValue(item, maxBytes)) capped = true;
+      if (capAnyValue(item, maxBytes, previewBytes)) capped = true;
     }
   }
 
   if (value.kvlistValue && Array.isArray(value.kvlistValue.values)) {
     for (const entry of value.kvlistValue.values) {
-      if (entry?.value && capAnyValue(entry.value, maxBytes)) capped = true;
+      if (entry?.value && capAnyValue(entry.value, maxBytes, previewBytes))
+        capped = true;
     }
   }
 
@@ -130,12 +209,20 @@ function capAnyValue(value: OtlpAnyValue, maxBytes: number): boolean {
 
 type AttributeList = OtlpSpan["attributes"];
 
-/** Caps every value in an attribute list in place. */
+/**
+ * Caps every value in an attribute list in place. Attributes whose key is in
+ * `IO_ATTRIBUTE_KEYS` get the wider `IO_ATTRIBUTE_PREVIEW_BYTES` preview
+ * budget; everything else gets `DEFAULT_ATTRIBUTE_PREVIEW_BYTES`.
+ */
 function capAttributeList(attributes: AttributeList, maxBytes: number): number {
   if (!Array.isArray(attributes)) return 0;
   let count = 0;
   for (const attr of attributes) {
-    if (attr?.value && capAnyValue(attr.value, maxBytes)) count++;
+    if (!attr?.value) continue;
+    const previewBytes = IO_ATTRIBUTE_KEYS.has(attr.key)
+      ? IO_ATTRIBUTE_PREVIEW_BYTES
+      : DEFAULT_ATTRIBUTE_PREVIEW_BYTES;
+    if (capAnyValue(attr.value, maxBytes, previewBytes)) count++;
   }
   return count;
 }
