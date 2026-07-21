@@ -1,11 +1,9 @@
 import {
   Box,
-  Code,
   Button,
-  Heading,
+  Code,
   HStack,
   SimpleGrid,
-  Spacer,
   Table,
   Text,
   VStack,
@@ -13,21 +11,28 @@ import {
 import type { Monitor, TriggerAction } from "@prisma/client";
 import { useMemo } from "react";
 import {
+  Calendar,
   Edit2,
   Eye,
   Filter,
-  Calendar,
   MoreVertical,
-  Plus,
   Trash,
   TrendingUp,
   Zap,
 } from "react-feather";
-import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
+import { DashboardLayout } from "~/components/DashboardLayout";
 import { HoverableBigText } from "~/components/HoverableBigText";
-import { AutomationsHistory } from "~/features/automations/components/page/AutomationsHistory";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { SectionNavigationLayout } from "~/components/ui/layouts/SectionNavigationLayout";
+import { Link } from "~/components/ui/link";
+import { Menu } from "~/components/ui/menu";
+import { Switch } from "~/components/ui/switch";
+import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { UseCaseStrip } from "~/features/automations/components/page/AutomationsEducation";
+import { AutomationsHistory } from "~/features/automations/components/page/AutomationsHistory";
 import {
   AlertRuleCell,
   AlertSubjectCell,
@@ -41,25 +46,57 @@ import {
   SectionHeader,
   TableShell,
 } from "~/features/automations/components/page/AutomationTableCells";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
+import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api, type RouterOutputs } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
-import { DashboardLayout } from "../../components/DashboardLayout";
-import { Link } from "../../components/ui/link";
-import { Menu } from "../../components/ui/menu";
-import { Switch } from "../../components/ui/switch";
-import { toaster } from "../../components/ui/toaster";
-import { Tooltip } from "../../components/ui/tooltip";
-import { withPermissionGuard } from "../../components/WithPermissionGuard";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api, type RouterOutputs } from "../../utils/api";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 
-function Automations() {
+type AutomationSection = "overview" | "automations" | "alerts" | "schedules";
+
+const sectionDetails: Record<
+  AutomationSection,
+  { title: string; description: string }
+> = {
+  overview: {
+    title: "Overview",
+    description:
+      "See what is firing, what is scheduled next, and recent automation activity.",
+  },
+  automations: {
+    title: "Automations",
+    description: "Act on every incoming trace that matches your filters.",
+  },
+  alerts: {
+    title: "Alerts",
+    description:
+      "Get told when a metric crosses a threshold and when it recovers.",
+  },
+  schedules: {
+    title: "Schedules",
+    description:
+      "Send a dashboard, graph, or trace table on a recurring cadence.",
+  },
+};
+
+const sectionFromPath = (pathname: string): AutomationSection => {
+  if (pathname.includes("/automations/automations")) return "automations";
+  if (pathname.includes("/automations/alerts")) return "alerts";
+  if (pathname.includes("/automations/schedules")) return "schedules";
+  return "overview";
+};
+
+function AutomationsPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
+  const router = useRouter();
+  const section = sectionFromPath(router.pathname);
+  const details = sectionDetails[section];
+  const basePath = project ? `/${project.slug}/automations` : "/auth/signin";
 
   const triggers = api.automation.getTriggers.useQuery(
     {
@@ -81,7 +118,7 @@ function Automations() {
     [triggerStats.data],
   );
 
-  // A report's cron only DESCRIBES its schedule — the scheduler owns the real
+  // A report's cron only DESCRIBES its schedule; the scheduler owns the real
   // instants, so next/last run come from there, not from the trigger row.
   const reportSchedules = api.automation.getReportSchedules.useQuery(
     { projectId: project?.id ?? "" },
@@ -390,8 +427,7 @@ function Automations() {
     "data-trigger-id": trigger.id,
     cursor: "pointer",
     _hover: { bg: "bg.muted" },
-    onClick: () =>
-      openDrawer("viewAutomation", { automationId: trigger.id }),
+    onClick: () => openDrawer("viewAutomation", { automationId: trigger.id }),
   });
 
   const activeCell = (trigger: EnhancedTrigger) => (
@@ -412,98 +448,62 @@ function Automations() {
 
   const isLoading = triggers.isLoading;
 
-  // At-a-glance overview: what's wrong right now, how busy things have been,
-  // and what runs next. Derived from the same queries the tables use.
   const overview = useMemo(() => {
     const stats = [...statsByTriggerId.values()];
-    const firingNow = stats.filter((s) => s.currentlyFiring).length;
+    const firingNow = stats.filter((stat) => stat.currentlyFiring).length;
     const fired30d = stats.reduce(
-      (sum, s) => sum + (s.recentFireCount ?? 0),
+      (sum, stat) => sum + (stat.recentFireCount ?? 0),
       0,
     );
     const next = (reportSchedules.data ?? [])
-      .filter((s) => s.nextRunAt)
-      .map((s) => ({
-        at: new Date(s.nextRunAt!).getTime(),
-        triggerId: s.triggerId,
+      .filter((schedule) => schedule.nextRunAt)
+      .map((schedule) => ({
+        at: new Date(schedule.nextRunAt!).getTime(),
+        triggerId: schedule.triggerId,
       }))
-      .sort((a, b) => a.at - b.at)[0];
+      .sort((left, right) => left.at - right.at)[0];
     const nextName = next
-      ? ((triggers.data ?? []).find((t) => t.id === next.triggerId)?.name ??
-        null)
+      ? ((triggers.data ?? []).find((trigger) => trigger.id === next.triggerId)
+          ?.name ?? null)
       : null;
+
     return { firingNow, fired30d, next, nextName };
-  }, [statsByTriggerId, reportSchedules.data, triggers.data]);
+  }, [reportSchedules.data, statsByTriggerId, triggers.data]);
 
   return (
-    <DashboardLayout>
+    <SectionNavigationLayout
+      sectionLabel="Automations"
+      navigationItems={[
+        {
+          label: "Overview",
+          href: basePath,
+          icon: <Eye size={14} />,
+        },
+        {
+          label: "Automations",
+          href: `${basePath}/automations`,
+          icon: <Zap size={14} />,
+        },
+        {
+          label: "Alerts",
+          href: `${basePath}/alerts`,
+          icon: <TrendingUp size={14} />,
+        },
+        {
+          label: "Schedules",
+          href: `${basePath}/schedules`,
+          icon: <Calendar size={14} />,
+        },
+      ]}
+    >
       <PageLayout.Header>
-        <PageLayout.Heading>Automations</PageLayout.Heading>
-        <Spacer />
-        <Menu.Root>
-          <Menu.Trigger asChild>
-            <Button colorPalette="orange" size="sm">
-              <Plus size={16} /> New
-            </Button>
-          </Menu.Trigger>
-          <Menu.Content>
-            <Menu.Item value="automation" onClick={() => openDrawer("automation", {})}>
-              <HStack gap={2}>
-                <Zap size={14} /> Automation
-              </HStack>
-            </Menu.Item>
-            <Menu.Item
-              value="alert"
-              onClick={() =>
-                openDrawer("automation", { initialSource: "customGraph" })
-              }
-            >
-              <HStack gap={2}>
-                <TrendingUp size={14} /> Alert
-              </HStack>
-            </Menu.Item>
-            <Menu.Item
-              value="schedule"
-              onClick={() =>
-                openDrawer("automation", { initialSource: "report" })
-              }
-            >
-              <HStack gap={2}>
-                <Calendar size={14} /> Schedule
-              </HStack>
-            </Menu.Item>
-          </Menu.Content>
-        </Menu.Root>
+        <PageLayout.Heading>{details.title}</PageLayout.Heading>
       </PageLayout.Header>
-      <Box paddingX={6} paddingY={6} width="full">
-        <VStack align="stretch" gap={8} width="full">
+      <Box padding={6} width="full">
+        <VStack align="stretch" gap={6} width="full">
           <Text textStyle="sm" color="fg.muted">
-            Alerts watch a metric, schedules go out on a recurring cadence, and
-            automations act on traces as they arrive.
+            {details.description}
           </Text>
-
-          <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
-            <StatTile
-              label="Firing now"
-              value={overview.firingNow}
-              sub={
-                overview.firingNow > 0
-                  ? "alerts over their threshold"
-                  : "all clear"
-              }
-              alert={overview.firingNow > 0}
-            />
-            <StatTile
-              label="Fired (30 days)"
-              value={overview.fired30d.toLocaleString()}
-              sub="across every automation"
-            />
-            <StatTile
-              label="Next scheduled"
-              value={overview.next ? (formatTimeAgo(overview.next.at) ?? "—") : "—"}
-              sub={overview.nextName ?? "no schedules queued"}
-            />
-          </SimpleGrid>
 
           {isLoading ? (
             <Text textStyle="sm" color="fg.muted">
@@ -511,340 +511,445 @@ function Automations() {
             </Text>
           ) : (
             <>
-              {/* Alerts — fire when a graph's metric crosses a threshold */}
-              <VStack align="stretch" gap={4}>
-                <SectionHeader
-                  icon={<TrendingUp size={18} />}
-                  accent="orange"
-                  title="Alerts"
-                  count={alerts.length}
-                  summary="Get told when a metric crosses a threshold — and again when it recovers."
-                  details="An alert watches one series on an analytics graph. When the value crosses your threshold it notifies your channel; when it returns to normal it sends a recovery notice."
-                  addLabel="New alert"
-                  onAdd={() =>
-                    openDrawer("automation", { initialSource: "customGraph" })
-                  }
-                />
-                {alerts.length === 0 ? (
-                  <UseCaseStrip
-                    kind="alert"
-                    onOpen={(prefill) => openDrawer("automation", prefill)}
+              {section === "alerts" && (
+                <VStack align="stretch" gap={4}>
+                  <SectionHeader
+                    icon={<TrendingUp size={18} />}
+                    accent="orange"
+                    title="Alerts"
+                    count={alerts.length}
+                    summary="Get told when a metric crosses a threshold, and again when it recovers."
+                    details="An alert watches one series on an analytics graph. When the value crosses your threshold it notifies your channel; when it returns to normal it sends a recovery notice."
+                    addLabel="New alert"
+                    onAdd={() =>
+                      openDrawer("automation", {
+                        initialSource: "customGraph",
+                      })
+                    }
                   />
-                ) : (
-                  <TableShell>
-                    <Table.Root variant="line" width="full">
-                      <Table.Header>
-                        <Table.Row>
-                          <Table.ColumnHeader>Name</Table.ColumnHeader>
-                          <Table.ColumnHeader>Watches</Table.ColumnHeader>
-                          <Table.ColumnHeader whiteSpace="nowrap">
-                            Fires when
-                          </Table.ColumnHeader>
-                          <Table.ColumnHeader>Notifies</Table.ColumnHeader>
-                          <Table.ColumnHeader whiteSpace="nowrap">
-                            <MetricHeader
-                              label="Last fired"
-                              help="When this alert last crossed its threshold and notified you."
-                            />
-                          </Table.ColumnHeader>
-                          <Table.ColumnHeader whiteSpace="nowrap">
-                            <MetricHeader
-                              label="Status"
-                              help="Firing while the metric is past its threshold, back to OK when it recovers."
-                            />
-                          </Table.ColumnHeader>
-                          <Table.ColumnHeader>Active</Table.ColumnHeader>
-                          <Table.ColumnHeader />
-                        </Table.Row>
-                      </Table.Header>
-                      <Table.Body>
-                        {alerts.map((trigger) => {
-                          const actionParams =
-                            trigger.actionParams as TriggerActionParams;
-                          const stats = statsByTriggerId.get(trigger.id);
-                          return (
-                            <Table.Row {...sharedRowProps(trigger)}>
-                              <Table.Cell fontWeight="medium">
-                                {trigger.name}
-                              </Table.Cell>
-                              <Table.Cell maxWidth="260px">
-                                <AlertSubjectCell
-                                  graphName={trigger.customGraph?.name ?? null}
-                                  graph={graphJsonById.get(
-                                    trigger.customGraphId ?? "",
-                                  )}
-                                  seriesName={actionParams.seriesName}
-                                />
-                              </Table.Cell>
-                              <Table.Cell whiteSpace="nowrap">
-                                <AlertRuleCell actionParams={actionParams} />
-                              </Table.Cell>
-                              <Table.Cell>
-                                {actionItems(trigger.action, actionParams)}
-                              </Table.Cell>
-                              <Table.Cell whiteSpace="nowrap">
-                                <LastFiredCell
-                                  trigger={trigger}
-                                  stats={stats}
-                                />
-                              </Table.Cell>
-                              <Table.Cell whiteSpace="nowrap">
-                                <FiringStatus
-                                  firing={!!stats?.currentlyFiring}
-                                />
-                              </Table.Cell>
-                              {activeCell(trigger)}
-                              <Table.Cell>{rowActionsMenu(trigger)}</Table.Cell>
-                            </Table.Row>
-                          );
-                        })}
-                      </Table.Body>
-                    </Table.Root>
-                  </TableShell>
-                )}
-              </VStack>
-
-              {/* Schedules — send something on a recurring schedule */}
-              <VStack align="stretch" gap={4}>
-                <SectionHeader
-                  icon={<Calendar size={18} />}
-                  accent="purple"
-                  title="Schedules"
-                  count={reports.length}
-                  summary="Send a dashboard, a graph, or a table of traces on a recurring schedule."
-                  details="A schedule bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set."
-                  addLabel="New schedule"
-                  onAdd={() =>
-                    openDrawer("automation", { initialSource: "report" })
-                  }
-                />
-                {reports.length === 0 ? (
-                  <EmptyHint>
-                    No schedules yet. Create one for a recurring Slack or email
-                    digest.
-                  </EmptyHint>
-                ) : (
-                  <TableShell>
-                    <Table.Root variant="line" width="full">
-                      <Table.Header>
-                        <Table.Row>
-                          <Table.ColumnHeader>Name</Table.ColumnHeader>
-                          <Table.ColumnHeader>Sends</Table.ColumnHeader>
-                          <Table.ColumnHeader whiteSpace="nowrap">
-                            Schedule
-                          </Table.ColumnHeader>
-                          <Table.ColumnHeader whiteSpace="nowrap">
-                            <MetricHeader
-                              label="Next run"
-                              help="When this next goes out, straight from the scheduler. A paused schedule has no next run."
-                            />
-                          </Table.ColumnHeader>
-                          <Table.ColumnHeader whiteSpace="nowrap">
-                            <MetricHeader
-                              label="Last run"
-                              help="The last time this was sent."
-                            />
-                          </Table.ColumnHeader>
-                          <Table.ColumnHeader>Delivery</Table.ColumnHeader>
-                          <Table.ColumnHeader>Active</Table.ColumnHeader>
-                          <Table.ColumnHeader />
-                        </Table.Row>
-                      </Table.Header>
-                      <Table.Body>
-                        {reports.map((trigger) => {
-                          const actionParams =
-                            trigger.actionParams as TriggerActionParams;
-                          const schedule = (
-                            actionParams as {
-                              schedule?: { cron?: string; timezone?: string };
-                            }
-                          ).schedule;
-                          return (
-                            <Table.Row
-                              key={trigger.id}
-                              data-trigger-id={trigger.id}
-                              cursor="pointer"
-                              _hover={{ bg: "bg.muted" }}
-                              onClick={() =>
-                                openDrawer("automation", {
-                                  automationId: trigger.id,
-                                })
-                              }
-                            >
-                              <Table.Cell fontWeight="medium">
-                                {trigger.name}
-                              </Table.Cell>
-                              <Table.Cell>
-                                <ReportSubjectCell
-                                  actionParams={actionParams}
-                                  graphNameById={graphNameById}
-                                />
-                              </Table.Cell>
-                              <Table.Cell whiteSpace="nowrap">
-                                <Text textStyle="sm">
-                                  {schedule?.cron
-                                    ? describeSchedule(
-                                        schedule.cron,
-                                        schedule.timezone ?? "UTC",
-                                      )
-                                    : "—"}
-                                </Text>
-                              </Table.Cell>
-                              <ReportRunCells
-                                schedule={scheduleByTriggerId.get(trigger.id)}
-                                loading={reportSchedules.isLoading}
+                  {alerts.length === 0 ? (
+                    <UseCaseStrip
+                      kind="alert"
+                      onOpen={(prefill) => openDrawer("automation", prefill)}
+                    />
+                  ) : (
+                    <TableShell>
+                      <Table.Root variant="line" width="full">
+                        <Table.Header>
+                          <Table.Row>
+                            <Table.ColumnHeader>Name</Table.ColumnHeader>
+                            <Table.ColumnHeader>Watches</Table.ColumnHeader>
+                            <Table.ColumnHeader whiteSpace="nowrap">
+                              Fires when
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader>Notifies</Table.ColumnHeader>
+                            <Table.ColumnHeader whiteSpace="nowrap">
+                              <MetricHeader
+                                label="Last fired"
+                                help="When this alert last crossed its threshold and notified you."
                               />
-                              <Table.Cell>
-                                {trigger.action === "SEND_SLACK_MESSAGE"
-                                  ? "Slack"
-                                  : "Email"}
-                              </Table.Cell>
-                              {activeCell(trigger)}
-                              <Table.Cell>{rowActionsMenu(trigger)}</Table.Cell>
-                            </Table.Row>
-                          );
-                        })}
-                      </Table.Body>
-                    </Table.Root>
-                  </TableShell>
-                )}
-              </VStack>
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader whiteSpace="nowrap">
+                              <MetricHeader
+                                label="Status"
+                                help="Firing while the metric is past its threshold, back to OK when it recovers."
+                              />
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader>Active</Table.ColumnHeader>
+                            <Table.ColumnHeader />
+                          </Table.Row>
+                        </Table.Header>
+                        <Table.Body>
+                          {alerts.map((trigger) => {
+                            const actionParams =
+                              trigger.actionParams as TriggerActionParams;
+                            const stats = statsByTriggerId.get(trigger.id);
+                            return (
+                              <Table.Row {...sharedRowProps(trigger)}>
+                                <Table.Cell fontWeight="medium">
+                                  {trigger.name}
+                                </Table.Cell>
+                                <Table.Cell maxWidth="260px">
+                                  <AlertSubjectCell
+                                    graphName={
+                                      trigger.customGraph?.name ?? null
+                                    }
+                                    graph={graphJsonById.get(
+                                      trigger.customGraphId ?? "",
+                                    )}
+                                    seriesName={actionParams.seriesName}
+                                  />
+                                </Table.Cell>
+                                <Table.Cell whiteSpace="nowrap">
+                                  <AlertRuleCell actionParams={actionParams} />
+                                </Table.Cell>
+                                <Table.Cell>
+                                  {actionItems(trigger.action, actionParams)}
+                                </Table.Cell>
+                                <Table.Cell whiteSpace="nowrap">
+                                  <LastFiredCell
+                                    trigger={trigger}
+                                    stats={stats}
+                                  />
+                                </Table.Cell>
+                                <Table.Cell whiteSpace="nowrap">
+                                  <FiringStatus
+                                    firing={!!stats?.currentlyFiring}
+                                  />
+                                </Table.Cell>
+                                {activeCell(trigger)}
+                                <Table.Cell>
+                                  {rowActionsMenu(trigger)}
+                                </Table.Cell>
+                              </Table.Row>
+                            );
+                          })}
+                        </Table.Body>
+                      </Table.Root>
+                    </TableShell>
+                  )}
+                </VStack>
+              )}
 
-              {/* Automations — act on each incoming trace that matches */}
-              <VStack align="stretch" gap={4}>
-                <SectionHeader
-                  icon={<Zap size={18} />}
-                  accent="blue"
-                  title="Automations"
-                  count={traceAutomations.length}
-                  summary="Act on every incoming trace that matches your filters."
-                  details="An automation runs on each trace matching your filters: post to Slack or email, add rows to a dataset, or queue traces for annotation."
-                  addLabel="New automation"
-                  onAdd={() => openDrawer("automation", {})}
-                />
-                {traceAutomations.length === 0 ? (
-                  <UseCaseStrip
-                    kind="automation"
-                    onOpen={(prefill) => openDrawer("automation", prefill)}
+              {section === "overview" && (
+                <VStack align="stretch" gap={8} width="full">
+                  <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
+                    <StatTile
+                      label="Firing now"
+                      value={overview.firingNow}
+                      sub={
+                        overview.firingNow > 0
+                          ? "alerts over their threshold"
+                          : "all clear"
+                      }
+                      alert={overview.firingNow > 0}
+                    />
+                    <StatTile
+                      label="Fired (30 days)"
+                      value={overview.fired30d.toLocaleString()}
+                      sub="across every automation"
+                    />
+                    <StatTile
+                      label="Next scheduled"
+                      value={
+                        overview.next
+                          ? (formatTimeAgo(overview.next.at) ?? "—")
+                          : "—"
+                      }
+                      sub={overview.nextName ?? "no schedules queued"}
+                    />
+                  </SimpleGrid>
+
+                  <VStack align="stretch" gap={3} width="full">
+                    <OverviewSectionHeading
+                      title="Recent activity"
+                      summary="See what alerts, schedules, and automations have done recently."
+                    />
+                    <AutomationsHistory
+                      fires={activity.data ?? []}
+                      triggers={triggers.data ?? []}
+                      isLoading={activity.isLoading}
+                      onOpenAutomation={(triggerId) =>
+                        openDrawer("viewAutomation", {
+                          automationId: triggerId,
+                        })
+                      }
+                    />
+                  </VStack>
+
+                  <VStack align="stretch" gap={4} width="full">
+                    <OverviewSectionHeading
+                      title="Popular uses"
+                      summary="Start from a common workflow and tailor it to your project."
+                    />
+                    <VStack align="stretch" gap={2}>
+                      <Text
+                        textStyle="xs"
+                        fontWeight="semibold"
+                        color="fg.muted"
+                      >
+                        Alerts
+                      </Text>
+                      <UseCaseStrip
+                        kind="alert"
+                        showLabel={false}
+                        onOpen={(prefill) => openDrawer("automation", prefill)}
+                      />
+                    </VStack>
+                    <VStack align="stretch" gap={2}>
+                      <Text
+                        textStyle="xs"
+                        fontWeight="semibold"
+                        color="fg.muted"
+                      >
+                        Automations
+                      </Text>
+                      <UseCaseStrip
+                        kind="automation"
+                        showLabel={false}
+                        onOpen={(prefill) => openDrawer("automation", prefill)}
+                      />
+                    </VStack>
+                  </VStack>
+                </VStack>
+              )}
+
+              {section === "schedules" && (
+                <VStack align="stretch" gap={4}>
+                  <SectionHeader
+                    icon={<Calendar size={18} />}
+                    accent="purple"
+                    title="Schedules"
+                    count={reports.length}
+                    summary="Send a dashboard, a graph, or a table of traces on a recurring schedule."
+                    details="A schedule bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set."
+                    addLabel="New schedule"
+                    onAdd={() =>
+                      openDrawer("automation", { initialSource: "report" })
+                    }
                   />
-                ) : (
-                  <TableShell>
-                    <Table.Root variant="line" width="full">
-                      <Table.Header>
-                        <Table.Row>
-                          <Table.ColumnHeader>Name</Table.ColumnHeader>
-                          <Table.ColumnHeader>Acts on</Table.ColumnHeader>
-                          <Table.ColumnHeader>Then</Table.ColumnHeader>
-                          <Table.ColumnHeader whiteSpace="nowrap">
-                            <MetricHeader
-                              label="Last fired"
-                              help="When this automation last matched a trace and ran its action. Automations on a digest schedule also show when the next bundled send is due."
-                            />
-                          </Table.ColumnHeader>
-                          <Table.ColumnHeader whiteSpace="nowrap">
-                            <MetricHeader
-                              label="Fires (30d)"
-                              help="Times this automation fired in the last 30 days."
-                            />
-                          </Table.ColumnHeader>
-                          <Table.ColumnHeader>Active</Table.ColumnHeader>
-                          <Table.ColumnHeader />
-                        </Table.Row>
-                      </Table.Header>
-                      <Table.Body>
-                        {traceAutomations.map((trigger) => {
-                          const actionParams =
-                            trigger.actionParams as TriggerActionParams;
-                          const stats = statsByTriggerId.get(trigger.id);
-                          return (
-                            <Table.Row {...sharedRowProps(trigger)}>
-                              <Table.Cell fontWeight="medium">
-                                {trigger.name}
-                              </Table.Cell>
-                              <Table.Cell maxWidth="360px">
-                                <VStack gap={2} align="stretch">
-                                  {applyChecks(
-                                    trigger.checks?.filter(
-                                      (check): check is Monitor => !!check,
-                                    ) ?? [],
-                                  )}
-
-                                  {trigger.filterQuery ? (
-                                    // ADR-043: a trace-subject automation shows
-                                    // its search query.
-                                    <Code
-                                      size="sm"
-                                      variant="surface"
-                                      whiteSpace="pre-wrap"
-                                      wordBreak="break-word"
-                                    >
-                                      {trigger.filterQuery}
-                                    </Code>
-                                  ) : trigger.filters &&
-                                    typeof trigger.filters === "string" &&
-                                    trigger.filters !== "{}" ? (
-                                    <FilterDisplay
-                                      filters={trigger.filters}
-                                      hasBorder={true}
-                                    />
-                                  ) : null}
-                                </VStack>
-                              </Table.Cell>
-                              <Table.Cell>
-                                <VStack align="start" gap={0}>
-                                  <Text textStyle="sm" fontWeight="medium">
-                                    {triggerActionName(trigger.action)}
+                  {reports.length === 0 ? (
+                    <EmptyHint>
+                      No schedules yet. Create one for a recurring Slack or
+                      email digest.
+                    </EmptyHint>
+                  ) : (
+                    <TableShell>
+                      <Table.Root variant="line" width="full">
+                        <Table.Header>
+                          <Table.Row>
+                            <Table.ColumnHeader>Name</Table.ColumnHeader>
+                            <Table.ColumnHeader>Sends</Table.ColumnHeader>
+                            <Table.ColumnHeader whiteSpace="nowrap">
+                              Schedule
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader whiteSpace="nowrap">
+                              <MetricHeader
+                                label="Next run"
+                                help="When this next goes out, straight from the scheduler. A paused schedule has no next run."
+                              />
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader whiteSpace="nowrap">
+                              <MetricHeader
+                                label="Last run"
+                                help="The last time this was sent."
+                              />
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader>Delivery</Table.ColumnHeader>
+                            <Table.ColumnHeader>Active</Table.ColumnHeader>
+                            <Table.ColumnHeader />
+                          </Table.Row>
+                        </Table.Header>
+                        <Table.Body>
+                          {reports.map((trigger) => {
+                            const actionParams =
+                              trigger.actionParams as TriggerActionParams;
+                            const schedule = (
+                              actionParams as {
+                                schedule?: {
+                                  cron?: string;
+                                  timezone?: string;
+                                };
+                              }
+                            ).schedule;
+                            return (
+                              <Table.Row
+                                key={trigger.id}
+                                data-trigger-id={trigger.id}
+                                cursor="pointer"
+                                _hover={{ bg: "bg.muted" }}
+                                onClick={() =>
+                                  openDrawer("automation", {
+                                    automationId: trigger.id,
+                                  })
+                                }
+                              >
+                                <Table.Cell fontWeight="medium">
+                                  {trigger.name}
+                                </Table.Cell>
+                                <Table.Cell>
+                                  <ReportSubjectCell
+                                    actionParams={actionParams}
+                                    graphNameById={graphNameById}
+                                  />
+                                </Table.Cell>
+                                <Table.Cell whiteSpace="nowrap">
+                                  <Text textStyle="sm">
+                                    {schedule?.cron
+                                      ? describeSchedule(
+                                          schedule.cron,
+                                          schedule.timezone ?? "UTC",
+                                        )
+                                      : "Not set"}
                                   </Text>
-                                  <Box textStyle="xs" color="fg.muted">
-                                    {actionItems(trigger.action, actionParams)}
-                                  </Box>
-                                </VStack>
-                              </Table.Cell>
-                              <Table.Cell whiteSpace="nowrap">
-                                <LastFiredCell
-                                  trigger={trigger}
-                                  stats={stats}
+                                </Table.Cell>
+                                <ReportRunCells
+                                  schedule={scheduleByTriggerId.get(trigger.id)}
+                                  loading={reportSchedules.isLoading}
                                 />
-                              </Table.Cell>
-                              <Table.Cell>
-                                <Text as="span" color="fg.muted">
-                                  {stats?.recentFireCount ?? 0}
-                                </Text>
-                              </Table.Cell>
-                              {activeCell(trigger)}
-                              <Table.Cell>{rowActionsMenu(trigger)}</Table.Cell>
-                            </Table.Row>
-                          );
-                        })}
-                      </Table.Body>
-                    </Table.Root>
-                  </TableShell>
-                )}
-              </VStack>
+                                <Table.Cell>
+                                  {trigger.action === "SEND_SLACK_MESSAGE"
+                                    ? "Slack"
+                                    : "Email"}
+                                </Table.Cell>
+                                {activeCell(trigger)}
+                                <Table.Cell>
+                                  {rowActionsMenu(trigger)}
+                                </Table.Cell>
+                              </Table.Row>
+                            );
+                          })}
+                        </Table.Body>
+                      </Table.Root>
+                    </TableShell>
+                  )}
+                </VStack>
+              )}
 
-              {/* Recent activity — always visible, no longer behind a tab */}
-              <VStack align="stretch" gap={3} width="full">
-                <Heading size="sm">Recent activity</Heading>
-                <AutomationsHistory
-                  fires={activity.data ?? []}
-                  triggers={triggers.data ?? []}
-                  isLoading={activity.isLoading}
-                  onOpenAutomation={(triggerId) =>
-                    openDrawer("viewAutomation", { automationId: triggerId })
-                  }
-                />
-              </VStack>
+              {section === "automations" && (
+                <VStack align="stretch" gap={4}>
+                  <SectionHeader
+                    icon={<Zap size={18} />}
+                    accent="blue"
+                    title="Automations"
+                    count={traceAutomations.length}
+                    summary="Act on every incoming trace that matches your filters."
+                    details="An automation runs on each trace matching your filters: post to Slack or email, add rows to a dataset, or queue traces for annotation."
+                    addLabel="New automation"
+                    onAdd={() => openDrawer("automation", {})}
+                  />
+                  {traceAutomations.length === 0 ? (
+                    <UseCaseStrip
+                      kind="automation"
+                      onOpen={(prefill) => openDrawer("automation", prefill)}
+                    />
+                  ) : (
+                    <TableShell>
+                      <Table.Root variant="line" width="full">
+                        <Table.Header>
+                          <Table.Row>
+                            <Table.ColumnHeader>Name</Table.ColumnHeader>
+                            <Table.ColumnHeader>Acts on</Table.ColumnHeader>
+                            <Table.ColumnHeader>Then</Table.ColumnHeader>
+                            <Table.ColumnHeader whiteSpace="nowrap">
+                              <MetricHeader
+                                label="Last fired"
+                                help="When this automation last matched a trace and ran its action. Automations on a digest schedule also show when the next bundled send is due."
+                              />
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader whiteSpace="nowrap">
+                              <MetricHeader
+                                label="Fires (30d)"
+                                help="Times this automation fired in the last 30 days."
+                              />
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader>Active</Table.ColumnHeader>
+                            <Table.ColumnHeader />
+                          </Table.Row>
+                        </Table.Header>
+                        <Table.Body>
+                          {traceAutomations.map((trigger) => {
+                            const actionParams =
+                              trigger.actionParams as TriggerActionParams;
+                            const stats = statsByTriggerId.get(trigger.id);
+                            return (
+                              <Table.Row {...sharedRowProps(trigger)}>
+                                <Table.Cell fontWeight="medium">
+                                  {trigger.name}
+                                </Table.Cell>
+                                <Table.Cell maxWidth="360px">
+                                  <VStack gap={2} align="stretch">
+                                    {applyChecks(
+                                      trigger.checks?.filter(
+                                        (check): check is Monitor => !!check,
+                                      ) ?? [],
+                                    )}
+
+                                    {trigger.filterQuery ? (
+                                      // ADR-043: a trace-subject automation shows
+                                      // its search query.
+                                      <Code
+                                        size="sm"
+                                        variant="surface"
+                                        whiteSpace="pre-wrap"
+                                        wordBreak="break-word"
+                                      >
+                                        {trigger.filterQuery}
+                                      </Code>
+                                    ) : trigger.filters &&
+                                      typeof trigger.filters === "string" &&
+                                      trigger.filters !== "{}" ? (
+                                      <FilterDisplay
+                                        filters={trigger.filters}
+                                        hasBorder={true}
+                                      />
+                                    ) : null}
+                                  </VStack>
+                                </Table.Cell>
+                                <Table.Cell>
+                                  <VStack align="start" gap={0}>
+                                    <Text textStyle="sm" fontWeight="medium">
+                                      {triggerActionName(trigger.action)}
+                                    </Text>
+                                    <Box textStyle="xs" color="fg.muted">
+                                      {actionItems(
+                                        trigger.action,
+                                        actionParams,
+                                      )}
+                                    </Box>
+                                  </VStack>
+                                </Table.Cell>
+                                <Table.Cell whiteSpace="nowrap">
+                                  <LastFiredCell
+                                    trigger={trigger}
+                                    stats={stats}
+                                  />
+                                </Table.Cell>
+                                <Table.Cell>
+                                  <Text as="span" color="fg.muted">
+                                    {stats?.recentFireCount ?? 0}
+                                  </Text>
+                                </Table.Cell>
+                                {activeCell(trigger)}
+                                <Table.Cell>
+                                  {rowActionsMenu(trigger)}
+                                </Table.Cell>
+                              </Table.Row>
+                            );
+                          })}
+                        </Table.Body>
+                      </Table.Root>
+                    </TableShell>
+                  )}
+                </VStack>
+              )}
             </>
           )}
         </VStack>
       </Box>
-    </DashboardLayout>
+    </SectionNavigationLayout>
   );
 }
 
-/** One glance tile in the overview strip: a quiet uppercase label, a big
- *  number, and a one-line qualifier. Turns red when it's reporting a problem
- *  (an alert past its threshold). */
+function OverviewSectionHeading({
+  title,
+  summary,
+}: {
+  title: string;
+  summary: string;
+}) {
+  return (
+    <VStack align="start" gap={0.5}>
+      <Text fontSize="lg" fontWeight="semibold">
+        {title}
+      </Text>
+      <Text textStyle="sm" color="fg.muted">
+        {summary}
+      </Text>
+    </VStack>
+  );
+}
+
 function StatTile({
   label,
   value,
@@ -891,4 +996,4 @@ function StatTile({
 
 export default withPermissionGuard("triggers:view", {
   layoutComponent: DashboardLayout,
-})(Automations);
+})(AutomationsPage);

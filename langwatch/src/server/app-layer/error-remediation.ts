@@ -133,6 +133,13 @@ const registry = {
       "If it persists, check the LangWatch status page or contact support",
     ],
   },
+  evaluator_input_too_large: {
+    tips: [
+      "Shorten the input sent to this evaluator — the payload exceeded the evaluator's size limit",
+      "Map the evaluator to a specific field rather than the whole trace, so only what it scores is sent",
+    ],
+    docsPath: "/evaluations/evaluators/list",
+  },
   evaluator_missing_field: {
     tips: [
       "Provide the missing field in the request (see meta.field)",
@@ -174,6 +181,19 @@ const registry = {
   langy_turn_in_progress: {
     tips: [
       "Wait for the current response to finish before sending another message",
+    ],
+  },
+  langy_idempotency_mismatch: {
+    tips: [
+      "The same idempotency key was reused with different content — mint a fresh key for every new send",
+    ],
+  },
+  langy_empty_message: {
+    tips: ["Send a message with actual text content"],
+  },
+  langy_dispatch_rejected: {
+    tips: [
+      "The agent rejected this turn's request as invalid — it will not be retried; send a new message",
     ],
   },
   langy_agent_unavailable: {

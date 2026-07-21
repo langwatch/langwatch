@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { writeSpotlightFragment } from "../spotlights/SpotlightOverlay";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../spotlights/spotlights";
 import { useOnboardingStore } from "../store/onboardingStore";
+import { useTraceExplorerTourPreference } from "./useTraceExplorerTourPreference";
 
 interface UseFirstTraceSpotlightTriggerArgs {
   projectId: string | null;
@@ -9,14 +10,13 @@ interface UseFirstTraceSpotlightTriggerArgs {
 }
 
 /**
- * One-shot global (browser-level) effect: the moment `hasAnyTraces`
- * flips to true in any project we haven't auto-fired the spotlight tour
- * on yet, start spotlights so the user gets a contextual walk-through of
- * their own data the instant it lands.
+ * One-shot automatic effect: the moment `hasAnyTraces` flips to true in
+ * any project where we have not auto-fired the spotlight tour, start the
+ * contextual walkthrough of the user's data.
  *
- * Persisted in the global `firstTraceSpotlightFired` flag so refreshes
- * don't re-trigger AND so seeing the tour once suppresses it across every
- * project on this browser (no longer keyed by project). See
+ * The server-backed user preference is the authoritative cross-project,
+ * cross-browser dismissal. `firstTraceSpotlightFired` also prevents a
+ * duplicate automatic start in the current browser before dismissal. See
  * specs/traces-v2/tour-visibility-and-persistence.feature
  *
  * Skipped silently when:
@@ -32,8 +32,16 @@ export function useFirstTraceSpotlightTrigger({
   projectId,
   hasAnyTraces,
 }: UseFirstTraceSpotlightTriggerArgs): void {
+  const {
+    dismiss: persistDismissal,
+    isDismissed,
+    isResolved,
+  } = useTraceExplorerTourPreference();
   const firstTraceSpotlightFired = useOnboardingStore(
     (s) => s.firstTraceSpotlightFired,
+  );
+  const seenDrawerSpotlights = useOnboardingStore(
+    (s) => s.seenDrawerSpotlights,
   );
   const markFired = useOnboardingStore((s) => s.markFirstTraceSpotlightFired);
   const spotlightsActive = useOnboardingStore((s) => s.spotlightsActive);
@@ -42,10 +50,28 @@ export function useFirstTraceSpotlightTrigger({
   const setCurrentSpotlightId = useOnboardingStore(
     (s) => s.setCurrentSpotlightId,
   );
+  const hasLegacyTourHistoryOnMount = useRef(
+    firstTraceSpotlightFired || Object.keys(seenDrawerSpotlights).length > 0,
+  ).current;
+  const hasLegacyMigrationAttempted = useRef(false);
+
+  useEffect(() => {
+    if (
+      hasLegacyMigrationAttempted.current ||
+      !isResolved ||
+      isDismissed ||
+      !hasLegacyTourHistoryOnMount
+    ) {
+      return;
+    }
+    hasLegacyMigrationAttempted.current = true;
+    persistDismissal();
+  }, [hasLegacyTourHistoryOnMount, isDismissed, isResolved, persistDismissal]);
 
   useEffect(() => {
     if (!projectId) return;
     if (hasAnyTraces !== true) return;
+    if (isDismissed) return;
     if (firstTraceSpotlightFired) return;
     if (spotlightsActive || tourActive) {
       // The user is already mid-tour or mid-journey — don't yank them
@@ -82,6 +108,7 @@ export function useFirstTraceSpotlightTrigger({
   }, [
     projectId,
     hasAnyTraces,
+    isDismissed,
     firstTraceSpotlightFired,
     spotlightsActive,
     tourActive,

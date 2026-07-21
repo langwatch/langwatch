@@ -30,14 +30,16 @@ export class PrismaShareRepository implements ShareRepository {
   }
 
   async findByResourceType({
+    projectId,
     resourceType,
     resourceId,
   }: {
+    projectId: string;
     resourceType: ShareResourceType;
     resourceId: string;
   }): Promise<PublicShare | null> {
     return this.prisma.publicShare.findFirst({
-      where: { resourceType, resourceId },
+      where: { projectId, resourceType, resourceId },
     });
   }
 

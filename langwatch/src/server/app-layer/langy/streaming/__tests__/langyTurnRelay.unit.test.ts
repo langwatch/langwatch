@@ -51,6 +51,11 @@ function makeRelay(
   over: {
     conversations?: ReturnType<typeof fakeConversations>;
     fresh?: boolean;
+    readHandoffRunToken?: (a: {
+      projectId: string;
+      conversationId: string;
+      turnId: string;
+    }) => Promise<string | null>;
   } = {},
 ) {
   const buffer = fakeBuffer();
@@ -60,6 +65,9 @@ function makeRelay(
     buffer,
     conversations,
     reserveFrameNonce,
+    ...(over.readHandoffRunToken
+      ? { readHandoffRunToken: over.readHandoffRunToken }
+      : {}),
   });
   return { relay, buffer, conversations, reserveFrameNonce };
 }
@@ -466,6 +474,75 @@ describe("LangyTurnRelay", () => {
       await relay.handle(frame({ type: "delta", text: "b" }));
       await relay.handle(frame({ type: "final", text: "done" }));
       expect(conversations.getRunToken).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given the run-token handoff races the projection", () => {
+    describe("when a frame arrives before the projection has landed", () => {
+      it("authenticates it against the handoff token", async () => {
+        // First-turn reality: the async RunToken projection is still queued
+        // (null), but the synchronous handoff carries the token the worker
+        // signed with.
+        const conversations = fakeConversations(null);
+        const readHandoffRunToken = vi.fn(async () => RUN_TOKEN);
+        const { relay, buffer } = makeRelay({
+          conversations,
+          readHandoffRunToken,
+        });
+
+        const out = await relay.handle(frame({ type: "delta", text: "hi" }));
+
+        expect(out).toEqual({ status: "applied" });
+        expect(buffer.appendChunk).toHaveBeenCalledTimes(1);
+        // projectId is passed so the handoff read can refuse a handoff stashed
+        // under another project (conversation ids are project-scoped).
+        expect(readHandoffRunToken).toHaveBeenCalledWith({
+          projectId: "proj-1",
+          conversationId: "conv-1",
+          turnId: "turn-1",
+        });
+        // The lagging projection is never consulted once the handoff has it.
+        expect(conversations.getRunToken).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the handoff read fails transiently", () => {
+      it("falls back to the projection instead of tearing down the stream", async () => {
+        const conversations = fakeConversations();
+        const readHandoffRunToken = vi.fn(async () => {
+          throw new Error("redis unreachable");
+        });
+        const { relay, buffer } = makeRelay({
+          conversations,
+          readHandoffRunToken,
+        });
+
+        const out = await relay.handle(frame({ type: "delta", text: "hi" }));
+
+        // The throw must NOT propagate out of handle() and end the relay stream:
+        // falling through to the projection is the point of the two-stage lookup.
+        expect(out).toEqual({ status: "applied" });
+        expect(buffer.appendChunk).toHaveBeenCalledTimes(1);
+        expect(conversations.getRunToken).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the first lookup misses and a later frame arrives", () => {
+      it("re-reads the token instead of reusing the cached miss", async () => {
+        // No handoff wired; the projection is null on the first read, then lands.
+        const conversations = fakeConversations();
+        conversations.getRunToken.mockResolvedValueOnce(null);
+        const { relay, buffer } = makeRelay({ conversations });
+
+        const first = await relay.handle(frame({ type: "delta", text: "one" }));
+        expect(first).toEqual({ status: "rejected", reason: "no-run-token" });
+
+        const second = await relay.handle(frame({ type: "delta", text: "two" }));
+        expect(second).toEqual({ status: "applied" });
+        expect(buffer.appendChunk).toHaveBeenCalledTimes(1);
+        // Re-queried because the first null was NOT cached (the bug this fixes).
+        expect(conversations.getRunToken).toHaveBeenCalledTimes(2);
+      });
     });
   });
 });

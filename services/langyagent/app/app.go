@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"hash/fnv"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -21,6 +22,47 @@ import (
 // panics. Its message is user-safe (surfaced as an ndjson error event) and
 // carries no internals — the stack is logged by the goroutine's recover.
 var errStreamConsumerCrashed = errors.New("stream ended unexpectedly")
+
+// wakingLangyStatuses are the cold pre-first-frame lines: this worker has never
+// answered, so the wait really is a boot. Varied by turn (see readyStatusFor)
+// because one phrase repeated under every conversation start reads as a looping
+// machine.
+var wakingLangyStatuses = []string{
+	"Waking Langy up…",
+	"Giving Langy a pep talk…",
+	"Poking Langy…",
+}
+
+// reachingLangyStatuses are the warm-worker pre-first-frame lines: the worker
+// has answered before, so the wait is a round-trip, not a boot.
+var reachingLangyStatuses = []string{
+	"Paging Langy…",
+	"Pinging Langy…",
+	"Getting Langy's attention…",
+	"Nudging Langy…",
+}
+
+// readyStatusFor words the pre-first-frame status by the transition actually
+// happening: resuming a checkpointed turn (ADR-048), waking a worker that has
+// never answered, or reaching one that has. Lines rotate deterministically off
+// the turn id — stable for a re-drive of the same turn, different across turns.
+func readyStatusFor(req ChatRequest, worker Worker) string {
+	if req.ResumeToken != "" {
+		return "Picking up where it left off…"
+	}
+	if !worker.HasServedTurn() {
+		return wakingLangyStatuses[statusIndexOf(req.TurnID, len(wakingLangyStatuses))]
+	}
+	return reachingLangyStatuses[statusIndexOf(req.TurnID, len(reachingLangyStatuses))]
+}
+
+// statusIndexOf maps a turn id onto [0, n) with FNV-1a — cheap, deterministic,
+// and evenly spread, which is all a copy rotation needs.
+func statusIndexOf(turnID string, n int) int {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(turnID))
+	return int(h.Sum32() % uint32(n)) //nolint:gosec // bounded by n
+}
 
 // App is the langyagent application. It composes the worker pool and the
 // telemetry seam. All fields are injected via Options so tests can swap any
@@ -206,10 +248,14 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	// and every mediated LLM call it makes — is stitched under this turn's trace.
 	// With telemetry off this is the remote (control-plane) span context; still
 	// valid, still the right parent.
+	start := time.Now()
 	if sc := turnSpan.SpanContext(); sc.IsValid() {
 		worker.SetTurnTraceContext(sc)
+		// The customer's copy of the turn span, emitted when the turn ends —
+		// the real root under which the worker's re-parented spans and the
+		// gateway's retold LLM spans already sit.
+		defer func() { worker.ForwardTurnSpan(sc, start, time.Now()) }()
 	}
-	start := time.Now()
 
 	// The per-turn relay push. Disabled (no runToken/endpoint/secret) ⇒ nil stream:
 	// the turn still runs + finalizes, it just has no live edge.
@@ -222,16 +268,14 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	// LLM request the worker prepares its tools (measured at 10s+ on a cold
 	// home) and produces NO frames — the panel would sit on an escalating
 	// "Starting up…" that reads as a hang. The wording names the transition the
-	// manager actually knows: a resume from a shutdown handoff (ADR-048) is
-	// picking a checkpointed turn back up; everything else is a cold workspace
-	// coming to life. Emitted BEFORE onFirstFrame is wired, so time-to-first-
+	// manager actually knows (readyStatusFor): a resume from a shutdown handoff
+	// (ADR-048) is picking a checkpointed turn back up, a worker that has never
+	// answered is waking up, and a warm worker gets a short reaching-Langy line
+	// that varies by turn — one phrase repeated under every message reads as a
+	// looping machine. Emitted BEFORE onFirstFrame is wired, so time-to-first-
 	// frame keeps meaning the agent's own first output; the client clears the
 	// status the moment real output arrives.
-	readyStatus := "Setting up a fresh workspace…"
-	if req.ResumeToken != "" {
-		readyStatus = "Picking up where it left off…"
-	}
-	if f, err := frames.Status(readyStatus); err == nil {
+	if f, err := frames.Status(readyStatusFor(req, worker)); err == nil {
 		_ = sink.Emit(f)
 	}
 	// Mark time-to-first-frame (the agent's first output) on the turn span, so the

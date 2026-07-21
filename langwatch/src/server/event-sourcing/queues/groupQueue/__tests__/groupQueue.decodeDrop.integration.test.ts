@@ -18,8 +18,7 @@ import {
 } from "../../../__tests__/integration/testContainers";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
-import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle";
-import { encodeJobEnvelope, readEnvelopeHold } from "../jobEnvelope";
+import { encodeJobEnvelope } from "../jobEnvelope";
 import { gqJobsDroppedTotal } from "../metrics";
 import { GroupStagingScripts } from "../scripts";
 import { TieredBlobStore } from "../tieredBlobStore";
@@ -223,10 +222,12 @@ describe.skipIf(!hasTestcontainers)(
           // named it a drop. Reverting removes gq_jobs_dropped_total entirely, so
           // dropsFor() stays empty and the waitFor above times out.
           expect(entry!.labels.reason).toBe("retry_encode_failed");
-          // Unlike every other reason, this one SHOULD release: the body was
-          // already read, so keeping it buys a later worker nothing — and holding
-          // it would leak the hold to the 4-day TTL backstop.
-          expect(objectStore.deleted.length).toBeGreaterThan(0);
+          // Unlike body-present decode failures, this path retires its lease:
+          // the body was already read, so keeping the lease buys a later worker
+          // nothing. Shared bytes remain for lazy lifecycle reclaim.
+          expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(0);
+          expect(objectStore.deleted).toHaveLength(0);
+          expect(objectStore.store.size).toBe(1);
           // AC8 still holds here: a discard is not a completion.
           expect(await completedStat(name)).toBeNull();
         });
@@ -236,7 +237,7 @@ describe.skipIf(!hasTestcontainers)(
     describe("given a staged job whose body is present but cannot be decoded", () => {
       describe("when a worker claims the group and the decode fails", () => {
         /** @scenario a body-present decode failure does not destroy the body it could not read */
-        it("does not release the blob", async () => {
+        it("retires the lease without deleting the blob", async () => {
           const name = freshName();
           const groupId = `${TENANT}/body-present-release`;
           const objectStore = new InMemoryObjectStore();
@@ -266,10 +267,9 @@ describe.skipIf(!hasTestcontainers)(
           );
 
           expect(processed).not.toHaveBeenCalled();
-          // The revert-check: before #5538's fix this path called release(),
-          // which for an s3-tier blob means tieredBlobs.delete() — recorded
-          // here. Reverting the fix turns this into a non-empty array.
+          expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(0);
           expect(objectStore.deleted).toEqual([]);
+          expect(objectStore.store.size).toBe(1);
         });
 
         it("leaves the body readable from the blob store afterwards", async () => {
@@ -307,8 +307,8 @@ describe.skipIf(!hasTestcontainers)(
 
     describe("given a staged job whose referenced blob is genuinely gone", () => {
       describe("when a worker claims the group and the decode fails", () => {
-        /** @scenario a missing-blob drop releases the absent blob's holder */
-        it("releases the blob's holder", async () => {
+        /** @scenario "a missing-blob drop releases the absent blob's holder" */
+        it("releases the blob's lease without eager object deletion", async () => {
           const name = freshName();
           const groupId = `${TENANT}/missing-blob-release`;
           const objectStore = new InMemoryObjectStore();
@@ -333,17 +333,10 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 10000, interval: 100 },
           );
 
-          // The stated exemption (AC2a): a missing_blob drop DOES release —
-          // there is nothing left to preserve, so the holder is dropped.
-          // Revert-check: this currently passes either way (release() always
-          // ran pre-fix); its value is guarding the *other* reason branches
-          // don't regress into skipping this legitimate release.
-          await vi.waitFor(
-            () => {
-              expect(objectStore.deleted).toContain(uri);
-            },
-            { timeout: 5000, interval: 50 },
-          );
+          // There is nothing left to preserve, so the lease is retired. The
+          // application still never issues an eager shared-object delete.
+          expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(0);
+          expect(objectStore.deleted).toHaveLength(0);
         });
       });
     });
@@ -671,21 +664,6 @@ describe.skipIf(!hasTestcontainers)(
             queueName: name,
           });
 
-          // Acquire the holder that `send()` would have. Staging via
-          // encodeJobEnvelope + stageBatch bypasses `blobLifecycle.acquire()`, so
-          // WITHOUT this there is no holder — release() would delete nothing and
-          // `flaky.deleted === []` would pass even with the fix reverted. Caught
-          // by review after I shipped exactly that vacuous assertion; verified by
-          // reverting the release rule and watching this test stay green.
-          const lifecycle = new EnvelopeBlobLifecycle({
-            redis,
-            queueName: name,
-            objectStoreFor: () => flaky,
-            resolveStorageDestination: STORAGE_DESTINATION,
-          });
-          await lifecycle.acquire(envelope);
-          expect(readEnvelopeHold(envelope)).not.toBeNull(); // the holder is real
-
           const scripts = new GroupStagingScripts(redis, name);
           await scripts.stageBatch([
             {
@@ -697,6 +675,9 @@ describe.skipIf(!hasTestcontainers)(
               jobDataJson: envelope,
             },
           ]);
+          // The stage transaction publishes the lease with the job. Without
+          // this assertion, the later no-delete check could pass vacuously.
+          expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(1);
 
           newQueue({
             name,
@@ -713,14 +694,13 @@ describe.skipIf(!hasTestcontainers)(
           );
 
           const [entry] = await dropsFor(name);
-          // Revert-check: before #5538, this terminal called release() AND
-          // never counted the loss — an operator saw nothing while an event
-          // that could not possibly recover via replay was thrown away.
+          // Revert-check: before #5538 this terminal never counted the loss —
+          // an operator saw nothing while an event that could not recover via
+          // replay was thrown away.
           expect(entry!.labels.reason).toBe("transient_exhausted");
-          // The terminal's OTHER deliberate change, which had no coverage until a
-          // review caught it: it no longer releases. Eight failed READS mean the
-          // STORE was unreachable, not that the blob is gone — most likely it is
-          // still there, so retiring it would delete a body that exists.
+          // The terminal retires its lease but leaves shared object bytes to
+          // the durable-store lifecycle.
+          expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(0);
           expect(flaky.deleted).toEqual([]);
         });
       });

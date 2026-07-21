@@ -7,6 +7,11 @@ import { startTopicClusteringBootSeeds } from "../bootSeeds";
  * both seeds in the background and never lets a failure escape to the boot
  * path. The seed walks themselves are tested in seedTopicModel /
  * seedClusteringSchedules unit tests; here only the composition is real.
+ *
+ * Both seeds page the GLOBAL `Project` model (the tenancy guard exempts it),
+ * so they are told apart by their where-clause: the topic-model seed keeps
+ * projects that own Topic rows (`topics: { some }`), the schedule seed keeps
+ * projects past their first message (`firstMessage: true`).
  */
 
 const emptyPrisma = () =>
@@ -22,6 +27,9 @@ const commands = () => ({
   requestClustering: vi.fn().mockResolvedValue(undefined),
 });
 
+const pageWheres = (findMany: { mock: { calls: any[][] } }) =>
+  findMany.mock.calls.map((call) => call[0]?.where);
+
 describe("startTopicClusteringBootSeeds", () => {
   describe("when a worker boots", () => {
     it("fires both seed walks in the background", async () => {
@@ -34,10 +42,11 @@ describe("startTopicClusteringBootSeeds", () => {
       });
 
       await vi.waitFor(() => {
-        // Topic-model seed pages distinct projectIds off the Topic table…
-        expect(prisma.topic.findMany).toHaveBeenCalled();
+        const wheres = pageWheres(prisma.project.findMany);
+        // Topic-model seed pages the projects that own Topic rows…
+        expect(wheres.some((where) => where?.topics)).toBe(true);
         // …and the schedule seed pages eligible projects.
-        expect(prisma.project.findMany).toHaveBeenCalled();
+        expect(wheres.some((where) => where?.firstMessage === true)).toBe(true);
       });
     });
   });
@@ -63,9 +72,9 @@ describe("startTopicClusteringBootSeeds", () => {
         }),
       ).not.toThrow();
 
-      // Both rejections must have been consumed (no unhandled rejection).
+      // Both seeds' page walk rejects; both rejections must be consumed
+      // (no unhandled rejection escapes to the boot path).
       await vi.waitFor(() => {
-        expect(prisma.topic.findMany).toHaveBeenCalled();
         expect(prisma.project.findMany).toHaveBeenCalled();
       });
       await new Promise((resolve) => setImmediate(resolve));

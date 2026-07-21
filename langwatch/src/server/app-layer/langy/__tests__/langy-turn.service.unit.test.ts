@@ -10,10 +10,10 @@ import {
   type LangyTurnServiceDeps,
   type StartConversationTurnInput,
 } from "../langy-turn.service";
+import { langyTurnIdentity } from "../langy-turn.service";
 import type { LangyTurnAdmissionClaim } from "../repositories/langy-turn-admission.repository";
 
 const REQUEST_ID = "00000000-0000-4000-8000-000000000001";
-const TURN_ID = `langyturn_request-${REQUEST_ID}`;
 const SESSION = {
   user: { id: "user-1" },
 } as StartConversationTurnInput["session"];
@@ -123,11 +123,18 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   };
 }
 
+const IDENTITY = langyTurnIdentity({
+  userId: "user-1",
+  idempotencyKey: REQUEST_ID,
+  messages: [{ role: "user", parts: [{ type: "text", text: "hi" }] }],
+});
+const TURN_ID = IDENTITY.turnId;
+
 const input = (
   over: Partial<StartConversationTurnInput> = {},
 ): StartConversationTurnInput => ({
   projectId: "p1",
-  requestId: REQUEST_ID,
+  idempotencyKey: REQUEST_ID,
   session: SESSION,
   requestedConversationId: null,
   messages: [{ role: "user", parts: [{ type: "text", text: "hi" }] }],
@@ -163,7 +170,7 @@ describe("LangyTurnService.startConversationTurn", () => {
       expect.objectContaining({
         questionParts: [{ type: "text", text: "hi" }],
         userMessage: expect.objectContaining({
-          messageId: `langymsg_request-${REQUEST_ID}`,
+          messageId: IDENTITY.messageId,
           role: "user",
           parts: [{ type: "text", text: "hi" }],
         }),
@@ -398,5 +405,68 @@ describe("LangyTurnService.startConversationTurn", () => {
     expect(mocks.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({ intent: "revive", resumeToken: "checkpoint" }),
     );
+  });
+});
+
+describe("langyTurnIdentity", () => {
+  const base = {
+    userId: "user-1",
+    idempotencyKey: "key-1",
+    messages: [{ role: "user", parts: [{ type: "text", text: "hi" }] }],
+  };
+
+  it("derives the same identity for a byte-identical retry", () => {
+    expect(langyTurnIdentity(base)).toEqual(langyTurnIdentity({ ...base }));
+  });
+
+  it("derives a different identity when the content changes under the same key", () => {
+    const other = langyTurnIdentity({
+      ...base,
+      messages: [{ role: "user", parts: [{ type: "text", text: "bye" }] }],
+    });
+    expect(other.turnId).not.toBe(langyTurnIdentity(base).turnId);
+  });
+
+  it("derives a different identity for another user with the same key and content", () => {
+    const other = langyTurnIdentity({ ...base, userId: "user-2" });
+    expect(other.turnId).not.toBe(langyTurnIdentity(base).turnId);
+  });
+
+  it("treats a model override change as different content", () => {
+    const other = langyTurnIdentity({ ...base, modelOverride: "openai/gpt-5-mini" });
+    expect(other.turnId).not.toBe(langyTurnIdentity(base).turnId);
+  });
+});
+
+describe("when the idempotency key is reused with different content", () => {
+  it("rejects with the mismatch error instead of replaying the original send", async () => {
+    const { deps } = makeDeps({
+      admission: {
+        claim: vi.fn(async () => ({ kind: "mismatch" }) as LangyTurnAdmissionClaim),
+        commit: vi.fn(async () => {}),
+        abort: vi.fn(async () => {}),
+        release: vi.fn(async () => {}),
+      } as unknown as LangyTurnServiceDeps["admission"],
+    });
+    const service = LangyTurnService.create(deps);
+
+    await expect(service.startConversationTurn(input())).rejects.toMatchObject({
+      code: "langy_idempotency_mismatch",
+    });
+  });
+});
+
+describe("when the send carries no usable text", () => {
+  it("rejects before admitting anything durable", async () => {
+    const { deps, mocks } = makeDeps();
+    const service = LangyTurnService.create(deps);
+
+    await expect(
+      service.startConversationTurn(
+        input({ messages: [{ role: "user", parts: [] }] }),
+      ),
+    ).rejects.toMatchObject({ code: "langy_empty_message" });
+    expect(mocks.claim).not.toHaveBeenCalled();
+    expect(mocks.dispatch).not.toHaveBeenCalled();
   });
 });

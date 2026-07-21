@@ -16,6 +16,7 @@ export interface ShareRepository {
   }): Promise<PublicShare | null>;
 
   findByResourceType(params: {
+    projectId: string;
     resourceType: ShareResourceType;
     resourceId: string;
   }): Promise<PublicShare | null>;

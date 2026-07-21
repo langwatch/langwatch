@@ -16,13 +16,13 @@ import posthog from "posthog-js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { IconType } from "react-icons";
 import { LuArrowLeft, LuArrowRight, LuMic, LuX, LuZap } from "react-icons/lu";
+import { SERIF } from "~/features/asaplangy";
+import { getIsMac } from "~/features/command-bar/utils/platform";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useRouter } from "~/utils/compat/next-router";
 import { useColorModeValue } from "../ui/color-mode";
-import { getIsMac } from "~/features/command-bar/utils/platform";
 import { Tooltip } from "../ui/tooltip";
-import { SERIF } from "~/features/asaplangy";
 
 // ---- Timing knobs -------------------------------------------------------
 
@@ -939,17 +939,21 @@ export function HomePageBanners({
                       fontSize="11.5px"
                       whiteSpace="nowrap"
                       cursor="pointer"
-                      color="fg"
+                      // Wears the same orange as the "New" pill beside the
+                      // heading so the call to action reads as the announcement's
+                      // own colour, not a muted default. A filled subtle pill (vs
+                      // the badge's outline) keeps it clearly a button.
+                      color="orange.fg"
                       borderWidth="1px"
-                      borderColor="border.emphasized"
+                      borderColor="orange.emphasized"
                       borderRadius="8px"
                       paddingX={2.5}
                       paddingY="4px"
-                      background="bg.emphasized"
-                      transition="border-color 130ms ease, color 130ms ease"
+                      background="orange.subtle"
+                      transition="background-color 130ms ease, border-color 130ms ease"
                       _hover={{
-                        borderColor: "orange.emphasized",
-                        color: "orange.fg",
+                        background: "orange.muted",
+                        borderColor: "orange.solid",
                       }}
                     >
                       {s.ctaLabel}
@@ -967,7 +971,10 @@ export function HomePageBanners({
             })}
           </Box>
 
-          {/* Dismiss — quiet inline chrome, like every other card control. */}
+          {/* Dismiss — quiet inline chrome, like every other card control.
+              Pinned to the TOP of the row (the row centres its items, which
+              otherwise floats the X to the vertical middle) so it reads as a
+              normal top-right card close. */}
           <Tooltip
             content={`Hide for ${SNOOZE_DAYS} days`}
             positioning={{ placement: "top" }}
@@ -977,6 +984,7 @@ export function HomePageBanners({
               variant="ghost"
               color="fg.subtle"
               flexShrink={0}
+              alignSelf="flex-start"
               _hover={{ bg: "bg.muted", color: "fg" }}
               onClick={() => dismiss(slide)}
               aria-label="Dismiss"

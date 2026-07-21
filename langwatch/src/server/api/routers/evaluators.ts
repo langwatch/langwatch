@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -15,6 +15,23 @@ import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
  * Evaluator type enum for validation
  */
 const evaluatorTypeSchema = z.enum(["evaluator", "code", "workflow"]);
+
+const assertWorkflowInProject = async (
+  prisma: PrismaClient,
+  projectId: string,
+  workflowId: string,
+) => {
+  const workflow = await prisma.workflow.findFirst({
+    where: { id: workflowId, projectId, archivedAt: null },
+    select: { id: true },
+  });
+  if (!workflow) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Workflow is not available in this project",
+    });
+  }
+};
 
 /**
  * Evaluator Router - Manages evaluator CRUD operations
@@ -99,6 +116,11 @@ export const evaluatorsRouter = createTRPCRouter({
 
       // If workflowId is provided, check if an evaluator already exists for this workflow
       if (input.workflowId) {
+        await assertWorkflowInProject(
+          ctx.prisma,
+          input.projectId,
+          input.workflowId,
+        );
         const existingEvaluator = await ctx.prisma.evaluator.findFirst({
           where: {
             workflowId: input.workflowId,
@@ -150,6 +172,13 @@ export const evaluatorsRouter = createTRPCRouter({
             message: "Code evaluators need code, inputs, and outputs",
           });
         }
+      }
+      if (input.workflowId) {
+        await assertWorkflowInProject(
+          ctx.prisma,
+          input.projectId,
+          input.workflowId,
+        );
       }
       const evaluatorService = EvaluatorService.create(ctx.prisma);
       return await evaluatorService.update({
@@ -290,19 +319,12 @@ export const evaluatorsRouter = createTRPCRouter({
     .input(z.object({ id: z.string(), projectId: z.string() }))
     .use(checkProjectPermission("evaluations:view"))
     .query(async ({ ctx, input }) => {
-      // Fetch the evaluator with its workflow
+      // Fetch the evaluator first, then scope its workflow to the same project.
       const evaluator = await ctx.prisma.evaluator.findFirst({
         where: {
           id: input.id,
           projectId: input.projectId,
           archivedAt: null,
-        },
-        include: {
-          workflow: {
-            include: {
-              currentVersion: true,
-            },
-          },
         },
       });
 
@@ -313,8 +335,19 @@ export const evaluatorsRouter = createTRPCRouter({
         });
       }
 
+      const workflow = evaluator.workflowId
+        ? await ctx.prisma.workflow.findFirst({
+            where: {
+              id: evaluator.workflowId,
+              projectId: input.projectId,
+              archivedAt: null,
+            },
+            include: { currentVersion: true },
+          })
+        : null;
+
       // If not a workflow evaluator, return empty fields
-      if (evaluator.type !== "workflow" || !evaluator.workflow) {
+      if (evaluator.type !== "workflow" || !workflow) {
         return {
           evaluatorId: evaluator.id,
           evaluatorType: evaluator.type,
@@ -323,7 +356,7 @@ export const evaluatorsRouter = createTRPCRouter({
       }
 
       // Get the workflow DSL from the current version
-      const dsl = evaluator.workflow.currentVersion?.dsl as unknown as
+      const dsl = workflow.currentVersion?.dsl as unknown as
         | Workflow
         | undefined;
 
@@ -334,10 +367,9 @@ export const evaluatorsRouter = createTRPCRouter({
         evaluatorId: evaluator.id,
         evaluatorType: evaluator.type,
         workflowId: evaluator.workflowId,
-        workflowName: evaluator.workflow.name,
-        workflowIcon: (
-          evaluator.workflow.currentVersion?.dsl as { icon?: string } | null
-        )?.icon,
+        workflowName: workflow.name,
+        workflowIcon: (workflow.currentVersion?.dsl as { icon?: string } | null)
+          ?.icon,
         fields,
       };
     }),

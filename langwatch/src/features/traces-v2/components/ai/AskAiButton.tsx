@@ -4,6 +4,7 @@ import { MeshGradient } from "@paper-design/shaders-react";
 import { Sparkles, Zap } from "lucide-react";
 import React, { useCallback, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { useColorModeValue } from "~/components/ui/color-mode";
 import {
   PopoverArrow,
   PopoverBody,
@@ -14,24 +15,27 @@ import {
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import NextLink from "~/utils/compat/next-link";
-import { aiBrandPalette } from "./aiBrandPalette";
+import { aiBrandPalette, aiBrandPaletteHot } from "./aiBrandPalette";
 
-// Slow, breathing halo that cycles through the Langy palette so the
-// Ask AI affordance reads as alive without becoming a flashing
-// distraction. Each step blends two of the three palette stops so the
-// shadow drifts between blue / purple / amber over a 6s cycle.
-const aiGlowPulse = keyframes`
+// Slow, breathing halo that cycles through the palette so the Ask AI
+// affordance reads as alive without becoming a flashing distraction. Each
+// step blends two of the three palette stops over a 6s cycle. One halo per
+// ground: light runs the hot ramp (orange / pink / violet), dark the langy
+// ramp (blue / purple / amber).
+const createAiGlowPulse = (palette: readonly string[]) => keyframes`
   0%, 100% {
     box-shadow:
-      0 0 0 0 ${aiBrandPalette[0]}33,
-      0 1px 4px ${aiBrandPalette[2]}55;
+      0 0 0 0 ${palette[0]}33,
+      0 1px 4px ${palette[2]}55;
   }
   50% {
     box-shadow:
-      0 0 14px 2px ${aiBrandPalette[1]}66,
-      0 1px 4px ${aiBrandPalette[2]}55;
+      0 0 14px 2px ${palette[1]}66,
+      0 1px 4px ${palette[2]}55;
   }
 `;
+const aiGlowPulseHot = createAiGlowPulse(aiBrandPaletteHot);
+const aiGlowPulse = createAiGlowPulse(aiBrandPalette);
 
 interface AskAiButtonProps {
   onClick: () => void;
@@ -77,6 +81,10 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
 }) => {
   const reduceMotion = useReducedMotion();
   const isGated = needsProviderPrimer || !!disabledReason;
+  // Light keeps the hot ramp (the langy ramp read lifeless on white); dark
+  // keeps the langy identity ramp untouched.
+  const palette = useColorModeValue(aiBrandPaletteHot, aiBrandPalette);
+  const glowPulse = useColorModeValue(aiGlowPulseHot, aiGlowPulse);
   const button = (
     <Button
       aria-label={ariaLabel}
@@ -94,7 +102,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       position="relative"
       overflow="hidden"
       bg="transparent"
-      boxShadow="0 1px 4px rgba(237,137,38,0.22), 0 0 0 1px rgba(237,137,38,0.14)"
+      boxShadow="0 1px 4px rgba(168,85,247,0.25), 0 0 0 1px rgba(255,95,31,0.12)"
       _dark={{ boxShadow: "0 1px 4px rgba(237,137,38,0.16)" }}
       // Live "AI breathing" halo — only when motion is allowed. Skipped
       // when fully gated by `disabledReason` (sample mode) — a pulsing
@@ -104,7 +112,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       animation={
         reduceMotion || disabledReason
           ? undefined
-          : `${aiGlowPulse} 6s ease-in-out infinite`
+          : `${glowPulse} 6s ease-in-out infinite`
       }
       _hover={isGated ? undefined : { filter: "brightness(1.08)" }}
       cursor={disabledReason ? "not-allowed" : undefined}
@@ -122,7 +130,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
         _dark={{ opacity: 0.7 }}
       >
         <MeshGradient
-          colors={aiBrandPalette}
+          colors={palette}
           distortion={0.5}
           swirl={0.5}
           grainMixer={0}

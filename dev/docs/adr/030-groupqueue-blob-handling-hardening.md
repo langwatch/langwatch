@@ -4,7 +4,19 @@
 
 **Status:** Proposed
 
-**Amends:** [ADR-029](./029-groupqueue-content-addressed-payload-store.md) (GroupQueue content-addressed tiered payload store). ADR-029's tiered store, GQ2 envelope, holder-set reclaim, and queue wiring stand; this ADR hardens the blob lifecycle against the correctness, security, and design gaps a three-pass review (tests / security / code) surfaced after the implementation landed.
+> **Lifecycle amendment (2026-07-18):** WP4 superseded the holder TTL and eager release/transfer decisions below with Redis-time, per-holder renewable leases. Release and transfer now mutate lease membership only; Redis expiry and the durable-store lifecycle reclaim shared bytes lazily. See the current [GroupQueue architecture](../../../langwatch/src/server/event-sourcing/queues/groupQueue/ARCHITECTURE.md#per-holder-renewable-leases).
+>
+> **Migration (WP4 → leases).** This ADR and ADR-029 ship in the same rolling deploy and share one migration; [ADR-029's WP4 amendment](./029-groupqueue-content-addressed-payload-store.md) is the authoritative copy. Restated here so this ADR stands alone:
+>
+> - **Phases.** One phase. No schema change, no backfill, no Terraform-managed resource added or removed — the change is in-Redis bookkeeping under the existing queue prefix and hash tag (`blobholders:` SET → `blobleases:` ZSET). Old holder sets are left to the 4-day `BLOB_LEASE_SET_TTL_SECONDS` that the compatibility-guard write refreshes them to. `LEGACY_HOLDER_LEASE_GUARD` keeps old and new pods safe alongside each other during the roll.
+> - **Canary validation.** One worker replica first, held 15 minutes. Pass: no increase in `gq_jobs_dropped_total{reason="missing_blob"}` attributable to the canary, `gq_jobs_completed_total` still advancing on that pod, no `"Failed to parse staged job data"` lines carrying its `hostname`. Any one failing, roll back before widening.
+> - **Rollback.** `kubectl rollout undo` on the workers deployment; no data step. Lease ZSETs left behind are ignored by the old path and expire on their own TTL. Prefer a trough over a burst, since the reverse direction reopens the same narrow cross-version window.
+> - **Dashboards.** `gq_jobs_dropped_total` by `reason`, `gq_jobs_completed_total`, `gq_jobs_staged_total`, and Redis `used_memory` on the queue instance. Reclaim is lazy now, so `used_memory` is *expected* to rise until the 4-day backstop reaches steady state — that alone is not a rollback signal; a rising `missing_blob` count is.
+> - **Post-deployment state comparison.** No Terraform-managed resource changes, so desired-versus-live is confirmed by an empty plan for the queue's Redis and the workers deployment, plus the usual `helm template` versus `kubectl get -o yaml` diff on the workers pod spec. Drift here means something other than this change moved.
+>
+> Lease deadlines are scored with Redis `TIME` rather than a client clock, so the migration carries no worker-clock-skew requirement.
+
+**Amends:** [ADR-029](./029-groupqueue-content-addressed-payload-store.md) (GroupQueue content-addressed tiered payload store). ADR-029's tiered store, GQ2 envelope, and queue wiring stand; this ADR hardens the blob lifecycle against the correctness, security, and design gaps a three-pass review (tests / security / code) surfaced after the implementation landed. Its holder-set reclaim does **not** stand — WP4 replaced it with per-holder renewable leases and lazy reclaim, as the amendment above records.
 
 **Relates to:** [ADR-022](./022-event-log-source-of-truth.md) (the edge `COMMAND_INLINE_THRESHOLD` this revisits), `src/server/stored-objects/` (the reused object store).
 

@@ -1,6 +1,14 @@
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Box, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import { Activity, Anvil, Film, Flag, History, Shield, CalendarClock,} from "lucide-react";
+import {
+  Activity,
+  Anvil,
+  CalendarClock,
+  Film,
+  Flag,
+  History,
+  Shield,
+} from "lucide-react";
 import React, { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 import { useOpsPermission } from "../hooks/useOpsPermission";
@@ -12,6 +20,11 @@ import { projectRoutes } from "../utils/routes";
 import { useTableView } from "./messages/HeaderButtons";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
 import { GovernSection } from "./sidebar/GovernSection";
+import {
+  isExperimentsActivePath,
+  isOnlineEvaluationsActivePath,
+} from "./sidebar/navigationActiveState";
+import { SidebarSection } from "./sidebar/SidebarSection";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
 import { ThemeToggle } from "./sidebar/ThemeToggle";
@@ -103,178 +116,171 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
 
-            <Text
-              fontSize="11px"
-              fontWeight="medium"
-              textTransform="uppercase"
-              color="gray.500"
-              paddingX={2}
-              paddingTop={3}
-              paddingBottom={1}
+            <SidebarSection
+              id="observe"
+              label="Observe"
+              showExpanded={showExpanded}
+              projectId={project?.id}
             >
-              {showExpanded ? "Observe" : <>&nbsp;</>}
-            </Text>
-
-            <PageMenuLink
-              path={projectRoutes.analytics.path}
-              icon={featureIcons.analytics.icon}
-              label={projectRoutes.analytics.title}
-              project={project}
-              isActive={router.pathname.includes("/analytics")}
-              showLabel={showExpanded}
-            />
-            <PageMenuLink
-              path={projectRoutes.traces_v2.path}
-              icon={featureIcons.traces_v2.icon}
-              label={projectRoutes.traces_v2.title}
-              project={project}
-              isActive={router.pathname.includes("/traces")}
-              showLabel={showExpanded}
-            />
-            <PageMenuLink
-              path={projectRoutes.messages.path}
-              icon={featureIcons.traces.icon}
-              label={projectRoutes.messages.title}
-              project={project}
-              isActive={router.pathname.includes("/messages")}
-              showLabel={showExpanded}
-              legacy
-            />
-
-            <Text
-              fontSize="11px"
-              fontWeight="medium"
-              textTransform="uppercase"
-              color="gray.500"
-              paddingX={2}
-              paddingTop={3}
-              paddingBottom={1}
-            >
-              {showExpanded ? "Evaluate" : <>&nbsp;</>}
-            </Text>
-
-            <CollapsibleMenuGroup
-              icon={featureIcons.simulations.icon}
-              label={projectRoutes.simulations.title}
-              project={project}
-              showLabel={showExpanded}
-              children={[
-                {
-                  icon: featureIcons.scenarios.icon,
-                  label: projectRoutes.scenarios.title,
-                  href: project
-                    ? projectRoutes.scenarios.path.replace(
-                        "[project]",
-                        project.slug,
-                      )
-                    : "/auth/signin",
-                  isActive: router.pathname.includes("/simulations/scenarios"),
-                },
-                {
-                  icon: featureIcons.simulation_runs.icon,
-                  label: projectRoutes.simulation_runs.title,
-                  href: project
-                    ? projectRoutes.simulation_runs.path.replace(
-                        "[project]",
-                        project.slug,
-                      )
-                    : "/auth/signin",
-                  isActive:
-                    router.pathname.includes("/simulations") &&
-                    !router.pathname.includes("/simulations/scenarios"),
-                },
-              ]}
-            />
-
-            <PageMenuLink
-              path={projectRoutes.evaluations.path}
-              icon={featureIcons.evaluations.icon}
-              label={projectRoutes.evaluations.title}
-              project={project}
-              isActive={
-                router.pathname.includes("/evaluations") &&
-                !router.pathname.includes("/analytics")
-              }
-              showLabel={showExpanded}
-            />
-
-            <PageMenuLink
-              path={projectRoutes.annotations.path}
-              icon={featureIcons.annotations.icon}
-              label={projectRoutes.annotations.title}
-              project={project}
-              badgeNumber={pendingItemsCount.data}
-              isActive={router.pathname.includes("/annotations")}
-              showLabel={showExpanded}
-            />
-
-            <Text
-              fontSize="11px"
-              fontWeight="medium"
-              textTransform="uppercase"
-              color="gray.500"
-              paddingX={2}
-              paddingTop={3}
-              paddingBottom={1}
-            >
-              {showExpanded ? "Build" : <>&nbsp;</>}
-            </Text>
-
-            <PageMenuLink
-              path={projectRoutes.prompts.path}
-              icon={featureIcons.prompts.icon}
-              label={projectRoutes.prompts.title}
-              project={project}
-              isActive={router.pathname.includes("/prompts")}
-              showLabel={showExpanded}
-            />
-
-            <PageMenuLink
-              path={projectRoutes.agents.path}
-              icon={featureIcons.agents.icon}
-              label={projectRoutes.agents.title}
-              project={project}
-              isActive={router.pathname.includes("/agents")}
-              showLabel={showExpanded}
-            />
-
-            <PageMenuLink
-              path={projectRoutes.workflows.path}
-              icon={featureIcons.workflows.icon}
-              label={projectRoutes.workflows.title}
-              project={project}
-              isActive={router.pathname.includes("/workflows")}
-              showLabel={showExpanded}
-            />
-
-            <PageMenuLink
-              path={projectRoutes.evaluators.path}
-              icon={featureIcons.evaluators.icon}
-              label={projectRoutes.evaluators.title}
-              project={project}
-              isActive={router.pathname.includes("/evaluators")}
-              showLabel={showExpanded}
-            />
-
-            <PageMenuLink
-              path={projectRoutes.datasets.path}
-              icon={featureIcons.datasets.icon}
-              label={projectRoutes.datasets.title}
-              project={project}
-              isActive={router.pathname.includes("/datasets")}
-              showLabel={showExpanded}
-            />
-
-            {hasPermission("triggers:view") && (
               <PageMenuLink
-                path={projectRoutes.automations.path}
-                icon={featureIcons.automations.icon}
-                label={projectRoutes.automations.title}
+                path={projectRoutes.analytics.path}
+                icon={featureIcons.analytics.icon}
+                label={projectRoutes.analytics.title}
                 project={project}
-                isActive={router.pathname.includes("/automations")}
+                isActive={router.pathname.includes("/analytics")}
                 showLabel={showExpanded}
               />
-            )}
+              <PageMenuLink
+                path={projectRoutes.traces_v2.path}
+                icon={featureIcons.traces_v2.icon}
+                label={projectRoutes.traces_v2.title}
+                project={project}
+                isActive={router.pathname.includes("/traces")}
+                showLabel={showExpanded}
+              />
+              <PageMenuLink
+                path={projectRoutes.messages.path}
+                icon={featureIcons.traces.icon}
+                label={projectRoutes.messages.title}
+                project={project}
+                isActive={router.pathname.includes("/messages")}
+                showLabel={showExpanded}
+                legacy
+              />
+              <PageMenuLink
+                path={projectRoutes.online_evaluations.path}
+                icon={featureIcons.online_evaluations.icon}
+                label="Online Evals"
+                project={project}
+                isActive={isOnlineEvaluationsActivePath(router.pathname)}
+                showLabel={showExpanded}
+              />
+            </SidebarSection>
+
+            <SidebarSection
+              id="test"
+              label="Test"
+              showExpanded={showExpanded}
+              projectId={project?.id}
+            >
+              <CollapsibleMenuGroup
+                icon={featureIcons.simulations.icon}
+                label={projectRoutes.simulations.title}
+                project={project}
+                showLabel={showExpanded}
+                children={[
+                  {
+                    icon: featureIcons.scenarios.icon,
+                    label: projectRoutes.scenarios.title,
+                    href: project
+                      ? projectRoutes.scenarios.path.replace(
+                          "[project]",
+                          project.slug,
+                        )
+                      : "/auth/signin",
+                    isActive: router.pathname.includes(
+                      "/simulations/scenarios",
+                    ),
+                  },
+                  {
+                    icon: featureIcons.simulation_runs.icon,
+                    label: projectRoutes.simulation_runs.title,
+                    href: project
+                      ? projectRoutes.simulation_runs.path.replace(
+                          "[project]",
+                          project.slug,
+                        )
+                      : "/auth/signin",
+                    isActive:
+                      router.pathname.includes("/simulations") &&
+                      !router.pathname.includes("/simulations/scenarios"),
+                  },
+                ]}
+              />
+
+              <PageMenuLink
+                path={projectRoutes.experiments.path}
+                icon={featureIcons.experiments.icon}
+                label={projectRoutes.experiments.title}
+                project={project}
+                isActive={isExperimentsActivePath(router.pathname)}
+                showLabel={showExpanded}
+              />
+
+              <PageMenuLink
+                path={projectRoutes.annotations.path}
+                icon={featureIcons.annotations.icon}
+                label={projectRoutes.annotations.title}
+                project={project}
+                badgeNumber={pendingItemsCount.data}
+                isActive={router.pathname.includes("/annotations")}
+                showLabel={showExpanded}
+              />
+            </SidebarSection>
+
+            <SidebarSection
+              id="library"
+              label="Build"
+              showExpanded={showExpanded}
+              defaultExpanded={false}
+              projectId={project?.id}
+            >
+              <PageMenuLink
+                path={projectRoutes.prompts.path}
+                icon={featureIcons.prompts.icon}
+                label={projectRoutes.prompts.title}
+                project={project}
+                isActive={router.pathname.includes("/prompts")}
+                showLabel={showExpanded}
+              />
+
+              <PageMenuLink
+                path={projectRoutes.agents.path}
+                icon={featureIcons.agents.icon}
+                label={projectRoutes.agents.title}
+                project={project}
+                isActive={router.pathname.includes("/agents")}
+                showLabel={showExpanded}
+              />
+
+              <PageMenuLink
+                path={projectRoutes.workflows.path}
+                icon={featureIcons.workflows.icon}
+                label={projectRoutes.workflows.title}
+                project={project}
+                isActive={router.pathname.includes("/workflows")}
+                showLabel={showExpanded}
+              />
+
+              <PageMenuLink
+                path={projectRoutes.evaluators.path}
+                icon={featureIcons.evaluators.icon}
+                label={projectRoutes.evaluators.title}
+                project={project}
+                isActive={router.pathname.includes("/evaluators")}
+                showLabel={showExpanded}
+              />
+
+              <PageMenuLink
+                path={projectRoutes.datasets.path}
+                icon={featureIcons.datasets.icon}
+                label={projectRoutes.datasets.title}
+                project={project}
+                isActive={router.pathname.includes("/datasets")}
+                showLabel={showExpanded}
+              />
+
+              {hasPermission("triggers:view") && (
+                <PageMenuLink
+                  path={projectRoutes.automations.path}
+                  icon={featureIcons.automations.icon}
+                  label={projectRoutes.automations.title}
+                  project={project}
+                  isActive={router.pathname.includes("/automations")}
+                  showLabel={showExpanded}
+                />
+              )}
+            </SidebarSection>
 
             <GovernSection showExpanded={showExpanded} />
 
@@ -352,18 +358,7 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
     : (opsBadge.data?.dlqCount ?? 0);
 
   return (
-    <>
-      <Text
-        fontSize="11px"
-        fontWeight="medium"
-        textTransform="uppercase"
-        color="gray.500"
-        paddingX={2}
-        paddingTop={3}
-        paddingBottom={1}
-      >
-        {showExpanded ? "Ops" : <>&nbsp;</>}
-      </Text>
+    <SidebarSection id="ops" label="Ops" showExpanded={showExpanded}>
       <SideMenuLink
         icon={Activity}
         label="Dashboard"
@@ -419,7 +414,7 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
           showLabel={showExpanded}
         />
       )}
-    </>
+    </SidebarSection>
   );
 };
 

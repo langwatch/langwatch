@@ -99,7 +99,7 @@ func LoadConfig(ctx context.Context) (Config, error) {
 		return Config{}, err
 	}
 	cfg.OTel.SampleRatioSet = os.Getenv("OTEL_SAMPLE_RATIO") != ""
-	if err := cfg.OTel.Resolve(cfg.Environment); err != nil {
+	if err := cfg.OTel.Resolve(); err != nil {
 		return Config{}, err
 	}
 	if err := config.Validate(ctx, cfg); err != nil {

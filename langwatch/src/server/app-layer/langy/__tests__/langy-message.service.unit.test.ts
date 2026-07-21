@@ -43,8 +43,9 @@ function makeConversationRepo(
     findActiveOwnedIds: vi.fn().mockResolvedValue([]),
     findPendingHandoff: vi.fn().mockResolvedValue(null),
     findRunToken: vi.fn().mockResolvedValue(null),
+    turnExists: vi.fn().mockResolvedValue(false),
     ...overrides,
-  } as LangyConversationRepository;
+  };
 }
 
 describe("LangyMessageService", () => {

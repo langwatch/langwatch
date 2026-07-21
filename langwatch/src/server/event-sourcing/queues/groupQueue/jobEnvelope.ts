@@ -71,7 +71,7 @@ async function boundedDecompress(data: Buffer): Promise<Buffer> {
  * Inflate + parse a body, naming the failure if it will not read.
  *
  * Named `decode*`, not `read*`: every `read*` in this file contractually never
- * throws (`readJobRoutingMeta`, `readEnvelopeDescriptor`, `readEnvelopeHold`…),
+ * throws (`readJobRoutingMeta`, `readEnvelopeDescriptor`, `readEnvelopeLease`…),
  * and this throws the `DecodeFailureError`s the drop path dispatches on.
  *
  * A body that is present but unreadable — bad compression frame, a codec this
@@ -253,7 +253,7 @@ export interface EnvelopeHeader {
   r?: string;
   /** GQ2 content-addressed tiered blob reference. */
   ref?: BlobRef;
-  /** GQ2 per-stage hold token — the holder-set member for this staged occupancy. */
+  /** GQ2 per-stage lease holder identity for this staged occupancy. */
   h?: string;
   /** Routing fields read by the Lua dispatcher and ops dashboard WITHOUT parsing the body. */
   p?: string;
@@ -590,7 +590,7 @@ export async function encodeJobEnvelope({
       });
       header.e = ref.tier;
       header.ref = ref;
-      // Per-stage hold token: the holder-set member identifying this staged
+      // Per-stage lease holder identity for this staged
       // occupancy. Lives in the (inline) header, never in the content-addressed
       // body, so it doesn't perturb the blob hash that collapses the fan-out.
       header.h = randomUUID();
@@ -615,7 +615,7 @@ export async function encodeJobEnvelope({
 
   // GQ1 fallback path: reached when the caller opted into writes but didn't
   // supply BOTH a tiered store and a projectId. Loud so a composition-root
-  // regression can't silently ship a pipeline without dedup / holder refcount /
+  // regression can't silently ship a pipeline without dedup / blob leasing /
   // tenant namespacing (2026-06-24 review).
   if (queueName) gqEnvelopeGQ2DowngradeTotal.inc({ queue_name: queueName });
   if (logger) {
@@ -771,8 +771,9 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
 }
 
 /**
- * Header-taking variant of {@link readEnvelopeBlobId} — for callers that have
- * already parsed the envelope and don't want a second `Buffer.from + JSON.parse`.
+ * The GQ1 offloaded-blob id from a parsed envelope header, or null for inline
+ * bodies, GQ2 tiered refs, and legacy JSON. The retirement paths read it via
+ * {@link readEnvelopeRetirement} so completion/restage pay a single parse.
  */
 export function readEnvelopeBlobIdFromHeader(
   header: EnvelopeHeader,
@@ -781,74 +782,76 @@ export function readEnvelopeBlobIdFromHeader(
 }
 
 /**
- * Returns the GQ1 offloaded-blob id of an envelope value, or null for inline
- * bodies, GQ2 tiered refs, legacy JSON, and unreadable values. Used by the
- * completion and restage paths to delete blobs whose staged value is retired.
- */
-export function readEnvelopeBlobId(value: string): string | null {
-  try {
-    if (!isEnvelope(value)) return null;
-    const { header } = splitEnvelope(value);
-    return readEnvelopeBlobIdFromHeader(header);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Header-taking variant of {@link readEnvelopeHold} — for callers that have
+ * Header-taking variant of {@link readEnvelopeLease} — for callers that have
  * already parsed the envelope and don't want a second `Buffer.from + JSON.parse`.
  */
-export function readEnvelopeHoldFromHeader(
+export function readEnvelopeLeaseFromHeader(
   header: EnvelopeHeader,
-): { ref: BlobRef; token: string } | null {
+): { ref: BlobRef; holderId: string } | null {
   if (
     (header.e === "redis" || header.e === "s3") &&
     header.ref &&
     typeof header.h === "string"
   ) {
-    return { ref: header.ref, token: header.h };
+    return { ref: header.ref, holderId: header.h };
   }
   return null;
 }
 
 /**
- * Returns the GQ2 ref together with its per-stage hold token (the holder-set
- * member), or null for inline bodies, GQ1 refs, legacy JSON, and unreadable
- * values. The acquire/release seams use this to reference-count the blob
- * without depending on the Lua-internal slot id.
+ * Every tiered ref the decoder would fetch, whether or not it carries a lease.
+ *
+ * The tenant guard MUST key off this rather than off {@link readEnvelopeLeaseFromHeader}:
+ * that one additionally requires `header.h`, so an envelope with a valid
+ * cross-tenant `ref` and no holder id yields no lease, skips the guard, and is
+ * still fetched by `decodeJobEnvelope` — which has no tenant check of its own.
+ * A forged or mis-routed envelope could read another tenant's blob that way.
+ * Validate the ref; use the lease only for renewal (ADR-030 §5).
  */
-export function readEnvelopeHold(
+export function readEnvelopeTieredRefFromHeader(
+  header: EnvelopeHeader,
+): BlobRef | null {
+  if ((header.e === "redis" || header.e === "s3") && header.ref) {
+    return header.ref;
+  }
+  return null;
+}
+
+/**
+ * Returns the GQ2 ref together with its per-stage lease holder identity, or
+ * null for inline bodies, GQ1 refs, legacy JSON, and unreadable values.
+ */
+export function readEnvelopeLease(
   value: string,
-): { ref: BlobRef; token: string } | null {
+): { ref: BlobRef; holderId: string } | null {
   try {
     if (!isEnvelope(value)) return null;
     const { header } = splitEnvelope(value);
-    return readEnvelopeHoldFromHeader(header);
+    return readEnvelopeLeaseFromHeader(header);
   } catch {
     return null;
   }
 }
 
 /**
- * Single parse for retirement: given a staged value, return the GQ2 hold and/or
- * GQ1 blob id from ONE `splitEnvelope`. Prefer over calling `readEnvelopeHold`
- * + `readEnvelopeBlobId` in sequence on the completion / restage hot path
+ * Single parse for retirement: given a staged value, return the GQ2 lease and/or
+ * GQ1 blob id from ONE `splitEnvelope`. Prefer over calling `readEnvelopeLease`
+ * + the blob-id read in sequence on the completion / restage hot path
  * (2026-06-24 review).
  */
 export function readEnvelopeRetirement(value: string): {
-  hold: { ref: BlobRef; token: string } | null;
+  lease: { ref: BlobRef; holderId: string } | null;
   blobId: string | null;
 } {
   try {
-    if (!isEnvelope(value)) return { hold: null, blobId: null };
+    if (!isEnvelope(value)) return { lease: null, blobId: null };
     const { header } = splitEnvelope(value);
     return {
-      hold: readEnvelopeHoldFromHeader(header),
+      lease: readEnvelopeLeaseFromHeader(header),
       blobId: readEnvelopeBlobIdFromHeader(header),
     };
   } catch {
-    return { hold: null, blobId: null };
+    return { lease: null, blobId: null };
   }
 }
 

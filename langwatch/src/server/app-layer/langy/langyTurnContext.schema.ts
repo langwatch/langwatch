@@ -73,10 +73,12 @@ const MAX_SKILL_CHIPS = 6;
  * never depend on the app layer, or a UI concern becomes load-bearing in a
  * request path. Pure data over `feature-map.json`, so it belongs to neither side.
  */
-const SKILL_IDS = LANGY_SKILLS.map((skill) => skill.id) as [
-  string,
-  ...string[],
-];
+// Client commands ("/feedback") are composer-intercepted and never travel as
+// skill context, so they stay out of the wire enum — a skill id the agent will
+// never be handed must not be acceptable on the wire either.
+const SKILL_IDS = LANGY_SKILLS.filter(
+  (skill) => skill.source !== "client-command",
+).map((skill) => skill.id) as [string, ...string[]];
 
 /**
  * A resource the user is looking at, attached so the agent can resolve "this

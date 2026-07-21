@@ -7,7 +7,7 @@ Feature: Scenario tests for skills quality assurance
   # All `@unimplemented` scenarios in this file describe live Claude
   # Code-driven scenario tests under `skills/_tests/*.scenario.test.ts`
   # (e.g. `tracing.scenario.test.ts`, `evaluations.scenario.test.ts`,
-  # `level-up.scenario.test.ts`, `analytics.scenario.test.ts`,
+  # `level-up.scenario.test.ts`, `agent-performance.scenario.test.ts`,
   # `prompts*.scenario.test.ts`, `scenarios.scenario.test.ts`). The
   # tests exist and are skipped in CI (`it.skipIf(isCI)`) — they
   # spawn an actual Claude Code agent against a fixture codebase.
@@ -215,14 +215,15 @@ Feature: Scenario tests for skills quality assurance
   # Platform skill tests (no codebase — simulating claude web)
   # ──────────────────────────────────────────────────
 
-  @platform @analytics @integration @unimplemented
-  Scenario: Analytics skill uses the CLI to query performance
+  @platform @agent-performance @integration @unimplemented
+  Scenario: Agent performance skill diagnoses production behavior through the CLI
     Given an empty temporary directory (no codebase)
-    And the skill "analytics" is loaded
-    When the agent receives "tell me how my agent has been performing"
+    And the skill "agent-performance" is loaded
+    When the agent receives "how is my agent performing?"
     Then the agent runs `langwatch analytics query` with one or more metric presets
-    And the agent uses `langwatch trace search` or `langwatch trace get` to inspect specific traces
-    And the agent provides a summary of performance trends
+    And the agent exports or inspects traces with `langwatch trace export`, `langwatch trace search`, or `langwatch trace get`
+    And the agent writes an HTML report whose findings link to example traces
+    And the agent recommends the agent-improve skill as the next step
     And the agent does NOT use any MCP tools
 
   # ──────────────────────────────────────────────────

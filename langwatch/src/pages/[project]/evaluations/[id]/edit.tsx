@@ -9,9 +9,9 @@ import {
   Spacer,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useState } from "react";
 import { MoreVertical } from "react-feather";
+import { useRouter } from "~/utils/compat/next-router";
 import CheckConfigForm, {
   type CheckConfigFormData,
 } from "../../../../components/checks/CheckConfigForm";
@@ -52,7 +52,7 @@ export default function EditTraceCheck() {
           closable: true,
         },
       });
-      void router.push(`/${project.slug}/evaluations`);
+      void router.push(`/${project.slug}/online-evaluations`);
       check.remove();
     } catch {
       toaster.create({
@@ -105,7 +105,7 @@ export default function EditTraceCheck() {
                     closable: true,
                   },
                 });
-                void router.push(`/${project.slug}/evaluations`);
+                void router.push(`/${project.slug}/online-evaluations`);
               },
               onError: () => {
                 toaster.create({

@@ -67,6 +67,12 @@ describe("getOverlayConfig()", () => {
         const config = getOverlayConfig(ScenarioRunStatus.STALLED);
         expect(config.scrim).toContain("yellow");
       });
+
+      it("provides the established full-card light-mode wash", () => {
+        const config = getOverlayConfig(ScenarioRunStatus.STALLED);
+        expect(config.lightModeGradient).toContain("radial-gradient");
+        expect(config.lightModeGradient).toContain("rgba(214, 158, 46");
+      });
     });
 
     describe("when compared to ERROR overlay", () => {
@@ -92,6 +98,21 @@ describe("getOverlayConfig()", () => {
       it("treats the run as complete", () => {
         const config = getOverlayConfig(ScenarioRunStatus.SUCCESS);
         expect(config.isComplete).toBe(true);
+      });
+
+      /** @scenario Light mode restores the full-card completion wash */
+      it("uses the established layered green light-mode gradient", () => {
+        const config = getOverlayConfig(ScenarioRunStatus.SUCCESS);
+        expect(config.lightModeGradient.match(/radial-gradient/g)).toHaveLength(
+          3,
+        );
+        expect(config.lightModeGradient).toContain("rgba(56, 161, 105");
+      });
+
+      /** @scenario Dark mode keeps the compact status scrim */
+      it("keeps the semantic green scrim for dark mode", () => {
+        const config = getOverlayConfig(ScenarioRunStatus.SUCCESS);
+        expect(config.scrim).toBe("green.solid/20");
       });
     });
   });

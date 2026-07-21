@@ -7,7 +7,7 @@ import {
  * Langy error explainer (ADR-045).
  *
  * The platform serializes handled `HandledError`s to `{ code, kind, meta,
- * httpStatus, traceId, spanId, reasons }` — over tRPC as `error.data.domainError`, and (new in
+ * httpStatus, traceId, spanId, reasons }` — over tRPC as `error.data.error`, and (new in
  * this PR) over the chat stream as a JSON-encoded string in the error part.
  * This module turns either into a keyed presentation the UI renders:
  *
@@ -163,17 +163,17 @@ export function readLangyStreamError(
   };
 }
 
-/** Read a Langy domain error off a tRPC client error (`error.data.domainError`). */
+/** Read a Langy domain error off a tRPC client error (`error.data.error`). */
 export function readLangyTrpcError(err: unknown): LangyDomainError | null {
   const domain = readHandledError(err);
   if (!domain) return null;
   const serialized = (
     err as {
       data?: {
-        domainError?: { traceId?: unknown; reasons?: unknown };
+        error?: { traceId?: unknown; reasons?: unknown };
       };
     }
-  )?.data?.domainError;
+  )?.data?.error;
   const traceId = serialized?.traceId;
   return {
     ...domain,
@@ -425,17 +425,25 @@ export function explainLangyError(
         ...debug,
       };
 
-    default:
+    default: {
       // A handled kind we don't have bespoke copy for yet: still useful, never
-      // a raw string, and its meta + reasons are surfaced for debugging.
+      // a raw string, and its meta + reasons are surfaced for debugging. A
+      // server-authored sentence in `meta.message` wins over the stock line —
+      // that is the only channel carrying prose (ADR-045), and it is how a
+      // proxied Go herr explains itself before we write copy for its code.
+      const authored = domain.meta?.message;
       return {
         kind: domain.code,
         title: "Langy couldn't finish that",
-        description: "The request was rejected. Try rephrasing or start again.",
+        description:
+          typeof authored === "string" && authored.length > 0
+            ? authored
+            : "The request was rejected. Try rephrasing or start again.",
         render: "card",
         action: { label: "Try again", kind: "retry" },
         traceId: domain.traceId,
         ...debug,
       };
+    }
   }
 }

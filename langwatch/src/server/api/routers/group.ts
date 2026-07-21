@@ -13,6 +13,7 @@ import { RoleService } from "~/server/role/role.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { slugify } from "~/utils/slugify";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
 
 async function findUniqueGroupSlug(
   prisma: Pick<PrismaClient, "group">,
@@ -99,7 +100,19 @@ export const groupRouter = createTRPCRouter({
           roleBindings: {
             include: { customRole: { select: { id: true, name: true } } },
           },
-          _count: { select: { members: true } },
+          _count: {
+            select: {
+              members: {
+                where: {
+                  user: {
+                    orgMemberships: {
+                      some: { organizationId: input.organizationId },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
         orderBy: { name: "asc" },
       });
@@ -147,6 +160,13 @@ export const groupRouter = createTRPCRouter({
             include: { customRole: { select: { id: true, name: true } } },
           },
           members: {
+            where: {
+              user: {
+                orgMemberships: {
+                  some: { organizationId: input.organizationId },
+                },
+              },
+            },
             include: { user: { select: { id: true, name: true, email: true } } },
           },
         },
@@ -211,6 +231,12 @@ export const groupRouter = createTRPCRouter({
       });
 
       const baseSlug = slugify(input.name, { lower: true, strict: true });
+
+      await assertUsersInOrganization(
+        ctx.prisma,
+        input.organizationId,
+        input.memberIds ?? [],
+      );
 
       // Validate all binding scopes belong to this org before starting the transaction
       if (input.bindings?.length) {

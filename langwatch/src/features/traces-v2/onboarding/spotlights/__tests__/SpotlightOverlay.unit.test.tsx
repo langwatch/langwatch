@@ -26,6 +26,7 @@ const mockSetSpotlightsActive = vi.fn((v: boolean) => {
 const mockSetCurrentSpotlightId = vi.fn((id: string | null) => {
   mockCurrentSpotlightId = id;
 });
+const mockPersistDismissal = vi.fn();
 
 vi.mock("../../store/onboardingStore", () => ({
   useOnboardingStore: (selector: (s: unknown) => unknown) =>
@@ -35,6 +36,14 @@ vi.mock("../../store/onboardingStore", () => ({
       setSpotlightsActive: mockSetSpotlightsActive,
       setCurrentSpotlightId: mockSetCurrentSpotlightId,
     }),
+}));
+
+vi.mock("../../hooks/useTraceExplorerTourPreference", () => ({
+  useTraceExplorerTourPreference: () => ({
+    dismiss: mockPersistDismissal,
+    isDismissed: false,
+    isResolved: true,
+  }),
 }));
 
 // Stub history.replaceState so fragment writes don't throw in jsdom
@@ -52,7 +61,12 @@ vi.stubGlobal("cancelAnimationFrame", () => undefined);
 
 // ─── Module under test ────────────────────────────────────────────────────────
 import React from "react";
-import { SpotlightOverlay } from "../SpotlightOverlay";
+import {
+  type AnchorRect,
+  isAnchorParkedOffscreen,
+  isAnchorSettled,
+  SpotlightOverlay,
+} from "../SpotlightOverlay";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../spotlights";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -183,6 +197,15 @@ describe("<SpotlightOverlay />", () => {
         fireEvent.click(dismissBtn);
         expect(mockSetCurrentSpotlightId).toHaveBeenCalledWith(null);
       });
+
+      it("persists dismissal for the authenticated user", async () => {
+        renderOverlay();
+        const skipButton = await waitFor(() =>
+          screen.getByRole("button", { name: /skip tour/i }),
+        );
+        fireEvent.click(skipButton);
+        expect(mockPersistDismissal).toHaveBeenCalledOnce();
+      });
     });
 
     describe("when on the last spotlight and user clicks Done", () => {
@@ -202,6 +225,7 @@ describe("<SpotlightOverlay />", () => {
         );
         fireEvent.click(doneBtn);
         expect(mockSetSpotlightsActive).toHaveBeenCalledWith(false);
+        expect(mockPersistDismissal).toHaveBeenCalledOnce();
       });
     });
 
@@ -260,6 +284,81 @@ describe("<SpotlightOverlay />", () => {
         );
         fireEvent.keyDown(window, { key: "Escape" });
         expect(mockSetSpotlightsActive).toHaveBeenCalledWith(false);
+        expect(mockPersistDismissal).toHaveBeenCalledOnce();
+      });
+    });
+  });
+});
+
+// The drawer companion ride slides the drawer in from the right, parking its
+// anchors off-screen mid-ride. These predicates gate WHERE the fixed ring may
+// land so it (and its full-viewport scrim) never strand off-screen.
+// Spec: specs/langy/langy-panel-layout.feature.
+describe("anchor settle predicates", () => {
+  const VW = 1440;
+  const rect = (over: Partial<AnchorRect> = {}): AnchorRect => ({
+    top: 100,
+    left: 200,
+    width: 120,
+    height: 40,
+    ...over,
+  });
+
+  describe("isAnchorParkedOffscreen", () => {
+    describe("given the anchor's left edge is at or past the right viewport edge", () => {
+      it("reports it parked off-screen", () => {
+        expect(isAnchorParkedOffscreen(rect({ left: VW }), VW, 0)).toBe(true);
+        expect(isAnchorParkedOffscreen(rect({ left: VW + 500 }), VW, 0)).toBe(
+          true,
+        );
+      });
+    });
+
+    describe("given the anchor sits within the viewport", () => {
+      it("reports it on-screen (a zero-rect included, for jsdom)", () => {
+        expect(isAnchorParkedOffscreen(rect({ left: 200 }), VW, 0)).toBe(false);
+        expect(
+          isAnchorParkedOffscreen(rect({ left: 0, width: 0 }), VW, 0),
+        ).toBe(false);
+      });
+    });
+
+    describe("given the page is scrolled horizontally", () => {
+      it("subtracts scrollX before testing the edge", () => {
+        // left carries scrollX; a rect at viewport x=200 reads on-screen.
+        expect(isAnchorParkedOffscreen(rect({ left: VW + 200 }), VW, 500)).toBe(
+          false,
+        );
+      });
+    });
+  });
+
+  describe("isAnchorSettled", () => {
+    describe("given the anchor is on-screen and unchanged since the last frame", () => {
+      it("reports it settled", () => {
+        expect(isAnchorSettled(rect(), rect(), VW, 0)).toBe(true);
+      });
+    });
+
+    describe("given the anchor is still parked off-screen", () => {
+      it("is never settled, even if unchanged (parked, not resting)", () => {
+        const parked = rect({ left: VW });
+        expect(isAnchorSettled(parked, parked, VW, 0)).toBe(false);
+      });
+    });
+
+    describe("given the anchor moved since the last frame", () => {
+      it("is not settled (still riding in)", () => {
+        expect(isAnchorSettled(rect({ left: 200 }), rect({ left: 260 }), VW, 0)).toBe(
+          false,
+        );
+      });
+    });
+
+    describe("given there is no prior frame to compare", () => {
+      it("is not settled yet", () => {
+        expect(isAnchorSettled(rect(), null, VW, 0)).toBe(false);
+        expect(isAnchorSettled(null, rect(), VW, 0)).toBe(false);
       });
     });
   });

@@ -115,7 +115,7 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if cfg.CustomerTraceBridge.BaseURL == "" {
 		cfg.CustomerTraceBridge.BaseURL = cfg.ControlPlane.BaseURL
 	}
-	if err := cfg.OTel.Resolve(cfg.Environment); err != nil {
+	if err := cfg.OTel.Resolve(); err != nil {
 		return Config{}, err
 	}
 	if err := config.Validate(ctx, cfg); err != nil {

@@ -39,6 +39,12 @@ Feature: Topic clustering owns the topic model
     And their ids, names, and hierarchy are preserved exactly
     And re-running the seed changes nothing
 
+  Scenario: Seeding reaches every project that predates ownership
+    Given many projects whose topics predate event-sourced ownership
+    When the worker service starts
+    Then every one of those projects is seeded, not just the first page
+    And a project the projection already owns is left untouched
+
   Scenario: A late duplicate seed can never remove recorded topics
     Given a project whose topics were seeded and then extended by clustering
     When a duplicate seed carrying only the original topics arrives late

@@ -131,7 +131,7 @@ export class RecentItemsService {
           id: monitor.id,
           type: "evaluation",
           name: monitor.name,
-          href: `/${monitor.project.slug}/evaluations`,
+          href: `/${monitor.project.slug}/online-evaluations`,
           updatedAt: timestamp,
         };
       }
