@@ -75,6 +75,11 @@ export function createLangyConversationUpdateBroadcastSubscriber(
           JSON.stringify({
             event: "langy_conversation_updated",
             conversationId,
+            // The projection's position when this signal was published
+            // (ADR-059 §3): the client compares it with its own local cursor
+            // and fetches the event tail only when it is behind. A cursor is
+            // inert — no conversation content rides the tenant-wide channel.
+            cursor: record.cursor,
             // These fields are consumed by the server-side SSE authorization
             // gate and stripped from the client signal schema.
             ownerUserId: record.ownerUserId,
