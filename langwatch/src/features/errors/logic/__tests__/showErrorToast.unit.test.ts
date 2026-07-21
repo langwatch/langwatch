@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const create = vi.fn();
+const create = vi.fn<(args: Record<string, unknown>) => void>();
 vi.mock("~/components/ui/toaster", () => ({ toaster: { create } }));
 
 const isHandledByGlobalHandler = vi.fn(() => false);
