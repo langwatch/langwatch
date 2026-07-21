@@ -282,13 +282,13 @@ func TestTenantRouter_OpsFallback(t *testing.T) {
 			t.Fatalf("ops pipeline received %d spans, want 1", len(ops.spans))
 		}
 		got := ops.spans[0].Resource().Attributes()
-		found := false
+		hasMarker := false
 		for _, kv := range got {
 			if string(kv.Key) == AttrLangWatchOrigin && kv.Value.AsString() == "platform_internal" {
-				found = true
+				hasMarker = true
 			}
 		}
-		if !found {
+		if !hasMarker {
 			t.Fatalf("ops span resource lacks the internal-origin marker: %v", got)
 		}
 		if n := len(ops.spans[0].Attributes()); n != 0 {
