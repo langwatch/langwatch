@@ -31,6 +31,7 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
 ## Notes per row
 
 ### 1–2. Output contract & agent mode (P1) — DONE
+
 - Single `printResult` helper in `typescript-sdk/src/cli/utils/output.ts`; formats
   `table|json|agents|yaml` (yaml via the existing `js-yaml` dependency — no new dep).
 - Legacy flags normalized centrally: `-f/--format` and bare `--json` → `-o`
@@ -53,6 +54,7 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
   path, not the output contract).
 
 ### 3–4. Catalog & help-tree (P3) — DONE
+
 - Base: `feature-map.json` (canonical IA per `dev/docs/adr/012-skills-information-architecture.md`
   and `013-workflow-based-onboarding.md`; update protocol in `.claude/skills/feature-map/SKILL.md`).
   Backfilled: new `ai-gateway/` category (`virtual-keys`, `gateway-budgets`,
@@ -78,6 +80,7 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
   guarding the Langy catalog.
 
 ### 5. Skills (P4) — DONE
+
 - Bundle at build time: `copy-types.sh` → `typescript-sdk/scripts/generate-skills-bundle.mjs`
   (pure node, zero workspace deps) →
   `src/internal/generated/cli/skills.generated.ts`. Bodies are the COMMITTED
@@ -125,6 +128,7 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
 - Distribution today: `npx skills add langwatch/skills` — stays as alternative.
 
 ### 6. Errors (P2) — CLI side DONE
+
 - Three REST error dialects exist server-side (see `handled-error.ts` consumers):
   flattened `{error, message, ...meta, trace:{…}}` (drops `reasons`/`traceUrl`),
   verbatim `serialize()` under `domainError`, and the new framework envelope in
@@ -154,6 +158,7 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
   client change needed.
 
 ### 7–8. Status & ask (P5)
+
 - `lw status` (DONE): gh-status-style "Needs Attention" section renders above
   the resource counts — errored traces (24h), still-running experiments,
   budgets at ≥80% utilization — each fetched in parallel and soft-failing
@@ -174,6 +179,7 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
   for, so it is split into a server follow-up (spec in Open items).
 
 ### 12. Help topics (P5) — DONE
+
 - `help` is registered as a REAL command (`help [topic]`): a command named
   `help` suppresses commander's lazily-created implicit one, so
   `lw help agent-mode` reaches our action while `lw help` / `lw help <command>`
@@ -185,6 +191,7 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
   coverage test.
 
 ### 11. Fast cold start (P6) — DONE
+
 - zod is off the always-loaded program path: the local-prompt-config schema moved
   from `src/cli/types.ts` to `src/cli/types-prompt.ts` (only the lazy-loaded prompt
   commands import it; `types.ts` re-exports the TYPE only, so type-only callers are
@@ -215,6 +222,7 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
   ~50ms warm.
 
 ## Follow-ups
+
 - Phase 6 (build & binary optimization) landed — see the row-11 notes for the
   measured numbers (~100ms → ~80ms cold start, 9.6MB → 3.6MB dist, 1.68MB →
   0.69MB tarball, 62.7MB → 61.7MB binary). Deliberately DEFERRED to a separate
@@ -223,6 +231,7 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
   one file) replacement, and the js-yaml vs `yaml` consolidation.
 
 ## Open items
+
 - [x] ~~Verify npm availability of the `lw` package name before publish~~ — the
   `lw` PACKAGE name is taken (abandoned 2022 utility, v0.1.1) but declares no
   `bin`, so shipping `bin: { "lw": …, "langwatch": … }` from the existing

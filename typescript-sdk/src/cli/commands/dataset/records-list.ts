@@ -55,7 +55,6 @@ export const recordsListCommand = async (
           return;
         }
 
-        // Collect all keys from record entries
         const entryKeys = new Set<string>();
         records.forEach((record) => {
           Object.keys(record.entry).forEach((key) => entryKeys.add(key));

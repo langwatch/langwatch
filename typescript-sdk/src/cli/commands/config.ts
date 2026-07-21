@@ -18,12 +18,6 @@ import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpo
 
 type ConfigKey = "endpoint" | "gateway-url" | "daemon";
 
-const KEY_LABELS: Record<ConfigKey, string> = {
-  endpoint: "endpoint",
-  "gateway-url": "gateway_url",
-  daemon: "daemon",
-};
-
 const VALID_KEYS = new Set<ConfigKey>(["endpoint", "gateway-url", "daemon"]);
 
 function isValidKey(s: string): s is ConfigKey {

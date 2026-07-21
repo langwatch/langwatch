@@ -6,6 +6,50 @@ import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
 
+/** How many records the human table previews before it says "and N more". */
+const PREVIEW_LIMIT = 10;
+
+/** Longest cell the preview renders before it truncates with an ellipsis. */
+const MAX_CELL_LENGTH = 50;
+
+/**
+ * The previewed records, shaped for `formatTable`.
+ *
+ * Dataset rows are free-form, so the header set is the UNION of every key seen
+ * in the preview window rather than the first row's keys — otherwise a row with
+ * an extra field renders that field nowhere. Cells are truncated because a
+ * single oversized value would push every other column off the terminal.
+ */
+const buildDatasetPreviewRows = (
+  entries: readonly { entry: Record<string, unknown> }[],
+): { headers: string[]; tableData: Record<string, string>[] } => {
+  const previewEntries = entries.slice(0, PREVIEW_LIMIT);
+
+  const allKeys = new Set<string>();
+  previewEntries.forEach((entry) => {
+    Object.keys(entry.entry).forEach((key) => allKeys.add(key));
+  });
+  const headers = Array.from(allKeys);
+
+  const tableData = previewEntries.map((entry) => {
+    const row: Record<string, string> = {};
+    headers.forEach((key) => {
+      const value = entry.entry[key];
+      row[key] =
+        value === null || value === undefined
+          ? ""
+          : typeof value === "string"
+            ? value.length > MAX_CELL_LENGTH
+              ? value.substring(0, MAX_CELL_LENGTH - 3) + "..."
+              : value
+            : JSON.stringify(value).substring(0, MAX_CELL_LENGTH);
+    });
+    return row;
+  });
+
+  return { headers, tableData };
+};
+
 /**
  * Gets dataset details by slug or ID, showing metadata and a preview of records.
  */
@@ -51,42 +95,17 @@ export const getCommand = async (slugOrId: string): Promise<CommandResult | void
           console.log(`  ${chalk.bold("View:")}       ${chalk.underline(viewUrl)}`);
         }
 
-        // Show a preview of the first 10 records
         if (dataset.entries.length > 0) {
           console.log();
-          console.log(chalk.bold("Preview (first 10 records):"));
+          console.log(chalk.bold(`Preview (first ${PREVIEW_LIMIT} records):`));
 
-          const previewEntries = dataset.entries.slice(0, 10);
-
-          // Collect all keys from entries
-          const allKeys = new Set<string>();
-          previewEntries.forEach((entry) => {
-            Object.keys(entry.entry).forEach((key) => allKeys.add(key));
-          });
-          const headers = Array.from(allKeys);
-
-          const tableData = previewEntries.map((entry) => {
-            const row: Record<string, string> = {};
-            headers.forEach((key) => {
-              const value = entry.entry[key];
-              row[key] =
-                value === null || value === undefined
-                  ? ""
-                  : typeof value === "string"
-                    ? value.length > 50
-                      ? value.substring(0, 47) + "..."
-                      : value
-                    : JSON.stringify(value).substring(0, 50);
-            });
-            return row;
-          });
-
+          const { headers, tableData } = buildDatasetPreviewRows(dataset.entries);
           formatTable({ data: tableData, headers });
 
-          if (dataset.entries.length > 10) {
+          if (dataset.entries.length > PREVIEW_LIMIT) {
             console.log(
               chalk.gray(
-                `  ... and ${dataset.entries.length - 10} more record(s)`,
+                `  ... and ${dataset.entries.length - PREVIEW_LIMIT} more record(s)`,
               ),
             );
           }
