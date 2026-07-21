@@ -815,11 +815,17 @@ export const langyRouter = createTRPCRouter({
             userId,
             buffer,
             signal: followSignal,
-          }).then((entry) => {
-            if (!entry) return;
-            synthesized = entry;
-            settle.abort(); // unblock the follow() below
-          });
+          })
+            .then((entry) => {
+              if (!entry) return;
+              synthesized = entry;
+              settle.abort(); // unblock the follow() below
+            })
+            // Attached HERE, not in the finally below: follow() can block for
+            // minutes, so a rejection would sit unhandled until then — and Node's
+            // default --unhandled-rejections=throw would take the process down
+            // first. A failed watcher just means no synthesized terminal.
+            .catch(() => {});
 
           try {
             for await (const { entry } of buffer.follow({
@@ -837,7 +843,7 @@ export const langyRouter = createTRPCRouter({
             }
           } finally {
             settle.abort();
-            await watcher.catch(() => {});
+            await watcher; // already has its own .catch()
           }
 
           // follow() ended with no buffered terminal. If the watcher proved the
