@@ -253,6 +253,56 @@ func TestPruneModelNothingSelected(t *testing.T) {
 	})
 }
 
+func TestPruneDeleteCancelsScan(t *testing.T) {
+	t.Run("given a delete is confirmed", func(t *testing.T) {
+		t.Run("when it starts, the size scan (and its du processes) is cancelled", func(t *testing.T) {
+			var deleted []string
+			m := newModel(context.Background(), testActions(&deleted))
+			cancelled := false
+			m.cancelScan = func() { cancelled = true }
+			m = update(m, metaDoneMsg{index: 0, meta: staleMeta()}) // select /wt/a
+			m = update(m, key("enter"))                             // -> confirm
+			m = typeWord(m, confirmWord)
+			next, cmd := m.Update(key("enter")) // -> deleting
+			m = drain(next.(model), cmd)
+			if !cancelled {
+				t.Error("starting a delete should cancel the size scan to kill its du processes")
+			}
+		})
+	})
+}
+
+func TestPruneDeleteScreen(t *testing.T) {
+	t.Run("given a delete is underway", func(t *testing.T) {
+		var deleted []string
+		acts := testActions(&deleted)
+		block := make(chan struct{})
+		// DeleteAll parks so the model stays in modeDeleting while we render it.
+		acts.DeleteAll = func(_ context.Context, _ []string, _ func(string, error)) { <-block }
+		m := newModel(context.Background(), acts)
+		m = update(m, tea.WindowSizeMsg{Width: 80, Height: 20})
+		m = update(m, metaDoneMsg{index: 0, meta: staleMeta()})
+		m = update(m, key("enter"))
+		m = typeWord(m, confirmWord)
+		next, _ := m.Update(key("enter")) // -> deleting; drop the listen cmd so it stays there
+		m = next.(model)
+		v := m.View()
+		close(block)
+
+		t.Run("the screen shows the parallel-delete progress, not the browse list", func(t *testing.T) {
+			if !strings.Contains(v, "deleting") || !strings.Contains(v, "in parallel") {
+				t.Errorf("delete screen should show the parallel-delete headline, got:\n%s", v)
+			}
+			if strings.Contains(v, "space toggle") || strings.Contains(v, "sort:") {
+				t.Errorf("the browse list/keybar must be gone on the delete screen, got:\n%s", v)
+			}
+			if countLines(v) > 20 {
+				t.Errorf("delete screen overflows the terminal: %d lines", countLines(v))
+			}
+		})
+	})
+}
+
 // The reported complaint: with many worktrees the list must never push the header
 // off the top — it has to window and scroll within the terminal height.
 //

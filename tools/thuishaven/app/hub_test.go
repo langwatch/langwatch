@@ -149,7 +149,7 @@ func (f *fakeHygiene) DirSize(dir string) (int64, bool) {
 	sz, ok := f.dirSizes[dir]
 	return sz, ok
 }
-func (f *fakeHygiene) DiskUsage(dir string) (int64, bool) {
+func (f *fakeHygiene) DiskUsage(_ context.Context, dir string) (int64, bool) {
 	if f.dirSizes == nil {
 		return 0, false
 	}

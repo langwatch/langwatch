@@ -225,7 +225,9 @@ type Hygiene interface {
 	// deleting the worktree would reclaim. Unlike DirSize (a Go tree-walk summing
 	// file sizes, used by the artefact reclaim), this shells out to `du` for speed
 	// on a big tree — the difference matters when sizing dozens of worktrees at once.
-	DiskUsage(path string) (bytes int64, ok bool)
+	// It takes a context so an in-flight `du` is killed when sizing is cancelled
+	// (the picker cancels it the moment a delete starts, freeing the disk at once).
+	DiskUsage(ctx context.Context, path string) (bytes int64, ok bool)
 	Remove(path string) error
 	PruneGitWorktrees(repoRoot string)
 	// RemoveWorktree deletes a linked worktree (directory + git admin entry),

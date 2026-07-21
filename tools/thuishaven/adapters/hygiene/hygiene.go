@@ -7,6 +7,7 @@ package hygiene
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -110,9 +111,10 @@ func (Hygiene) LastActivity(worktreeDir string) (time.Time, bool) {
 // non-zero when it hits an unreadable subdirectory (permission denied, or a file
 // that vanished mid-walk) yet still prints a usable grand total to stdout — so the
 // verdict is "did it print a number", not "did it exit 0". ok=false only when
-// there is nothing to parse (the path is gone, or du is missing).
-func (Hygiene) DiskUsage(path string) (int64, bool) {
-	out, _ := exec.Command("du", "-sk", path).Output()
+// there is nothing to parse (the path is gone, du is missing, or ctx was cancelled
+// mid-walk — CommandContext kills the du process, and a killed du prints nothing).
+func (Hygiene) DiskUsage(ctx context.Context, path string) (int64, bool) {
+	out, _ := exec.CommandContext(ctx, "du", "-sk", path).Output()
 	fields := strings.Fields(string(out))
 	if len(fields) == 0 {
 		return 0, false

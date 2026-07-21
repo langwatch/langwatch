@@ -114,6 +114,12 @@ func (m model) updateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // updating and never freezes on a slow teardown.
 func (m model) startDeleting() (tea.Model, tea.Cmd) {
 	m.mode = modeDeleting
+	// Stop sizing immediately: the size scan is the only other heavy thing running,
+	// and cancelling it kills any in-flight du processes — several of them walking
+	// worktrees we are about to delete — so the disk is freed for the teardown.
+	if m.cancelScan != nil {
+		m.cancelScan()
+	}
 	m.status = map[string]string{}
 	var dirs []string
 	for _, ri := range m.order {

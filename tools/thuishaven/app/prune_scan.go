@@ -160,7 +160,7 @@ func (o *Orchestrator) ScanSizes(ctx context.Context, rows []PruneRow, onSize fu
 		if !rows[i].Deletable() {
 			return
 		}
-		if b, ok := o.hyg.DiskUsage(rows[i].Dir); ok {
+		if b, ok := o.hyg.DiskUsage(ctx, rows[i].Dir); ok {
 			onSize(i, b)
 		}
 	})

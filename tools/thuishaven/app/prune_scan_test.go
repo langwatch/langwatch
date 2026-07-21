@@ -167,7 +167,7 @@ type barrierHygiene struct {
 	onDiskUsage func()
 }
 
-func (b *barrierHygiene) DiskUsage(string) (int64, bool) {
+func (b *barrierHygiene) DiskUsage(context.Context, string) (int64, bool) {
 	if b.onDiskUsage != nil {
 		b.onDiskUsage()
 	}

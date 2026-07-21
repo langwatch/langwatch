@@ -22,11 +22,16 @@ var (
 
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
-// View assembles three measured parts — a fixed header, a scrolling list window,
-// and a footer — so header + list + footer never exceeds the terminal height and
-// the header can't scroll off the top. Every line is finally clamped to the
-// terminal width so a long row can't soft-wrap and break the vertical budget.
+// View has two layouts. Browsing/confirming shows three measured parts — a fixed
+// header, a scrolling list window, and a footer — so they never exceed the
+// terminal height and the header can't scroll off the top. Once a delete starts
+// the list is gone entirely: the screen resets to just the deletion progress (see
+// renderDeleteScreen). Every line is finally clamped to the terminal width so a
+// long row can't soft-wrap and break the vertical budget.
 func (m model) View() string {
+	if m.mode == modeDeleting || m.mode == modeDone {
+		return clampLines(m.renderDeleteScreen(), m.width)
+	}
 	header := m.renderHeader()
 	footer := m.renderFooter()
 	budget := m.viewHeight() - countLines(header) - countLines(footer) - 1
@@ -208,8 +213,7 @@ func (m model) facts(r Row) string {
 
 func (m model) renderFooter() string {
 	var b strings.Builder
-	switch m.mode {
-	case modeConfirm:
+	if m.mode == modeConfirm {
 		n := m.countSelected()
 		b.WriteString("\n")
 		b.WriteString(styleWarn.Render(fmt.Sprintf("  Delete %d worktree(s) — stops their stacks, drops their databases, removes their", n)))
@@ -218,45 +222,19 @@ func (m model) renderFooter() string {
 		b.WriteString("\n")
 		b.WriteString(styleWarn.Render(fmt.Sprintf("  type %q to confirm: %s▏", confirmWord, m.confirm)))
 		b.WriteString("\n")
-	case modeDeleting:
-		done := m.deletedOK + m.deletedErr
-		inFlight := m.deletingTotal - done
-		spin := spinnerFrames[m.spin%len(spinnerFrames)]
+		return b.String()
+	}
+	b.WriteString("\n")
+	b.WriteString(m.renderDetail())
+	if m.anyDeletable() {
+		b.WriteString(styleDim.Render("  ↑↓ move · space toggle · a all · n none · s sort · enter delete · q quit"))
+	} else {
+		b.WriteString(styleDim.Render("  no other worktrees to prune · q quit"))
+	}
+	b.WriteString("\n")
+	if m.actions.SharedNote != "" {
+		b.WriteString(styleDim.Render("  " + m.actions.SharedNote))
 		b.WriteString("\n")
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  %s deleting in parallel — %d/%d done", spin, done, m.deletingTotal)))
-		b.WriteString("\n")
-		tally := fmt.Sprintf("  %d in flight", inFlight)
-		if m.deletedOK > 0 {
-			tally += fmt.Sprintf(" · %d done", m.deletedOK)
-		}
-		if m.deletedErr > 0 {
-			tally += fmt.Sprintf(" · %d failed", m.deletedErr)
-		}
-		b.WriteString(styleDim.Render(tally))
-		b.WriteString("\n")
-	case modeDone:
-		msg := fmt.Sprintf("  deleted %d worktree(s), reclaimed ~%s", m.deletedOK, domain.HumanBytes(m.reclaimed))
-		if m.deletedErr > 0 {
-			msg += fmt.Sprintf(", %d failed", m.deletedErr)
-		}
-		b.WriteString("\n")
-		b.WriteString(styleGood.Render(msg))
-		b.WriteString("\n")
-		b.WriteString(styleDim.Render("  press any key to exit"))
-		b.WriteString("\n")
-	default:
-		b.WriteString("\n")
-		b.WriteString(m.renderDetail())
-		if m.anyDeletable() {
-			b.WriteString(styleDim.Render("  ↑↓ move · space toggle · a all · n none · s sort · enter delete · q quit"))
-		} else {
-			b.WriteString(styleDim.Render("  no other worktrees to prune · q quit"))
-		}
-		b.WriteString("\n")
-		if m.actions.SharedNote != "" {
-			b.WriteString(styleDim.Render("  " + m.actions.SharedNote))
-			b.WriteString("\n")
-		}
 	}
 	return b.String()
 }

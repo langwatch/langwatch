@@ -88,9 +88,17 @@ func Run(ctx context.Context, a Actions) error {
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	p := tea.NewProgram(newModel(runCtx, a), tea.WithAltScreen(), tea.WithContext(runCtx))
+	// The scan gets its own child context so the picker can kill it — and the du
+	// processes it spawned — the instant a delete starts, without disturbing the
+	// program or the delete itself (which run on runCtx).
+	scanCtx, cancelScan := context.WithCancel(runCtx)
+	defer cancelScan()
+
+	m := newModel(runCtx, a)
+	m.cancelScan = cancelScan
+	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithContext(runCtx))
 	if a.Scan != nil {
-		go a.Scan(runCtx,
+		go a.Scan(scanCtx,
 			func(i int, meta MetaResult) { p.Send(metaDoneMsg{index: i, meta: meta}) },
 			func(i int, bytes int64) { p.Send(sizeDoneMsg{index: i, bytes: bytes}) },
 		)
@@ -136,20 +144,23 @@ type deleteResult struct {
 }
 
 type model struct {
-	ctx      context.Context
-	actions  Actions
-	rows     []Row
-	order    []int // display order: positions into rows, per the current sort
-	sort     sortMode
-	selected map[string]bool // keyed by Dir
-	touched  map[string]bool // rows the user toggled by hand (suppresses auto-select)
-	cursor   int             // position within order
-	top      int             // first order-position shown in the scrolling window
-	mode     mode
-	confirm  string // the text typed at the confirm prompt
-	spin     int
-	width    int
-	height   int
+	ctx context.Context
+	// cancelScan kills the (still-running) size scan and its du processes the moment
+	// a delete is confirmed — set by Run, nil in tests that drive the model directly.
+	cancelScan context.CancelFunc
+	actions    Actions
+	rows       []Row
+	order      []int // display order: positions into rows, per the current sort
+	sort       sortMode
+	selected   map[string]bool // keyed by Dir
+	touched    map[string]bool // rows the user toggled by hand (suppresses auto-select)
+	cursor     int             // position within order
+	top        int             // first order-position shown in the scrolling window
+	mode       mode
+	confirm    string // the text typed at the confirm prompt
+	spin       int
+	width      int
+	height     int
 
 	metaCount int
 	sizeCount int
@@ -192,10 +203,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spin++
 		return m, tick()
 	case metaDoneMsg:
-		m.applyMeta(msg.index, msg.meta)
+		// Ignore scan results once a delete is underway — the scan is cancelled, and a
+		// straggler landing now must not reshuffle the frozen delete list.
+		if m.mode == modeBrowse || m.mode == modeConfirm {
+			m.applyMeta(msg.index, msg.meta)
+		}
 		return m, nil
 	case sizeDoneMsg:
-		m.applySize(msg.index, msg.bytes)
+		if m.mode == modeBrowse || m.mode == modeConfirm {
+			m.applySize(msg.index, msg.bytes)
+		}
 		return m, nil
 	case deleteDoneMsg:
 		return m.afterDelete(msg)
