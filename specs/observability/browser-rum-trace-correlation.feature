@@ -1,0 +1,105 @@
+Feature: Browser RUM and full-stack trace correlation
+
+  Work a user starts in the browser and work the server does on their behalf
+  belong to one trace. A click, the navigation it causes, the calls that
+  navigation fires and the server work behind each call can all be read as a
+  single object, and an error anywhere in it can be followed back to its origin.
+
+  Browser telemetry describes the platform operating, not a customer's
+  application. It is kept separate from customer OTLP ingest and is treated as
+  untrusted input, because it arrives from a public browser.
+
+  See ADR-058 for the architectural decisions behind this.
+
+  Background:
+    Given the browser telemetry feature is enabled
+    And the application is instrumented for the browser
+
+  Rule: One interaction produces one trace across the stack
+
+    Scenario: A call started in the browser continues on the server
+      When the user performs an action that calls the server
+      Then the server work appears in the same trace as the browser work
+      And the server span is a descendant of the browser span
+
+    Scenario: Batched calls stay individually visible
+      Given several calls are dispatched together as one network request
+      When the user performs an action that triggers them
+      Then each call appears as its own span
+      And a slow call is attributable without inspecting the others
+
+    Scenario: Calls over the realtime transports still correlate
+      Given a call is sent over the WebSocket transport
+      When the server handles it
+      Then the server work appears in the same trace as the browser work
+
+    Scenario: Navigating between pages is visible as work
+      When the user navigates to another page
+      Then the navigation appears as a span
+      And the calls that navigation triggers appear beneath it
+
+    Scenario: Everything from one visit can be found together
+      When the user performs several unrelated actions in one visit
+      Then every resulting span carries the same session identifier
+
+  Rule: Telemetry never degrades the product
+
+    Scenario: A failing telemetry pipeline leaves the application working
+      Given the telemetry endpoint is unreachable
+      When the user performs an action that calls the server
+      Then the call succeeds
+      And the user sees no error
+
+    Scenario: Instrumentation failure does not fail the call
+      Given the client instrumentation raises an error while handling a call
+      When the user performs an action that calls the server
+      Then the call is delivered unchanged
+
+    Scenario: Telemetry is silent when disabled
+      Given the browser telemetry feature is disabled
+      When the user performs an action that calls the server
+      Then no telemetry leaves the browser
+
+  Rule: Browser telemetry is platform-internal, never customer data
+
+    Scenario: Browser telemetry is identifiable as internal
+      When the browser reports telemetry
+      Then the telemetry is marked as originating from the platform itself
+
+    Scenario: Browser telemetry does not enter customer ingest
+      When the browser reports telemetry
+      Then it is not recorded against any customer's project
+
+  Rule: The ingest endpoint treats browser input as untrusted
+
+    Scenario: A client sending too much is throttled
+      Given a client reports telemetry far above the expected rate
+      When it continues reporting
+      Then further reports are rejected
+      And previously accepted telemetry is unaffected
+
+    Scenario: An oversized report is rejected
+      When a client reports telemetry larger than the accepted size
+      Then the report is rejected before it reaches the collector
+
+    Scenario: Telemetry claiming to be another service is refused
+      When a client reports telemetry claiming to originate from a different service
+      Then the report is rejected
+
+  Rule: A recorded error can be followed to its trace
+
+    Scenario: An error captured in the browser carries its trace
+      Given a call is in progress
+      When an error is captured
+      Then the captured error records the trace it happened in
+
+    Scenario: An error captured on the server carries its trace
+      Given the server is handling a call
+      When an error is captured
+      Then the captured error records the trace it happened in
+
+    Scenario: An error captured outside any call records no trace
+      Given no call is in progress
+      When an error is captured
+      Then the captured error is still recorded
+      And it claims no trace
