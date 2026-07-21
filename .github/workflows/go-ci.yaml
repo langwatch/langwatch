@@ -29,9 +29,12 @@ jobs:
             go:
               - 'services/aigateway/**'
               - 'services/nlpgo/**'
+              - 'services/langyagent/**'
               - 'pkg/**'
               - 'cmd/**'
               - 'tools/migrationorder/**'
+              - 'tools/herrgen/**'
+              - 'packages/handled-error/**'
               - 'go.mod'
               - 'go.sum'
               - '.golangci.yml'
@@ -62,7 +65,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - run: go test -count=1 -race ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/...
+      - run: go test -count=1 -race ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/herrgen/...
 
   lint:
     needs: changes
@@ -78,7 +81,7 @@ jobs:
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.11.4
-          args: ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/...
+          args: ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/herrgen/...
 
   vet:
     needs: changes
@@ -91,4 +94,21 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - run: go vet ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/...
+      - run: go vet ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/herrgen/...
+
+  # packages/handled-error/src/codes.generated.ts mirrors the services' herr
+  # codes; the TypeScript presentation registry is keyed off it, so a Go code
+  # added without regenerating would silently ship with no customer copy.
+  # Spec: specs/ci/herr-codes-generation.feature
+  generated:
+    needs: changes
+    if: ${{ needs.changes.outputs.go == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: go run ./cmd/herrgen -check

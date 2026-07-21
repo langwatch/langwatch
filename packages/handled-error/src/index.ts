@@ -14,3 +14,5 @@ export type {
   TraceUrlProvider,
   ZodLikeError,
 } from "./handled-error";
+export { goErrorCodes } from "./codes.generated";
+export type { GoErrorCode } from "./codes.generated";

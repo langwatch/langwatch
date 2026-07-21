@@ -33,8 +33,8 @@ throw new PromptNotFoundError(promptId);
 // ✅ known + actionable, wrapping an internal cause that stays masked
 throw new DatasetUnavailableError(datasetId, { reasons: [pgError] });
 
-// ❌ unknown cause dressed as handled — leaks internals, caller can't act
-throw new HandledError("database_error", pgError.message);
+// ❌ unknown cause dressed as handled — caller can't act on it
+throw new DatabaseError("database_error", pgError.message);
 
 // ✅ the same failure, correctly
 throw pgError; // degrades to "unknown" at the boundary, logged with the trace id
@@ -63,8 +63,8 @@ Each field earns its place:
 
 | field | rule |
 |---|---|
-| `code` | Stable, `snake_case`, unique platform-wide. This is the wire discriminant and the key every client explainer is written against — renaming one is a breaking change. |
-| `message` | Customer-safe prose. Assume it is rendered verbatim in the UI, because it is. Never interpolate an upstream error, a hostname, a SQL fragment, or a Prisma model name. |
+| `code` | Stable, `snake_case`, unique platform-wide. This is the wire discriminant, the key every client explainer is written against, **and the literal wire message** — renaming one is a breaking change. |
+| `message` | **Server copy, for logs — it does not reach the client.** Write it for whoever is reading the trace, so naming an env var or an internal service is fine and useful. Customer-facing copy lives in the client presentation registry, keyed by `code`. See "Where the words come from" below. |
 | `fault` | Who can act. Drives **log level and alerting**, not UI. Defaults to `customer` — so any subclass with a 5xx status must set `platform` or `provider` explicitly, or a real incident logs as routine noise. |
 | `meta` | Structured context the **client can actually use**. Not a debug dump. If no UI reads a field, it does not belong here — put it in the log instead. |
 | `tips` | Short, actionable, imperative. Written for an agent driving the API/CLI/MCP with no UI to fall back on. |
@@ -89,18 +89,34 @@ meta: { field: "name", maxLength: 255, receivedLength: 340 }
 meta: { query: rawSql, durationMs: 4210, shard: "ch-03" }
 ```
 
+## Where the words come from
+
+This is the part that trips people up, so be precise about it:
+
+| | source |
+|---|---|
+| What the customer reads | The **client presentation registry**, keyed by `code` |
+| `HandledError.message` | Server-side only — logs, OTel, exception capture |
+| The wire `message` field | **The `code` itself**, on every transport ([#5984](https://github.com/langwatch/langwatch/pull/5984)) |
+| Server-authored dynamic prose | `meta.message`, an explicit opt-in — mirrors Go, where free text appears only when a caller sets `Meta["message"]` |
+
+Handled-error messages were leaking env vars and internal hostnames to browsers,
+so the wire now carries only the stable code where a message is required. The
+consequence: **`error.message` on the client is a code slug, not a sentence.**
+Rendering it directly puts `validation_error` in front of a customer.
+
 ## Surfacing one to the user
 
 The server emits the typed fact; the client decides presentation. Principles,
 in order of how often they are violated:
 
-1. **Never toast a raw `error.message`.** It is unreliable for handled errors
-   (the message channel differs from `data.domainError`) and unsafe for unhandled
-   ones. Read the handled payload; fall back to the generic unknown state.
-2. **Title comes from the `code`**, not the server. A code-keyed map owns the
-   user-facing headline, with a `fault`-based fallback for codes it doesn't know
-   (customer → "Check your input", platform/provider → "Something went wrong on
-   our end").
+1. **Never toast a raw `error.message`.** For a handled error it is the code
+   slug; for an unhandled one it is unsafe. Read the handled payload and render
+   from the registry; fall back to the generic unknown state.
+2. **Title and description both come from the `code`**, not the server. The
+   registry owns the customer-facing copy, with a `fault`-based fallback for
+   codes it doesn't know (customer → "Check your input", platform/provider →
+   "Something went wrong on our end").
 3. **Render `tips` and `docsUrl`.** They exist; showing them is the whole point of
    the remediation channel.
 4. **Never render raw `meta` or the reason chain in the UI.** They are for agents

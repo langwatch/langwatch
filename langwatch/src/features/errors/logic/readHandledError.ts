@@ -1,0 +1,98 @@
+import type {
+  HandledErrorFault,
+  SerializedReason,
+} from "@langwatch/handled-error";
+
+/**
+ * The client-side view of a handled error, lifted off whatever transport
+ * carried it.
+ *
+ * Deliberately NOT a re-export of `SerializedHandledError`: this is the shape
+ * after validation of untrusted input, so every optional field is narrowed to
+ * something the UI can render without further checks. A malformed payload
+ * yields `null` from {@link readHandledError} rather than a partially-trusted
+ * object.
+ */
+export interface HandledErrorShape {
+  code: string;
+  meta: Record<string, unknown>;
+  httpStatus: number;
+  fault: HandledErrorFault;
+  tips: readonly string[];
+  docsUrl: string | undefined;
+  traceId: string | undefined;
+  reasons: readonly SerializedReason[];
+}
+
+const FAULTS = new Set<string>(["customer", "platform", "provider"]);
+
+/**
+ * Lifts the handled-error payload the server attaches at the boundary
+ * (`data.error` — see `src/server/api/trpc.ts`), returning `null` when the
+ * failure was not handled (an infrastructure fault, a bug) and therefore has
+ * nothing structured to say.
+ *
+ * `null` is the signal to fall back to the generic unknown treatment. It is a
+ * correct, expected outcome — see ADR-045.
+ *
+ * Trusts nothing: the input is `unknown` and a misconfigured or older server
+ * must not be able to crash a render by omitting a field.
+ */
+export function readHandledError(err: unknown): HandledErrorShape | null {
+  const candidate = (err as { data?: { error?: unknown } })?.data?.error;
+  if (!candidate || typeof candidate !== "object") return null;
+
+  const value = candidate as Record<string, unknown>;
+
+  // `kind` is the deprecated pre-`HandledError` discriminant — read it as a
+  // fallback so a payload from an older server (or an older client reading a
+  // newer server) still resolves during the transition.
+  const code =
+    typeof value.code === "string"
+      ? value.code
+      : typeof value.kind === "string"
+        ? value.kind
+        : null;
+  if (code === null) return null;
+  if (typeof value.httpStatus !== "number") return null;
+
+  return {
+    code,
+    httpStatus: value.httpStatus,
+    meta: isRecord(value.meta) ? value.meta : {},
+    // The server defaults this, but an older payload may predate the field.
+    // `customer` matches the server-side default rather than inventing a
+    // different one on the client.
+    fault:
+      typeof value.fault === "string" && FAULTS.has(value.fault)
+        ? (value.fault as HandledErrorFault)
+        : "customer",
+    tips: Array.isArray(value.tips)
+      ? value.tips.filter((tip): tip is string => typeof tip === "string")
+      : [],
+    docsUrl: typeof value.docsUrl === "string" ? value.docsUrl : undefined,
+    traceId: typeof value.traceId === "string" ? value.traceId : undefined,
+    reasons: Array.isArray(value.reasons)
+      ? (value.reasons.filter(isRecord) as unknown as SerializedReason[])
+      : [],
+  };
+}
+
+/**
+ * The trace id for any error, handled or not.
+ *
+ * Unhandled errors carry no handled payload by design, but support still needs
+ * something to correlate on — the boundary attaches `data.traceId` for exactly
+ * this case.
+ */
+export function readErrorTraceId(err: unknown): string | undefined {
+  const handled = readHandledError(err);
+  if (handled?.traceId) return handled.traceId;
+
+  const traceId = (err as { data?: { traceId?: unknown } })?.data?.traceId;
+  return typeof traceId === "string" ? traceId : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}

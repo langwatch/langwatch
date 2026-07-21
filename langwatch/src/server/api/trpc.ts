@@ -239,6 +239,13 @@ export function errorFormatterForTesting({
         aiCallFailedCause ??
         limitInfo,
       error: domainError,
+      // The trace id for EVERY failure, not just handled ones. An unhandled
+      // error deliberately tells the client nothing about what went wrong
+      // (ADR-045), which leaves support with nothing to correlate on — so the
+      // one thing it does carry is the id that ties the customer's "it broke"
+      // to the logs. Safe to expose: an opaque id is not a detail about the
+      // failure, and a handled error already ships it inside `error`.
+      traceId: otelTrace.getActiveSpan()?.spanContext().traceId,
     },
   };
 }
