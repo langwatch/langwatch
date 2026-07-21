@@ -166,6 +166,15 @@ const spanTreeNodeSchema = z.object({
   outputTokens: z.number().nullish(),
   cacheReadTokens: z.number().nullish(),
   cacheCreationTokens: z.number().nullish(),
+  /**
+   * Row version (ms) — when the span was last projected, NOT span timing.
+   * The live delta poll takes its high-water mark from this: `startTimeMs`
+   * never moves when a span is updated in place (end time, duration, status,
+   * cost), so it cannot serve as the mark. `.nullish()` for preview-mode
+   * fixtures that carry no version — the mark then reads as 0 and corrects
+   * itself on the first server-sourced row.
+   */
+  updatedAtMs: z.number().nullish(),
 });
 
 export type SpanTreeNode = z.infer<typeof spanTreeNodeSchema>;

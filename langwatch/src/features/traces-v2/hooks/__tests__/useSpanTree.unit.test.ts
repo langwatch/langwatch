@@ -14,7 +14,7 @@ type TreeQueryOptions = {
 };
 
 type DeltaQueryCall = {
-  input: { sinceStartTimeMs: number };
+  input: { sinceUpdatedAtMs: number };
   options: {
     enabled: boolean;
     refetchInterval: unknown;
@@ -22,7 +22,11 @@ type DeltaQueryCall = {
   };
 };
 
-const node = (spanId: string, startTimeMs: number): SpanTreeNode => ({
+const node = (
+  spanId: string,
+  startTimeMs: number,
+  updatedAtMs = startTimeMs,
+): SpanTreeNode => ({
   spanId,
   parentSpanId: null,
   name: spanId,
@@ -30,6 +34,7 @@ const node = (spanId: string, startTimeMs: number): SpanTreeNode => ({
   startTimeMs,
   endTimeMs: startTimeMs + 1,
   durationMs: 1,
+  updatedAtMs,
   status: "ok",
   model: null,
 });
@@ -38,6 +43,7 @@ const capturedTreeOptions: TreeQueryOptions[] = [];
 const capturedDeltaCalls: DeltaQueryCall[] = [];
 const getQueryData = vi.fn();
 const setQueryData = vi.fn();
+const deltaInvalidate = vi.fn();
 
 let treeData: SpanTreeNode[] | undefined;
 let treeIsPreviousData = false;
@@ -64,7 +70,9 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useUtils: () => ({}),
+    useUtils: () => ({
+      tracesV2: { spanTreeDelta: { invalidate: deltaInvalidate } },
+    }),
     tracesV2: {
       spanTreeDelta: {
         useQuery: (
@@ -81,16 +89,21 @@ vi.mock("~/utils/api", () => ({
 
 const QUERY_FN_MARKER = () => Promise.resolve([]);
 
-vi.mock("../spanTreePagedQuery", () => ({
-  spanTreeQueryKey: (input: unknown) => ["spanTree", input],
-  spanTreeQueryFn: () => QUERY_FN_MARKER,
-  spanTreeDeltaSinceMs: (nodes: SpanTreeNode[]) =>
-    nodes.length === 0
-      ? 0
-      : Math.max(0, Math.max(...nodes.map((n) => n.startTimeMs)) - 1),
-  mergeSpanTreeDelta: (existing: SpanTreeNode[], delta: SpanTreeNode[]) =>
-    delta.length === 0 ? existing : [...existing, ...delta],
-}));
+vi.mock("../spanTreePagedQuery", async () => {
+  const actual = await vi.importActual<
+    typeof import("../spanTreePagedQuery")
+  >("../spanTreePagedQuery");
+  return {
+    spanTreeQueryKey: (input: unknown) => ["spanTree", input],
+    spanTreeQueryFn: () => QUERY_FN_MARKER,
+    // NOT stubbed: which column the high-water mark comes from is precisely
+    // what these tests are about. A hand-rolled stub here would keep passing
+    // while the hook polled from the wrong one.
+    spanTreeDeltaSinceMs: actual.spanTreeDeltaSinceMs,
+    mergeSpanTreeDelta: (existing: SpanTreeNode[], delta: SpanTreeNode[]) =>
+      delta.length === 0 ? existing : [...existing, ...delta],
+  };
+});
 
 vi.mock("../useTraceQueryArgs", () => ({
   useTraceQueryArgs: () => traceQueryArgs,
@@ -120,6 +133,7 @@ describe("useSpanTree", () => {
     capturedDeltaCalls.length = 0;
     getQueryData.mockReset();
     setQueryData.mockReset();
+    deltaInvalidate.mockReset();
     treeData = [node("a", 100)];
     treeIsPreviousData = false;
     treeIsFetching = false;
@@ -157,10 +171,20 @@ describe("useSpanTree", () => {
   });
 
   describe("when the trace is live and SSE is connected", () => {
-    it("does not poll deltas — SSE invalidation keeps the tree fresh push-style", () => {
+    it("keeps the delta armed but runs it on no timer — SSE invalidation drives it push-style", () => {
       renderHook(() => useSpanTree());
 
-      expect(lastDeltaCall().options.enabled).toBe(false);
+      expect(lastDeltaCall().options.enabled).toBe(true);
+      expect(lastDeltaCall().options.refetchInterval).toBe(false);
+    });
+
+    it("never re-walks the tree on an SSE update — that is ceil(N/500) requests per batch", () => {
+      // The tree query owns the page walk; it must not be given a timer of
+      // its own, and `useTraceFreshness` invalidates `spanTreeDelta` rather
+      // than `spanTree` so a live 100k-span trace merges deltas in place.
+      renderHook(() => useSpanTree());
+
+      expect(lastTreeOptions().refetchInterval).toBeUndefined();
     });
   });
 
@@ -179,8 +203,17 @@ describe("useSpanTree", () => {
       expect(lastDeltaCall().input).toMatchObject({
         projectId: "p1",
         traceId: "t1",
-        sinceStartTimeMs: 299,
+        sinceUpdatedAtMs: 299,
       });
+    });
+
+    it("takes the mark from the newest row version, so a re-projected root span is re-read", () => {
+      // Root starts first (oldest start) but is updated last (newest version).
+      treeData = [node("root", 100, 900), node("leaf", 300, 300)];
+
+      renderHook(() => useSpanTree());
+
+      expect(lastDeltaCall().input).toMatchObject({ sinceUpdatedAtMs: 899 });
     });
 
     it("waits for the tree to load before polling (no high-water mark yet)", () => {
@@ -234,6 +267,33 @@ describe("useSpanTree", () => {
       lastDeltaCall().options.onSuccess([]);
 
       expect(setQueryData).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when SSE reconnects after being down", () => {
+    it("fetches one catch-up delta, since a span that landed during the gap raises no event of its own", () => {
+      sseConnectionState = "disconnected";
+      const { rerender } = renderHook(() => useSpanTree());
+      expect(deltaInvalidate).not.toHaveBeenCalled();
+
+      sseConnectionState = "connected";
+      rerender();
+
+      expect(deltaInvalidate).toHaveBeenCalledWith({
+        projectId: "p1",
+        traceId: "t1",
+      });
+    });
+
+    it("does not catch up on a trace that is no longer live", () => {
+      traceQueryArgs = { ...traceQueryArgs, isLive: false };
+      sseConnectionState = "disconnected";
+      const { rerender } = renderHook(() => useSpanTree());
+
+      sseConnectionState = "connected";
+      rerender();
+
+      expect(deltaInvalidate).not.toHaveBeenCalled();
     });
   });
 

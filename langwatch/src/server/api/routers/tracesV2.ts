@@ -223,6 +223,7 @@ function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
     outputTokens: row.outputTokens,
     cacheReadTokens: row.cacheReadTokens,
     cacheCreationTokens: row.cacheCreationTokens,
+    updatedAtMs: row.updatedAtMs,
   };
 }
 
@@ -1289,12 +1290,19 @@ export const tracesV2Router = createTRPCRouter({
       },
     ),
 
+  /**
+   * Spans of a live trace whose row version is newer than `sinceUpdatedAtMs`.
+   * Keyed on the row version rather than the span start so an in-place update
+   * (end time, duration, status, cost) is picked up too — the root span
+   * starts first and ends last, so a start-keyed delta left its duration, and
+   * with it the waterfall's time scale, frozen at first projection.
+   */
   spanTreeDelta: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         traceId: z.string(),
-        sinceStartTimeMs: z.number(),
+        sinceUpdatedAtMs: z.number().int().min(0),
         ...spanReadHintShape,
       }),
     )
@@ -1304,7 +1312,7 @@ export const tracesV2Router = createTRPCRouter({
       const rows = await app.traces.spans.getSpanSummariesSince({
         tenantId: input.projectId,
         traceId: input.traceId,
-        sinceStartTimeMs: input.sinceStartTimeMs,
+        sinceUpdatedAtMs: input.sinceUpdatedAtMs,
         ...occurredAtFromInput(input),
       });
       return rows.map(mapSpanSummaryToTreeNode);

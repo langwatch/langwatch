@@ -219,7 +219,8 @@ const SUMMARY_SPAN_SELECT = `
   SpanAttributes['langwatch.model.cacheReadCostPerToken'] AS CustomCacheReadRate,
   SpanAttributes['langwatch.model.cacheCreationCostPerToken'] AS CustomCacheCreationRate,
   SpanAttributes['langwatch.span.cost'] AS LwSpanCost,
-  toUnixTimestamp64Milli(StartTime) AS StartTimeMs
+  toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
+  toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs
 `;
 
 /**
@@ -288,9 +289,16 @@ function mapModelSpanSampleRow(
  * picks the latest version (max UpdatedAt) per spanId. Caller assembles the
  * surrounding `AND (TenantId, TraceId, SpanId, UpdatedAt) IN (…)`.
  *
- * Kept as a function so optional extra predicates (partition window,
- * sinceStartTimeMs) are applied symmetrically in inner + outer scopes —
- * essential because the dedup must see the same row set as the outer scan.
+ * Kept as a function so an optional extra predicate (the partition-hint
+ * window, or the `since` readers' row-version bound) can be applied to the
+ * inner scope as well as the outer.
+ *
+ * Only pass a predicate that a span's versions cannot straddle. The subquery
+ * elects each span's latest version, so it has to see every version: bound it
+ * by something a re-projection can move — a span's StartTime, say — and it
+ * will elect a stale version whose row the outer filter then emits. This is
+ * why the span-tree cursor's `StartTime >=` bound is deliberately NOT passed
+ * in (see `findSpanSummariesPage`).
  */
 function dedupInTuple(extraInnerWhere: string): string {
   return `(TenantId, TraceId, SpanId, UpdatedAt) IN (
@@ -345,6 +353,7 @@ export interface SpanSummaryQueryRow {
   CustomCacheCreationRate: string;
   LwSpanCost: string;
   StartTimeMs: number;
+  UpdatedAtMs: number;
 }
 
 /** "" → null, malformed → null, otherwise the parsed number. */
@@ -421,6 +430,7 @@ export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
     cacheReadTokens,
     cacheCreationTokens,
     startTimeMs: Number(row.StartTimeMs),
+    updatedAtMs: Number(row.UpdatedAtMs),
   };
 }
 
@@ -1723,21 +1733,29 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           : "";
       // Keyed pagination over (StartTimeMs, SpanId): the tuple compare uses
       // the same millisecond expression the rows are ordered (and returned)
-      // by, so page boundaries are exact even though StartTime itself has
-      // sub-ms precision.
+      // by, so page boundaries are exact. `StartTime` is `DateTime64(3)` —
+      // already exactly milliseconds — so `toUnixTimestamp64Milli` is a
+      // representation change, not a lossy truncation, and no two rows can
+      // differ by less than the tuple can express.
       //
       // The coarse `StartTime >=` bound restates the tuple predicate on the
       // raw partition key: `toYearWeek(StartTime)` partition pruning can't
       // see through `toUnixTimestamp64Milli(...)`, so without it every page
       // re-scans the partitions pagination already moved past — exactly the
-      // long-running multi-week traces that need paging. It goes into the
-      // dedup subquery too (else the inner scan stays unpruned), same trade
-      // the `since` readers make: a span's versions share its StartTime, so
-      // bounding the version scan by it is safe. The exact tuple predicate
-      // stays OUT of the dedup subquery — dedup must pick the latest version
-      // per span; if the winning version sorts before the cursor, the span
-      // belongs to an earlier page and is correctly excluded by the outer
-      // filter rather than re-emitted stale.
+      // long-running multi-week traces that need paging.
+      //
+      // NEITHER cursor predicate may enter the dedup subquery. The subquery's
+      // job is to elect each span's LATEST version, which it can only do if it
+      // sees every version. Restricting it to `StartTime >= cursor` breaks
+      // that whenever a span was re-emitted with a corrected EARLIER start:
+      // the latest version then sorts below the bound, the inner scan elects a
+      // stale older version instead, and the outer tuple filter emits it
+      // happily — and the client's dedup is last-write-wins per spanId, so the
+      // stale row wins the waterfall row. (`pageLowerBound` does stay in: it
+      // is the ±2-day hint window applied identically to both scopes, and a
+      // correction would have to move a span's start by more than two days to
+      // slip past it — whereas the cursor bound advances into the trace on
+      // every single page.)
       const cursorCoarseBound = cursor
         ? `AND StartTime >= fromUnixTimestamp64Milli({cursorStartTimeMs:Int64})`
         : "";
@@ -1756,7 +1774,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             AND TraceId = {traceId:String}
             ${pageLowerBound}
             ${cursorFilter}
-            AND ${dedupInTuple(`${pageLowerBound} ${cursorCoarseBound}`)}
+            AND ${dedupInTuple(pageLowerBound)}
           ORDER BY StartTimeMs ASC, SpanId ASC
           LIMIT {limit:UInt32}
         `,
@@ -1797,23 +1815,33 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   async findSpanSummariesSince({
     tenantId,
     traceId,
-    sinceStartTimeMs,
+    sinceUpdatedAtMs,
   }: {
     tenantId: string;
     traceId: string;
-    sinceStartTimeMs: number;
+    sinceUpdatedAtMs: number;
   } & OccurredAtHint): Promise<SpanSummaryRow[]> {
     EventUtils.validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findSpanSummariesSince",
     );
 
-    // Poll reader: see findSpansSince — `StartTime > sinceStartTimeMs` already
-    // prunes partitions, so this does NOT resolve or clamp to the trace's
-    // OccurredAt window. An upper bound would silently stop the spanTreeDelta
-    // live view from showing new spans on a long-running trace.
+    // Keyed on the ROW VERSION, not the span start. A span updated in place —
+    // end time, duration, status, cost, all re-projected as the span closes —
+    // keeps its StartTime, so a `StartTime >` poll can only ever see brand-new
+    // spans. The root span is the worst case: it starts first and ends last,
+    // so a start-keyed poll left its duration (and with it the waterfall's
+    // whole time scale) frozen at first projection until SSE reconnected.
+    //
+    // UpdatedAt is not the partition key, so this gives up partition pruning.
+    // The read stays cheap because (TenantId, TraceId) is the table's sort-key
+    // prefix and carries a bloom-filter index: partitions that hold none of
+    // this trace's rows are skipped on the index, not scanned.
+    //
+    // Deliberately NOT clamped to the trace's OccurredAt window: an upper
+    // bound would silently stop the live view on a long-running trace.
     const sinceFilter =
-      "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
+      "AND UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})";
     const client = await this.resolveClient(tenantId);
     const result = await client.query({
       query: `
@@ -1826,7 +1854,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         ORDER BY StartTimeMs ASC
         LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
       `,
-      query_params: { tenantId, traceId, sinceStartTimeMs },
+      query_params: { tenantId, traceId, sinceUpdatedAtMs },
       format: "JSONEachRow",
     });
 

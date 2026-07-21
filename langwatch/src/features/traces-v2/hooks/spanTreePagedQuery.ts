@@ -158,21 +158,31 @@ export function spanTreeQueryFn({
 
 /**
  * Lower bound for the live-delta poll over a loaded tree: 1ms before the
- * newest span start. `spanTreeDelta` filters `StartTime > since` at sub-ms
- * precision while tree rows carry ms-truncated times, so polling from the
- * exact high-water mark could permanently miss a span that started later
- * within the same millisecond; backing off 1ms re-fetches the boundary rows
- * instead, and {@link mergeSpanTreeDelta} dedupes them. 0 for an empty tree,
- * so a live trace whose spans haven't been ingested yet still picks them up.
+ * newest ROW VERSION it holds.
+ *
+ * Keyed on `updatedAtMs`, not `startTimeMs`. A span updated in place — end
+ * time, duration, status, cost, all re-projected as it closes — keeps its
+ * start time, so a start-keyed mark can only ever surface brand-new spans.
+ * The root span is the worst case: it starts first and ends last, so its
+ * duration (and with it the waterfall's whole time scale) stayed frozen at
+ * first projection for as long as SSE was down.
+ *
+ * Both bounds are ms-truncated from `DateTime64(3)`, so a row written later
+ * within the same millisecond as the mark would be missed by a strict `>`;
+ * backing off 1ms re-fetches the boundary rows and
+ * {@link mergeSpanTreeDelta} dedupes them.
+ *
+ * 0 for an empty tree, so a live trace whose spans haven't been ingested yet
+ * still picks them up — and likewise for preview fixtures carrying no
+ * version, where the mark corrects itself on the first server-sourced row.
  */
 export function spanTreeDeltaSinceMs(nodes: SpanTreeNode[]): number {
-  let highWaterMs: number | undefined;
+  let highWaterMs = 0;
   for (const node of nodes) {
-    if (highWaterMs === undefined || node.startTimeMs > highWaterMs) {
-      highWaterMs = node.startTimeMs;
-    }
+    const updatedAtMs = node.updatedAtMs ?? 0;
+    if (updatedAtMs > highWaterMs) highWaterMs = updatedAtMs;
   }
-  return highWaterMs === undefined ? 0 : Math.max(0, highWaterMs - 1);
+  return highWaterMs === 0 ? 0 : Math.max(0, highWaterMs - 1);
 }
 
 /** Every field of SpanTreeNode is a scalar (or null), so shallow works. */

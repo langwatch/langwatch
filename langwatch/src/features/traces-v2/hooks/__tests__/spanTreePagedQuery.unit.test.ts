@@ -25,7 +25,11 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-const node = (spanId: string, startTimeMs = 0): SpanTreeNode => ({
+const node = (
+  spanId: string,
+  startTimeMs = 0,
+  updatedAtMs = startTimeMs,
+): SpanTreeNode => ({
   spanId,
   parentSpanId: null,
   name: spanId,
@@ -33,6 +37,7 @@ const node = (spanId: string, startTimeMs = 0): SpanTreeNode => ({
   startTimeMs,
   endTimeMs: startTimeMs + 1,
   durationMs: 1,
+  updatedAtMs,
   status: "ok",
   model: null,
 });
@@ -297,16 +302,35 @@ describe("spanTreeQueryFn progressive publishing", () => {
 
 describe("spanTreeDeltaSinceMs", () => {
   describe("when the tree has spans", () => {
-    it("returns 1ms before the newest span start so same-millisecond arrivals are re-fetched", () => {
+    it("returns 1ms before the newest row version so same-millisecond writes are re-fetched", () => {
       expect(
         spanTreeDeltaSinceMs([node("a", 100), node("b", 300), node("c", 200)]),
       ).toBe(299);
+    });
+
+    it("keys off the row version, not the span start, so in-place updates advance the mark", () => {
+      // The root starts first and ends last: its start is the OLDEST in the
+      // trace while its version is the NEWEST. A start-keyed mark would sit
+      // at the newest start (300) and never re-read the root, freezing its
+      // duration — and with it the waterfall's time scale.
+      const root = node("root", 100, 900);
+      const leaf = node("leaf", 300, 300);
+
+      expect(spanTreeDeltaSinceMs([root, leaf])).toBe(899);
     });
   });
 
   describe("when the tree is empty", () => {
     it("returns 0 so a live trace picks up its first spans", () => {
       expect(spanTreeDeltaSinceMs([])).toBe(0);
+    });
+  });
+
+  describe("when the spans carry no row version (preview fixtures)", () => {
+    it("returns 0 rather than a bogus mark, so the first server rows correct it", () => {
+      const previewNode = { ...node("a", 100), updatedAtMs: undefined };
+
+      expect(spanTreeDeltaSinceMs([previewNode])).toBe(0);
     });
   });
 });

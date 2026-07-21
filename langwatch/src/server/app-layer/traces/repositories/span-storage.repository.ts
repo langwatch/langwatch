@@ -85,6 +85,13 @@ export interface SpanSummaryRow {
   cacheReadTokens: number | null;
   cacheCreationTokens: number | null;
   startTimeMs: number;
+  /**
+   * Row version, not span timing: bumped every time a span is re-projected.
+   * The live delta poll keys off this rather than `startTimeMs`, because a
+   * span updated in place (end time, duration, status, cost) keeps its start
+   * time and a start-keyed poll could never see it.
+   */
+  updatedAtMs: number;
 }
 
 /**
@@ -245,11 +252,17 @@ export interface SpanStorageRepository {
       cursor?: SpanSummaryPageCursor;
     } & OccurredAtHint,
   ): Promise<SpanSummaryPage>;
+  /**
+   * Spans of a trace whose row version is newer than `sinceUpdatedAtMs`.
+   * Keyed on the row version, not the span start: an in-place update (end
+   * time, duration, status, cost) keeps the span's start time, so a
+   * start-keyed poll would never observe it.
+   */
   findSpanSummariesSince(
     params: {
       tenantId: string;
       traceId: string;
-      sinceStartTimeMs: number;
+      sinceUpdatedAtMs: number;
     } & OccurredAtHint,
   ): Promise<SpanSummaryRow[]>;
   findSpansPaginated(
@@ -380,7 +393,7 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     _params: {
       tenantId: string;
       traceId: string;
-      sinceStartTimeMs: number;
+      sinceUpdatedAtMs: number;
     } & OccurredAtHint,
   ): Promise<SpanSummaryRow[]> {
     return [];

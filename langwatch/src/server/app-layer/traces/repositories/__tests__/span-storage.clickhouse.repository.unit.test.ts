@@ -316,6 +316,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
     CustomCacheCreationRate: "",
     LwSpanCost: "",
     StartTimeMs: startTimeMs,
+    UpdatedAtMs: startTimeMs,
   });
 
   function repoWithSpyClient(pages: SpanSummaryQueryRow[][] = [[]]) {
@@ -388,6 +389,36 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
       );
       expect(sql).toContain("StartTime >=");
       expect(sql).not.toContain("StartTime <=");
+    });
+
+    it("keeps every cursor bound out of the dedup subquery so a page can't emit a stale span version", async () => {
+      // The subquery elects each span's latest version via max(UpdatedAt), so
+      // it has to see every version. Bounding it by the cursor's StartTime
+      // breaks that for a span re-emitted with a corrected EARLIER start: its
+      // latest version sorts below the bound, the inner scan elects an older
+      // one instead, and the outer tuple filter emits that stale row — which
+      // then wins the waterfall, the client deduping last-write-wins.
+      const { repo, query } = repoWithSpyClient([[summaryRow("s-2")]]);
+
+      await repo.findSpanSummariesPage({
+        tenantId: "p-1",
+        traceId: "t-1",
+        limit: 2,
+        cursor: { startTimeMs: 1_700_000_000_000, spanId: "s-1" },
+        occurredAtMs: Date.now(),
+      });
+
+      const sql = query.mock.calls[0]?.[0]?.query as string;
+      const dedupSubquery = sql.slice(
+        sql.indexOf("(TenantId, TraceId, SpanId, UpdatedAt) IN ("),
+      );
+      expect(dedupSubquery).toContain("max(UpdatedAt)");
+      expect(dedupSubquery).not.toContain("cursorStartTimeMs");
+      expect(dedupSubquery).not.toContain("cursorSpanId");
+      // The outer scan still restates it — that is what prunes partitions.
+      expect(sql).toContain(
+        "AND StartTime >= fromUnixTimestamp64Milli({cursorStartTimeMs:Int64})",
+      );
     });
 
     it("treats an empty cursor page as authoritative end-of-trace instead of rescanning unhinted", async () => {
@@ -496,11 +527,46 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
       await repo.findSpanSummariesSince({
         tenantId: "p-1",
         traceId: "t-1",
-        sinceStartTimeMs: Date.now(),
+        sinceUpdatedAtMs: Date.now(),
       });
 
       expect(query.mock.calls[0]?.[0]?.query as string).toContain(
         `LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}`,
+      );
+    });
+
+    it("bounds on the row version, never the span start, so in-place updates are visible", async () => {
+      // A span updated in place (end time, duration, status, cost) keeps its
+      // StartTime. Bounding on StartTime would make the live poll structurally
+      // incapable of ever seeing it — the root span, which ends last, would
+      // stay frozen at its first projection.
+      const { repo, query } = repoWithSpyClient();
+      await repo.findSpanSummariesSince({
+        tenantId: "p-1",
+        traceId: "t-1",
+        sinceUpdatedAtMs: 1_700_000_000_000,
+      });
+
+      const sql = query.mock.calls[0]?.[0]?.query as string;
+      expect(sql).toContain(
+        "AND UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})",
+      );
+      expect(sql).not.toContain("StartTime > fromUnixTimestamp64Milli");
+      expect(query.mock.calls[0]?.[0]?.query_params).toMatchObject({
+        sinceUpdatedAtMs: 1_700_000_000_000,
+      });
+    });
+
+    it("selects the row version so the client can advance its high-water mark", async () => {
+      const { repo, query } = repoWithSpyClient();
+      await repo.findSpanSummariesSince({
+        tenantId: "p-1",
+        traceId: "t-1",
+        sinceUpdatedAtMs: 0,
+      });
+
+      expect(query.mock.calls[0]?.[0]?.query as string).toContain(
+        "toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs",
       );
     });
   });
@@ -544,6 +610,7 @@ describe("mapSpanSummaryRow", () => {
     CustomCacheCreationRate: "",
     LwSpanCost: "",
     StartTimeMs: 1700000000000,
+    UpdatedAtMs: 1700000000000,
     ...overrides,
   });
 
