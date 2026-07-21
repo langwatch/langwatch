@@ -498,15 +498,8 @@ describe("LangyTurnRelay", () => {
 
     it("does not cache a transient null, so a later frame authenticates once the token appears", async () => {
       // No handoff wired; the projection is null on the first read, then lands.
-      const getRunToken = vi
-        .fn(
-          async (_a: {
-            projectId: string;
-            conversationId: string;
-          }): Promise<string | null> => RUN_TOKEN,
-        )
-        .mockResolvedValueOnce(null);
-      const conversations = { ...fakeConversations(), getRunToken };
+      const conversations = fakeConversations();
+      conversations.getRunToken.mockResolvedValueOnce(null);
       const { relay, buffer } = makeRelay({ conversations });
 
       const first = await relay.handle(frame({ type: "delta", text: "one" }));
@@ -516,7 +509,7 @@ describe("LangyTurnRelay", () => {
       expect(second).toEqual({ status: "applied" });
       expect(buffer.appendChunk).toHaveBeenCalledTimes(1);
       // Re-queried because the first null was NOT cached (the bug this fixes).
-      expect(getRunToken).toHaveBeenCalledTimes(2);
+      expect(conversations.getRunToken).toHaveBeenCalledTimes(2);
     });
   });
 });
