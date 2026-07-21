@@ -36,20 +36,14 @@
 			}
 		]
 	},
-	// Workspace packages are composite projects (repo-root /packages). With
-	// these references, imports of @langwatch/* resolve to each package's
-	// emitted dist/*.d.ts instead of pulling its sources (and their deps) into
-	// this program — skipLibCheck then makes them parse-only. Build them first:
-	// `tsgo --build` handles ordering + staleness (pnpm typecheck does this).
-	"references": [
-		{ "path": "../packages/api" },
-		{ "path": "../packages/contracts" },
-		{ "path": "../packages/automations" },
-		{ "path": "../packages/observability" },
-		{ "path": "../packages/ssrf" },
-		{ "path": "../packages/cli-cards" },
-		{ "path": "../packages/handled-error" }
-	],
+	// NOTE: no `references` here, and this project is checked with `-p`
+	// (not `tsgo --build`). Under `--build`, the referenced-project output
+	// redirection changed how `vite/client`'s ambient declarations
+	// (import.meta.env, *.css, *?raw) resolve at full-program scale — a
+	// handful of files silently lost them. Resolving @langwatch/* to source
+	// via the pnpm workspace symlink (as the app already did for cli-cards /
+	// handled-error) is the historically-green behavior. Packages get their
+	// own composite build via `pnpm typecheck:packages`.
 	// Broad include (matches the historically-green config) so ambient
 	// declarations resolve identically — a narrowed src-only include silently
 	// changed how `vite/client`'s asset/import.meta ambients apply at

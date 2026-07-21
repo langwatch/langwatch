@@ -33,19 +33,9 @@
 		},
 		"plugins": []
 	},
-	// Same composite-package references as tsconfig.tsgo.json: the editor's
-	// tsserver resolves @langwatch/* to emitted dist/*.d.ts instead of holding
-	// the package sources in the app program. (`references` is not inherited
-	// via `extends`, so each config repeats it.)
-	"references": [
-		{ "path": "../packages/api" },
-		{ "path": "../packages/contracts" },
-		{ "path": "../packages/automations" },
-		{ "path": "../packages/observability" },
-		{ "path": "../packages/ssrf" },
-		{ "path": "../packages/cli-cards" },
-		{ "path": "../packages/handled-error" }
-	],
+	// No `references`: @langwatch/* resolves to package source via the pnpm
+	// workspace symlink, so go-to-definition lands on source directly. (The
+	// tsgo build configs dropped --build/references too — see tsconfig.tsgo.json.)
 	// Deliberately broad (unlike tsconfig.tsgo.json): the editor project also
 	// covers tests, scripts and config files so every open file has a project.
 	"include": [

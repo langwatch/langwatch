@@ -8,18 +8,9 @@
 	"compilerOptions": {
 		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsgo-tooling.tsbuildinfo"
 	},
-	// `references` is a top-level field and is NOT inherited via `extends` —
-	// repeat it so scripts that transitively import @langwatch/* also resolve
-	// the packages' emitted declarations.
-	"references": [
-		{ "path": "../packages/api" },
-		{ "path": "../packages/contracts" },
-		{ "path": "../packages/automations" },
-		{ "path": "../packages/observability" },
-		{ "path": "../packages/ssrf" },
-		{ "path": "../packages/cli-cards" },
-		{ "path": "../packages/handled-error" }
-	],
+	// No `references` — checked with `-p`, resolving @langwatch/* to source
+	// via the workspace symlink (see tsconfig.tsgo.json for why --build was
+	// dropped).
 	"include": [
 		"./scripts/**/*",
 		"./vite/**/*",
