@@ -5,6 +5,7 @@ import {
   commandValidationError,
   reportCommandError,
 } from "../../utils/errorOutput";
+import type { CommandResult } from "../../utils/output";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
 
@@ -14,8 +15,8 @@ import { handleDatasetCommandError } from "./error-handler";
 export const recordsUpdateCommand = async (
   slugOrId: string,
   recordId: string,
-  options: { json: string; format?: string },
-): Promise<void> => {
+  options: { json: string },
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   let entry: Record<string, unknown>;
@@ -42,9 +43,13 @@ export const recordsUpdateCommand = async (
 
     spinner.succeed(`Record updated: ${chalk.cyan(record.id)}`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(record, null, 2));
-    }
+    return {
+      data: record,
+      table: () => {
+        // Nothing further to print: the spinner line above was the whole
+        // human output before the migration, and stays so.
+      },
+    };
   } catch (error) {
     handleDatasetCommandError({ spinner, error, context: "update record" });
   }

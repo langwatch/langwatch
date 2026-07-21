@@ -52,11 +52,6 @@ const loginCommand = async (
   return loginCommandImpl(options);
 };
 
-const listCommand = async (options?: { format?: string }): Promise<void> => {
-  const { listCommand: listCommandImpl } = await import("./commands/list.js");
-  return listCommandImpl(options);
-};
-
 const syncCommand = async (): Promise<void> => {
   const { syncCommand: syncCommandImpl } = await import("./commands/sync.js");
   return syncCommandImpl();
@@ -67,40 +62,9 @@ const pullCommand = async (options?: { tag?: string }): Promise<void> => {
   return pullCommandImpl(options);
 };
 
-// Tag commands
-const tagListCommand = async (options?: { format?: string }): Promise<void> => {
-  const { tagListCommand: impl } = await import("./commands/tag/list.js");
-  return impl(options);
-};
-
-const tagCreateCommand = async (name: string): Promise<void> => {
-  const { tagCreateCommand: impl } = await import("./commands/tag/create.js");
-  return impl(name);
-};
-
-const tagRenameCommand = async (oldName: string, newName: string): Promise<void> => {
-  const { tagRenameCommand: impl } = await import("./commands/tag/rename.js");
-  return impl(oldName, newName);
-};
-
-const tagAssignCommand = async (promptHandle: string, tagName: string, options?: { version?: string }): Promise<void> => {
-  const { tagAssignCommand: impl } = await import("./commands/tag/assign.js");
-  return impl(promptHandle, tagName, options);
-};
-
-const tagDeleteCommand = async (tagName: string, options?: { force?: boolean }): Promise<void> => {
-  const { tagDeleteCommand: impl } = await import("./commands/tag/delete.js");
-  return impl(tagName, options);
-};
-
 const pushCommand = async (options?: { forceLocal?: boolean; forceRemote?: boolean }): Promise<void> => {
   const { pushCommand: pushCommandImpl } = await import("./commands/push.js");
   return pushCommandImpl(options);
-};
-
-const createCommand = async (name: string, options: { format?: string }): Promise<void> => {
-  const { createCommand: createCommandImpl } = await import("./commands/create.js");
-  return createCommandImpl(name, options);
 };
 
 export function buildProgram(): Command {
@@ -605,18 +569,21 @@ export function buildProgram(): Command {
       }
     });
 
-  promptCmd
-    .command("create <name>")
-    .description("Create a new prompt YAML file with default content")
-    .option("-f, --format <format>", "Output format: text (default) or json", "text")
-    .action(async (name: string, options: { format?: string }) => {
+  emitsResult(
+    promptCmd
+      .command("create <name>")
+      .description("Create a new prompt YAML file with default content")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (name: string) => {
       try {
-        await createCommand(name, options);
+        const { createCommand: impl } = await import("./commands/create.js");
+        return await impl(name);
       } catch (error) {
         console.error(`Error: ${formatApiErrorMessage({ error })}`);
         process.exit(1);
       }
-    });
+    },
+  );
 
   promptCmd
     .command("add <spec> [localFile]")
@@ -647,18 +614,21 @@ export function buildProgram(): Command {
       }
     });
 
-  promptCmd
-    .command("list")
-    .description("List all available prompts on the server")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (options: { format?: string }) => {
+  emitsResult(
+    promptCmd
+      .command("list")
+      .description("List all available prompts on the server")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
       try {
-        await listCommand(options);
+        const { listCommand: impl } = await import("./commands/list.js");
+        return await impl();
       } catch (error) {
         console.error(`Error: ${formatApiErrorMessage({ error })}`);
         process.exit(1);
       }
-    });
+    },
+  );
 
   promptCmd
     .command("sync")
@@ -699,91 +669,110 @@ export function buildProgram(): Command {
       }
     });
 
-  promptCmd
-    .command("versions <handle>")
-    .description("List all versions of a prompt")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (handle: string, options: { format?: string }) => {
+  emitsResult(
+    promptCmd
+      .command("versions <handle>")
+      .description("List all versions of a prompt")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (handle: string) => {
       const { promptVersionsCommand: impl } = await import("./commands/prompt/versions.js");
-      await impl(handle, options);
-    });
+      return impl(handle);
+    },
+  );
 
-  promptCmd
-    .command("restore <handle> <versionId>")
-    .description("Restore a prompt to a previous version (creates a new version with that config)")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (handle: string, versionId: string, options: { format?: string }) => {
+  emitsResult(
+    promptCmd
+      .command("restore <handle> <versionId>")
+      .description("Restore a prompt to a previous version (creates a new version with that config)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (handle: string, versionId: string) => {
       const { promptRestoreCommand: impl } = await import("./commands/prompt/restore.js");
-      await impl(handle, versionId, options);
-    });
+      return impl(handle, versionId);
+    },
+  );
 
   // Add prompt tag subcommand group
   const tagCmd = promptCmd
     .command("tag")
     .description("Manage prompt tags");
 
-  tagCmd
-    .command("list")
-    .description("List all tag definitions for the organization")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (options: { format?: string }) => {
+  emitsResult(
+    tagCmd
+      .command("list")
+      .description("List all tag definitions for the organization")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
       try {
-        await tagListCommand(options);
+        const { tagListCommand: impl } = await import("./commands/tag/list.js");
+        return await impl();
       } catch (error) {
         console.error(`Error: ${formatApiErrorMessage({ error })}`);
         process.exit(1);
       }
-    });
+    },
+  );
 
-  tagCmd
-    .command("create <name>")
-    .description("Create a custom tag")
-    .action(async (name: string) => {
+  emitsResult(
+    tagCmd
+      .command("create <name>")
+      .description("Create a custom tag"),
+    async (name: string) => {
       try {
-        await tagCreateCommand(name);
+        const { tagCreateCommand: impl } = await import("./commands/tag/create.js");
+        return await impl(name);
       } catch (error) {
         console.error(`Error: ${formatApiErrorMessage({ error })}`);
         process.exit(1);
       }
-    });
+    },
+  );
 
-  tagCmd
-    .command("rename <oldName> <newName>")
-    .description("Rename a tag")
-    .action(async (oldName: string, newName: string) => {
+  emitsResult(
+    tagCmd
+      .command("rename <oldName> <newName>")
+      .description("Rename a tag"),
+    async (oldName: string, newName: string) => {
       try {
-        await tagRenameCommand(oldName, newName);
+        const { tagRenameCommand: impl } = await import("./commands/tag/rename.js");
+        return await impl(oldName, newName);
       } catch (error) {
         console.error(`Error: ${formatApiErrorMessage({ error })}`);
         process.exit(1);
       }
-    });
+    },
+  );
 
-  tagCmd
-    .command("assign <prompt> <tag>")
-    .description("Assign a tag to a prompt version")
-    .option("--version <number>", "Version number to assign (defaults to latest)")
-    .action(async (prompt: string, tag: string, options: { version?: string }) => {
+  emitsResult(
+    tagCmd
+      .command("assign <prompt> <tag>")
+      .description("Assign a tag to a prompt version")
+      .option("--version <number>", "Version number to assign (defaults to latest)"),
+    async (prompt: string, tag: string, options: { version?: string }) => {
       try {
-        await tagAssignCommand(prompt, tag, options);
+        const { tagAssignCommand: impl } = await import("./commands/tag/assign.js");
+        return await impl(prompt, tag, options);
       } catch (error) {
         console.error(`Error: ${formatApiErrorMessage({ error })}`);
         process.exit(1);
       }
-    });
+    },
+  );
 
-  tagCmd
-    .command("delete <name>")
-    .description("Delete a tag and remove all its assignments")
-    .option("--force", "Skip confirmation prompt")
-    .action(async (name: string, options: { force?: boolean }) => {
+  emitsResult(
+    tagCmd
+      .command("delete <name>")
+      .description("Delete a tag and remove all its assignments")
+      .option("--force", "Skip confirmation prompt"),
+    async (name: string, options: { force?: boolean }) => {
       try {
-        await tagDeleteCommand(name, options);
+        const { tagDeleteCommand: impl } = await import("./commands/tag/delete.js");
+        return await impl(name, options);
       } catch (error) {
         console.error(`Error: ${formatApiErrorMessage({ error })}`);
         process.exit(1);
       }
-    });
+    },
+  );
 
   // Status command - project overview
   program
@@ -1052,79 +1041,83 @@ export function buildProgram(): Command {
     .command("experiment")
     .description("Run, monitor, list, and inspect experiments");
 
-  experimentCmd
-    .command("list")
-    .description("List experiments in the project")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .option("--limit <n>", "Maximum experiments to fetch (default 50, max 200)", "50")
-    .action(async (options: { format?: string; limit?: string }) => {
+  emitsResult(
+    experimentCmd
+      .command("list")
+      .description("List experiments in the project")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table")
+      .option("--limit <n>", "Maximum experiments to fetch (default 50, max 200)", "50"),
+    async (options: { limit?: string }) => {
       const { experimentListCommand: impl } = await import("./commands/experiment/list.js");
-      await impl(options);
-    });
+      return impl(options);
+    },
+  );
 
-  experimentCmd
-    .command("run <slug>")
-    .description("Start an experiment run by slug")
-    .option("--wait", "Wait for the experiment to complete before returning")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (slug: string, options: { wait?: boolean; format?: string }) => {
+  emitsResult(
+    experimentCmd
+      .command("run <slug>")
+      .description("Start an experiment run by slug")
+      .option("--wait", "Wait for the experiment to complete before returning")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (slug: string, options: { wait?: boolean }) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
-      await impl(slug, options);
-    });
+      return impl(slug, options);
+    },
+  );
 
-  experimentCmd
-    .command("status <experiment>")
-    .description("Check the status of an experiment run (defaults to the latest run)")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .option("--run-id <id>", "Specific run id to check (defaults to the latest run)")
-    .action(async (experiment: string, options: { format?: string; runId?: string }) => {
+  emitsResult(
+    experimentCmd
+      .command("status <experiment>")
+      .description("Check the status of an experiment run (defaults to the latest run)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table")
+      .option("--run-id <id>", "Specific run id to check (defaults to the latest run)"),
+    async (experiment: string, options: { runId?: string }) => {
       const { experimentStatusCommand: impl } = await import("./commands/experiment/status.js");
-      await impl(experiment, options);
-    });
+      return impl(experiment, options);
+    },
+  );
 
-  experimentCmd
-    .command("list-runs <experiment>")
-    .description("List experiment runs for an experiment by slug")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .option("--limit <n>", "Maximum runs to fetch (default 50, max 200)", "50")
-    .action(
-      async (
-        experiment: string,
-        options: {
-          format?: string;
-          limit?: string;
-        },
-      ) => {
-        const { experimentListRunsCommand: impl } = await import("./commands/experiment/list-runs.js");
-        await impl({ experiment, ...options });
+  emitsResult(
+    experimentCmd
+      .command("list-runs <experiment>")
+      .description("List experiment runs for an experiment by slug")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table")
+      .option("--limit <n>", "Maximum runs to fetch (default 50, max 200)", "50"),
+    async (
+      experiment: string,
+      options: {
+        limit?: string;
       },
-    );
+    ) => {
+      const { experimentListRunsCommand: impl } = await import("./commands/experiment/list-runs.js");
+      return impl({ experiment, ...options });
+    },
+  );
 
-  experimentCmd
-    .command("results <experiment>")
-    .description(
-      "Fetch per-row results for an experiment run, defaulting to the latest run (debug evaluator scores and missed rows)",
-    )
-    .option("--run-id <id>", "Specific run id to fetch (defaults to the latest run)")
-    .option("--filter <filter>", "Filter rows: failed | all (default)", "all")
-    .option("--evaluator <name>", "Show only this evaluator's column")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .option("--limit <n>", "Maximum rows to print in table mode (default 20)", "20")
-    .action(
-      async (
-        experiment: string,
-        options: {
-          runId?: string;
-          filter?: string;
-          evaluator?: string;
-          format?: string;
-          limit?: string;
-        },
-      ) => {
-        const { experimentResultsCommand: impl } = await import("./commands/experiment/results.js");
-        await impl({ experimentSlug: experiment, options });
+  emitsResult(
+    experimentCmd
+      .command("results <experiment>")
+      .description(
+        "Fetch per-row results for an experiment run, defaulting to the latest run (debug evaluator scores and missed rows)",
+      )
+      .option("--run-id <id>", "Specific run id to fetch (defaults to the latest run)")
+      .option("--filter <filter>", "Filter rows: failed | all (default)", "all")
+      .option("--evaluator <name>", "Show only this evaluator's column")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table")
+      .option("--limit <n>", "Maximum rows to print in table mode (default 20)", "20"),
+    async (
+      experiment: string,
+      options: {
+        runId?: string;
+        filter?: string;
+        evaluator?: string;
+        limit?: string;
       },
-    );
+    ) => {
+      const { experimentResultsCommand: impl } = await import("./commands/experiment/results.js");
+      return impl({ experimentSlug: experiment, options });
+    },
+  );
 
 
   // Add workflow command group
@@ -1132,54 +1125,64 @@ export function buildProgram(): Command {
     .command("workflow")
     .description("Manage workflows");
 
-  workflowCmd
-    .command("list")
-    .description("List all workflows in the project")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (options: { format?: string }) => {
+  emitsResult(
+    workflowCmd
+      .command("list")
+      .description("List all workflows in the project")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
       const { listWorkflowsCommand: impl } = await import("./commands/workflows/list.js");
-      await impl(options);
-    });
+      return impl();
+    },
+  );
 
-  workflowCmd
-    .command("get <id>")
-    .description("Get workflow details by ID")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { format?: string }) => {
+  emitsResult(
+    workflowCmd
+      .command("get <id>")
+      .description("Get workflow details by ID")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
       const { getWorkflowCommand: impl } = await import("./commands/workflows/get.js");
-      await impl(id, options);
-    });
+      return impl(id);
+    },
+  );
 
-  workflowCmd
-    .command("update <id>")
-    .description("Update a workflow's metadata (name, icon, description)")
-    .option("--name <name>", "New workflow name")
-    .option("--icon <icon>", "New workflow icon")
-    .option("--description <desc>", "New workflow description")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { name?: string; icon?: string; description?: string; format?: string }) => {
+  emitsResult(
+    workflowCmd
+      .command("update <id>")
+      .description("Update a workflow's metadata (name, icon, description)")
+      .option("--name <name>", "New workflow name")
+      .option("--icon <icon>", "New workflow icon")
+      .option("--description <desc>", "New workflow description")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { name?: string; icon?: string; description?: string }) => {
       const { updateWorkflowCommand: impl } = await import("./commands/workflows/update.js");
-      await impl(id, options);
-    });
+      return impl(id, options);
+    },
+  );
 
-  workflowCmd
-    .command("run <id>")
-    .description("Execute a workflow with JSON input")
-    .option("--input <json>", "Input data as JSON string")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { input?: string; format?: string }) => {
+  emitsResult(
+    workflowCmd
+      .command("run <id>")
+      .description("Execute a workflow with JSON input")
+      .option("--input <json>", "Input data as JSON string")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { input?: string }) => {
       const { runWorkflowCommand: impl } = await import("./commands/workflows/run.js");
-      await impl(id, options);
-    });
+      return impl(id, options);
+    },
+  );
 
-  workflowCmd
-    .command("delete <id>")
-    .description("Archive (soft-delete) a workflow")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { format?: string }) => {
+  emitsResult(
+    workflowCmd
+      .command("delete <id>")
+      .description("Archive (soft-delete) a workflow")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
       const { deleteWorkflowCommand: impl } = await import("./commands/workflows/delete.js");
-      await impl(id, options);
-    });
+      return impl(id);
+    },
+  );
 
   // Add agent command group
   const agentCmd = program
@@ -1720,48 +1723,56 @@ export function buildProgram(): Command {
     .command("scenario")
     .description("Manage scenarios");
 
-  scenarioCmd
-    .command("list")
-    .description("List all scenarios in the project")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (options: { format?: string }) => {
+  emitsResult(
+    scenarioCmd
+      .command("list")
+      .description("List all scenarios in the project")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
       const { listScenariosCommand: impl } = await import("./commands/scenarios/list.js");
-      await impl(options);
-    });
+      return impl();
+    },
+  );
 
-  scenarioCmd
-    .command("get <id>")
-    .description("Get scenario details by ID")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { format?: string }) => {
+  emitsResult(
+    scenarioCmd
+      .command("get <id>")
+      .description("Get scenario details by ID")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
       const { getScenarioCommand: impl } = await import("./commands/scenarios/get.js");
-      await impl(id, options);
-    });
+      return impl(id);
+    },
+  );
 
-  scenarioCmd
-    .command("create <name>")
-    .description("Create a new scenario")
-    .requiredOption("--situation <situation>", "The situation/context for the scenario")
-    .option("--criteria <criteria>", "Comma-separated list of evaluation criteria")
-    .option("--labels <labels>", "Comma-separated list of labels")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (name: string, options: { situation: string; criteria?: string; labels?: string; format?: string }) => {
+  emitsResult(
+    scenarioCmd
+      .command("create <name>")
+      .description("Create a new scenario")
+      .requiredOption("--situation <situation>", "The situation/context for the scenario")
+      .option("--criteria <criteria>", "Comma-separated list of evaluation criteria")
+      .option("--labels <labels>", "Comma-separated list of labels")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (name: string, options: { situation: string; criteria?: string; labels?: string }) => {
       const { createScenarioCommand: impl } = await import("./commands/scenarios/create.js");
-      await impl(name, options);
-    });
+      return impl(name, options);
+    },
+  );
 
-  scenarioCmd
-    .command("update <id>")
-    .description("Update an existing scenario")
-    .option("--name <name>", "New scenario name")
-    .option("--situation <situation>", "New situation/context")
-    .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
-    .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { name?: string; situation?: string; criteria?: string; labels?: string; format?: string }) => {
+  emitsResult(
+    scenarioCmd
+      .command("update <id>")
+      .description("Update an existing scenario")
+      .option("--name <name>", "New scenario name")
+      .option("--situation <situation>", "New situation/context")
+      .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
+      .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { name?: string; situation?: string; criteria?: string; labels?: string }) => {
       const { updateScenarioCommand: impl } = await import("./commands/scenarios/update.js");
-      await impl(id, options);
-    });
+      return impl(id, options);
+    },
+  );
 
   scenarioCmd
     .command("run <id>")
@@ -1774,75 +1785,87 @@ export function buildProgram(): Command {
       await impl(id, options);
     });
 
-  scenarioCmd
-    .command("delete <id>")
-    .description("Archive (soft-delete) a scenario")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { format?: string }) => {
+  emitsResult(
+    scenarioCmd
+      .command("delete <id>")
+      .description("Archive (soft-delete) a scenario")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
       const { deleteScenarioCommand: impl } = await import("./commands/scenarios/delete.js");
-      await impl(id, options);
-    });
+      return impl(id);
+    },
+  );
 
   // Add suite (run plan) command group
   const suiteCmd = program
     .command("suite")
     .description("Manage suites (run plans) — scenario × target execution plans");
 
-  suiteCmd
-    .command("list")
-    .description("List all suites in the project")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (options: { format?: string }) => {
+  emitsResult(
+    suiteCmd
+      .command("list")
+      .description("List all suites in the project")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
       const { listSuitesCommand: impl } = await import("./commands/suites/list.js");
-      await impl(options);
-    });
+      return impl();
+    },
+  );
 
-  suiteCmd
-    .command("get <id>")
-    .description("Get suite details by ID")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { format?: string }) => {
+  emitsResult(
+    suiteCmd
+      .command("get <id>")
+      .description("Get suite details by ID")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
       const { getSuiteCommand: impl } = await import("./commands/suites/get.js");
-      await impl(id, options);
-    });
+      return impl(id);
+    },
+  );
 
-  suiteCmd
-    .command("create <name>")
-    .description("Create a new suite (run plan)")
-    .requiredOption("--scenarios <ids>", "Comma-separated scenario IDs")
-    .requiredOption("--targets <targets...>", "Targets as <type>:<referenceId> (e.g., http:agent_abc)")
-    .option("--repeat-count <n>", "Number of times to repeat each scenario-target pair", "1")
-    .option("--labels <labels>", "Comma-separated labels")
-    .option("--description <desc>", "Suite description")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (name: string, options: { scenarios?: string; targets?: string[]; repeatCount?: string; labels?: string; description?: string; format?: string }) => {
+  emitsResult(
+    suiteCmd
+      .command("create <name>")
+      .description("Create a new suite (run plan)")
+      .requiredOption("--scenarios <ids>", "Comma-separated scenario IDs")
+      .requiredOption("--targets <targets...>", "Targets as <type>:<referenceId> (e.g., http:agent_abc)")
+      .option("--repeat-count <n>", "Number of times to repeat each scenario-target pair", "1")
+      .option("--labels <labels>", "Comma-separated labels")
+      .option("--description <desc>", "Suite description")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (name: string, options: { scenarios?: string; targets?: string[]; repeatCount?: string; labels?: string; description?: string }) => {
       const { createSuiteCommand: impl } = await import("./commands/suites/create.js");
-      await impl(name, options);
-    });
+      return impl(name, options);
+    },
+  );
 
-  suiteCmd
-    .command("update <id>")
-    .description("Update a suite (run plan)")
-    .option("--name <name>", "New suite name")
-    .option("--scenarios <ids>", "New comma-separated scenario IDs")
-    .option("--targets <targets...>", "New targets as <type>:<referenceId>")
-    .option("--repeat-count <n>", "New repeat count")
-    .option("--labels <labels>", "New comma-separated labels")
-    .option("--description <desc>", "New description")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { name?: string; scenarios?: string; targets?: string[]; repeatCount?: string; labels?: string; description?: string; format?: string }) => {
+  emitsResult(
+    suiteCmd
+      .command("update <id>")
+      .description("Update a suite (run plan)")
+      .option("--name <name>", "New suite name")
+      .option("--scenarios <ids>", "New comma-separated scenario IDs")
+      .option("--targets <targets...>", "New targets as <type>:<referenceId>")
+      .option("--repeat-count <n>", "New repeat count")
+      .option("--labels <labels>", "New comma-separated labels")
+      .option("--description <desc>", "New description")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { name?: string; scenarios?: string; targets?: string[]; repeatCount?: string; labels?: string; description?: string }) => {
       const { updateSuiteCommand: impl } = await import("./commands/suites/update.js");
-      await impl(id, options);
-    });
+      return impl(id, options);
+    },
+  );
 
-  suiteCmd
-    .command("duplicate <id>")
-    .description("Duplicate a suite")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { format?: string }) => {
+  emitsResult(
+    suiteCmd
+      .command("duplicate <id>")
+      .description("Duplicate a suite")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
       const { duplicateSuiteCommand: impl } = await import("./commands/suites/duplicate.js");
-      await impl(id, options);
-    });
+      return impl(id);
+    },
+  );
 
   suiteCmd
     .command("run <id>")
@@ -1854,14 +1877,16 @@ export function buildProgram(): Command {
       await impl(id, options);
     });
 
-  suiteCmd
-    .command("delete <id>")
-    .description("Archive (soft-delete) a suite")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { format?: string }) => {
+  emitsResult(
+    suiteCmd
+      .command("delete <id>")
+      .description("Archive (soft-delete) a suite")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
       const { deleteSuiteCommand: impl } = await import("./commands/suites/delete.js");
-      await impl(id, options);
-    });
+      return impl(id);
+    },
+  );
 
   // Add graph command group
   const graphCmd = program
@@ -2139,80 +2164,94 @@ export function buildProgram(): Command {
     .command("simulation-run")
     .description("View simulation run results");
 
-  simulationRunCmd
-    .command("list")
-    .description("List simulation runs (optionally filter by scenario set or batch)")
-    .option("--scenario-set-id <id>", "Filter by scenario set ID")
-    .option("--batch-run-id <id>", "Filter by batch run ID (requires --scenario-set-id)")
-    .option("--status <status>", "Filter by status (e.g. SUCCESS, FAILED, ERROR, IN_PROGRESS)")
-    .option("--name <substring>", "Filter by run name substring (case-insensitive)")
-    .option("--limit <n>", "Max results (default: 20)")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (options: { scenarioSetId?: string; batchRunId?: string; status?: string; name?: string; limit?: string; format?: string }) => {
+  emitsResult(
+    simulationRunCmd
+      .command("list")
+      .description("List simulation runs (optionally filter by scenario set or batch)")
+      .option("--scenario-set-id <id>", "Filter by scenario set ID")
+      .option("--batch-run-id <id>", "Filter by batch run ID (requires --scenario-set-id)")
+      .option("--status <status>", "Filter by status (e.g. SUCCESS, FAILED, ERROR, IN_PROGRESS)")
+      .option("--name <substring>", "Filter by run name substring (case-insensitive)")
+      .option("--limit <n>", "Max results (default: 20)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { scenarioSetId?: string; batchRunId?: string; status?: string; name?: string; limit?: string }) => {
       const { listSimulationRunsCommand: impl } = await import("./commands/simulation-runs/list.js");
-      await impl(options);
-    });
+      return impl(options);
+    },
+  );
 
-  simulationRunCmd
-    .command("get <runId>")
-    .description("Get full details of a simulation run (messages, results, costs)")
-    .option("--full", "Show full message content instead of truncating long lines")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (runId: string, options: { format?: string; full?: boolean }) => {
+  emitsResult(
+    simulationRunCmd
+      .command("get <runId>")
+      .description("Get full details of a simulation run (messages, results, costs)")
+      .option("--full", "Show full message content instead of truncating long lines")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (runId: string, options: { full?: boolean }) => {
       const { getSimulationRunCommand: impl } = await import("./commands/simulation-runs/get.js");
-      await impl(runId, options);
-    });
+      return impl(runId, options);
+    },
+  );
 
   // Add dataset command group
   const datasetCmd = program
     .command("dataset")
     .description("Manage datasets");
 
-  datasetCmd
-    .command("list")
-    .description("List all datasets")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (options: { format?: string }) => {
+  emitsResult(
+    datasetCmd
+      .command("list")
+      .description("List all datasets")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
       const { listCommand: listDatasetsImpl } = await import("./commands/dataset/list.js");
-      await listDatasetsImpl(options);
-    });
+      return listDatasetsImpl();
+    },
+  );
 
-  datasetCmd
-    .command("create <name>")
-    .description("Create a new dataset")
-    .option("-c, --columns <columns>", "Column definitions (e.g. input:string,output:string)")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (name: string, options: { columns?: string; format?: string }) => {
+  emitsResult(
+    datasetCmd
+      .command("create <name>")
+      .description("Create a new dataset")
+      .option("-c, --columns <columns>", "Column definitions (e.g. input:string,output:string)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (name: string, options: { columns?: string }) => {
       const { createCommand: createDatasetImpl } = await import("./commands/dataset/create.js");
-      await createDatasetImpl(name, options);
-    });
+      return createDatasetImpl(name, options);
+    },
+  );
 
-  datasetCmd
-    .command("get <slugOrId>")
-    .description("Get dataset details and preview records")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (slugOrId: string, options: { format?: string }) => {
+  emitsResult(
+    datasetCmd
+      .command("get <slugOrId>")
+      .description("Get dataset details and preview records")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (slugOrId: string) => {
       const { getCommand: getDatasetImpl } = await import("./commands/dataset/get.js");
-      await getDatasetImpl(slugOrId, options);
-    });
+      return getDatasetImpl(slugOrId);
+    },
+  );
 
-  datasetCmd
-    .command("delete <slugOrId>")
-    .description("Delete (archive) a dataset")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (slugOrId: string, options: { format?: string }) => {
+  emitsResult(
+    datasetCmd
+      .command("delete <slugOrId>")
+      .description("Delete (archive) a dataset")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (slugOrId: string) => {
       const { deleteCommand: deleteDatasetImpl } = await import("./commands/dataset/delete.js");
-      await deleteDatasetImpl(slugOrId, options);
-    });
+      return deleteDatasetImpl(slugOrId);
+    },
+  );
 
-  datasetCmd
-    .command("upload <slug> <file>")
-    .description("Upload a file to a dataset (creates if not found)")
-    .option("--if-exists <strategy>", "Strategy when dataset exists: append (default), replace, error")
-    .action(async (slug: string, file: string, options: { ifExists?: string }) => {
+  emitsResult(
+    datasetCmd
+      .command("upload <slug> <file>")
+      .description("Upload a file to a dataset (creates if not found)")
+      .option("--if-exists <strategy>", "Strategy when dataset exists: append (default), replace, error"),
+    async (slug: string, file: string, options: { ifExists?: string }) => {
       const { uploadCommand: uploadDatasetImpl } = await import("./commands/dataset/upload.js");
-      await uploadDatasetImpl(slug, file, options);
-    });
+      return uploadDatasetImpl(slug, file, options);
+    },
+  );
 
   datasetCmd
     .command("download <slugOrId>")
@@ -2223,63 +2262,73 @@ export function buildProgram(): Command {
       await downloadDatasetImpl(slugOrId, options);
     });
 
-  datasetCmd
-    .command("update <slugOrId>")
-    .description("Update a dataset name or columns")
-    .option("--name <name>", "New dataset name")
-    .option("--columns <columns>", "New column definitions (e.g. input:string,output:string)")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (slugOrId: string, options: { name?: string; columns?: string; format?: string }) => {
+  emitsResult(
+    datasetCmd
+      .command("update <slugOrId>")
+      .description("Update a dataset name or columns")
+      .option("--name <name>", "New dataset name")
+      .option("--columns <columns>", "New column definitions (e.g. input:string,output:string)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (slugOrId: string, options: { name?: string; columns?: string }) => {
       const { updateCommand: updateDatasetImpl } = await import("./commands/dataset/update.js");
-      await updateDatasetImpl(slugOrId, options);
-    });
+      return updateDatasetImpl(slugOrId, options);
+    },
+  );
 
   // Records subcommand group
   const recordsCmd = datasetCmd
     .command("records")
     .description("Manage dataset records");
 
-  recordsCmd
-    .command("list <slugOrId>")
-    .description("List records in a dataset")
-    .option("--page <n>", "Page number (default: 1)")
-    .option("--limit <n>", "Records per page (default: 20)")
-    .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (slugOrId: string, options: { page?: string; limit?: string; format?: string }) => {
+  emitsResult(
+    recordsCmd
+      .command("list <slugOrId>")
+      .description("List records in a dataset")
+      .option("--page <n>", "Page number (default: 1)")
+      .option("--limit <n>", "Records per page (default: 20)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (slugOrId: string, options: { page?: string; limit?: string }) => {
       const { recordsListCommand } = await import("./commands/dataset/records-list.js");
-      await recordsListCommand(slugOrId, options);
-    });
+      return recordsListCommand(slugOrId, options);
+    },
+  );
 
-  recordsCmd
-    .command("add <slugOrId>")
-    .description("Add records to a dataset")
-    .option("--json <json>", "JSON array of records (inline)")
-    .option("--file <path>", "Read JSON array of records from a file")
-    .option("--stdin", "Read JSON array from stdin")
-    .option("-f, --format <format>", "Output format: text (default) or json", "text")
-    .action(async (slugOrId: string, options: { json?: string; file?: string; stdin?: boolean; format?: string }) => {
+  emitsResult(
+    recordsCmd
+      .command("add <slugOrId>")
+      .description("Add records to a dataset")
+      .option("--json <json>", "JSON array of records (inline)")
+      .option("--file <path>", "Read JSON array of records from a file")
+      .option("--stdin", "Read JSON array from stdin")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (slugOrId: string, options: { json?: string; file?: string; stdin?: boolean }) => {
       const { recordsAddCommand } = await import("./commands/dataset/records-add.js");
-      await recordsAddCommand(slugOrId, options);
-    });
+      return recordsAddCommand(slugOrId, options);
+    },
+  );
 
-  recordsCmd
-    .command("update <slugOrId> <recordId>")
-    .description("Update a single record in a dataset")
-    .requiredOption("--json <json>", "JSON object with updated fields")
-    .option("-f, --format <format>", "Output format: text (default) or json", "text")
-    .action(async (slugOrId: string, recordId: string, options: { json: string; format?: string }) => {
+  emitsResult(
+    recordsCmd
+      .command("update <slugOrId> <recordId>")
+      .description("Update a single record in a dataset")
+      .requiredOption("--json <json>", "JSON object with updated fields")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (slugOrId: string, recordId: string, options: { json: string }) => {
       const { recordsUpdateCommand } = await import("./commands/dataset/records-update.js");
-      await recordsUpdateCommand(slugOrId, recordId, options);
-    });
+      return recordsUpdateCommand(slugOrId, recordId, options);
+    },
+  );
 
-  recordsCmd
-    .command("delete <slugOrId> <recordIds...>")
-    .description("Delete records from a dataset")
-    .option("-f, --format <format>", "Output format: text (default) or json", "text")
-    .action(async (slugOrId: string, recordIds: string[], options: { format?: string }) => {
+  emitsResult(
+    recordsCmd
+      .command("delete <slugOrId> <recordIds...>")
+      .description("Delete records from a dataset")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (slugOrId: string, recordIds: string[]) => {
       const { recordsDeleteCommand } = await import("./commands/dataset/records-delete.js");
-      await recordsDeleteCommand(slugOrId, recordIds, options);
-    });
+      return recordsDeleteCommand(slugOrId, recordIds);
+    },
+  );
   const projectsCmd = program
     .command("projects")
     .description("Manage organization projects");

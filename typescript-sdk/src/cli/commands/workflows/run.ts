@@ -5,12 +5,13 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 export const runWorkflowCommand = async (
   id: string,
-  options: { input?: string; format?: string },
-): Promise<void> => {
+  options: { input?: string },
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const spinner = createSpinner(`Running workflow "${id}"...`).start();
@@ -44,22 +45,23 @@ export const runWorkflowCommand = async (
 
     spinner.succeed(`Workflow "${id}" executed successfully`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(result, null, 2));
-    } else {
-      console.log();
-      if (result.output !== undefined) {
-        console.log(chalk.bold("  Output:"));
-        const output = typeof result.output === "string"
-          ? result.output
-          : JSON.stringify(result.output, null, 2);
-        console.log(`    ${output.split("\n").join("\n    ")}`);
-      } else {
-        console.log(chalk.bold("  Result:"));
-        console.log(`    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`);
-      }
-      console.log();
-    }
+    return {
+      data: result,
+      table: () => {
+        console.log();
+        if (result.output !== undefined) {
+          console.log(chalk.bold("  Output:"));
+          const output = typeof result.output === "string"
+            ? result.output
+            : JSON.stringify(result.output, null, 2);
+          console.log(`    ${output.split("\n").join("\n    ")}`);
+        } else {
+          console.log(chalk.bold("  Result:"));
+          console.log(`    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`);
+        }
+        console.log();
+      },
+    };
   } catch (error) {
     // Route BOTH failure kinds through failSpinner: a direct spinner.fail()
     // prints nothing in --json/--jq/agent mode (spinners are silent there).

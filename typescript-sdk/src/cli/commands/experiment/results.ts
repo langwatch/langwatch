@@ -13,15 +13,14 @@ import {
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatTable } from "../../utils/formatting";
+import type { CommandResult } from "../../utils/output";
 import { resolveRunId } from "./resolve-run";
 
 export type ExperimentResultsFilter = "failed" | "all";
-export type ExperimentResultsFormat = "table" | "json";
 
 export interface ExperimentResultsOptions {
   filter?: string;
   evaluator?: string;
-  format?: string;
   limit?: string;
   runId?: string;
 }
@@ -73,13 +72,11 @@ export const experimentResultsCommand = async ({
 }: {
   experimentSlug: string;
   options?: ExperimentResultsOptions;
-}): Promise<void> => {
+}): Promise<CommandResult | void> => {
   checkApiKey();
 
   const filter: ExperimentResultsFilter =
     options.filter === "failed" ? "failed" : "all";
-  const format: ExperimentResultsFormat =
-    options.format === "json" ? "json" : "table";
   const limit = (() => {
     const parsed = options.limit ? parseInt(options.limit, 10) : DEFAULT_LIMIT;
     return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_LIMIT;
@@ -103,16 +100,6 @@ export const experimentResultsCommand = async ({
     spinner.succeed(
       `Loaded results for ${chalk.cyan(runId)} (${results.dataset.length} rows, ${results.evaluations.length} evaluations)`,
     );
-
-    if (!isTerminalStatus(runStatus) && format !== "json") {
-      console.log(
-        chalk.yellow(
-          runStatus === "interrupted"
-            ? `Run status: interrupted. These are partial results (the run never sent a finished/stopped marker and has had no recent updates).`
-            : `Run status: running. These are partial results; more rows may appear later.`,
-        ),
-      );
-    }
 
     // Group evaluations by target-scoped row key.
     const evaluationsByRow = new Map<string, ExperimentRunEvaluation[]>();
@@ -146,102 +133,106 @@ export const experimentResultsCommand = async ({
     const truncated = rows.length > limit;
     rows = rows.slice(0, limit);
 
-    if (format === "json") {
-      console.log(
-        JSON.stringify(
-          {
-            ...results,
-            dataset: rows.map((row) => row.entry),
-            evaluations: rows.flatMap((row) => row.evaluations),
-            meta: {
-              totalMatching,
-              truncated,
-              limit,
-              filter,
-              evaluator: evaluatorFilter ?? null,
-            },
-          },
-          null,
-          2,
-        ),
-      );
-      return;
-    }
-
-    if (rows.length === 0) {
-      if (filter === "failed") {
-        console.log(chalk.gray("No rows matched the filter."));
-      } else if (runStatus === "running") {
-        console.log(
-          chalk.gray(
-            "No rows recorded yet. The run is still in progress; run this again shortly.",
-          ),
-        );
-      } else if (runStatus === "interrupted") {
-        console.log(
-          chalk.gray("No rows were recorded before the run was interrupted."),
-        );
-      } else {
-        console.log(chalk.gray("No rows recorded for this run."));
-      }
-      return;
-    }
-
-    const headers = ["#", "Target", ...evaluatorNames, "Status"];
-    const tableData = rows.map(({ entry, evaluations }) => {
-      const evaluatorCols: Record<string, string> = {};
-      for (const name of evaluatorNames) {
-        const e = evaluations.find((x) => x.evaluator === name);
-        if (!e) {
-          evaluatorCols[name] = chalk.gray("—");
-        } else if (e.status === "error") {
-          evaluatorCols[name] = chalk.red("error");
-        } else if (typeof e.score === "number") {
-          const passedSuffix =
-            e.passed === false
-              ? chalk.red(" ✗")
-              : e.passed === true
-                ? chalk.green(" ✓")
-                : "";
-          evaluatorCols[name] = `${e.score.toFixed(2)}${passedSuffix}`;
-        } else if (e.label) {
-          evaluatorCols[name] = e.label;
-        } else if (typeof e.passed === "boolean") {
-          evaluatorCols[name] = e.passed
-            ? chalk.green("pass")
-            : chalk.red("fail");
-        } else {
-          evaluatorCols[name] = chalk.gray("—");
+    return {
+      data: {
+        ...results,
+        dataset: rows.map((row) => row.entry),
+        evaluations: rows.flatMap((row) => row.evaluations),
+        meta: {
+          totalMatching,
+          truncated,
+          limit,
+          filter,
+          evaluator: evaluatorFilter ?? null,
+        },
+      },
+      table: () => {
+        if (!isTerminalStatus(runStatus)) {
+          console.log(
+            chalk.yellow(
+              runStatus === "interrupted"
+                ? `Run status: interrupted. These are partial results (the run never sent a finished/stopped marker and has had no recent updates).`
+                : `Run status: running. These are partial results; more rows may appear later.`,
+            ),
+          );
         }
-      }
-      const status = entry.error
-        ? chalk.red(
-            entry.error.length > 40
-              ? `${entry.error.slice(0, 37)}...`
-              : entry.error,
-          )
-        : evaluations.some(isFailedEvaluation)
-          ? chalk.red("failed")
-          : chalk.green("ok");
 
-      return {
-        "#": String(entry.index),
-        Target: summarizeEntry(entry.entry),
-        ...evaluatorCols,
-        Status: status,
-      };
-    });
+        if (rows.length === 0) {
+          if (filter === "failed") {
+            console.log(chalk.gray("No rows matched the filter."));
+          } else if (runStatus === "running") {
+            console.log(
+              chalk.gray(
+                "No rows recorded yet. The run is still in progress; run this again shortly.",
+              ),
+            );
+          } else if (runStatus === "interrupted") {
+            console.log(
+              chalk.gray("No rows were recorded before the run was interrupted."),
+            );
+          } else {
+            console.log(chalk.gray("No rows recorded for this run."));
+          }
+          return;
+        }
 
-    formatTable({ data: tableData, headers });
+        const headers = ["#", "Target", ...evaluatorNames, "Status"];
+        const tableData = rows.map(({ entry, evaluations }) => {
+          const evaluatorCols: Record<string, string> = {};
+          for (const name of evaluatorNames) {
+            const e = evaluations.find((x) => x.evaluator === name);
+            if (!e) {
+              evaluatorCols[name] = chalk.gray("—");
+            } else if (e.status === "error") {
+              evaluatorCols[name] = chalk.red("error");
+            } else if (typeof e.score === "number") {
+              const passedSuffix =
+                e.passed === false
+                  ? chalk.red(" ✗")
+                  : e.passed === true
+                    ? chalk.green(" ✓")
+                    : "";
+              evaluatorCols[name] = `${e.score.toFixed(2)}${passedSuffix}`;
+            } else if (e.label) {
+              evaluatorCols[name] = e.label;
+            } else if (typeof e.passed === "boolean") {
+              evaluatorCols[name] = e.passed
+                ? chalk.green("pass")
+                : chalk.red("fail");
+            } else {
+              evaluatorCols[name] = chalk.gray("—");
+            }
+          }
+          const status = entry.error
+            ? chalk.red(
+                entry.error.length > 40
+                  ? `${entry.error.slice(0, 37)}...`
+                  : entry.error,
+              )
+            : evaluations.some(isFailedEvaluation)
+              ? chalk.red("failed")
+              : chalk.green("ok");
 
-    if (truncated) {
-      console.log();
-      console.log(
-        chalk.gray(
-          `Showing ${rows.length} of ${totalMatching} rows. Use --limit <n> or --format json for the full payload.`,
-        ),
-      );
-    }
+          return {
+            "#": String(entry.index),
+            Target: summarizeEntry(entry.entry),
+            ...evaluatorCols,
+            Status: status,
+          };
+        });
+
+        formatTable({ data: tableData, headers });
+
+        if (truncated) {
+          console.log();
+          console.log(
+            chalk.gray(
+              `Showing ${rows.length} of ${totalMatching} rows. Use --limit <n> or --format json for the full payload.`,
+            ),
+          );
+        }
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "fetch experiment results" });
     process.exit(1);

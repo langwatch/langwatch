@@ -16,11 +16,11 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
 | # | Capability | gcx | gh | langwatch today | Close in |
 |---|---|---|---|---|---|
 | 1 | Agent mode: `--agent` flag + env autodetect (`CLAUDECODE`, `CLAUDE_CODE`, `CURSOR_AGENT`, `GITHUB_COPILOT`, `AMAZON_Q`) → JSON stdout, no color/spinners, hints on stderr | ✅ | n/a | ✅ `--agent` + env autodetect (+ `LW_AGENT_MODE`/`LANGWATCH_AGENT_MODE`) in `typescript-sdk/src/cli/utils/output.ts`; wired via `preAction` → `applyOutputContext` (chalk off, spinner silent, errors structured); agent env vars forwarded to the daemon (`daemon/eligibility.ts`) | P1 |
-| 2 | Uniform output contract: `-o table/json/yaml/agents`, `--jq <expr>`, `--json <fields>` on every command | ✅ | ✅ (`--json/--jq/--template`) | ⚠️ contract + flags live everywhere (`utils/output.ts` `printResult`/`resolveOutputOptions`/`registerOutputOptions`; legacy `-f/--format` + bare `--json` normalized centrally); success output routed through `printResult` on the pilot groups (traces, status, evaluator, monitor) — remaining commands still render their own tables but get machine errors/spinner-silence for free | P1 |
+| 2 | Uniform output contract: `-o table/json/yaml/agents`, `--jq <expr>`, `--json <fields>` on every command | ✅ | ✅ (`--json/--jq/--template`) | ✅ output PORT: commands return `{ data, table }` and the port (`emitsResult` in `utils/output.ts`) renders the caller's format (`-o table/json/yaml/agents`, `--jq`, `--json <fields>`); legacy `-f/--format` + bare `--json` normalized centrally. ~105 commands migrated across every resource group; 3 genuinely format-incompatible commands stay self-printing and REFUSE new-contract flags rather than fail-green (`assertFormatIsSupported`): `dataset download` (raw CSV/JSONL byte stream), `suites run` + `scenarios run` (human-interactive `--wait` polling, no structured completion payload) | P1 |
 | 3 | Machine-readable command catalog with flags, args, hints, token-cost estimates (`gcx commands`) | ✅ | ❌ | ✅ `lw commands [--flat]` (`typescript-sdk/src/cli/commands/commands.ts`) built live from the commander tree + `feature-map.json` metadata (`cli/utils/commandCatalog.ts`); map backfilled with the 5 gateway-surface resources + per-command `hints` (43 across 10 agent-critical groups); embedded in the SDK via `copy-types.sh` → `src/internal/generated/cli/feature-map.generated.ts`; drift guarded by `src/cli/__tests__/feature-map-drift.unit.test.ts` | ~~P3~~ done |
 | 4 | Compact help-tree for agent context injection (`gcx help-tree`, `# hint:`/`# skill:` annotations) | ✅ | ❌ | ✅ `lw help-tree` (`typescript-sdk/src/cli/commands/help-tree.ts`, renderer in `cli/utils/commandCatalog.ts`) — plain text in human AND agent mode, `-o json/yaml` emits the tree structure; the `status` cheat-sheet is now generated from the same catalog (`commands/status.ts`) | ~~P3~~ done |
 | 5 | Self-installing bundled skills → `~/.agents/skills` (`gcx agent skills list/get/install/uninstall/update`) | ✅ | ❌ | ✅ `lw skills list\|get\|install\|uninstall\|update` (`typescript-sdk/src/cli/commands/skills/`, gcx semantics: `--all`, `--dir` (default `~/.agents`), `--dry-run`, `--force`, `-y`; recipes nest under `recipes/<slug>`; managed-by marker guards user files; non-TTY never prompts) — bundle embedded at build time by `copy-types.sh` → `scripts/generate-skills-bundle.mjs` → `src/internal/generated/cli/skills.generated.ts` (16 skills, MDX partials fully inlined, versioned by `skills/version.txt`); `npx skills add` stays as alternative (`docs/skills/directory.mdx:23`) | ~~P4~~ done |
-| 6 | Backend-driven structured errors: Error / Details / Suggestions / Docs blocks + JSON envelope | ✅ | partial | ✅ CLI side complete: `CliDomainError` (`packages/cli-cards/src/domain-error.ts`) now carries `code` (+ deprecated `kind` alias), `suggestions`/`docUrl`/`traceUrl` end-to-end through `LangWatchDomainError`; dialect-1's `trace.traceId` lifted, dialects 2–3 keep `reasons`/`traceUrl`; human errors render gcx-style Error/Details/Suggestions/Docs blocks on stderr (`cli/utils/errorOutput.ts`), JSON envelope carries the full structure; code-keyed fallback explainer (`cli/utils/errorSuggestions.ts`, 10 codes) fills advice until the backend sends `suggestions` (server-sent always wins) | ~~P2~~ done (CLI); backend `suggestions` follow-up pending |
+| 6 | Backend-driven structured errors: Error / Details / Suggestions / Docs blocks + JSON envelope | ✅ | partial | ✅ CLI side complete: `CliHandledError` (`packages/cli-cards/src/handled-error.ts`) now carries `code` (+ deprecated `kind` alias), `suggestions`/`docUrl`/`traceUrl` end-to-end through `LangWatchHandledError`; dialect-1's `trace.traceId` lifted, dialects 2–3 keep `reasons`/`traceUrl`; human errors render gcx-style Error/Details/Suggestions/Docs blocks on stderr (`cli/utils/errorOutput.ts`), JSON envelope carries the full structure; code-keyed fallback explainer (`cli/utils/errorSuggestions.ts`, 10 codes) fills advice until the backend sends `suggestions` (server-sent always wins) | ~~P2~~ done (CLI); backend `suggestions` follow-up pending |
 | 7 | Personalized `status`: what needs my attention | ❌ | ✅ (`gh status`) | ✅ "Needs Attention" section above the resource counts (`commands/status.ts`): errored-trace count over 24h (`traces.error` filter, `pageSize: 1` → `totalHits`), still-running experiments (latest run of the ≤5 most recently active experiments), gateway budgets ≥80% utilization (403-tolerant). Each section soft-fails independently — `null` field + per-section `errors` map in the machine document, dim note in human mode; everything fetches in one `Promise.allSettled` wave; the machine document is now `{ attention, resources }`. Monitors deliberately omitted: the monitors REST list exposes config only, no firing/health state (that lives in ClickHouse evaluation results, not the API) | ~~P5~~ done |
 | 8 | Natural-language escape hatch routed to the product's assistant | ✅ (`gcx assistant prompt`) | ✅ (`gh copilot`, `gh agent-task`) | ⚠️ Langy in-product only; **no CLI `ask` yet** — P5 investigation verdict: Langy's only entry points are tRPC procedures (`langwatch/src/server/api/routers/langy.ts`) gated by a BetterAuth session cookie (no API-key plugin) plus the `release_langy_enabled` rollout flag, so a CLI holding only `LANGWATCH_API_KEY` cannot reach it. Scoped as a server follow-up — see Open items | follow-up (server endpoint) |
 | 9 | Docs as markdown from the CLI (llms.txt index + pages) | ❌ | ❌ | ✅ `commands/docs.ts` (`docs`, `scenario-docs`) — ahead of both | — |
@@ -45,9 +45,12 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
 - Human-first default: tables + color unchanged unless `--agent`/env detection fires.
 - gcx pitfall to avoid repeating: hints on **stderr** (its own skill warns `2>&1`
   breaks JSON piping). Our `errorOutput.ts` already honors this.
-- Pilot groups migrated: `trace search`/`trace get`, `status`, `evaluator *`,
-  `monitor *`. `trace export` deliberately NOT migrated (its `--format` is a
-  file format and `-o` a file path, not the output contract).
+- Migrated to the output port (`emitsResult`): every command group. The 3
+  exceptions stay self-printing and REFUSE new-contract flags (never fail-green):
+  `dataset download` (raw byte stream), `suites run` + `scenarios run`
+  (human-interactive `--wait` polling with no structured completion payload).
+  `trace export` also stays out (its `--format` is a file format and `-o` a file
+  path, not the output contract).
 
 ### 3–4. Catalog & help-tree (P3) — DONE
 - Base: `feature-map.json` (canonical IA per `dev/docs/adr/012-skills-information-architecture.md`
@@ -125,7 +128,7 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
 - Three REST error dialects exist server-side (see `handled-error.ts` consumers):
   flattened `{error, message, ...meta, trace:{…}}` (drops `reasons`/`traceUrl`),
   verbatim `serialize()` under `domainError`, and the new framework envelope in
-  `langwatch/packages/api/src/errors.ts`. `parseDomainError` reads all three —
+  `langwatch/packages/api/src/errors.ts`. `parseHandledError` reads all three —
   including lifting dialect-1's `trace.traceId`/`trace.traceUrl` out of the nested
   block (they used to land inertly in `meta.trace`) and preserving
   `reasons`/`traceUrl` where dialects 2–3 send them.
@@ -134,11 +137,11 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
   `specs/features/domain-error-contract.feature`) and emits both
   (`code` + deprecated `kind` alias) in the JSON error document, so old and new
   servers and old and new readers all keep working through the rollout.
-- `CliDomainError` carries `suggestions?: string[]` / `docUrl?: string` end-to-end
-  (parse → `LangWatchDomainError` → render). Human output is the gcx-style block
+- `CliHandledError` carries `suggestions?: string[]` / `docUrl?: string` end-to-end
+  (parse → `LangWatchHandledError` → render). Human output is the gcx-style block
   on stderr — `Error:` / `Details:` (code, status, trace id+url, meta, reason
   chain) / `Suggestions:` / `Docs:` — and the JSON envelope carries the same
-  fields. Infrastructure errors (`isDomain=false`) still print the sentence alone.
+  fields. Infrastructure errors (`isHandled=false`) still print the sentence alone.
 - Until the backend ships `suggestions`, a code-keyed client-side fallback table
   (`typescript-sdk/src/cli/utils/errorSuggestions.ts`, pattern from
   `langwatch/src/features/langy/logic/langyErrorExplainer.ts`) covers the 10 most

@@ -9,15 +9,11 @@ import {
 } from "../utils/errorOutput";
 import { ensureProjectInitialized } from "../utils/init";
 import { DEFAULT_PROMPT_MODEL } from "../constants";
-
-interface CreateOptions {
-  format?: string;
-}
+import type { CommandResult } from "../utils/output";
 
 export const createCommand = async (
   name: string,
-  options: CreateOptions = {},
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   try {
     // Validate prompt name
     if (!name || name.trim() === "") {
@@ -89,22 +85,16 @@ messages:
 
     const displayPath = `./${relativePath}`;
 
-    if (options.format === "json") {
-      console.log(
-        JSON.stringify(
-          { name, path: relativePath, dependency: `file:${relativePath}` },
-          null,
-          2,
-        ),
-      );
-      return;
-    }
-
-    console.log(
-      chalk.green(`✓ Created prompt file: ${chalk.cyan(displayPath)}`),
-    );
-    console.log(chalk.gray(`  Edit this file and then run:`));
-    console.log(chalk.cyan(`  langwatch prompt sync`));
+    return {
+      data: { name, path: relativePath, dependency: `file:${relativePath}` },
+      table: () => {
+        console.log(
+          chalk.green(`✓ Created prompt file: ${chalk.cyan(displayPath)}`),
+        );
+        console.log(chalk.gray(`  Edit this file and then run:`));
+        console.log(chalk.cyan(`  langwatch prompt sync`));
+      },
+    };
   } catch (error) {
     reportCommandError({ error });
     process.exit(1);

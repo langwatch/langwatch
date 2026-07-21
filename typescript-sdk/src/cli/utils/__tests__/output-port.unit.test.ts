@@ -451,11 +451,13 @@ describe("the real command tree", () => {
   });
 
   describe("when a command still prints its own output", () => {
+    // The commands that legitimately still print their own output because a
+    // format-blind port cannot serve them: a raw byte stream, and the two
+    // human-interactive `--wait` polls whose completion has no structured payload.
     const unmigrated = [
-      ["prompt", "list"],
-      ["dataset", "list"],
-      ["workflow", "list"],
-      ["experiment", "list"],
+      ["dataset", "download"],
+      ["suite", "run"],
+      ["scenario", "run"],
     ];
 
     it.each(unmigrated)("leaves `%s %s` unmarked", async (group, name) => {

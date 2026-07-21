@@ -466,7 +466,7 @@ export const isOutputAware = (command: Command): boolean =>
  *
  * `registerOutputOptions` puts `-o/--output` on EVERY command, and `choices()`
  * makes a typo fail loudly at parse time. Until a command is migrated to
- * `withOutput`, a VALID value is the more dangerous case: the flag validates,
+ * `emitsResult`, a VALID value is the more dangerous case: the flag validates,
  * the command prints its chalk table anyway, and the caller gets human text at
  * exit 0 having explicitly asked for JSON. `--jq` is worse still — the
  * expression is never parsed, so a malformed one also exits 0.

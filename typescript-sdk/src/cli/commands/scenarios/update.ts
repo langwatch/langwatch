@@ -4,11 +4,12 @@ import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import type { UpdateScenarioBody } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
 export const updateScenarioCommand = async (
   id: string,
-  options: { name?: string; situation?: string; criteria?: string; labels?: string; format?: string },
-): Promise<void> => {
+  options: { name?: string; situation?: string; criteria?: string; labels?: string },
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new ScenariosApiService();
@@ -29,9 +30,12 @@ export const updateScenarioCommand = async (
       `Updated scenario "${chalk.cyan(scenario.name)}" ${chalk.gray(`(id: ${scenario.id})`)}`,
     );
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(scenario, null, 2));
-    }
+    return {
+      data: scenario,
+      table: () => {
+        // The spinner's success line is the human output.
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "update scenario" });
     process.exit(1);

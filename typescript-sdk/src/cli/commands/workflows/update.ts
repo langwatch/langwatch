@@ -5,12 +5,13 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 export const updateWorkflowCommand = async (
   id: string,
-  options: { name?: string; icon?: string; description?: string; format?: string },
-): Promise<void> => {
+  options: { name?: string; icon?: string; description?: string },
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
@@ -62,17 +63,17 @@ export const updateWorkflowCommand = async (
 
     spinner.succeed(`Workflow "${workflow.name}" updated`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(workflow, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`  ${chalk.gray("ID:")}          ${chalk.green(workflow.id)}`);
-    console.log(`  ${chalk.gray("Name:")}        ${chalk.cyan(workflow.name)}`);
-    console.log(`  ${chalk.gray("Icon:")}        ${workflow.icon ?? chalk.gray("—")}`);
-    console.log(`  ${chalk.gray("Description:")} ${workflow.description ?? chalk.gray("—")}`);
-    console.log();
+    return {
+      data: workflow,
+      table: () => {
+        console.log();
+        console.log(`  ${chalk.gray("ID:")}          ${chalk.green(workflow.id)}`);
+        console.log(`  ${chalk.gray("Name:")}        ${chalk.cyan(workflow.name)}`);
+        console.log(`  ${chalk.gray("Icon:")}        ${workflow.icon ?? chalk.gray("—")}`);
+        console.log(`  ${chalk.gray("Description:")} ${workflow.description ?? chalk.gray("—")}`);
+        console.log();
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "update workflow" });
     process.exit(1);

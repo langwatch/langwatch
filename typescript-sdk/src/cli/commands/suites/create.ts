@@ -6,6 +6,7 @@ import {
 } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
 function parseTargets(targetStrings: string[]): SuiteTarget[] {
   return targetStrings.map((t) => {
@@ -24,6 +25,10 @@ function parseTargets(targetStrings: string[]): SuiteTarget[] {
   });
 }
 
+/**
+ * Returns the created suite rather than printing it: the output port renders it
+ * in whatever format the caller asked for (utils/output.ts).
+ */
 export const createSuiteCommand = async (
   name: string,
   options: {
@@ -32,9 +37,8 @@ export const createSuiteCommand = async (
     repeatCount?: string;
     labels?: string;
     description?: string;
-    format?: string;
   },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   if (!options.scenarios) {
@@ -67,24 +71,24 @@ export const createSuiteCommand = async (
 
     spinner.succeed(`Suite "${suite.name}" created (${suite.id})`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(suite, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`  ${chalk.gray("ID:")}        ${chalk.green(suite.id)}`);
-    console.log(`  ${chalk.gray("Slug:")}      ${chalk.yellow(suite.slug)}`);
-    console.log(`  ${chalk.gray("Scenarios:")} ${suite.scenarioIds.length}`);
-    console.log(`  ${chalk.gray("Targets:")}   ${suite.targets.length}`);
-    console.log(`  ${chalk.gray("Repeat:")}    ${suite.repeatCount}`);
-    console.log();
-    if (suite.platformUrl) {
-      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(suite.platformUrl)}`);
-    }
-    console.log(
-      chalk.gray(`Run it with: ${chalk.cyan(`langwatch suite run ${suite.id}`)}`),
-    );
+    return {
+      data: suite,
+      table: () => {
+        console.log();
+        console.log(`  ${chalk.gray("ID:")}        ${chalk.green(suite.id)}`);
+        console.log(`  ${chalk.gray("Slug:")}      ${chalk.yellow(suite.slug)}`);
+        console.log(`  ${chalk.gray("Scenarios:")} ${suite.scenarioIds.length}`);
+        console.log(`  ${chalk.gray("Targets:")}   ${suite.targets.length}`);
+        console.log(`  ${chalk.gray("Repeat:")}    ${suite.repeatCount}`);
+        console.log();
+        if (suite.platformUrl) {
+          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(suite.platformUrl)}`);
+        }
+        console.log(
+          chalk.gray(`Run it with: ${chalk.cyan(`langwatch suite run ${suite.id}`)}`),
+        );
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "create suite" });
     process.exit(1);

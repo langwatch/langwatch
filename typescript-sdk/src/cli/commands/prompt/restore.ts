@@ -6,11 +6,16 @@ import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import type { CommandResult } from "../../utils/output";
+
+/**
+ * Returns the restored version rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts).
+ */
 export const promptRestoreCommand = async (
   handle: string,
   versionId: string,
-  options?: { format?: string }
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
@@ -53,19 +58,19 @@ export const promptRestoreCommand = async (
       `Restored "${handle}" — new version v${restored.version} created`
     );
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(restored, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(
-      `  ${chalk.gray("New version:")} ${chalk.cyan(`v${restored.version}`)}`
-    );
-    console.log(
-      `  ${chalk.gray("Message:")}     ${restored.commitMessage ?? chalk.gray("—")}`
-    );
-    console.log();
+    return {
+      data: restored,
+      table: () => {
+        console.log();
+        console.log(
+          `  ${chalk.gray("New version:")} ${chalk.cyan(`v${restored.version}`)}`
+        );
+        console.log(
+          `  ${chalk.gray("Message:")}     ${restored.commitMessage ?? chalk.gray("—")}`
+        );
+        console.log();
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "restore prompt" });
     process.exit(1);
