@@ -3,7 +3,7 @@ import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
-} from "../../schemas/constants";
+} from "@langwatch/langy";
 import {
   LangyConversationHandoffPendingEventSchema,
   LangyConversationMetadataUpdatedEventSchema,

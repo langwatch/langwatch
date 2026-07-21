@@ -5,7 +5,7 @@ import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+} from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 
 import { createLangyConversationUpdateBroadcastSubscriber } from "../langy-conversation-update-broadcast.subscriber";

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import {
   LangyConversationNotOwnedError,
   LangyModelNotAllowedError,

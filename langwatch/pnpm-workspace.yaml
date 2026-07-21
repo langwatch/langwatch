@@ -9,6 +9,11 @@ packages:
   # The handled-error contract (HandledError ⇔ Go herr), shared by the app,
   # mcp-server, CLI and SDKs. Source-only, OTel peer-dep'd like cli-cards.
   - "../packages/handled-error"
+  # Langy's shared conversation-projection contract (ADR-059): event payload
+  # schemas, the pure turn fold, the turn-phase machine, the event cursor.
+  # Source-only and zod-peer-dep'd, imported by the server pipeline AND the
+  # browser panel so a turn renders identically on both sides.
+  - "../packages/langy"
 
 minimumReleaseAge: 10080
 # Adding workspace packages forces a re-resolve; these shipped fresh releases

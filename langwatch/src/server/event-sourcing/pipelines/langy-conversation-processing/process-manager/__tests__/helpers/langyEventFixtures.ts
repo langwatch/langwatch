@@ -1,7 +1,7 @@
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+} from "@langwatch/langy";
 import {
   LangyAgentRespondedEventSchema,
   LangyAgentResponseFailedEventSchema,

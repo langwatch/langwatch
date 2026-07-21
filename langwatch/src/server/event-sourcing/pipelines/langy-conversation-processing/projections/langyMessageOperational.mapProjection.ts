@@ -3,7 +3,7 @@ import {
   type MapEventHandlers,
 } from "../../../projections/abstractMapProjection";
 import type { AppendStore } from "../../../projections/mapProjection.types";
-import type { LangyMessageRole } from "../schemas/shared";
+import type { LangyMessageRole } from "@langwatch/langy";
 import {
   type LangyAgentRespondedEvent,
   type LangyMessageRecordedEvent,
@@ -12,7 +12,7 @@ import {
   LangyMessageRecordedEventSchema,
   LangyMessageImportedEventSchema,
 } from "../schemas/events";
-import type { LangyMessagePart } from "../schemas/shared";
+import type { LangyMessagePart } from "@langwatch/langy";
 
 export interface LangyMessageProjectionRecord {
   ConversationId: string;

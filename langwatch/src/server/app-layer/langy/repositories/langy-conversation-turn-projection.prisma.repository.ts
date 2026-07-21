@@ -6,19 +6,16 @@ import type {
   StoredProjection,
 } from "~/server/event-sourcing/projections/stateProjection.types";
 import {
+  langyMessagePartSchema,
+  langyPlanItemSchema,
+  langyTurnToolCallSchema,
   parseConversationTurnKey,
   type LangyConversationTurnData,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
+} from "@langwatch/langy";
 import {
   LANGY_CONVERSATION_TURN_STATUS,
   type LangyConversationTurnStatus,
-  LANGY_TURN_TOOL_CALL_STATUS,
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
-import { langyPlanItemSchema } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import {
-  langyJsonValueSchema,
-  langyMessagePartSchema,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/shared";
 
 /**
  * The status values this column accepts, derived from the ONE definition rather
@@ -43,25 +40,11 @@ const turnStatusSchema = z.enum(
   ],
 );
 
+// Composed only through instanceof-safe combinators (z.array) — the record
+// intersection itself lives in the package, next to the type it validates.
 const messagePartsSchema = z.array(langyMessagePartSchema);
 const planSchema = z.array(langyPlanItemSchema);
-const toolCallsSchema = z.array(
-  z.record(z.string(), langyJsonValueSchema).and(
-    z.object({
-      toolCallId: z.string(),
-      toolName: z.string(),
-      command: z.string().optional(),
-      input: langyJsonValueSchema.optional(),
-      status: z.union([
-        z.literal(LANGY_TURN_TOOL_CALL_STATUS.INITIATED),
-        z.literal(LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED),
-        z.literal(LANGY_TURN_TOOL_CALL_STATUS.FAILED),
-      ]),
-      durationMs: z.number().optional(),
-      errorText: z.string().optional(),
-    }),
-  ),
-);
+const toolCallsSchema = z.array(langyTurnToolCallSchema);
 
 type Row = Prisma.LangyConversationTurnProjectionGetPayload<object>;
 

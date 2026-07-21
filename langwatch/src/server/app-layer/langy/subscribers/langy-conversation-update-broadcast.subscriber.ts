@@ -5,13 +5,12 @@ import type { ProjectionCursor } from "~/server/event-sourcing/projections/state
 import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 import {
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+} from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 
-import {
-  projectionCursorHasReachedEvent,
-  projectionNotReadyError,
-} from "./projection-cursor";
+import { cursorHasReachedEvent } from "@langwatch/langy";
+
+import { projectionNotReadyError } from "./projection-cursor";
 
 const logger = createLogger(
   "langwatch:langy:conversation-update-broadcast-subscriber",
@@ -63,7 +62,7 @@ export function createLangyConversationUpdateBroadcastSubscriber(
         projectId,
         conversationId,
       });
-      if (!record || !projectionCursorHasReachedEvent(record.cursor, event)) {
+      if (!record || !cursorHasReachedEvent(record.cursor, event)) {
         throw projectionNotReadyError({
           projectionName: "langyConversation",
           eventId: event.id,

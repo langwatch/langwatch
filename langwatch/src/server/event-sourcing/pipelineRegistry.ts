@@ -122,7 +122,7 @@ import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-proces
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import { type LangyConversationStateData } from "./pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
-import type { LangyConversationTurnData } from "./pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
+import type { LangyConversationTurnData } from "@langwatch/langy";
 import type { LangyMessageProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyMessageOperational.mapProjection";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import type { LangyTitleGenerator } from "../app-layer/langy/langy-title-generation.service";

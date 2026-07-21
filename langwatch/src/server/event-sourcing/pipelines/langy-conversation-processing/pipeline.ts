@@ -37,10 +37,8 @@ import {
   type LangyConversationStateData,
   LangyConversationStateFoldProjection,
 } from "./projections/langyConversationState.foldProjection";
-import {
-  type LangyConversationTurnData,
-  LangyConversationTurnFoldProjection,
-} from "./projections/langyConversationTurn.foldProjection";
+import type { LangyConversationTurnData } from "@langwatch/langy";
+import { LangyConversationTurnFoldProjection } from "./projections/langyConversationTurn.foldProjection";
 import type { LangyConversationProcessingEvent } from "./schemas/events";
 
 export interface LangyConversationProcessingPipelineDeps {
