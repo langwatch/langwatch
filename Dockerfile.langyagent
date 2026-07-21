@@ -129,6 +129,13 @@ COPY langwatch/src/server/evaluations/types.ts        /src/langwatch/src/server/
 COPY langwatch/src/server/modelProviders/llmModels.json /src/langwatch/src/server/modelProviders/llmModels.json
 COPY langwatch/src/app/api/openapiLangWatch.json      /src/langwatch/src/app/api/openapiLangWatch.json
 COPY langevals/ts-integration/evaluators.generated.ts /src/langevals/ts-integration/evaluators.generated.ts
+# copy-types.sh also embeds the repo-root feature-map.json (feature-map.generated.ts),
+# and generate-skills-bundle.mjs walks the whole skills/ tree (feature-skills.ts,
+# each published SKILL.mdx, recipes/, version.txt, and the committed _compiled/native
+# renders). Bring both in at the ../ paths those generators expect relative to
+# /src/typescript-sdk, or `pnpm run prepare` dies with `Cannot find module '../feature-map.json'`.
+COPY feature-map.json                                 /src/feature-map.json
+COPY skills                                            /src/skills
 RUN pnpm run prepare
 
 # BuildKit fills TARGETARCH from the target platform. Map it to Bun's target
