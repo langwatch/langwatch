@@ -31,6 +31,7 @@ const metricNames = [
   "gq_retry_encode_failures_total",
   // #5538
   "gq_jobs_dropped_total",
+  "gq_group_attempt_read_failures_total",
 ] as const;
 
 for (const name of metricNames) {
@@ -151,6 +152,21 @@ export const gqRetryBackoffMilliseconds = new Histogram({
 });
 
 // --- Per-job duration metric ---
+/**
+ * Failed reads of the group retry-chain counter.
+ *
+ * Matters more than it looks. A failed read returns 0, so a sibling-led retry
+ * resolves to attempt 1 — byte-identical to a genuine fresh delivery in the
+ * span, the metrics, and the `deliveryAttempt` reaching the fold. That both
+ * restarts the retry budget AND makes the fold discard its record of what the
+ * chain already applied. Without this counter the two are indistinguishable.
+ */
+export const gqGroupAttemptReadFailuresTotal = new Counter({
+  name: "gq_group_attempt_read_failures_total",
+  help: "Failed reads of the group retry-chain counter; a retry may read as a fresh delivery",
+  labelNames: ["queue_name"] as const,
+});
+
 export const gqJobDurationMilliseconds = new Histogram({
   name: "gq_job_duration_milliseconds",
   help: "Duration of individual job processing in milliseconds",
