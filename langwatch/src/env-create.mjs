@@ -160,6 +160,11 @@ export function createEnvConfig() {
       // frontend telemetry volume, and the ingest route it exports to is
       // inert without OTEL_EXPORTER_OTLP_ENDPOINT anyway.
       RUM_ENABLED: z.boolean().optional(),
+      // Share of browser *sessions* recorded, 0..1. Sessions rather than
+      // traces so a recorded visit is complete; the decision also reaches the
+      // server, which drops the backend half of an unsampled browser trace.
+      // Defaults to all of them. See ADR-058.
+      RUM_SAMPLE_RATIO: z.coerce.number().min(0).max(1).default(1),
       // Controls SSRF blocking for outbound HTTP calls (TS proxy + scenario
       // runner; mirrored on the Python NLP side via the same env name). When
       // true: private IPs, localhost, and hostnames resolving to private IPs
@@ -363,6 +368,7 @@ export function createEnvConfig() {
       RUM_ENABLED:
         process.env.RUM_ENABLED === "1" ||
         process.env.RUM_ENABLED?.toLowerCase() === "true",
+      RUM_SAMPLE_RATIO: process.env.RUM_SAMPLE_RATIO,
       BLOCK_LOCAL_HTTP_CALLS:
         process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
         process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",

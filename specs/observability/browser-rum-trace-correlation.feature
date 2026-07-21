@@ -38,18 +38,62 @@ Feature: Browser RUM and full-stack trace correlation
       When a later call arrives on that same connection
       Then the later call is not attributed to the trace that opened it
 
-    @pending
-    # Not built. Only the initial page load produces a span today; an in-app
-    # navigation produces none, so the calls it triggers have no parent. Needs
-    # a router integration — ADR-058 phase 6.
     Scenario: Navigating between pages is visible as work
       When the user navigates to another page
       Then the navigation appears as a span
       And the calls that navigation triggers appear beneath it
+      And the span is named for the route rather than the page's address
+
+    # The address carries project slugs and record ids. Named by address, a
+    # span name would be unique per record and no aggregate would exist to ask
+    # "how slow is this page".
+    Scenario: A navigation is attributed to its route, not its address
+      When the user opens a record on a page
+      Then the navigation names the route it opened
+      And the address it opened is recorded as an attribute
+
+    Scenario: A navigation the user abandons is distinguishable
+      Given a navigation is under way
+      When the user navigates somewhere else before it arrives
+      Then the abandoned navigation is marked as superseded
+      And the work that follows belongs to the navigation they chose
+
+    Scenario: Work well after a navigation is not attributed to it
+      Given a navigation has arrived and the page has settled
+      When a background call is made later
+      Then it is not attributed to that navigation
 
     Scenario: Everything from one visit can be found together
       When the user performs several unrelated actions in one visit
       Then every resulting span carries the same session identifier
+
+  Rule: Volume is controllable without losing whole answers
+
+    # Head sampling propagates: an unsampled browser trace takes the server
+    # spans down with it. The lever is real, so what it keeps has to stay
+    # usable.
+    Scenario: Reducing volume keeps whole visits rather than fragments
+      Given telemetry is configured to record a share of visits
+      When a recorded visitor performs several actions
+      Then every action from that visit is recorded
+
+    Scenario: A visit outside the share costs nothing
+      Given telemetry is configured to record a share of visits
+      When a visitor outside that share performs several actions
+      Then none of their actions are recorded
+      And the server work behind them is not recorded either
+
+    Scenario: Recording everything is the default
+      Given nothing has been said about how much to record
+      When a visitor performs an action
+      Then it is recorded
+
+    # Collecting nothing is a silent failure — nobody notices missing
+    # telemetry until they need it.
+    Scenario: A nonsensical share records rather than silently collecting nothing
+      Given the share to record is configured to something meaningless
+      When a visitor performs an action
+      Then it is recorded
 
   Rule: Telemetry never degrades the product
 

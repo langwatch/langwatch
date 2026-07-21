@@ -18,10 +18,7 @@ import { DocumentLoadInstrumentation } from "@opentelemetry/instrumentation-docu
 import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import {
-  StackContextManager,
-  WebTracerProvider,
-} from "@opentelemetry/sdk-trace-web";
+import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
 import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
@@ -29,10 +26,13 @@ import {
 import { ATTR_DEPLOYMENT_ENVIRONMENT_NAME } from "@opentelemetry/semantic-conventions/incubating";
 
 import {
+  RUM_DEFAULT_SAMPLE_RATIO,
   RUM_SERVICE_NAME,
   RUM_SESSION_HEADER,
   RUM_TRACES_PATH,
 } from "./constants";
+import { NavigationContextManager } from "./navigationContextManager";
+import { createBrowserSampler } from "./sampling";
 import { currentSessionId } from "./session";
 import { SessionSpanProcessor } from "./sessionSpanProcessor";
 
@@ -45,9 +45,16 @@ let started = false;
 export function startBrowserTracing({
   environment,
   serviceVersion,
+  sampleRatio = RUM_DEFAULT_SAMPLE_RATIO,
 }: {
   environment?: string;
   serviceVersion?: string;
+  /**
+   * Share of sessions recorded, in [0, 1]. Whole sessions rather than
+   * individual traces, and the decision reaches the backend too — see
+   * `sampling.ts`.
+   */
+  sampleRatio?: number;
 } = {}): void {
   // Never reset, even when the bootstrap below throws part-way. By then a
   // provider and an exporter may already be globally registered, and a second
@@ -57,6 +64,7 @@ export function startBrowserTracing({
 
   try {
     const provider = new WebTracerProvider({
+      sampler: createBrowserSampler({ ratio: sampleRatio }),
       resource: resourceFromAttributes({
         [ATTR_SERVICE_NAME]: RUM_SERVICE_NAME,
         ...(serviceVersion ? { [ATTR_SERVICE_VERSION]: serviceVersion } : {}),
@@ -76,7 +84,10 @@ export function startBrowserTracing({
     });
 
     provider.register({
-      contextManager: new StackContextManager().enable(),
+      // A navigation parents the fetches it triggers; the stock stack manager
+      // cannot follow the async gap between the two. See
+      // `navigationContextManager.ts`.
+      contextManager: new NavigationContextManager().enable(),
       propagator: new W3CTraceContextPropagator(),
     });
 

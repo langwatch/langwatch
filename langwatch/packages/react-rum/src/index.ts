@@ -13,6 +13,10 @@
  */
 
 export {
+  ATTR_NAVIGATION_FROM_PATH,
+  ATTR_NAVIGATION_SUPERSEDED,
+  ATTR_NAVIGATION_TYPE,
+  RUM_DEFAULT_SAMPLE_RATIO,
   RUM_MAX_BODY_BYTES,
   RUM_MAX_SPANS,
   RUM_SERVICE_NAME,
@@ -23,5 +27,7 @@ export {
 // disables the global OTel API, and nothing in an application bundle should be
 // able to reach it. Tests import it from "./browserTracing" directly.
 export { startBrowserTracing } from "./browserTracing";
+export type { NavigationSpanHandle, NavigationType } from "./navigation";
+export { startNavigationSpan } from "./navigation";
 export { currentSessionId, SESSION_INACTIVITY_MS } from "./session";
 export { SessionSpanProcessor } from "./sessionSpanProcessor";

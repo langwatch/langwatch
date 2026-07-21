@@ -1,4 +1,5 @@
 import { resolveGatewayBaseUrl } from "@ee/governance/services/gatewayUrl";
+import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum";
 import { z } from "zod";
 
 import { env } from "../../../env.mjs";
@@ -46,6 +47,10 @@ export const publicEnvRouter = publicProcedure
       // URL: the browser always exports to this app's own origin, so there is
       // no endpoint for the client to know.
       RUM_ENABLED: !!env.RUM_ENABLED,
+      // Share of browser sessions the client should record. Server-side
+      // because it is a cost lever operators pull without shipping a bundle,
+      // and because the browser has no other way to learn it.
+      RUM_SAMPLE_RATIO: env.RUM_SAMPLE_RATIO ?? RUM_DEFAULT_SAMPLE_RATIO,
       HAS_LANGWATCH_NLP_SERVICE:
         !!env.LANGWATCH_NLP_SERVICE || !!env.LANGWATCH_NLP_LAMBDA_CONFIG,
       HAS_LANGEVALS_ENDPOINT: !!env.LANGEVALS_ENDPOINT,
