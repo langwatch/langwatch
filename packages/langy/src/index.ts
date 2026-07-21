@@ -5,3 +5,5 @@ export * from "./cursor";
 export * from "./turnPhase";
 export * from "./turnFold";
 export * from "./turnProjection";
+export * from "./conversationFold";
+export * from "./messageMap";
