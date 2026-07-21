@@ -3,7 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError } from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import type { CommandResult } from "../../utils/output";
 
@@ -14,14 +14,24 @@ export const runWorkflowCommand = async (
 ): Promise<CommandResult | void> => {
   checkApiKey();
 
+  // Parsed before the request, and outside its try: `await response.json()`
+  // throws SyntaxError too, so sharing one catch reported a malformed SERVER
+  // body as `--input must be valid JSON` — an input error the caller never made.
+  let input: Record<string, unknown> = {};
+  if (options.input) {
+    try {
+      input = JSON.parse(options.input) as Record<string, unknown>;
+    } catch {
+      reportCommandError({
+        error: commandValidationError("--input must be valid JSON"),
+      });
+      process.exit(1);
+    }
+  }
+
   const spinner = createSpinner(`Running workflow "${id}"...`).start();
 
   try {
-    let input: Record<string, unknown> = {};
-    if (options.input) {
-      input = JSON.parse(options.input) as Record<string, unknown>;
-    }
-
     // Workflow run API is on the pages API, not the Hono app API
     const apiKey = process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
@@ -63,16 +73,9 @@ export const runWorkflowCommand = async (
       },
     };
   } catch (error) {
-    // Route BOTH failure kinds through failSpinner: a direct spinner.fail()
-    // prints nothing in --json/--jq/agent mode (spinners are silent there).
-    failSpinner({
-      spinner,
-      error:
-        error instanceof SyntaxError
-          ? commandValidationError("--input must be valid JSON")
-          : error,
-      action: "run workflow",
-    });
+    // failSpinner, not spinner.fail(): a direct spinner.fail() prints nothing
+    // in --json/--jq/agent mode (spinners are silent there).
+    failSpinner({ spinner, error, action: "run workflow" });
     process.exit(1);
   }
 };

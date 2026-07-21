@@ -59,6 +59,16 @@ export const runSuiteCommand = async (
       return;
     }
 
+    // Nothing was scheduled — every scenario or target was archived, and the
+    // skip notice above says which. No completion can ever arrive, so polling
+    // would run out the full timeout and report a timeout for a run that is
+    // already over.
+    if (result.jobCount === 0) {
+      console.log();
+      console.log(chalk.yellow("  No jobs were scheduled — nothing to wait for."));
+      return;
+    }
+
     // Poll for completion
     console.log();
     const pollSpinner = createSpinner("Waiting for suite run to complete...").start();
