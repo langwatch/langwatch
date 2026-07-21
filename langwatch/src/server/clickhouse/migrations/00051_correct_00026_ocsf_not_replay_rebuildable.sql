@@ -28,4 +28,5 @@ SELECT 1;
 -- +goose StatementEnd
 
 -- +goose Down
--- No-op: documentation-only correction, nothing to roll back.
+-- IRREVERSIBLE: documentation-only correction (a SELECT 1 no-op) — there is no
+-- schema or data change for a down migration to undo.
