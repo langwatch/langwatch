@@ -10,6 +10,8 @@ import {
 } from "@chakra-ui/react";
 import { Info } from "react-feather";
 
+import { ErrorActions } from "~/features/errors/components/ErrorActions";
+
 const toaster_ = createToaster({
   placement: "top-end",
   pauseOnPageIdle: true,
@@ -48,6 +50,21 @@ export const Toaster = () => {
               {toast.description && (
                 <Toast.Description>{toast.description}</Toast.Description>
               )}
+              {/* Set by `showErrorToast` — the docs link and copyable error id
+                  that every handled error offers. Plain `toaster.create` calls
+                  leave these unset and render exactly as before. */}
+              <ErrorActions
+                docsUrl={
+                  typeof toast.meta?.docsUrl === "string"
+                    ? toast.meta.docsUrl
+                    : undefined
+                }
+                traceId={
+                  typeof toast.meta?.traceId === "string"
+                    ? toast.meta.traceId
+                    : undefined
+                }
+              />
               {toast.action && (
                 <Toast.ActionTrigger marginTop="2">
                   {toast.action.label}
