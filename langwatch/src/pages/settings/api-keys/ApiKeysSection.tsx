@@ -14,6 +14,7 @@ import {
 import { Clipboard, Key, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
+import { showErrorToast } from "~/features/errors";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import { useSession } from "~/utils/auth-client";
@@ -22,7 +23,6 @@ import { ProviderScopeChips } from "../../../components/settings/ProviderScopeCh
 import { RegenerateApiKeyDialog } from "../../../components/settings/RegenerateApiKeyDialog";
 import { PageLayout } from "../../../components/ui/layouts/PageLayout";
 import { toaster } from "../../../components/ui/toaster";
-import { showErrorToast } from "~/features/errors";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";

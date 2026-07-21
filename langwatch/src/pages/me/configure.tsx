@@ -9,23 +9,22 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Checkbox } from "~/components/ui/checkbox";
 import { Copy, Laptop, Monitor, Server } from "lucide-react";
 import { useState } from "react";
-import Head from "~/utils/compat/next-head";
-
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import MyLayout from "~/components/me/MyLayout";
 import { AvatarUploadControl } from "~/components/me/avatar/AvatarUploadControl";
 import { HomePagePicker } from "~/components/me/HomePagePicker";
+import MyLayout from "~/components/me/MyLayout";
 import { PersonalOtlpEndpointPanel } from "~/components/me/PersonalOtlpEndpointPanel";
 import {
   type PersonalApiKeyRow,
   usePersonalContext,
 } from "~/components/me/usePersonalContext";
+import { Checkbox } from "~/components/ui/checkbox";
 import { toaster } from "~/components/ui/toaster";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
+import Head from "~/utils/compat/next-head";
 
 const fmtRelative = (iso: string | null): string => {
   if (!iso) return "Never";
@@ -76,7 +75,10 @@ function MySettingsPage() {
       });
     },
     onError: (err) =>
-      showErrorToast(err, { fallbackTitle: "Couldn't issue the personal key" }),
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't issue the personal key",
+      }),
   });
 
   const personalContextQuery = api.user.personalContext.useQuery(
@@ -112,7 +114,8 @@ function MySettingsPage() {
         });
       },
       onError: (err) =>
-        showErrorToast(err, {
+        showErrorToast({
+          error: err,
           fallbackTitle: "Couldn't enable advanced features",
         }),
     },
@@ -133,7 +136,8 @@ function MySettingsPage() {
         });
       },
       onError: (err) =>
-        showErrorToast(err, {
+        showErrorToast({
+          error: err,
           fallbackTitle: "Couldn't disable advanced features",
         }),
     });
@@ -151,7 +155,7 @@ function MySettingsPage() {
       });
     },
     onError: (err) =>
-      showErrorToast(err, { fallbackTitle: "Couldn't revoke the key" }),
+      showErrorToast({ error: err, fallbackTitle: "Couldn't revoke the key" }),
   });
 
   const onIssue = () => {

@@ -7,11 +7,11 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Dialog } from "../../../components/ui/dialog";
 import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
+import { useRouter } from "~/utils/compat/next-router";
+import { Dialog } from "../../../components/ui/dialog";
 import { useLicenseEnforcement } from "../../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";

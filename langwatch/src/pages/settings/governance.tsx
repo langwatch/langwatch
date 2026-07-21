@@ -29,9 +29,9 @@ import {
 import { InstallCliCard } from "~/components/me/InstallCliCard";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
-import { showErrorToast } from "~/features/errors";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { getHexColorForString } from "~/utils/rotatingColors";

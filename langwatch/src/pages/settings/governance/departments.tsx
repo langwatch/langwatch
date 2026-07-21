@@ -10,15 +10,14 @@ import {
 } from "@chakra-ui/react";
 import { Archive, ExternalLink, MoreVertical, Pencil } from "lucide-react";
 import { useState } from "react";
-
-import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { DepartmentEditDrawer } from "~/components/settings/DepartmentEditDrawer";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
