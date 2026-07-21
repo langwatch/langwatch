@@ -12,7 +12,7 @@
  * wrong". The assertions below are that contract.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { readCliErrorDocument } from "@langwatch/cli-cards/domain-error";
+import { readCliErrorDocument } from "@langwatch/cli-cards/handled-error";
 import type * as TracesApiModule from "@/client-sdk/services/traces/traces-api.service";
 
 vi.mock(
@@ -37,7 +37,7 @@ vi.mock("ora", () => ({
 }));
 
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
-import { LangWatchDomainError } from "@/internal/api/errors";
+import { LangWatchHandledError } from "@/internal/api/errors";
 import { searchTracesCommand } from "../traces/search";
 import { setOutputFormat } from "../../utils/errorOutput";
 
@@ -48,14 +48,14 @@ class ProcessExitError extends Error {
 }
 
 const notFound = () =>
-  new LangWatchDomainError({
-    domain: {
+  new LangWatchHandledError({
+    handled: {
       code: "trace_not_found",
       kind: "trace_not_found",
       message: "Trace not found: trace-abc",
       httpStatus: 404,
       meta: { id: "trace-abc" },
-      isDomain: true,
+      isHandled: true,
       traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
     },
     body: { error: "trace_not_found", message: "Trace not found: trace-abc" },
@@ -111,7 +111,7 @@ describe("given a command fails with a domain error", () => {
         httpStatus: 404,
         meta: { id: "trace-abc" },
         traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
-        isDomain: true,
+        isHandled: true,
       });
     });
 

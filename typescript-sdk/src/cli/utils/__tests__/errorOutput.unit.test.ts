@@ -3,9 +3,9 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import chalk from "chalk";
-import { readCliErrorDocument } from "@langwatch/cli-cards/domain-error";
+import { readCliErrorDocument } from "@langwatch/cli-cards/handled-error";
 
-import { LangWatchDomainError } from "@/internal/api/errors";
+import { LangWatchHandledError } from "@/internal/api/errors";
 import {
   ExecutionContext,
   withExecutionContext,
@@ -23,7 +23,7 @@ import {
   setOutputFormat,
 } from "../errorOutput";
 
-const domainError = ({
+const handledError = ({
   code = "dataset_not_found",
   message = "Dataset not found: sales-q3",
   httpStatus = 404,
@@ -34,14 +34,14 @@ const domainError = ({
   suggestions = undefined as string[] | undefined,
   docUrl = undefined as string | undefined,
 } = {}) =>
-  new LangWatchDomainError({
-    domain: {
+  new LangWatchHandledError({
+    handled: {
       code,
       kind: code,
       message,
       httpStatus,
       meta,
-      isDomain: true,
+      isHandled: true,
       traceId,
       traceUrl,
       reasons,
@@ -56,13 +56,13 @@ const domainError = ({
 describe("given a failure the platform named", () => {
   describe("when rendering it for a person", () => {
     it("leads with the platform's sentence", () => {
-      const rendered = renderErrorForHumans(readCommandError(domainError()));
+      const rendered = renderErrorForHumans(readCommandError(handledError()));
 
       expect(rendered.split("\n")[0]).toBe("Error: Dataset not found: sales-q3");
     });
 
     it("prints the code, the status and the trace id under Details", () => {
-      const rendered = renderErrorForHumans(readCommandError(domainError()));
+      const rendered = renderErrorForHumans(readCommandError(handledError()));
 
       expect(rendered).toContain("Details:");
       expect(rendered).toContain("dataset_not_found");
@@ -71,7 +71,7 @@ describe("given a failure the platform named", () => {
     });
 
     it("prints the meta the platform attached", () => {
-      const rendered = renderErrorForHumans(readCommandError(domainError()));
+      const rendered = renderErrorForHumans(readCommandError(handledError()));
 
       expect(rendered).toContain("sales-q3");
     });
@@ -79,7 +79,7 @@ describe("given a failure the platform named", () => {
     it("names the chain when the failure had a cause", () => {
       const rendered = renderErrorForHumans(
         readCommandError(
-          domainError({ reasons: [{ kind: "gateway_timeout" }, { kind: "unknown" }] }),
+          handledError({ reasons: [{ kind: "gateway_timeout" }, { kind: "unknown" }] }),
         ),
       );
 
@@ -89,7 +89,7 @@ describe("given a failure the platform named", () => {
     it("prints the trace link when the route sent one", () => {
       const rendered = renderErrorForHumans(
         readCommandError(
-          domainError({ traceUrl: "https://grafana.example.com/explore?traceId=4bf" }),
+          handledError({ traceUrl: "https://grafana.example.com/explore?traceId=4bf" }),
         ),
       );
 
@@ -99,7 +99,7 @@ describe("given a failure the platform named", () => {
 
   describe("when rendering it for a machine", () => {
     it("emits a document a parser can read the code, meta and trace id out of", () => {
-      const json = renderErrorAsJson(readCommandError(domainError()));
+      const json = renderErrorAsJson(readCommandError(handledError()));
       const parsed = readCliErrorDocument(json);
 
       expect(parsed).toMatchObject({
@@ -108,13 +108,13 @@ describe("given a failure the platform named", () => {
         httpStatus: 404,
         meta: { id: "sales-q3" },
         traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
-        isDomain: true,
+        isHandled: true,
       });
     });
 
     it("marks the document as a failure so it cannot be mistaken for a result", () => {
       const parsed: unknown = JSON.parse(
-        renderErrorAsJson(readCommandError(domainError())),
+        renderErrorAsJson(readCommandError(handledError())),
       );
 
       expect(parsed).toMatchObject({ ok: false });
@@ -123,12 +123,12 @@ describe("given a failure the platform named", () => {
     it("stays a single compact line in agent mode, pretty with -o json", () => {
       try {
         setOutputFormat("agents");
-        const compact = renderErrorAsJson(readCommandError(domainError()));
+        const compact = renderErrorAsJson(readCommandError(handledError()));
         expect(compact).not.toContain("\n");
         expect(JSON.parse(compact)).toMatchObject({ ok: false });
 
         setOutputFormat("json");
-        const pretty = renderErrorAsJson(readCommandError(domainError()));
+        const pretty = renderErrorAsJson(readCommandError(handledError()));
         expect(pretty).toContain("\n");
       } finally {
         setOutputFormat(undefined);
@@ -155,7 +155,7 @@ describe("given an infrastructure failure the platform did NOT name", () => {
         renderErrorAsJson(readCommandError(new Error("fetch failed"))),
       );
 
-      expect(parsed?.isDomain).toBe(false);
+      expect(parsed?.isHandled).toBe(false);
     });
   });
 });
@@ -172,7 +172,7 @@ describe("given a server echoes a credential back in its message", () => {
   });
 
   const echoed = () =>
-    domainError({
+    handledError({
       code: "project_not_found",
       message: `No project for key ${API_KEY}`,
       meta: { projectId: "project-1" },
@@ -207,7 +207,7 @@ describe("given a server echoes a credential back in its message", () => {
  */
 describe("given a domain error whose meta holds an actionable identifier", () => {
   const withKeyLikeIds = () =>
-    domainError({
+    handledError({
       code: "virtual_key_not_found",
       message: "Virtual key not found",
       meta: { virtualKeyId: "vk-abc123def456", handle: "lw-team-handle" },
@@ -280,7 +280,7 @@ describe("given a failure on a command path that has no spinner", () => {
 
   describe("when reported under --format json", () => {
     it("puts the structured document on stdout and only prose on stderr", () => {
-      reportCommandError({ error: domainError(), format: "json" });
+      reportCommandError({ error: handledError(), format: "json" });
 
       const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
       const parsed = readCliErrorDocument(stdout);
@@ -293,7 +293,7 @@ describe("given a failure on a command path that has no spinner", () => {
 
   describe("when reported under the default text output", () => {
     it("writes the human block to stderr and nothing to stdout", () => {
-      reportCommandError({ error: domainError() });
+      reportCommandError({ error: handledError() });
 
       expect(logSpy).not.toHaveBeenCalled();
       const stderr = errorSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
@@ -312,7 +312,7 @@ describe("given a failure on a command path that has no spinner", () => {
       const parsed = readCliErrorDocument(stdout);
 
       expect(parsed?.kind).toBe("validation_error");
-      expect(parsed?.isDomain).toBe(true);
+      expect(parsed?.isHandled).toBe(true);
       expect(parsed?.message).toBe("At least one record ID is required.");
     });
   });
@@ -320,7 +320,7 @@ describe("given a failure on a command path that has no spinner", () => {
 
 describe("given a failure the platform sent advice with", () => {
   const advised = () =>
-    domainError({
+    handledError({
       code: "budget_exceeded",
       message: "Budget exceeded: monthly cap reached",
       httpStatus: 402,
@@ -360,7 +360,7 @@ describe("given a failure the platform sent NO advice with", () => {
   describe("when the code is one the fallback table knows", () => {
     it("fills the human block from the fallback table", () => {
       const rendered = renderErrorForHumans(
-        readCommandError(domainError({ code: "missing_api_key" })),
+        readCommandError(handledError({ code: "missing_api_key" })),
       );
 
       expect(rendered).toContain("Suggestions:");
@@ -370,7 +370,7 @@ describe("given a failure the platform sent NO advice with", () => {
 
     it("fills the JSON document from the same table", () => {
       const parsed = readCliErrorDocument(
-        renderErrorAsJson(readCommandError(domainError({ code: "missing_api_key" }))),
+        renderErrorAsJson(readCommandError(handledError({ code: "missing_api_key" }))),
       );
 
       expect(parsed?.suggestions?.length).toBeGreaterThan(0);
@@ -380,7 +380,7 @@ describe("given a failure the platform sent NO advice with", () => {
     it("never overrides advice the platform DID send", () => {
       const rendered = renderErrorForHumans(
         readCommandError(
-          domainError({
+          handledError({
             code: "missing_api_key",
             suggestions: ["Use the project-scoped key from settings"],
           }),
@@ -395,7 +395,7 @@ describe("given a failure the platform sent NO advice with", () => {
   describe("when the code is one the table does NOT know", () => {
     it("prints no Suggestions or Docs section at all", () => {
       const rendered = renderErrorForHumans(
-        readCommandError(domainError({ code: "some_unlisted_code" })),
+        readCommandError(handledError({ code: "some_unlisted_code" })),
       );
 
       expect(rendered).not.toContain("Suggestions:");

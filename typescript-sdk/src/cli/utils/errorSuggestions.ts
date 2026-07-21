@@ -11,7 +11,7 @@
  * Keys are EXACT codes, never prefix matches: an unknown code gets no invented
  * advice, and a new backend code lands nowhere rather than in the wrong bucket.
  */
-import type { CliDomainError } from "@langwatch/cli-cards/domain-error";
+import type { CliHandledError } from "@langwatch/cli-cards/handled-error";
 
 /** The fallback advice for one code. */
 export interface ErrorExplanation {
@@ -105,8 +105,8 @@ export const fallbackSuggestionsFor = (
  * shipped with the CLI.
  */
 export const withFallbackSuggestions = (
-  domain: CliDomainError,
-): CliDomainError => {
+  domain: CliHandledError,
+): CliHandledError => {
   if (domain.suggestions?.length && domain.docUrl) return domain;
 
   const fallback = fallbackSuggestionsFor(domain.code);

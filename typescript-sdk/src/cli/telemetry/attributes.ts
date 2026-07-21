@@ -41,7 +41,7 @@ export const LANGWATCH_EVENT_ATTRIBUTES = {
   /** The failure message on an `error` record. Never carries a credential. */
   error: "langwatch.error",
   /**
-   * The platform's own name for a failure — the `DomainError.kind` it raised,
+   * The platform's own name for a failure — the `HandledError.kind` it raised,
    * e.g. `dataset_not_found`. This is the attribute that lets the panel react to
    * a failure instead of merely printing it: a `not_found` can offer to list what
    * does exist, where a sentence can only be read.
@@ -54,7 +54,7 @@ export const LANGWATCH_EVENT_ATTRIBUTES = {
    * user's problem, actionable). False for infrastructure failures, which are
    * OURS — the panel must not present those as something the user did wrong.
    */
-  errorIsDomain: "langwatch.error.domain",
+  errorIsHandled: "langwatch.error.handled",
   /** Wall-clock milliseconds the command took, on a `completed` record. */
   durationMs: "langwatch.duration_ms",
 } as const;

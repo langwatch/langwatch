@@ -26,10 +26,10 @@
  */
 import chalk from "chalk";
 import {
-  domainErrorFromThrown,
+  handledErrorFromThrown,
   toCliErrorDocument,
-  type CliDomainError,
-} from "@langwatch/cli-cards/domain-error";
+  type CliHandledError,
+} from "@langwatch/cli-cards/handled-error";
 import { redactSecrets } from "../telemetry/events";
 import { withFallbackSuggestions } from "./errorSuggestions";
 import {
@@ -89,7 +89,7 @@ export const disableOutputColor = (): void => {
  * failure reads identically wherever it surfaces.
  *
  * `meta`, `kind` and `reasons` are the opposite: they are a CURATED payload the
- * platform composes for a user, an agent or the UI to act on, and the domain-error
+ * platform composes for a user, an agent or the UI to act on, and the handled-error
  * contract is that nothing internal or secret goes in them (see the content rule
  * on `server/app-layer/langy/errors.ts`). Scrubbing them would not add safety —
  * it would destroy the actionable data this whole feature exists to surface,
@@ -98,13 +98,13 @@ export const disableOutputColor = (): void => {
  * and the user would be left staring at the redaction instead of the id they
  * needed.
  */
-export const readCommandError = (error: unknown): CliDomainError => {
-  const domain = domainErrorFromThrown(error);
+export const readCommandError = (error: unknown): CliHandledError => {
+  const domain = handledErrorFromThrown(error);
   return { ...domain, message: redactSecrets(domain.message) };
 };
 
 /** `code` / `trace id` / meta keys, aligned into a dim block under `Details:`. */
-const detailLines = (domain: CliDomainError): string[] => {
+const detailLines = (domain: CliHandledError): string[] => {
   const details: [string, string][] = [["code", domain.code]];
 
   if (domain.httpStatus > 0) {
@@ -163,8 +163,8 @@ const detailLines = (domain: CliDomainError): string[] => {
  * `network_error`), and dressing that up as though the platform had said it
  * would be inventing precision that does not exist.
  */
-export const renderErrorForHumans = (domain: CliDomainError): string => {
-  if (!domain.isDomain) return domain.message;
+export const renderErrorForHumans = (domain: CliHandledError): string => {
+  if (!domain.isHandled) return domain.message;
 
   const enriched = withFallbackSuggestions(domain);
   const lines = [`Error: ${enriched.message}`, ...detailLines(enriched)];
@@ -187,17 +187,17 @@ export const renderErrorForHumans = (domain: CliDomainError): string => {
  * Suggestions/docUrl are filled from the fallback table when the platform sent
  * none, so an agent gets the same way forward a person does.
  *
- * The fallback applies here even for INFRASTRUCTURE errors (`isDomain: false`),
+ * The fallback applies here even for INFRASTRUCTURE errors (`isHandled: false`),
  * and that asymmetry with the human rendering is deliberate. A person gets the
  * bare sentence because dressing a failure the platform never named in
  * CLI-invented detail would fake precision; a machine gets the fallback advice
  * anyway, because the status-derived codes (`network_error`, `internal_error`)
  * are exactly the codes the fallback table has honest, generic guidance for
  * (check connectivity; retry and quote the trace id), and the document still
- * carries `isDomain: false` so the reader knows the code is ours, not the
+ * carries `isHandled: false` so the reader knows the code is ours, not the
  * platform's.
  */
-export const renderErrorAsJson = (domain: CliDomainError): string =>
+export const renderErrorAsJson = (domain: CliHandledError): string =>
   JSON.stringify(
     toCliErrorDocument(withFallbackSuggestions(domain)),
     null,
@@ -209,21 +209,21 @@ export const renderErrorAsJson = (domain: CliDomainError): string =>
 /**
  * A local argument/precondition failure, pre-shaped so the error path reports
  * it as the `validation_error` it is rather than guessing `network_error` from
- * a bare `Error`. Carries the SDK's `isLangWatchDomainError` brand, which is
- * how `domainErrorFromThrown` recognises an error that has already been read
+ * a bare `Error`. Carries the SDK's `isLangWatchHandledError` brand, which is
+ * how `handledErrorFromThrown` recognises an error that has already been read
  * into the domain structure.
  */
 export const commandValidationError = (
   message: string,
   meta: Record<string, unknown> = {},
-): CliDomainError & { isLangWatchDomainError: true } => ({
-  isLangWatchDomainError: true,
+): CliHandledError & { isLangWatchHandledError: true } => ({
+  isLangWatchHandledError: true,
   code: "validation_error",
   kind: "validation_error",
   message,
   httpStatus: 0,
   meta,
-  isDomain: true,
+  isHandled: true,
 });
 
 /**

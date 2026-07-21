@@ -3,19 +3,19 @@
  * that advice the platform sent always beats advice the CLI shipped with.
  */
 import { describe, expect, it } from "vitest";
-import type { CliDomainError } from "@langwatch/cli-cards/domain-error";
+import type { CliHandledError } from "@langwatch/cli-cards/handled-error";
 import {
   fallbackSuggestionsFor,
   withFallbackSuggestions,
 } from "../errorSuggestions";
 
-const domain = (overrides: Partial<CliDomainError> = {}): CliDomainError => ({
+const domain = (overrides: Partial<CliHandledError> = {}): CliHandledError => ({
   code: "not_found",
   kind: "not_found",
   message: "Dataset not found: sales-q3",
   httpStatus: 404,
   meta: {},
-  isDomain: true,
+  isHandled: true,
   ...overrides,
 });
 

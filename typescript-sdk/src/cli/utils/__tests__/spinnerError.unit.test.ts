@@ -69,7 +69,7 @@ describe("failSpinner", () => {
 
   describe("when error carries the platform's error shape", () => {
     // `{ error: <code>, message }` is exactly what the shared Hono error handler
-    // puts on the wire for a handled DomainError. It used to be flattened back
+    // puts on the wire for a `HandledError`. It used to be flattened back
     // into the sentence "NotFoundError: Record missing", which reads as though
     // the class name were part of the prose. Now the sentence is the sentence and
     // the code is named as a code — which is the whole point: a caller can act on

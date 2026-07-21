@@ -7,7 +7,7 @@
  */
 
 import type { LangwatchApiClient } from "@/internal/api/client";
-import { isLangWatchDomainError } from "@/internal/api/errors";
+import { isLangWatchHandledError } from "@/internal/api/errors";
 import type { Logger } from "@/logger";
 import { Experiment } from "./experiment";
 import {
@@ -313,7 +313,7 @@ export class ExperimentsFacade {
         },
       );
     } catch (error) {
-      if (isLangWatchDomainError(error)) {
+      if (isLangWatchHandledError(error)) {
         this.handleStartRunError(slug, error.body, error.httpStatus);
       }
       throw error;
@@ -347,7 +347,7 @@ export class ExperimentsFacade {
         },
       );
     } catch (error) {
-      if (isLangWatchDomainError(error)) {
+      if (isLangWatchHandledError(error)) {
         this.handleRunStatusError(runId, error.body, error.httpStatus);
       }
       throw error;

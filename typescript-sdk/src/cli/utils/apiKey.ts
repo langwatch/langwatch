@@ -53,7 +53,7 @@ export const checkApiKey = (): void => {
             "LANGWATCH_API_KEY is not set. Run `langwatch login` or add it to your .env file.",
           httpStatus: 0,
           meta: { authUrl },
-          isDomain: true,
+          isHandled: true,
         }),
       );
       console.error(chalk.red("Error: LANGWATCH_API_KEY not found."));

@@ -5,7 +5,7 @@
  * — and a nonzero exit either way.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { readCliErrorDocument } from "@langwatch/cli-cards/domain-error";
+import { readCliErrorDocument } from "@langwatch/cli-cards/handled-error";
 
 // A developer's local .env must not decide whether these tests see a key; the
 // scoped loader's `parse` results are stubbed per test below.
@@ -55,7 +55,7 @@ describe("checkApiKey()", () => {
 
         expect(domain).not.toBeNull();
         expect(domain?.kind).toBe("missing_api_key");
-        expect(domain?.isDomain).toBe(true);
+        expect(domain?.isHandled).toBe(true);
         expect(exitSpy).toHaveBeenCalledWith(1);
       });
 

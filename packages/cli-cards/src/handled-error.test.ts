@@ -6,15 +6,15 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  domainErrorFromThrown,
-  parseDomainError,
+  handledErrorFromThrown,
+  parseHandledError,
   readCliErrorDocument,
   toCliErrorDocument,
-} from "./domain-error.js";
+} from "./handled-error.js";
 
 const TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
-describe("parseDomainError, given dialect 1 (the flattened Hono handler body)", () => {
+describe("parseHandledError, given dialect 1 (the flattened Hono handler body)", () => {
   const body = {
     error: "dataset_not_found",
     message: "Dataset not found: sales-q3",
@@ -28,19 +28,19 @@ describe("parseDomainError, given dialect 1 (the flattened Hono handler body)", 
   };
 
   it("reads the code off `error` and the sentence off `message`", () => {
-    const parsed = parseDomainError({ status: 404, body });
+    const parsed = parseHandledError({ status: 404, body });
 
     expect(parsed).toMatchObject({
       code: "dataset_not_found",
       kind: "dataset_not_found",
       message: "Dataset not found: sales-q3",
       httpStatus: 404,
-      isDomain: true,
+      isHandled: true,
     });
   });
 
   it("lifts the trace id out of the nested `trace` block instead of meta", () => {
-    const parsed = parseDomainError({ status: 404, body });
+    const parsed = parseHandledError({ status: 404, body });
 
     expect(parsed.traceId).toBe(TRACE_ID);
     expect(parsed.traceUrl).toBe(
@@ -56,7 +56,7 @@ describe("parseDomainError, given dialect 1 (the flattened Hono handler body)", 
     // Dialect 1 spreads meta flat, so a meta bag holding a literal `code` key
     // arrives looking like dialect 3's discriminant. With no `kind` beside it
     // (dialect 3 always emits the pair), `error` is the code.
-    const parsed = parseDomainError({
+    const parsed = parseHandledError({
       status: 422,
       body: {
         error: "validation_error",
@@ -69,7 +69,7 @@ describe("parseDomainError, given dialect 1 (the flattened Hono handler body)", 
   });
 
   it("keeps the flat meta spread, minus the envelope's own fields", () => {
-    const parsed = parseDomainError({ status: 404, body });
+    const parsed = parseHandledError({ status: 404, body });
 
     expect(parsed.meta).not.toHaveProperty("trace");
     expect(parsed.meta).not.toHaveProperty("error");
@@ -77,9 +77,9 @@ describe("parseDomainError, given dialect 1 (the flattened Hono handler body)", 
   });
 });
 
-describe("parseDomainError, given dialect 2 (serialize() under `domainError`)", () => {
+describe("parseHandledError, given dialect 2 (serialize() under `domainError`)", () => {
   it("keeps the trace, the reason chain and the advice the route forwarded", () => {
-    const parsed = parseDomainError({
+    const parsed = parseHandledError({
       status: 429,
       body: {
         error: "Rate limited: slow down",
@@ -105,12 +105,12 @@ describe("parseDomainError, given dialect 2 (serialize() under `domainError`)", 
       reasons: [{ kind: "upstream_saturated" }],
       suggestions: ["Back off and retry"],
       docUrl: "https://langwatch.ai/docs/ai-gateway/rate-limits",
-      isDomain: true,
+      isHandled: true,
     });
   });
 
   it("still reads an older server that sends only the deprecated `kind`", () => {
-    const parsed = parseDomainError({
+    const parsed = parseHandledError({
       status: 404,
       body: {
         error: "Dataset not found: sales-q3",
@@ -123,7 +123,7 @@ describe("parseDomainError, given dialect 2 (serialize() under `domainError`)", 
   });
 });
 
-describe("parseDomainError, given dialect 3 (the new framework envelope)", () => {
+describe("parseHandledError, given dialect 3 (the new framework envelope)", () => {
   const body = {
     error: "Unprocessable Entity",
     code: "validation_error",
@@ -139,13 +139,13 @@ describe("parseDomainError, given dialect 3 (the new framework envelope)", () =>
   };
 
   it("reads meta from its own key, not from a flat spread", () => {
-    const parsed = parseDomainError({ status: 422, body });
+    const parsed = parseHandledError({ status: 422, body });
 
     expect(parsed.meta).toEqual({ fieldErrors: { name: ["Required"] } });
   });
 
   it("keeps the reasons, trace, and advice — and the status text is not the message", () => {
-    const parsed = parseDomainError({ status: 422, body });
+    const parsed = parseHandledError({ status: 422, body });
 
     expect(parsed).toMatchObject({
       code: "validation_error",
@@ -155,7 +155,7 @@ describe("parseDomainError, given dialect 3 (the new framework envelope)", () =>
       traceUrl: "https://grafana.example.com/explore?traceId=4bf",
       suggestions: ["Check the field errors"],
       docUrl: "https://langwatch.ai/docs/api-reference",
-      isDomain: true,
+      isHandled: true,
     });
   });
 
@@ -163,7 +163,7 @@ describe("parseDomainError, given dialect 3 (the new framework envelope)", () =>
     // Go emits `type` (OpenAI-compatible) and `code` with the same value. A
     // writer that sent only `type` must still name the failure, or the CLI
     // degrades a perfectly well-named error to a status-derived guess.
-    const parsed = parseDomainError({
+    const parsed = parseHandledError({
       status: 404,
       body: { type: "dataset_not_found", message: "dataset_not_found", meta: { id: "ds_1" } },
     });
@@ -171,7 +171,7 @@ describe("parseDomainError, given dialect 3 (the new framework envelope)", () =>
     expect(parsed.code).toBe("dataset_not_found");
     expect(parsed.kind).toBe("dataset_not_found");
     expect(parsed.meta).toEqual({ id: "ds_1" });
-    expect(parsed.isDomain).toBe(true);
+    expect(parsed.isHandled).toBe(true);
   });
 
   it("does not repeat the code back as prose when the server authored none", () => {
@@ -179,7 +179,7 @@ describe("parseDomainError, given dialect 3 (the new framework envelope)", () =>
     // boundary (ADR-045), so the envelope echoes the code into `message`.
     // Passing that through as a sentence would print `dataset_not_found` where
     // the panel expects English; the caller's own copy should win instead.
-    const parsed = parseDomainError({
+    const parsed = parseHandledError({
       status: 404,
       body: {
         code: "dataset_not_found",
@@ -194,7 +194,7 @@ describe("parseDomainError, given dialect 3 (the new framework envelope)", () =>
   });
 
   it("prefers prose the server deliberately authored under `meta.message`", () => {
-    const parsed = parseDomainError({
+    const parsed = parseHandledError({
       status: 404,
       body: {
         code: "dataset_not_found",
@@ -211,7 +211,7 @@ describe("parseDomainError, given dialect 3 (the new framework envelope)", () =>
     // Flat body, so meta is whatever is left after the envelope's own fields
     // are lifted out. `type` named the failure; it must not also be reported as
     // context the platform attached to it.
-    const parsed = parseDomainError({
+    const parsed = parseHandledError({
       status: 404,
       body: {
         type: "dataset_not_found",
@@ -229,19 +229,19 @@ describe("parseDomainError, given dialect 3 (the new framework envelope)", () =>
     // it clears the same envelope check: without a sentence, a meta bag or a
     // `kind` beside it, this is not the platform speaking, and calling it a
     // domain error would blame the user for something they did not do.
-    const parsed = parseDomainError({
+    const parsed = parseHandledError({
       status: 0,
       body: { type: "csv", rows: 12 },
     });
 
     expect(parsed.code).toBe("network_error");
-    expect(parsed.isDomain).toBe(false);
+    expect(parsed.isHandled).toBe(false);
   });
 });
 
-describe("parseDomainError, given the `code` ↔ `kind` transition", () => {
+describe("parseHandledError, given the `code` ↔ `kind` transition", () => {
   it("resolves the discriminant from `code` alone (new server)", () => {
-    const parsed = parseDomainError({
+    const parsed = parseHandledError({
       status: 404,
       body: { code: "dataset_not_found", message: "Dataset not found" },
     });
@@ -251,7 +251,7 @@ describe("parseDomainError, given the `code` ↔ `kind` transition", () => {
   });
 
   it("resolves the same error from `kind` alone (old server)", () => {
-    const parsed = parseDomainError({
+    const parsed = parseHandledError({
       status: 404,
       body: { kind: "dataset_not_found", message: "Dataset not found" },
     });
@@ -261,56 +261,56 @@ describe("parseDomainError, given the `code` ↔ `kind` transition", () => {
   });
 });
 
-describe("parseDomainError, given a failure the platform did NOT name", () => {
+describe("parseHandledError, given a failure the platform did NOT name", () => {
   it("degrades an unrecognisable body to a status-coded infrastructure error", () => {
-    const parsed = parseDomainError({ status: 502, body: "<html>Bad Gateway</html>" });
+    const parsed = parseHandledError({ status: 502, body: "<html>Bad Gateway</html>" });
 
     expect(parsed).toMatchObject({
       code: "internal_error",
-      isDomain: false,
+      isHandled: false,
       httpStatus: 502,
     });
   });
 
   it("calls a dead socket a network error, with status 0 semantics unchanged", () => {
-    const parsed = parseDomainError({ status: 0, body: null });
+    const parsed = parseHandledError({ status: 0, body: null });
 
     expect(parsed).toMatchObject({
       code: "network_error",
       httpStatus: 0,
-      isDomain: false,
+      isHandled: false,
     });
   });
 
   it("trusts a specific code with no status, but never a generic one", () => {
     expect(
-      parseDomainError({
+      parseHandledError({
         status: 0,
         body: { error: "dataset_not_found", message: "Dataset not found" },
-      }).isDomain,
+      }).isHandled,
     ).toBe(true);
 
     expect(
-      parseDomainError({
+      parseHandledError({
         status: 0,
         body: { error: "Internal server error", message: "An unknown error occurred" },
-      }).isDomain,
+      }).isHandled,
     ).toBe(false);
   });
 
   it("never lets a 5xx present itself as the caller's fault, whatever the body says", () => {
-    const parsed = parseDomainError({
+    const parsed = parseHandledError({
       status: 500,
       body: { error: "dataset_not_found", message: "Dataset not found" },
     });
 
-    expect(parsed.isDomain).toBe(false);
+    expect(parsed.isHandled).toBe(false);
   });
 });
 
 describe("the JSON error document round-trip", () => {
   it("carries code, kind, advice and trace through to the reader intact", () => {
-    const parsed = parseDomainError({
+    const parsed = parseHandledError({
       status: 429,
       body: {
         code: "rate_limited",
@@ -340,7 +340,7 @@ describe("the JSON error document round-trip", () => {
         message: "Dataset not found",
         httpStatus: 404,
         meta: {},
-        isDomain: true,
+        isHandled: true,
       },
     });
 
@@ -356,10 +356,10 @@ describe("the JSON error document round-trip", () => {
   });
 });
 
-describe("domainErrorFromThrown", () => {
+describe("handledErrorFromThrown", () => {
   it("trusts the SDK's own typed error, advice and trace included", () => {
     const thrown = {
-      isLangWatchDomainError: true,
+      isLangWatchHandledError: true,
       code: "budget_exceeded",
       message: "Budget exceeded",
       httpStatus: 402,
@@ -371,7 +371,7 @@ describe("domainErrorFromThrown", () => {
       docUrl: "https://langwatch.ai/docs/ai-gateway/budgets",
     };
 
-    expect(domainErrorFromThrown(thrown)).toMatchObject({
+    expect(handledErrorFromThrown(thrown)).toMatchObject({
       code: "budget_exceeded",
       kind: "budget_exceeded",
       traceId: TRACE_ID,
@@ -379,13 +379,13 @@ describe("domainErrorFromThrown", () => {
       reasons: [{ kind: "spend_over_cap" }],
       suggestions: ["Raise the budget"],
       docUrl: "https://langwatch.ai/docs/ai-gateway/budgets",
-      isDomain: true,
+      isHandled: true,
     });
   });
 
   it("still recognises a typed error from before the rename (kind only)", () => {
-    const parsed = domainErrorFromThrown({
-      isLangWatchDomainError: true,
+    const parsed = handledErrorFromThrown({
+      isLangWatchHandledError: true,
       kind: "dataset_not_found",
       message: "Dataset not found",
       httpStatus: 404,
@@ -396,7 +396,7 @@ describe("domainErrorFromThrown", () => {
   });
 
   it("unwraps a service wrapper to the wire body underneath", () => {
-    const parsed = domainErrorFromThrown(
+    const parsed = handledErrorFromThrown(
       Object.assign(new Error("Failed to get dataset: Dataset not found"), {
         status: 404,
         originalError: {
@@ -411,14 +411,14 @@ describe("domainErrorFromThrown", () => {
       code: "dataset_not_found",
       message: "Dataset not found: sales-q3",
       meta: { id: "sales-q3" },
-      isDomain: true,
+      isHandled: true,
     });
   });
 
   it("reports anything unrecognisable as infrastructure, not a claimed code", () => {
-    const parsed = domainErrorFromThrown(new Error("fetch failed"));
+    const parsed = handledErrorFromThrown(new Error("fetch failed"));
 
-    expect(parsed).toMatchObject({ isDomain: false, message: "fetch failed" });
+    expect(parsed).toMatchObject({ isHandled: false, message: "fetch failed" });
   });
 });
 
@@ -456,7 +456,7 @@ const systemError = ({
     }),
   });
 
-describe("domainErrorFromThrown, given a transport failure fetch threw", () => {
+describe("handledErrorFromThrown, given a transport failure fetch threw", () => {
   describe("when the socket was refused", () => {
     const refused = () =>
       systemError({
@@ -468,13 +468,13 @@ describe("domainErrorFromThrown, given a transport failure fetch threw", () => {
       });
 
     it("classifies a refused connection as infrastructure", () => {
-      const parsed = domainErrorFromThrown(refused());
+      const parsed = handledErrorFromThrown(refused());
 
-      expect(parsed).toMatchObject({ code: "network_error", isDomain: false });
+      expect(parsed).toMatchObject({ code: "network_error", isHandled: false });
     });
 
     it("never claims the libuv code as a domain discriminant", () => {
-      const parsed = domainErrorFromThrown(refused());
+      const parsed = handledErrorFromThrown(refused());
 
       expect(parsed.code).not.toBe("ECONNREFUSED");
       expect(parsed.kind).not.toBe("ECONNREFUSED");
@@ -482,7 +482,7 @@ describe("domainErrorFromThrown, given a transport failure fetch threw", () => {
 
     it("keeps the local address and port out of the rendered document", () => {
       const rendered = JSON.stringify(
-        toCliErrorDocument(domainErrorFromThrown(refused())),
+        toCliErrorDocument(handledErrorFromThrown(refused())),
       );
 
       expect(rendered).not.toContain("127.0.0.1");
@@ -492,13 +492,13 @@ describe("domainErrorFromThrown, given a transport failure fetch threw", () => {
     });
 
     it("reports the failure with status 0, not a fabricated one", () => {
-      expect(domainErrorFromThrown(refused()).httpStatus).toBe(0);
+      expect(handledErrorFromThrown(refused()).httpStatus).toBe(0);
     });
   });
 
   describe("when DNS could not resolve the host", () => {
     it("classifies an unresolvable host as infrastructure", () => {
-      const parsed = domainErrorFromThrown(
+      const parsed = handledErrorFromThrown(
         systemError({
           message: "getaddrinfo ENOTFOUND app.langwatch.invalid",
           code: "ENOTFOUND",
@@ -508,11 +508,11 @@ describe("domainErrorFromThrown, given a transport failure fetch threw", () => {
         }),
       );
 
-      expect(parsed).toMatchObject({ code: "network_error", isDomain: false });
+      expect(parsed).toMatchObject({ code: "network_error", isHandled: false });
     });
 
     it("classifies a DNS timeout as infrastructure", () => {
-      const parsed = domainErrorFromThrown(
+      const parsed = handledErrorFromThrown(
         systemError({
           message: "getaddrinfo EAI_AGAIN app.langwatch.ai",
           code: "EAI_AGAIN",
@@ -521,13 +521,13 @@ describe("domainErrorFromThrown, given a transport failure fetch threw", () => {
         }),
       );
 
-      expect(parsed).toMatchObject({ code: "network_error", isDomain: false });
+      expect(parsed).toMatchObject({ code: "network_error", isHandled: false });
     });
   });
 
   describe("when TLS could not verify the certificate", () => {
     it("classifies a self-signed certificate as infrastructure", () => {
-      const parsed = domainErrorFromThrown(
+      const parsed = handledErrorFromThrown(
         systemError({
           message: "self signed certificate in certificate chain",
           code: "SELF_SIGNED_CERT_IN_CHAIN",
@@ -536,11 +536,11 @@ describe("domainErrorFromThrown, given a transport failure fetch threw", () => {
         }),
       );
 
-      expect(parsed).toMatchObject({ code: "network_error", isDomain: false });
+      expect(parsed).toMatchObject({ code: "network_error", isHandled: false });
     });
 
     it("classifies an unverifiable leaf certificate as infrastructure", () => {
-      const parsed = domainErrorFromThrown(
+      const parsed = handledErrorFromThrown(
         systemError({
           message: "unable to verify the first certificate",
           code: "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
@@ -549,7 +549,7 @@ describe("domainErrorFromThrown, given a transport failure fetch threw", () => {
         }),
       );
 
-      expect(parsed).toMatchObject({ code: "network_error", isDomain: false });
+      expect(parsed).toMatchObject({ code: "network_error", isHandled: false });
     });
   });
 
@@ -559,16 +559,16 @@ describe("domainErrorFromThrown, given a transport failure fetch threw", () => {
       ["ECONNRESET", -54, "read ECONNRESET"],
       ["EPIPE", -32, "write EPIPE"],
     ])("classifies %s as infrastructure", (code, errno, message) => {
-      const parsed = domainErrorFromThrown(
+      const parsed = handledErrorFromThrown(
         systemError({ message, code, errno, syscall: "connect" }),
       );
 
-      expect(parsed).toMatchObject({ code: "network_error", isDomain: false });
+      expect(parsed).toMatchObject({ code: "network_error", isHandled: false });
     });
   });
 
   it("keeps the transport's own sentence, so the user still learns what broke", () => {
-    const parsed = domainErrorFromThrown(
+    const parsed = handledErrorFromThrown(
       systemError({
         message: "connect ECONNREFUSED 127.0.0.1:5560",
         code: "ECONNREFUSED",
@@ -581,24 +581,24 @@ describe("domainErrorFromThrown, given a transport failure fetch threw", () => {
   });
 });
 
-describe("parseDomainError, given a bare `code` with nothing else", () => {
+describe("parseHandledError, given a bare `code` with nothing else", () => {
   it("refuses to read a lone code as a domain discriminant", () => {
-    const parsed = parseDomainError({ status: 0, body: { code: "ECONNREFUSED" } });
+    const parsed = parseHandledError({ status: 0, body: { code: "ECONNREFUSED" } });
 
-    expect(parsed).toMatchObject({ code: "network_error", isDomain: false });
+    expect(parsed).toMatchObject({ code: "network_error", isHandled: false });
   });
 
   it("still reads a code that arrives with the envelope's sentence", () => {
-    const parsed = parseDomainError({
+    const parsed = parseHandledError({
       status: 0,
       body: { code: "dataset_not_found", message: "Dataset not found" },
     });
 
-    expect(parsed).toMatchObject({ code: "dataset_not_found", isDomain: true });
+    expect(parsed).toMatchObject({ code: "dataset_not_found", isHandled: true });
   });
 
   it("still reads a code that arrives with the envelope's meta bag", () => {
-    const parsed = parseDomainError({
+    const parsed = parseHandledError({
       status: 404,
       body: { code: "dataset_not_found", meta: { id: "sales-q3" } },
     });
@@ -606,7 +606,7 @@ describe("parseDomainError, given a bare `code` with nothing else", () => {
     expect(parsed).toMatchObject({
       code: "dataset_not_found",
       meta: { id: "sales-q3" },
-      isDomain: true,
+      isHandled: true,
     });
   });
 });

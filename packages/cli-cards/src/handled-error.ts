@@ -20,7 +20,7 @@
  *   - anything else (a dead socket, a 500, a proxy's HTML error page) is OUR
  *     problem, and the panel must say so rather than blame the user.
  *
- * DELIBERATELY ZOD-FREE, and importable on its own (`@langwatch/cli-cards/domain-error`).
+ * DELIBERATELY ZOD-FREE, and importable on its own (`@langwatch/cli-cards/handled-error`).
  * This module sits on the CLI's hot path: every instrumented command imports it,
  * including the overwhelming majority of runs where telemetry is switched off.
  * Importing zod here costs ~28ms on EVERY `langwatch` invocation — measured — and
@@ -34,14 +34,14 @@
  * Recursive, and named by kind only: the platform masks anything it did not
  * raise itself as `{ code: "unknown" }` rather than leaking an internal message.
  */
-export interface CliDomainErrorReason {
+export interface CliHandledErrorReason {
   kind: string;
   meta?: Record<string, unknown>;
-  reasons?: CliDomainErrorReason[];
+  reasons?: CliHandledErrorReason[];
 }
 
 /** A failure, read back into the structure the platform originally gave it. */
-export interface CliDomainError {
+export interface CliHandledError {
   /** The platform's serialisable discriminant, e.g. `dataset_not_found`. */
   code: string;
   /**
@@ -63,7 +63,7 @@ export interface CliDomainError {
    * where the CLI is guessing and the panel must not present it as the user's
    * fault.
    */
-  isDomain: boolean;
+  isHandled: boolean;
   /**
    * The OTel trace the failure happened on, when the route sent it.
    *
@@ -78,7 +78,7 @@ export interface CliDomainError {
   /** A clickable link to the logs for that trace, when the route sent one. */
   logsUrl?: string;
   /** The reason chain, when the route sent it. Same availability as `traceId`. */
-  reasons?: CliDomainErrorReason[];
+  reasons?: CliHandledErrorReason[];
   /**
    * What the user can DO about it, when the platform sent next steps. Absent
    * until the backend grows `suggestions` on `HandledError` — the CLI's
@@ -117,7 +117,7 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     : null;
 
 /** The reason chain, defensively: anything without a code is not a reason. */
-const asReasons = (value: unknown): CliDomainErrorReason[] | undefined => {
+const asReasons = (value: unknown): CliHandledErrorReason[] | undefined => {
   if (!Array.isArray(value)) return undefined;
 
   const reasons = value
@@ -139,7 +139,7 @@ const asReasons = (value: unknown): CliDomainErrorReason[] | undefined => {
  * A libuv/Node system error, not a platform error body.
  *
  * `fetch` reports a transport failure by throwing a `TypeError("fetch failed")`
- * whose `cause` is the system error, and `domainErrorFromThrown` unwraps to that
+ * whose `cause` is the system error, and `handledErrorFromThrown` unwraps to that
  * cause. Its own enumerable keys are `{ errno, code, syscall, address, port }` —
  * so its `code` is `ECONNREFUSED`/`ENOTFOUND`/`ETIMEDOUT`/a TLS cert code, NOT a
  * discriminant the platform ever chose. Reading one as a domain error is the
@@ -180,7 +180,7 @@ interface ErrorBody {
   traceId?: string;
   traceUrl?: string;
   logsUrl?: string;
-  reasons?: CliDomainErrorReason[];
+  reasons?: CliHandledErrorReason[];
   suggestions?: string[];
   docUrl?: string;
 }
@@ -397,21 +397,21 @@ const fallbackMessage = ({
 };
 
 /**
- * Read an HTTP failure back into a {@link CliDomainError}.
+ * Read an HTTP failure back into a {@link CliHandledError}.
  *
  * A body in the platform's error shape that came back BELOW 500 is a true domain
  * error and keeps its code. A 5xx, or a body that is not the platform's shape at
  * all (a gateway's HTML, a truncated response), is infrastructure: it still
- * yields a usable error, but `isDomain` is false and the code degrades to a
+ * yields a usable error, but `isHandled` is false and the code degrades to a
  * status-derived one rather than a fabricated domain code.
  */
-export const parseDomainError = ({
+export const parseHandledError = ({
   status,
   body,
 }: {
   status: number;
   body: unknown;
-}): CliDomainError => {
+}): CliHandledError => {
   const parsed = asErrorBody(body);
 
   if (!parsed) {
@@ -421,13 +421,13 @@ export const parseDomainError = ({
       message: fallbackMessage({ status, body }),
       httpStatus: status,
       meta: {},
-      isDomain: false,
+      isHandled: false,
     };
   }
 
   return {
     code: parsed.code,
-    // Deprecated back-compat alias — see CliDomainError.kind.
+    // Deprecated back-compat alias — see CliHandledError.kind.
     kind: parsed.code,
     message: parsed.message ?? parsed.code,
     httpStatus: status,
@@ -445,7 +445,7 @@ export const parseDomainError = ({
     // With no status to go on, the code decides: the platform only emits a
     // generic code when it fell over, so anything more specific than that is a
     // failure it chose to name — which is exactly what a domain error is.
-    isDomain:
+    isHandled:
       status > 0
         ? status < SERVER_ERROR_STATUS
         : !isGenericCode(parsed.code),
@@ -468,12 +468,12 @@ export const parseDomainError = ({
  */
 export interface CliErrorDocument {
   ok: false;
-  error: CliDomainError;
+  error: CliHandledError;
 }
 
 /** Build the `--format json` failure document. */
 export const toCliErrorDocument = (
-  error: CliDomainError,
+  error: CliHandledError,
 ): CliErrorDocument => ({ ok: false, error });
 
 /**
@@ -484,7 +484,7 @@ export const toCliErrorDocument = (
  */
 export const readCliErrorDocument = (
   output: unknown,
-): CliDomainError | null => {
+): CliHandledError | null => {
   const document =
     typeof output === "string" ? safeParseJson(output) : asRecord(output);
 
@@ -502,12 +502,12 @@ export const readCliErrorDocument = (
 
   return {
     code,
-    // Deprecated back-compat alias — see CliDomainError.kind.
+    // Deprecated back-compat alias — see CliHandledError.kind.
     kind: code,
     message: typeof error.message === "string" ? error.message : code,
     httpStatus: typeof error.httpStatus === "number" ? error.httpStatus : 0,
     meta: asRecord(error.meta) ?? {},
-    isDomain: error.isDomain === true,
+    isHandled: error.isHandled === true,
     ...(typeof error.traceId === "string" ? { traceId: error.traceId } : {}),
     ...(typeof error.traceUrl === "string" ? { traceUrl: error.traceUrl } : {}),
     ...(typeof error.logsUrl === "string" ? { logsUrl: error.logsUrl } : {}),
@@ -530,14 +530,14 @@ const safeParseJson = (value: string): unknown => {
 };
 
 /**
- * A `LangWatchDomainError` — an error the SDK's transport ALREADY read the wire
+ * A `LangWatchHandledError` — an error the SDK's transport ALREADY read the wire
  * into. It brands itself with a boolean rather than relying on `instanceof`,
  * which does not survive a bundled CLI meeting a consumer's own copy of the SDK.
  */
-const asAlreadyReadDomainError = (
+const asAlreadyReadHandledError = (
   outer: Record<string, unknown> | null,
-): CliDomainError | null => {
-  if (!outer || outer.isLangWatchDomainError !== true) return null;
+): CliHandledError | null => {
+  if (!outer || outer.isLangWatchHandledError !== true) return null;
   const code =
     typeof outer.code === "string"
       ? outer.code
@@ -548,12 +548,12 @@ const asAlreadyReadDomainError = (
 
   return {
     code,
-    // Deprecated back-compat alias — see CliDomainError.kind.
+    // Deprecated back-compat alias — see CliHandledError.kind.
     kind: code,
     message: typeof outer.message === "string" ? outer.message : code,
     httpStatus: typeof outer.httpStatus === "number" ? outer.httpStatus : 0,
     meta: asRecord(outer.meta) ?? {},
-    isDomain: true,
+    isHandled: true,
     ...(typeof outer.traceId === "string" ? { traceId: outer.traceId } : {}),
     ...(typeof outer.traceUrl === "string" ? { traceUrl: outer.traceUrl } : {}),
     ...(typeof outer.logsUrl === "string" ? { logsUrl: outer.logsUrl } : {}),
@@ -595,14 +595,14 @@ const statusOf = (value: Record<string, unknown> | null): number => {
  * which is the honest answer: we do not know what went wrong, so we do not claim
  * a code we cannot substantiate.
  */
-export const domainErrorFromThrown = (error: unknown): CliDomainError => {
+export const handledErrorFromThrown = (error: unknown): CliHandledError => {
   const outer = asRecord(error);
 
   // The SDK's HTTP layer may have read this already, into a richer structure than
   // the wire body it came from: the flattened body carries no trace id and no
   // reason chain, so re-deriving from it would THROW AWAY the fields the typed
   // error exists to preserve. Trust the reading that already happened.
-  const alreadyRead = asAlreadyReadDomainError(outer);
+  const alreadyRead = asAlreadyReadHandledError(outer);
   if (alreadyRead) return alreadyRead;
 
   // The SDK wraps the API's error body; the body is the thing worth reading.
@@ -613,9 +613,9 @@ export const domainErrorFromThrown = (error: unknown): CliDomainError => {
     outer;
 
   const status = statusOf(cause) || statusOf(outer);
-  const parsed = parseDomainError({ status, body: cause });
+  const parsed = parseHandledError({ status, body: cause });
 
-  if (parsed.isDomain) return parsed;
+  if (parsed.isHandled) return parsed;
 
   return {
     ...parsed,
