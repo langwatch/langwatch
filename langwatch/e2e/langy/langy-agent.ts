@@ -127,14 +127,23 @@ async function trpcMutate<T>({
  * (`admission.kind === "busy"`), and a conversation-status PROJECTION read
  * that its own comment calls "only a rollout/back-compat hint... the
  * Postgres admission claim above is the concurrency authority" — i.e. it can
- * go stale. In practice, an 80s×10-attempt retry (comfortably longer than
- * this stack's observed 35-65s real turn duration) still hit the SAME 409 —
- * that rules out "still genuinely processing" and points at the projection
- * never flipping back off RUNNING (a likely event-sourcing projection lag
- * under rapid back-to-back turns, not something a longer wait fixes). Flag
- * this as a real product finding rather than retry around it indefinitely;
- * keep only a short retry here in case a given instance IS the legitimate
- * few-second race.
+ * go stale.
+ *
+ * Two confirmed causes, both server-side and neither fixable by retrying
+ * around them forever:
+ *  1. A permanently-abandoned COMMITTED admission row (worker died without
+ *     ever publishing a terminal event) — fixed server-side via
+ *     COMMITTED_ABANDON_MS in langy-turn-admission.prisma.repository.ts (a
+ *     10-minute reclaim backstop); no client-side retry budget should be
+ *     sized to paper over that case, it's now a real self-heal on the server.
+ *  2. A worker crashing mid-reply (`langy_worker_stopped`) — confirmed live
+ *     via the DB: the projection correctly resolves to `status: "failed"`
+ *     with that error, and the admission row is correctly released, but
+ *     agent-turn-liveness.subscriber.ts's own stall detection can take up to
+ *     MAX_STALL_MS (90s) to notice and fail the turn. A 15s retry budget
+ *     (the old 3×5s) gives up on the server's OWN documented recovery window
+ *     before it has even elapsed, turning a self-healing 90s hiccup into a
+ *     hard test failure. Retry comfortably past that window instead.
  */
 async function trpcMutateWithTurnLockRetry<T>({
   cookie,
@@ -145,8 +154,8 @@ async function trpcMutateWithTurnLockRetry<T>({
   path: string;
   input: unknown;
 }): Promise<T> {
-  const maxAttempts = 3;
-  const delayMs = 5_000;
+  const maxAttempts = 8;
+  const delayMs = 15_000;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await trpcMutate<T>({ cookie, path, input });
