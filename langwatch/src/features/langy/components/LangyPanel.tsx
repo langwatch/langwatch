@@ -111,6 +111,8 @@ import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyCardGallery } from "./LangyCardGallery";
+import { LangyDevDrawer } from "./LangyDevDrawer";
+import { useLangyDevLog } from "../stores/langyDevLog";
 import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
 import { LangyDevDrawer } from "./LangyDevDrawer";
 import { LangyError } from "./LangyError";

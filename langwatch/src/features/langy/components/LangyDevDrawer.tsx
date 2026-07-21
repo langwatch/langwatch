@@ -639,6 +639,20 @@ function StoreTab() {
     { label: "activeTurnId", value: state.activeTurnId },
     { label: "settledTurnId", value: state.settledTurnId },
     { label: "backendSawTurnInFlight", value: state.backendSawTurnInFlight },
+    // The LOCAL turn projection (ADR-059): the durable tail folded in the
+    // browser. `projection.cursor` against the freshness signal's cursor is
+    // THE question when debugging the event stream — is the client behind,
+    // and did the fold land?
+    { label: "projection.cursor", value: state.turnProjection.cursor },
+    { label: "projection.turnId", value: state.turnProjection.turnId },
+    {
+      label: "projection.turn.Status",
+      value: state.turnProjection.turn?.Status ?? null,
+    },
+    {
+      label: "projection.turn.ToolCalls",
+      value: state.turnProjection.turn?.ToolCalls?.length ?? null,
+    },
     { label: "activeConversationId", value: state.activeConversationId },
     {
       label: "historyLoadConversationId",
