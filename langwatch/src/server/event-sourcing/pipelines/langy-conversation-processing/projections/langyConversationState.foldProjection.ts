@@ -9,7 +9,7 @@ import {
   LANGY_CONVERSATION_STATUS,
   LANGY_TITLE_SOURCE,
   type LangyTitleSource,
-} from "../schemas/constants";
+} from "@langwatch/langy";
 import type {
   LangyAgentResponseFailedEvent,
   LangyAgentTurnAcceptedEvent,

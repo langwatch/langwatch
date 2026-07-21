@@ -96,6 +96,7 @@
     "@langwatch/automations": "workspace:*",
     "@langwatch/cli-cards": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/langy": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/mcp-server": "workspace:*",
     "@langwatch/observability": "workspace:*",

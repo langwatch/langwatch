@@ -14,16 +14,14 @@ import type { StateProjectionStore } from "../../../../projections/stateProjecti
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
-} from "../../schemas/constants";
+} from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "../../schemas/events";
 import {
   LangyConversationStateFoldProjection,
   type LangyConversationStateData,
 } from "../langyConversationState.foldProjection";
-import {
-  LangyConversationTurnFoldProjection,
-  type LangyConversationTurnData,
-} from "../langyConversationTurn.foldProjection";
+import type { LangyConversationTurnData } from "@langwatch/langy";
+import { LangyConversationTurnFoldProjection } from "../langyConversationTurn.foldProjection";
 
 const TENANT = createTenantId("project-1");
 const CONVERSATION = "conv-1";

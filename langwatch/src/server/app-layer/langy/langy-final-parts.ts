@@ -2,7 +2,7 @@ import type { CliResultDigest, CliToolResult } from "@langwatch/cli-cards";
 import {
   langyMessagePartSchema,
   type LangyMessagePart,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/shared";
+} from "@langwatch/langy";
 import { LangyCliEnvelopeService } from "./execution/langy-cli-envelope.service";
 
 /**

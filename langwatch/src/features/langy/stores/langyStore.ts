@@ -10,7 +10,7 @@ import {
   observeBackendTurn as reduceObserveBackendTurn,
   requestStop as reduceRequestStop,
   settleTurn as reduceSettleTurn,
-} from "./langyTurnPhase";
+} from "@langwatch/langy";
 
 /**
  * Single client/UI-state store for the Langy panel (ADR-046 frontend).
@@ -357,7 +357,7 @@ interface LangyState extends TurnPhaseState {
   //
   // The phase STATE fields (turnPhase, activeTurnId, settledTurnId,
   // backendSawTurnInFlight) come from `TurnPhaseState`; the machine's pure
-  // transitions live in langyTurnPhase.ts. The store exposes them as events:
+  // transitions live in @langwatch/langy's turnPhase.ts. The store exposes them as events:
   /** A turn was dispatched (transport adopted its ids): adopt it, go `active`. */
   beginTurn: (args: { conversationId: string; turnId: string }) => void;
   /** The user hit Stop: `active` → `stopping` (a no-op in any other phase). */
@@ -748,7 +748,7 @@ export const useLangyStore = create<LangyState>()(
           };
         }),
 
-      // The turn phase machine (langyTurnPhase.ts) — pure transitions wired in a
+      // The turn phase machine (@langwatch/langy turnPhase.ts) — pure transitions wired in a
       // few lines. Every phase change goes through these four events.
       ...initialTurnPhaseState,
       beginTurn: ({ conversationId, turnId }) =>

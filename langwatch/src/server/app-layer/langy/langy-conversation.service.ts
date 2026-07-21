@@ -25,9 +25,8 @@ import type {
   LangyToolCallFailedEventData,
   LangyToolCallInitiatedEventData,
   LangyToolCallSucceededEventData,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing";
-import { langyJsonValueSchema } from "~/server/event-sourcing/pipelines/langy-conversation-processing";
-import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+} from "@langwatch/langy";
+import { LANGY_CONVERSATION_STATUS, langyJsonValueSchema } from "@langwatch/langy";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   LangyConversationNotFoundError,

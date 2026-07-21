@@ -23,7 +23,7 @@ import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/lang
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 
 import type { Session } from "~/server/auth";
-import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
 import { connection } from "~/server/redis";

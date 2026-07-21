@@ -6,7 +6,7 @@ import {
   LANGY_CONVERSATION_EVENT_VERSIONS,
   LANGY_CONVERSATION_STATUS,
   LANGY_TITLE_SOURCE,
-} from "../../schemas/constants";
+} from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "../../schemas/events";
 import {
   LangyConversationStateFoldProjection,
