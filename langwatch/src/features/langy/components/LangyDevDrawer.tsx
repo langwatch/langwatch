@@ -132,11 +132,14 @@ export function LangyDevDrawer({
   }, [open, setRecording]);
 
   // TIME TRAVEL. `scrubSeq` caps every view at one moment of the tape; null is
-  // LIVE (follow the edge). Scrubbing costs nothing to be correct: the views
-  // are pure functions of the visible records, and the fold readout is
-  // literally re-run from the recorded durable lane (replayTurnProjection) —
-  // the same reducers the live store uses, exercised on history.
-  const [scrubSeq, setScrubSeq] = useState<number | null>(null);
+  // LIVE (follow the edge). It lives in the dev-log STORE because the chat
+  // panel time-travels with it (langyTimeTravel.ts) — the whole UI, not just
+  // this drawer. Scrubbing costs nothing to be correct: the views are pure
+  // functions of the visible records, and the fold readout is literally re-run
+  // from the recorded durable lane (replayTurnProjection) — the same reducers
+  // the live store uses, exercised on history.
+  const scrubSeq = useLangyDevLog((s) => s.scrubSeq);
+  const setScrubSeq = useLangyDevLog((s) => s.setScrub);
   const allRecords = useLangyDevLog((s) => s.records);
   const visibleRecords = useMemo(
     () => tapeUpTo(allRecords, scrubSeq),

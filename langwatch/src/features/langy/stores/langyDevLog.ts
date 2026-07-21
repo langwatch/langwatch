@@ -100,6 +100,13 @@ interface LangyDevLogState {
   /** How many entries the ring has discarded, so the view can admit the gap. */
   dropped: number;
   nextSeq: number;
+  /**
+   * The scrubber's position — the tape seq every view (INCLUDING the chat
+   * panel, which time-travels with it) is capped at. Null is LIVE. Lives here
+   * rather than in the drawer so the panel can read it without prop plumbing.
+   */
+  scrubSeq: number | null;
+  setScrub: (seq: number | null) => void;
   setRecording: (recording: boolean) => void;
   /** INBOUND stream lane — every live turn-stream entry. */
   record: (entry: LangyStreamEntry, turnId: string | null) => void;
@@ -145,7 +152,12 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
     records: [],
     dropped: 0,
     nextSeq: 1,
-    setRecording: (recording) => set({ recording }),
+    scrubSeq: null,
+    setScrub: (scrubSeq) => set({ scrubSeq }),
+    // Disarming also snaps back to live: a closed drawer must never leave the
+    // panel frozen in the past.
+    setRecording: (recording) =>
+      set(recording ? { recording } : { recording, scrubSeq: null }),
     record: (entry, turnId) =>
       append((seq) => ({
         seq,
