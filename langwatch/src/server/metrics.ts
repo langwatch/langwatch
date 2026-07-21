@@ -959,10 +959,13 @@ const esFoldPostStoreFailure = new Counter({
  * Rate against `es_fold_projection_total{status="failed"}` for the share of
  * fold failures that land in the dangerous half.
  */
-export const incrementEsFoldPostStoreFailure = (
-  projectionName: string,
-  stage: "reactor_dispatch",
-) => esFoldPostStoreFailure.labels(projectionName, stage).inc();
+export const incrementEsFoldPostStoreFailure = ({
+  projectionName,
+  stage,
+}: {
+  projectionName: string;
+  stage: "reactor_dispatch";
+}) => esFoldPostStoreFailure.labels(projectionName, stage).inc();
 
 // ============================================================================
 // Stored Objects Metrics

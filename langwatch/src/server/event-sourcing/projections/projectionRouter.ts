@@ -1495,7 +1495,7 @@ export class ProjectionRouter<
     events: EventType[];
     error: unknown;
   }): void {
-    incrementEsFoldPostStoreFailure(projectionName, stage);
+    incrementEsFoldPostStoreFailure({ projectionName, stage });
     const first = events[0];
     this.logger.warn(
       {

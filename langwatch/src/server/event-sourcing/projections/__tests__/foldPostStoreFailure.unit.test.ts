@@ -69,10 +69,10 @@ describe("fold failures after the state was stored", () => {
    */
   async function dispatchBatch({
     batch,
-    reactorFails,
+    shouldReactorFail,
   }: {
     batch: Event[];
-    reactorFails: boolean;
+    shouldReactorFail: boolean;
   }): Promise<unknown> {
     const queueManager = createMockQueueManager({ hasReactorQueues: false });
     const router = new ProjectionRouter<Event>(
@@ -91,7 +91,7 @@ describe("fold failures after the state was stored", () => {
 
     const reactor: ReactorDefinition<Event> = {
       name: "flakyReactor",
-      handle: reactorFails
+      handle: shouldReactorFail
         ? vi.fn().mockRejectedValue(new Error("reactor boom"))
         : vi.fn().mockResolvedValue(undefined),
     };
@@ -116,18 +116,18 @@ describe("fold failures after the state was stored", () => {
 
   describe("when a reactor throws after the fold state was stored", () => {
     it("counts the failure as post-store, labelled by stage", async () => {
-      await dispatchBatch({ batch: events(3), reactorFails: true });
+      await dispatchBatch({ batch: events(3), shouldReactorFail: true });
 
-      expect(incrementEsFoldPostStoreFailure).toHaveBeenCalledWith(
-        "counter",
-        "reactor_dispatch",
-      );
+      expect(incrementEsFoldPostStoreFailure).toHaveBeenCalledWith({
+        projectionName: "counter",
+        stage: "reactor_dispatch",
+      });
     });
 
     it("rethrows so the queue still retries the job", async () => {
       const error = await dispatchBatch({
         batch: events(3),
-        reactorFails: true,
+        shouldReactorFail: true,
       });
 
       expect(error).toBeInstanceOf(Error);
@@ -136,7 +136,7 @@ describe("fold failures after the state was stored", () => {
 
   describe("when every reactor succeeds", () => {
     it("counts nothing, because no state was left behind a failed job", async () => {
-      await dispatchBatch({ batch: events(3), reactorFails: false });
+      await dispatchBatch({ batch: events(3), shouldReactorFail: false });
 
       expect(incrementEsFoldPostStoreFailure).not.toHaveBeenCalled();
     });
