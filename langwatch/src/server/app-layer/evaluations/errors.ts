@@ -48,6 +48,10 @@ export class EvaluatorConfigError extends HandledError {
   ) {
     super("evaluator_config_error", message, {
       httpStatus: 422,
+      // Declared rather than inherited: `fault` decides whether the
+      // evaluation-processing command reports a skip or an error, so the
+      // classification belongs where the class is read.
+      fault: "customer",
       ...remediation("evaluator_config_error"),
       ...options,
     });

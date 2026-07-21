@@ -43,18 +43,27 @@ const logger = createLogger(
 
 /**
  * A failure the customer can resolve themselves (provider disabled, missing
- * credentials, an unmapped evaluator field) rather than one we have to fix.
+ * credentials, an oversized evaluator payload) rather than one we have to fix.
  *
  * Keyed on `HandledError.fault` — the repo's own classification, mirrored in
- * `services/aigateway/adapters/httpapi/faults.go` — so this stays correct as
- * new error types are added instead of drifting behind a hand-kept list.
+ * `services/aigateway/adapters/httpapi/faults.go`.
  *
- * Note it is deliberately NOT `HandledError.isHandled(error)`: that is the
- * whole base class, which also covers `EvaluatorExecutionError`
- * (`fault: "platform"`, raised when langevals times out, is unreachable, or
- * returns 5xx). Downgrading those would hide an outage behind a benign skip.
+ * It is deliberately NOT `HandledError.isHandled(error)`: that is the whole
+ * base class, which also covers `EvaluatorExecutionError` (`fault: "platform"`,
+ * raised when langevals times out, is unreachable, or returns 5xx).
+ * Downgrading those would hide an outage behind a benign skip.
  * `fault: "provider"` likewise stays an error — a third-party outage is not
  * something the customer can act on.
+ *
+ * Know the failure mode before adding an error type under `executeForTrace`:
+ * `fault` **defaults to `"customer"`** (`HandledError`), so this predicate is
+ * opt-out, not opt-in. An error class whose author never thought about
+ * classification lands on the skip path and stops producing error telemetry.
+ * That is a deliberate trade — the alternative, a hand-kept allowlist, goes
+ * stale silently in the other direction — but it means any new
+ * `HandledError` on this path that represents *our* failure has to declare
+ * `fault: "platform"` explicitly. The base class says as much for 5xx-ish
+ * errors; this call site is what makes ignoring it expensive.
  */
 function isCustomerFixable(error: unknown): error is HandledError {
   return HandledError.isHandled(error) && error.fault === "customer";
@@ -297,8 +306,9 @@ export class ExecuteEvaluationCommand implements CommandHandler<
       // score to fold, and a bulk re-evaluation over non-evaluatable traces
       // would otherwise emit thousands of results, each paying the heavy
       // evaluation-projection read. Config skips (monitor not found, provider
-      // not configured) are emitted earlier via their own path and still
-      // surface in the UI.
+      // not configured) are emitted earlier via their own path — or, when the
+      // failure is thrown from inside execution, by the customer-fault branch
+      // in the catch below — and still surface in the UI.
       if (result.status === "skipped") {
         logger.debug(
           {
@@ -367,7 +377,10 @@ export class ExecuteEvaluationCommand implements CommandHandler<
             traceId: data.traceId,
             error: error.message,
           },
-          "Evaluator misconfigured — skipping evaluation",
+          // Neutral wording on purpose: this branch also catches oversized
+          // payloads and non-evaluatable traces, neither of which is a
+          // misconfiguration. `code` in the payload says which it was.
+          "Customer-fixable evaluator failure — skipping evaluation",
         );
 
         return emitReported(data, tenantId, {
