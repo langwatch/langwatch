@@ -10,6 +10,13 @@ import {
   observeBackendTurn as reduceObserveBackendTurn,
   requestStop as reduceRequestStop,
   settleTurn as reduceSettleTurn,
+  applyLangyTurnEvents,
+  initialLangyTurnProjection,
+  isLangyTurnProjectionTerminal,
+  seedLangyTurnProjection,
+  type LangyConversationTurnWireEvent,
+  type LangyEventCursor,
+  type LangyTurnProjectionState,
 } from "@langwatch/langy";
 
 /**
@@ -379,6 +386,26 @@ interface LangyState extends TurnPhaseState {
   observeBackendTurn: (inFlight: boolean) => void;
   /** A genuine end-of-turn frame settled the turn: go `idle` immediately. */
   settleTurn: (turnId: string | null) => void;
+  /**
+   * The LOCAL turn projection (ADR-059): the durable event tail folded through
+   * the same reducer the server projection runs. Seeded from the conversation
+   * snapshot, advanced by `applyTurnEvents`, and composed with the phase
+   * machine — a folded terminal settles the phase, a folded running turn
+   * confirms it, both replayable from the recorded events.
+   */
+  turnProjection: LangyTurnProjectionState;
+  /**
+   * Adopt a conversation snapshot's position (cursor + in-flight turn id).
+   * When the snapshot names a turn in flight and this tab tracks none, the tab
+   * adopts it — which is what makes Stop (and the live stream) work after a
+   * refresh. Never rewinds a fresher local fold.
+   */
+  seedTurnProjection: (snapshot: {
+    cursor: LangyEventCursor | null;
+    currentTurnId?: string | null;
+  }) => void;
+  /** Fold a fetched durable tail; idempotent under re-delivery and overlap. */
+  applyTurnEvents: (events: readonly LangyConversationTurnWireEvent[]) => void;
   /** Latest coarse status line for the turn (e.g. "Searching traces…"). */
   turnStatus: string | null;
   /** Latest progress fraction/percentage for the turn (0..1 or 0..100). */
@@ -460,6 +487,7 @@ const emptyConversationState = () => ({
   dismissedFeedbackMessageIds: new Set<string>(),
   pinnedFeedbackMessageId: null as string | null,
   ...initialTurnPhaseState,
+  turnProjection: initialLangyTurnProjection,
   turnStatus: null as string | null,
   turnProgress: null as number | null,
   turnProgressSample: null as LangyProgressSample | null,
@@ -769,6 +797,63 @@ export const useLangyStore = create<LangyState>()(
       observeBackendTurn: (inFlight) =>
         set((s) => reduceObserveBackendTurn(s, inFlight)),
       settleTurn: (turnId) => set((s) => reduceSettleTurn(s, turnId)),
+
+      // The local turn projection (ADR-059) — pure reducers from
+      // @langwatch/langy, composed with the phase machine in the two places
+      // durable truth arrives: the snapshot seed and the folded tail.
+      turnProjection: initialLangyTurnProjection,
+      seedTurnProjection: (snapshot) =>
+        set((s) => {
+          const turnProjection = seedLangyTurnProjection(
+            s.turnProjection,
+            snapshot,
+          );
+          // Refresh-resume: the durable record names a turn in flight and this
+          // tab tracks none — adopt it so Stop targets it and live signals
+          // route to it. Guarded so a mid-send tab never gets clobbered.
+          const adoptTurnId =
+            snapshot.currentTurnId &&
+            s.activeTurnId === null &&
+            s.turnPhase === "idle"
+              ? snapshot.currentTurnId
+              : null;
+          // The phase reducers return the WHOLE state (`{...state, ...}`), so
+          // the fresh projection must be spread AFTER them or the old one
+          // rides back in — same override-after-spread shape as beginTurn.
+          return {
+            ...(adoptTurnId
+              ? {
+                  ...reduceObserveBackendTurn(s, true),
+                  activeTurnId: adoptTurnId,
+                }
+              : {}),
+            turnProjection,
+          };
+        }),
+      applyTurnEvents: (events) =>
+        set((s) => {
+          const turnProjection = applyLangyTurnEvents(s.turnProjection, events);
+          if (turnProjection === s.turnProjection) return {};
+          if (isLangyTurnProjectionTerminal(turnProjection)) {
+            // The recorded terminal settles the machine — same effect as the
+            // stream's end frame, but driven by the durable record, so it
+            // lands even when this tab never had the stream.
+            return {
+              ...reduceSettleTurn(s, turnProjection.turnId),
+              turnProjection,
+            };
+          }
+          if (turnProjection.turn?.Status === "running") {
+            return {
+              ...reduceObserveBackendTurn(s, true),
+              // Adopt a running turn this tab doesn't track (another tab's
+              // send, a re-driven turn) so Stop and live signals target it.
+              activeTurnId: s.activeTurnId ?? turnProjection.turnId,
+              turnProjection,
+            };
+          }
+          return { turnProjection };
+        }),
       turnStatus: null,
       turnProgress: null,
       turnProgressSample: null,

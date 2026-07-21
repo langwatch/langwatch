@@ -699,6 +699,8 @@ function LangyPanel({
     isError: hasHistoryError,
     error: historyError,
     refetch: refetchHistory,
+    eventCursor: snapshotEventCursor,
+    currentTurnId: snapshotCurrentTurnId,
   } = useLangyMessages(activeConversationId);
 
   /**
@@ -793,6 +795,23 @@ function LangyPanel({
         useLangyStore.getState().abandonStop();
       });
   }, [stop, projectId, stopTurn, foldInFlightTurnId]);
+
+  // Seed the LOCAL turn projection from the snapshot (ADR-059): its cursor is
+  // where the durable-tail fold starts, and an in-flight turn id is what a
+  // refreshed tab adopts (making Stop + live signals work again). The seed
+  // reducer never rewinds a fresher local fold, so refetches are harmless.
+  useEffect(() => {
+    if (!activeConversationId) return;
+    useLangyStore.getState().seedTurnProjection({
+      cursor: snapshotEventCursor,
+      currentTurnId: snapshotCurrentTurnId,
+    });
+  }, [
+    activeConversationId,
+    snapshotEventCursor?.acceptedAt,
+    snapshotEventCursor?.eventId,
+    snapshotCurrentTurnId,
+  ]);
 
   // Push a settled server history into the chat engine. Gated on a USER
   // selection (`historyLoadConversationId`) so a background refetch — or the
