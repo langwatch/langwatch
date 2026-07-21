@@ -141,6 +141,24 @@ func TestScanWorktrees(t *testing.T) {
 	})
 }
 
+// @scenario "A branch merged and deleted upstream is flagged"
+func TestScanMetaFlagsOriginGone(t *testing.T) {
+	dir := "/repos/worktrees/merged"
+	rows := []PruneRow{{Dir: dir, Branch: "feat/merged", Slug: "merged"}}
+	hyg := &fakeHygiene{goneDirs: map[string]bool{dir: true}}
+	o := pruneOrch(&fakeStore{}, &fakeSystem{now: now2020()}, &fakeDBServer{}, &fakeDBServer{}, hyg)
+
+	t.Run("given a worktree whose branch tracks a deleted upstream", func(t *testing.T) {
+		t.Run("when scanned, its meta is flagged origin-gone", func(t *testing.T) {
+			var got PruneMeta
+			o.ScanMeta(context.Background(), rows, func(_ int, m PruneMeta) { got = m })
+			if !got.OriginGone {
+				t.Error("a merged + deleted-upstream worktree should be flagged origin-gone")
+			}
+		})
+	})
+}
+
 // barrierHygiene blocks inside DiskUsage (the size queue) until every scan
 // goroutine has entered it, so a serial size pass would deadlock and a concurrent
 // one sails through — proving the queue really runs in parallel goroutines.

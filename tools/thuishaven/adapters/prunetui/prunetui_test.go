@@ -255,6 +255,8 @@ func TestPruneModelNothingSelected(t *testing.T) {
 
 // The reported complaint: with many worktrees the list must never push the header
 // off the top — it has to window and scroll within the terminal height.
+//
+// @scenario "The list never overflows the terminal"
 func TestPruneViewportNeverOverflows(t *testing.T) {
 	rows := make([]Row, 50)
 	for i := range rows {
@@ -302,6 +304,7 @@ func TestPruneViewportNeverOverflows(t *testing.T) {
 	})
 }
 
+// @scenario "The list can be re-sorted"
 func TestPruneSort(t *testing.T) {
 	rows := []Row{
 		{Dir: "/wt/big-fresh", Slug: "big-fresh", Deletable: true, MetaKnown: true, StaleKnown: true, StaleFor: 1 * day, SizeKnown: true, DiskBytes: 9000},
