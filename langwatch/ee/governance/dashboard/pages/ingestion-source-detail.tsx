@@ -42,6 +42,7 @@ import {
 } from "~/components/ui/dialog";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRouter } from "~/utils/compat/next-router";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -127,11 +128,7 @@ function IngestionSourceDetailPage() {
       });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to rotate secret",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast(e, { fallbackTitle: "Couldn't rotate the secret" }),
   });
   const archiveMutation = api.ingestionSources.archive.useMutation({
     onSuccess: () => {
@@ -139,11 +136,7 @@ function IngestionSourceDetailPage() {
       void router.push("/settings/governance/ingestion-sources");
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to archive",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast(e, { fallbackTitle: "Couldn't archive the source" }),
   });
 
   if (!sourceId) {

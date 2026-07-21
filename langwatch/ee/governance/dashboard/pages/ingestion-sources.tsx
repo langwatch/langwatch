@@ -46,6 +46,7 @@ import {
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -271,11 +272,7 @@ function IngestionSourcesPage() {
       });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to create source",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast(e, { fallbackTitle: "Couldn't create the source" }),
   });
 
   const rotateMutation = api.ingestionSources.rotateSecret.useMutation({
@@ -290,11 +287,7 @@ function IngestionSourcesPage() {
       });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to rotate secret",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast(e, { fallbackTitle: "Couldn't rotate the secret" }),
   });
 
   const updateMutation = api.ingestionSources.update.useMutation({
@@ -304,11 +297,7 @@ function IngestionSourcesPage() {
       toaster.create({ title: "Source updated", type: "success" });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to update source",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast(e, { fallbackTitle: "Couldn't update the source" }),
   });
 
   const archiveMutation = api.ingestionSources.archive.useMutation({
@@ -317,11 +306,7 @@ function IngestionSourcesPage() {
       toaster.create({ title: "Source archived", type: "success" });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to archive",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast(e, { fallbackTitle: "Couldn't archive the source" }),
   });
 
   const onSubmit = () => {

@@ -20,6 +20,7 @@ import { useDebounce } from "use-debounce";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import {
   BackofficeTable,
   EmptyCell,

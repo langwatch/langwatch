@@ -20,6 +20,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import NextLink from "~/utils/compat/next-link";
 import { useRouter } from "~/utils/compat/next-router";
 import { impersonateUser } from "../adminClient";
