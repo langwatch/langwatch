@@ -434,6 +434,7 @@ describe("createClaudeCodeSpanSyncReactor", () => {
         ).rejects.toThrow("not visible yet");
       });
 
+      /** @scenario the retry-until-visible gate gives up once a contribution outlives the deadline */
       it("gives up without retrying once the contribution outlives the deadline, so the poison group drains", async () => {
         const { reactor, recordSpan, getMarkedClaudeCodeLogs } = setup([], {
           visibilityDeadlineMs: DEADLINE_MS,

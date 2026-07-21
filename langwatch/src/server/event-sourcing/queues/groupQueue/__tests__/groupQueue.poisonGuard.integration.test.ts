@@ -238,7 +238,7 @@ describe.skipIf(!hasTestcontainers)(
       const ENV = "LANGWATCH_GQ_QUARANTINE_FAILSTREAK_THRESHOLD";
 
       describe("when one group's jobs keep failing with no success", () => {
-        /** @scenario a runaway group is quarantined once its failure streak crosses the threshold */
+        /** @scenario a group that fails on every attempt without draining is quarantined */
         it("blocks the group so one poison producer can't monopolise the shared queue", async () => {
           const previous = process.env[ENV];
           process.env[ENV] = "2";
@@ -283,7 +283,7 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       describe("given the quarantine kill switch is set to 0", () => {
-        /** @scenario the failure-streak breaker is disabled by setting the threshold to 0 */
+        /** @scenario the failure-streak quarantine is disabled by setting the threshold to 0 */
         it("keeps dispatching a persistently-failing group instead of quarantining it", async () => {
           const previous = process.env[ENV];
           process.env[ENV] = "0";
@@ -320,7 +320,7 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       describe("when a group's job succeeds", () => {
-        /** @scenario a success clears the group's failure streak so blips never accumulate to quarantine */
+        /** @scenario a group's success clears its failure streak */
         it("clears the failure streak", async () => {
           const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
           processed.mockResolvedValue(undefined);
