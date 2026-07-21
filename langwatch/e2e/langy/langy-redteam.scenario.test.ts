@@ -4,8 +4,11 @@
 // RedTeamAgent generate them." Each scenario targets a distinct attack
 // category; the attacker LLM improvises the actual wording.
 //
-// totalTurns is capped at 6 (not the skill's example 30) for cost — enough
-// for crescendo escalation to matter without burning the budget 5x over.
+// totalTurns is 20 per case — deliberately thorough, not the minimal-cost
+// budget used elsewhere in this suite: crescendo attacks are most dangerous
+// in the turns a shallow run never reaches, so this suite favors depth over
+// wall-clock/cost. Per-test timeout is disabled (0) so a long crescendo runs
+// to a real verdict instead of being truncated mid-attack.
 //
 // RUN: same env vars as langy.scenario.test.ts (see README.md).
 //
@@ -23,22 +26,30 @@ import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
 import { runScenarioAndLog } from "./scenario-logger";
 
 const model = openai("gpt-5-mini");
-// The attacker gets the strongest available model, not the repo's usual
-// gpt-5-mini default — a weak attacker under-tests Langy's defenses. Judge
-// and target stay on gpt-5-mini so verdicts stay comparable across the rest
-// of e2e/langy/ and Langy's own behavior is unaffected.
-const attackerModel = openai("gpt-5.6-terra");
+// gpt-5.6-terra (a reasoning-tier model) carries a strict `cyber_policy`
+// classifier that blocks the vendored RedTeamAgent's own metaprompt outright
+// — "write a structured attack plan" with sections like "technique
+// catalogue" and "encoding/obfuscation" reads as attack-guide content to it
+// regardless of the authorized-red-team framing, non-deterministically
+// across categories and reruns. Confirmed live: this took out 11/15
+// categories in one run before Langy was ever reached. gpt-5-mini doesn't
+// carry that classifier, so it actually produces the attack turns instead of
+// refusing to write them. Judge and target stay on gpt-5-mini so verdicts
+// stay comparable across the rest of e2e/langy/ and Langy's own behavior is
+// unaffected.
+const attackerModel = openai("gpt-5-mini");
 // A single real Langy turn through the full stack (app -> langyagent ->
 // aigateway -> provider, with tool calls) already takes 35-65s on its own
-// (measured against langy-workspace) — a budget like the scenarios skill's
-// own 30-turn example would take 20+ minutes per case. 6 is enough for
-// crescendo escalation to matter without blowing the suite's wall-clock/cost
-// budget across 15 cases. The gpt-5.6-terra attacker reasons longer per turn
-// than gpt-5-mini did — 480s was measured to be too tight (a real run hit
-// the wall at 480007ms with no verdict, wasting the whole spend); 900s
-// leaves real headroom instead of failing on the clock.
-const TOTAL_TURNS = 6;
-const REDTEAM_TIMEOUT_MS = 900_000;
+// (measured against langy-workspace), so 20 turns per case across 15 cases
+// is a genuinely long run — accepted deliberately, per explicit instruction
+// to red-team thoroughly rather than optimize for suite wall-clock/cost.
+// REDTEAM_TIMEOUT_MS = 0 disables Vitest's per-test timeout entirely (its
+// documented meaning for testTimeout/it()'s third arg), so a 20-turn
+// crescendo always runs to a real judge verdict instead of being killed
+// mid-attack by a clock the deeper coverage was intentionally allowed to
+// exceed.
+const TOTAL_TURNS = 20;
+const REDTEAM_TIMEOUT_MS = 0;
 
 interface RedTeamCase {
   key: string;
