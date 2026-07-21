@@ -230,6 +230,71 @@ function abortableDelay(ms: number, signal: AbortSignal): Promise<boolean> {
   });
 }
 
+/** How often the settlement watcher consults the durable fold + heartbeat. */
+const SETTLEMENT_POLL_MS = 5_000;
+/**
+ * Consecutive settled reads required before synthesizing a terminal, so a single
+ * projection blip can never end a live stream.
+ */
+const SETTLEMENT_CONFIRM_POLLS = 2;
+
+/**
+ * Poll a turn's durable fold + per-turn heartbeat while its live edge is being
+ * tailed, and resolve to the terminal entry the buffer never received — or null
+ * if the stream ended first (aborted) or the turn never settled.
+ *
+ * Split out of `onTurnStream` so the subscription body stays at the orchestration
+ * level and this confirmation loop is independently testable. The safety gate
+ * itself lives in {@link decideSyntheticTerminal}.
+ */
+async function watchForMissedTerminal({
+  projectId,
+  conversationId,
+  turnId,
+  userId,
+  buffer,
+  signal,
+}: {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  userId: string;
+  buffer: {
+    liveness(a: {
+      conversationId: string;
+      turnId: string;
+    }): Promise<{ stale: boolean }>;
+  };
+  signal: AbortSignal;
+}): Promise<LangyStreamEntry | null> {
+  let settledStreak = 0;
+  while (!signal.aborted) {
+    if (!(await abortableDelay(SETTLEMENT_POLL_MS, signal))) return null;
+    const [conversation, liveness] = await Promise.all([
+      getApp()
+        .langy.conversations.getById({ id: conversationId, projectId, userId })
+        .catch(() => null),
+      buffer.liveness({ conversationId, turnId }).catch(() => null),
+    ]);
+    if (!conversation || !liveness) {
+      settledStreak = 0;
+      continue;
+    }
+    const decision = decideSyntheticTerminal({
+      status: conversation.status,
+      lastError: conversation.lastError,
+      heartbeatStale: liveness.stale,
+    });
+    if (!decision) {
+      settledStreak = 0;
+      continue;
+    }
+    settledStreak += 1;
+    if (settledStreak >= SETTLEMENT_CONFIRM_POLLS) return decision;
+  }
+  return null;
+}
+
 /**
  * Dispatch a turn through the app-layer turn service. Create and Continue are
  * the SAME operation — `isNewConversation` is the only difference (it emits the
@@ -739,49 +804,22 @@ export const langyRouter = createTRPCRouter({
           // though the turn already finished. While we tail the live edge, watch
           // the durable fold + per-turn heartbeat; if the turn has settled with
           // no terminal in the buffer, synthesize one so the client resolves.
-          const POLL_MS = 5_000;
-          const CONFIRM_POLLS = 2; // consecutive settled reads before we act
           const settle = new AbortController();
           const followSignal = AbortSignal.any([signal, settle.signal]);
           let synthesized: LangyStreamEntry | null = null;
 
-          const watcher = (async () => {
-            let settledStreak = 0;
-            while (!followSignal.aborted) {
-              if (!(await abortableDelay(POLL_MS, followSignal))) return;
-              const [conversation, liveness] = await Promise.all([
-                getApp()
-                  .langy.conversations.getById({
-                    id: conversationId,
-                    projectId,
-                    userId,
-                  })
-                  .catch(() => null),
-                buffer.liveness({ conversationId, turnId }).catch(() => null),
-              ]);
-              if (!conversation || !liveness) {
-                settledStreak = 0;
-                continue;
-              }
-              const decision = decideSyntheticTerminal({
-                status: conversation.status,
-                lastError: conversation.lastError,
-                heartbeatStale: liveness.stale,
-              });
-              if (!decision) {
-                settledStreak = 0;
-                continue;
-              }
-              // Require two consecutive settled reads so a single projection blip
-              // can't end a live stream.
-              settledStreak += 1;
-              if (settledStreak >= CONFIRM_POLLS) {
-                synthesized = decision;
-                settle.abort(); // unblock follow() below
-                return;
-              }
-            }
-          })();
+          const watcher = watchForMissedTerminal({
+            projectId,
+            conversationId,
+            turnId,
+            userId,
+            buffer,
+            signal: followSignal,
+          }).then((entry) => {
+            if (!entry) return;
+            synthesized = entry;
+            settle.abort(); // unblock the follow() below
+          });
 
           try {
             for await (const { entry } of buffer.follow({

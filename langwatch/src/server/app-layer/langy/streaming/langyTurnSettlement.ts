@@ -20,7 +20,16 @@ import type { LangyStreamEntry } from "./langyTokenBuffer";
  *     settled.
  *
  * FAILED → `error` (carrying lastError); IDLE (completed) → `end`. Any other or
- * transitional status yields null (stay patient — do not guess a terminal).
+ * transitional status — including ARCHIVED and anything added later — yields
+ * null (stay patient; never guess a terminal).
+ *
+ * `status` is deliberately `string`, not the `LANGY_CONVERSATION_STATUS` union:
+ * it arrives from the conversation projection's bare string column
+ * (`getById(): { status: string }`), so narrowing here would only buy a cast at
+ * the call site that asserts something the data does not guarantee. Typo safety
+ * is already structural — every comparison below is against the exported
+ * constant, so a renamed or removed status fails to compile here, and an
+ * unrecognised value falls through to the safe `null`.
  */
 export function decideSyntheticTerminal({
   status,

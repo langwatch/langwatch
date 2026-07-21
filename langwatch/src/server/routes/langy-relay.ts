@@ -71,8 +71,15 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
     // (the exact one the worker signs with), so a first turn whose RunToken
     // projection is still landing isn't dropped as no-run-token. Empty token
     // (legacy conversation) falls through to the projection.
-    readHandoffRunToken: async ({ conversationId, turnId }) =>
-      (await handoffStore.read({ conversationId, turnId }))?.runToken || null,
+    readHandoffRunToken: async ({ projectId, conversationId, turnId }) => {
+      const handoff = await handoffStore.read({ conversationId, turnId });
+      // The handoff key is conversation+turn scoped, but conversation identity
+      // is project-scoped (`@@unique([projectId, ConversationId])`). Refuse a
+      // handoff stashed under a different project so a colliding conversation
+      // id can never hand this stream another tenant's runToken.
+      if (!handoff || handoff.projectId !== projectId) return null;
+      return handoff.runToken || null;
+    },
     logger,
   });
 
