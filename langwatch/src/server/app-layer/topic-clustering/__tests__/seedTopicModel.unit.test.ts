@@ -45,6 +45,26 @@ const topicRow = (id: string, projectId: string) => ({
 });
 
 /**
+ * The projection-ownership reads, shared by both stubs below: the per-project
+ * `findUnique` the seed uses to decide "already owned?" and the per-page
+ * `findMany` batch that front-runs it. Both still run the real guard.
+ */
+const topicModelProjectionMock = (ownedProjectIds: Set<string>) => ({
+  findUnique: async (args: { where: { projectId: string } }) => {
+    await guard(modelParams("TopicModelProjection", "findUnique", args));
+    return ownedProjectIds.has(args.where.projectId)
+      ? { id: `cursor-${args.where.projectId}` }
+      : null;
+  },
+  findMany: async (args: { where: { projectId: { in: string[] } } }) => {
+    await guard(modelParams("TopicModelProjection", "findMany", args));
+    return args.where.projectId.in
+      .filter((projectId) => ownedProjectIds.has(projectId))
+      .map((projectId) => ({ projectId }));
+  },
+});
+
+/**
  * A Prisma stub that enforces the real tenancy guard on every call and
  * serves `topicPages` to the fleet-wide Project walk in order.
  */
@@ -77,20 +97,7 @@ const guardedPrismaStub = ({
         return topicsByProject[args.where.projectId] ?? [];
       },
     },
-    topicModelProjection: {
-      findUnique: async (args: { where: { projectId: string } }) => {
-        await guard(modelParams("TopicModelProjection", "findUnique", args));
-        return ownedProjectIds.has(args.where.projectId)
-          ? { id: `cursor-${args.where.projectId}` }
-          : null;
-      },
-      findMany: async (args: { where: { projectId: { in: string[] } } }) => {
-        await guard(modelParams("TopicModelProjection", "findMany", args));
-        return args.where.projectId.in
-          .filter((projectId) => ownedProjectIds.has(projectId))
-          .map((projectId) => ({ projectId }));
-      },
-    },
+    topicModelProjection: topicModelProjectionMock(ownedProjectIds),
   } as unknown as PrismaClient;
 
   return { prisma, pageArgs };
@@ -140,20 +147,7 @@ const fakeDbStub = ({
         return topicsByProject.get(args.where.projectId) ?? [];
       },
     },
-    topicModelProjection: {
-      findUnique: async (args: { where: { projectId: string } }) => {
-        await guard(modelParams("TopicModelProjection", "findUnique", args));
-        return ownedProjectIds.has(args.where.projectId)
-          ? { id: `cursor-${args.where.projectId}` }
-          : null;
-      },
-      findMany: async (args: { where: { projectId: { in: string[] } } }) => {
-        await guard(modelParams("TopicModelProjection", "findMany", args));
-        return args.where.projectId.in
-          .filter((projectId) => ownedProjectIds.has(projectId))
-          .map((projectId) => ({ projectId }));
-      },
-    },
+    topicModelProjection: topicModelProjectionMock(ownedProjectIds),
   } as unknown as PrismaClient;
 
   return { prisma };
