@@ -5,7 +5,6 @@
  * standalone-adapters.ts and scenario-worker.ts.
  */
 
-import type { LanguageModel } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { LiteLLMParams } from "./types";
 
@@ -19,7 +18,7 @@ import type { LiteLLMParams } from "./types";
 export function createModelFromParams(
   litellmParams: LiteLLMParams,
   nlpServiceUrl: string,
-): LanguageModel {
+) {
   const providerKey = litellmParams.model.split("/")[0] || undefined;
   const headers = Object.fromEntries(
     Object.entries(litellmParams).map(([key, value]) => [
