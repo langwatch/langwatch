@@ -75,37 +75,50 @@ export function buildTimeTravelView({
   const atMs = visible.at(-1)?.atMs ?? 0;
   const fold = replayTurnProjection(visible);
 
+  // Settled messages carry a SERVER-TIME sort key, and the two sources share
+  // one clock by construction: a history row's createdAtMs IS the event's
+  // occurredAt (the message map stamps CreatedAt from it). Merging on that key
+  // is what keeps order right — an answer recorded on the tape but not yet in
+  // the history rows must still sort BETWEEN its question and the next one,
+  // never appended at the end of the whole baseline.
+  const settled: { key: number; message: TimeTravelMessage }[] = [];
+
   // History rows the durable projection had by the moment. Rows with no
   // timestamp (older builds default 0) are always in.
-  const baseline: TimeTravelMessage[] = historyMessages
-    .filter(
-      (message) =>
-        (message.role === "user" || message.role === "assistant") &&
-        (message.createdAtMs ?? 0) <= atMs,
-    )
-    .map((message) => ({
-      id: message.id,
-      role: message.role as "user" | "assistant",
-      parts: message.parts,
-    }));
-  const baselineIds = new Set(baseline.map((message) => message.id));
+  const seenIds = new Set<string>();
+  for (const message of historyMessages) {
+    if (message.role !== "user" && message.role !== "assistant") continue;
+    if ((message.createdAtMs ?? 0) > atMs) continue;
+    seenIds.add(message.id);
+    settled.push({
+      key: message.createdAtMs ?? 0,
+      message: { id: message.id, role: message.role, parts: message.parts },
+    });
+  }
 
   // Settled answers from the recorded EVENT LOG itself — parts exactly as the
   // terminal event carried them, deduplicated against history by messageId so
   // client/server clock skew can never double-render an answer.
-  const messages = [...baseline];
   for (const record of visible) {
     if (record.lane !== "durable" || record.source !== "tail") continue;
     const event = record.event;
     if (event.type !== LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED) continue;
-    if (baselineIds.has(event.data.messageId)) continue;
-    baselineIds.add(event.data.messageId);
-    messages.push({
-      id: event.data.messageId,
-      role: "assistant",
-      parts: event.data.parts,
+    if (seenIds.has(event.data.messageId)) continue;
+    seenIds.add(event.data.messageId);
+    settled.push({
+      key: event.occurredAt,
+      message: {
+        id: event.data.messageId,
+        role: "assistant",
+        parts: event.data.parts,
+      },
     });
   }
+
+  // Stable sort on the shared server clock; legacy zero-keyed rows keep their
+  // arrival order at the front.
+  settled.sort((a, b) => a.key - b.key);
+  const messages = settled.map((entry) => entry.message);
 
   const terminal =
     fold.turn?.Status === "completed" ||
@@ -130,15 +143,30 @@ export function buildTimeTravelView({
       )
       .map((message) => message.createdAtMs ?? 0),
   );
+  const sendText = lastSend
+    ? ((lastSend.detail as { text?: string } | null)?.text ?? lastSend.label)
+    : null;
+  // Skew guard alongside the timestamp check: if a history row already shows
+  // this exact text as the newest user message, the send has landed — a
+  // synthetic copy would render the question twice.
+  const lastSettledUser = [...messages]
+    .reverse()
+    .find((message) => message.role === "user");
+  const sendAlreadySettled =
+    !!sendText &&
+    !!lastSettledUser &&
+    JSON.stringify(lastSettledUser.parts).includes(JSON.stringify(sendText));
   const pendingSend =
-    !!lastSend && !terminal && lastSend.atMs > newestBaselineUserAt;
+    !!lastSend &&
+    !terminal &&
+    !sendAlreadySettled &&
+    lastSend.atMs > newestBaselineUserAt;
 
   if (pendingSend && lastSend) {
-    const detail = lastSend.detail as { text?: string } | null;
     messages.push({
       id: `tt-send-${lastSend.seq}`,
       role: "user",
-      parts: [{ type: "text", text: detail?.text ?? lastSend.label }],
+      parts: [{ type: "text", text: sendText ?? lastSend.label }],
     });
   }
 

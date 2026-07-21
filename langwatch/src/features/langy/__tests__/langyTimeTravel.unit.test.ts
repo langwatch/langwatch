@@ -166,6 +166,46 @@ describe("buildTimeTravelView", () => {
     });
   });
 
+  describe("message ordering", () => {
+    it("sorts a tape-only answer between its question and the next one", () => {
+      // The regression: an answer recorded on the tape but not yet in the
+      // history rows was appended after the WHOLE baseline — below questions
+      // asked later. Settled messages merge on the shared server clock
+      // (row.createdAtMs ≡ event.occurredAt), so it must sort in place.
+      seq = 0;
+      const records = [responded(2_500, "t1", 2_000)];
+      const view = buildTimeTravelView({
+        records,
+        scrubSeq: 1,
+        historyMessages: [
+          historyRow("q1", "user", 1_000, "first question"),
+          historyRow("q2", "user", 2_400, "second question"),
+        ],
+      });
+      expect(view!.messages.map((m) => m.id)).toEqual(["q1", "msg-t1", "q2"]);
+    });
+
+    it("never duplicates a question the history already settled (clock skew)", () => {
+      // The send's client timestamp can be AHEAD of the row's server
+      // timestamp; the text guard keeps the settled row as the only copy.
+      seq = 0;
+      const records = [
+        send(2_000, "same question"),
+        accepted(2_100, "t1", 2_100),
+        delta(2_200, "t1", "answer…"),
+      ];
+      const view = buildTimeTravelView({
+        records,
+        scrubSeq: 3,
+        historyMessages: [historyRow("q1", "user", 1_500, "same question")],
+      });
+      expect(
+        view!.messages.filter((m) => m.role === "user"),
+      ).toHaveLength(1);
+      expect(view!.messages[0]!.id).toBe("q1");
+    });
+  });
+
   describe("history beyond the moment", () => {
     it("hides rows created after the scrubbed instant", () => {
       seq = 0;
