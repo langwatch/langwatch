@@ -3,14 +3,23 @@
  * wire, a customer never reads a code slug, a server message, or a raw meta
  * dump (ADR-045 + #5984).
  */
+import { goErrorCodes, nodeErrorCodes } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
 import { APP_ERROR_CODES } from "../codes";
 import {
   explainHandledError,
+  explainSerializedError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "../presentation";
 import type { HandledErrorShape } from "../readHandledError";
+
+/** Every code the registry must cover — app + generated Go + generated node. */
+const ALL_CODES = [
+  ...APP_ERROR_CODES,
+  ...Object.keys(goErrorCodes),
+  ...Object.keys(nodeErrorCodes),
+];
 
 const shape = (
   overrides: Partial<HandledErrorShape> = {},
@@ -125,9 +134,27 @@ describe("explainHandledError", () => {
     });
   });
 
+  describe("given a coded failure serialised on an event payload", () => {
+    it("explains it from the registry, not from its raw message", () => {
+      // A target_result.domainError, as the engine's http_error arrives.
+      const { title } = explainSerializedError({
+        code: "http_error",
+        kind: "http_error",
+        meta: {},
+        traceId: undefined,
+        spanId: undefined,
+        httpStatus: 502,
+        fault: "provider",
+        reasons: [],
+      });
+
+      expect(title).toBe("Couldn't reach the agent");
+    });
+  });
+
   describe("across every registered code", () => {
     it("never renders the code itself as the title", () => {
-      for (const code of APP_ERROR_CODES) {
+      for (const code of ALL_CODES) {
         const { title, description } = explainHandledError(shape({ code }));
 
         expect(title, `${code} title`).not.toContain(code);
@@ -150,7 +177,7 @@ describe("explainHandledError", () => {
         fieldErrors: { projectId: ["Required"], organizationId: ["Required"] },
       };
 
-      for (const code of APP_ERROR_CODES) {
+      for (const code of ALL_CODES) {
         const { title, description } = explainHandledError(
           shape({ code, meta: poison }),
         );
@@ -183,7 +210,7 @@ describe("explainHandledError", () => {
     });
 
     it("writes a non-empty, sentence-cased title", () => {
-      for (const code of APP_ERROR_CODES) {
+      for (const code of ALL_CODES) {
         const { title } = explainHandledError(shape({ code }));
 
         expect(title.length, `${code} title`).toBeGreaterThan(0);

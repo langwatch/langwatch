@@ -1,3 +1,4 @@
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 import {
   type DatasetReference,
@@ -8,7 +9,6 @@ import {
   targetConfigSchema,
 } from "~/experiments-v3/types";
 import type { Workflow } from "~/optimization_studio/types/dsl";
-import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 
 // ============================================================================
@@ -219,7 +219,19 @@ export type EvaluationV3Event =
       cost?: number;
       duration?: number;
       traceId?: string;
+      /**
+       * Raw engineer-facing message — a legacy fallback the client renders
+       * only when there is no `domainError`. Since the node-error code now
+       * travels, this is for older engines and un-coded failures.
+       */
       error?: string;
+      /**
+       * The coded failure, mirroring the evaluator side
+       * (`EvaluationV3EvaluatorResult.domainError`). Built from the engine's
+       * `NodeError.Type`; the client renders customer copy from the
+       * presentation registry rather than the raw `error` string.
+       */
+      domainError?: SerializedHandledError;
     }
   | {
       type: "evaluator_result";

@@ -320,3 +320,141 @@ export const goErrorCodes = {
 } as const;
 
 export type GoErrorCode = keyof typeof goErrorCodes;
+
+/**
+ * Workflow NodeError codes produced by the nlpgo engine (the `Type` field of
+ * `NodeError`). Generated for the same reason as `goErrorCodes`: the client
+ * presentation registry is exhaustive over them, so a new node-error type in
+ * Go fails the TypeScript build until its customer copy is written.
+ */
+export const nodeErrorCodes = {
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  agent_missing_type: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  agent_missing_workflow_id: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  agent_unauthorized: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  agent_unconfigured: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  agent_unknown_type: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  agent_workflow_error: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  agent_workflow_executor_unavailable: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/attachment.go
+   */
+  attachment_fetch_error: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  code_runner_error: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  code_runner_unavailable: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   * @source services/nlpgo/app/engine/evaluation.go
+   * @source services/nlpgo/app/engine/stream.go
+   */
+  context_canceled: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  custom_missing_workflow_id: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  custom_unauthorized: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  custom_unconfigured: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  custom_workflow_error: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  custom_workflow_executor_unavailable: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/evaluation.go
+   */
+  engine_error: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  evaluator_error: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  evaluator_executor_unavailable: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  evaluator_missing_slug: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  evaluator_unauthorized: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  evaluator_unconfigured: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  http_error: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  http_executor_unavailable: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  invalid_condition: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   * @source services/nlpgo/app/engine/evaluation.go
+   */
+  invalid_dataset: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  llm_error: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  llm_executor_unavailable: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  llm_model_not_set: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  unsupported_node_kind: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  upstream_http_error: { service: "nlpgo" },
+} as const;
+
+export type NodeErrorCode = keyof typeof nodeErrorCodes;

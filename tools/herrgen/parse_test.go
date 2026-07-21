@@ -301,7 +301,7 @@ const (
 				files[path] = source
 			}
 
-			got, err := herrgen.Parse(tree(t, files))
+			got, _, err := herrgen.Parse(tree(t, files))
 			if err != nil {
 				t.Fatalf("Parse() error = %v", err)
 			}
@@ -366,7 +366,7 @@ func registerErrorStatuses() {
 `,
 	})
 
-	_, err := herrgen.Parse(root)
+	_, _, err := herrgen.Parse(root)
 	if err == nil {
 		t.Fatal("Parse() error = nil, want a conflict")
 	}
@@ -418,7 +418,7 @@ func RegisterStatuses() {
 `,
 	})
 
-	entries, err := herrgen.Parse(root)
+	entries, _, err := herrgen.Parse(root)
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
 	}

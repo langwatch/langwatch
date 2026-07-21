@@ -1,6 +1,7 @@
 import {
   goErrorCodes,
   type HandledErrorFault,
+  type SerializedHandledError,
   type SerializedReason,
 } from "@langwatch/handled-error";
 
@@ -98,6 +99,30 @@ export function readErrorTraceId(err: unknown): string | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Narrows a `SerializedHandledError` — the shape carried on an event payload
+ * (e.g. a `target_result.domainError`) rather than under `data.error` — to the
+ * client-side `HandledErrorShape` the presentation layer reads.
+ *
+ * Use this when the handled error already arrived structured on the event, so
+ * there is nothing to lift or validate off an untrusted envelope; for a raw
+ * transport error, use {@link readHandledError} instead.
+ */
+export function handledShapeFromSerialized(
+  serialized: SerializedHandledError,
+): HandledErrorShape {
+  return {
+    code: serialized.code,
+    meta: serialized.meta,
+    httpStatus: serialized.httpStatus,
+    fault: serialized.fault,
+    tips: serialized.tips ?? [],
+    docsUrl: serialized.docsUrl,
+    traceId: serialized.traceId,
+    reasons: serialized.reasons,
+  };
 }
 
 /**

@@ -10,6 +10,7 @@
  * 6. Checks abort flags between executions
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
@@ -35,7 +36,6 @@ import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
-import { HandledError } from "@langwatch/handled-error";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { RecordTargetResultCommandData } from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
@@ -50,6 +50,7 @@ import { generateOtelTraceId } from "~/utils/trace";
 import { abortManager } from "./abortManager";
 import { type LoadedWorkflow, workflowLoadKey } from "./dataLoader";
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
+import { nodeErrorToDomainError } from "./nodeErrorDomain";
 import {
   extractTargetOutput,
   mapErrorEvent,
@@ -1357,6 +1358,8 @@ export async function* executeWorkflowCell(
     let sawCost = false;
     let targetFailed = false;
     let targetError: string | undefined;
+    let targetErrorType: string | undefined;
+    let targetUpstreamStatus: number | undefined;
     let durationMs: number | undefined;
     let finalTraceId = traceId;
     const evaluatorEvents: EvaluationV3Event[] = [];
@@ -1377,6 +1380,8 @@ export async function* executeWorkflowCell(
         if (ex?.status === "error") {
           targetFailed = true;
           targetError = ex.error ?? targetError;
+          targetErrorType = ex.error_type ?? targetErrorType;
+          targetUpstreamStatus = ex.upstream_status ?? targetUpstreamStatus;
         }
         continue;
       }
@@ -1435,6 +1440,16 @@ export async function* executeWorkflowCell(
       error: targetFailed
         ? (targetError ?? "Workflow execution failed")
         : undefined,
+      ...(targetFailed && targetErrorType
+        ? {
+            domainError: nodeErrorToDomainError({
+              errorType: targetErrorType,
+              message: targetError,
+              upstreamStatus: targetUpstreamStatus,
+              traceId: finalTraceId,
+            }),
+          }
+        : {}),
     };
 
     for (const evaluatorEvent of evaluatorEvents) {
@@ -2600,7 +2615,9 @@ const getLoadedDataForTarget = (
           agent.workflowId ??
           (agent.config as { workflow_id?: string }).workflow_id;
         const workflow = linkedWorkflowId
-          ? loadedWorkflows?.get(workflowLoadKey({ workflowId: linkedWorkflowId }))
+          ? loadedWorkflows?.get(
+              workflowLoadKey({ workflowId: linkedWorkflowId }),
+            )
           : undefined;
         return { agent, workflow };
       }
