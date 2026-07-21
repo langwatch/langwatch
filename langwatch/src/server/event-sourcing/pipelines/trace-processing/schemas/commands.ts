@@ -1,8 +1,14 @@
 import { z } from "zod";
+import { logTraceContributionSchema } from "../../log-processing/schemas/logRecord";
 import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "./constants";
+import { metricCorrelationFields } from "./metricCorrelationFields";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
-export const piiRedactionLevelSchema = z.enum(["STRICT", "ESSENTIAL", "DISABLED"]);
+export const piiRedactionLevelSchema = z.enum([
+  "STRICT",
+  "ESSENTIAL",
+  "DISABLED",
+]);
 export type PIIRedactionLevel = z.infer<typeof piiRedactionLevelSchema>;
 
 /**
@@ -42,7 +48,9 @@ export const assignTopicCommandDataSchema = z.object({
   occurredAt: z.number(),
 });
 
-export type AssignTopicCommandData = z.infer<typeof assignTopicCommandDataSchema>;
+export type AssignTopicCommandData = z.infer<
+  typeof assignTopicCommandDataSchema
+>;
 
 export const recordLogCommandDataSchema = z.object({
   tenantId: z.string(),
@@ -62,31 +70,29 @@ export const recordLogCommandDataSchema = z.object({
 
 export type RecordLogCommandData = z.infer<typeof recordLogCommandDataSchema>;
 
-export const metricTypeSchema = z.enum(["histogram", "gauge", "sum"]);
-export type MetricType = z.infer<typeof metricTypeSchema>;
+export const recordLogContributionCommandDataSchema =
+  logTraceContributionSchema;
+export type RecordLogContributionCommandData = z.infer<
+  typeof recordLogContributionCommandDataSchema
+>;
 
-export const recordMetricCommandDataSchema = z.object({
+export const recordMetricCorrelationCommandDataSchema = z.object({
   tenantId: z.string(),
-  traceId: z.string(),
-  spanId: z.string(),
-  metricName: z.string(),
-  metricUnit: z.string(),
-  metricType: metricTypeSchema,
-  value: z.number(),
-  timeUnixMs: z.number(),
-  attributes: z.record(z.string(), z.string()),
-  resourceAttributes: z.record(z.string(), z.string()),
-  piiRedactionLevel: piiRedactionLevelSchema.optional(),
+  ...metricCorrelationFields,
   occurredAt: z.number(),
 });
 
-export type RecordMetricCommandData = z.infer<
-  typeof recordMetricCommandDataSchema
+export type RecordMetricCorrelationCommandData = z.infer<
+  typeof recordMetricCorrelationCommandDataSchema
 >;
 
 export const resolveOriginCommandDataSchema = z.object({
   tenantId: z.string(),
-  traceId: z.string(),
+  // Must be non-empty: an empty traceId becomes an empty aggregateId on the
+  // resulting OriginResolvedEvent, which then fails validation downstream in
+  // the automations pipeline (recordTriggerMatch requires a non-empty traceId).
+  // Reject here so the bad value never reaches the event store.
+  traceId: z.string().min(1),
   origin: z.string(),
   reason: z.string(),
   occurredAt: z.number(),
@@ -110,4 +116,3 @@ export const changeTraceNameInputSchema = z.object({
 });
 
 export type ChangeTraceNameInput = z.infer<typeof changeTraceNameInputSchema>;
-

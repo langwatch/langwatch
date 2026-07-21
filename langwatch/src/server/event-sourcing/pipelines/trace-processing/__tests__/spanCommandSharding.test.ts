@@ -47,8 +47,6 @@ vi.mock("../commands/recordSpanCommand", async (importOriginal) => {
  */
 
 const reactorStub = (name: string) => ({ name, handle: async () => {} }) as any;
-const outboxReactorStub = (name: string) =>
-  ({ name, decide: async () => [] }) as any;
 
 function buildTraceDeps(
   overrides: Partial<TraceProcessingPipelineDeps> = {},
@@ -56,11 +54,10 @@ function buildTraceDeps(
   const store = {} as any;
   return {
     spanAppendStore: store,
-    logRecordAppendStore: store,
-    metricRecordAppendStore: store,
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,
+    logRecordAppendStore: store,
     originGateReactor: reactorStub("originGate"),
     evaluationTriggerReactor: reactorStub("evaluationTrigger"),
     customEvaluationSyncReactor: reactorStub("customEvaluationSync"),
@@ -68,13 +65,10 @@ function buildTraceDeps(
     projectMetadataReactor: reactorStub("projectMetadata"),
     simulationMetricsSyncReactor: reactorStub("simulationMetricsSync"),
     experimentMetricsSyncReactor: reactorStub("experimentMetricsSync"),
-    alertTriggerReactor: outboxReactorStub("alertTrigger"),
-    alertTriggerNotifyOutboxReactor: outboxReactorStub(
-      "alertTriggerNotifyOutbox",
-    ),
-    graphTriggerEvaluationOutboxReactor: outboxReactorStub(
-      "graphTriggerEvaluation",
-    ),
+    automations: {
+      triggerMatchHandler: vi.fn().mockResolvedValue(undefined),
+      graphActivityHandler: vi.fn().mockResolvedValue(undefined),
+    },
     spanStorageBroadcastReactor: reactorStub("spanStorageBroadcast"),
     claudeCodeSpanSyncReactor: reactorStub("claudeCodeSpanSync"),
     ...overrides,

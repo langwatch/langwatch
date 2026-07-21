@@ -1,9 +1,10 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import type { ScenarioResponse } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
 const formatScenarioDetails = (scenario: ScenarioResponse): void => {
   console.log();
@@ -37,20 +38,21 @@ const formatScenarioDetails = (scenario: ScenarioResponse): void => {
   console.log();
 };
 
-export const getScenarioCommand = async (id: string, options?: { format?: string }): Promise<void> => {
+export const getScenarioCommand = async (id: string): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new ScenariosApiService();
-  const spinner = ora(`Fetching scenario "${id}"...`).start();
+  const spinner = createSpinner(`Fetching scenario "${id}"...`).start();
 
   try {
     const scenario = await service.get(id);
     spinner.succeed(`Found scenario "${scenario.name}"`);
-    if (options?.format === "json") {
-      console.log(JSON.stringify(scenario, null, 2));
-      return;
-    }
-    formatScenarioDetails(scenario);
+    return {
+      data: scenario,
+      table: () => {
+        formatScenarioDetails(scenario);
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "fetch scenario" });
     process.exit(1);

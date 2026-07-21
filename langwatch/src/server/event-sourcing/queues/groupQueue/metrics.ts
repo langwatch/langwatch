@@ -31,6 +31,7 @@ const metricNames = [
   "gq_retry_encode_failures_total",
   // #5538
   "gq_jobs_dropped_total",
+  "gq_group_attempt_read_failures_total",
 ] as const;
 
 for (const name of metricNames) {
@@ -151,6 +152,21 @@ export const gqRetryBackoffMilliseconds = new Histogram({
 });
 
 // --- Per-job duration metric ---
+/**
+ * Failed reads of the group retry-chain counter.
+ *
+ * Matters more than it looks. A failed read returns 0, so a sibling-led retry
+ * resolves to attempt 1 — byte-identical to a genuine fresh delivery in the
+ * span, the metrics, and the `deliveryAttempt` reaching the fold. That both
+ * restarts the retry budget AND makes the fold discard its record of what the
+ * chain already applied. Without this counter the two are indistinguishable.
+ */
+export const gqGroupAttemptReadFailuresTotal = new Counter({
+  name: "gq_group_attempt_read_failures_total",
+  help: "Failed reads of the group retry-chain counter; a retry may read as a fresh delivery",
+  labelNames: ["queue_name"] as const,
+});
+
 export const gqJobDurationMilliseconds = new Histogram({
   name: "gq_job_duration_milliseconds",
   help: "Duration of individual job processing in milliseconds",
@@ -169,13 +185,6 @@ export const gqOldestPendingAgeMilliseconds = new Gauge({
 });
 
 // --- Blob lifecycle observability (ADR-030 hardening + review 2026-06-24) ---
-
-/** S3-tier reclaim throw (network / 5xx). Warn-only; TTL / bucket-lifecycle backstop. */
-export const gqBlobReclaimS3FailuresTotal = new Counter({
-  name: "gq_blob_reclaim_s3_failures_total",
-  help: "Blob s3-tier reclaim failures (relies on TTL / bucket-lifecycle backstop)",
-  labelNames: ["queue_name"] as const,
-});
 
 /** A stored blob exceeded the decode cap — possible tamper / zip-bomb. Distinct from a missing blob. */
 export const gqBlobDecodeCapExceededTotal = new Counter({
@@ -206,7 +215,7 @@ export const gqPayloadTooLargeTotal = new Counter({
  */
 export const gqGroupsPoisonParkedTotal = new Counter({
   name: "gq_groups_poison_parked_total",
-  help: "Groups parked into the blocked set by the claim-side poison guard",
+  help: "Groups parked into the blocked set by a poison guard (reason: claim_strikes | oversized_payload | failure_streak)",
   labelNames: ["queue_name", "reason"] as const,
 });
 

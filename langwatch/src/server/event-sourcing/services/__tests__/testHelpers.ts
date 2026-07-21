@@ -31,17 +31,20 @@ export function createMockQueueManager(overrides?: {
   return {
     hasProjectionQueues: vi.fn().mockReturnValue(false),
     hasHandlerQueues: vi.fn().mockReturnValue(false),
+    hasSubscriberQueues: vi.fn().mockReturnValue(false),
     hasReactorQueues: vi
       .fn()
       .mockReturnValue(overrides?.hasReactorQueues ?? false),
     getProjectionQueue: vi.fn().mockReturnValue(undefined),
     getHandlerQueue: vi.fn().mockReturnValue(undefined),
+    getSubscriberQueue: vi.fn().mockReturnValue(undefined),
     getReactorQueue:
       overrides?.getReactorQueue ?? vi.fn().mockReturnValue(undefined),
     close: vi.fn().mockResolvedValue(void 0),
     waitUntilReady: vi.fn().mockResolvedValue(void 0),
     initializeProjectionQueues: vi.fn(),
     initializeHandlerQueues: vi.fn(),
+    initializeSubscriberQueues: vi.fn(),
     initializeReactorQueues: vi.fn(),
   } as unknown as QueueManager<Event>;
 }

@@ -6,8 +6,8 @@ import { Checkbox } from "@chakra-ui/react";
 import type { HeaderContext } from "@tanstack/react-table";
 
 import type { TableMeta, TableRowData } from "../types";
-import { ComparisonCell } from "./ComparisonCell";
 import { toComparisonConfig } from "../utils/normalizeComparison";
+import { ComparisonCell } from "./ComparisonCell";
 import { TargetCellContent } from "./TargetSection/TargetCell";
 import { TargetHeader } from "./TargetSection/TargetHeader";
 
@@ -142,8 +142,15 @@ export const TargetCellFromMeta = ({
     return (
       <ComparisonCell
         result={data?.evaluators?.[target.id]}
-        isLoading={data?.isLoading}
+        isLoading={
+          tableMeta?.isCellExecuting?.(rowIndex, targetId) ?? data?.isLoading
+        }
         variantTargets={variantTargets}
+        onRun={
+          tableMeta?.handleRunCell
+            ? () => tableMeta.handleRunCell?.(rowIndex, targetId)
+            : undefined
+        }
       />
     );
   }
@@ -185,9 +192,7 @@ export const TargetCellFromMeta = ({
               tableMeta.handleRunEvaluatorOnAllRows?.(targetId, evaluatorId)
           : undefined
       }
-      hasAnyTargetOutputs={
-        tableMeta?.hasAnyTargetOutputs?.(targetId) ?? false
-      }
+      hasAnyTargetOutputs={tableMeta?.hasAnyTargetOutputs?.(targetId) ?? false}
     />
   );
 };

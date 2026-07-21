@@ -165,7 +165,19 @@ function createNodeLogger(
     timestamp: pino.stdTimeFunctions.isoTime,
     serializers: { error: superjsonErrorSerializer },
     formatters: {
-      bindings: (bindings) => bindings,
+      // Adds process identity alongside pino's own pid/hostname bindings,
+      // distinct from `name` (the per-module label like "langwatch:api:hono").
+      // Prod ships stdout through fluent-bit, which promotes this field to the
+      // Loki `service_name` label — it is how the Go services land under
+      // `langwatch-service-aigateway` / `-nlp` (pkg/clog stamps the same
+      // field). Without it every line from this app arrives as
+      // `service_name="fluent-bit"`, unfilterable by service. Done here rather
+      // than via `base` so pino keeps supplying pid/hostname and this module
+      // stays free of a node:os import (it must remain browser-safe).
+      bindings: (bindings) => ({
+        ...bindings,
+        service: process.env.OTEL_SERVICE_NAME ?? DEFAULT_SERVICE_NAME,
+      }),
       level: (label) => ({ level: label.toUpperCase() }),
     },
     mixin: options?.disableContext
@@ -205,7 +217,9 @@ function buildTransport({
   return pino.transport({ targets });
 }
 
-const BASE_CONSOLE_IGNORE = "pid,hostname";
+// `service` is constant for the process and only exists so fluent-bit can
+// promote it to a Loki label — it is pure noise on a local console line.
+const BASE_CONSOLE_IGNORE = "pid,hostname,service";
 const HEAVY_CONTEXT_FIELDS = ["organizationId", "projectId", "userId"];
 
 /**
@@ -256,7 +270,7 @@ function buildOtelTransport(level: string): pino.TransportTargetOptions {
       serviceVersion: process.env.npm_package_version ?? "1.0.0",
       resourceAttributes: {
         "service.name": process.env.OTEL_SERVICE_NAME ?? DEFAULT_SERVICE_NAME,
-        "deployment.environment": process.env.ENVIRONMENT ?? "development",
+        "deployment.environment.name": process.env.ENVIRONMENT ?? "development",
       },
     },
     level,

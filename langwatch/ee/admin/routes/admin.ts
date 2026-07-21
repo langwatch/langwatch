@@ -23,7 +23,7 @@ import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { auditLog } from "~/server/auditLog";
 import { UserService } from "~/server/users/user.service";
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { isAdmin } from "../isAdmin";
 import {
   ORGANIZATION_SAFE_SELECT,

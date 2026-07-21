@@ -52,12 +52,6 @@ workers:
     requests: { cpu: 100m, memory: 1Gi }
     limits:   { cpu: 1000m, memory: 2Gi }
 
-# No writable stored-objects backend above → the dataset backfill hook has
-# nowhere to migrate to; keep it out of the full-stack run (covered by the
-# local-FS upgrade path instead).
-datasetS3Migration:
-  enabled: false
-
 # ── NLP ──────────────────────────────────────────────────────────────────────
 langwatch_nlp:
   replicaCount: 1

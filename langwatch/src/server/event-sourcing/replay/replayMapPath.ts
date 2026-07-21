@@ -10,7 +10,11 @@ import type {
 } from "./types";
 import { isAtOrBeforeCutoff } from "./replayConstants";
 import type { DiscoveredAggregate } from "./replayEventLoader";
-import { batchLoadAggregateEvents, getBoundedCutoffs } from "./replayEventLoader";
+import {
+  batchLoadAggregateEvents,
+  getBoundedCutoffs,
+  maxEventPosition,
+} from "./replayEventLoader";
 import {
   aggregateKey,
   markPendingBatch,
@@ -23,10 +27,17 @@ import {
   removeStaleMarker,
   cleanupAll,
 } from "./replayMarkers";
-import { pauseProjection, unpauseProjection, waitForActiveJobs } from "./replayDrain";
+import {
+  pauseProjection,
+  unpauseProjection,
+  waitForActiveJobs,
+} from "./replayDrain";
 import { MapAccumulator } from "./replayExecutor";
 import type { ReplayLogWriter } from "./replayLog";
-import { discoverProjectionAggregates, filterDiscoveredByAggregateIds } from "./replayDiscovery";
+import {
+  discoverProjectionAggregates,
+  filterDiscoveredByAggregateIds,
+} from "./replayDiscovery";
 
 /**
  * Replays a single map projection across discovered aggregates.
@@ -95,14 +106,29 @@ export async function replayMapProjection({
   });
 
   if (allAggregates.length === 0 || dryRun) {
-    return { aggregatesReplayed: 0, totalEvents: 0, batchErrors: 0, touchedTenants: [] };
+    return {
+      aggregatesReplayed: 0,
+      totalEvents: 0,
+      batchErrors: 0,
+      touchedTenants: [],
+    };
   }
 
-  const completedSet = await getCompletedSet({ redis, projectionName: projection.projectionName });
+  const completedSet = await getCompletedSet({
+    redis,
+    projectionName: projection.projectionName,
+  });
 
-  const staleMarkers = await getCutoffMarkers({ redis, projectionName: projection.projectionName });
+  const staleMarkers = await getCutoffMarkers({
+    redis,
+    projectionName: projection.projectionName,
+  });
   for (const aggKey of staleMarkers.keys()) {
-    await removeStaleMarker({ redis, projectionName: projection.projectionName, aggKey });
+    await removeStaleMarker({
+      redis,
+      projectionName: projection.projectionName,
+      aggKey,
+    });
   }
 
   let aggregatesCompleted = 0;
@@ -174,7 +200,8 @@ export async function replayMapProjection({
             progress.batchPhase = phase;
             if (eventsProcessed !== undefined) {
               progress.batchEventsProcessed = eventsProcessed;
-              progress.totalEventsReplayed = totalEventsReplayed + eventsProcessed;
+              progress.totalEventsReplayed =
+                totalEventsReplayed + eventsProcessed;
             }
             emit();
           },
@@ -223,7 +250,9 @@ export async function replayMapProjection({
           log.write({
             step: "error",
             error: `unpause failed after batch error: ${
-              unpauseError instanceof Error ? unpauseError.message : String(unpauseError)
+              unpauseError instanceof Error
+                ? unpauseError.message
+                : String(unpauseError)
             }`,
           });
         });
@@ -288,7 +317,12 @@ async function replayMapBatch({
   // 1. MARK
   onBatchPhase("mark");
   await markPendingBatch({ redis, projectionName, aggKeys });
-  log.write({ step: "mark-batch", tenant: tenantId, count: batch.length, kind: "map" });
+  log.write({
+    step: "mark-batch",
+    tenant: tenantId,
+    count: batch.length,
+    kind: "map",
+  });
 
   // 2. PAUSE
   onBatchPhase("pause");
@@ -297,8 +331,19 @@ async function replayMapBatch({
   // 3. DRAIN
   onBatchPhase("drain");
   const drainStart = Date.now();
-  await waitForActiveJobs({ redis, aggregates: batch, projectionName, kind: "map" });
-  log.write({ step: "drain-batch", tenant: tenantId, count: batch.length, durationMs: Date.now() - drainStart, kind: "map" });
+  await waitForActiveJobs({
+    redis,
+    aggregates: batch,
+    projectionName,
+    kind: "map",
+  });
+  log.write({
+    step: "drain-batch",
+    tenant: tenantId,
+    count: batch.length,
+    durationMs: Date.now() - drainStart,
+    kind: "map",
+  });
 
   // 4. CUTOFF — occurred-at bounds first, for partition pruning (see
   //    the fold path's replayBatch / getAggregateOccurredAtBounds /
@@ -322,7 +367,13 @@ async function replayMapBatch({
     }
   }
 
-  log.write({ step: "cutoff-batch", tenant: tenantId, count: batch.length, withEvents: withCutoffKeys.length, kind: "map" });
+  log.write({
+    step: "cutoff-batch",
+    tenant: tenantId,
+    count: batch.length,
+    withEvents: withCutoffKeys.length,
+    kind: "map",
+  });
 
   if (withoutCutoffKeys.length > 0) {
     await unmarkBatch({ redis, projectionName, aggKeys: withoutCutoffKeys });
@@ -341,15 +392,16 @@ async function replayMapBatch({
   //    For ClickHouse-backed AppendStores this turns N round-trips into
   //    a small number of chunked bulk inserts.
   onBatchPhase("replay", 0);
-  const maxCutoffEventId = [...cutoffs.values()]
-    .map((c) => c.eventId)
-    .reduce((a, b) => (a > b ? a : b));
+  const maxCutoff = maxEventPosition(cutoffs.values());
   const aggregateIds = batch
     .filter((a) => cutoffs.has(aggregateKey(a)))
     .map((a) => a.aggregateId);
 
-  const accumulator = new MapAccumulator(projection.definition, accumulatorOpts);
-  let cursorEventId = "";
+  const accumulator = new MapAccumulator(
+    projection.definition,
+    accumulatorOpts,
+  );
+  let cursor: { timestamp: number; eventId: string } | undefined;
   let eventsProcessed = 0;
   const replayStart = Date.now();
 
@@ -359,8 +411,8 @@ async function replayMapBatch({
       tenantId,
       aggregateIds,
       eventTypes: projection.definition.eventTypes,
-      maxCutoffEventId,
-      cursorEventId,
+      maxCutoff,
+      cursor,
       batchSize,
       occurredAtBounds,
     });
@@ -374,7 +426,10 @@ async function replayMapBatch({
         aggregateId: e.aggregateId,
       });
       const cutoff = cutoffs.get(key);
-      if (cutoff != null && isAtOrBeforeCutoff(e.timestamp, e.id, cutoff.timestamp, cutoff.eventId)) {
+      if (
+        cutoff != null &&
+        isAtOrBeforeCutoff(e.timestamp, e.id, cutoff.timestamp, cutoff.eventId)
+      ) {
         await accumulator.apply(e);
         eventsProcessed++;
       }
@@ -385,7 +440,9 @@ async function replayMapBatch({
     onBatchPhase("replay", eventsProcessed);
 
     const lastEvent = events[events.length - 1];
-    if (lastEvent) cursorEventId = lastEvent.id;
+    if (lastEvent) {
+      cursor = { timestamp: lastEvent.timestamp, eventId: lastEvent.id };
+    }
     if (events.length < batchSize) break;
   }
 
@@ -410,7 +467,12 @@ async function replayMapBatch({
   onBatchPhase("unmark", eventsProcessed);
   await markCompletedBatch({ redis, projectionName, cutoffs });
   await unpauseProjection({ redis, pauseKey: projection.pauseKey });
-  log.write({ step: "unmark-batch", tenant: tenantId, count: withCutoffKeys.length, kind: "map" });
+  log.write({
+    step: "unmark-batch",
+    tenant: tenantId,
+    count: withCutoffKeys.length,
+    kind: "map",
+  });
 
   return { eventsReplayed: eventsProcessed };
 }

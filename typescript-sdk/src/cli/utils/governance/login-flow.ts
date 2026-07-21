@@ -21,7 +21,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../spinner";
 import {
   startDeviceCode,
   pollUntilDone,
@@ -94,7 +94,7 @@ export async function runUnifiedLoginFlow(
   // ora swallows instead of a SIGINT — the wait becomes unkillable. Keeping
   // stdin cooked lets the terminal deliver SIGINT; the handler stops the
   // spinner and exits cleanly so the user can always abort the login wait.
-  const spinner = ora({
+  const spinner = createSpinner({
     text: "Waiting for you to approve in the browser",
     discardStdin: false,
   }).start();

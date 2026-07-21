@@ -1,9 +1,24 @@
 # ADR-039: Outbox heartbeat primitive
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-052](052-automations-on-process-manager-substrate.md)
 - **Date:** 2026-07-07
 - **Related:** ADR-030 (transactional outbox), ADR-034 (event-sourced analytics materialization — the consumer that motivated this primitive)
 - **Behavioural contract:** [specs/triggers/event-sourced-graph-triggers.feature](../../../specs/triggers/event-sourced-graph-triggers.feature)
+
+> **Superseded (2026-07-18).** ADR-052 moves automations onto the
+> process-manager substrate and deletes the primitive this ADR describes: the
+> entire `event-sourcing/outbox/` stack (including
+> `outbox/heartbeat/heartbeat.registry.ts`, `heartbeat.types.ts`,
+> `heartbeat.scheduler.ts`), the Redis leader-lock election, and
+> `dispatchOutboxEnqueues`/`adaptOutboxReactor`. The first (and only) consumer,
+> the graph-trigger heartbeat, is now driven by the `graphAlertSweep`
+> scheduled process manager — a revision-fenced durable wake on the same 30 s
+> cadence, replacing the Redis `SET ... NX PX` lock with process-manager
+> revision fencing so racing wake workers stand down instead of racing for a
+> lock. Candidate discovery and absence/resolve semantics are unchanged; see
+> `src/server/app-layer/automations/graph-trigger-heartbeat.ts` and ADR-052
+> ("Graph alerts and replay"). The rest of this document describes the
+> deleted design and is kept for historical context.
 
 ## Context
 
@@ -63,8 +78,15 @@ This ADR is framework-primitive; the first consumer's specifics live here as imp
 - **Source-aware pre-filter** (Phase 6 extension): per candidate trigger, look up the metric's source (`trace` | `evaluation`) via `field-availability`. Group candidates per `(project, source)` and issue ONE batched recency query per source per project per tick — `trace_analytics` for trace-source candidates, `evaluation_analytics` for eval-source candidates. If the project has any qualifying event newer than a candidate's window, the real-time outbox reactor is already firing for that trigger; skip.
 - Surviving candidates enqueue `graphEval`-stage payloads. The shared handler `evaluateGraphTrigger` picks up — same handler the real-time reactor's payloads land at, regardless of source pipeline.
 
-## Implementation
+## Implementation (historical — deleted by ADR-052)
 
 - Registry + types: `src/server/event-sourcing/outbox/heartbeat/heartbeat.registry.ts`, `heartbeat.types.ts`.
 - Scheduler: `src/server/event-sourcing/outbox/heartbeat/heartbeat.scheduler.ts`.
-- First consumer (graph triggers): `src/server/app-layer/triggers/graph-trigger-heartbeat.ts`, registered from the worker bootstrap in `src/server/app-layer/presets.ts`.
+- First consumer (graph triggers): `src/server/app-layer/automations/graph-trigger-heartbeat.ts`, registered from the worker bootstrap in `src/server/app-layer/presets.ts`.
+
+None of the paths above exist anymore. The graph-trigger heartbeat consumer
+file survives at the same path (`src/server/app-layer/automations/graph-trigger-heartbeat.ts`)
+but is now registered as the `graphAlertSweep` process manager's `onWake`
+handler in `src/server/event-sourcing/pipelines/automations/pipeline.ts`,
+via `src/server/event-sourcing/pipelines/automations/process-manager/graphAlertSweep.process.ts`
+— see ADR-052.

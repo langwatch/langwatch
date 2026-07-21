@@ -92,17 +92,31 @@ func (s Stack) OverlayEnv() []string {
 		"ADMIN_EMAILS="+DefaultAdminEmail,
 	)
 	// langyagent (the OpenCode manager): the control plane dials it at its loopback
-	// port with the shared internal secret both sides require. Isolation (gVisor +
-	// iptables egress control) is a production concern the local host can't provide,
-	// so haven disables it here — the "unsafe dev" mode the manager exposes for
-	// exactly this. Emitted whenever the service has a port (local or a baseline
-	// fallback).
+	// port with the shared internal secret both sides require. Emitted whenever the
+	// service has a port (local or a baseline fallback). The isolation posture
+	// (LANGY_UNSAFE_DEV_DISABLE_ISOLATION) is NOT set here — it is a langyagent-only
+	// concern the plan sets on the worker itself per tier (see LangyTier); the
+	// control plane never reads it.
 	if langy.Port != 0 {
 		env = append(env,
 			fmt.Sprintf("OPENCODE_AGENT_URL=http://127.0.0.1:%d", langy.Port),
 			"LANGY_INTERNAL_SECRET="+DefaultLangyInternalSecret,
-			"LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true",
 		)
+		// When the worker runs inside colima (the sandboxed / container-unsafe
+		// tiers), it cannot reach the control plane or the gateway at 127.0.0.1 or
+		// the portless .localhost hostnames — those resolve to the container itself.
+		// Hand it host-reachable overrides: colima maps host.docker.internal to the
+		// macOS host (verified reaching even loopback-bound listeners), and the raw
+		// ports skip the portless HTTPS proxy and its CA entirely. The control plane
+		// prefers these over LANGWATCH_ENDPOINT / LW_GATEWAY_* when building the
+		// worker's credentials envelope (see LangyCredentialService). On the host
+		// tier they are absent, so the worker keeps using the normal portless URLs.
+		if s.LangyTier.RunsInContainer() {
+			env = append(env,
+				fmt.Sprintf("LANGY_WORKER_CALLBACK_URL=http://host.docker.internal:%d", s.APIPort),
+				fmt.Sprintf("LANGY_WORKER_GATEWAY_URL=http://host.docker.internal:%d", gw.Port),
+			)
+		}
 	}
 	// haven manages one shared ClickHouse container; this stack gets its own
 	// database on it. The app connects straight to loopback (HTTP, no proxy) at
@@ -145,8 +159,8 @@ func (s Stack) observabilityEnv() []string {
 	}
 	otlp := fmt.Sprintf("http://127.0.0.1:%d", s.ObservabilityOTLPPort)
 	env := []string{
-		"OTEL_EXPORTER_OTLP_ENDPOINT=" + otlp,   // TS: traces + logs + metrics
-		"OTEL_DEBUG_COLLECTOR_ENDPOINT=" + otlp, // Go: dual-export, additive to the product trace path
+		"OTEL_EXPORTER_OTLP_ENDPOINT=" + otlp,   // official name — TS app AND Go services (their own telemetry)
+		"OTEL_DEBUG_COLLECTOR_ENDPOINT=" + otlp, // Go OTLP logs ride this; span/metric export dedupes when equal to the official endpoint
 		"PINO_OTEL_ENABLED=true",
 		"OTEL_METRICS_ENABLED=true",
 		"LOG_OTEL_LEVEL=debug",

@@ -77,7 +77,7 @@ describe("extractPromptReference", () => {
       expect(ref?.draft).toBe(true);
     });
 
-    it("accepts the stringified \"true\" form (ClickHouse SpanAttributes path)", () => {
+    it('accepts the stringified "true" form (ClickHouse SpanAttributes path)', () => {
       // Regression caught during 2026-05-17 dogfood: the ClickHouse
       // SpanAttributes column stringifies scalar OTel attrs on ingest,
       // so an `attribute.Bool(true)` from nlpgo lands as the literal

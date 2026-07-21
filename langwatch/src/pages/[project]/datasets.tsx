@@ -26,6 +26,8 @@ import {
   Upload,
 } from "react-feather";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { datasetContextChip } from "~/features/langy/logic/langyContextChips";
 import { ListTable } from "~/components/ui/ListTable";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -42,7 +44,10 @@ import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../server/api/root";
 import { datasetDisplayRecordCount } from "../../server/datasets/record-count";
-import type { DatasetColumns } from "../../server/datasets/types";
+import {
+  datasetColumnsSchema,
+  type DatasetColumns,
+} from "../../server/datasets/types";
 import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 
@@ -88,6 +93,14 @@ function DatasetsPage() {
   );
 
   type Dataset = inferRouterOutputs<AppRouter>["dataset"]["getAll"][number];
+
+  // Dataset.columnTypes is persisted JSON and older/CLI-created rows can carry
+  // an object or malformed value. A bad row must be displayable and deletable,
+  // never crash the whole datasets page.
+  const columnsOf = (dataset: Dataset): DatasetColumns => {
+    const parsed = datasetColumnsSchema.safeParse(dataset.columnTypes);
+    return parsed.success ? parsed.data : [];
+  };
 
   const [search, setSearch] = useState("");
   const filteredDatasets = useMemo(() => {
@@ -252,9 +265,10 @@ function DatasetsPage() {
                 <Text>
                   To learn more about datasets, please visit our{" "}
                   <Link
-                    color="orange.400"
                     href="https://docs.langwatch.ai/datasets/overview"
+                    color="inherit"
                     isExternal
+                    textDecoration="underline"
                   >
                     documentation
                   </Link>
@@ -296,11 +310,20 @@ function DatasetsPage() {
                 </Table.Row>
               ) : filteredDatasets ? (
                 filteredDatasets.map((dataset: Dataset) => (
-                  <Table.Row
-                    cursor="pointer"
-                    onClick={() => goToDataset(dataset.id)}
+                  // While the Langy panel is open the row can be pointed at and
+                  // absorbed as context; its own click (open the dataset) is
+                  // untouched. Inert while Langy is closed.
+                  <LangyContextTarget
                     key={dataset.id}
+                    target={datasetContextChip({
+                      datasetId: dataset.id,
+                      name: dataset.name,
+                    })}
                   >
+                    <Table.Row
+                      cursor="pointer"
+                      onClick={() => goToDataset(dataset.id)}
+                    >
                     <Table.Cell>
                       <HStack gap={2}>
                         <Text>{dataset.name}</Text>
@@ -318,7 +341,7 @@ function DatasetsPage() {
                     </Table.Cell>
                     <Table.Cell maxWidth="250px">
                       <HStack wrap="wrap">
-                        {((dataset.columnTypes as DatasetColumns) ?? []).map(
+                        {columnsOf(dataset).map(
                           ({ name }) => (
                             <Badge size="sm" key={name}>
                               {name}
@@ -380,8 +403,7 @@ function DatasetsPage() {
                                     setEditDataset({
                                       datasetId: dataset.id,
                                       name: dataset.name,
-                                      columnTypes:
-                                        dataset.columnTypes as DatasetColumns,
+                                      columnTypes: columnsOf(dataset),
                                     });
                                     addEditDatasetDrawer.onOpen();
                                   }}
@@ -407,7 +429,8 @@ function DatasetsPage() {
                         </Menu.Content>
                       </Menu.Root>
                     </Table.Cell>
-                  </Table.Row>
+                    </Table.Row>
+                  </LangyContextTarget>
                 ))
               ) : null}
             </Table.Body>

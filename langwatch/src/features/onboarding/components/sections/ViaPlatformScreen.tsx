@@ -9,8 +9,8 @@ import {
   Settings,
   Shield,
 } from "lucide-react";
-import { Link } from "~/components/ui/link";
 import type React from "react";
+import { Link } from "~/components/ui/link";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 
 interface CapabilityProps {
@@ -32,9 +32,9 @@ const capabilities: CapabilityProps[] = [
   },
   {
     icon: Shield,
-    title: "Evaluations",
-    description: "Set up automated quality checks on your LLM outputs",
-    path: "/evaluations",
+    title: "Online Evaluations",
+    description: "Run automated quality checks on live LLM outputs",
+    path: "/online-evaluations",
   },
   {
     icon: MessageSquareText,
@@ -86,39 +86,38 @@ function CapabilityCard({
       cursor="pointer"
       _hover={{
         borderColor: "orange.emphasized",
-        boxShadow:
-          "0 6px 28px rgba(237,137,38,0.06)",
+        boxShadow: "0 6px 28px rgba(237,137,38,0.06)",
         transform: "translateY(-2px)",
         textDecoration: "none",
       }}
     >
-    <Link href={href} textDecoration="none" color="inherit">
-      <Box
-        flexShrink={0}
-        p={2.5}
-        borderRadius="xl"
-        bg="orange.50"
-        color="orange.500"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-      >
-        <Icon size={20} strokeWidth={1.5} />
-      </Box>
-      <VStack align="stretch" gap={1}>
-        <Text
-          fontSize="sm"
-          fontWeight="semibold"
-          color="fg"
-          letterSpacing="-0.01em"
+      <Link href={href} textDecoration="none" color="inherit">
+        <Box
+          flexShrink={0}
+          p={2.5}
+          borderRadius="xl"
+          bg="orange.50"
+          color="orange.500"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
         >
-          {title}
-        </Text>
-        <Text fontSize="xs" color="fg.muted" lineHeight="tall">
-          {description}
-        </Text>
-      </VStack>
-    </Link>
+          <Icon size={20} strokeWidth={1.5} />
+        </Box>
+        <VStack align="stretch" gap={1}>
+          <Text
+            fontSize="sm"
+            fontWeight="semibold"
+            color="fg"
+            letterSpacing="-0.01em"
+          >
+            {title}
+          </Text>
+          <Text fontSize="xs" color="fg.muted" lineHeight="tall">
+            {description}
+          </Text>
+        </VStack>
+      </Link>
     </VStack>
   );
 }
@@ -130,7 +129,11 @@ export function ViaPlatformScreen(): React.ReactElement {
     <>
       <VStack align="stretch" gap={6} mb={20} w="full">
         <Grid
-          templateColumns={{ base: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }}
+          templateColumns={{
+            base: "1fr",
+            md: "repeat(2, 1fr)",
+            lg: "repeat(3, 1fr)",
+          }}
           gap={3}
         >
           {capabilities.map((cap) => (
@@ -168,7 +171,6 @@ export function ViaPlatformScreen(): React.ReactElement {
           </a>
         </HStack>
       </VStack>
-
     </>
   );
 }

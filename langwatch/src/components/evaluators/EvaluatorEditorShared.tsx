@@ -68,7 +68,7 @@ import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
 // mid-selection any time an unrelated field in the drawer re-rendered it.
 const EMPTY_COMPARISON_CONFIG: ComparisonEvaluatorConfig = {
   variants: [],
-  hasGoldenAnswer: true,
+  hasGoldenAnswer: false,
   goldenField: "",
   includeMetrics: [],
   randomizeOrder: true,
@@ -121,6 +121,9 @@ export type EvaluatorEditorDrawerProps = {
     initialComparison?: ComparisonEvaluatorConfig;
     targets: { id: string }[];
     datasetColumns: { id: string; name: string }[];
+    /** Active dataset's name, used only to qualify column labels as
+     * "Test Data.expected_output" — matching the mapping chips elsewhere. */
+    datasetName?: string;
   };
 };
 
@@ -166,8 +169,16 @@ export type EvaluatorEditorController = {
         initialComparison?: ComparisonEvaluatorConfig;
         targets: TargetConfig[];
         datasetColumns: { id: string; name: string }[];
+        datasetName?: string;
       }
     | undefined;
+  /**
+   * Whether a `comparisonContext` is expected to arrive for this drawer, i.e.
+   * the workbench opened it. False for openers that have no workbench behind
+   * them (Settings → Evaluators, online-eval, guardrails), which never attach
+   * one — so the form must not sit waiting on it there.
+   */
+  expectsComparisonContext: boolean;
   /** The live comparison draft, mirrored from ComparisonConfigForm. */
   comparison: ComparisonEvaluatorConfig;
   onComparisonChange:
@@ -221,6 +232,7 @@ export function useEvaluatorEditorController(
         initialComparison?: ComparisonEvaluatorConfig;
         targets: TargetConfig[];
         datasetColumns: { id: string; name: string }[];
+        datasetName?: string;
       }
     | undefined;
   const onComparisonChange = (
@@ -702,6 +714,9 @@ export function useEvaluatorEditorController(
     mappingsConfig,
     onMappingChange,
     comparisonContext,
+    // Only the workbench carries a targetId, so it's the signal that a
+    // comparisonContext is on its way — see the field's docs.
+    expectsComparisonContext: !!drawerParams.targetId,
     comparison,
     onComparisonChange: onComparisonChange ? handleComparisonChange : undefined,
     onLocalConfigChange,
@@ -738,6 +753,7 @@ export function EvaluatorEditorBody({
     mappingsConfig,
     onMappingChange,
     comparisonContext,
+    expectsComparisonContext,
     comparison,
     onComparisonChange,
   } = controller;
@@ -752,6 +768,30 @@ export function EvaluatorEditorBody({
   const isComparison = isComparisonEvaluatorType(evaluatorType);
 
   if (evaluatorId && isLoadingEvaluator) {
+    return (
+      <HStack justify="center" paddingY={8}>
+        <Spinner size="md" />
+      </HStack>
+    );
+  }
+
+  // A comparison editor needs its context (targets/dataset-columns) to render
+  // the variants+golden+input picker. On the Add→Comparison flow that context is
+  // attached synchronously, so this never trips. On a page RELOAD it is
+  // re-attached a beat later (once the workbench store hydrates) — without this
+  // gate the name/model/prompt paint first and the picker pops in afterwards,
+  // which reads as a janky two-stage load. Holding the form until the context
+  // lands makes it appear in one piece.
+  //
+  // Only wait when the context is actually COMING. A comparison evaluator is a
+  // normal saved evaluator, so it is also reachable from places that have no
+  // workbench behind them — Settings → Evaluators lists it, as do the online-
+  // eval and guardrail drawers. Those openers never attach a comparisonContext,
+  // so waiting on one there is waiting forever. The workbench is the only opener
+  // that carries a targetId, which makes it the signal for "context is coming";
+  // everywhere else falls through and renders the name/model/prompt form, with
+  // the variants section omitted by the guard at the render site below.
+  if (isComparison && !comparisonContext && expectsComparisonContext) {
     return (
       <HStack justify="center" paddingY={8}>
         <Spinner size="md" />
@@ -858,6 +898,7 @@ export function EvaluatorEditorBody({
               onChange={onComparisonChange}
               targets={comparisonContext.targets}
               datasetColumns={comparisonContext.datasetColumns}
+              datasetName={comparisonContext.datasetName}
             />
           </Box>
         )}

@@ -12,8 +12,9 @@ import {
 } from "@chakra-ui/react";
 import { TriggerKind } from "@prisma/client";
 import { differenceInMinutes, differenceInSeconds } from "date-fns";
+import { useState } from "react";
 import { Calendar, TrendingUp } from "react-feather";
-import { CLIENT_PROVIDERS } from "~/automations/providers/client";
+import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -75,9 +76,18 @@ export function ViewAutomationDrawer({
     { triggerId: automationId, projectId: project?.id ?? "", limit: 20 },
     { enabled: !!project?.id },
   );
+  // ADR-040 §6: the per-attempt delivery log, only for webhook automations.
+  const webhookDeliveriesQuery = api.automation.getWebhookDeliveries.useQuery(
+    { triggerId: automationId, projectId: project?.id ?? "", limit: 50 },
+    {
+      enabled:
+        !!project?.id && triggerQuery.data?.action === "SEND_WEBHOOK",
+    },
+  );
 
   const trigger = triggerQuery.data;
   const isGraphAlert = !!trigger?.customGraphId;
+  const isWebhook = trigger?.action === "SEND_WEBHOOK";
   const isSchedule = trigger?.triggerKind === TriggerKind.REPORT;
   const actionParams = (trigger?.actionParams ?? {}) as TriggerActionParams;
 
@@ -118,6 +128,21 @@ export function ViewAutomationDrawer({
             {actionParams.members.join(", ")}
           </Text>
         ) : null;
+      case "SEND_WEBHOOK": {
+        let hostname = "Webhook";
+        try {
+          hostname = actionParams.url
+            ? new URL(actionParams.url).hostname
+            : hostname;
+        } catch {
+          // Stored rows are validated; retain a safe label for legacy data.
+        }
+        return (
+          <Text textStyle="sm" wordBreak="break-all">
+            {actionParams.method ?? "POST"} {hostname}
+          </Text>
+        );
+      }
       case "ADD_TO_DATASET":
         return datasetName ? <Text textStyle="sm">{datasetName}</Text> : null;
       case "ADD_TO_ANNOTATION_QUEUE":
@@ -268,6 +293,25 @@ export function ViewAutomationDrawer({
                 />
               )}
             </VStack>
+
+            {isWebhook ? (
+              <VStack align="start" gap={2} width="full">
+                <Text textStyle="xs" color="fg.muted" fontWeight="medium">
+                  Recent deliveries
+                </Text>
+                {webhookDeliveriesQuery.isLoading ? (
+                  <Skeleton height="60px" width="full" />
+                ) : (webhookDeliveriesQuery.data ?? []).length === 0 ? (
+                  <Text textStyle="sm" color="fg.muted">
+                    No delivery attempts recorded yet.
+                  </Text>
+                ) : (
+                  <WebhookDeliveriesList
+                    deliveries={webhookDeliveriesQuery.data ?? []}
+                  />
+                )}
+              </VStack>
+            ) : null}
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -380,4 +424,170 @@ function groupFiresByLabel(
     else groups.push({ key: fire.id, label, count: 1 });
   }
   return groups;
+}
+
+type WebhookDelivery =
+  RouterOutputs["automation"]["getWebhookDeliveries"][number];
+
+const OUTCOME_DOT: Record<WebhookDelivery["outcome"], string> = {
+  success: "green.solid",
+  retryable: "yellow.solid",
+  terminal: "red.solid",
+  pending: "gray.solid",
+};
+
+/**
+ * The webhook delivery log (ADR-040 §6): attempts grouped by the fire that
+ * produced them (`dispatchId`), newest fire first. A failed attempt expands
+ * to its error and a plain-language explanation of what went wrong — the log
+ * stores outcome facts only, never request or response content.
+ */
+function WebhookDeliveriesList({
+  deliveries,
+}: {
+  deliveries: WebhookDelivery[];
+}) {
+  // Rows arrive newest-first. Group by dispatchId keeping first-seen order
+  // (newest fire on top); reverse each group so attempts read oldest→newest.
+  const groups: { dispatchId: string; attempts: WebhookDelivery[] }[] = [];
+  const byId = new Map<string, WebhookDelivery[]>();
+  for (const d of deliveries) {
+    let attempts = byId.get(d.dispatchId);
+    if (!attempts) {
+      attempts = [];
+      byId.set(d.dispatchId, attempts);
+      groups.push({ dispatchId: d.dispatchId, attempts });
+    }
+    attempts.push(d);
+  }
+  for (const g of groups) g.attempts.reverse();
+
+  return (
+    <VStack align="stretch" gap={2} width="full">
+      {groups.map((g) => (
+        <VStack
+          key={g.dispatchId}
+          align="stretch"
+          gap={0}
+          width="full"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="md"
+          overflow="hidden"
+        >
+          {g.attempts.map((attempt, index) => (
+            <DeliveryAttemptRow
+              key={attempt.id}
+              attempt={attempt}
+              index={index}
+              total={g.attempts.length}
+            />
+          ))}
+        </VStack>
+      ))}
+    </VStack>
+  );
+}
+
+/** Plain-language guidance derived from the HTTP status bucket — what
+ *  happened and what the operator can do about it. Transport failures carry
+ *  their own self-explanatory error text instead. */
+function guidanceForStatus(status: number | null): string | undefined {
+  if (status === null) return undefined;
+  if (status === 429)
+    return "The endpoint asked us to slow down. Delivery backs off and retries.";
+  if (status === 408 || status >= 500)
+    return "The endpoint had a server error. Delivery retries automatically.";
+  if (status >= 400)
+    return "The endpoint rejected the request. Check its authentication and the payload it expects.";
+  return undefined;
+}
+
+function DeliveryAttemptRow({
+  attempt,
+  index,
+  total,
+}: {
+  attempt: WebhookDelivery;
+  index: number;
+  total: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const statusText =
+    attempt.responseStatus != null
+      ? `HTTP ${attempt.responseStatus}`
+      : (attempt.error ?? "No response");
+  const guidance =
+    attempt.outcome === "success"
+      ? undefined
+      : guidanceForStatus(attempt.responseStatus);
+  const hasDetail = Boolean(attempt.error ?? guidance ?? attempt.response);
+
+  return (
+    <Box borderBottomWidth="1px" borderColor="border" _last={{ borderBottomWidth: 0 }}>
+      <HStack
+        as="button"
+        gap={2.5}
+        paddingX={3}
+        paddingY={2}
+        width="full"
+        textAlign="left"
+        cursor={hasDetail ? "pointer" : "default"}
+        onClick={() => hasDetail && setOpen((v) => !v)}
+      >
+        <Box
+          boxSize={2}
+          borderRadius="full"
+          flexShrink={0}
+          bg={OUTCOME_DOT[attempt.outcome]}
+        />
+        <Text textStyle="sm" flex="1" minWidth="0">
+          {total > 1 ? `Attempt ${index + 1} · ` : ""}
+          {statusText}
+        </Text>
+        <Text textStyle="xs" color="fg.muted" flexShrink={0} whiteSpace="nowrap">
+          {attempt.latencyMs != null ? `${attempt.latencyMs}ms · ` : ""}
+          {formatTimeAgo(new Date(attempt.firedAt).getTime())}
+        </Text>
+      </HStack>
+      {open && hasDetail ? (
+        <VStack align="stretch" gap={2} paddingX={3} paddingBottom={3}>
+          {attempt.error ? (
+            <Code
+              fontSize="xs"
+              width="full"
+              whiteSpace="pre-wrap"
+              wordBreak="break-word"
+            >
+              {attempt.error}
+            </Code>
+          ) : null}
+          {attempt.response?.body ? (
+            <Code
+              fontSize="xs"
+              width="full"
+              whiteSpace="pre-wrap"
+              wordBreak="break-word"
+            >
+              {attempt.response.body}
+            </Code>
+          ) : null}
+          {attempt.response?.headers ? (
+            <VStack align="stretch" gap={0.5}>
+              {Object.entries(attempt.response.headers).map(([name, value]) => (
+                <Code key={name} fontSize="xs" width="full" whiteSpace="pre-wrap">
+                  {name}: {value}
+                </Code>
+              ))}
+            </VStack>
+          ) : null}
+          {guidance ? (
+            <Text textStyle="xs" color="fg.muted">
+              {guidance}
+            </Text>
+          ) : null}
+        </VStack>
+      ) : null}
+    </Box>
+  );
 }

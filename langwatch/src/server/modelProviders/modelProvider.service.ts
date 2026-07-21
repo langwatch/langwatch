@@ -100,6 +100,41 @@ function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
 }
 
 /**
+ * Whether this provider row serves `bareModel` through its effective
+ * catalog: the provider's registry lists (`models` / `embeddingsModels` —
+ * every row of a provider serves its registry models) plus the row's own
+ * custom catalog (chat or embeddings). Registry models short-circuit to
+ * true, so a collapse winner with no custom catalog is never mistaken
+ * for "doesn't serve this model" and swapped away from the project's own
+ * credentials. Accepts both the raw DB shape (legacy string[] or new
+ * object[]) and the normalized `MaybeStoredModelProvider` lists; raw DB
+ * rows carry no registry lists, so for them only the custom catalog
+ * decides — the right question to ask of a candidate row for a
+ * non-registry model.
+ */
+export function providerRowServesModel({
+  row,
+  bareModel,
+}: {
+  row: {
+    models?: string[] | null;
+    embeddingsModels?: string[] | null;
+    customModels?: unknown;
+    customEmbeddingsModels?: unknown;
+  };
+  bareModel: string;
+}): boolean {
+  if ((row.models ?? []).includes(bareModel)) return true;
+  if ((row.embeddingsModels ?? []).includes(bareModel)) return true;
+  const chat = toLegacyCompatibleCustomModels(row.customModels ?? null, "chat");
+  const embeddings = toLegacyCompatibleCustomModels(
+    row.customEmbeddingsModels ?? null,
+    "embedding",
+  );
+  return chat.concat(embeddings).some((m) => m?.modelId === bareModel);
+}
+
+/**
  * Service layer for ModelProvider business logic.
  * Single Responsibility: Model provider lifecycle management.
  *
@@ -156,8 +191,14 @@ export class ModelProviderService {
    * Gets model providers with API keys masked for frontend display.
    *
    * Business rules:
-   * - Only masks fields matching KEY_CHECK patterns (API keys)
+   * - Only masks customKeys fields matching KEY_CHECK patterns (API keys)
+   * - Extra-header values are always masked — they routinely carry auth
+   *   secrets for azure/custom providers
    * - URLs and other values remain visible
+   *
+   * Masking runs even when `includeKeys` is false: customKeys are already
+   * nulled by that flag, but extraHeaders are returned regardless, so
+   * skipping the mask would hand view-only users plaintext header values.
    */
   async getProjectModelProvidersForFrontend(
     projectId: string,
@@ -167,10 +208,6 @@ export class ModelProviderService {
       projectId,
       includeKeys,
     );
-
-    if (!includeKeys) {
-      return providers;
-    }
 
     return this.maskApiKeys(providers);
   }
@@ -217,56 +254,13 @@ export class ModelProviderService {
 
     const storedRows = savedProviders
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
-      .map((mp) => {
-        const defaultProvider = defaultProviders[mp.provider];
-        const customModels = toLegacyCompatibleCustomModels(
-          mp.customModels,
-          "chat",
-        );
-        const customEmbeddingsModels = toLegacyCompatibleCustomModels(
-          mp.customEmbeddingsModels,
-          "embedding",
-        );
-        const narrowestScope = this.pickNarrowestScope(mp.scopes);
-        const masked = (
-          mp.customKeys
-            ? Object.fromEntries(
-                Object.entries(mp.customKeys as Record<string, unknown>).map(
-                  ([key, value]) => [
-                    key,
-                    KEY_CHECK.some((k) => key.includes(k))
-                      ? MASKED_KEY_PLACEHOLDER
-                      : value,
-                  ],
-                ),
-              )
-            : null
-        ) as MaybeStoredModelProvider["customKeys"];
-        const provider_: MaybeStoredModelProvider = {
-          id: mp.id,
-          name: mp.name,
-          provider: mp.provider,
-          enabled: mp.enabled,
-          customKeys: masked,
-          models: defaultProvider?.models ?? null,
-          embeddingsModels: defaultProvider?.embeddingsModels ?? null,
-          customModels: customModels.length > 0 ? customModels : null,
-          customEmbeddingsModels:
-            customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
-          deploymentMapping: mp.deploymentMapping,
-          disabledByDefault: defaultProvider?.disabledByDefault,
-          extraHeaders: mp.extraHeaders as
-            | { key: string; value: string }[]
-            | null,
-          scopes: mp.scopes.map((s) => ({
-            scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-            scopeId: s.scopeId,
-          })),
-          scopeType: narrowestScope.scopeType,
-          scopeId: narrowestScope.scopeId,
-        };
-        return provider_;
-      });
+      .map((mp) => ({
+        ...this.toMaybeStoredProvider(mp, defaultProviders, true),
+        customKeys: this.maskRowCustomKeys(mp.customKeys),
+        extraHeaders: this.maskExtraHeaders(
+          mp.extraHeaders as { key: string; value: string }[] | null,
+        ),
+      }));
     return [...storedRows, ...systemRows];
   }
 
@@ -332,56 +326,13 @@ export class ModelProviderService {
 
     const storedRows = savedProviders
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
-      .map((mp) => {
-        const defaultProvider = defaultProviders[mp.provider];
-        const customModels = toLegacyCompatibleCustomModels(
-          mp.customModels,
-          "chat",
-        );
-        const customEmbeddingsModels = toLegacyCompatibleCustomModels(
-          mp.customEmbeddingsModels,
-          "embedding",
-        );
-        const narrowestScope = this.pickNarrowestScope(mp.scopes);
-        const masked = (
-          mp.customKeys
-            ? Object.fromEntries(
-                Object.entries(mp.customKeys as Record<string, unknown>).map(
-                  ([key, value]) => [
-                    key,
-                    KEY_CHECK.some((k) => key.includes(k))
-                      ? MASKED_KEY_PLACEHOLDER
-                      : value,
-                  ],
-                ),
-              )
-            : null
-        ) as MaybeStoredModelProvider["customKeys"];
-        const provider_: MaybeStoredModelProvider = {
-          id: mp.id,
-          name: mp.name,
-          provider: mp.provider,
-          enabled: mp.enabled,
-          customKeys: masked,
-          models: defaultProvider?.models ?? null,
-          embeddingsModels: defaultProvider?.embeddingsModels ?? null,
-          customModels: customModels.length > 0 ? customModels : null,
-          customEmbeddingsModels:
-            customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
-          deploymentMapping: mp.deploymentMapping,
-          disabledByDefault: defaultProvider?.disabledByDefault,
-          extraHeaders: mp.extraHeaders as
-            | { key: string; value: string }[]
-            | null,
-          scopes: mp.scopes.map((s) => ({
-            scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-            scopeId: s.scopeId,
-          })),
-          scopeType: narrowestScope.scopeType,
-          scopeId: narrowestScope.scopeId,
-        };
-        return provider_;
-      });
+      .map((mp) => ({
+        ...this.toMaybeStoredProvider(mp, defaultProviders, true),
+        customKeys: this.maskRowCustomKeys(mp.customKeys),
+        extraHeaders: this.maskExtraHeaders(
+          mp.extraHeaders as { key: string; value: string }[] | null,
+        ),
+      }));
     return [...storedRows, ...systemRows];
   }
 
@@ -821,44 +772,11 @@ export class ModelProviderService {
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
       .reduce(
         (acc, mp) => {
-          // Always use registry models for models/embeddingsModels
-          const defaultProvider = defaultProviders[mp.provider];
-
-          // Convert DB custom models (may be legacy string[] or new object[])
-          const customModels = toLegacyCompatibleCustomModels(
-            mp.customModels,
-            "chat",
+          const provider_ = this.toMaybeStoredProvider(
+            mp,
+            defaultProviders,
+            includeKeys,
           );
-          const customEmbeddingsModels = toLegacyCompatibleCustomModels(
-            mp.customEmbeddingsModels,
-            "embedding",
-          );
-
-          const narrowestScope = this.pickNarrowestScope(mp.scopes);
-
-          const provider_: MaybeStoredModelProvider = {
-            id: mp.id,
-            name: mp.name,
-            provider: mp.provider,
-            enabled: mp.enabled,
-            customKeys: includeKeys ? mp.customKeys : null,
-            models: defaultProvider?.models ?? null,
-            embeddingsModels: defaultProvider?.embeddingsModels ?? null,
-            customModels: customModels.length > 0 ? customModels : null,
-            customEmbeddingsModels:
-              customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
-            deploymentMapping: mp.deploymentMapping,
-            disabledByDefault: defaultProvider?.disabledByDefault,
-            extraHeaders: mp.extraHeaders as
-              | { key: string; value: string }[]
-              | null,
-            scopes: mp.scopes.map((s) => ({
-              scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-              scopeId: s.scopeId,
-            })),
-            scopeType: narrowestScope.scopeType,
-            scopeId: narrowestScope.scopeId,
-          };
 
           // Collapse rules when the same provider string has multiple
           // accessible rows: an enabled row beats a disabled one, then
@@ -872,6 +790,166 @@ export class ModelProviderService {
         },
         {} as Record<string, MaybeStoredModelProvider>,
       );
+  }
+
+  /** Map a stored row to the `MaybeStoredModelProvider` shape consumers
+   * expect: registry models for models/embeddingsModels, normalized
+   * custom lists, and the narrowest scope surfaced as scopeType/scopeId. */
+  private toMaybeStoredProvider(
+    mp: ModelProviderWithScopes,
+    defaultProviders: Record<string, MaybeStoredModelProvider>,
+    includeKeys: boolean,
+  ): MaybeStoredModelProvider {
+    // Always use registry models for models/embeddingsModels
+    const defaultProvider = defaultProviders[mp.provider];
+
+    // Convert DB custom models (may be legacy string[] or new object[])
+    const customModels = toLegacyCompatibleCustomModels(
+      mp.customModels,
+      "chat",
+    );
+    const customEmbeddingsModels = toLegacyCompatibleCustomModels(
+      mp.customEmbeddingsModels,
+      "embedding",
+    );
+
+    const narrowestScope = this.pickNarrowestScope(mp.scopes);
+
+    return {
+      id: mp.id,
+      name: mp.name,
+      provider: mp.provider,
+      enabled: mp.enabled,
+      customKeys: includeKeys ? mp.customKeys : null,
+      models: defaultProvider?.models ?? null,
+      embeddingsModels: defaultProvider?.embeddingsModels ?? null,
+      customModels: customModels.length > 0 ? customModels : null,
+      customEmbeddingsModels:
+        customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
+      deploymentMapping: mp.deploymentMapping,
+      disabledByDefault: defaultProvider?.disabledByDefault,
+      extraHeaders: mp.extraHeaders as { key: string; value: string }[] | null,
+      scopes: mp.scopes.map((s) => ({
+        scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+        scopeId: s.scopeId,
+      })),
+      scopeType: narrowestScope.scopeType,
+      scopeId: narrowestScope.scopeId,
+    };
+  }
+
+  /** Mask key-bearing fields of a row's customKeys for frontend display,
+   * leaving URLs and other non-secret values visible. */
+  private maskRowCustomKeys(
+    customKeys: unknown,
+  ): MaybeStoredModelProvider["customKeys"] {
+    if (!customKeys) return null;
+    return Object.fromEntries(
+      Object.entries(customKeys as Record<string, unknown>).map(
+        ([key, value]) => [
+          key,
+          KEY_CHECK.some((k) => key.includes(k))
+            ? MASKED_KEY_PLACEHOLDER
+            : value,
+        ],
+      ),
+    ) as MaybeStoredModelProvider["customKeys"];
+  }
+
+  /**
+   * The accessible row that actually serves `bareModel` for this provider
+   * key: the narrowest-scope ENABLED row whose custom catalog (chat or
+   * embeddings) lists the model. Null when no enabled row lists it —
+   * callers then keep the scope-collapse winner, which also covers
+   * registry-model providers whose rows list nothing custom.
+   *
+   * Why this exists: with multi-instance providers the default-models
+   * picker offers the union of every accessible row's catalog, so a
+   * configured default may only be served by a wider-scope row than the
+   * collapse winner. Executing it against the narrower row's credentials
+   * targets a deployment that doesn't exist there (Azure answers 404
+   * "Resource not found"). See
+   * specs/model-providers/scope-and-multi-instance.feature ("Runtime
+   * provider-row selection follows the model").
+   */
+  async findRowServingModel(params: {
+    projectId: string;
+    provider: string;
+    bareModel: string;
+  }): Promise<MaybeStoredModelProvider | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: params.projectId },
+      include: { team: { select: { organizationId: true } } },
+    });
+    if (!project) return null;
+
+    const defaultProviders = this.buildDefaultProviders(project);
+    const rows = await this.repository.findAllAccessibleForProject(
+      params.projectId,
+    );
+
+    const candidates = rows.filter(
+      (mp) =>
+        mp.provider === params.provider &&
+        mp.enabled &&
+        providerRowServesModel({ row: mp, bareModel: params.bareModel }),
+    );
+    if (candidates.length === 0) return null;
+
+    // Rank by the scope that grants THIS project access to the row — a
+    // multi-scope row's attachment to some other project's scope must not
+    // inflate its specificity here (that scope grants nothing to us).
+    const chain = {
+      projectId: project.id,
+      teamId: project.teamId,
+      organizationId: project.team?.organizationId ?? null,
+    };
+    // Deterministic order within the same tier: fallbackPriorityGlobal
+    // ASC (nulls last) then createdAt ASC — two same-tier rows both
+    // serving the model must not route by the DB's unspecified row
+    // order.
+    const sorted = [...candidates].sort((a, b) => {
+      const tier =
+        this.chainSpecificity(b.scopes, chain) -
+        this.chainSpecificity(a.scopes, chain);
+      if (tier !== 0) return tier;
+      const aPriority = a.fallbackPriorityGlobal ?? Number.MAX_SAFE_INTEGER;
+      const bPriority = b.fallbackPriorityGlobal ?? Number.MAX_SAFE_INTEGER;
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    });
+    return this.toMaybeStoredProvider(sorted[0]!, defaultProviders, true);
+  }
+
+  /**
+   * Specificity of a row RELATIVE to a project's scope chain: the highest
+   * tier among the row's attachments that actually grant this project
+   * access (its own PROJECT scope > its TEAM > its ORGANIZATION).
+   * Attachments outside the chain — e.g. another project's PROJECT scope
+   * on a shared row — contribute nothing.
+   */
+  private chainSpecificity(
+    scopes: { scopeType: string; scopeId: string }[],
+    chain: {
+      projectId: string;
+      teamId: string | null;
+      organizationId: string | null;
+    },
+  ): number {
+    let best = 0;
+    for (const s of scopes) {
+      if (s.scopeType === "PROJECT" && s.scopeId === chain.projectId) {
+        best = Math.max(best, 3);
+      } else if (s.scopeType === "TEAM" && s.scopeId === chain.teamId) {
+        best = Math.max(best, 2);
+      } else if (
+        s.scopeType === "ORGANIZATION" &&
+        s.scopeId === chain.organizationId
+      ) {
+        best = Math.max(best, 1);
+      }
+    }
+    return best;
   }
 
   private scopePriority(
@@ -953,22 +1031,33 @@ export class ModelProviderService {
     const masked = { ...providers };
 
     for (const [providerKey, config] of Object.entries(masked)) {
-      if (config.customKeys) {
+      if (config.customKeys || config.extraHeaders?.length) {
         masked[providerKey] = {
           ...config,
-          customKeys: Object.fromEntries(
-            Object.entries(config.customKeys).map(([key, value]) => [
-              key,
-              KEY_CHECK.some((k) => key.includes(k))
-                ? MASKED_KEY_PLACEHOLDER
-                : value,
-            ]),
-          ),
+          customKeys: this.maskRowCustomKeys(config.customKeys),
+          extraHeaders: this.maskExtraHeaders(config.extraHeaders),
         };
       }
     }
 
     return masked;
+  }
+
+  /**
+   * Header values are masked wholesale — unlike customKeys there is no
+   * name pattern to distinguish secrets, and azure/custom extra headers
+   * routinely carry auth tokens. Keys stay visible so the form can be
+   * edited; `mergeExtraHeaders` restores real values when the masked
+   * placeholder comes back on save.
+   */
+  private maskExtraHeaders(
+    extraHeaders: { key: string; value: string }[] | null | undefined,
+  ): { key: string; value: string }[] | null {
+    if (extraHeaders == null) return null;
+    return extraHeaders.map(({ key }) => ({
+      key,
+      value: MASKED_KEY_PLACEHOLDER,
+    }));
   }
 
   private validateAndCleanKeys(
@@ -1043,7 +1132,11 @@ export class ModelProviderService {
   }
 
   private async updateExisting(
-    existingProvider: { id: string; customKeys: unknown },
+    existingProvider: {
+      id: string;
+      customKeys: unknown;
+      extraHeaders: unknown;
+    },
     data: {
       projectId: string;
       provider: string;
@@ -1075,7 +1168,12 @@ export class ModelProviderService {
         enabled: data.enabled,
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
-        extraHeaders: data.extraHeaders,
+        extraHeaders: this.mergeExtraHeaders(
+          data.extraHeaders,
+          existingProvider.extraHeaders as
+            | { key: string; value: string }[]
+            | null,
+        ),
         ...(data.name !== undefined && { name: data.name }),
         ...(data.scopes !== undefined && { scopes: data.scopes }),
         ...(customKeysToSave !== undefined && {
@@ -1111,7 +1209,9 @@ export class ModelProviderService {
         enabled: data.enabled,
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
-        extraHeaders: data.extraHeaders,
+        // No existing row to restore from — placeholder values are dropped
+        // instead of being stored literally.
+        extraHeaders: this.mergeExtraHeaders(data.extraHeaders, null),
         scopes: data.scopes,
         ...(customKeysProvided &&
           validatedKeys && { customKeys: validatedKeys }),
@@ -1144,5 +1244,33 @@ export class ModelProviderService {
           .map(([key, value]) => [key, value]),
       ),
     };
+  }
+
+  /**
+   * Header counterpart of `mergeCustomKeys`: the frontend receives header
+   * values as the masked placeholder, so an untouched header comes back
+   * masked on save and must be restored from the stored row. Restore by
+   * header key first; when the key was renamed in place, fall back to the
+   * header at the same position — but only when that positional header
+   * isn't also claimed by name elsewhere in the submission, so a
+   * rename+reorder can never copy one header's secret under another
+   * header's name. A placeholder that matches nothing is dropped rather
+   * than stored as a literal value.
+   */
+  private mergeExtraHeaders(
+    incoming: { key: string; value: string }[],
+    existing: { key: string; value: string }[] | null,
+  ): { key: string; value: string }[] {
+    const incomingKeys = new Set(incoming.map((h) => h.key));
+    return incoming.flatMap((header, index) => {
+      if (header.value !== MASKED_KEY_PLACEHOLDER) return [header];
+      const byKey = existing?.find((h) => h.key === header.key);
+      if (byKey) return [{ key: header.key, value: byKey.value }];
+      const positional = existing?.[index];
+      if (positional && !incomingKeys.has(positional.key)) {
+        return [{ key: header.key, value: positional.value }];
+      }
+      return [];
+    });
   }
 }

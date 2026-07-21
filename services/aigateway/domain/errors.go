@@ -52,4 +52,9 @@ const (
 	ErrProviderTimeout  = herr.Code("provider_timeout")
 	ErrKeyRevoked       = herr.Code("virtual_key_revoked")
 	ErrAuthUpstream     = herr.Code("auth_upstream_unavailable")
+	// ErrNoProviderConfigured means the virtual key's bundle carries zero
+	// provider credentials — the organization has no ModelProvider configured.
+	// Without this guard the dispatcher would hand Bifrost a zero-value
+	// Credential and the caller would see an opaque "provider is required".
+	ErrNoProviderConfigured = herr.Code("no_provider_configured")
 )

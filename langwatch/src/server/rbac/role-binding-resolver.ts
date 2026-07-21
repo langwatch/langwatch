@@ -112,7 +112,15 @@ async function collectBindingsForUser({
 }): Promise<ResolvedBinding[]> {
   const [directBindings, groupBindings] = await Promise.all([
     prisma.roleBinding.findMany({
-      where: { organizationId, userId },
+      // Gate the direct binding on current organization membership so a stale
+      // cross-org binding does not confer access — this is the API-key ceiling
+      // path (resolveApiKeyPermission checks the owning user's bindings here),
+      // and it must fail closed on membership just like the tRPC resolver.
+      where: {
+        organizationId,
+        userId,
+        user: { orgMemberships: { some: { organizationId } } },
+      },
       select: { role: true, customRoleId: true, scopeType: true, scopeId: true },
     }),
     prisma.roleBinding.findMany({

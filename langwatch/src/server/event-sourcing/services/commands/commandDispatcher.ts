@@ -107,12 +107,7 @@ export async function processCommand<EventType extends Event>(
     return;
   }
 
-  const command = createCommand(
-    tenantId,
-    aggregateId,
-    commandType,
-    validated,
-  );
+  const command = createCommand(tenantId, aggregateId, commandType, validated);
 
   const commandStartTime = performance.now();
   try {
@@ -186,7 +181,10 @@ export async function processCommand<EventType extends Event>(
           await handler.cleanupAfterStore(command);
         } catch (err) {
           log?.warn(
-            { error: err instanceof Error ? err.message : String(err), commandType },
+            {
+              error: err instanceof Error ? err.message : String(err),
+              commandType,
+            },
             "Post-store cleanup failed (best-effort) — event is durable, cleanup skipped",
           );
         }
@@ -210,6 +208,13 @@ export async function processCommand<EventType extends Event>(
 export interface CommandHandlerOptions<Payload> {
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
+  /**
+   * Serialize this command with every other command that enables the option
+   * for the same tenant and aggregate. This keeps command handling, event
+   * append, and projection staging atomic with respect to the next command
+   * for that aggregate while allowing other aggregates to run concurrently.
+   */
+  serializeByAggregate?: boolean;
   delay?: number;
   deduplication?: DeduplicationStrategy<Payload>;
   concurrency?: number;
@@ -218,4 +223,3 @@ export interface CommandHandlerOptions<Payload> {
   ) => Record<string, string | number | boolean>;
   killSwitch?: KillSwitchOptions;
 }
-

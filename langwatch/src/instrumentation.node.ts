@@ -73,8 +73,13 @@ if (
   setupObservability({
     langwatch: langwatchTracingEnabled ? undefined : "disabled",
     attributes: {
-      "service.name": "langwatch-backend",
-      "deployment.environment": process.env.ENVIRONMENT,
+      "service.name": process.env.OTEL_SERVICE_NAME ?? "langwatch-app",
+      "deployment.environment.name": process.env.ENVIRONMENT,
+      // Provenance marker shared with the Go services (pkg/otelsetup):
+      // everything the platform emits about ITSELF is identifiable as
+      // internal wherever it lands, so a misrouted payload can be
+      // recognised and refused. Customer traces never carry it.
+      "langwatch.origin": "platform_internal",
     },
     // envDetector merges OTEL_RESOURCE_ATTRIBUTES (e.g. langwatch.worktree=<name>,
     // set by `make observability-connect`) so telemetry from each worktree is
@@ -124,6 +129,11 @@ if (
         // Truncate ioredis db.statement to command + first key
         // (avoid logging content + large attributes)
         "@opentelemetry/instrumentation-ioredis": {
+          // Redis calls are only interesting as part of some larger operation.
+          // Without this, the connection pool's `connect`/`auth`/`info` and the
+          // queue dispatcher's blocking `brpop`/`xread` — none of which have a
+          // parent — each became a root span, burying real traces in noise.
+          requireParentSpan: true,
           dbStatementSerializer: (
             cmdName: string,
             cmdArgs: Array<string | Buffer | number | unknown[]>,
@@ -144,10 +154,10 @@ if (
 // traces + logs when debugging local dev in Grafana.
 if (explicitEndpoint && isEnvTrue(process.env.OTEL_METRICS_ENABLED)) {
   const metricAttrs: Record<string, string> = {
-    "service.name": process.env.OTEL_SERVICE_NAME ?? "langwatch-backend",
+    "service.name": process.env.OTEL_SERVICE_NAME ?? "langwatch-app",
   };
   if (process.env.ENVIRONMENT) {
-    metricAttrs["deployment.environment"] = process.env.ENVIRONMENT;
+    metricAttrs["deployment.environment.name"] = process.env.ENVIRONMENT;
   }
 
   const meterProvider = new MeterProvider({
@@ -167,7 +177,10 @@ if (explicitEndpoint && isEnvTrue(process.env.OTEL_METRICS_ENABLED)) {
   });
   metrics.setGlobalMeterProvider(meterProvider);
 
-  new HostMetrics({ meterProvider, name: "langwatch-backend" }).start();
+  new HostMetrics({
+    meterProvider,
+    name: process.env.OTEL_SERVICE_NAME ?? "langwatch-app",
+  }).start();
 
   // The graceful-shutdown path (start.ts / workers.ts) calls process.exit(0)
   // without waiting on this provider, so the last periodic export can be

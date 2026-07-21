@@ -1,4 +1,4 @@
-import { HandledError } from "../handled-error";
+import { HandledError } from "@langwatch/handled-error";
 
 /**
  * Thrown when a Stripe-dependent operation is invoked in self-hosted

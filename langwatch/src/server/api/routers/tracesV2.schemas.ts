@@ -178,9 +178,33 @@ const spanTreeNodeSchema = z.object({
   outputTokens: z.number().nullish(),
   cacheReadTokens: z.number().nullish(),
   cacheCreationTokens: z.number().nullish(),
+  /**
+   * Row version (ms) — when the span was last projected, NOT span timing.
+   * The live delta poll takes its high-water mark from this: `startTimeMs`
+   * never moves when a span is updated in place (end time, duration, status,
+   * cost), so it cannot serve as the mark. `.nullish()` for preview-mode
+   * fixtures that carry no version — the mark then reads as 0 and corrects
+   * itself on the first server-sourced row.
+   */
+  updatedAtMs: z.number().nullish(),
 });
 
 export type SpanTreeNode = z.infer<typeof spanTreeNodeSchema>;
+
+/**
+ * Cursor for the paged span-tree read (`tracesV2.spanTreePaginated`): the
+ * next page starts strictly after `(startTimeMs, spanId)` in
+ * `(StartTimeMs ASC, SpanId ASC)` order. Keyed rather than offset-based so
+ * pages stay stable while spans are still being ingested.
+ */
+export const spanTreeCursorSchema = z.object({
+  // Bound to a ClickHouse Int64 param — reject Infinity / floats / negatives
+  // so a hand-crafted cursor can't turn into an unparseable bind and a 500.
+  startTimeMs: z.number().int().min(0),
+  spanId: z.string().min(1).max(128),
+});
+
+export type SpanTreeCursor = z.infer<typeof spanTreeCursorSchema>;
 
 /**
  * Per-span LangWatch instrumentation signals — fetched via

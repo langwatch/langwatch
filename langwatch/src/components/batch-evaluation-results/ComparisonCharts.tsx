@@ -20,6 +20,11 @@ import {
 } from "recharts";
 
 import { ChartTooltip } from "../analytics/ChartTooltip";
+import {
+  axisLabelProps,
+  chartHeightFor,
+  truncateLabel,
+} from "./chartAxisLabels";
 import { WinRateChart } from "./WinRateChart";
 import type {
   BatchEvaluationData,
@@ -83,23 +88,8 @@ const calculateYAxisWidth = (
   return Math.max(minWidth, Math.min(maxWidth, calculatedWidth));
 };
 
-/** Threshold for rotating X-axis labels (item count) */
-const ROTATE_LABELS_THRESHOLD = 3;
-
-/** Max label length before truncating (normal) */
-const MAX_LABEL_LENGTH = 14;
-/** Max label length when rotated */
-const MAX_LABEL_LENGTH_ROTATED = 10;
-
-/** Truncate a label and add ellipsis if too long */
-const truncateLabel = (label: string, maxLength = MAX_LABEL_LENGTH): string => {
-  if (label.length <= maxLength) return label;
-  return label.slice(0, maxLength - 1) + "…";
-};
-
-/** Chart height when labels are rotated (needs more space) */
-const CHART_HEIGHT_ROTATED = 190;
-const CHART_HEIGHT_NORMAL = 150;
+// Axis label geometry is shared with WinRateChart so every chart on this page
+// trims and slants the same variant names identically — see chartAxisLabels.ts.
 
 export type XAxisOption = "runs" | "target" | "model" | "prompt" | string;
 
@@ -124,15 +114,6 @@ type ComparisonChartsProps = {
   onXAxisOptionChange?: (option: XAxisOption) => void;
   /** Callback to provide target color map when X-axis is "target" */
   onTargetColorsChange?: (colors: Record<string, string>) => void;
-  /**
-   * Evaluator ids to exclude from the auto-generated `<name> (Score)` bar
-   * chart list. Comparison evaluators emit a 0/1 label chip that reads as a
-   * misleading "score 0" for non-scored prompt targets on the same axis;
-   * BatchEvaluationResults suppresses them here and renders a dedicated
-   * WinRateChart instead. Optional — undefined = no suppression,
-   * preserving pre-existing behavior.
-   */
-  suppressedScoreEvaluatorIds?: Set<string>;
   /**
    * Comparison columns detected in the run. Rendered as extra chart cards
    * inside the same flex row as Cost / Latency so the win-rate chart
@@ -328,9 +309,23 @@ export const ComparisonCharts = ({
   xAxisOption: controlledXAxisOption,
   onXAxisOptionChange,
   onTargetColorsChange,
-  suppressedScoreEvaluatorIds,
   comparisonColumns,
 }: ComparisonChartsProps) => {
+  /**
+   * The comparison evaluators on this page, which are excluded from the
+   * candidate-oriented charts in two ways:
+   *  - no `<name> (Score)` chart, because a comparison's 0/1 label reads as a
+   *    misleading "score 0" for the non-scored prompts on the same axis;
+   *  - no bar on Cost / Latency, because a judge is not a candidate.
+   * Both get their own home in the WinRateChart instead.
+   *
+   * detectComparisonColumns keys a column-style comparison by its target id, so
+   * this same set matches both an evaluator id and a target id.
+   */
+  const comparisonEvaluatorIds = useMemo(
+    () => new Set((comparisonColumns ?? []).map((c) => c.evaluatorId)),
+    [comparisonColumns],
+  );
   // Determine default visibility based on target count
   const shouldShowByDefault = useMemo(() => {
     if (defaultVisible !== undefined) return defaultVisible;
@@ -527,6 +522,7 @@ export const ComparisonCharts = ({
 
       for (const run of runMetrics) {
         for (const targetCol of run.targetColumns) {
+          if (comparisonEvaluatorIds.has(targetCol.id)) continue;
           // Compute metrics for THIS target only (not global run metrics!)
           const targetMetrics = computeTargetMetrics(run.rows, targetCol.id);
 
@@ -711,7 +707,7 @@ export const ComparisonCharts = ({
         ]),
       ),
     }));
-  }, [runMetrics, xAxisOption, promptNames]);
+  }, [runMetrics, xAxisOption, promptNames, comparisonEvaluatorIds]);
 
   // Calculate dynamic Y-axis widths based on data
   const yAxisWidths = useMemo(() => {
@@ -724,11 +720,20 @@ export const ComparisonCharts = ({
     };
   }, [chartData]);
 
-  // Determine if X-axis labels should be rotated (3+ items)
-  const shouldRotateLabels = chartData.length >= ROTATE_LABELS_THRESHOLD;
-  const chartHeight = shouldRotateLabels
-    ? CHART_HEIGHT_ROTATED
-    : CHART_HEIGHT_NORMAL;
+  // Axis geometry for THIS component's charts (cost / latency / score), which
+  // all share one x-axis of `chartData`.
+  const axis = axisLabelProps(chartData.length);
+
+  // Height is shared by every chart in the row, including the WinRateCharts
+  // rendered alongside — and a win-rate chart's bar count (its variants, plus
+  // Tie) is independent of `chartData`, which excludes comparison columns
+  // entirely. Size from the busiest chart so the tallest axis still fits.
+  const chartHeight = chartHeightFor(
+    Math.max(
+      chartData.length,
+      ...(comparisonColumns ?? []).map((c) => c.variants.length + 1),
+    ),
+  );
 
   // Get all evaluators with scores (for score chart)
   const scoreEvaluators = useMemo(() => {
@@ -736,7 +741,7 @@ export const ComparisonCharts = ({
     const seen = new Set<string>();
     for (const run of runMetrics) {
       for (const evalId of Object.keys(run.metrics.avgScores)) {
-        if (suppressedScoreEvaluatorIds?.has(evalId)) continue;
+        if (comparisonEvaluatorIds.has(evalId)) continue;
         if (!seen.has(evalId)) {
           seen.add(evalId);
           evaluators.push({
@@ -747,7 +752,7 @@ export const ComparisonCharts = ({
       }
     }
     return evaluators;
-  }, [runMetrics, suppressedScoreEvaluatorIds]);
+  }, [runMetrics, comparisonEvaluatorIds]);
 
   // Get all evaluators with pass rates (for pass rate chart)
   const passRateEvaluators = useMemo(() => {
@@ -1159,16 +1164,11 @@ export const ComparisonCharts = ({
                       style={{ fontSize: "11px" }}
                       axisLine={false}
                       tickLine={false}
-                      angle={shouldRotateLabels ? -45 : 0}
-                      textAnchor={shouldRotateLabels ? "end" : "middle"}
-                      height={shouldRotateLabels ? 60 : 25}
+                      angle={axis.angle}
+                      textAnchor={axis.textAnchor}
+                      height={axis.height}
                       tickFormatter={(value) =>
-                        truncateLabel(
-                          String(value),
-                          shouldRotateLabels
-                            ? MAX_LABEL_LENGTH_ROTATED
-                            : MAX_LABEL_LENGTH,
-                        )
+                        truncateLabel(String(value), axis.maxLabelLength)
                       }
                     />
                     <YAxis
@@ -1235,16 +1235,11 @@ export const ComparisonCharts = ({
                       style={{ fontSize: "11px" }}
                       axisLine={false}
                       tickLine={false}
-                      angle={shouldRotateLabels ? -45 : 0}
-                      textAnchor={shouldRotateLabels ? "end" : "middle"}
-                      height={shouldRotateLabels ? 60 : 25}
+                      angle={axis.angle}
+                      textAnchor={axis.textAnchor}
+                      height={axis.height}
                       tickFormatter={(value) =>
-                        truncateLabel(
-                          String(value),
-                          shouldRotateLabels
-                            ? MAX_LABEL_LENGTH_ROTATED
-                            : MAX_LABEL_LENGTH,
-                        )
+                        truncateLabel(String(value), axis.maxLabelLength)
                       }
                     />
                     <YAxis
@@ -1317,17 +1312,12 @@ export const ComparisonCharts = ({
                           style={{ fontSize: "11px" }}
                           axisLine={false}
                           tickLine={false}
-                          angle={shouldRotateLabels ? -45 : 0}
-                          textAnchor={shouldRotateLabels ? "end" : "middle"}
-                          height={shouldRotateLabels ? 60 : 25}
+                          angle={axis.angle}
+                          textAnchor={axis.textAnchor}
+                          height={axis.height}
                           tickFormatter={(value) =>
-                            truncateLabel(
-                              String(value),
-                              shouldRotateLabels
-                                ? MAX_LABEL_LENGTH_ROTATED
-                                : MAX_LABEL_LENGTH,
-                            )
-                          }
+                        truncateLabel(String(value), axis.maxLabelLength)
+                      }
                         />
                         <YAxis
                           style={{ fontSize: "11px" }}
@@ -1419,17 +1409,12 @@ export const ComparisonCharts = ({
                           style={{ fontSize: "11px" }}
                           axisLine={false}
                           tickLine={false}
-                          angle={shouldRotateLabels ? -45 : 0}
-                          textAnchor={shouldRotateLabels ? "end" : "middle"}
-                          height={shouldRotateLabels ? 60 : 25}
+                          angle={axis.angle}
+                          textAnchor={axis.textAnchor}
+                          height={axis.height}
                           tickFormatter={(value) =>
-                            truncateLabel(
-                              String(value),
-                              shouldRotateLabels
-                                ? MAX_LABEL_LENGTH_ROTATED
-                                : MAX_LABEL_LENGTH,
-                            )
-                          }
+                        truncateLabel(String(value), axis.maxLabelLength)
+                      }
                         />
                         <YAxis
                           style={{ fontSize: "11px" }}

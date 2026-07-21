@@ -1,16 +1,23 @@
-Feature: Governance preview hides behind a single feature flag
+Feature: Governance visibility rides a single feature flag
   The governance plane (personal keys, admin oversight, RoutingPolicy
-  admin, IngestionSource setup, Activity Monitor) is being built out on a
-  long-lived branch while existing customers continue using the shipping
-  product. To let this branch merge into main without exposing in-progress
-  surfaces, all user-visible governance UI is gated behind ONE app feature
-  flag. The unified `langwatch` CLI carries no preview gate — once
+  admin, IngestionSource setup, Activity Monitor) is controlled by ONE app
+  feature flag, and that flag ships enabled by default: a fresh
+  self-hosted installation (`npx @langwatch/server`, docker compose,
+  `pnpm dev`) renders the governance surfaces and accepts AI-tools
+  (device) CLI login with zero flag configuration. On SaaS, PostHog
+  release conditions decide per organization, and switching an
+  organization off re-arms every gate for it: UI hidden, device login
+  refused. The unified `langwatch` CLI carries no preview gate: once
   installed the commands are always available, with per-account
   entitlement enforced server-side on the underlying API.
 
   Spec scope: the gating contract itself — what's hidden, when, and how
-  to enable it for development. Implementation lives in
-  `langwatch/src/server/featureFlag/frontendFeatureFlags.ts`.
+  operators control it. The default lives in
+  `langwatch/src/server/featureFlag/registry.ts`; frontend exposure in
+  `langwatch/src/server/featureFlag/frontendFeatureFlags.ts`; the CLI
+  device-login gate in `langwatch/src/server/routes/auth-cli.ts`
+  (ADR-038 Decision 7 pins the registry default and the gate fallback as
+  a pair that moves together).
 
   Background:
     Given the canonical name is locked:
@@ -19,11 +26,17 @@ Feature: Governance preview hides behind a single feature flag
     And the AI Gateway product itself ships unblocked on its own flag
       `release_ui_ai_gateway_menu_enabled` (separate concern, not gated)
 
-  Scenario: The single app flag gates every new governance UI surface
+  Scenario: A default installation enables governance without configuration
+    Given a self-hosted installation with no PostHog key and no flag overrides
+    When a user logs in and navigates the product
+    Then the governance surfaces render (sidebar Govern section, /me)
+    And an AI-tools (device) CLI login approval is not refused by the governance gate
+
+  Scenario: The single app flag gates every governance UI surface when off
     Given a user logged into LangWatch
     And `release_ui_ai_governance_enabled` evaluates to false for them
     When they navigate the product
-    Then none of the governance preview surfaces are reachable from the UI:
+    Then none of the governance surfaces are reachable from the UI:
       | surface                            | path                              |
       | My Workspace dashboard             | /me                               |
       | My Workspace settings              | /me/settings                      |
@@ -36,18 +49,19 @@ Feature: Governance preview hides behind a single feature flag
     And no governance API calls fire from the client
     And the existing AI Gateway menu still renders (different flag)
 
-  Scenario: Force-enable in dev via env override
-    Given a developer is running `pnpm dev`
-    When they set `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_governance_enabled`
-    Then every governance surface above renders
-    And the standard PostHog evaluation path is bypassed
-    And no PostHog connection is required for the override to work
+  Scenario: Operators force the flag off via env override
+    Given an operator disables governance for the whole installation via env override
+    When users log in
+    Then every governance surface above is hidden
+    And AI-tools (device) CLI login approvals are refused with a pointer at project login
+    And no PostHog connection is required for the override to apply
 
-  Scenario: Per-org rollout via PostHog release condition
-    Given an admin enables the governance preview for one customer org via PostHog
+  Scenario: Per-org kill switch via PostHog release condition
+    Given an admin switches the governance flag off for one customer org via PostHog
     When users in that org log in
-    Then the governance surfaces render only for them
-    And users in other orgs continue to see the existing product unchanged
+    Then the governance surfaces are hidden only for them
+    And their AI-tools (device) CLI login approvals are refused
+    And users in other orgs continue with governance enabled unchanged
 
   Scenario: CLI surface is always available once installed
     Given a user has installed the unified `langwatch` CLI
@@ -66,8 +80,9 @@ Feature: Governance preview hides behind a single feature flag
 
   Scenario: Gating contract documented for downstream contributors
     Given a contributor is adding a new governance UI page
-    When they read docs/ai-gateway/governance/feature-flag.md
-    Then it explains:
+    When they read `dev/docs/adr/038-intent-forked-onboarding-governance-vs-llmops.md`
+      and the flag's entry in `langwatch/src/server/featureFlag/registry.ts`
+    Then they explain:
       | concern                                                        |
       | which flag to use (release_ui_ai_governance_enabled, not gateway) |
       | how to gate a page (useFeatureFlag hook + redirect/empty state) |

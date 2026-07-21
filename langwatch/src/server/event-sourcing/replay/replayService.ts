@@ -14,6 +14,7 @@ import { nullLog } from "./replayLog";
 import { discoverProjectionAggregates } from "./replayDiscovery";
 import { replayFoldProjection } from "./replayFoldPath";
 import { replayMapProjection } from "./replayMapPath";
+import { replayStateProjection } from "./replayStatePath";
 import { replayOptimized } from "./replayOptimizedPath";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 
@@ -72,7 +73,11 @@ export class ReplayService {
     const touchedTenants = new Set<string>();
 
     const mapProjections = config.mapProjections ?? [];
-    const totalProjections = config.projections.length + mapProjections.length;
+    const stateProjections = config.stateProjections ?? [];
+    const totalProjections =
+      config.projections.length +
+      mapProjections.length +
+      stateProjections.length;
 
     for (let pi = 0; pi < config.projections.length; pi++) {
       const projection = config.projections[pi]!;
@@ -108,6 +113,38 @@ export class ReplayService {
           ctx: this.ctx,
           projection,
           projectionIndex: config.projections.length + mi,
+          totalProjections,
+          tenantIds: config.tenantIds,
+          aggregateIds: config.aggregateIds,
+          since: config.since,
+          batchSize,
+          aggregateBatchSize,
+          dryRun: config.dryRun ?? false,
+          log,
+          onProgress: callbacks?.onProgress,
+          onBatchComplete: callbacks?.onBatchComplete,
+        });
+
+        totalAggregatesReplayed += result.aggregatesReplayed;
+        totalEventsReplayed += result.totalEvents;
+        totalBatchErrors += result.batchErrors;
+        if (!firstError && result.firstError) firstError = result.firstError;
+        for (const tid of result.touchedTenants) touchedTenants.add(tid);
+
+        if (result.batchErrors > 0) break;
+      }
+    }
+
+    // State-projection lane: pause and drain each `.withProjection()` queue,
+    // then rebuild its Postgres rows deterministically from canonical events.
+    if (totalBatchErrors === 0) {
+      for (let si = 0; si < stateProjections.length; si++) {
+        const projection = stateProjections[si]!;
+        const result = await replayStateProjection({
+          ctx: this.ctx,
+          projection,
+          projectionIndex:
+            config.projections.length + mapProjections.length + si,
           totalProjections,
           tenantIds: config.tenantIds,
           aggregateIds: config.aggregateIds,

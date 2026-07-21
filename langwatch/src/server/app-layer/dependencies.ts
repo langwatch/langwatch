@@ -26,24 +26,31 @@ import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
 import type { ShareService } from "./share/share.service";
 import type { SimulationRunService } from "./simulations/simulation-run.service";
+import type { LangyConversationService } from "./langy/langy-conversation.service";
+import type { LangyTurnService } from "./langy/langy-turn.service";
+import type { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
+import type { LangyCredentialService } from "./langy/LangyCredentialService";
+import type { LangyMessageService } from "./langy/langy-message.service";
+import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
+import type { TopicService } from "./topic-clustering/topic.service";
+import type { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
-import type { MetricRecordStorageService } from "./traces/metric-record-storage.service";
 import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
 import type { TraceListService } from "./traces/trace-list.service";
 import type { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import type { TraceSummaryService } from "./traces/trace-summary.service";
-import type { EmailSuppressionService } from "./triggers/emailSuppression.service";
-import type { TriggerService } from "./triggers/trigger.service";
+import type { EmailSuppressionService } from "./automations/emailSuppression.service";
+import type { TriggerService } from "./automations/trigger.service";
 import type {
   TestFireResult,
   TestFireTriggerInput,
-} from "./triggers/trigger-template.service";
+} from "./automations/trigger-template.service";
 import type { UsageService } from "./usage/usage.service";
 
 export interface DataRetentionDependencies {
@@ -72,7 +79,6 @@ export interface AppDependencies {
     list: TraceListService;
     spans: SpanStorageService;
     logRecords: LogRecordStorageService;
-    metricRecords: MetricRecordStorageService;
     collection: TraceRequestCollectionService;
     logCollection: LogRequestCollectionService;
     metricCollection: MetricRequestCollectionService;
@@ -89,6 +95,24 @@ export interface AppDependencies {
   };
   suiteRuns: {
     runs: SuiteRunService;
+  };
+  /**
+   * ADR-051 §7: read side of topic clustering. The commands live on
+   * `commands.topicClustering` and are merged onto the same `app.topicClustering`
+   * facade, so callers get status reads and clustering requests from one place.
+   */
+  topicClustering: {
+    status: TopicClusteringStatusService;
+    topics: TopicService;
+  };
+  /** ADR-046: Langy conversations as an event-sourced projection. */
+  langy: {
+    conversations: LangyConversationService;
+    turns: LangyTurnService;
+    messages: LangyMessageService;
+    githubInstallations: LangyGithubInstallationsService;
+    credentials: LangyCredentialService;
+    feedbackPrompt: LangyFeedbackPromptService;
   };
   experiments: ExperimentService;
   triggers: TriggerService;

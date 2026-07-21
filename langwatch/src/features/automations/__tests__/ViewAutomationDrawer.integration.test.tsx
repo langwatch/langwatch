@@ -14,6 +14,7 @@ let mockTriggerRow: Record<string, unknown> | null = null;
 let mockRecentFires: Array<Record<string, unknown>> = [];
 let mockGraphRow: Record<string, unknown> | null = null;
 let mockDatasets: Array<Record<string, unknown>> = [];
+let mockWebhookDeliveries: Array<Record<string, unknown>> = [];
 
 const { mockOpenDrawer, mockCloseDrawer } = vi.hoisted(() => ({
   mockOpenDrawer: vi.fn(),
@@ -62,6 +63,13 @@ vi.mock("~/utils/api", () => ({
           error: null,
         }),
       },
+      getWebhookDeliveries: {
+        useQuery: () => ({
+          data: mockWebhookDeliveries,
+          isLoading: false,
+          error: null,
+        }),
+      },
     },
     graphs: {
       getById: {
@@ -95,6 +103,7 @@ function renderDrawer() {
 describe("ViewAutomationDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockWebhookDeliveries = [];
   });
 
   afterEach(() => {
@@ -170,6 +179,84 @@ describe("ViewAutomationDrawer", () => {
         expect(mockOpenDrawer).toHaveBeenCalledWith("automation", {
           automationId: "trigger_1",
         });
+      });
+    });
+  });
+
+  describe("given a saved webhook automation", () => {
+    it("shows the method, safe hostname, and empty delivery state", () => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "Pager webhook",
+        action: "SEND_WEBHOOK",
+        customGraphId: null,
+        filters: "{}",
+        actionParams: {
+          url: "https://events.example.test/private/path?token=hidden",
+          method: "PATCH",
+          headers: { Authorization: "__kept__" },
+        },
+      };
+
+      renderDrawer();
+
+      expect(screen.getByText("PATCH events.example.test")).toBeDefined();
+      expect(
+        screen.getByText("No delivery attempts recorded yet."),
+      ).toBeDefined();
+      expect(screen.queryByText(/token=hidden/)).toBeNull();
+    });
+  });
+
+  describe("given a webhook automation with a failed delivery attempt", () => {
+    beforeEach(() => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "Pager webhook",
+        action: "SEND_WEBHOOK",
+        customGraphId: null,
+        filters: "{}",
+        actionParams: {
+          url: "https://events.example.test/hook",
+          method: "POST",
+          headers: {},
+        },
+      };
+      mockRecentFires = [];
+      mockWebhookDeliveries = [
+        {
+          id: "delivery_1",
+          triggerId: "trigger_1",
+          dispatchId: "dispatch_1",
+          responseStatus: 500,
+          latencyMs: 120,
+          error: null,
+          response: {
+            body: "<script>alert('xss')</script>",
+            headers: { "X-Debug": "<img src=x onerror=alert(1)>" },
+          },
+          outcome: "terminal",
+          firedAt: new Date(Date.now() - HOUR_MS),
+        },
+      ];
+    });
+
+    describe("when the user expands the attempt", () => {
+      it("renders the response body and headers as literal text, not markup", async () => {
+        renderDrawer();
+
+        await userEvent.click(
+          screen.getByRole("button", { name: /HTTP 500/ }),
+        );
+
+        expect(
+          screen.getByText("<script>alert('xss')</script>"),
+        ).toBeDefined();
+        expect(document.querySelector("script")).toBeNull();
+        expect(
+          screen.getByText("X-Debug: <img src=x onerror=alert(1)>"),
+        ).toBeDefined();
+        expect(document.querySelector("img")).toBeNull();
       });
     });
   });

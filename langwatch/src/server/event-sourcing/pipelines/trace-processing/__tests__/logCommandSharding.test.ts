@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { RecordLogCommand } from "../commands/recordLogCommand";
 import { MAX_LOG_SHARD_COUNT } from "../commands/logCommandGroupKey";
+import { RecordLogCommand } from "../commands/recordLogCommand";
 import {
   createTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,
@@ -41,8 +41,6 @@ vi.mock("../commands/recordSpanCommand", async (importOriginal) => {
  */
 
 const reactorStub = (name: string) => ({ name, handle: async () => {} }) as any;
-const outboxReactorStub = (name: string) =>
-  ({ name, decide: async () => [] }) as any;
 
 function buildTraceDeps(
   overrides: Partial<TraceProcessingPipelineDeps> = {},
@@ -50,11 +48,10 @@ function buildTraceDeps(
   const store = {} as any;
   return {
     spanAppendStore: store,
-    logRecordAppendStore: store,
-    metricRecordAppendStore: store,
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,
+    logRecordAppendStore: store,
     originGateReactor: reactorStub("originGate"),
     evaluationTriggerReactor: reactorStub("evaluationTrigger"),
     customEvaluationSyncReactor: reactorStub("customEvaluationSync"),
@@ -62,13 +59,10 @@ function buildTraceDeps(
     projectMetadataReactor: reactorStub("projectMetadata"),
     simulationMetricsSyncReactor: reactorStub("simulationMetricsSync"),
     experimentMetricsSyncReactor: reactorStub("experimentMetricsSync"),
-    alertTriggerReactor: outboxReactorStub("alertTrigger"),
-    alertTriggerNotifyOutboxReactor: outboxReactorStub(
-      "alertTriggerNotifyOutbox",
-    ),
-    graphTriggerEvaluationOutboxReactor: outboxReactorStub(
-      "graphTriggerEvaluation",
-    ),
+    automations: {
+      triggerMatchHandler: vi.fn().mockResolvedValue(undefined),
+      graphActivityHandler: vi.fn().mockResolvedValue(undefined),
+    },
     spanStorageBroadcastReactor: reactorStub("spanStorageBroadcast"),
     claudeCodeSpanSyncReactor: reactorStub("claudeCodeSpanSync"),
     ...overrides,
@@ -109,7 +103,9 @@ describe("trace-processing pipeline log-command sharding", () => {
       const getGroupKey = shardedGroupKey({ logCommandShardCount: 8 });
       const groups = new Set(
         Array.from({ length: 64 }, (_, i) =>
-          getGroupKey(payload(TRACE_ID, (i + 1).toString(16).padStart(16, "0"))),
+          getGroupKey(
+            payload(TRACE_ID, (i + 1).toString(16).padStart(16, "0")),
+          ),
         ),
       );
       expect(groups.size).toBeGreaterThan(1);

@@ -240,8 +240,38 @@ async function flushOtelTraces(): Promise<void> {
   }
 }
 
+/**
+ * Flatten an error and its `cause` chain into a single string.
+ *
+ * Node's `fetch`/undici surface TLS and network failures as a generic
+ * `TypeError: fetch failed` whose real reason (e.g. "self-signed certificate in
+ * certificate chain", `SELF_SIGNED_CERT_IN_CHAIN`) lives on `error.cause`.
+ * Reporting only `error.message` would drop that signal, so the parent — and
+ * the failure classifier — would never see why the run died. Walk the chain and
+ * include any error `code` so the classification is accurate.
+ */
+function formatErrorWithCauses(error: unknown): string {
+  const parts: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    if (current instanceof Error) {
+      const code = (current as { code?: unknown }).code;
+      parts.push(
+        typeof code === "string" ? `${current.message} (${code})` : current.message,
+      );
+      current = (current as { cause?: unknown }).cause;
+    } else {
+      parts.push(String(current));
+      break;
+    }
+  }
+  return parts.filter((p) => p.length > 0).join(": ");
+}
+
 main().catch(async (error) => {
-  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorMessage = formatErrorWithCauses(error);
   logger.error({ err: errorMessage }, "scenario execution failed");
   // Still flush traces on error so we capture what happened
   await flushOtelTraces();

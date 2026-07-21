@@ -5,7 +5,7 @@ export interface EventSourcedQueueProcessorOptions {
   /**
    * Maximum number of groups that can be processed in parallel.
    * Only used by GroupQueueProcessor.
-   * @default 300
+   * @default 100 (or the GLOBAL_QUEUE_CONCURRENCY env var)
    */
   globalConcurrency?: number;
 }
@@ -88,6 +88,20 @@ export type DeduplicationStrategy<Payload> =
   | DeduplicationConfig<Payload>;
 
 /**
+ * What the queue knows about THIS delivery of a job, as opposed to the job's
+ * own payload.
+ *
+ * `attempt` is 1 on a fresh delivery and increments per retry. A fold uses it
+ * to tell a first delivery from a redelivery: on a fresh delivery the previous
+ * batch for that group must already have been acked (the queue holds one
+ * active batch per group), so anything it recorded about applied events is
+ * dead and can be discarded rather than accumulated forever.
+ */
+export interface JobDelivery {
+  attempt: number;
+}
+
+/**
  * Resolves a deduplication strategy to a concrete DeduplicationConfig or undefined.
  */
 export function resolveDeduplicationStrategy<Payload>(
@@ -115,7 +129,7 @@ export interface EventSourcedQueueDefinition<
   /**
    * Domain-specific processor that runs inside the worker.
    */
-  process: (payload: Payload) => Promise<void>;
+  process: (payload: Payload, delivery?: JobDelivery) => Promise<void>;
 
   /**
    * Optional batch processor. When set together with `coalesceMaxBatch`, the
@@ -124,7 +138,10 @@ export interface EventSourcedQueueDefinition<
    * Used by fold projections to collapse a backed-up group's events into one
    * load/apply/store cycle. The first payload is always the dispatched job.
    */
-  processBatch?: (payloads: Payload[]) => Promise<void>;
+  processBatch?: (
+    payloads: Payload[],
+    delivery?: JobDelivery,
+  ) => Promise<void>;
 
   /**
    * Optional per-payload resolver for the maximum number of same-group jobs to

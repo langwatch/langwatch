@@ -24,6 +24,7 @@ import { getTypeLabel } from "~/prompts/components/ui/VariableTypeIcon";
 import { HoverableBigText } from "../../../components/HoverableBigText";
 import { toaster } from "../../../components/ui/toaster";
 import { Tooltip } from "../../../components/ui/tooltip";
+import { DEFAULT_MODEL } from "../../../utils/constants";
 import { camelCaseToTitleCase } from "../../../utils/stringCasing";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type {
@@ -313,11 +314,10 @@ export function FieldsForm({
   field: "parameters" | "inputs" | "outputs";
 }) {
   const _parameters = node.data.parameters;
-  const { default_llm, setNode } = useWorkflowStore(
+  const { setNode } = useWorkflowStore(
     useShallow((state) => ({
       parameters: state.nodes.find((n) => n.id === node.id)?.data.parameters,
       setNode: state.setNode,
-      default_llm: state.default_llm,
     })),
   );
 
@@ -395,7 +395,9 @@ export function FieldsForm({
           return (
             <OptimizationStudioLLMConfigField
               key={field.id}
-              llmConfig={(field.value as LLMConfig) ?? default_llm}
+              // Nodes own their LLM config; the constant is only a display
+              // fallback for stale in-memory state predating materialization.
+              llmConfig={(field.value as LLMConfig) ?? { model: DEFAULT_MODEL }}
               onChange={(llmConfig) => {
                 // Update form state instead of directly calling setNode
                 // This ensures form state stays in sync and prevents resets

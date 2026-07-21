@@ -18,12 +18,7 @@ export function MatchCounter({
       : `${currentIndex + 1} of ${matchCount}`;
 
   return (
-    <Text
-      textStyle="2xs"
-      color="fg.subtle"
-      flexShrink={0}
-      whiteSpace="nowrap"
-    >
+    <Text textStyle="2xs" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
       {label}
     </Text>
   );

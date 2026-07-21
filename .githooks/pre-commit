@@ -10,15 +10,18 @@ set -euo pipefail
 
 staged_before=$(git diff --cached --name-only | sort)
 
-# Check if any staged files match skill sources
-if echo "$staged_before" | grep -qE '^skills/.*\.md$|^skills/_shared/'; then
-  echo "pre-commit: Regenerating prompts-data.jsx from skill sources..."
+# Check if any staged files match skill sources or the docs skills manifest
+regenerated_docs_pages=0
+if echo "$staged_before" | grep -qE '^skills/.*\.mdx?$|^skills/_shared/|^docs/skills/skills-pages-manifest\.json$'; then
+  echo "pre-commit: Regenerating docs/skills pages from skill sources..."
   bash docs/scripts/sync-prompts.sh
-  git add docs/snippets/prompts-data.jsx
+  git add docs/skills/directory.mdx docs/skills/pms-and-domain-experts.mdx
+  regenerated_docs_pages=1
 fi
 
-# Check if any staged files are under docs/ — always regenerate llms.txt (generation is fast)
-if echo "$staged_before" | grep -qE '^docs/'; then
+# Regenerate llms.txt when docs/ files were staged, or when the block above
+# just staged regenerated pages (a skills-only commit still changes docs/).
+if [ "$regenerated_docs_pages" = "1" ] || echo "$staged_before" | grep -qE '^docs/'; then
   echo "pre-commit: Regenerating llms.txt..."
   # Suppress per-file "Processing: ..." stdout noise (errors still surface via
   # stderr) so the index-race ABORT block below remains visible without
@@ -28,7 +31,7 @@ if echo "$staged_before" | grep -qE '^docs/'; then
 fi
 
 # Detect peer-agent index races: anything in $staged_before must still be
-# staged. Hook-written paths (prompts-data.jsx, llms.txt, llms-full.txt) are
+# staged. Hook-written paths (docs/skills pages, llms.txt, llms-full.txt) are
 # additions on top, so we only fail if an originally-staged path disappeared.
 staged_after=$(git diff --cached --name-only | sort)
 dropped=$(comm -23 <(echo "$staged_before") <(echo "$staged_after") || true)

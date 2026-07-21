@@ -36,7 +36,11 @@ import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/
 const tenantId = `test-rollup-${generate("tenant").toString()}`;
 // All spans below land in one minute bucket so the rollup collapses to a
 // single (TenantId, BucketStart, Model, SpanType) group per distinct dim pair.
-const baseMs = new Date("2026-06-01T12:00:00.000Z").getTime();
+// Minute-aligned "yesterday", never a fixed calendar date: inserts are stamped
+// with PLATFORM_DEFAULT_RETENTION_DAYS (49) and the table TTL-deletes rows
+// `_retention_days` after BucketStart, so a fixed date eventually ages past
+// the horizon and the fixtures silently vanish before the reads.
+const baseMs = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 60_000) * 60_000;
 const bucketStart = new Date(baseMs);
 
 let ch: ClickHouseClient;
@@ -98,31 +102,82 @@ async function readRollupForTenant(tenant: string): Promise<{
   durationSum: number;
   errorCount: number;
 }> {
-  const result = await ch.query({
-    query: `
-      SELECT
-        sum(CostSum) AS costSum,
-        sum(SpanCount) AS spanCount,
-        sum(TraceCount) AS traceCount,
-        sum(DurationSum) AS durationSum,
-        sum(ErrorCount) AS errorCount
-      FROM trace_analytics_rollup
-      WHERE TenantId = {tenantId:String}
-      GROUP BY TenantId, BucketStart, Model, SpanType
-    `,
-    query_params: { tenantId: tenant },
-    format: "JSONEachRow",
-  });
-  const rows = (await result.json()) as Array<Record<string, number | string>>;
-  // The fixtures land in one (Model, SpanType) group so we get exactly one row.
-  const row = rows[0] ?? {};
-  return {
-    costSum: Number(row.costSum ?? 0),
-    spanCount: Number(row.spanCount ?? 0),
-    traceCount: Number(row.traceCount ?? 0),
-    durationSum: Number(row.durationSum ?? 0),
-    errorCount: Number(row.errorCount ?? 0),
-  };
+  // Async-inserted rows are intermittently not yet visible to the first
+  // read even with wait_for_async_insert=1 (observed both in CI and
+  // locally, independent of any code change). Every fixture row carries
+  // SpanCount 1, so an empty or zero-span read can only mean the parts
+  // are not queryable yet: retry briefly instead of asserting on a
+  // pre-visibility snapshot. The assertions still verify the SUMS, which
+  // is the contract under test.
+  const deadline = Date.now() + 5_000;
+  for (;;) {
+    const result = await ch.query({
+      query: `
+        SELECT
+          sum(CostSum) AS costSum,
+          sum(SpanCount) AS spanCount,
+          sum(TraceCount) AS traceCount,
+          sum(DurationSum) AS durationSum,
+          sum(ErrorCount) AS errorCount
+        FROM trace_analytics_rollup
+        WHERE TenantId = {tenantId:String}
+        GROUP BY TenantId, BucketStart, Model, SpanType
+      `,
+      query_params: { tenantId: tenant },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<
+      Record<string, number | string>
+    >;
+    // The fixtures land in one (Model, SpanType) group so we get exactly one row.
+    const row = rows[0] ?? {};
+    const read = {
+      costSum: Number(row.costSum ?? 0),
+      spanCount: Number(row.spanCount ?? 0),
+      traceCount: Number(row.traceCount ?? 0),
+      durationSum: Number(row.durationSum ?? 0),
+      errorCount: Number(row.errorCount ?? 0),
+    };
+    if (read.spanCount > 0 || Date.now() >= deadline) return read;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+}
+
+/**
+ * Wait until the tenant's inserted rows are visible to SELECTs. The
+ * repository inserts with async_insert + wait_for_async_insert, but the ack
+ * can still beat part visibility when a server profile overrides the wait —
+ * both CI and local runs have seen a read land on 0 rows milliseconds after
+ * an acked insert. Deadline-polling is the same pattern
+ * metricsSync.convergence uses; a genuinely lost insert still fails, loudly,
+ * after the deadline.
+ */
+async function waitForSpanCount(
+  tenant: string,
+  expected: number,
+): Promise<void> {
+  const deadline = Date.now() + 15_000;
+  for (;;) {
+    const result = await ch.query({
+      query: `
+        SELECT sum(SpanCount) AS spanCount
+        FROM trace_analytics_rollup
+        WHERE TenantId = {tenantId:String}
+      `,
+      query_params: { tenantId: tenant },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{
+      spanCount: number | string;
+    }>;
+    if (Number(rows[0]?.spanCount ?? 0) >= expected) return;
+    if (Date.now() > deadline) {
+      throw new Error(
+        `trace_analytics_rollup rows not visible after 15s (tenant ${tenant}, want ${expected})`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
 }
 
 beforeAll(async () => {
@@ -145,12 +200,25 @@ afterAll(async () => {
 describe("trace_analytics_rollup app-side projection (integration)", () => {
   describe("given three spans of one trace each contributing cost 0.01, 0.04, 0.05", () => {
     beforeAll(async () => {
-      await repo.insertRows([
+      const rows = [
         makeRow(tenantId, { cost: 0.01 }),
         makeRow(tenantId, { cost: 0.04 }),
         makeRow(tenantId, { cost: 0.05 }),
-      ]);
-    });
+      ];
+      // The client's keep-alive reuse can lose an insert on slow CI runners
+      // (the socket closes before the ack is read and the batch silently
+      // never lands — observed as "expected +0" here). One 3-row insert into
+      // one partition is atomic, so "0 rows visible" is the only retry state
+      // and re-inserting can never double-count.
+      await repo.insertRows(rows);
+      for (let attempt = 0; attempt < 20; attempt++) {
+        if ((await readRollupForTenant(tenantId)).spanCount === 3) return;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        if ((await readRollupForTenant(tenantId)).spanCount === 0) {
+          await repo.insertRows(rows);
+        }
+      }
+    }, 30_000);
 
     describe("when each span contributes its own cost as a SimpleAggregateFunction(sum) row", () => {
       it("sums the bucket cost to 0.10", async () => {
@@ -179,6 +247,7 @@ describe("trace_analytics_rollup root-span duration (integration)", () => {
       makeRow(rootTenantId, { cost: 0, durationMs: 0 }),
       makeRow(rootTenantId, { cost: 0, durationMs: 0 }),
     ]);
+    await waitForSpanCount(rootTenantId, 3);
   });
 
   afterAll(async () => {
@@ -217,6 +286,7 @@ describe("trace_analytics_rollup per-trace average via TraceCount (integration)"
       makeRow(avgTenantId, { cost: 0, durationMs: 300, isRoot: true }),
       makeRow(avgTenantId, { cost: 0, durationMs: 0 }),
     ]);
+    await waitForSpanCount(avgTenantId, 3);
   });
 
   afterAll(async () => {
@@ -257,6 +327,7 @@ describe("trace_analytics_rollup re-delivered span (integration)", () => {
     // — no back-out, no signs, no settle.
     await dupRepo.insertRows([row]);
     await dupRepo.insertRows([row]);
+    await waitForSpanCount(dupTenantId, 2);
   });
 
   afterAll(async () => {

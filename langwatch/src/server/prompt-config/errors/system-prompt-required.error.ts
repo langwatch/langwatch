@@ -1,4 +1,4 @@
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 
 /**
  * Thrown when neither a top-level `prompt` nor a system message in

@@ -25,6 +25,22 @@ describe("ShareService.revokeAllTraceShares", () => {
     service = new ShareService(repo, pinnedTraces as PinnedTraceService);
   });
 
+  describe("getStateForResource", () => {
+    it("passes the project to the repository", async () => {
+      await service.getStateForResource({
+        projectId: "project_1",
+        resourceType: "TRACE",
+        resourceId: "trace_1",
+      });
+
+      expect(repo.findByResourceType).toHaveBeenCalledWith({
+        projectId: "project_1",
+        resourceType: "TRACE",
+        resourceId: "trace_1",
+      });
+    });
+  });
+
   describe("regression: source=share pins must be cleared when bulk-revoking", () => {
     /**
      * Disabling trace sharing via project settings calls `revokeAllTraceShares`

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "description": "Canonical information architecture for LangWatch. Every feature is defined here with its surfaces (code, platform, API, docs) and sync state. All implementations (sidebar, docs, skills, MCP) derive from this map.",
+  "description": "Canonical information architecture for LangWatch. Every feature is defined here with its surfaces (code, platform, API, docs) and sync state. All implementations (sidebar, docs, skills, MCP, CLI) derive from this map. A feature also declares what it can be chained with: `produces` (the resource kinds a result of this feature contains) and `consumes` (the resource kinds this feature can act on). Those are semantic facts about the feature, not about any one view — a view (e.g. the Langy panel) binds its own rendering and copy on top of them.",
   "features": [
     {
       "id": "observability",
@@ -25,6 +25,11 @@
                 "trace get",
                 "trace export"
               ],
+              "hints": {
+                "trace search": "langwatch trace search -q \"timeout\" --limit 10 -o json",
+                "trace get": "langwatch trace get <traceId> -o json",
+                "trace export": "langwatch trace export --start-date 2026-01-01 -f jsonl -o traces.jsonl"
+              },
               "skill": "tracing",
               "docs": "https://langwatch.ai/docs/integration/overview.md"
             },
@@ -40,7 +45,11 @@
             "api": "/api/collector",
             "docs": "https://langwatch.ai/docs/integration/overview.md"
           },
-          "sync": "code-to-platform"
+          "sync": "code-to-platform",
+          "produces": [
+            "traces"
+          ],
+          "consumes": []
         },
         {
           "id": "observability.analytics",
@@ -55,6 +64,9 @@
               "cli": [
                 "analytics query"
               ],
+              "hints": {
+                "analytics query": "langwatch analytics query -m trace-count -a sum --group-by metadata.model -o json"
+              },
               "skill": "analytics",
               "docs": null
             },
@@ -72,7 +84,13 @@
             "api": "/api/analytics",
             "docs": "https://langwatch.ai/docs/features/embedded-analytics.md"
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "metrics"
+          ],
+          "consumes": [
+            "traces"
+          ]
         },
         {
           "id": "observability.user-events",
@@ -131,7 +149,13 @@
             "api": "/api/annotations",
             "docs": "https://langwatch.ai/docs/features/annotations.md"
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "annotations"
+          ],
+          "consumes": [
+            "traces"
+          ]
         }
       ]
     },
@@ -154,9 +178,19 @@
                 "typescript": "langwatch.experiments"
               },
               "cli": [
-                "evaluation run",
-                "evaluation status"
+                "experiment list",
+                "experiment run",
+                "experiment status",
+                "experiment list-runs",
+                "experiment results"
               ],
+              "hints": {
+                "experiment list": "langwatch experiment list --limit 20 -o json",
+                "experiment run": "langwatch experiment run <slug> --wait",
+                "experiment status": "langwatch experiment status <slug> -o json",
+                "experiment list-runs": "langwatch experiment list-runs <slug> -o json",
+                "experiment results": "langwatch experiment results <slug> --filter failed -o json"
+              },
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/experiments/sdk.md"
             },
@@ -172,7 +206,15 @@
             "api": "/api/experiment",
             "docs": "https://langwatch.ai/docs/evaluations/experiments/overview.md"
           },
-          "sync": "code-to-platform"
+          "sync": "code-to-platform",
+          "produces": [
+            "experiments"
+          ],
+          "consumes": [
+            "datasets",
+            "evaluators",
+            "prompts"
+          ]
         },
         {
           "id": "evaluations.online-evaluation",
@@ -191,6 +233,13 @@
                 "monitor update",
                 "monitor delete"
               ],
+              "hints": {
+                "monitor list": "langwatch monitor list -o json",
+                "monitor get": "langwatch monitor get <id> -o json",
+                "monitor create": "langwatch monitor create \"toxicity guard\" --check-type ragas/toxicity",
+                "monitor update": "langwatch monitor update <id> --enabled false",
+                "monitor delete": "langwatch monitor delete <id>"
+              },
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/guardrails/code-integration.md"
             },
@@ -210,6 +259,12 @@
             "docs": "https://langwatch.ai/docs/evaluations/online-evaluation/overview.md"
           },
           "sync": null,
+          "produces": [
+            "monitors"
+          ],
+          "consumes": [
+            "evaluators"
+          ],
           "notes": "Platform side uses Monitors. Code side includes guardrails (as_guardrail=True for sync blocking)."
         }
       ]
@@ -240,6 +295,13 @@
                 "scenario run",
                 "scenario delete"
               ],
+              "hints": {
+                "scenario list": "langwatch scenario list -o json",
+                "scenario get": "langwatch scenario get <id> -o json",
+                "scenario create": "langwatch scenario create \"angry user\" --situation \"User is frustrated with billing\"",
+                "scenario run": "langwatch scenario run <id> --target http:agent_abc123 --wait",
+                "scenario delete": "langwatch scenario delete <id>"
+              },
               "skill": "scenarios",
               "docs": "https://langwatch.ai/scenario/introduction/getting-started.md"
             },
@@ -259,7 +321,14 @@
             "docs": "https://langwatch.ai/docs/agent-simulations/introduction.md"
           },
           "sync": null,
-          "plannedSync": "bidirectional"
+          "plannedSync": "bidirectional",
+          "produces": [
+            "scenarios"
+          ],
+          "consumes": [
+            "agents",
+            "prompts"
+          ]
         },
         {
           "id": "agent-simulations.runs",
@@ -275,6 +344,10 @@
                 "simulation-run list",
                 "simulation-run get"
               ],
+              "hints": {
+                "simulation-run list": "langwatch simulation-run list --status FAILED -o json",
+                "simulation-run get": "langwatch simulation-run get <runId> --full -o json"
+              },
               "skill": null,
               "docs": null
             },
@@ -290,7 +363,13 @@
             "api": "/api/simulation-runs",
             "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "simulation-runs"
+          ],
+          "consumes": [
+            "scenarios"
+          ]
         },
         {
           "id": "agent-simulations.suites",
@@ -311,6 +390,12 @@
                 "suite run",
                 "suite delete"
               ],
+              "hints": {
+                "suite list": "langwatch suite list -o json",
+                "suite get": "langwatch suite get <id> -o json",
+                "suite create": "langwatch suite create \"regression\" --scenarios id1,id2 --targets http:agent_abc123",
+                "suite run": "langwatch suite run <id> --wait"
+              },
               "skill": null,
               "docs": null
             },
@@ -330,7 +415,15 @@
             "api": "/api/suites",
             "docs": null
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "suites",
+            "simulation-runs"
+          ],
+          "consumes": [
+            "scenarios",
+            "agents"
+          ]
         }
       ]
     },
@@ -369,6 +462,14 @@
                 "prompt versions",
                 "prompt restore"
               ],
+              "hints": {
+                "prompt list": "langwatch prompt list -o json",
+                "prompt create": "langwatch prompt create my-prompt",
+                "prompt add": "langwatch prompt add agent/foo@5",
+                "prompt sync": "langwatch prompt sync",
+                "prompt pull": "langwatch prompt pull --tag production",
+                "prompt push": "langwatch prompt push"
+              },
               "skill": "prompts",
               "docs": "https://langwatch.ai/docs/prompt-management/cli.md"
             },
@@ -391,7 +492,11 @@
             "api": "/api/prompts",
             "docs": "https://langwatch.ai/docs/prompt-management/overview.md"
           },
-          "sync": "bidirectional"
+          "sync": "bidirectional",
+          "produces": [
+            "prompts"
+          ],
+          "consumes": []
         },
         {
           "id": "prompt-management.prompt-playground",
@@ -459,7 +564,13 @@
             "api": "/api/agents",
             "docs": null
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "agents"
+          ],
+          "consumes": [
+            "prompts"
+          ]
         },
         {
           "id": "library.workflows",
@@ -495,7 +606,14 @@
             "api": "/api/workflows",
             "docs": "https://langwatch.ai/docs/optimization-studio/overview.md"
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "workflows"
+          ],
+          "consumes": [
+            "prompts",
+            "datasets"
+          ]
         },
         {
           "id": "library.evaluators",
@@ -514,6 +632,13 @@
                 "evaluator update",
                 "evaluator delete"
               ],
+              "hints": {
+                "evaluator list": "langwatch evaluator list -o json",
+                "evaluator get": "langwatch evaluator get <idOrSlug> -o json",
+                "evaluator create": "langwatch evaluator create \"my judge\" --type langevals/llm_judge",
+                "evaluator update": "langwatch evaluator update <idOrSlug> --settings '{\"model\":\"openai/gpt-5-mini\"}'",
+                "evaluator delete": "langwatch evaluator delete <idOrSlug>"
+              },
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/evaluators/built-in-evaluators.md"
             },
@@ -532,7 +657,13 @@
             "api": "/api/evaluations",
             "docs": "https://langwatch.ai/docs/evaluations/evaluators/overview.md"
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "evaluators"
+          ],
+          "consumes": [
+            "datasets"
+          ]
         },
         {
           "id": "library.datasets",
@@ -557,6 +688,15 @@
                 "dataset records update",
                 "dataset records delete"
               ],
+              "hints": {
+                "dataset list": "langwatch dataset list -o json",
+                "dataset create": "langwatch dataset create my-dataset -c input:string,output:string",
+                "dataset get": "langwatch dataset get <slugOrId> -o json",
+                "dataset upload": "langwatch dataset upload <slug> ./records.csv",
+                "dataset download": "langwatch dataset download <slugOrId> -f jsonl > records.jsonl",
+                "dataset records list": "langwatch dataset records list <slugOrId> --limit 50 -o json",
+                "dataset records add": "langwatch dataset records add <slugOrId> --file records.json"
+              },
               "skill": "datasets",
               "docs": "https://langwatch.ai/docs/datasets/programmatic-access.md"
             },
@@ -579,7 +719,13 @@
             "api": "/api/dataset",
             "docs": "https://langwatch.ai/docs/datasets/overview.md"
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "datasets"
+          ],
+          "consumes": [
+            "traces"
+          ]
         }
       ],
       "surfaces": {
@@ -626,7 +772,14 @@
         "api": "/api/dashboards",
         "docs": null
       },
-      "sync": null
+      "sync": null,
+      "produces": [
+        "dashboards",
+        "graphs"
+      ],
+      "consumes": [
+        "metrics"
+      ]
     },
     {
       "id": "triggers",
@@ -662,7 +815,165 @@
         "api": "/api/triggers",
         "docs": null
       },
-      "sync": null
+      "sync": null,
+      "produces": [
+        "triggers"
+      ],
+      "consumes": [
+        "traces"
+      ]
+    },
+    {
+      "id": "ai-gateway",
+      "name": "AI Gateway",
+      "description": "Route LLM traffic through LangWatch with virtual keys, budgets, and governance",
+      "surfaces": {
+        "docs": "https://langwatch.ai/docs/ai-gateway/overview.md"
+      },
+      "children": [
+        {
+          "id": "ai-gateway.virtual-keys",
+          "name": "Virtual Keys",
+          "description": "Scoped gateway credentials that pin routing policy and attribute spend",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "virtual-keys list",
+                "virtual-keys get",
+                "virtual-keys create",
+                "virtual-keys update",
+                "virtual-keys rotate",
+                "virtual-keys revoke"
+              ],
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/ai-gateway/virtual-keys.md"
+            },
+            "platform": {
+              "ui": "/settings/gateway/virtual-keys",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/gateway/v1/virtual-keys",
+            "docs": "https://langwatch.ai/docs/ai-gateway/virtual-keys.md"
+          },
+          "sync": null,
+          "produces": [
+            "virtual-keys"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "ai-gateway.budgets",
+          "name": "Budgets",
+          "description": "Hierarchical spend caps (organization → team → project → virtual key → principal)",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "gateway-budgets list",
+                "gateway-budgets create",
+                "gateway-budgets update",
+                "gateway-budgets archive"
+              ],
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/ai-gateway/budgets.md"
+            },
+            "platform": {
+              "ui": "/settings/gateway/budgets",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/gateway/v1/budgets",
+            "docs": "https://langwatch.ai/docs/ai-gateway/budgets.md"
+          },
+          "sync": null,
+          "produces": [
+            "budgets"
+          ],
+          "consumes": [
+            "virtual-keys"
+          ]
+        },
+        {
+          "id": "ai-gateway.governance",
+          "name": "Governance",
+          "description": "Org-wide AI tooling governance — ingestion templates and setup status, audit-logged",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "governance status",
+                "governance ingestion-templates admin-list",
+                "governance ingestion-templates get",
+                "governance ingestion-templates create",
+                "governance ingestion-templates update-ottl-rules",
+                "governance ingestion-templates archive",
+                "governance ingestion-templates clone-from-platform"
+              ],
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
+            },
+            "platform": {
+              "ui": "/settings/governance",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/governance",
+            "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
+          },
+          "sync": null,
+          "produces": [
+            "ingestion-templates"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "ai-gateway.ingest",
+          "name": "Ingestion Sources",
+          "description": "Read-only inspection of OCSF-normalised event ingestion (sources, event tail, health)",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "ingest list",
+                "ingest tail",
+                "ingest health"
+              ],
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
+            },
+            "platform": {
+              "ui": "/settings/governance/ingestion-sources",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/governance",
+            "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
+          },
+          "sync": null,
+          "produces": [
+            "ingestion-sources"
+          ],
+          "consumes": []
+        }
+      ]
     },
     {
       "id": "settings",
@@ -704,7 +1015,11 @@
             "api": "/api/projects",
             "docs": null
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "projects"
+          ],
+          "consumes": []
         },
         {
           "id": "settings.api-keys",
@@ -737,7 +1052,11 @@
             "api": "/api/api-keys",
             "docs": null
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "api-keys"
+          ],
+          "consumes": []
         },
         {
           "id": "settings.model-providers",
@@ -768,7 +1087,11 @@
             "api": "/api/model-providers",
             "docs": "https://langwatch.ai/docs/integration/custom-models.md"
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "model-providers"
+          ],
+          "consumes": []
         },
         {
           "id": "settings.secrets",
@@ -804,7 +1127,83 @@
             "api": "/api/secrets",
             "docs": null
           },
-          "sync": null
+          "sync": null,
+          "produces": [
+            "secrets"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.model-defaults",
+          "name": "Model Defaults",
+          "description": "Cascading default models per role or feature, scoped to project, team, or organization",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "model-default list",
+                "model-default set",
+                "model-default unset"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/model-defaults",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "model-defaults"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.agent-skills",
+          "name": "Agent Skills",
+          "description": "Bundled LangWatch agent skills (tracing, evaluations, scenarios, prompts, analytics, datasets, level-up + workflow recipes) installed into ~/.agents/skills for coding agents",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "skills list",
+                "skills get",
+                "skills install",
+                "skills uninstall",
+                "skills update"
+              ],
+              "hints": {
+                "skills install": "langwatch skills install --all",
+                "skills get": "langwatch skills get tracing"
+              },
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/skills/directory"
+            },
+            "platform": {
+              "ui": null,
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": null,
+            "docs": "https://langwatch.ai/docs/skills/directory"
+          },
+          "sync": null,
+          "produces": [
+            "skills"
+          ],
+          "consumes": []
         }
       ],
       "surfaces": {
@@ -817,12 +1216,6 @@
       "fetch_langwatch_docs",
       "fetch_scenario_docs"
     ],
-    "cli_meta": [
-      "login",
-      "status",
-      "docs",
-      "scenario-docs"
-    ],
     "meta_skills": {
       "level-up": "Orchestrates tracing + prompts + evaluations + scenarios",
       "analytics": "Cross-cutting skill for querying performance (works for both code and platform users)",
@@ -831,6 +1224,9 @@
     "recipes": {
       "test-cli-usability": "Write scenario tests to ensure your CLI is usable by AI agents",
       "debug-instrumentation": "Debug and improve your LangWatch traces",
+      "debug-with-langwatch": "Root-cause production errors: errored traces, span inspection, monitor/evaluator scores",
+      "eval-triage": "Investigate failing experiments and evaluation regressions",
+      "setup-lw": "Set up and troubleshoot the LangWatch CLI (login, endpoint, project)",
       "improve-setup": "Expert AI engineering consultant for your LangWatch setup",
       "evaluate-multimodal": "Evaluate multimodal agents (images, audio, PDFs)",
       "generate-rag-dataset": "Generate synthetic evaluation dataset from your RAG knowledge base",

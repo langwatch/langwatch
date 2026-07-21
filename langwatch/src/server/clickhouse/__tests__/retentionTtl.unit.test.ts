@@ -44,6 +44,16 @@ describe("buildRetentionTTLExpression", () => {
         "IF(_retention_days > 0, toDateTime(UpdatedAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
       );
     });
+
+    it("Langy analytics anchors retention on its immutable event time", () => {
+      const config = TABLE_TTL_CONFIG.find(
+        (entry) => entry.table === "langy_analytics_events",
+      )!;
+      expect(config.retentionTTLColumn).toBe("OccurredAt");
+      expect(buildRetentionTTLExpression(config)).toBe(
+        "IF(_retention_days > 0, toDateTime(OccurredAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
+      );
+    });
   });
 
   describe("when retentionTTLColumn is not set", () => {
@@ -72,11 +82,16 @@ describe("hasRetentionTTL", () => {
 });
 
 describe("RETENTION_MANAGED_TABLES", () => {
-  it("includes all 15 retention-managed tables", () => {
-    expect(RETENTION_MANAGED_TABLES).toHaveLength(15);
+  it("includes all 19 retention-managed tables", () => {
+    expect(RETENTION_MANAGED_TABLES).toHaveLength(19);
     expect(RETENTION_MANAGED_TABLES).toContain("stored_spans");
     expect(RETENTION_MANAGED_TABLES).toContain("event_log");
     expect(RETENTION_MANAGED_TABLES).toContain("trace_summaries");
+    expect(RETENTION_MANAGED_TABLES).toContain("metric_data_points");
+    expect(RETENTION_MANAGED_TABLES).toContain("log_records");
+    expect(RETENTION_MANAGED_TABLES).toContain("metric_series");
+    expect(RETENTION_MANAGED_TABLES).toContain("metric_time_rollups");
+    expect(RETENTION_MANAGED_TABLES).not.toContain("stored_metric_records");
     // ADR-034 Phase 2 (slim) + Phase 1 (rollup) — both derive from trace events
     // and age on the same per-project retention policy as trace_summaries.
     expect(RETENTION_MANAGED_TABLES).toContain("trace_analytics");
@@ -85,6 +100,7 @@ describe("RETENTION_MANAGED_TABLES", () => {
     // (currently categorised "traces" until eval split-out lands).
     expect(RETENTION_MANAGED_TABLES).toContain("evaluation_analytics");
     expect(RETENTION_MANAGED_TABLES).toContain("evaluation_analytics_rollup");
+    expect(RETENTION_MANAGED_TABLES).toContain("langy_analytics_events");
     expect(RETENTION_MANAGED_TABLES).toContain("simulation_runs");
     expect(RETENTION_MANAGED_TABLES).toContain("suite_runs");
     expect(RETENTION_MANAGED_TABLES).toContain("experiment_runs");

@@ -24,6 +24,7 @@ import {
   LuPlay,
   LuSquare,
   LuTrash2,
+  LuWorkflow,
 } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -164,6 +165,22 @@ export const TargetHeader = memo(function TargetHeader({
       ),
     [variantNames, variantIds],
   );
+
+  // Two columns can resolve to the same name — duplicating a prompt is the
+  // usual way there — leaving the user with two identical headers and no way to
+  // tell which is which. Number them "(1)" / "(2)" the same way the comparison
+  // config's variant cards do.
+  //
+  // The ordinal is taken over the canonical column order, NOT over any one
+  // comparison's variant order: the same target can be a variant of several
+  // comparisons, each with its own ordering, so a column header has no single
+  // comparison to inherit a number from.
+  const allTargetNames = useTargetNames(allTargets);
+  const headerName = useMemo(() => {
+    const index = allTargets.findIndex((t) => t.id === target.id);
+    if (index < 0) return targetName;
+    return disambiguateNames(allTargetNames)[index] || targetName;
+  }, [allTargets, allTargetNames, target.id, targetName]);
 
   // Get results, evaluators, and dataset for computing aggregates
   const { results, evaluators, activeDataset } = useEvaluationsV3Store(
@@ -328,7 +345,21 @@ export const TargetHeader = memo(function TargetHeader({
         </span>
       );
     }
-    // Other agents (code, workflow, signature) get Code icon
+    // A workflow-type agent (built in Studio, saved as an agent) or a
+    // directly-attached workflow target both run a whole Studio workflow, not
+    // a single code/signature node — give them their own icon so they don't
+    // read as raw code.
+    if (
+      target.type === "workflow" ||
+      (target.type === "agent" && target.agentType === "workflow")
+    ) {
+      return (
+        <span data-testid="icon-workflow">
+          <LuWorkflow size={12} />
+        </span>
+      );
+    }
+    // Other agents (code, signature) get Code icon
     return (
       <span data-testid="icon-code">
         <LuCode size={12} />
@@ -366,6 +397,20 @@ export const TargetHeader = memo(function TargetHeader({
     <HStack
       gap={2}
       width="full"
+      // A flex item defaults to min-width:auto, so the name and the
+      // "<winner> wins" summary refuse to shrink below their text and the row
+      // grows past the column — pushing the play button under the next column.
+      // minWidth=0 here (and on the name button) lets the name truncate first,
+      // while the play button stays pinned via flexShrink={0}.
+      //
+      // Deliberately NOT overflow:hidden. Flex overflow spills at the END of
+      // the row, which is exactly where the play button lives — so clipping
+      // would hide the run button entirely rather than let it poke into the
+      // neighbouring column. Unreachable beats ugly only if it's never
+      // reachable, and badges (Won / version / missing-mapping) are themselves
+      // unshrinkable, so a narrow enough column can still overflow. Visible is
+      // the safer failure.
+      minWidth={0}
       marginY={-2}
       // Glow lives on the <th> itself (EvaluationsV3Table.tsx) so the whole
       // column reads as highlighted, not just this inner content row. Keep
@@ -389,6 +434,10 @@ export const TargetHeader = memo(function TargetHeader({
             gap={2}
             marginX={-2}
             marginY={-2}
+            // Absorb the overflow: the name truncates rather than shoving the
+            // metrics and play button out of the column.
+            minWidth={0}
+            flexShrink={1}
             className="group"
             data-testid="target-header-button"
           >
@@ -400,7 +449,7 @@ export const TargetHeader = memo(function TargetHeader({
               marginTop={target.type === "evaluator" ? "-2px" : undefined}
             />
             <Text fontSize="13px" fontWeight="medium" truncate>
-              {targetName}
+              {headerName}
             </Text>
             {didWin && (
               <HStack
@@ -512,7 +561,11 @@ export const TargetHeader = memo(function TargetHeader({
           popover — dogfood ask "I also want the cost metric in pairwise
           compare in v3". Other columns keep the single popover. */}
       {comparisonAggregate && comparisonAggregate.decidedRows > 0 ? (
-        <HStack gap={2}>
+        // Shrinkable too: a comparison column carries the most header content
+        // ("<winner> wins" + latency + cost), and pinning it would push the
+        // play button out of the column on a narrow viewport. Only the play
+        // button is truly unshrinkable.
+        <HStack gap={2} minWidth={0} overflow="hidden">
           <ComparisonScoreboard
             aggregate={comparisonAggregate}
             variantTargets={variantTargets}
@@ -567,6 +620,8 @@ export const TargetHeader = memo(function TargetHeader({
           minWidth="auto"
           height="auto"
           padding={1}
+          // Never let the run button be squeezed out of its own column.
+          flexShrink={0}
         >
           {isRunning ? <LuSquare size={14} /> : <LuPlay size={14} />}
         </IconButton>

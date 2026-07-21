@@ -48,7 +48,8 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 
 	d := wire(logger, isAgent)
 
-	// SIGINT/SIGTERM cancel the context so up/daemon/watch clean up.
+	// SIGINT/SIGTERM cancel the context. Supervisors hard-kill child process
+	// groups immediately; command cleanup then deregisters routes and resources.
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -164,7 +165,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	}
 
 	return deps{
-		orch: app.New(cfg, proxy, store, sup, sys, ch, pg, rds, obs, hyg, sem, logger),
+		orch: app.New(cfg, proxy, store, sup, sys, ch, pg, rds, obs, hyg, sem, rt, logger),
 		dash: dashboard.New(store.Stacks, sharedURL, dashboard.Probes{
 			PortInUse:    sys.PortInUse,
 			ProcessAlive: sys.ProcessAlive,
@@ -230,8 +231,24 @@ var commands = map[string]command{
 	"postgres": func(ctx context.Context, d deps, rest []string) error {
 		return d.orch.RunPostgres(ctx, d.params, rest)
 	},
-	"prune": func(ctx context.Context, d deps, rest []string) error {
-		return d.orch.Prune(ctx, d.worktree, hasFlag(rest, "--yes"))
+	"prune": runPrune,
+	"cleanup": func(ctx context.Context, d deps, rest []string) error {
+		if !hasFlag(rest, "--force") {
+			return fmt.Errorf("refusing cleanup without --force")
+		}
+		procsupervisor.ReapOrphans([]string{d.worktree})
+		fmt.Printf("haven cleaned orphaned dev runtimes under %s\n", d.worktree)
+		return nil
+	},
+	"upgrade": func(ctx context.Context, d deps, _ []string) error {
+		cmd := exec.CommandContext(ctx, "go", "install", "./cmd/haven")
+		cmd.Dir = d.worktree
+		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("install updated haven: %w", err)
+		}
+		fmt.Println("haven binary updated; restart the active launcher to load it (haven restart)")
+		return nil
 	},
 	"typecheck": func(ctx context.Context, d deps, rest []string) error {
 		return d.orch.Typecheck(ctx, d.lwDir, rest, envInt("HAVEN_TYPECHECK_SLOTS", 0), envInt("HAVEN_TYPECHECK_MAX_RSS_MB", 0))
@@ -285,6 +302,7 @@ var aliases = map[string]string{
 	"sw":     "switch",
 	"ps":     "hub",
 	"active": "hub",
+	"oc":     "cleanup",
 }
 
 // observabilityEndpoints are fixed ports rather than ephemeral ones: the gcx CLI
@@ -305,6 +323,10 @@ func clickHouseLimits() domain.ClickHouseLimits {
 		l.ContainerMemoryMB = mb
 		l.MaxServerMemory = int64(mb) * 9 / 10 * (1 << 20)
 	}
+	if envTruthy("HAVEN_CLICKHOUSE_FULL_LOGS") {
+		l.LightweightLogsEnabled = false
+	}
+	l.SystemLogTTLDays = envInt("HAVEN_CLICKHOUSE_LOG_TTL_DAYS", l.SystemLogTTLDays)
 	return l
 }
 
@@ -335,13 +357,21 @@ func optionsFromEnv(repoRoot string) app.PlanOptions {
 		ShouldSkipGateway:         os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1",
 		ShouldSkipLangyAgent:      os.Getenv("LANGWATCH_SKIP_LANGYAGENT") == "1",
 		ShouldSeed:                os.Getenv("LANGWATCH_SEED") == "1",
-		IsStub:                    os.Getenv("HAVEN_STUB") == "1",
-		RepoRoot:                  repoRoot,
+		// The langyagent worker's local isolation posture. Default (neither flag) is
+		// the sandboxed, production-like tier: the worker runs in colima with the
+		// per-worker UID sandbox on. LANGY_UNSAFE_CONTAINER relaxes the sandbox inside
+		// the VM; LANGY_UNSAFE_HOST_ACCESS drops the VM and runs it on the host.
+		LangyTier: domain.ResolveLangyTier(
+			envTruthy("LANGY_UNSAFE_CONTAINER"),
+			envTruthy("LANGY_UNSAFE_HOST_ACCESS"),
+		),
+		IsStub:   os.Getenv("HAVEN_STUB") == "1",
+		RepoRoot: repoRoot,
 	}
 }
 
 // resolveAgent turns agent mode on for AI drivers: explicit env, NO_COLOR, or a
-// non-terminal stdout — unless FORCE_COLOR asks us to keep colour under a pipe.
+// non-terminal stdout — unless FORCE_COLOR asks us to keep color under a pipe.
 func resolveAgent() bool {
 	if os.Getenv("HAVEN_AGENT") == "1" {
 		return true
@@ -639,6 +669,9 @@ func seedExtraEnv(rest []string) []string {
 	if hasFlag(rest, "--skip-model-providers") {
 		env = append(env, "HAVEN_SEED_MODEL_PROVIDERS=0")
 	}
+	if hasFlag(rest, "--skip-feature-flags") {
+		env = append(env, "HAVEN_SEED_FEATURE_FLAGS=0")
+	}
 	return env
 }
 
@@ -670,6 +703,13 @@ func hasFlag(args []string, flag string) bool {
 		}
 	}
 	return false
+}
+
+// envTruthy reports whether an env var is set to a common "on" value. Accepts the
+// two spellings haven's flags already use across the codebase ("1" / "true").
+func envTruthy(key string) bool {
+	v := os.Getenv(key)
+	return v == "1" || v == "true"
 }
 
 func envOr(key, def string) string {

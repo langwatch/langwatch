@@ -1,20 +1,26 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
+/**
+ * Returns the created evaluator rather than printing it: the output port
+ * renders it in whatever format the caller asked for (utils/output.ts).
+ */
 export const createEvaluatorCommand = async (
   name: string,
-  options: { type: string; format?: string },
-): Promise<void> => {
+  options: { type: string },
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new EvaluatorsApiService();
-  const spinner = ora(`Creating evaluator "${name}"...`).start();
+  const spinner = createSpinner(`Creating evaluator "${name}"...`).start();
 
+  let evaluator: Awaited<ReturnType<EvaluatorsApiService["create"]>>;
   try {
-    const evaluator = await service.create({
+    evaluator = await service.create({
       name,
       config: {
         evaluatorType: options.type,
@@ -24,14 +30,19 @@ export const createEvaluatorCommand = async (
     spinner.succeed(
       `Created evaluator "${chalk.cyan(evaluator.name)}" ${chalk.gray(`(slug: ${evaluator.slug ?? "—"})`)}`,
     );
-
-    if (options.format === "json") {
-      console.log(JSON.stringify(evaluator, null, 2));
-    } else if (evaluator.platformUrl) {
-      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
-    }
   } catch (error) {
+    // No explicit `format`: see traces/search.ts — the preAction hook covers
+    // every spelling; the `-f` commander default must not override it.
     failSpinner({ spinner, error, action: "create evaluator" });
     process.exit(1);
   }
+
+  return {
+    data: evaluator,
+    table: () => {
+      if (evaluator.platformUrl) {
+        console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
+      }
+    },
+  };
 };

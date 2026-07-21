@@ -90,9 +90,14 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     const { distinctId, defaultValue = false } = opts;
     const definition = resolveFlagDefinition(flagKey);
 
-    const envOverride = checkFlagEnvOverride(flagKey, definition?.legacyEnvVar);
-    if (envOverride !== undefined) {
-      return envOverride;
+    if (definition?.envOverridable !== false) {
+      const envOverride = checkFlagEnvOverride(
+        flagKey,
+        definition?.legacyEnvVar,
+      );
+      if (envOverride !== undefined) {
+        return envOverride;
+      }
     }
     const forceOn = (process.env.FEATURE_FLAG_FORCE_ENABLE ?? "")
       .split(",")

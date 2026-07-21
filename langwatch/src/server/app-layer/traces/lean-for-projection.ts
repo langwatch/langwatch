@@ -12,15 +12,18 @@
 
 import type { Event } from "~/server/event-sourcing";
 import {
-  SPAN_RECEIVED_EVENT_TYPE,
   LOG_RECORD_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import type {
+  OtlpResource,
+  OtlpSpan,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   capOversizedAttributes,
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
   hasOversizedAttribute,
 } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
-import type { OtlpSpan, OtlpResource } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 
 /**
  * Spans whose serialized command payload exceeds this threshold are spooled to S3 at
@@ -55,7 +58,7 @@ export const IO_ATTR_KEYS = new Set([
 export const EVENTREF_ATTR_PREFIX = "langwatch.reserved.eventref.";
 
 /** UTF-8-safe truncation to at most `maxBytes`, backing off to a codepoint boundary. */
-function utf8Preview(value: string, maxBytes: number): string {
+export function utf8Preview(value: string, maxBytes: number): string {
   const buf = Buffer.from(value, "utf8");
   if (buf.byteLength <= maxBytes) return value;
   let end = maxBytes;
@@ -115,7 +118,7 @@ function leanSpanReceivedEvent(event: Event): Event {
   };
 
   // Guard: if span or attributes are absent (e.g. test events with empty data), pass through unchanged.
-  if (!data || !data.span) {
+  if (!data?.span) {
     return event;
   }
 
@@ -138,7 +141,11 @@ function leanSpanReceivedEvent(event: Event): Event {
   // (span.attributes, span.events[].attributes, span.links[].attributes, resource.attributes)
   // might need the 256 KB cap. Uses hasOversizedAttribute — the read-only counterpart
   // colocated with capOversizedAttributes — so the gate covers EVERY surface the action covers.
-  const needsNonIoCap = hasOversizedAttribute(data.span, data.resource ?? null, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES);
+  const needsNonIoCap = hasOversizedAttribute(
+    data.span,
+    data.resource ?? null,
+    DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+  );
 
   if (!hasLargeIoAttr && !needsNonIoCap) {
     // Sub-threshold event — return original, no allocations.
@@ -149,7 +156,9 @@ function leanSpanReceivedEvent(event: Event): Event {
   // the IO-lean pass and capOversizedAttributes — operate on independent copies.
   // structuredClone creates a fully independent deep copy; no shared object references remain.
   const clonedSpan: OtlpSpan = structuredClone(data.span);
-  const clonedResource: OtlpResource | null = data.resource ? structuredClone(data.resource) : null;
+  const clonedResource: OtlpResource | null = data.resource
+    ? structuredClone(data.resource)
+    : null;
 
   // Step 4: IO-lean pass — run on the CLONED attributes so originals stay untouched.
   if (hasLargeIoAttr) {
@@ -169,7 +178,9 @@ function leanSpanReceivedEvent(event: Event): Event {
         // the read path uses both in `BlobStore.getFromEventLog`.
         eventrefAttrs.push({
           key: `${EVENTREF_ATTR_PREFIX}${attr.key}`,
-          value: { stringValue: JSON.stringify({ field: attr.key, eventId: event.id }) },
+          value: {
+            stringValue: JSON.stringify({ field: attr.key, eventId: event.id }),
+          },
         });
       } else {
         ioLeanedAttrs.push(attr);

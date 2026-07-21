@@ -36,6 +36,10 @@ describe("isPrivateOrLocalhostIP", () => {
     ["FC00::1", true], // uppercase
     // IPv6 link-local
     ["fe80::1", true],
+    ["fe90::1", true],
+    ["fea0::1", true],
+    ["febf:ffff::1", true],
+    ["fec0::1", false], // outside fe80::/10
     ["FE80::1", true], // uppercase
     // IPv4-mapped IPv6 (dotted)
     ["::ffff:127.0.0.1", true],
