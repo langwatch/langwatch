@@ -94,8 +94,8 @@ export class ExecutionContext {
     // to one request, so the request's bytes have their SGR (colour/style)
     // sequences stripped here instead of touching it.
     const scope = currentOutputScope();
-    if (scope && !scope.color) {
-      chunk = this.stripSgr(stream, chunk);
+    if (scope && !scope.hasColor) {
+      chunk = this.stripSgr({ stream, chunk });
     }
     this.sink(stream, chunk);
   }
@@ -107,7 +107,7 @@ export class ExecutionContext {
    * otherwise leak half of it to the caller. A partial left dangling at
    * finalize is never a complete sequence, so nothing visible is lost.
    */
-  private stripSgr(stream: OutputStream, chunk: Buffer): Buffer {
+  private stripSgr({ stream, chunk }: { stream: OutputStream; chunk: Buffer }): Buffer {
     // SGR sequences are pure ASCII, so the held-back partial decodes safely on
     // its own; the chunk goes through the stream's StringDecoder so a
     // multibyte character split across writes is reassembled, not corrupted.
@@ -322,10 +322,13 @@ export class ExecutionWindow {
    * than being admitted — and wedging the window — long after anyone stopped
    * listening for it.
    */
-  async acquire(
-    request: WindowRequest,
-    signal?: AbortSignal,
-  ): Promise<() => void> {
+  async acquire({
+    request,
+    signal,
+  }: {
+    request: WindowRequest;
+    signal?: AbortSignal;
+  }): Promise<() => void> {
     const key = windowKey(request);
 
     // Queue behind anyone already waiting, even on a key match — otherwise a

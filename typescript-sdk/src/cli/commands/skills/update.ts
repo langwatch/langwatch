@@ -44,9 +44,9 @@ export const skillsUpdateCommand = async (
   // installs anything new (that is `install`'s job).
   const targets =
     names.length > 0
-      ? resolveTargets(names, {})
+      ? resolveTargets({ names })
       : SKILLS_BUNDLE.filter((skill) =>
-          fs.existsSync(skillFilePath(root, skill)),
+          fs.existsSync(skillFilePath({ root, skill })),
         );
 
   announceRoot(root, options);
@@ -67,7 +67,7 @@ export const skillsUpdateCommand = async (
   }
 
   const results = targets.map((skill) =>
-    updateSkill(skill, root, { dryRun, force }),
+    updateSkill({ skill, root, dryRun, force }),
   );
 
   await printResult(
@@ -79,7 +79,7 @@ export const skillsUpdateCommand = async (
           console.log("No installed skills found. Run `langwatch skills install --all`.");
           return;
         }
-        renderSkillFileResults(results, { dryRun });
+        renderSkillFileResults({ results, dryRun });
       },
     },
   );

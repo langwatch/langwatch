@@ -65,7 +65,7 @@ describe("the skills installer, given a temp install root", () => {
   });
 
   it("installs a feature skill to skills/<slug> and a recipe to skills/recipes/<slug>", () => {
-    const tracing = installSkill(skill("tracing"), root, {});
+    const tracing = installSkill({ skill: skill("tracing"), root });
     expect(tracing.action).toBe("created");
     expect(tracing.path).toBe(
       path.join(root, "skills", "tracing", "SKILL.md"),
@@ -74,45 +74,45 @@ describe("the skills installer, given a temp install root", () => {
       renderSkillFile(skill("tracing")),
     );
 
-    const recipe = installSkill(skill("debug-instrumentation"), root, {});
+    const recipe = installSkill({ skill: skill("debug-instrumentation"), root });
     expect(recipe.path).toBe(
       path.join(root, "skills", "recipes", "debug-instrumentation", "SKILL.md"),
     );
   });
 
   it("marks installed files as managed", () => {
-    const result = installSkill(skill("tracing"), root, {});
+    const result = installSkill({ skill: skill("tracing"), root });
     expect(fs.readFileSync(result.path, "utf8")).toContain(MANAGED_MARKER);
   });
 
   it("writes nothing in dry-run mode but reports the would-be action", () => {
-    const result = installSkill(skill("tracing"), root, { dryRun: true });
+    const result = installSkill({ skill: skill("tracing"), root, dryRun: true });
     expect(result.action).toBe("created");
     expect(fs.existsSync(result.path)).toBe(false);
   });
 
   it("reports an identical reinstall as unchanged", () => {
-    installSkill(skill("tracing"), root, {});
-    expect(installSkill(skill("tracing"), root, {}).action).toBe("unchanged");
+    installSkill({ skill: skill("tracing"), root });
+    expect(installSkill({ skill: skill("tracing"), root }).action).toBe("unchanged");
   });
 
   it("refuses to overwrite a differing file without --force, overwrites with it", () => {
-    const target = skillFilePath(root, skill("tracing"));
+    const target = skillFilePath({ root, skill: skill("tracing") });
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, "# the user's own file\n", "utf8");
 
-    const skipped = installSkill(skill("tracing"), root, {});
+    const skipped = installSkill({ skill: skill("tracing"), root });
     expect(skipped.action).toBe("skipped");
     expect(skipped.reason).toContain("--force");
     expect(fs.readFileSync(target, "utf8")).toBe("# the user's own file\n");
 
-    const forced = installSkill(skill("tracing"), root, { force: true });
+    const forced = installSkill({ skill: skill("tracing"), root, force: true });
     expect(forced.action).toBe("updated");
     expect(fs.readFileSync(target, "utf8")).toContain(MANAGED_MARKER);
   });
 
   it("points a managed older-version install at `skills update` when skipping", () => {
-    const target = skillFilePath(root, skill("tracing"));
+    const target = skillFilePath({ root, skill: skill("tracing") });
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(
       target,
@@ -120,45 +120,45 @@ describe("the skills installer, given a temp install root", () => {
       "utf8",
     );
 
-    const skipped = installSkill(skill("tracing"), root, {});
+    const skipped = installSkill({ skill: skill("tracing"), root });
     expect(skipped.action).toBe("skipped");
     expect(skipped.reason).toContain("langwatch skills update");
     expect(skipped.reason).toContain("v0.0.1");
   });
 
   it("uninstalls only managed files, in dry-run and for real", () => {
-    const { path: managed } = installSkill(skill("tracing"), root, {});
-    const foreign = skillFilePath(root, skill("prompts"));
+    const { path: managed } = installSkill({ skill: skill("tracing"), root });
+    const foreign = skillFilePath({ root, skill: skill("prompts") });
     fs.mkdirSync(path.dirname(foreign), { recursive: true });
     fs.writeFileSync(foreign, "# not ours\n", "utf8");
 
     const plan = [
-      planUninstall(skill("tracing"), root),
-      planUninstall(skill("prompts"), root),
-      planUninstall(skill("scenarios"), root), // never installed
+      planUninstall({ skill: skill("tracing"), root }),
+      planUninstall({ skill: skill("prompts"), root }),
+      planUninstall({ skill: skill("scenarios"), root }), // never installed
     ];
     expect(plan.map((p) => p.action)).toEqual(["removed", "skipped", "skipped"]);
     expect(plan[2]!.reason).toBe("not installed");
 
-    applyUninstall(plan, { dryRun: true });
+    applyUninstall({ results: plan, dryRun: true });
     expect(fs.existsSync(managed)).toBe(true);
 
-    applyUninstall(plan);
+    applyUninstall({ results: plan });
     expect(fs.existsSync(managed)).toBe(false);
     expect(fs.readFileSync(foreign, "utf8")).toBe("# not ours\n");
   });
 
   it("keeps a locally modified managed file unless -y is given", () => {
-    const { path: managed } = installSkill(skill("tracing"), root, {});
+    const { path: managed } = installSkill({ skill: skill("tracing"), root });
     editBody(managed);
 
-    expect(planUninstall(skill("tracing"), root).action).toBe("skipped");
-    expect(planUninstall(skill("tracing"), root, { yes: true }).action).toBe("removed");
+    expect(planUninstall({ skill: skill("tracing"), root }).action).toBe("skipped");
+    expect(planUninstall({ skill: skill("tracing"), root, yes: true }).action).toBe("removed");
   });
 
   it("updates only managed files whose content drifted from the bundle", () => {
-    const { path: managed } = installSkill(skill("tracing"), root, {});
-    expect(updateSkill(skill("tracing"), root, {}).action).toBe("unchanged");
+    const { path: managed } = installSkill({ skill: skill("tracing"), root });
+    expect(updateSkill({ skill: skill("tracing"), root }).action).toBe("unchanged");
 
     // Simulate an older bundle install: managed marker, stale content.
     fs.writeFileSync(
@@ -166,35 +166,35 @@ describe("the skills installer, given a temp install root", () => {
       `# old tracing skill\n\n<!-- managed-by: langwatch-skills v0.0.1 -->\n`,
       "utf8",
     );
-    const dry = updateSkill(skill("tracing"), root, { dryRun: true });
+    const dry = updateSkill({ skill: skill("tracing"), root, dryRun: true });
     expect(dry.action).toBe("updated");
     expect(fs.readFileSync(managed, "utf8")).toContain("old tracing skill");
 
-    const applied = updateSkill(skill("tracing"), root, {});
+    const applied = updateSkill({ skill: skill("tracing"), root });
     expect(applied.action).toBe("updated");
     expect(fs.readFileSync(managed, "utf8")).toBe(
       renderSkillFile(skill("tracing")),
     );
 
     // A file without the marker is never overwritten by update.
-    const foreign = skillFilePath(root, skill("prompts"));
+    const foreign = skillFilePath({ root, skill: skill("prompts") });
     fs.mkdirSync(path.dirname(foreign), { recursive: true });
     fs.writeFileSync(foreign, "# not ours\n", "utf8");
-    expect(updateSkill(skill("prompts"), root, {}).action).toBe("skipped");
+    expect(updateSkill({ skill: skill("prompts"), root }).action).toBe("skipped");
     expect(fs.readFileSync(foreign, "utf8")).toBe("# not ours\n");
   });
 
   it("update skips a locally modified managed file without --force, overwrites with it", () => {
     // Current-version marker but edited content = the user's own changes.
-    const { path: managed } = installSkill(skill("tracing"), root, {});
+    const { path: managed } = installSkill({ skill: skill("tracing"), root });
     editBody(managed);
 
-    const skipped = updateSkill(skill("tracing"), root, {});
+    const skipped = updateSkill({ skill: skill("tracing"), root });
     expect(skipped.action).toBe("skipped");
     expect(skipped.reason).toBe("locally modified; pass --force");
     expect(fs.readFileSync(managed, "utf8")).toContain("user notes");
 
-    const forced = updateSkill(skill("tracing"), root, { force: true });
+    const forced = updateSkill({ skill: skill("tracing"), root, force: true });
     expect(forced.action).toBe("updated");
     expect(fs.readFileSync(managed, "utf8")).toBe(
       renderSkillFile(skill("tracing")),
@@ -203,7 +203,7 @@ describe("the skills installer, given a temp install root", () => {
 
   it("update refreshes a stale-version managed install without --force", () => {
     // Older-version marker = clean install from a previous bundle, not edits.
-    const target = skillFilePath(root, skill("tracing"));
+    const target = skillFilePath({ root, skill: skill("tracing") });
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(
       target,
@@ -211,7 +211,7 @@ describe("the skills installer, given a temp install root", () => {
       "utf8",
     );
 
-    const result = updateSkill(skill("tracing"), root, {});
+    const result = updateSkill({ skill: skill("tracing"), root });
     expect(result.action).toBe("updated");
     expect(fs.readFileSync(target, "utf8")).toBe(
       renderSkillFile(skill("tracing")),
@@ -240,20 +240,20 @@ describe("the skills installer, given a temp install root", () => {
     });
 
     it("refuses to update a hand-written file that merely quotes an old footer", () => {
-      const target = skillFilePath(root, skill("tracing"));
+      const target = skillFilePath({ root, skill: skill("tracing") });
       writeFile(target, QUOTED_FOOTER);
 
-      const result = updateSkill(skill("tracing"), root, {});
+      const result = updateSkill({ skill: skill("tracing"), root });
       expect(result.action).toBe("skipped");
       expect(result.reason).toContain("not managed by `langwatch skills`");
       expect(fs.readFileSync(target, "utf8")).toBe(QUOTED_FOOTER);
     });
 
     it("refuses to uninstall a hand-written file that merely quotes an old footer", () => {
-      const target = skillFilePath(root, skill("tracing"));
+      const target = skillFilePath({ root, skill: skill("tracing") });
       writeFile(target, QUOTED_FOOTER);
 
-      const plan = planUninstall(skill("tracing"), root, { yes: true });
+      const plan = planUninstall({ skill: skill("tracing"), root, yes: true });
       expect(plan.action).toBe("skipped");
       expect(plan.reason).toContain("not managed by `langwatch skills`");
     });
@@ -261,10 +261,10 @@ describe("the skills installer, given a temp install root", () => {
     it("reads the version from the trailing marker, not an earlier stale one", () => {
       // Quoted v0.0.1 up top, genuine CURRENT footer at the end: this IS ours,
       // and it carries local edits — so it needs --force, not a silent refresh.
-      const target = skillFilePath(root, skill("tracing"));
+      const target = skillFilePath({ root, skill: skill("tracing") });
       writeFile(target, `${QUOTED_FOOTER}\n${MANAGED_MARKER}\n`);
 
-      const result = updateSkill(skill("tracing"), root, {});
+      const result = updateSkill({ skill: skill("tracing"), root });
       expect(result.action).toBe("skipped");
       expect(result.reason).toBe("locally modified; pass --force");
     });
@@ -272,23 +272,23 @@ describe("the skills installer, given a temp install root", () => {
     it("stops treating a managed file as ours once content is appended below the footer", () => {
       // Deliberately conservative: text after the footer means the last bytes
       // are no longer ours, so the safe answer is to leave the file alone.
-      const { path: managed } = installSkill(skill("tracing"), root, {});
+      const { path: managed } = installSkill({ skill: skill("tracing"), root });
       fs.appendFileSync(managed, "\nuser notes\n", "utf8");
 
-      expect(planUninstall(skill("tracing"), root, { yes: true }).action).toBe(
+      expect(planUninstall({ skill: skill("tracing"), root, yes: true }).action).toBe(
         "skipped",
       );
-      expect(updateSkill(skill("tracing"), root, { force: true }).action).toBe(
+      expect(updateSkill({ skill: skill("tracing"), root, force: true }).action).toBe(
         "skipped",
       );
       expect(fs.readFileSync(managed, "utf8")).toContain("user notes");
     });
 
     it("still recognises a managed file with trailing blank lines", () => {
-      const { path: managed } = installSkill(skill("tracing"), root, {});
+      const { path: managed } = installSkill({ skill: skill("tracing"), root });
       fs.appendFileSync(managed, "\n\n", "utf8");
 
-      expect(planUninstall(skill("tracing"), root, { yes: true }).action).toBe(
+      expect(planUninstall({ skill: skill("tracing"), root, yes: true }).action).toBe(
         "removed",
       );
     });
@@ -299,11 +299,11 @@ describe("the skills installer, given a temp install root", () => {
       const outside = path.join(root, "outside.md");
       fs.writeFileSync(outside, "# somebody else's file\n", "utf8");
 
-      const target = skillFilePath(root, skill("tracing"));
+      const target = skillFilePath({ root, skill: skill("tracing") });
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.symlinkSync(outside, target);
 
-      const result = installSkill(skill("tracing"), root, { force: true });
+      const result = installSkill({ skill: skill("tracing"), root, force: true });
       expect(result.action).toBe("skipped");
       expect(result.failed).toBe(true);
       expect(result.reason).toContain("symbolic link");
@@ -313,11 +313,11 @@ describe("the skills installer, given a temp install root", () => {
 
     it("refuses a dangling link too, rather than creating the file it points at", () => {
       const outside = path.join(root, "not-there-yet.md");
-      const target = skillFilePath(root, skill("tracing"));
+      const target = skillFilePath({ root, skill: skill("tracing") });
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.symlinkSync(outside, target);
 
-      const result = installSkill(skill("tracing"), root, {});
+      const result = installSkill({ skill: skill("tracing"), root });
       expect(result.action).toBe("skipped");
       expect(result.failed).toBe(true);
       expect(fs.existsSync(outside)).toBe(false);
@@ -330,7 +330,7 @@ describe("the skills installer, given a temp install root", () => {
     const asNonRoot = it.skipIf(process.getuid?.() === 0);
 
     asNonRoot("leaves the existing file whole, and no temp file behind", () => {
-      const { path: managed } = installSkill(skill("tracing"), root, {});
+      const { path: managed } = installSkill({ skill: skill("tracing"), root });
       const stale = `# stale\n\n<!-- managed-by: langwatch-skills v0.0.1 -->\n`;
       writeFile(managed, stale);
 
@@ -340,7 +340,7 @@ describe("the skills installer, given a temp install root", () => {
       fs.chmodSync(dir, 0o555);
       let result;
       try {
-        result = updateSkill(skill("tracing"), root, {});
+        result = updateSkill({ skill: skill("tracing"), root });
       } finally {
         fs.chmodSync(dir, 0o755);
       }
@@ -358,10 +358,10 @@ describe("the skills installer, given a temp install root", () => {
     });
 
     it("leaves no temp files behind on a successful write", () => {
-      const { path: managed } = installSkill(skill("tracing"), root, {});
+      const { path: managed } = installSkill({ skill: skill("tracing"), root });
       expect(fs.readdirSync(path.dirname(managed))).toEqual(["SKILL.md"]);
 
-      updateSkill(skill("tracing"), root, { force: true });
+      updateSkill({ skill: skill("tracing"), root, force: true });
       expect(fs.readdirSync(path.dirname(managed))).toEqual(["SKILL.md"]);
     });
   });
@@ -369,11 +369,11 @@ describe("the skills installer, given a temp install root", () => {
   describe("when the filesystem refuses one file in a batch", () => {
     it("reports the errno as a skip and still processes the rest", () => {
       // A directory where the SKILL.md should be: readFileSync raises EISDIR.
-      const blocked = skillFilePath(root, skill("tracing"));
+      const blocked = skillFilePath({ root, skill: skill("tracing") });
       fs.mkdirSync(blocked, { recursive: true });
 
       const results = [skill("tracing"), skill("prompts")].map((entry) =>
-        installSkill(entry, root, {}),
+        installSkill({ skill: entry, root }),
       );
 
       expect(results[0]!.action).toBe("skipped");
@@ -384,11 +384,11 @@ describe("the skills installer, given a temp install root", () => {
     });
 
     it("reports a failed removal instead of aborting the uninstall loop", () => {
-      const first = installSkill(skill("tracing"), root, {});
-      const second = installSkill(skill("prompts"), root, {});
+      const first = installSkill({ skill: skill("tracing"), root });
+      const second = installSkill({ skill: skill("prompts"), root });
       const plan = [
-        planUninstall(skill("tracing"), root),
-        planUninstall(skill("prompts"), root),
+        planUninstall({ skill: skill("tracing"), root }),
+        planUninstall({ skill: skill("prompts"), root }),
       ];
       expect(plan.map((p) => p.action)).toEqual(["removed", "removed"]);
 
@@ -399,7 +399,7 @@ describe("the skills installer, given a temp install root", () => {
       fs.mkdirSync(first.path);
       fs.writeFileSync(path.join(first.path, "keep.md"), "x", "utf8");
 
-      const applied = applyUninstall(plan);
+      const applied = applyUninstall({ results: plan });
 
       expect(applied[0]!.action).toBe("skipped");
       expect(applied[0]!.failed).toBe(true);
@@ -414,12 +414,12 @@ describe("the skills installer, given a temp install root", () => {
 
   describe("when planning what --force would clobber", () => {
     it("lists only files carrying content the installer did not write", () => {
-      const foreign = skillFilePath(root, skill("tracing"));
+      const foreign = skillFilePath({ root, skill: skill("tracing") });
       writeFile(foreign, "# the team's own tracing skill\n");
 
-      const { path: managed } = installSkill(skill("prompts"), root, {});
+      const { path: managed } = installSkill({ skill: skill("prompts"), root });
       editBody(managed); // ours, locally edited — still ours
-      installSkill(skill("scenarios"), root, {}); // ours, byte-identical
+      installSkill({ skill: skill("scenarios"), root }); // ours, byte-identical
       // skill("evaluations") is not installed at all
 
       const clobbers = planForcedClobbers(
@@ -463,10 +463,10 @@ describe("the skills installer, given a temp install root", () => {
         ...skill("tracing"),
         slug: "../../../etc/evil",
       };
-      expect(() => skillFilePath(root, traversal)).toThrow(/single path segment/);
+      expect(() => skillFilePath({ root, skill: traversal })).toThrow(/single path segment/);
 
       const nested: BundledSkill = { ...skill("tracing"), slug: "a/b" };
-      expect(() => skillFilePath(root, nested)).toThrow(/single path segment/);
+      expect(() => skillFilePath({ root, skill: nested })).toThrow(/single path segment/);
     });
   });
 });

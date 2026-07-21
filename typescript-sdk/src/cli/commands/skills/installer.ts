@@ -105,7 +105,13 @@ const assertPathSafeSlug = (slug: string): void => {
   }
 };
 
-export const skillFilePath = (root: string, skill: BundledSkill): string => {
+export const skillFilePath = ({
+  root,
+  skill,
+}: {
+  root: string;
+  skill: BundledSkill;
+}): string => {
   assertPathSafeSlug(skill.slug);
   return path.join(
     root,
@@ -300,12 +306,18 @@ const writeSkill = (filePath: string, content: string): void => {
  * installer's work). A file we manage from an OLDER bundle is pointed at
  * `langwatch skills update`, the intended path for it.
  */
-export const installSkill = (
-  skill: BundledSkill,
-  root: string,
-  { dryRun = false, force = false }: { dryRun?: boolean; force?: boolean },
-): SkillFileResult => {
-  const filePath = skillFilePath(root, skill);
+export const installSkill = ({
+  skill,
+  root,
+  dryRun = false,
+  force = false,
+}: {
+  skill: BundledSkill;
+  root: string;
+  dryRun?: boolean;
+  force?: boolean;
+}): SkillFileResult => {
+  const filePath = skillFilePath({ root, skill });
   return asFileResult(skill, filePath, () => {
     const wanted = renderSkillFile(skill);
     const existing = readIfExists(filePath);
@@ -358,7 +370,7 @@ export const planForcedClobbers = (
 ): ForcedClobber[] => {
   const clobbers: ForcedClobber[] = [];
   for (const skill of skills) {
-    const filePath = skillFilePath(root, skill);
+    const filePath = skillFilePath({ root, skill });
     let existing: string | undefined;
     try {
       existing = readIfExists(filePath);
@@ -387,12 +399,16 @@ export const planForcedClobbers = (
  * (it may carry the user's edits). A file with no marker and different
  * content is not ours; it stays.
  */
-export const planUninstall = (
-  skill: BundledSkill,
-  root: string,
-  { yes = false }: { yes?: boolean } = {},
-): SkillFileResult => {
-  const filePath = skillFilePath(root, skill);
+export const planUninstall = ({
+  skill,
+  root,
+  yes = false,
+}: {
+  skill: BundledSkill;
+  root: string;
+  yes?: boolean;
+}): SkillFileResult => {
+  const filePath = skillFilePath({ root, skill });
   return asFileResult(skill, filePath, () => {
     const existing = readIfExists(filePath);
 
@@ -433,10 +449,13 @@ export const planUninstall = (
  * rather than throwing out of the loop and stranding the caller with no
  * record of which files were already gone.
  */
-export const applyUninstall = (
-  results: SkillFileResult[],
-  { dryRun = false }: { dryRun?: boolean } = {},
-): SkillFileResult[] => {
+export const applyUninstall = ({
+  results,
+  dryRun = false,
+}: {
+  results: SkillFileResult[];
+  dryRun?: boolean;
+}): SkillFileResult[] => {
   if (dryRun) return results;
   return results.map((result) => {
     if (result.action !== "removed") return result;
@@ -466,12 +485,18 @@ export const applyUninstall = (
  * CURRENT bundle that still differs carries local edits, and — mirroring
  * uninstall's -y — those are only overwritten with --force.
  */
-export const updateSkill = (
-  skill: BundledSkill,
-  root: string,
-  { dryRun = false, force = false }: { dryRun?: boolean; force?: boolean } = {},
-): SkillFileResult => {
-  const filePath = skillFilePath(root, skill);
+export const updateSkill = ({
+  skill,
+  root,
+  dryRun = false,
+  force = false,
+}: {
+  skill: BundledSkill;
+  root: string;
+  dryRun?: boolean;
+  force?: boolean;
+}): SkillFileResult => {
+  const filePath = skillFilePath({ root, skill });
   return asFileResult(skill, filePath, () => {
     const wanted = renderSkillFile(skill);
     const existing = readIfExists(filePath);

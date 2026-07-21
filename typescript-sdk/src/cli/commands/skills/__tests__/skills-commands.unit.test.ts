@@ -58,7 +58,7 @@ describe("the skills commands", () => {
   const logged = (): string => consoleLogSpy.mock.calls.flat().join("\n");
 
   it("list reports the installed state at the target root", async () => {
-    installSkill(skill("tracing"), root, {});
+    installSkill({ skill: skill("tracing"), root });
     await skillsListCommand({ dir: root, output: "json" });
     const parsed = JSON.parse(logged()) as {
       skills: { slug: string; installed: boolean }[];
@@ -158,7 +158,7 @@ describe("the skills commands", () => {
   });
 
   it("uninstall --dry-run needs no confirmation and removes nothing", async () => {
-    installSkill(skill("tracing"), root, {});
+    installSkill({ skill: skill("tracing"), root });
     await skillsUninstallCommand(["tracing"], { dir: root, dryRun: true, output: "json" });
     const parsed = JSON.parse(logged()) as { results: { action: string }[] };
     expect(parsed.results[0]!.action).toBe("removed");
@@ -172,8 +172,8 @@ describe("the skills commands", () => {
     // EISDIR. That must not abort the batch: the other skills still get
     // removed, and the caller still gets a full report of what happened.
     it("removes the readable skills, reports the failure, and exits non-zero", async () => {
-      installSkill(skill("tracing"), root, {});
-      const blocked = skillFilePath(root, skill("prompts"));
+      installSkill({ skill: skill("tracing"), root });
+      const blocked = skillFilePath({ root, skill: skill("prompts") });
       fs.mkdirSync(blocked, { recursive: true });
 
       await skillsUninstallCommand([], {
@@ -256,7 +256,7 @@ describe("the skills commands", () => {
 
   describe("when --force only touches files the bundle already manages", () => {
     it("overwrites without asking for -y", async () => {
-      const installed = installSkill(skill("tracing"), root, {});
+      const installed = installSkill({ skill: skill("tracing"), root });
       fs.writeFileSync(
         installed.path,
         `# stale\n\n<!-- managed-by: langwatch-skills v0.0.1 -->\n`,

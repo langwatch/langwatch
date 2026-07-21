@@ -204,7 +204,7 @@ export function createCommandExecutor({
       abandonTimer.unref();
     };
 
-    const abort = (code: number, note?: string): void => {
+    const abort = ({ code, note }: { code: number; note?: string }): void => {
       if (context.isFinished) return;
       cancelled = true;
       if (note !== undefined) {
@@ -235,10 +235,10 @@ export function createCommandExecutor({
     // 124, the `timeout(1)` convention, so scripts can tell a timeout apart
     // from both a command failure (1) and a client cancel (130).
     const timeout = setTimeout(() => {
-      abort(
-        124,
-        `langwatch: request timed out after ${Math.round(timeoutMs / 1000)}s; the daemon abandoned it\n`,
-      );
+      abort({
+        code: 124,
+        note: `langwatch: request timed out after ${Math.round(timeoutMs / 1000)}s; the daemon abandoned it\n`,
+      });
     }, timeoutMs);
     timeout.unref();
 
@@ -250,14 +250,14 @@ export function createCommandExecutor({
       // client can safely re-run the command itself.
       let release: (() => void) | undefined;
       try {
-        release = await window.acquire(
-          {
+        release = await window.acquire({
+          request: {
             cwd: request.cwd,
             env: request.env,
             colorLevel: request.colorLevel,
           },
-          abortController.signal,
-        );
+          signal: abortController.signal,
+        });
       } catch (error) {
         // Aborted while queued: the cancel/timeout path already settled the
         // caller; there is nothing left to report.
@@ -349,7 +349,7 @@ export function createCommandExecutor({
 
     return {
       completed: raced,
-      cancel: (code: number) => abort(code),
+      cancel: (code: number) => abort({ code }),
     };
   };
 }

@@ -316,9 +316,7 @@ describe("ExecutionWindow", () => {
   describe("when a request arrives", () => {
     it("runs it in the CALLER's working directory, not the daemon's", async () => {
       const release = await window.acquire({
-        cwd: dirA,
-        env: {},
-        colorLevel: 0,
+        request: { cwd: dirA, env: {}, colorLevel: 0 },
       });
 
       expect(fs.realpathSync(process.cwd())).toBe(fs.realpathSync(dirA));
@@ -327,9 +325,7 @@ describe("ExecutionWindow", () => {
 
     it("applies the caller's env overlay", async () => {
       const release = await window.acquire({
-        cwd: dirA,
-        env: { LANGWATCH_API_KEY: "sk-caller" },
-        colorLevel: 0,
+        request: { cwd: dirA, env: { LANGWATCH_API_KEY: "sk-caller" }, colorLevel: 0 },
       });
 
       expect(process.env.LANGWATCH_API_KEY).toBe("sk-caller");
@@ -342,9 +338,7 @@ describe("ExecutionWindow", () => {
       delete process.env.LANGWATCH_LEAKED;
 
       const release = await scoped.acquire({
-        cwd: dirA,
-        env: { LANGWATCH_API_KEY: "sk-caller" },
-        colorLevel: 0,
+        request: { cwd: dirA, env: { LANGWATCH_API_KEY: "sk-caller" }, colorLevel: 0 },
       });
 
       expect(process.env.LANGWATCH_LEAKED).toBeUndefined();
@@ -363,9 +357,7 @@ describe("ExecutionWindow", () => {
         delete process.env.CLAUDECODE;
 
         const release = await scoped.acquire({
-          cwd: dirA,
-          env: {},
-          colorLevel: 0,
+          request: { cwd: dirA, env: {}, colorLevel: 0 },
         });
 
         expect(process.env.CLAUDECODE).toBeUndefined();
@@ -383,9 +375,7 @@ describe("ExecutionWindow", () => {
         const scoped = new ExecutionWindow();
 
         const release = await scoped.acquire({
-          cwd: dirA,
-          env: { CLAUDECODE: "1" },
-          colorLevel: 0,
+          request: { cwd: dirA, env: { CLAUDECODE: "1" }, colorLevel: 0 },
         });
 
         expect(process.env.CLAUDECODE).toBe("1");
@@ -403,13 +393,13 @@ describe("ExecutionWindow", () => {
       // reused window would otherwise keep the previous caller's level.
       const savedLevel = chalk.level;
       try {
-        const first = await window.acquire({ cwd: dirA, env: {}, colorLevel: 3 });
+        const first = await window.acquire({ request: { cwd: dirA, env: {}, colorLevel: 3 } });
         expect(chalk.level).toBe(3);
 
         chalk.level = 0; // what the just-finished --agent request left behind
         first();
 
-        const second = await window.acquire({ cwd: dirA, env: {}, colorLevel: 3 });
+        const second = await window.acquire({ request: { cwd: dirA, env: {}, colorLevel: 3 } });
         expect(chalk.level).toBe(3);
         second();
       } finally {
@@ -422,8 +412,8 @@ describe("ExecutionWindow", () => {
     it("runs them concurrently rather than queueing them", async () => {
       const request = { cwd: dirA, env: {}, colorLevel: 0 };
 
-      const first = await window.acquire(request);
-      const second = await window.acquire(request);
+      const first = await window.acquire({ request });
+      const second = await window.acquire({ request });
 
       expect(window.inflightCount).toBe(2);
       expect(window.queuedCount).toBe(0);
@@ -436,14 +426,12 @@ describe("ExecutionWindow", () => {
   describe("when requests disagree about the working directory", () => {
     it("makes the second wait until the first drains, then switches the globals", async () => {
       const releaseA = await window.acquire({
-        cwd: dirA,
-        env: {},
-        colorLevel: 0,
+        request: { cwd: dirA, env: {}, colorLevel: 0 },
       });
 
       let admitted = false;
       const pendingB = window
-        .acquire({ cwd: dirB, env: {}, colorLevel: 0 })
+        .acquire({ request: { cwd: dirB, env: {}, colorLevel: 0 } })
         .then((release) => {
           admitted = true;
           return release;
@@ -464,14 +452,12 @@ describe("ExecutionWindow", () => {
 
     it("does not let a stream of same-window requests starve a waiting one", async () => {
       const releaseA = await window.acquire({
-        cwd: dirA,
-        env: {},
-        colorLevel: 0,
+        request: { cwd: dirA, env: {}, colorLevel: 0 },
       });
 
-      const pendingB = window.acquire({ cwd: dirB, env: {}, colorLevel: 0 });
+      const pendingB = window.acquire({ request: { cwd: dirB, env: {}, colorLevel: 0 } });
       // Arrives after B, but matches the ACTIVE window. It must not jump B.
-      const pendingA2 = window.acquire({ cwd: dirA, env: {}, colorLevel: 0 });
+      const pendingA2 = window.acquire({ request: { cwd: dirA, env: {}, colorLevel: 0 } });
 
       await Promise.resolve();
       expect(window.queuedCount).toBe(2);
@@ -493,16 +479,14 @@ describe("ExecutionWindow", () => {
       // If such a caller is cancelled or times out while waiting, admitting it
       // later would wedge the window: nobody is left to release it.
       const releaseA = await window.acquire({
-        cwd: dirA,
-        env: {},
-        colorLevel: 0,
+        request: { cwd: dirA, env: {}, colorLevel: 0 },
       });
 
       const controller = new AbortController();
-      const pendingB = window.acquire(
-        { cwd: dirB, env: {}, colorLevel: 0 },
-        controller.signal,
-      );
+      const pendingB = window.acquire({
+        request: { cwd: dirB, env: {}, colorLevel: 0 },
+        signal: controller.signal,
+      });
 
       await Promise.resolve();
       expect(window.queuedCount).toBe(1);
@@ -513,7 +497,7 @@ describe("ExecutionWindow", () => {
 
       // The window still drains correctly for the next caller.
       releaseA();
-      const releaseB = await window.acquire({ cwd: dirB, env: {}, colorLevel: 0 });
+      const releaseB = await window.acquire({ request: { cwd: dirB, env: {}, colorLevel: 0 } });
       expect(fs.realpathSync(process.cwd())).toBe(fs.realpathSync(dirB));
       releaseB();
     });
@@ -525,7 +509,7 @@ describe("ExecutionWindow", () => {
       fs.rmSync(doomed, { recursive: true, force: true });
 
       await expect(
-        window.acquire({ cwd: doomed, env: {}, colorLevel: 0 }),
+        window.acquire({ request: { cwd: doomed, env: {}, colorLevel: 0 } }),
       ).rejects.toThrow();
     });
   });

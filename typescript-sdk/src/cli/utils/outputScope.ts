@@ -37,7 +37,7 @@ export type CliOutputFormat = "json" | "agents" | "text";
 interface OutputScope {
   format: CliOutputFormat;
   /** Whether ANSI colour may be emitted for this request. */
-  color: boolean;
+  hasColor: boolean;
 }
 
 const scopeStorage = new AsyncLocalStorage<OutputScope>();
@@ -50,7 +50,7 @@ let ambientFormat: CliOutputFormat = "text";
  * enters a scope and uses the ambient global instead.
  */
 export const withOutputScope = <T>(fn: () => T): T =>
-  scopeStorage.run({ format: "text", color: true }, fn);
+  scopeStorage.run({ format: "text", hasColor: true }, fn);
 
 /** The active request's output scope, if the caller is inside one. */
 export const currentOutputScope = (): OutputScope | undefined =>

@@ -42,9 +42,9 @@ export const skillsUninstallCommand = async (
   const root = resolveSkillsRoot(options.dir);
   const dryRun = options.dryRun === true;
   const yes = options.yes === true;
-  const targets = resolveTargets(names, { all: options.all });
+  const targets = resolveTargets({ names, all: options.all });
 
-  const results = targets.map((skill) => planUninstall(skill, root, { yes }));
+  const results = targets.map((skill) => planUninstall({ skill, root, yes }));
   const removals = results.filter((result) => result.action === "removed");
 
   let confirmed = false;
@@ -55,7 +55,7 @@ export const skillsUninstallCommand = async (
         { removals: removals.map((result) => result.path) },
       );
     }
-    renderSkillFileResults(results);
+    renderSkillFileResults({ results });
     const ok = await confirm("Remove these files?");
     if (!ok) {
       console.log("Aborted. Nothing was removed.");
@@ -64,7 +64,7 @@ export const skillsUninstallCommand = async (
     confirmed = true;
   }
 
-  const applied = applyUninstall(results, { dryRun });
+  const applied = applyUninstall({ results, dryRun });
   const failures = applied.filter((result) => result.failed);
 
   await printResult(
@@ -75,8 +75,8 @@ export const skillsUninstallCommand = async (
         // The confirmed path already printed the list as the prompt preview —
         // rendering it again would say the same thing twice. A file the
         // filesystem then refused is news, though, so those are always shown.
-        if (!confirmed) renderSkillFileResults(applied, { dryRun });
-        else if (failures.length > 0) renderSkillFileResults(failures);
+        if (!confirmed) renderSkillFileResults({ results: applied, dryRun });
+        else if (failures.length > 0) renderSkillFileResults({ results: failures });
       },
     },
   );

@@ -42,7 +42,7 @@ export const skillsInstallCommand = async (
   options: SkillsInstallOptions = {},
 ): Promise<void> => {
   const root = resolveSkillsRoot(options.dir);
-  const targets = resolveTargets(names, { all: options.all });
+  const targets = resolveTargets({ names, all: options.all });
   const dryRun = options.dryRun === true;
   const force = options.force === true;
 
@@ -60,14 +60,14 @@ export const skillsInstallCommand = async (
   }
 
   const results = targets.map((skill) =>
-    installSkill(skill, root, { dryRun, force }),
+    installSkill({ skill, root, dryRun, force }),
   );
 
   await printResult(
     { dir: root, bundleVersion: SKILLS_BUNDLE_VERSION, dryRun, results },
     {
       ...options,
-      table: () => renderSkillFileResults(results, { dryRun }),
+      table: () => renderSkillFileResults({ results, dryRun }),
     },
   );
 

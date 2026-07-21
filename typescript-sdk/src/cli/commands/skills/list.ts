@@ -25,7 +25,7 @@ export const skillsListCommand = async (
   const skills = SKILLS_BUNDLE.map((skill) => ({
     slug: skill.isRecipe ? `recipes/${skill.slug}` : skill.slug,
     description: skill.description,
-    installed: fs.existsSync(skillFilePath(root, skill)),
+    installed: fs.existsSync(skillFilePath({ root, skill })),
   }));
 
   await printResult(

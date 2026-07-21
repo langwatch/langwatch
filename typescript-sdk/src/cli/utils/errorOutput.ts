@@ -73,7 +73,7 @@ export {
  */
 export const disableOutputColor = (): void => {
   const scope = currentOutputScope();
-  if (scope) scope.color = false;
+  if (scope) scope.hasColor = false;
   else chalk.level = 0;
 };
 

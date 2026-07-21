@@ -22,10 +22,13 @@ import { throwValidationError } from "./validation";
  * a silent no-op install is how an agent ends up believing a skill exists
  * on disk when nothing was ever written.
  */
-export const resolveTargets = (
-  names: string[],
-  { all = false }: { all?: boolean },
-): BundledSkill[] => {
+export const resolveTargets = ({
+  names,
+  all = false,
+}: {
+  names: string[];
+  all?: boolean;
+}): BundledSkill[] => {
   if (all) return [...SKILLS_BUNDLE];
   if (names.length === 0) {
     return throwValidationError(
@@ -63,10 +66,13 @@ const DRY_RUN_ACTION: Partial<Record<SkillFileResult["action"], string>> = {
 };
 
 /** The human form of a per-file result list (`-o json` never reaches this). */
-export const renderSkillFileResults = (
-  results: SkillFileResult[],
-  { dryRun = false }: { dryRun?: boolean } = {},
-): void => {
+export const renderSkillFileResults = ({
+  results,
+  dryRun = false,
+}: {
+  results: SkillFileResult[];
+  dryRun?: boolean;
+}): void => {
   for (const result of results) {
     const action =
       (dryRun ? DRY_RUN_ACTION[result.action] : undefined) ?? result.action;

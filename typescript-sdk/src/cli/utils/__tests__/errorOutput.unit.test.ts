@@ -454,7 +454,7 @@ describe("given two concurrent daemon requests in one window", () => {
             disableOutputColor();
             await new Promise((resolve) => setTimeout(resolve, 1));
             return {
-              scopeColor: currentOutputScope()?.color,
+              scopeColor: currentOutputScope()?.hasColor,
               level: chalk.level,
             };
           },
