@@ -26,7 +26,7 @@ Every job sent to a GroupQueue lands first in the **staging layer** — a set of
 | Key | Type | Role |
 |---|---|---|
 | `{queue}:groups:active` | sorted set | groups with pending work, scored by next-eligible timestamp |
-| `{queue}:group:{groupId}:jobs` | list | per-group FIFO of staged-job IDs (RPUSH on stage, LPOP on dispatch) |
+| `{queue}:group:{groupId}:jobs` | sorted set | per-group staged-job IDs scored by ready time — FIFO in practice, with retries scored into the future (ZADD on stage, ZRANGEBYSCORE + ZREM on dispatch) |
 | `{queue}:group:{groupId}:data` | hash | staged-job ID → envelope value (the body) |
 | `{queue}:group:{groupId}:blocked` | string | non-empty marker that this group is paused (set by retries, cleared on resume) |
 | `{queue}:signals` | list | wake-up signals consumed by `BRPOP` (one entry per stage) |
@@ -42,12 +42,13 @@ The `{queue}` prefix is a Redis Cluster hash tag (`{...}`), so every key for a g
 ```
 producer.send(payload)
   │
-  ▼  STAGE_LUA: RPUSH job id, HSET envelope, ZADD group → active, dedup write,
-  │             LPUSH a signal
+  ▼  STAGE_LUA: ZADD job id to `:jobs` (scored by ready time), HSET envelope,
+  │             ZADD group → active, dedup write, LPUSH a signal
   │
   ▼  signals list  ──BRPOP──▶  dispatcher loop  (idle workers wake up here)
   │
-  ▼  DISPATCH_BATCH_LUA: pick next eligible groups (weighted RR), LPOP its job,
+  ▼  DISPATCH_BATCH_LUA: pick next eligible groups (weighted RR), take its next
+  │                due job from `:jobs` (ZRANGEBYSCORE + ZREM),
   │                read envelope, mark group active with TTL
   │
   ▼  fastq processing slot (local node concurrency)
