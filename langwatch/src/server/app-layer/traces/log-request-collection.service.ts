@@ -18,7 +18,8 @@ import {
 } from "../../event-sourcing/pipelines/trace-processing/projections/services";
 import { piiRedactionLevelSchema } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { LogRecordReceivedEventData } from "../../event-sourcing/pipelines/trace-processing/schemas/events";
-import { IO_PREVIEW_BYTES, utf8Preview } from "./lean-for-projection";
+import { utf8Preview } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
+import { IO_PREVIEW_BYTES } from "./lean-for-projection";
 import { OtlpSpanPiiRedactionService } from "./span-pii-redaction.service";
 
 export interface LogRequestCollectionDeps {
