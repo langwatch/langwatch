@@ -1112,7 +1112,7 @@ function LangyPanel({
   const turnError = useMemo(() => {
     // The LIVE failure. Two roads reach `error`, and BOTH must be classified:
     //  - a turn-START rejection from the create/continue MUTATION carries the
-    //    domain error on `error.data.domainError` → readLangyTrpcError;
+    //    domain error on `error.data.error` → readLangyTrpcError;
     //  - a mid-turn failure off the STREAM carries it as a JSON message →
     //    readLangyStreamError.
     // Reading only the stream shape (as this once did) collapsed EVERY mutation

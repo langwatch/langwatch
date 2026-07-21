@@ -12,6 +12,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBody_CarriesTypeAndCode(t *testing.T) {
+	// Both are always emitted and always agree: `type` for OpenAI-compatible
+	// consumers, `code` for everyone reading the TypeScript-side name.
+	body := Body(New(context.Background(), Code("conversation_busy"), nil))
+	assert.Equal(t, "conversation_busy", body.Type)
+	assert.Equal(t, "conversation_busy", body.Code)
+
+	// A writer that only set `type` still resolves to the same error.
+	legacy := FromBody(ErrorBody{Type: "conversation_busy", Message: "conversation_busy"})
+	assert.Equal(t, Code("conversation_busy"), legacy.Code)
+	assert.NotContains(t, legacy.Meta, "message",
+		"a message equal to the code must not be promoted into meta")
+}
+
 func TestWriteHTTP_ExposesMetaTraceAndReasons(t *testing.T) {
 	RegisterStatus("chain_exhausted", http.StatusBadGateway)
 	RegisterStatus("provider_error", http.StatusBadGateway)
