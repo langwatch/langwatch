@@ -50,10 +50,10 @@ Feature: Evaluator misconfiguration is a skip, not a failure
     Then the evaluation is reported with status "error"
     And an error-level log is emitted
 
-  # Production evidence (8 days of prod logs, ~80 events): oversized payloads
-  # arrived as an opaque `413 {"message":"Request Too Long"}` execution error,
-  # which reads as a platform fault but is entirely the customer's to fix by
-  # sending less text. Retrying cannot help — the same body is resent.
+  # Oversized payloads arrive as an opaque `413 {"message":"Request Too Long"}`
+  # execution error, which reads as a platform fault but is entirely the
+  # customer's to fix by sending less text. Retrying cannot help — the same
+  # body is resent.
   @unit
   Scenario: An oversized evaluator payload is skipped with an actionable message
     Given a monitor whose evaluator input exceeds the evaluator size limit

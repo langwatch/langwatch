@@ -100,7 +100,6 @@ export class LangEvalsHttpClient implements LangEvalsClient {
 
       const duration = performance.now() - startTime;
       evaluationDurationHistogram.labels(evaluatorType).observe(duration);
-      getEvaluationStatusCounter(evaluatorType, "error").inc();
       let statusText = response.statusText;
       try {
         statusText = JSON.stringify(await response.json(), undefined, 2);
@@ -109,13 +108,17 @@ export class LangEvalsHttpClient implements LangEvalsClient {
       }
       // 413 is the customer's payload being too big, not our backend failing.
       // Raised as its own customer-fault error so it reports as an actionable
-      // skip instead of an opaque `413 {"message":"Request Too Long"}`.
+      // skip instead of an opaque `413 {"message":"Request Too Long"}`. The
+      // counter is labelled to match the status the command ultimately emits,
+      // so oversized inputs don't read as platform error-rate on dashboards.
       if (response.status === 413) {
+        getEvaluationStatusCounter(evaluatorType, "skipped").inc();
         throw new EvaluatorInputTooLargeError({
           meta: { evaluatorType, httpStatus: response.status },
         });
       }
 
+      getEvaluationStatusCounter(evaluatorType, "error").inc();
       throw new EvaluatorExecutionError(`${response.status} ${statusText}`, {
         meta: { evaluatorType, httpStatus: response.status },
       });
