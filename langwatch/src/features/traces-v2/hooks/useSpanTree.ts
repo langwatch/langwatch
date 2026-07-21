@@ -58,10 +58,19 @@ export function useSpanTree() {
       sinceStartTimeMs: tree !== undefined ? spanTreeDeltaSinceMs(tree) : 0,
     },
     {
-      // Gated on the tree having loaded: until then the main query's own
-      // fetch (and its retries) is the source of truth, and there is no
-      // high-water mark to poll from.
-      enabled: isReady && isLive && !sseConnected && tree !== undefined,
+      // Gated on the walk having FINISHED, not merely on `tree` being
+      // defined: progressive publishing sets the cache entry after page 1, so
+      // a mid-walk poll would take its high-water mark from a partial tree and
+      // ask for every span after it — one response of up to
+      // MAX_LIGHT_SPAN_READ_ROWS, i.e. exactly the unbounded fetch paging
+      // exists to avoid. Until the walk lands, the main query is the source of
+      // truth (and its retries have no high-water mark to poll from anyway).
+      enabled:
+        isReady &&
+        isLive &&
+        !sseConnected &&
+        tree !== undefined &&
+        !treeQuery.isFetching,
       refetchInterval: LIVE_REFETCH_MS,
       // Deltas are throwaway transport into the spanTree cache entry —
       // don't retain per-poll entries of their own.

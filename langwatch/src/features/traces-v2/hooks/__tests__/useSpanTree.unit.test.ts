@@ -41,6 +41,7 @@ const setQueryData = vi.fn();
 
 let treeData: SpanTreeNode[] | undefined;
 let treeIsPreviousData = false;
+let treeIsFetching = false;
 let sseConnectionState = "connected";
 let traceQueryArgs = {
   isLive: true,
@@ -54,6 +55,7 @@ vi.mock("@tanstack/react-query", () => ({
     return {
       data: treeData,
       isLoading: false,
+      isFetching: treeIsFetching,
       isPreviousData: treeIsPreviousData,
     };
   },
@@ -120,6 +122,7 @@ describe("useSpanTree", () => {
     setQueryData.mockReset();
     treeData = [node("a", 100)];
     treeIsPreviousData = false;
+    treeIsFetching = false;
     sseConnectionState = "connected";
     traceQueryArgs = {
       isLive: true,
@@ -182,6 +185,19 @@ describe("useSpanTree", () => {
 
     it("waits for the tree to load before polling (no high-water mark yet)", () => {
       treeData = undefined;
+
+      renderHook(() => useSpanTree());
+
+      expect(lastDeltaCall().options.enabled).toBe(false);
+    });
+
+    it("does not poll from a partially published tree while the page walk is still running", () => {
+      // Progressive publishing sets the cache entry after page 1, so `data` is
+      // defined long before the walk finishes. Polling from that partial
+      // high-water mark would ask for the whole remainder of the trace in one
+      // response — the unbounded fetch this paging exists to avoid.
+      treeData = [node("a", 100)];
+      treeIsFetching = true;
 
       renderHook(() => useSpanTree());
 
