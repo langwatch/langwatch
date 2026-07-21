@@ -94,7 +94,7 @@ export function ToolCatalogEditor({
       void utils.aiTools.adminList.invalidate({ organizationId });
       void utils.aiTools.list.invalidate({ organizationId });
     },
-    onError: (err) => showErrorToast(err, { fallbackTitle: "Couldn't update tile" }),
+    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't update tile" }),
   });
 
   const removeMutation = api.aiTools.remove.useMutation({
@@ -104,14 +104,14 @@ export function ToolCatalogEditor({
       toaster.create({ title: "Tile deleted", type: "success" });
       setPendingDelete(null);
     },
-    onError: (err) => showErrorToast(err, { fallbackTitle: "Couldn't delete tile" }),
+    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't delete tile" }),
   });
 
   const reorderMutation = api.aiTools.reorder.useMutation({
     onSuccess: () => {
       void utils.aiTools.list.invalidate({ organizationId });
     },
-    onError: (err) => showErrorToast(err, { fallbackTitle: "Couldn't reorder tiles" }),
+    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't reorder tiles" }),
   });
 
   const importStarterPackMutation = api.aiTools.importStarterPack.useMutation({
@@ -131,7 +131,7 @@ export function ToolCatalogEditor({
       });
     },
     onError: (err) =>
-      showErrorToast(err, { fallbackTitle: "Couldn't import the starter pack" }),
+      showErrorToast({ error: err, fallbackTitle: "Couldn't import the starter pack" }),
   });
 
   const starterPackQuery = api.aiTools.starterPackCatalog.useQuery(

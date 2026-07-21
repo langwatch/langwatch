@@ -126,7 +126,7 @@ function GuardrailsPage() {
       });
       setArchiving(null);
     } catch (error) {
-      showErrorToast(error, { fallbackTitle: "Couldn't archive the guardrail" });
+      showErrorToast({ error, fallbackTitle: "Couldn't archive the guardrail" });
     }
   };
 
@@ -387,7 +387,7 @@ function GuardrailDrawer({
       onClose();
     },
     onError: (err) =>
-      showErrorToast(err, { fallbackTitle: "Couldn't create the guardrail" }),
+      showErrorToast({ error: err, fallbackTitle: "Couldn't create the guardrail" }),
   });
   const updateMutation = api.gatewayGuardrails.update.useMutation({
     onSuccess: async () => {
@@ -395,7 +395,7 @@ function GuardrailDrawer({
       onClose();
     },
     onError: (err) =>
-      showErrorToast(err, { fallbackTitle: "Couldn't save the guardrail" }),
+      showErrorToast({ error: err, fallbackTitle: "Couldn't save the guardrail" }),
   });
 
   const isPending = createMutation.isPending || updateMutation.isPending;

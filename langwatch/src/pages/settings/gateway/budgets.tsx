@@ -92,7 +92,7 @@ function BudgetsPage() {
       });
       setArchiving(null);
     } catch (error) {
-      showErrorToast(error, { fallbackTitle: "Couldn't archive the budget" });
+      showErrorToast({ error, fallbackTitle: "Couldn't archive the budget" });
     }
   };
 

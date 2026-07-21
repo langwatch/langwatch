@@ -790,7 +790,7 @@ export function AutomationDrawer({
             errorTitle: isRegistered ? title : "Test fire failed",
             errorDetail: description,
           });
-          showErrorToast(err, { fallbackTitle: "Test fire failed" });
+          showErrorToast({ error: err, fallbackTitle: "Test fire failed" });
         },
       },
     );
@@ -858,7 +858,7 @@ export function AutomationDrawer({
           closeDrawer();
         },
         onError: (err) =>
-          showErrorToast(err, { fallbackTitle: "Couldn't save automation" }),
+          showErrorToast({ error: err, fallbackTitle: "Couldn't save automation" }),
       },
     );
   }, [

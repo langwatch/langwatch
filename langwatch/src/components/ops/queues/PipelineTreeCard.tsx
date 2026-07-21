@@ -28,11 +28,11 @@ export function PipelineTreeCard({
 
   const pauseMutation = api.ops.pausePipeline.useMutation({
     onSuccess: () => { toaster.create({ title: "Pipeline paused", type: "success" }); void utils.ops.invalidate(); },
-    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't pause the pipeline" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't pause the pipeline" }),
   });
   const unpauseMutation = api.ops.unpausePipeline.useMutation({
     onSuccess: () => { toaster.create({ title: "Pipeline unpaused", type: "success" }); void utils.ops.invalidate(); },
-    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't unpause the pipeline" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't unpause the pipeline" }),
   });
 
   function handleToggleExpand(path: string) {

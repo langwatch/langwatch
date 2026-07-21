@@ -93,7 +93,7 @@ function CacheRulesPage() {
       });
       setArchiving(null);
     } catch (error) {
-      showErrorToast(error, { fallbackTitle: "Couldn't archive the cache rule" });
+      showErrorToast({ error, fallbackTitle: "Couldn't archive the cache rule" });
     }
   };
 
@@ -106,7 +106,7 @@ function CacheRulesPage() {
         enabled: !rule.enabled,
       });
     } catch (error) {
-      showErrorToast(error, { fallbackTitle: "Couldn't toggle the cache rule" });
+      showErrorToast({ error, fallbackTitle: "Couldn't toggle the cache rule" });
     }
   };
 

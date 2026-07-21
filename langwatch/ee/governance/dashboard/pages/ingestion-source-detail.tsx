@@ -128,7 +128,7 @@ function IngestionSourceDetailPage() {
       });
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't rotate the secret" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
   });
   const archiveMutation = api.ingestionSources.archive.useMutation({
     onSuccess: () => {
@@ -136,7 +136,7 @@ function IngestionSourceDetailPage() {
       void router.push("/settings/governance/ingestion-sources");
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't archive the source" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't archive the source" }),
   });
 
   if (!sourceId) {

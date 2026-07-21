@@ -231,9 +231,7 @@ function DataRetentionPage({
       });
     },
     onError: (error) =>
-      showErrorToast(error, {
-        fallbackTitle: "Couldn't cancel the retroactive update",
-      }),
+      showErrorToast({ error, fallbackTitle: "Couldn't cancel the retroactive update" }),
   });
 
   if (rulesQuery.isLoading) {
@@ -290,9 +288,7 @@ function DataRetentionPage({
       const firstError = failed.find(
         (r): r is { ok: false; error: Error } => !r.ok,
       );
-      showErrorToast(firstError?.error, {
-        fallbackTitle: "Couldn't remove the retention policy",
-      });
+      showErrorToast({ error: firstError?.error, fallbackTitle: "Couldn't remove the retention policy" });
     }
   };
 
@@ -573,9 +569,7 @@ function DataRetentionPage({
                     meta: { closable: true },
                   });
                 }
-                showErrorToast(firstError?.error, {
-                  fallbackTitle: "Couldn't save the retention policy",
-                });
+                showErrorToast({ error: firstError?.error, fallbackTitle: "Couldn't save the retention policy" });
                 return {
                   success: failed.length === 0,
                   failed: failed.map((f) => f.category),
@@ -657,9 +651,7 @@ function DataRetentionPage({
                       const firstError = triggerFailed.find(
                         (r): r is { ok: false; error: Error } => !r.ok,
                       );
-                      showErrorToast(firstError?.error, {
-                        fallbackTitle: "Some retroactive updates failed",
-                      });
+                      showErrorToast({ error: firstError?.error, fallbackTitle: "Some retroactive updates failed" });
                     }
                   }
                   if (status.success) closeDrawer();

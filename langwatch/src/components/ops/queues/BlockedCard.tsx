@@ -35,19 +35,19 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
 
   const unblockAllMutation = api.ops.unblockAll.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Unblocked ${data.unblockedCount} groups`, type: "success" }); setUnblockAllTarget(null); void utils.ops.invalidate(); },
-    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't unblock the groups" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't unblock the groups" }),
   });
   const drainGroupMutation = api.ops.drainGroup.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Drained, removed ${data.jobsRemoved} jobs`, type: "success" }); setDrainTarget(null); void utils.ops.invalidate(); },
-    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't drain the group" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't drain the group" }),
   });
   const moveAllToDlqMutation = api.ops.moveAllBlockedToDlq.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Moved ${data.movedCount} groups to DLQ`, type: "success" }); setMoveToDlqTarget(null); void utils.ops.invalidate(); },
-    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't move the groups to the DLQ" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't move the groups to the DLQ" }),
   });
   const canaryUnblockMutation = api.ops.canaryUnblock.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Canary unblocked ${data.unblockedCount}`, type: "success" }); setCanaryQueueTarget(null); void utils.ops.invalidate(); },
-    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't run the canary unblock" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't run the canary unblock" }),
   });
 
   const queuesWithBlocked = (queuesQuery.data ?? []).filter((q) => q.blockedGroupCount > 0);

@@ -52,9 +52,7 @@ export function HomePagePicker({ organizationId }: Props) {
       void utils.governance.resolveHome.invalidate({ organizationId });
     },
     onError: (error) =>
-      showErrorToast(error, {
-        fallbackTitle: "Couldn't save your home preference",
-      }),
+      showErrorToast({ error, fallbackTitle: "Couldn't save your home preference" }),
   });
 
   const options = useMemo<PickerOption[]>(() => {

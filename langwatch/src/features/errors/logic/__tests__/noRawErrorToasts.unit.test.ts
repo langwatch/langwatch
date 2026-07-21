@@ -93,7 +93,7 @@ describe("error toasts", () => {
       offenders,
       `These toasts render an error's raw message. For a handled error that is ` +
         `the code slug (the customer reads "validation_error"); for an unhandled ` +
-        `one it can leak internals. Use showErrorToast(error, { fallbackTitle }) ` +
+        `one it can leak internals. Use showErrorToast({ error, fallbackTitle }) ` +
         `from ~/features/errors instead — see ` +
         `dev/docs/best_practices/error-handling.md.`,
     ).toEqual([]);

@@ -38,7 +38,7 @@ export function useLicenseActions({
         });
         return;
       }
-      showErrorToast(error, { fallbackTitle: "Couldn't activate license" });
+      showErrorToast({ error, fallbackTitle: "Couldn't activate license" });
     },
   });
 
@@ -53,7 +53,7 @@ export function useLicenseActions({
       window.location.reload();
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't remove license" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't remove license" }),
   });
 
   const upload = (licenseKey: string) => {

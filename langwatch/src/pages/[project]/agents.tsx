@@ -63,9 +63,7 @@ function Page() {
       });
     },
     onError: (error) =>
-      showErrorToast(error, {
-        fallbackTitle: "Couldn't update agent from source",
-      }),
+      showErrorToast({ error, fallbackTitle: "Couldn't update agent from source" }),
   });
 
   const handleSyncFromSource = useCallback(
@@ -110,7 +108,7 @@ function Page() {
       });
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't delete agent" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't delete agent" }),
   });
 
   const handleEditAgent = (agent: TypedAgent) => {
@@ -149,7 +147,7 @@ function Page() {
             });
           },
           onError: (error) =>
-            showErrorToast(error, { fallbackTitle: "Couldn't delete agent" }),
+            showErrorToast({ error, fallbackTitle: "Couldn't delete agent" }),
         },
       );
     }

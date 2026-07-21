@@ -190,7 +190,7 @@ function VirtualKeyDetailPage() {
       setRevealSecret({ name: vk.name, secret: result.secret });
       setRotating(false);
     } catch (err) {
-      showErrorToast(err, { fallbackTitle: "Couldn't rotate the key" });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't rotate the key" });
     }
   };
 
@@ -200,7 +200,7 @@ function VirtualKeyDetailPage() {
       await revokeMutation.mutateAsync({ organizationId: orgId, id: vk.id });
       setRevoking(false);
     } catch (err) {
-      showErrorToast(err, { fallbackTitle: "Couldn't revoke the key" });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't revoke the key" });
     }
   };
 

@@ -711,7 +711,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     },
     onError: (error) => {
       if (applyHandledErrorToForm({ error, form: methods })) return;
-      showErrorToast(error, { fallbackTitle: "Couldn't create prompt" });
+      showErrorToast({ error, fallbackTitle: "Couldn't create prompt" });
     },
   });
 
@@ -758,7 +758,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     },
     onError: (error) => {
       if (applyHandledErrorToForm({ error, form: methods })) return;
-      showErrorToast(error, { fallbackTitle: "Couldn't save prompt" });
+      showErrorToast({ error, fallbackTitle: "Couldn't save prompt" });
     },
   });
 
@@ -776,7 +776,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       });
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't rename prompt" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't rename prompt" }),
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;

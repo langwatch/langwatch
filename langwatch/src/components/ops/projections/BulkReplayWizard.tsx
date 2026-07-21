@@ -106,7 +106,7 @@ export function BulkReplayWizard({
       onReplayStarted();
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't start the replay" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't start the replay" }),
   });
 
   const [dryRunResult, setDryRunResult] = useState<{
@@ -126,7 +126,7 @@ export function BulkReplayWizard({
       });
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't complete the dry run" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't complete the dry run" }),
   });
 
   function toggleProjection(name: string) {

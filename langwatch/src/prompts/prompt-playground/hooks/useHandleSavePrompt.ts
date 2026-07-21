@@ -104,7 +104,7 @@ export function useHandleSavePrompt() {
      */
     const onError = (error: Error) => {
       if (applyHandledErrorToForm({ error, form: methods })) return;
-      showErrorToast(error, { fallbackTitle: "Couldn't save the prompt" });
+      showErrorToast({ error, fallbackTitle: "Couldn't save the prompt" });
     };
 
     /**

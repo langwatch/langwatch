@@ -68,7 +68,7 @@ export default function SecretsPage() {
       setNewSecretValue("");
       await utils.secrets.list.invalidate();
     } catch (error) {
-      showErrorToast(error, { fallbackTitle: "Couldn't create the secret" });
+      showErrorToast({ error, fallbackTitle: "Couldn't create the secret" });
     }
   };
 
@@ -82,7 +82,7 @@ export default function SecretsPage() {
       setSecretToDelete(null);
       await utils.secrets.list.invalidate();
     } catch (error) {
-      showErrorToast(error, { fallbackTitle: "Couldn't delete the secret" });
+      showErrorToast({ error, fallbackTitle: "Couldn't delete the secret" });
     }
   };
 
@@ -98,7 +98,7 @@ export default function SecretsPage() {
       setUpdateValue("");
       await utils.secrets.list.invalidate();
     } catch (error) {
-      showErrorToast(error, { fallbackTitle: "Couldn't update the secret" });
+      showErrorToast({ error, fallbackTitle: "Couldn't update the secret" });
     }
   };
 

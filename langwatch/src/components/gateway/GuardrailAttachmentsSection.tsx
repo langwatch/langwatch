@@ -114,7 +114,7 @@ export function GuardrailAttachmentsSection({
         });
         return;
       }
-      showErrorToast(err, { fallbackTitle: "Couldn't update the guardrails" });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't update the guardrails" });
     },
   });
 

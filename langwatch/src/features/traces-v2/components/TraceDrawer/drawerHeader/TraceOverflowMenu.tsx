@@ -81,7 +81,7 @@ export function TraceOverflowMenu({
       toaster.create({ title: "Trace pinned", type: "success" });
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't pin trace" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't pin trace" }),
   });
 
   const unpinMutation = api.pinnedTrace.unpin.useMutation({
@@ -92,7 +92,7 @@ export function TraceOverflowMenu({
       toaster.create({ title: "Trace unpinned", type: "success" });
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't unpin trace" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't unpin trace" }),
   });
 
   const handleTogglePin = useCallback(() => {

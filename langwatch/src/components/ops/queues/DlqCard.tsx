@@ -34,15 +34,15 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
 
   const replayMutation = api.ops.replayFromDlq.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Replayed ${data.jobsReplayed} jobs`, type: "success" }); setReplayTarget(null); void utils.ops.invalidate(); },
-    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't replay the group" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't replay the group" }),
   });
   const replayAllMutation = api.ops.replayAllFromDlq.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Replayed ${data.replayedCount} groups`, type: "success" }); setReplayAllTarget(null); void utils.ops.invalidate(); },
-    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't replay the groups" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't replay the groups" }),
   });
   const canaryRedriveMutation = api.ops.canaryRedrive.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Canary redrove ${data.redrivenCount}`, type: "success" }); setCanaryTarget(null); void utils.ops.invalidate(); },
-    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't run the canary redrive" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't run the canary redrive" }),
   });
 
   const groups = dlqQuery.data ?? [];

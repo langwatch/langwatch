@@ -264,7 +264,7 @@ export function ImpersonateDialog({
       });
       window.location.href = "/";
     } catch (err) {
-      showErrorToast(err, { fallbackTitle: "Couldn't impersonate the user" });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't impersonate the user" });
       setLoading(false);
     }
   };
@@ -384,7 +384,7 @@ function UserEditDrawer({
           onClose();
         },
         onError: (err) =>
-          showErrorToast(err, { fallbackTitle: "Couldn't update the user" }),
+          showErrorToast({ error: err, fallbackTitle: "Couldn't update the user" }),
       },
     );
   };

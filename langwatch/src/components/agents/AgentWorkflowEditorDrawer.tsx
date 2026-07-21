@@ -201,7 +201,7 @@ export function AgentWorkflowEditorDrawer(
       onClose();
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't save agent" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't save agent" }),
   });
 
   const isSaving = updateMutation.isPending;

@@ -127,11 +127,11 @@ in order of how often they are violated:
 6. **Unhandled errors get one calm generic state** plus the copyable error id —
    never the raw text.
 
-Read the payload with `readHandledError`
-(`src/features/automations/logic/errorExplainer.ts`); it resolves the
-`code ?? kind` discriminant and returns `null` for anything unhandled. Do not
-hand-roll `error.data?.domainError` at a call site — three separate ad-hoc
-readers is how this got inconsistent the first time.
+Everything lives in `langwatch/src/features/errors`: `readHandledError` to lift
+the payload, the code-keyed registry for the words, `showErrorToast` and
+`<HandledErrorAlert>` to render them, and `applyHandledErrorToForm` for a
+rejected submit. Do not hand-roll `error.data?.error` at a call site — three
+separate ad-hoc readers is how this got inconsistent the first time.
 
 ## Non-tRPC transports
 

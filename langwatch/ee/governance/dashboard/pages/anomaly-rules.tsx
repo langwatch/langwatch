@@ -212,7 +212,7 @@ function AnomalyRulesPage() {
       toaster.create({ title: "Rule created", type: "success" });
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't create the rule" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't create the rule" }),
   });
   const updateMutation = api.anomalyRules.update.useMutation({
     onSuccess: () => {
@@ -221,7 +221,7 @@ function AnomalyRulesPage() {
       toaster.create({ title: "Rule updated", type: "success" });
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't update the rule" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't update the rule" }),
   });
   const archiveMutation = api.anomalyRules.archive.useMutation({
     onSuccess: () => {
@@ -229,7 +229,7 @@ function AnomalyRulesPage() {
       toaster.create({ title: "Rule archived", type: "success" });
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't archive the rule" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't archive the rule" }),
   });
 
   const grouped = useMemo(() => {

@@ -93,9 +93,7 @@ export const CopyDatasetDialog = ({
 
       onClose();
     } catch (error) {
-      showErrorToast(error, {
-        fallbackTitle: "Couldn't replicate the dataset",
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't replicate the dataset" });
     }
   };
 

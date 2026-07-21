@@ -123,7 +123,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
         return;
       }
 
-      showErrorToast(err, { fallbackTitle: "Couldn't start run plan" });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't start run plan" });
     },
   });
 

@@ -158,7 +158,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     onError: (err) => {
       saveAndRunRef.current = false;
       if (applyHandledErrorToForm({ error: err, form })) return;
-      showErrorToast(err, { fallbackTitle: "Couldn't create run plan" });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't create run plan" });
     },
   });
 
@@ -186,7 +186,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     onError: (err) => {
       saveAndRunRef.current = false;
       if (applyHandledErrorToForm({ error: err, form })) return;
-      showErrorToast(err, { fallbackTitle: "Couldn't update run plan" });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't update run plan" });
     },
   });
 

@@ -27,7 +27,7 @@ export function PinButton({
       utils.pinnedTrace.getPin.invalidate({ projectId, traceId });
       toaster.create({ title: "Trace pinned", type: "success" });
     },
-    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't pin trace" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't pin trace" }),
   });
 
   const unpinMutation = api.pinnedTrace.unpin.useMutation({
@@ -35,7 +35,7 @@ export function PinButton({
       utils.pinnedTrace.getPin.invalidate({ projectId, traceId });
       toaster.create({ title: "Trace unpinned", type: "success" });
     },
-    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't unpin trace" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't unpin trace" }),
   });
 
   const isLoading = pinMutation.isLoading || unpinMutation.isLoading;

@@ -72,7 +72,7 @@ export function IngestionTemplatesEditor({
         });
       }
     },
-    onError: (err) => showErrorToast(err, { fallbackTitle: "Couldn't clone template" }),
+    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't clone template" }),
   });
 
   const archiveMutation = api.ingestionTemplates.archive.useMutation({
@@ -81,7 +81,7 @@ export function IngestionTemplatesEditor({
       toaster.create({ title: "Template archived", type: "success" });
     },
     onError: (err) =>
-      showErrorToast(err, { fallbackTitle: "Couldn't archive template" }),
+      showErrorToast({ error: err, fallbackTitle: "Couldn't archive template" }),
   });
 
   if (listQuery.isLoading) {
@@ -416,7 +416,7 @@ function EditOttlDrawer({
       toaster.create({ title: "OTTL saved", type: "success" });
       onClose();
     },
-    onError: (err) => showErrorToast(err, { fallbackTitle: "Couldn't save OTTL rules" }),
+    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't save OTTL rules" }),
   });
 
   const handleSave = () => {
@@ -529,7 +529,7 @@ function CreateTemplateDrawer({
       }
     },
     onError: (err) =>
-      showErrorToast(err, { fallbackTitle: "Couldn't create template" }),
+      showErrorToast({ error: err, fallbackTitle: "Couldn't create template" }),
   });
 
   const canSubmit =

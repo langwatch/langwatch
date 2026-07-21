@@ -141,7 +141,7 @@ function AddToTeamDialog({
       onClose();
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't add the member" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't add the member" }),
   });
 
   const userItems = useMemo(
@@ -286,7 +286,7 @@ function AddToProjectDialog({
       onClose();
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't add the access" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't add the access" }),
   });
 
   const userItems = (orgMembers.data?.members ?? []).map((m) => ({
@@ -417,7 +417,7 @@ function ProjectSection({
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't remove the access" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't remove the access" }),
   });
 
   const inherited = access.filter((a) => a.source === "team");
@@ -705,7 +705,7 @@ function TeamCard({
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't remove the member" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't remove the member" }),
   });
 
   const updateBinding = api.roleBinding.update.useMutation({
@@ -713,7 +713,7 @@ function TeamCard({
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't update the member's role" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't update the member's role" }),
   });
 
   const existingMemberIds = team.directMembers.flatMap((m) => m.userId ? [m.userId] : []);

@@ -217,9 +217,7 @@ export const NewWorkflowForm = ({
           },
           onError: (error) => {
             if (applyHandledErrorToForm({ error, form })) return;
-            showErrorToast(error, {
-              fallbackTitle: "Couldn't create workflow",
-            });
+            showErrorToast({ error, fallbackTitle: "Couldn't create workflow" });
           },
         },
       );

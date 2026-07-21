@@ -488,7 +488,7 @@ export function useEvaluatorEditorController(
     },
     onError: (error) => {
       if (applyHandledErrorToForm({ error, form })) return;
-      showErrorToast(error, { fallbackTitle: "Couldn't create evaluator" });
+      showErrorToast({ error, fallbackTitle: "Couldn't create evaluator" });
     },
   });
 
@@ -522,7 +522,7 @@ export function useEvaluatorEditorController(
     },
     onError: (error) => {
       if (applyHandledErrorToForm({ error, form })) return;
-      showErrorToast(error, { fallbackTitle: "Couldn't save evaluator" });
+      showErrorToast({ error, fallbackTitle: "Couldn't save evaluator" });
     },
   });
 

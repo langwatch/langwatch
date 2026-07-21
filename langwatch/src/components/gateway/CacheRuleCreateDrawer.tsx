@@ -53,7 +53,7 @@ export function CacheRuleCreateDrawer({ open, onOpenChange, onCreated }: Props) 
       onOpenChange(false);
       onCreated?.();
     } catch (e) {
-      showErrorToast(e, { fallbackTitle: "Couldn't create the cache rule" });
+      showErrorToast({ error: e, fallbackTitle: "Couldn't create the cache rule" });
     }
   };
 

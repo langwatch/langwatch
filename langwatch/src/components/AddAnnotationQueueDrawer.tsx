@@ -180,11 +180,9 @@ export const AddAnnotationQueueDrawer = ({
           reset();
         },
         onError: (error) =>
-          showErrorToast(error, {
-            fallbackTitle: queueId
+          showErrorToast({ error, fallbackTitle: queueId
               ? "Couldn't update annotation queue"
-              : "Couldn't create annotation queue",
-          }),
+              : "Couldn't create annotation queue" }),
       },
     );
   };

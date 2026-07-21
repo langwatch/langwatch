@@ -246,7 +246,7 @@ export function ApiKeysSection({
           void queryClient.apiKey.list.invalidate();
         },
         onError: (error) =>
-          showErrorToast(error, { fallbackTitle: "Couldn't create API key" }),
+          showErrorToast({ error, fallbackTitle: "Couldn't create API key" }),
       },
     );
   };
@@ -287,7 +287,7 @@ export function ApiKeysSection({
           void queryClient.apiKey.list.invalidate();
         },
         onError: (error) =>
-          showErrorToast(error, { fallbackTitle: "Couldn't update API key" }),
+          showErrorToast({ error, fallbackTitle: "Couldn't update API key" }),
       },
     );
   };
@@ -307,7 +307,7 @@ export function ApiKeysSection({
           void queryClient.apiKey.list.invalidate();
         },
         onError: (error) =>
-          showErrorToast(error, { fallbackTitle: "Couldn't revoke API key" }),
+          showErrorToast({ error, fallbackTitle: "Couldn't revoke API key" }),
       },
     );
   };
@@ -336,9 +336,7 @@ export function ApiKeysSection({
         },
         onError: (error) => {
           setIsRotateConfirmOpen(false);
-          showErrorToast(error, {
-            fallbackTitle: "Couldn't rotate the project API key",
-          });
+          showErrorToast({ error, fallbackTitle: "Couldn't rotate the project API key" });
         },
       },
     );

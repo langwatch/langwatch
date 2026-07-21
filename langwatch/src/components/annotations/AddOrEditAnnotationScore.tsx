@@ -198,11 +198,9 @@ export const AddOrEditAnnotationScore = ({
           void queryClient.annotationScore.getById.invalidate();
         },
         onError: (error) =>
-          showErrorToast(error, {
-            fallbackTitle: annotationScoreId
+          showErrorToast({ error, fallbackTitle: annotationScoreId
               ? "Couldn't save annotation score"
-              : "Couldn't create annotation score",
-          }),
+              : "Couldn't create annotation score" }),
       },
     );
   };
