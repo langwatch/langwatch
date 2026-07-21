@@ -357,7 +357,9 @@ export class EnvelopeBlobLifecycle {
             refProjectId: newLease ? "[redacted]" : undefined,
             blobHash: newLease?.ref.hash,
             groupId: "[redacted]",
-            err: err instanceof Error ? err.message : String(err),
+            err: redactStorageUrisInText(
+              err instanceof Error ? err.message : String(err),
+            ),
           },
           "transfer fallback: acquire failed; skipping release to keep old blob alive under TTL",
         );
