@@ -50,6 +50,10 @@ export function SectionNavigationLayout({
   );
 }
 
+/**
+ * Renders the shared navigation rail and adjacent content without the outer
+ * dashboard chrome.
+ */
 export function SectionNavigationFrame({
   children,
   sectionLabel,
