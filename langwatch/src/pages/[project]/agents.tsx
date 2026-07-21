@@ -63,7 +63,10 @@ function Page() {
       });
     },
     onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't update agent from source" }),
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't update agent from source",
+      }),
   });
 
   const handleSyncFromSource = useCallback(

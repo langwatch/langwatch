@@ -15,21 +15,14 @@ import {
 import { MoreVertical, Pencil } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
-import { useRouter } from "~/utils/compat/next-router";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
-import {
-  BackofficeTable,
-  EmptyCell,
-  formatDate,
-} from "../BackofficeTable";
-import {
-  useAdminList,
-  useAdminUpdate,
-} from "../useAdminResource";
+import { useRouter } from "~/utils/compat/next-router";
+import { BackofficeTable, EmptyCell, formatDate } from "../BackofficeTable";
+import { useAdminList, useAdminUpdate } from "../useAdminResource";
 
 /**
  * Read-facing Project shape — does NOT include s3Endpoint / s3AccessKeyId /
@@ -172,10 +165,7 @@ export default function ProjectsView() {
         </Table.Root>
       </BackofficeTable>
 
-      <ProjectEditDrawer
-        project={editing}
-        onClose={() => setEditing(null)}
-      />
+      <ProjectEditDrawer project={editing} onClose={() => setEditing(null)} />
     </>
   );
 }
@@ -266,9 +256,7 @@ function ProjectEditDrawer({
     if (form.s3Bucket.trim() !== "") data.s3Bucket = form.s3Bucket;
     const currentlyArchived = !!project.archivedAt;
     if (form.archive !== currentlyArchived) {
-      data.archivedAt = form.archive
-        ? new Date().toISOString()
-        : null;
+      data.archivedAt = form.archive ? new Date().toISOString() : null;
     }
 
     if (Object.keys(data).length === 0) {
@@ -288,7 +276,10 @@ function ProjectEditDrawer({
           onClose();
         },
         onError: (err) =>
-          showErrorToast({ error: err, fallbackTitle: "Couldn't update the project" }),
+          showErrorToast({
+            error: err,
+            fallbackTitle: "Couldn't update the project",
+          }),
       },
     );
   };
@@ -371,9 +362,7 @@ function ProjectEditDrawer({
                 <Field.Label>User link template</Field.Label>
                 <Input
                   value={form.userLinkTemplate}
-                  onChange={(e) =>
-                    setField("userLinkTemplate", e.target.value)
-                  }
+                  onChange={(e) => setField("userLinkTemplate", e.target.value)}
                   placeholder="e.g. https://app.acme.com/users/{{userId}}"
                 />
               </Field.Root>

@@ -18,6 +18,7 @@ import {
 import { FlaskConical, RefreshCw, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "~/components/PeriodSelector";
+import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import {
   explainHandledError,
   readHandledError,
@@ -29,6 +30,13 @@ import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
+import { GroupRow } from "./GroupRow";
+import {
+  RunHistoryFilters,
+  type RunHistoryFilterValues,
+} from "./RunHistoryFilters";
+import { RunHistorySkeleton } from "./RunHistorySkeleton";
+import { RunRow } from "./RunRow";
 import {
   availableGroupByOptions,
   computeBatchRunSummary,
@@ -36,17 +44,9 @@ import {
   groupRunsByBatchId,
   groupRunsByScenarioId,
 } from "./run-history-transforms";
-import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import { useAutoExpansion } from "./useAutoExpansion";
-import { useScrollToBatch } from "./useScrollToBatch";
-import {
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-} from "./RunHistoryFilters";
-import { RunHistorySkeleton } from "./RunHistorySkeleton";
-import { RunRow } from "./RunRow";
-import { GroupRow } from "./GroupRow";
 import { useRunHistoryStore } from "./useRunHistoryStore";
+import { useScrollToBatch } from "./useScrollToBatch";
 import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
 
 type ExternalSetDetailPanelProps = {
@@ -83,7 +83,6 @@ export function ExternalSetDetailPanel({
     ? groupBy
     : "none";
 
-
   // Live updates: SSE invalidates getSuiteRunData directly; its connection
   // state disables the fallback freshness polling below.
   const { isConnected: sseConnected } = useSimulationUpdateListener({
@@ -114,7 +113,8 @@ export function ExternalSetDetailPanel({
     },
   );
 
-  const runData = runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
+  const runData =
+    runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
 
   // The EmptyState below is this panel's whole error surface, so the copy is
   // read straight out of the registry rather than wrapped in a second Alert.
@@ -226,11 +226,7 @@ export function ExternalSetDetailPanel({
   return (
     <VStack align="stretch" gap={0} height="100%">
       {/* Header */}
-      <HStack
-        paddingX={6}
-        paddingY={4}
-        justify="space-between"
-      >
+      <HStack paddingX={6} paddingY={4} justify="space-between">
         <VStack align="start" gap={0}>
           <Text
             fontSize="xs"
@@ -262,7 +258,8 @@ export function ExternalSetDetailPanel({
             right: 0,
             height: "5px",
             borderTop: "1px solid var(--chakra-colors-border-muted)",
-            background: "linear-gradient(to bottom, color-mix(in srgb, var(--chakra-colors-border-muted) 40%, transparent), transparent)",
+            background:
+              "linear-gradient(to bottom, color-mix(in srgb, var(--chakra-colors-border-muted) 40%, transparent), transparent)",
             pointerEvents: "none",
           }}
         >
@@ -336,7 +333,9 @@ export function ExternalSetDetailPanel({
                           resolveTargetName={resolveTargetName}
                           onScenarioRunClick={handleScenarioRunClick}
                           viewMode={viewMode}
-                          isHighlighted={highlightedBatchId === batchRun.batchRunId}
+                          isHighlighted={
+                            highlightedBatchId === batchRun.batchRunId
+                          }
                         />
                       );
                     })

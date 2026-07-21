@@ -1,10 +1,10 @@
 import { Button } from "@chakra-ui/react";
 import { PinSource } from "@prisma/client";
 import { Pin, PinOff } from "lucide-react";
-import { api } from "~/utils/api";
-import { showErrorToast } from "~/features/errors";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
+import { api } from "~/utils/api";
 
 export function PinButton({
   projectId,
@@ -27,7 +27,8 @@ export function PinButton({
       utils.pinnedTrace.getPin.invalidate({ projectId, traceId });
       toaster.create({ title: "Trace pinned", type: "success" });
     },
-    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't pin trace" }),
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't pin trace" }),
   });
 
   const unpinMutation = api.pinnedTrace.unpin.useMutation({
@@ -35,7 +36,8 @@ export function PinButton({
       utils.pinnedTrace.getPin.invalidate({ projectId, traceId });
       toaster.create({ title: "Trace unpinned", type: "success" });
     },
-    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't unpin trace" }),
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't unpin trace" }),
   });
 
   const isLoading = pinMutation.isLoading || unpinMutation.isLoading;

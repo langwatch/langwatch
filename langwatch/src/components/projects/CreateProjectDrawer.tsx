@@ -1,9 +1,9 @@
 import { Heading, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { showErrorToast } from "~/features/errors";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
 import { Drawer } from "../ui/drawer";
@@ -29,8 +29,7 @@ export function CreateProjectDrawer({
 }): React.ReactElement {
   const { organization: currentOrganization } = useOrganizationTeamProject();
 
-  const effectiveOrganizationId =
-    organizationIdProp ?? currentOrganization?.id;
+  const effectiveOrganizationId = organizationIdProp ?? currentOrganization?.id;
   const { closeDrawer } = useDrawer();
   const queryClient = api.useContext();
   const { checkAndProceed } = useLicenseEnforcement("projects");
@@ -56,9 +55,7 @@ export function CreateProjectDrawer({
     // defaultValues seed and covers the race where useForm momentarily
     // holds the "" before the seed lands.
     const resolvedTeamId =
-      data.teamId === NEW_TEAM_VALUE
-        ? undefined
-        : data.teamId || defaultTeamId;
+      data.teamId === NEW_TEAM_VALUE ? undefined : data.teamId || defaultTeamId;
 
     checkAndProceed(() => {
       createProject.mutate(

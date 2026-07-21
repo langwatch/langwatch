@@ -9,11 +9,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Bot, Check, Terminal, Users } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
-  IngestionTemplateInstallDrawer,
   type IngestionBindingResult,
+  IngestionTemplateInstallDrawer,
 } from "~/components/me/IngestionTemplateInstallDrawer";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { Link } from "~/components/ui/link";
@@ -53,10 +53,7 @@ import { api } from "~/utils/api";
  * NOT render under /[project] chrome — only on /me. Embedding lives on
  * /me/index.tsx.
  */
-const TILE_META: Record<
-  string,
-  { icon: ReactNode; subtitle: string }
-> = {
+const TILE_META: Record<string, { icon: ReactNode; subtitle: string }> = {
   claude_cowork: {
     icon: <Users size={20} />,
     subtitle: "Multi-agent Claude sessions",
@@ -84,7 +81,10 @@ export function TraceIngestSection() {
       void utils.ingestionKey.list.invalidate();
     },
     onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't install this integration" }),
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't install this integration",
+      }),
   });
   const rotateMutation = api.ingestionKey.rotate.useMutation({
     onSuccess: () => {
@@ -111,7 +111,7 @@ export function TraceIngestSection() {
   /** Connected ingestion keys, keyed by the source they were minted for. */
   const keyBySourceType = new Map(keys.map((k) => [k.sourceType, k]));
   const openTemplate = openSlug
-    ? templates.find((t) => t.slug === openSlug) ?? null
+    ? (templates.find((t) => t.slug === openSlug) ?? null)
     : null;
 
   const handleInstall = async (
@@ -224,9 +224,7 @@ export function TraceIngestSection() {
       {openTemplate && (
         <IngestionTemplateInstallDrawer
           open={!!openSlug}
-          onOpenChange={(next) =>
-            handleOpenChange(openTemplate.slug, next)
-          }
+          onOpenChange={(next) => handleOpenChange(openTemplate.slug, next)}
           template={{
             slug: openTemplate.slug,
             displayName: openTemplate.displayName,
@@ -239,7 +237,7 @@ export function TraceIngestSection() {
             installMutation.error &&
             installMutation.variables?.sourceType === openTemplate.sourceType
               ? installMutation.error
-              : rotateMutation.error ?? null
+              : (rotateMutation.error ?? null)
           }
           hasExistingKey={keyBySourceType.has(openTemplate.sourceType)}
           onInstall={() =>

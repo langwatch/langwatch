@@ -18,51 +18,54 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import {
+  OrganizationUserRole,
+  PricingModel,
+  Currency as PrismaCurrency,
+  TeamUserRole,
+} from "@prisma/client";
 import { ArrowRight, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
+import { LabeledSwitch } from "~/components/ui/LabeledSwitch";
 import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
-import { LabeledSwitch } from "~/components/ui/LabeledSwitch";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import { showErrorToast } from "~/features/errors";
-import {
-  type Currency,
-  type BillingInterval,
-  getAnnualDiscountPercent,
-  formatPrice,
-  parseGrowthSeatPlanType,
-  isAnnualTieredPlan,
-  FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
-  getGrowthFeatures,
-  ENTERPRISE_PLAN_FEATURES,
-  buildTieredCapabilities,
-} from "./billing-plans";
-import { useBillingPricing } from "./useBillingPricing";
-import { useSubscriptionActions } from "./useSubscriptionActions";
-import { classifyMemberType, type MemberType } from "~/server/license-enforcement/member-classification";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
-  Currency as PrismaCurrency,
-  OrganizationUserRole,
-  TeamUserRole,
-  PricingModel,
-} from "@prisma/client";
+  classifyMemberType,
+  type MemberType,
+} from "~/server/license-enforcement/member-classification";
+import { api } from "~/utils/api";
+import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
 import {
-  formatPlanTypeLabel,
+  type BillingInterval,
+  buildTieredCapabilities,
+  type Currency,
+  FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
+  ENTERPRISE_PLAN_FEATURES,
+  formatPrice,
+  getAnnualDiscountPercent,
+  getGrowthFeatures,
+  isAnnualTieredPlan,
+  parseGrowthSeatPlanType,
+} from "./billing-plans";
+import { ContactSalesBlock } from "./ContactSalesBlock";
+import { CurrentPlanBlock } from "./CurrentPlanBlock";
+import { InvoicesBlock } from "./InvoicesBlock";
+import {
   countFullMembers,
+  type DrawerSaveResult,
+  formatPlanTypeLabel,
   type PlannedUser,
   type SubscriptionUser,
-  type DrawerSaveResult,
 } from "./subscription-types";
-import { CurrentPlanBlock } from "./CurrentPlanBlock";
 import { UpdateSeatsBlock } from "./UpdateSeatsBlock";
 import { UpgradePlanBlock } from "./UpgradePlanBlock";
-import { ContactSalesBlock } from "./ContactSalesBlock";
-import { InvoicesBlock } from "./InvoicesBlock";
 import { UserManagementDrawer } from "./UserManagementDrawer";
-import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
+import { useBillingPricing } from "./useBillingPricing";
+import { useSubscriptionActions } from "./useSubscriptionActions";
 
 const currencyOptions = [
   { label: "\u20AC EUR", value: PrismaCurrency.EUR },
@@ -78,18 +81,23 @@ export function SubscriptionPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [plannedUsers, setPlannedUsers] = useState<PlannedUser[]>([]);
   const [deletedSeatCount, setDeletedSeatCount] = useState(0);
-  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
-  const [billingPeriod, setBillingPeriod] = useState<BillingInterval>(
-    "monthly",
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(
+    null,
   );
+  const [billingPeriod, setBillingPeriod] =
+    useState<BillingInterval>("monthly");
   const [showSuccess, setShowSuccess] = useState(false);
   const [showUpgradeCredit, setShowUpgradeCredit] = useState(false);
 
-  const detectedCurrency = api.currency.detectCurrency.useQuery({}, {
-    enabled: !!organization,
-  });
+  const detectedCurrency = api.currency.detectCurrency.useQuery(
+    {},
+    {
+      enabled: !!organization,
+    },
+  );
 
-  const currency = selectedCurrency ?? detectedCurrency.data?.currency ?? PrismaCurrency.EUR;
+  const currency =
+    selectedCurrency ?? detectedCurrency.data?.currency ?? PrismaCurrency.EUR;
 
   useEffect(() => {
     setSelectedCurrency(null);
@@ -102,7 +110,6 @@ export function SubscriptionPage() {
       if (params.has("upgraded_from")) setShowUpgradeCredit(true);
     }
   }, []);
-
 
   // Fetch active plan
   const activePlan = api.plan.getActivePlan.useQuery(
@@ -118,10 +125,11 @@ export function SubscriptionPage() {
     );
 
   // Fetch pending invites for seat counting
-  const pendingInvites = api.organization.getOrganizationPendingInvites.useQuery(
-    { organizationId: organization?.id ?? "" },
-    { enabled: !!organization },
-  );
+  const pendingInvites =
+    api.organization.getOrganizationPendingInvites.useQuery(
+      { organizationId: organization?.id ?? "" },
+      { enabled: !!organization },
+    );
 
   // Mutation for sending invites to already-paid seats
   const createInvitesMutation = api.organization.createInvites.useMutation();
@@ -144,9 +152,14 @@ export function SubscriptionPage() {
   const plan = activePlan.data;
   const isDeveloperPlan = plan?.free ?? true;
   const isLicenseOverride = plan?.planSource === "license";
-  const isTieredPricingModel = organization?.pricingModel === PricingModel.TIERED;
+  const isTieredPricingModel =
+    organization?.pricingModel === PricingModel.TIERED;
   const isEnterprisePlan = plan?.type === "ENTERPRISE" && !isLicenseOverride;
-  const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride;
+  const isTieredLegacyPaidPlan =
+    isTieredPricingModel &&
+    !isDeveloperPlan &&
+    !isEnterprisePlan &&
+    !isLicenseOverride;
 
   useEffect(() => {
     if (isTieredLegacyPaidPlan && plan && isAnnualTieredPlan(plan.type)) {
@@ -187,24 +200,33 @@ export function SubscriptionPage() {
     periodSuffix,
     totalFullMembers,
     monthlyEquivalent,
-  } = useBillingPricing({ currency: effectiveCurrency, billingPeriod: effectiveBillingPeriod, users, plannedUsers: allPlannedUsers });
+  } = useBillingPricing({
+    currency: effectiveCurrency,
+    billingPeriod: effectiveBillingPeriod,
+    users,
+    plannedUsers: allPlannedUsers,
+  });
 
   // Free/license-override: baseline of 1 seat (Math.max with totalFullMembers below ensures actual count is the floor); paid plan: use plan capacity
-  const effectiveMaxSeats = (isDeveloperPlan || isLicenseOverride) ? 1 : seatUsageM;
+  const effectiveMaxSeats =
+    isDeveloperPlan || isLicenseOverride ? 1 : seatUsageM;
 
   // Manual planned seats only (NOT pending invites — they're already in maxMembers)
   const newPlannedFullMembers = countFullMembers(plannedUsers);
 
   // Single source of truth for billing seat count (never below existing members)
-  const billingSeats = (isDeveloperPlan || isLicenseOverride)
-    ? Math.max(
-        totalFullMembers,
-        (effectiveMaxSeats ?? 0) + newPlannedFullMembers - deletedSeatCount
-      )
-    : Math.max(
-        existingCoreMembers,
-        (effectiveMaxSeats ?? totalFullMembers) + newPlannedFullMembers - deletedSeatCount,
-      );
+  const billingSeats =
+    isDeveloperPlan || isLicenseOverride
+      ? Math.max(
+          totalFullMembers,
+          (effectiveMaxSeats ?? 0) + newPlannedFullMembers - deletedSeatCount,
+        )
+      : Math.max(
+          existingCoreMembers,
+          (effectiveMaxSeats ?? totalFullMembers) +
+            newPlannedFullMembers -
+            deletedSeatCount,
+        );
 
   // For tiered legacy plans upgrading to seat-based, use actual member count
   // (not the old plan's maxMembers capacity which is irrelevant for the new model)
@@ -214,7 +236,8 @@ export function SubscriptionPage() {
 
   const billingPriceCents = billingSeats * seatPricePerPeriodCents;
   const billingPriceFormatted = `${formatPrice({ cents: billingPriceCents, currency: effectiveCurrency })}${periodSuffix}`;
-  const upgradeBillingPriceCents = upgradeBillingSeats * seatPricePerPeriodCents;
+  const upgradeBillingPriceCents =
+    upgradeBillingSeats * seatPricePerPeriodCents;
   const upgradeBillingPriceFormatted = `${formatPrice({ cents: upgradeBillingPriceCents, currency: effectiveCurrency })}${periodSuffix}`;
 
   const handleDrawerSave = (result: DrawerSaveResult) => {
@@ -225,32 +248,50 @@ export function SubscriptionPage() {
     setDeletedSeatCount(result.deletedSeatCount);
 
     // 3. Paid plan: send invites immediately for already-paid seats
-    if (!isDeveloperPlan && !isLicenseOverride && result.inviteEmails.length > 0 && organization?.id) {
-      createInvitesMutation.mutate({
-        organizationId: organization.id,
-        invites: result.inviteEmails.map((email) => ({
-          email: email.toLowerCase(),
-          role: OrganizationUserRole.MEMBER,
-          ...(team?.id ? { teams: [{ teamId: team.id, role: TeamUserRole.MEMBER }] } : {}),
-        })),
-      }, {
-        onSuccess: () => {
-          toaster.create({ title: "Invites sent successfully", type: "success" });
-          void pendingInvites.refetch();
-          void organizationWithMembers.refetch();
+    if (
+      !isDeveloperPlan &&
+      !isLicenseOverride &&
+      result.inviteEmails.length > 0 &&
+      organization?.id
+    ) {
+      createInvitesMutation.mutate(
+        {
+          organizationId: organization.id,
+          invites: result.inviteEmails.map((email) => ({
+            email: email.toLowerCase(),
+            role: OrganizationUserRole.MEMBER,
+            ...(team?.id
+              ? { teams: [{ teamId: team.id, role: TeamUserRole.MEMBER }] }
+              : {}),
+          })),
         },
-        onError: (error) =>
-          showErrorToast({ error, fallbackTitle: "Couldn't send invites" }),
-      });
+        {
+          onSuccess: () => {
+            toaster.create({
+              title: "Invites sent successfully",
+              type: "success",
+            });
+            void pendingInvites.refetch();
+            void organizationWithMembers.refetch();
+          },
+          onError: (error) =>
+            showErrorToast({ error, fallbackTitle: "Couldn't send invites" }),
+        },
+      );
     }
 
     // 4. Free plan or license override: auto-fill rows with email go to plannedUsers (for upgrade flow)
-    if ((isDeveloperPlan || isLicenseOverride) && result.inviteEmails.length > 0) {
-      const inviteAsPlanned: PlannedUser[] = result.inviteEmails.map((email, i) => ({
-        id: `invite-${Date.now()}-${i}`,
-        email,
-        memberType: "FullMember" as MemberType,
-      }));
+    if (
+      (isDeveloperPlan || isLicenseOverride) &&
+      result.inviteEmails.length > 0
+    ) {
+      const inviteAsPlanned: PlannedUser[] = result.inviteEmails.map(
+        (email, i) => ({
+          id: `invite-${Date.now()}-${i}`,
+          email,
+          memberType: "FullMember" as MemberType,
+        }),
+      );
       setPlannedUsers((prev) => [...prev, ...inviteAsPlanned]);
     }
   };
@@ -319,18 +360,17 @@ export function SubscriptionPage() {
   const currentPlanFeatures = isLicenseOverride
     ? getGrowthFeatures(effectiveCurrency)
     : isTieredLegacyPaidPlan
-    ? buildTieredCapabilities({
-      maxMembers: plan?.maxMembers ?? 0,
-      maxMessagesPerMonth: plan?.maxMessagesPerMonth ?? 0,
-      maxProjects: plan?.maxProjects ?? 0,
-      maxMembersLite: plan?.maxMembersLite ?? 0,
-    })
-    : isEnterprisePlan
-      ? ENTERPRISE_PLAN_FEATURES
-      : isDeveloperPlan
-        ? DEVELOPER_FEATURES
-        : getGrowthFeatures(effectiveCurrency);
-
+      ? buildTieredCapabilities({
+          maxMembers: plan?.maxMembers ?? 0,
+          maxMessagesPerMonth: plan?.maxMessagesPerMonth ?? 0,
+          maxProjects: plan?.maxProjects ?? 0,
+          maxMembersLite: plan?.maxMembersLite ?? 0,
+        })
+      : isEnterprisePlan
+        ? ENTERPRISE_PLAN_FEATURES
+        : isDeveloperPlan
+          ? DEVELOPER_FEATURES
+          : getGrowthFeatures(effectiveCurrency);
 
   const isUpgradeSeatsRequired =
     !isDeveloperPlan &&
@@ -339,15 +379,19 @@ export function SubscriptionPage() {
     !isLicenseOverride &&
     (plannedUsers.length > 0 || deletedSeatCount > 0);
   const isUpgradePlanRequired =
-    ((isDeveloperPlan && (plannedUsers.length > 0 || deletedSeatCount > 0))
-    || isTieredLegacyPaidPlan || isDeveloperPlan || isLicenseOverride)
-    && !isEnterprisePlan;
-    const isUpgradePlanRequiredForFreePlan =
-    ((isDeveloperPlan && (plannedUsers.length > 0 || deletedSeatCount > 0))
-    || (isTieredLegacyPaidPlan))
-    && !isEnterprisePlan;
+    ((isDeveloperPlan && (plannedUsers.length > 0 || deletedSeatCount > 0)) ||
+      isTieredLegacyPaidPlan ||
+      isDeveloperPlan ||
+      isLicenseOverride) &&
+    !isEnterprisePlan;
+  const isUpgradePlanRequiredForFreePlan =
+    ((isDeveloperPlan && (plannedUsers.length > 0 || deletedSeatCount > 0)) ||
+      isTieredLegacyPaidPlan) &&
+    !isEnterprisePlan;
 
-    const freePlanUpgradeRequired = isDeveloperPlan ? isUpgradePlanRequiredForFreePlan : isUpgradePlanRequired;
+  const freePlanUpgradeRequired = isDeveloperPlan
+    ? isUpgradePlanRequiredForFreePlan
+    : isUpgradePlanRequired;
 
   const updateRequired = isUpgradeSeatsRequired || freePlanUpgradeRequired;
 
@@ -377,41 +421,42 @@ export function SubscriptionPage() {
             </Text>
           </VStack>
           <HStack gap={4} alignItems="center">
-            {(isDeveloperPlan || isTieredLegacyPaidPlan || isLicenseOverride) && !isEnterprisePlan && (
-              <>
-                <LabeledSwitch
-                  data-testid="billing-period-toggle"
-                  left={{ label: "Monthly", value: "monthly" }}
-                  right={{ label: "Annually", value: "annual" }}
-                  value={billingPeriod}
-                  onChange={setBillingPeriod}
-                />
-                <Select.Root
-                  data-testid="currency-selector"
-                  collection={currencyCollection}
-                  size="xs"
-                  width="100px"
-                  value={[currency]}
-                  onValueChange={(details) => {
-                    const selected = details.value[0];
-                    if (selected) {
-                      setSelectedCurrency(selected as Currency);
-                    }
-                  }}
-                >
-                  <Select.Trigger>
-                    <Select.ValueText />
-                  </Select.Trigger>
-                  <Select.Content paddingY={2}>
-                    {currencyOptions.map((option) => (
-                      <Select.Item key={option.value} item={option}>
-                        {option.label}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-              </>
-            )}
+            {(isDeveloperPlan || isTieredLegacyPaidPlan || isLicenseOverride) &&
+              !isEnterprisePlan && (
+                <>
+                  <LabeledSwitch
+                    data-testid="billing-period-toggle"
+                    left={{ label: "Monthly", value: "monthly" }}
+                    right={{ label: "Annually", value: "annual" }}
+                    value={billingPeriod}
+                    onChange={setBillingPeriod}
+                  />
+                  <Select.Root
+                    data-testid="currency-selector"
+                    collection={currencyCollection}
+                    size="xs"
+                    width="100px"
+                    value={[currency]}
+                    onValueChange={(details) => {
+                      const selected = details.value[0];
+                      if (selected) {
+                        setSelectedCurrency(selected as Currency);
+                      }
+                    }}
+                  >
+                    <Select.Trigger>
+                      <Select.ValueText />
+                    </Select.Trigger>
+                    <Select.Content paddingY={2}>
+                      {currencyOptions.map((option) => (
+                        <Select.Item key={option.value} item={option}>
+                          {option.label}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
+                </>
+              )}
             <Link href="/settings/plans">
               <Button variant="ghost" size="sm" color="fg.muted">
                 All plans <ArrowRight size={14} />
@@ -437,9 +482,13 @@ export function SubscriptionPage() {
                 </Text>
               </HStack>
               {showUpgradeCredit && (
-                <Text fontSize="sm" color="green.fg" data-testid="credit-notice">
-                  Your previous plan has been prorated. Any unused credit has been
-                  applied to your account and will offset future invoices.
+                <Text
+                  fontSize="sm"
+                  color="green.fg"
+                  data-testid="credit-notice"
+                >
+                  Your previous plan has been prorated. Any unused credit has
+                  been applied to your account and will offset future invoices.
                 </Text>
               )}
             </VStack>
@@ -456,21 +505,23 @@ export function SubscriptionPage() {
           upgradeRequired={updateRequired}
           onUserCountClick={() => setIsDrawerOpen(true)}
           onManageSubscription={
-            !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride ? handleManageSubscription : undefined
+            !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride
+              ? handleManageSubscription
+              : undefined
           }
           isManageLoading={isManageLoading}
           deprecatedNotice={isTieredLegacyPaidPlan}
-          contactSalesUrl={isEnterprisePlan
-            ? CONTACT_SALES_URL
-            : undefined
-          }
+          contactSalesUrl={isEnterprisePlan ? CONTACT_SALES_URL : undefined}
         />
 
         {/* Invoices Block - always shown; listInvoices returns [] when no Stripe customer exists */}
-        <InvoicesBlock organizationId={organization.id} onViewAllInStripe={handleManageSubscription} />
+        <InvoicesBlock
+          organizationId={organization.id}
+          onViewAllInStripe={handleManageSubscription}
+        />
 
         {/* Upgrade Block - show for free plan and TIERED legacy paid orgs */}
-        {(isUpgradePlanRequired) && (
+        {isUpgradePlanRequired && (
           <UpgradePlanBlock
             planName={
               <>

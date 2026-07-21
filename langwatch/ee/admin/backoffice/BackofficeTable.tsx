@@ -2,8 +2,8 @@ import {
   Box,
   Button,
   Card,
-  HStack,
   Heading,
+  HStack,
   Spacer,
   Spinner,
   Text,
@@ -11,8 +11,8 @@ import {
 } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import type { PropsWithChildren, ReactNode } from "react";
-import { SearchInput } from "~/components/ui/SearchInput";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { SearchInput } from "~/components/ui/SearchInput";
 import { HandledErrorAlert } from "~/features/errors";
 
 export interface PaginationState {
@@ -116,9 +116,7 @@ export function BackofficeTable({
         </Card.Body>
       </Card.Root>
 
-      {pagination && pagination.total > 0 && (
-        <PaginationBar {...pagination} />
-      )}
+      {pagination && pagination.total > 0 && <PaginationBar {...pagination} />}
     </VStack>
   );
 }
@@ -179,7 +177,9 @@ export function formatDate(value: string | Date | null | undefined): string {
   return d.toLocaleDateString();
 }
 
-export function formatDateTime(value: string | Date | null | undefined): string {
+export function formatDateTime(
+  value: string | Date | null | undefined,
+): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(d.getTime())) return "—";

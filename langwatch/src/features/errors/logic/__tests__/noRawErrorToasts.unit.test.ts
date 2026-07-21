@@ -11,7 +11,7 @@
  * is caught here instead, the same way `codes.unit.test.ts` catches an
  * unregistered code.
  */
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";

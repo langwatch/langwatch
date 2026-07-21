@@ -3,8 +3,8 @@ import {
   Box,
   Button,
   Center,
-  HStack,
   Heading,
+  HStack,
   IconButton,
   Spinner,
   Stack,
@@ -65,7 +65,10 @@ export function FeatureFlagsContent() {
       showErrorToast({ error, fallbackTitle: "Couldn't clear the override" }),
   });
 
-  const grouped = useMemo(() => groupByScope(query.data?.flags ?? []), [query.data]);
+  const grouped = useMemo(
+    () => groupByScope(query.data?.flags ?? []),
+    [query.data],
+  );
 
   if (query.isLoading) {
     return (
@@ -90,9 +93,9 @@ export function FeatureFlagsContent() {
     <Stack gap={8} paddingY={4} maxWidth="1200px">
       <Box>
         <Text fontSize="sm" color="fg.muted">
-          System-scoped flags are kill switches and pipeline toggles served
-          from this LangWatch postgres database. They never round-trip to
-          PostHog, so flipping them is fast and free.{" "}
+          System-scoped flags are kill switches and pipeline toggles served from
+          this LangWatch postgres database. They never round-trip to PostHog, so
+          flipping them is fast and free.{" "}
           {isSaas
             ? "Product-scoped flags still resolve through PostHog for user targeting and A/B tests; postgres values here only apply as an emergency override."
             : "Product-scoped flags fall back to this postgres store when PostHog is not configured."}
@@ -105,9 +108,7 @@ export function FeatureFlagsContent() {
         rows={grouped.system}
         canManage={canManage}
         isSaas={isSaas}
-        onToggle={({ key, enabled }) =>
-          setFlag.mutateAsync({ key, enabled })
-        }
+        onToggle={({ key, enabled }) => setFlag.mutateAsync({ key, enabled })}
         onClear={({ key }) => clearFlag.mutateAsync({ key })}
         pendingKey={
           (setFlag.isPending ? setFlag.variables?.key : undefined) ??
@@ -125,9 +126,7 @@ export function FeatureFlagsContent() {
         rows={grouped.product}
         canManage={canManage}
         isSaas={isSaas}
-        onToggle={({ key, enabled }) =>
-          setFlag.mutateAsync({ key, enabled })
-        }
+        onToggle={({ key, enabled }) => setFlag.mutateAsync({ key, enabled })}
         onClear={({ key }) => clearFlag.mutateAsync({ key })}
         pendingKey={
           (setFlag.isPending ? setFlag.variables?.key : undefined) ??
@@ -420,9 +419,7 @@ function FlagRowView({
         {row.storedValue !== null ? (
           <VStack align="start" gap={0}>
             <Text fontSize="xs">
-              {row.updatedAt
-                ? new Date(row.updatedAt).toLocaleString()
-                : ""}
+              {row.updatedAt ? new Date(row.updatedAt).toLocaleString() : ""}
             </Text>
             <HStack gap={2}>
               <Text fontSize="xs" color="fg.muted">
@@ -475,7 +472,10 @@ function ScopeBadge({ scope }: { scope: "SYSTEM" | "PRODUCT" }) {
   );
 }
 
-function groupByScope(rows: FlagRow[]): { system: FlagRow[]; product: FlagRow[] } {
+function groupByScope(rows: FlagRow[]): {
+  system: FlagRow[];
+  product: FlagRow[];
+} {
   return rows.reduce<{ system: FlagRow[]; product: FlagRow[] }>(
     (acc, r) => {
       if (r.scope === "SYSTEM") acc.system.push(r);

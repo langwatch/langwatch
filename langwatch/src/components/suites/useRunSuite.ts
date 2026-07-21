@@ -6,12 +6,12 @@
  * the returned state props.
  */
 
-import type { SimulationSuite } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
+import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { readHandledError, showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { readHandledError, showErrorToast } from "~/features/errors";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -35,8 +35,12 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  const [pendingSuite, setPendingSuite] = useState<SimulationSuite | null>(null);
-  const [pendingBatchRunId, setPendingBatchRunId] = useState<string | null>(null);
+  const [pendingSuite, setPendingSuite] = useState<SimulationSuite | null>(
+    null,
+  );
+  const [pendingBatchRunId, setPendingBatchRunId] = useState<string | null>(
+    null,
+  );
 
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result, variables) => {
@@ -88,7 +92,10 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
         });
       }
 
-      optionsRef.current.onRunScheduled?.(variables.id, variables.batchRunId ?? result.batchRunId);
+      optionsRef.current.onRunScheduled?.(
+        variables.id,
+        variables.batchRunId ?? result.batchRunId,
+      );
     },
     onError: (err, variables) => {
       setPendingSuite(null);
@@ -159,7 +166,8 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
   );
 
   const activeScenarioCount = useMemo(() => {
-    if (!pendingSuite || !allScenarios) return pendingSuite?.scenarioIds.length ?? 0;
+    if (!pendingSuite || !allScenarios)
+      return pendingSuite?.scenarioIds.length ?? 0;
     const activeIds = new Set(allScenarios.map((s) => s.id));
     return pendingSuite.scenarioIds.filter((id) => activeIds.has(id)).length;
   }, [pendingSuite, allScenarios]);

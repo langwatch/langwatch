@@ -35,6 +35,7 @@ import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "~/experiments-v3/types";
+import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
 import {
   getComplexProps,
   getDrawerStack,
@@ -51,7 +52,6 @@ import {
   evaluatorsSchema,
 } from "~/server/evaluations/evaluators";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
-import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
@@ -78,7 +78,9 @@ const EMPTY_COMPARISON_CONFIG: ComparisonEvaluatorConfig = {
  * config is normalized to the comparison shape on load, so the only thing its
  * evaluatorType still selects is which judge endpoint runs it.
  */
-const isComparisonEvaluatorType = (evaluatorType: string | undefined): boolean =>
+const isComparisonEvaluatorType = (
+  evaluatorType: string | undefined,
+): boolean =>
   evaluatorType === COMPARISON_EVALUATOR_TYPE ||
   evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
 
@@ -180,9 +182,7 @@ export type EvaluatorEditorController = {
   expectsComparisonContext: boolean;
   /** The live comparison draft, mirrored from ComparisonConfigForm. */
   comparison: ComparisonEvaluatorConfig;
-  onComparisonChange:
-    | ((config: ComparisonEvaluatorConfig) => void)
-    | undefined;
+  onComparisonChange: ((config: ComparisonEvaluatorConfig) => void) | undefined;
   onLocalConfigChange:
     | ((config: LocalEvaluatorConfig | undefined) => void)
     | undefined;

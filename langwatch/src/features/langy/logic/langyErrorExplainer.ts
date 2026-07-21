@@ -1,4 +1,4 @@
-import { readHandledError, type HandledErrorShape } from "~/features/errors";
+import { type HandledErrorShape, readHandledError } from "~/features/errors";
 
 /**
  * Langy error explainer (ADR-045).

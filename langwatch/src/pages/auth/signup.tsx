@@ -9,12 +9,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useSearchParams } from "~/utils/compat/next-navigation";
-import { signIn, useSession } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { HandledErrorAlert } from "~/features/errors";
+import { signIn, useSession } from "~/utils/auth-client";
+import { useSearchParams } from "~/utils/compat/next-navigation";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { Link } from "../../components/ui/link";

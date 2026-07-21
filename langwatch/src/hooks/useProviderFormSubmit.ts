@@ -125,7 +125,10 @@ export function useProviderFormSubmit({
         onSuccess?.();
       } catch (err) {
         onError?.(err);
-        showErrorToast({ error: err, fallbackTitle: "Couldn't update the provider" });
+        showErrorToast({
+          error: err,
+          fallbackTitle: "Couldn't update the provider",
+        });
       }
     },
     [getFormSnapshot, onSuccess, onError, updateMutation, utils],
@@ -458,7 +461,10 @@ export function useProviderFormSubmit({
       onSuccess?.();
     } catch (err) {
       onError?.(err);
-      showErrorToast({ error: err, fallbackTitle: "Couldn't save the provider settings" });
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't save the provider settings",
+      });
     } finally {
       setIsSaving(false);
     }

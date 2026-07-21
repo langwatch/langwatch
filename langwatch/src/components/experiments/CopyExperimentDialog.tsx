@@ -6,13 +6,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useState } from "react";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import {
   hasPermissionWithHierarchy,
   teamRoleHasPermission,
 } from "../../server/api/rbac";
-import { showErrorToast } from "~/features/errors";
 import { api } from "../../utils/api";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
@@ -110,7 +110,10 @@ export const CopyExperimentDialog = ({
 
       onClose();
     } catch (error) {
-      showErrorToast({ error, fallbackTitle: "Couldn't replicate the experiment" });
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't replicate the experiment",
+      });
     }
   };
 

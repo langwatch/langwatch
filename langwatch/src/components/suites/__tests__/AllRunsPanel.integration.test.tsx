@@ -165,7 +165,9 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
         });
         mockScenariosQuery.mockReturnValue({ data: [] });
 
-        render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
+        render(<RunHistoryPanel period={defaultPeriod} />, {
+          wrapper: Wrapper,
+        });
 
         expect(
           screen.getByText("This search took too long"),
@@ -230,14 +232,17 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
         data: {
           runs,
           scenarioSetIds: { batch_1: "__internal__suite_1__suite" },
-          hasMore: false, changed: true,
+          hasMore: false,
+          changed: true,
         },
         isLoading: false,
         error: null,
       });
       mockScenariosQuery.mockReturnValue({ data: [] });
 
-      return render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
+      return render(<RunHistoryPanel period={defaultPeriod} />, {
+        wrapper: Wrapper,
+      });
     }
 
     /** @scenario "Pre-suite scenario runs appear in All Runs" */
@@ -307,7 +312,9 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       });
       mockScenariosQuery.mockReturnValue({ data: [] });
 
-      const { rerender } = render(<RunHistoryPanel period={period1} />, { wrapper: Wrapper });
+      const { rerender } = render(<RunHistoryPanel period={period1} />, {
+        wrapper: Wrapper,
+      });
 
       // Re-render with a different period
       rerender(
@@ -360,7 +367,8 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
         data: {
           runs: runsFromTwoScenarios,
           scenarioSetIds: { batch_1: "__internal__suite_1__suite" },
-          hasMore: false, changed: true,
+          hasMore: false,
+          changed: true,
         },
         isLoading: false,
         error: null,
@@ -378,7 +386,9 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       /** @scenario "None grouping on All Runs preserves batch run layout" */
       it("renders the group-by selector with None selected by default", () => {
         setupWithRuns();
-        render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
+        render(<RunHistoryPanel period={defaultPeriod} />, {
+          wrapper: Wrapper,
+        });
 
         const groupBySelect = screen.getByLabelText("Group by");
         expect(groupBySelect).toBeInTheDocument();
@@ -387,7 +397,9 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
 
       it("has None, Scenario, and Target options", () => {
         setupWithRuns();
-        render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
+        render(<RunHistoryPanel period={defaultPeriod} />, {
+          wrapper: Wrapper,
+        });
 
         const groupBySelect = screen.getByLabelText("Group by");
         const options = groupBySelect.querySelectorAll("option");
@@ -401,7 +413,9 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       /** @scenario "User groups All Runs results by scenario" */
       it("renders group row headers instead of batch run rows", async () => {
         setupWithRuns();
-        render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
+        render(<RunHistoryPanel period={defaultPeriod} />, {
+          wrapper: Wrapper,
+        });
 
         const groupBySelect = screen.getByLabelText("Group by");
         await userEvent.selectOptions(groupBySelect, "scenario");
@@ -456,7 +470,8 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
               batch_suite_a: "__internal__suite_a__suite",
               batch_suite_b: "__internal__suite_b__suite",
             },
-            hasMore: false, changed: true,
+            hasMore: false,
+            changed: true,
           },
           isLoading: false,
           error: null,
@@ -465,7 +480,9 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
           data: [{ id: "scen_shared", name: "Shared Scenario" }],
         });
 
-        render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
+        render(<RunHistoryPanel period={defaultPeriod} />, {
+          wrapper: Wrapper,
+        });
 
         const groupBySelect = screen.getByLabelText("Group by");
         await userEvent.selectOptions(groupBySelect, "scenario");
@@ -473,7 +490,9 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
         // Both runs from different suites should be grouped under one scenario
         const groupHeaders = screen.getAllByTestId("group-row-header");
         expect(groupHeaders.length).toBe(1);
-        expect(within(groupHeaders[0]!).getByText("Shared Scenario")).toBeInTheDocument();
+        expect(
+          within(groupHeaders[0]!).getByText("Shared Scenario"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -513,7 +532,8 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
           data: {
             runs: runsSameScenarioDifferentTargets,
             scenarioSetIds: { batch_1: "__internal__suite_1__suite" },
-            hasMore: false, changed: true,
+            hasMore: false,
+            changed: true,
           },
           isLoading: false,
           error: null,
@@ -522,7 +542,9 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
           data: [{ id: "scen_1", name: "Login Flow" }],
         });
 
-        render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
+        render(<RunHistoryPanel period={defaultPeriod} />, {
+          wrapper: Wrapper,
+        });
 
         const groupBySelect = screen.getByLabelText("Group by");
         await userEvent.selectOptions(groupBySelect, "target");

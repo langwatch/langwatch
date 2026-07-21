@@ -146,7 +146,14 @@ describe("applyHandledErrorToForm", () => {
 
   describe("given anything that is not a validation error", () => {
     it.each([
-      ["a different handled code", { data: { error: { code: "trace_not_found", httpStatus: 404, meta: {} } } }],
+      [
+        "a different handled code",
+        {
+          data: {
+            error: { code: "trace_not_found", httpStatus: 404, meta: {} },
+          },
+        },
+      ],
       ["an unhandled error", { data: { error: null } }],
       ["a bare Error", new Error("boom")],
       ["nothing at all", undefined],
@@ -163,9 +170,9 @@ describe("applyHandledErrorToForm", () => {
       const form = formWithFields("name");
 
       expect(apply(validationError({}), form)).toBe(false);
-      expect(
-        apply(validationError({ fieldErrors: { name: [] } }), form),
-      ).toBe(false);
+      expect(apply(validationError({ fieldErrors: { name: [] } }), form)).toBe(
+        false,
+      );
       expect(
         apply(validationError({ fieldErrors: "not an object" }), form),
       ).toBe(false);

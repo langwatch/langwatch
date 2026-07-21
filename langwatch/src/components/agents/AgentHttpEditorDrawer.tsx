@@ -12,7 +12,10 @@ import {
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
-
+import {
+  isScenarioMappingValid,
+  ScenarioInputMappingSection,
+} from "~/components/suites/ScenarioInputMappingSection";
 import { Drawer } from "~/components/ui/drawer";
 import {
   type AvailableSource,
@@ -20,6 +23,7 @@ import {
   type Variable,
   VariablesSection,
 } from "~/components/variables";
+import { showErrorToast } from "~/features/errors";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -38,7 +42,7 @@ import type {
   AgentComponentConfig,
   TypedAgent,
 } from "~/server/agents/agent.repository";
-import { showErrorToast } from "~/features/errors";
+import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";
 import {
   AuthConfigSection,
@@ -49,11 +53,6 @@ import {
   OutputPathInput,
   useHttpTest,
 } from "./http";
-import {
-  ScenarioInputMappingSection,
-  isScenarioMappingValid,
-} from "~/components/suites/ScenarioInputMappingSection";
-import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 
 // ============================================================================
 // Constants
@@ -175,9 +174,9 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     props.onInputMappingsChange ?? flowCallbacks?.onInputMappingsChange;
 
   // Local state for mappings (allows fast UI updates while persisting to store)
-  const [localMappings, setLocalMappings] = useState<Record<string, FieldMapping>>(
-    initialInputMappings ?? {}
-  );
+  const [localMappings, setLocalMappings] = useState<
+    Record<string, FieldMapping>
+  >(initialInputMappings ?? {});
 
   // Sync local mappings when initial mappings change (e.g., when drawer reopens)
   useEffect(() => {
@@ -200,7 +199,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       });
       onInputMappingsChange?.(identifier, mapping);
     },
-    [onInputMappingsChange]
+    [onInputMappingsChange],
   );
 
   // Check if we should show the variables tab (only when availableSources is provided)
@@ -222,7 +221,9 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     Record<string, FieldMapping>
   >({});
   // Default to variables tab when in evaluations context (has availableSources)
-  const [activeTab, setActiveTab] = useState(showVariablesTab ? "variables" : "body");
+  const [activeTab, setActiveTab] = useState(
+    showVariablesTab ? "variables" : "body",
+  );
 
   // License enforcement for agent creation
   const { checkAndProceed } = useLicenseEnforcement("agents");
@@ -236,7 +237,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const handleVariablesChange = useCallback((newVariables: Variable[]) => {
     // Filter out fixed variables - only keep custom ones
     const newCustomVariables = newVariables.filter(
-      (v) => !FIXED_VARIABLE_IDS.has(v.identifier)
+      (v) => !FIXED_VARIABLE_IDS.has(v.identifier),
     );
     setCustomVariables(newCustomVariables);
     setHasUnsavedChanges(true);
@@ -441,7 +442,13 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   };
 
   // HTTP test via shared hook
-  const { handleTest } = useHttpTest({ url, method, headers, auth, outputPath });
+  const { handleTest } = useHttpTest({
+    url,
+    method,
+    headers,
+    auth,
+    outputPath,
+  });
 
   return (
     <>
@@ -452,261 +459,268 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
         closeOnInteractOutside={false}
         modal={false}
         preventScroll={false}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2}>
-            {canGoBack && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goBack}
-                padding={1}
-                minWidth="auto"
-                data-testid="back-button"
-              >
-                <LuArrowLeft size={20} />
-              </Button>
-            )}
-            <Heading>{agentId ? "Edit HTTP Agent" : "New HTTP Agent"}</Heading>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          overflow="hidden"
-          padding={0}
-        >
-          {agentId && agentQuery.isLoading ? (
-            <HStack justify="center" paddingY={8}>
-              <Spinner size="md" />
+      >
+        <Drawer.Content bg="bg">
+          <Drawer.CloseTrigger />
+          <Drawer.Header>
+            <HStack gap={2}>
+              {canGoBack && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goBack}
+                  padding={1}
+                  minWidth="auto"
+                  data-testid="back-button"
+                >
+                  <LuArrowLeft size={20} />
+                </Button>
+              )}
+              <Heading>
+                {agentId ? "Edit HTTP Agent" : "New HTTP Agent"}
+              </Heading>
             </HStack>
-          ) : (
-            <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-              {/* Agent Name */}
-              <Box paddingX={6} paddingTop={4}>
-                <Field.Root required>
-                  <Field.Label>Agent Name</Field.Label>
-                  <Input
-                    value={name}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                      markDirty();
-                    }}
-                    placeholder="Enter agent name"
-                    data-testid="agent-name-input"
-                  />
-                </Field.Root>
-              </Box>
-
-              {/* URL with Method Selector */}
-              <Box paddingX={6}>
-                <HStack gap={2}>
-                  <HttpMethodSelector
-                    value={method}
-                    onChange={(m) => {
-                      setMethod(m);
-                      markDirty();
-                    }}
-                  />
-                  <Input
-                    value={url}
-                    onChange={(e) => {
-                      setUrl(e.target.value);
-                      markDirty();
-                    }}
-                    placeholder="https://api.example.com/agent/chat"
-                    flex={1}
-                    data-testid="url-input"
-                  />
-                </HStack>
-              </Box>
-
-              {/* Tabbed Content */}
-              <Tabs.Root
-                value={activeTab}
-                onValueChange={(e) => setActiveTab(e.value)}
-                flex={1}
-                display="flex"
-                flexDirection="column"
-                overflow="hidden"
-                colorPalette="blue"
-              >
-                <Tabs.List
-                  paddingX={6}
-                  borderBottomWidth="1px"
-                  borderColor="border"
-                >
-                  <Tabs.Trigger value="body">Body</Tabs.Trigger>
-                  {showVariablesTab && (
-                    <Tabs.Trigger value="variables">Variables</Tabs.Trigger>
-                  )}
-                  <Tabs.Trigger value="auth">Auth</Tabs.Trigger>
-                  <Tabs.Trigger value="headers">Headers</Tabs.Trigger>
-                  <Tabs.Trigger value="test">Test</Tabs.Trigger>
-                </Tabs.List>
-
-                {/* Body Tab */}
-                <Tabs.Content
-                  value="body"
-                  flex={1}
-                  overflowY="auto"
-                  paddingX={6}
-                  paddingY={4}
-                >
-                  <VStack gap={6} align="stretch">
-                    <Field.Root>
-                      <Field.Label>Request Body Template</Field.Label>
-                      <Text fontSize="sm" color="fg.muted" marginBottom={2}>
-                        JSON body with mustache variables. Variables are
-                        replaced at runtime.
-                      </Text>
-                      <BodyTemplateEditor
-                        value={bodyTemplate}
-                        onChange={(v) => {
-                          setBodyTemplate(v);
-                          markDirty();
-                        }}
-                      />
-                    </Field.Root>
-                    <Field.Root>
-                      <Field.Label>Output Path (JSONPath)</Field.Label>
-                      <OutputPathInput
-                        value={outputPath}
-                        onChange={(v) => {
-                          setOutputPath(v);
-                          markDirty();
-                        }}
-                      />
-                    </Field.Root>
-                    {/* Scenario input mapping — HTTP adapter reads these at runtime */}
-                    <ScenarioInputMappingSection
-                      inputs={variables}
-                      mappings={scenarioMappings}
-                      onMappingChange={handleScenarioMappingChange}
+          </Drawer.Header>
+          <Drawer.Body
+            display="flex"
+            flexDirection="column"
+            overflow="hidden"
+            padding={0}
+          >
+            {agentId && agentQuery.isLoading ? (
+              <HStack justify="center" paddingY={8}>
+                <Spinner size="md" />
+              </HStack>
+            ) : (
+              <VStack gap={4} align="stretch" flex={1} overflow="hidden">
+                {/* Agent Name */}
+                <Box paddingX={6} paddingTop={4}>
+                  <Field.Root required>
+                    <Field.Label>Agent Name</Field.Label>
+                    <Input
+                      value={name}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        markDirty();
+                      }}
+                      placeholder="Enter agent name"
+                      data-testid="agent-name-input"
                     />
-                  </VStack>
-                </Tabs.Content>
+                  </Field.Root>
+                </Box>
 
-                {/* Variables Tab - only shown when availableSources is provided */}
-                {showVariablesTab && (
+                {/* URL with Method Selector */}
+                <Box paddingX={6}>
+                  <HStack gap={2}>
+                    <HttpMethodSelector
+                      value={method}
+                      onChange={(m) => {
+                        setMethod(m);
+                        markDirty();
+                      }}
+                    />
+                    <Input
+                      value={url}
+                      onChange={(e) => {
+                        setUrl(e.target.value);
+                        markDirty();
+                      }}
+                      placeholder="https://api.example.com/agent/chat"
+                      flex={1}
+                      data-testid="url-input"
+                    />
+                  </HStack>
+                </Box>
+
+                {/* Tabbed Content */}
+                <Tabs.Root
+                  value={activeTab}
+                  onValueChange={(e) => setActiveTab(e.value)}
+                  flex={1}
+                  display="flex"
+                  flexDirection="column"
+                  overflow="hidden"
+                  colorPalette="blue"
+                >
+                  <Tabs.List
+                    paddingX={6}
+                    borderBottomWidth="1px"
+                    borderColor="border"
+                  >
+                    <Tabs.Trigger value="body">Body</Tabs.Trigger>
+                    {showVariablesTab && (
+                      <Tabs.Trigger value="variables">Variables</Tabs.Trigger>
+                    )}
+                    <Tabs.Trigger value="auth">Auth</Tabs.Trigger>
+                    <Tabs.Trigger value="headers">Headers</Tabs.Trigger>
+                    <Tabs.Trigger value="test">Test</Tabs.Trigger>
+                  </Tabs.List>
+
+                  {/* Body Tab */}
                   <Tabs.Content
-                    value="variables"
+                    value="body"
                     flex={1}
                     overflowY="auto"
                     paddingX={6}
                     paddingY={4}
                   >
-                    <VStack gap={4} align="stretch">
-                      <Text fontSize="sm" color="fg.muted">
-                        Define variables to use in your body template (e.g.,{" "}
-                        <Text as="span" fontFamily="mono" bg="bg.subtle" paddingX={1}>
-                          {"{{input}}"}
+                    <VStack gap={6} align="stretch">
+                      <Field.Root>
+                        <Field.Label>Request Body Template</Field.Label>
+                        <Text fontSize="sm" color="fg.muted" marginBottom={2}>
+                          JSON body with mustache variables. Variables are
+                          replaced at runtime.
                         </Text>
-                        ) and map them to your evaluation dataset. At least one variable
-                        must be mapped.
-                      </Text>
-                      <VariablesSection
-                        title="Input Variables"
-                        variables={variables}
-                        onChange={handleVariablesChange}
-                        showMappings={true}
-                        availableSources={availableSources}
-                        mappings={localMappings}
-                        onMappingChange={handleMappingChange}
-                        canAddRemove={true}
-                        readOnly={false}
-                        lockedVariables={FIXED_VARIABLE_IDS}
-                        missingMappingIds={missingMappingIds}
-                        showMissingMappingsError={false}
-                        optionalHighlighting={true}
+                        <BodyTemplateEditor
+                          value={bodyTemplate}
+                          onChange={(v) => {
+                            setBodyTemplate(v);
+                            markDirty();
+                          }}
+                        />
+                      </Field.Root>
+                      <Field.Root>
+                        <Field.Label>Output Path (JSONPath)</Field.Label>
+                        <OutputPathInput
+                          value={outputPath}
+                          onChange={(v) => {
+                            setOutputPath(v);
+                            markDirty();
+                          }}
+                        />
+                      </Field.Root>
+                      {/* Scenario input mapping — HTTP adapter reads these at runtime */}
+                      <ScenarioInputMappingSection
+                        inputs={variables}
+                        mappings={scenarioMappings}
+                        onMappingChange={handleScenarioMappingChange}
                       />
-                      {!hasAtLeastOneMapping && (
-                        <Text
-                          data-testid="at-least-one-mapping-error"
-                          color="red.500"
-                          fontSize="sm"
-                        >
-                          At least one variable must be mapped
-                        </Text>
-                      )}
                     </VStack>
                   </Tabs.Content>
-                )}
 
-                {/* Auth Tab */}
-                <Tabs.Content
-                  value="auth"
-                  flex={1}
-                  overflowY="auto"
-                  paddingX={6}
-                  paddingY={4}
-                >
-                  <AuthConfigSection
-                    value={auth}
-                    onChange={(a) => {
-                      setAuth(a);
-                      markDirty();
-                    }}
-                  />
-                </Tabs.Content>
+                  {/* Variables Tab - only shown when availableSources is provided */}
+                  {showVariablesTab && (
+                    <Tabs.Content
+                      value="variables"
+                      flex={1}
+                      overflowY="auto"
+                      paddingX={6}
+                      paddingY={4}
+                    >
+                      <VStack gap={4} align="stretch">
+                        <Text fontSize="sm" color="fg.muted">
+                          Define variables to use in your body template (e.g.,{" "}
+                          <Text
+                            as="span"
+                            fontFamily="mono"
+                            bg="bg.subtle"
+                            paddingX={1}
+                          >
+                            {"{{input}}"}
+                          </Text>
+                          ) and map them to your evaluation dataset. At least
+                          one variable must be mapped.
+                        </Text>
+                        <VariablesSection
+                          title="Input Variables"
+                          variables={variables}
+                          onChange={handleVariablesChange}
+                          showMappings={true}
+                          availableSources={availableSources}
+                          mappings={localMappings}
+                          onMappingChange={handleMappingChange}
+                          canAddRemove={true}
+                          readOnly={false}
+                          lockedVariables={FIXED_VARIABLE_IDS}
+                          missingMappingIds={missingMappingIds}
+                          showMissingMappingsError={false}
+                          optionalHighlighting={true}
+                        />
+                        {!hasAtLeastOneMapping && (
+                          <Text
+                            data-testid="at-least-one-mapping-error"
+                            color="red.500"
+                            fontSize="sm"
+                          >
+                            At least one variable must be mapped
+                          </Text>
+                        )}
+                      </VStack>
+                    </Tabs.Content>
+                  )}
 
-                {/* Headers Tab */}
-                <Tabs.Content
-                  value="headers"
-                  flex={1}
-                  overflowY="auto"
-                  paddingX={6}
-                  paddingY={4}
-                >
-                  <HeadersConfigSection
-                    value={headers}
-                    onChange={(h) => {
-                      setHeaders(h);
-                      markDirty();
-                    }}
-                  />
-                </Tabs.Content>
+                  {/* Auth Tab */}
+                  <Tabs.Content
+                    value="auth"
+                    flex={1}
+                    overflowY="auto"
+                    paddingX={6}
+                    paddingY={4}
+                  >
+                    <AuthConfigSection
+                      value={auth}
+                      onChange={(a) => {
+                        setAuth(a);
+                        markDirty();
+                      }}
+                    />
+                  </Tabs.Content>
 
-                {/* Test Tab */}
-                <Tabs.Content
-                  value="test"
-                  flex={1}
-                  overflowY="auto"
-                  paddingX={6}
-                  paddingY={4}
-                >
-                  <HttpTestPanel
-                    onTest={handleTest}
-                    url={url}
-                    method={method}
-                    headers={headers}
-                    outputPath={outputPath}
-                    bodyTemplate={bodyTemplate}
-                  />
-                </Tabs.Content>
-              </Tabs.Root>
-            </VStack>
-          )}
-        </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border">
-          <HStack gap={3}>
-            <Button variant="outline" onClick={handleClose}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="blue"
-              onClick={handleSave}
-              disabled={!isValid || isSaving}
-              loading={isSaving}
-              data-testid="save-agent-button"
-            >
-              {agentId ? "Save Changes" : "Create Agent"}
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
+                  {/* Headers Tab */}
+                  <Tabs.Content
+                    value="headers"
+                    flex={1}
+                    overflowY="auto"
+                    paddingX={6}
+                    paddingY={4}
+                  >
+                    <HeadersConfigSection
+                      value={headers}
+                      onChange={(h) => {
+                        setHeaders(h);
+                        markDirty();
+                      }}
+                    />
+                  </Tabs.Content>
+
+                  {/* Test Tab */}
+                  <Tabs.Content
+                    value="test"
+                    flex={1}
+                    overflowY="auto"
+                    paddingX={6}
+                    paddingY={4}
+                  >
+                    <HttpTestPanel
+                      onTest={handleTest}
+                      url={url}
+                      method={method}
+                      headers={headers}
+                      outputPath={outputPath}
+                      bodyTemplate={bodyTemplate}
+                    />
+                  </Tabs.Content>
+                </Tabs.Root>
+              </VStack>
+            )}
+          </Drawer.Body>
+          <Drawer.Footer borderTopWidth="1px" borderColor="border">
+            <HStack gap={3}>
+              <Button variant="outline" onClick={handleClose}>
+                Cancel
+              </Button>
+              <Button
+                colorPalette="blue"
+                onClick={handleSave}
+                disabled={!isValid || isSaving}
+                loading={isSaving}
+                data-testid="save-agent-button"
+              >
+                {agentId ? "Save Changes" : "Create Agent"}
+              </Button>
+            </HStack>
+          </Drawer.Footer>
+        </Drawer.Content>
       </Drawer.Root>
     </>
   );

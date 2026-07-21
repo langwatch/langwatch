@@ -116,9 +116,7 @@ export default function SecretsPage() {
               content="Add a new secret for use in code blocks"
               disabled={false}
             >
-              <PageLayout.HeaderButton
-                onClick={() => setIsAddDialogOpen(true)}
-              >
+              <PageLayout.HeaderButton onClick={() => setIsAddDialogOpen(true)}>
                 <Plus /> Add Secret
               </PageLayout.HeaderButton>
             </Tooltip>
@@ -242,7 +240,7 @@ export default function SecretsPage() {
                     value={newSecretName}
                     onChange={(e) =>
                       setNewSecretName(
-                        e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "")
+                        e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""),
                       )
                     }
                   />
@@ -286,9 +284,7 @@ export default function SecretsPage() {
         >
           <Dialog.Content bg="bg">
             <Dialog.Header>
-              <Dialog.Title>
-                Delete {secretToDelete?.name ?? ""}?
-              </Dialog.Title>
+              <Dialog.Title>Delete {secretToDelete?.name ?? ""}?</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               <Text>

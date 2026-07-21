@@ -29,6 +29,7 @@ import {
   type Variable,
   VariablesSection,
 } from "~/components/variables";
+import { showErrorToast } from "~/features/errors";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -43,8 +44,8 @@ import type {
   Field as DSLField,
 } from "~/optimization_studio/types/dsl";
 import {
-  DEFAULT_CODE,
   buildCodeConfig,
+  DEFAULT_CODE,
   getCodeFromConfig,
 } from "~/optimization_studio/utils/codeAgentConfig";
 import type {
@@ -52,7 +53,6 @@ import type {
   TypedAgent,
 } from "~/server/agents/agent.repository";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
-import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 const DEFAULT_INPUTS: DSLField[] = [{ identifier: "input", type: "str" }];

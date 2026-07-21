@@ -12,23 +12,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  Archive,
-  MoreVertical,
-  Pencil,
-  Plus,
-  Zap,
-} from "lucide-react";
+import { Archive, MoreVertical, Pencil, Plus, Zap } from "lucide-react";
 import { useState } from "react";
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { CacheRuleCreateDrawer } from "~/components/gateway/CacheRuleCreateDrawer";
 import { CacheRuleEditDrawer } from "~/components/gateway/CacheRuleEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "~/components/ui/menu";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -93,7 +87,10 @@ function CacheRulesPage() {
       });
       setArchiving(null);
     } catch (error) {
-      showErrorToast({ error, fallbackTitle: "Couldn't archive the cache rule" });
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't archive the cache rule",
+      });
     }
   };
 
@@ -106,7 +103,10 @@ function CacheRulesPage() {
         enabled: !rule.enabled,
       });
     } catch (error) {
-      showErrorToast({ error, fallbackTitle: "Couldn't toggle the cache rule" });
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't toggle the cache rule",
+      });
     }
   };
 
@@ -131,11 +131,11 @@ function CacheRulesPage() {
 
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           <Text fontSize="sm" color="fg.muted" mb={4}>
-            Rules are evaluated first-match-wins by priority (highest first).
-            A per-request <code>X-LangWatch-Cache</code> header always wins
-            over matching rules, and a matched rule always wins over the
-            per-virtual-key default. Changes propagate to the gateway within
-            30 s via the /changes long-poll.
+            Rules are evaluated first-match-wins by priority (highest first). A
+            per-request <code>X-LangWatch-Cache</code> header always wins over
+            matching rules, and a matched rule always wins over the
+            per-virtual-key default. Changes propagate to the gateway within 30
+            s via the /changes long-poll.
           </Text>
           {listQuery.isLoading ? (
             <Spinner />
@@ -154,8 +154,8 @@ function CacheRulesPage() {
                 <EmptyState.Title>No cache rules yet</EmptyState.Title>
                 <EmptyState.Description>
                   Cache rules let operators force, disable, or override cache
-                  behaviour across virtual keys, models, principals, or
-                  custom request metadata — no client code changes required.
+                  behaviour across virtual keys, models, principals, or custom
+                  request metadata — no client code changes required.
                 </EmptyState.Description>
                 {canCreate && (
                   <Button
@@ -171,93 +171,93 @@ function CacheRulesPage() {
           ) : (
             <Card.Root width="full" overflow="hidden">
               <Card.Body paddingY={0} paddingX={0}>
-            <Table.Root variant="line" size="md" width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader width="60px">
-                    Priority
-                  </Table.ColumnHeader>
-                  <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Match</Table.ColumnHeader>
-                  <Table.ColumnHeader>Action</Table.ColumnHeader>
-                  <Table.ColumnHeader>Enabled</Table.ColumnHeader>
-                  <Table.ColumnHeader></Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {rows.map((r) => (
-                  <Table.Row key={r.id}>
-                    <Table.Cell>
-                      <Badge colorPalette="gray">{r.priority}</Badge>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <VStack align="start" gap={0}>
-                        <Text fontWeight="medium">{r.name}</Text>
-                        {r.description && (
-                          <Text fontSize="xs" color="fg.muted">
-                            {r.description}
-                          </Text>
-                        )}
-                      </VStack>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <MatcherSummary matchers={r.matchers} />
-                    </Table.Cell>
-                    <Table.Cell>
-                      <ActionBadge
-                        action={r.action}
-                        modeEnum={r.modeEnum}
-                      />
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Switch.Root
-                        checked={r.enabled}
-                        onCheckedChange={() => void toggleEnabled(r)}
-                        disabled={!canUpdate}
-                        size="sm"
-                        colorPalette="orange"
-                      >
-                        <Switch.HiddenInput />
-                        <Switch.Control />
-                      </Switch.Root>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {(canUpdate || canDelete) && (
-                        <Menu.Root>
-                          <Menu.Trigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="xs"
-                              aria-label="Actions"
-                            >
-                              <MoreVertical size={14} />
-                            </Button>
-                          </Menu.Trigger>
-                          <Menu.Content>
-                            {canUpdate && (
-                              <Menu.Item
-                                value="edit"
-                                onClick={() => setEditing(r)}
-                              >
-                                <Pencil size={14} /> Edit
-                              </Menu.Item>
+                <Table.Root variant="line" size="md" width="full">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader width="60px">
+                        Priority
+                      </Table.ColumnHeader>
+                      <Table.ColumnHeader>Name</Table.ColumnHeader>
+                      <Table.ColumnHeader>Match</Table.ColumnHeader>
+                      <Table.ColumnHeader>Action</Table.ColumnHeader>
+                      <Table.ColumnHeader>Enabled</Table.ColumnHeader>
+                      <Table.ColumnHeader></Table.ColumnHeader>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {rows.map((r) => (
+                      <Table.Row key={r.id}>
+                        <Table.Cell>
+                          <Badge colorPalette="gray">{r.priority}</Badge>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <VStack align="start" gap={0}>
+                            <Text fontWeight="medium">{r.name}</Text>
+                            {r.description && (
+                              <Text fontSize="xs" color="fg.muted">
+                                {r.description}
+                              </Text>
                             )}
-                            {canDelete && (
-                              <Menu.Item
-                                value="archive"
-                                onClick={() => setArchiving(r)}
-                              >
-                                <Archive size={14} /> Archive
-                              </Menu.Item>
-                            )}
-                          </Menu.Content>
-                        </Menu.Root>
-                      )}
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Root>
+                          </VStack>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <MatcherSummary matchers={r.matchers} />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <ActionBadge
+                            action={r.action}
+                            modeEnum={r.modeEnum}
+                          />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Switch.Root
+                            checked={r.enabled}
+                            onCheckedChange={() => void toggleEnabled(r)}
+                            disabled={!canUpdate}
+                            size="sm"
+                            colorPalette="orange"
+                          >
+                            <Switch.HiddenInput />
+                            <Switch.Control />
+                          </Switch.Root>
+                        </Table.Cell>
+                        <Table.Cell>
+                          {(canUpdate || canDelete) && (
+                            <Menu.Root>
+                              <Menu.Trigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="xs"
+                                  aria-label="Actions"
+                                >
+                                  <MoreVertical size={14} />
+                                </Button>
+                              </Menu.Trigger>
+                              <Menu.Content>
+                                {canUpdate && (
+                                  <Menu.Item
+                                    value="edit"
+                                    onClick={() => setEditing(r)}
+                                  >
+                                    <Pencil size={14} /> Edit
+                                  </Menu.Item>
+                                )}
+                                {canDelete && (
+                                  <Menu.Item
+                                    value="archive"
+                                    onClick={() => setArchiving(r)}
+                                  >
+                                    <Archive size={14} /> Archive
+                                  </Menu.Item>
+                                )}
+                              </Menu.Content>
+                            </Menu.Root>
+                          )}
+                        </Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
               </Card.Body>
             </Card.Root>
           )}
@@ -299,7 +299,11 @@ function CacheRulesPage() {
 
 function MatcherSummary({ matchers }: { matchers: unknown }) {
   if (!matchers || typeof matchers !== "object") {
-    return <Text fontSize="xs" color="fg.muted">any request</Text>;
+    return (
+      <Text fontSize="xs" color="fg.muted">
+        any request
+      </Text>
+    );
   }
   const m = matchers as Record<string, unknown>;
   const parts: string[] = [];
@@ -321,7 +325,11 @@ function MatcherSummary({ matchers }: { matchers: unknown }) {
     }
   }
   if (parts.length === 0) {
-    return <Text fontSize="xs" color="fg.muted">any request</Text>;
+    return (
+      <Text fontSize="xs" color="fg.muted">
+        any request
+      </Text>
+    );
   }
   return (
     <HStack gap={1} flexWrap="wrap">
@@ -343,11 +351,7 @@ function ActionBadge({
 }) {
   const a = (action ?? {}) as Record<string, unknown>;
   const tone =
-    modeEnum === "FORCE"
-      ? "orange"
-      : modeEnum === "DISABLE"
-        ? "red"
-        : "green";
+    modeEnum === "FORCE" ? "orange" : modeEnum === "DISABLE" ? "red" : "green";
   return (
     <HStack gap={1}>
       <Badge colorPalette={tone}>{modeEnum.toLowerCase()}</Badge>

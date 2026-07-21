@@ -1,13 +1,10 @@
-import type {
-  GoErrorCode,
-  HandledErrorFault,
-} from "@langwatch/handled-error";
+import type { GoErrorCode, HandledErrorFault } from "@langwatch/handled-error";
 
 import type { AppErrorCode } from "./codes";
 import {
+  type HandledErrorShape,
   readAuthoredMessage,
   readHandledError,
-  type HandledErrorShape,
 } from "./readHandledError";
 
 /**
@@ -603,7 +600,9 @@ export interface ErrorExplanation {
  * Never returns a code slug or a server message — an unrecognised code
  * degrades to fault-based copy, which is calm and true rather than precise.
  */
-export function explainHandledError(error: HandledErrorShape): ErrorExplanation {
+export function explainHandledError(
+  error: HandledErrorShape,
+): ErrorExplanation {
   // `hasOwn`, not a bare index: `code` is untrusted, and `"toString"` or
   // `"constructor"` would otherwise resolve to an inherited Object.prototype
   // member — truthy, so it would report itself registered and render a blank

@@ -12,12 +12,11 @@ import {
 import { useEffect, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-
-import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 
 type BudgetRow = {
   id: string;
@@ -79,7 +78,10 @@ export function BudgetEditDrawer({
     }
     const parsed = Number.parseFloat(limitUsd);
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      toaster.create({ title: "Limit must be a positive number", type: "error" });
+      toaster.create({
+        title: "Limit must be a positive number",
+        type: "error",
+      });
       return;
     }
     try {
@@ -176,9 +178,7 @@ export function BudgetEditDrawer({
                 <NativeSelect.Field
                   value={onBreach}
                   onChange={(e) =>
-                    setOnBreach(
-                      (e.target.value as "BLOCK" | "WARN") ?? "BLOCK",
-                    )
+                    setOnBreach((e.target.value as "BLOCK" | "WARN") ?? "BLOCK")
                   }
                 >
                   <option value="BLOCK">

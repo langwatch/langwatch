@@ -336,7 +336,10 @@ export function ApiKeysSection({
         },
         onError: (error) => {
           setIsRotateConfirmOpen(false);
-          showErrorToast({ error, fallbackTitle: "Couldn't rotate the project API key" });
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't rotate the project API key",
+          });
         },
       },
     );

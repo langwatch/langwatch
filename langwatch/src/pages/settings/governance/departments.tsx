@@ -233,7 +233,10 @@ function DepartmentList({
       await onChanged();
     },
     onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't archive department" }),
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't archive department",
+      }),
   });
 
   return (

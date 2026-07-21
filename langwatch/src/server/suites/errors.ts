@@ -7,7 +7,10 @@
  * prose" the handled-error contract exists to remove: each of these now
  * carries a stable `code` the UI keys its copy off.
  */
-import { HandledError, type HandledErrorOptions } from "@langwatch/handled-error";
+import {
+  HandledError,
+  type HandledErrorOptions,
+} from "@langwatch/handled-error";
 
 /**
  * Base class for suite domain errors.

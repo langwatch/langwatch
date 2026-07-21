@@ -64,7 +64,10 @@ function ScenarioLibraryPage() {
   const archiveMutation = api.scenarios.archive.useMutation({
     onSuccess: handleArchiveSuccess,
     onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't archive scenario" }),
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't archive scenario",
+      }),
   });
 
   const batchArchiveMutation = api.scenarios.batchArchive.useMutation({
@@ -82,7 +85,10 @@ function ScenarioLibraryPage() {
       setArchiveTarget(null);
     },
     onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't archive scenarios" }),
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't archive scenarios",
+      }),
   });
 
   const {

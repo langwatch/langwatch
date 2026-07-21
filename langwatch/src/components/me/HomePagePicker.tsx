@@ -52,7 +52,10 @@ export function HomePagePicker({ organizationId }: Props) {
       void utils.governance.resolveHome.invalidate({ organizationId });
     },
     onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't save your home preference" }),
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't save your home preference",
+      }),
   });
 
   const options = useMemo<PickerOption[]>(() => {
@@ -120,9 +123,7 @@ export function HomePagePicker({ organizationId }: Props) {
             <Box
               key={opt.value}
               borderWidth="1px"
-              borderColor={
-                selected === opt.value ? "blue.400" : "border.muted"
-              }
+              borderColor={selected === opt.value ? "blue.400" : "border.muted"}
               borderRadius="md"
               padding={3}
               backgroundColor={

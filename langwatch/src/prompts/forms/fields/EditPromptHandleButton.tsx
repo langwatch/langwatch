@@ -67,7 +67,10 @@ export function EditPromptHandleButton() {
     };
 
     const onError = (error: Error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't change the prompt handle" });
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't change the prompt handle",
+      });
 
     triggerChangeHandle({ id, onSuccess, onError });
   };

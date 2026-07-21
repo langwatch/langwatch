@@ -6,10 +6,15 @@
 import { describe, expect, it } from "vitest";
 
 import { APP_ERROR_CODES } from "../codes";
-import { UNKNOWN_ERROR_PRESENTATION, explainHandledError } from "../presentation";
+import {
+  explainHandledError,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "../presentation";
 import type { HandledErrorShape } from "../readHandledError";
 
-const shape = (overrides: Partial<HandledErrorShape> = {}): HandledErrorShape => ({
+const shape = (
+  overrides: Partial<HandledErrorShape> = {},
+): HandledErrorShape => ({
   code: "trace_not_found",
   meta: {},
   httpStatus: 404,

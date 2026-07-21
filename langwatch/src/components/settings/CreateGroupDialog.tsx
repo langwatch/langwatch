@@ -19,9 +19,9 @@ import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import {
   BindingInputRow,
+  type PendingBinding,
   roleBadgeColor,
   scopeTypeLabel,
-  type PendingBinding,
 } from "./GroupBindingInputRow";
 
 export function CreateGroupDialog({
@@ -40,10 +40,11 @@ export function CreateGroupDialog({
   const [addMemberId, setAddMemberId] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
 
-  const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    { organizationId },
-    { enabled: open },
-  );
+  const orgMembers =
+    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+      { organizationId },
+      { enabled: open },
+    );
 
   const createGroup = api.group.create.useMutation();
 
@@ -89,7 +90,9 @@ export function CreateGroupDialog({
         m.label.toLowerCase().includes(memberSearch.toLowerCase()),
       )
     : allAvailableMembers;
-  const availableMemberCollection = createListCollection({ items: availableMemberItems });
+  const availableMemberCollection = createListCollection({
+    items: availableMemberItems,
+  });
 
   return (
     <Dialog.Root
@@ -118,11 +121,20 @@ export function CreateGroupDialog({
 
             {/* Bindings */}
             <Box>
-              <Text fontSize="sm" fontWeight="semibold" mb={3}>Access</Text>
+              <Text fontSize="sm" fontWeight="semibold" mb={3}>
+                Access
+              </Text>
               {pendingBindings.length > 0 && (
                 <VStack gap={2} align="stretch" mb={2}>
                   {pendingBindings.map((b, i) => (
-                    <HStack key={i} px={3} py={2} bg="bg.muted" borderRadius="md" fontSize="sm">
+                    <HStack
+                      key={i}
+                      px={3}
+                      py={2}
+                      bg="bg.muted"
+                      borderRadius="md"
+                      fontSize="sm"
+                    >
                       <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
                         {b.customRoleName ?? b.role}
                       </Badge>
@@ -136,7 +148,11 @@ export function CreateGroupDialog({
                         variant="ghost"
                         color="fg.muted"
                         aria-label={`Remove ${b.customRoleName ?? b.role} binding on ${b.scopeName ?? b.scopeId}`}
-                        onClick={() => setPendingBindings((prev) => prev.filter((_, j) => j !== i))}
+                        onClick={() =>
+                          setPendingBindings((prev) =>
+                            prev.filter((_, j) => j !== i),
+                          )
+                        }
                       >
                         <X size={14} />
                       </Button>
@@ -152,11 +168,15 @@ export function CreateGroupDialog({
 
             {/* Members */}
             <Box>
-              <Text fontSize="sm" fontWeight="semibold" mb={3}>Members</Text>
+              <Text fontSize="sm" fontWeight="semibold" mb={3}>
+                Members
+              </Text>
               {pendingMemberIds.length > 0 && (
                 <VStack gap={1} align="stretch" mb={2}>
                   {pendingMemberIds.map((userId) => {
-                    const member = orgMembers.data?.members.find((m) => m.userId === userId);
+                    const member = orgMembers.data?.members.find(
+                      (m) => m.userId === userId,
+                    );
                     return (
                       <HStack key={userId} py={1} fontSize="sm">
                         <RandomColorAvatar
@@ -172,7 +192,9 @@ export function CreateGroupDialog({
                           color="fg.muted"
                           aria-label={`Remove ${member?.user.name ?? member?.user.email ?? userId} from group`}
                           onClick={() =>
-                            setPendingMemberIds((prev) => prev.filter((id) => id !== userId))
+                            setPendingMemberIds((prev) =>
+                              prev.filter((id) => id !== userId),
+                            )
                           }
                         >
                           <X size={14} />
@@ -216,7 +238,9 @@ export function CreateGroupDialog({
                       </InputGroup>
                     </Box>
                     {availableMemberItems.map((item) => (
-                      <Select.Item key={item.value} item={item}>{item.label}</Select.Item>
+                      <Select.Item key={item.value} item={item}>
+                        {item.label}
+                      </Select.Item>
                     ))}
                   </Select.Content>
                 </Select.Root>
@@ -225,7 +249,15 @@ export function CreateGroupDialog({
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="outline" onClick={() => { reset(); onClose(); }}>Cancel</Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              reset();
+              onClose();
+            }}
+          >
+            Cancel
+          </Button>
           <Button
             colorPalette="blue"
             disabled={!name.trim()}

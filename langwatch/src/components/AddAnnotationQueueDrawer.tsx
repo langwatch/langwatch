@@ -11,12 +11,12 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Check, ChevronDown, Plus } from "react-feather";
 import { useEffect, useState } from "react";
+import { Check, ChevronDown, Plus } from "react-feather";
 import { useForm } from "react-hook-form";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import { slugify } from "~/utils/slugify";
 import { Drawer } from "../components/ui/drawer";
@@ -180,9 +180,12 @@ export const AddAnnotationQueueDrawer = ({
           reset();
         },
         onError: (error) =>
-          showErrorToast({ error, fallbackTitle: queueId
+          showErrorToast({
+            error,
+            fallbackTitle: queueId
               ? "Couldn't update annotation queue"
-              : "Couldn't create annotation queue" }),
+              : "Couldn't create annotation queue",
+          }),
       },
     );
   };
@@ -257,9 +260,7 @@ export const AddAnnotationQueueDrawer = ({
                         width="full"
                         justifyContent="space-between"
                         fontWeight="normal"
-                        color={
-                          participants.length === 0 ? "fg.subtle" : "fg"
-                        }
+                        color={participants.length === 0 ? "fg.subtle" : "fg"}
                         paddingX={3}
                       >
                         {participants.length === 0 ? (
@@ -352,9 +353,7 @@ export const AddAnnotationQueueDrawer = ({
                         width="full"
                         justifyContent="space-between"
                         fontWeight="normal"
-                        color={
-                          scoreTypes.length === 0 ? "fg.subtle" : "fg"
-                        }
+                        color={scoreTypes.length === 0 ? "fg.subtle" : "fg"}
                         paddingX={3}
                       >
                         {scoreTypes.length === 0 ? (
@@ -395,9 +394,7 @@ export const AddAnnotationQueueDrawer = ({
                                 >
                                   <Check
                                     size={16}
-                                    color={
-                                      isSelected ? "green" : "transparent"
-                                    }
+                                    color={isSelected ? "green" : "transparent"}
                                   />
                                   <Text fontSize="sm">{score.name}</Text>
                                 </Button>

@@ -86,7 +86,9 @@ function extractMessage(error: unknown): string {
  * classified tier. Returns null for kinds without tailored copy so
  * they fall through to message matching.
  */
-function classifyByKind(error: ScenarioGenerationError): GenerationErrorClass | null {
+function classifyByKind(
+  error: ScenarioGenerationError,
+): GenerationErrorClass | null {
   switch (error.kind) {
     case "missing_provider":
       return {

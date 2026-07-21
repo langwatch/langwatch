@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Badge,
   Box,
@@ -8,10 +7,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { api } from "~/utils/api";
+import { useState } from "react";
+import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
-import { toaster } from "~/components/ui/toaster";
+import { api } from "~/utils/api";
 
 export function SingleAggregateReplay({
   projections,

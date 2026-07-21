@@ -472,7 +472,10 @@ function SessionPolicySection({ organizationId }: { organizationId: string }) {
       toaster.create({ title: "Session policy saved", type: "success" });
     },
     onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't save the session policy" }),
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't save the session policy",
+      }),
   });
 
   const persisted = policyQuery.data?.maxSessionDurationDays ?? 0;

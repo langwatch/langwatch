@@ -12,18 +12,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { NotificationCadence } from "@langwatch/automations/cadences";
 import { useEffect, useMemo, useState } from "react";
+import { FieldsFilters } from "~/components/filters/FieldsFilters";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   explainHandledError,
   readHandledError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "~/features/errors";
-import { ConditionBuilder } from "./ConditionBuilder";
-import { queryIsStructurable } from "../logic/conditionQuery";
-import { FieldsFilters } from "~/components/filters/FieldsFilters";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { FilterParam } from "~/hooks/useFilterParams";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   type FilterField,
   sanitizeTriggerFilters,
@@ -31,7 +30,7 @@ import {
 } from "~/server/filters/types";
 import { api } from "~/utils/api";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import type { NotificationCadence } from "@langwatch/automations/cadences";
+import { queryIsStructurable } from "../logic/conditionQuery";
 import {
   type AutomationDraft,
   filterQueryIsSet,
@@ -44,13 +43,16 @@ import { estimateFiringRate } from "../logic/firingRate";
 import { deriveSeriesOptionsFromGraph } from "../logic/seriesOptions";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
-import { FacetSection, type FacetAccordionProps } from "./FacetSection";
+import { ConditionBuilder } from "./ConditionBuilder";
+import { type FacetAccordionProps, FacetSection } from "./FacetSection";
 import { QueryFilterInput } from "./QueryFilterInput";
 
 /** One-line preview shown when the Subject facet is collapsed. */
 function subjectSummary(draft: AutomationDraft): string {
   if (draft.source === "customGraph") {
-    return subjectIsSet(draft) ? "Watching a graph metric" : "Pick a graph and series";
+    return subjectIsSet(draft)
+      ? "Watching a graph metric"
+      : "Pick a graph and series";
   }
   if (draft.source === "report") {
     return draft.report.sourceKind === "traceQuery"

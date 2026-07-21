@@ -2,8 +2,8 @@ import {
   Button,
   createListCollection,
   Field,
-  HStack,
   Heading,
+  HStack,
   Input,
   Spacer,
   Text,
@@ -99,7 +99,10 @@ export function EditProjectDrawer({
           },
           onError: (error) => {
             if (applyHandledErrorToForm({ error, form })) return;
-            showErrorToast({ error, fallbackTitle: "Couldn't update the project" });
+            showErrorToast({
+              error,
+              fallbackTitle: "Couldn't update the project",
+            });
           },
         },
       );
@@ -133,8 +136,8 @@ export function EditProjectDrawer({
           <form onSubmit={handleSubmit(onSubmit)}>
             <VStack align="stretch" gap={6}>
               <Text fontSize="sm" color="fg.muted">
-                Update the project name or move it to a different team.
-                Moving a project changes which team members inherit access.
+                Update the project name or move it to a different team. Moving a
+                project changes which team members inherit access.
               </Text>
 
               <Field.Root invalid={!!errors.name}>

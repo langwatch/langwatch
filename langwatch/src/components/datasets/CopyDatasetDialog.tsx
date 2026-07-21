@@ -1,12 +1,12 @@
 import { Button, createListCollection, Field, VStack } from "@chakra-ui/react";
 import { useState } from "react";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import {
   hasPermissionWithHierarchy,
   teamRoleHasPermission,
 } from "../../server/api/rbac";
-import { showErrorToast } from "~/features/errors";
 import { api } from "../../utils/api";
 import { Dialog } from "../ui/dialog";
 import { Select } from "../ui/select";
@@ -93,7 +93,10 @@ export const CopyDatasetDialog = ({
 
       onClose();
     } catch (error) {
-      showErrorToast({ error, fallbackTitle: "Couldn't replicate the dataset" });
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't replicate the dataset",
+      });
     }
   };
 
