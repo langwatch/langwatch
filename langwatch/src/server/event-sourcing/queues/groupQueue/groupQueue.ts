@@ -1115,6 +1115,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   await this.scripts.recordGroupFailure(groupId);
                 if (failStreak > this.quarantineFailStreakThreshold) {
                   quarantined = true;
+                  // Clear the streak as we park. Every ops recovery path
+                  // (unblock / drain / dead-letter) resets the poison guard's
+                  // claim strikes so a recovered group gets a FRESH run; the
+                  // failure streak must not outlive the park either, or an
+                  // operator who unblocks would see the group re-quarantine on
+                  // its very next failure instead of getting that fresh run.
+                  // Best-effort: we are already on the failure path, so a blip
+                  // clearing it must not derail parking the group.
+                  await this.scripts.clearGroupFailures(groupId).catch(() => {});
                   // Carried into handleExhaustedRetries as the group's stored
                   // error so /ops shows WHY it was blocked (a run of failures),
                   // not just the last job's error.

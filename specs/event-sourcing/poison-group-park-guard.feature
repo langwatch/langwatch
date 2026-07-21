@@ -79,6 +79,8 @@ Feature: GroupQueue poison-group park guard
     And the stored group error explains it was quarantined after a run of failures
     And the staged job remains staged for operator inspection or replay
     And other groups continue to dispatch and process normally
+    And the group's failure streak is cleared as it is parked, so an operator's
+      unblock gets a fresh run instead of re-quarantining on the next failure
 
   Scenario: a group's success clears its failure streak
     Given a group that has accumulated a failure streak below the quarantine threshold

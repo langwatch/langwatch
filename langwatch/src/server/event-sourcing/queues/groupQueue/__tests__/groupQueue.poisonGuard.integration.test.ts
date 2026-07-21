@@ -271,6 +271,9 @@ describe.skipIf(!hasTestcontainers)(
 
             const error = await storedError(name, "runaway");
             expect(error).toContain("quarantined");
+            // Cleared as the group parks, so an operator's unblock gets a fresh
+            // run rather than re-quarantining on the very next failure.
+            expect(await redis.get(failStreakKey(name, "runaway"))).toBeNull();
             // The job is re-staged for inspection, not dropped.
             expect(
               await redis.zcard(`${name}:gq:group:runaway:jobs`),
