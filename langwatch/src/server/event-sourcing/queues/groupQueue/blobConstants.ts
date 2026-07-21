@@ -35,6 +35,23 @@ export const BLOB_LEASE_TTL_SECONDS = 3 * 24 * 60 * 60;
  */
 export const BLOB_LEASE_SET_TTL_SECONDS = BLOB_LEASE_TTL_SECONDS + 24 * 60 * 60;
 
+/**
+ * How long a blob survives after its LAST lease is retired.
+ *
+ * The backstop above is sized for a blob someone is still expected to read — a
+ * paused pipeline, a weekend-long retry chain. A blob whose last holder has
+ * retired has no such reader, and leaving it on the 4-day backstop meant every
+ * dead payload occupied Redis for four days: the steady state that implies at
+ * ingestion volume is several times the queue instance's memory (2026-07-21).
+ *
+ * Shortening the expiry is deliberately NOT the eager delete that leases
+ * replaced. The bytes stay readable, and any subsequent take re-arms the full
+ * backstop, so the release still cannot strip a blob from a producer that wrote
+ * these bytes before the release and stages after it — a gap of one Redis round
+ * trip, which this window over-covers by orders of magnitude.
+ */
+export const BLOB_RELEASE_GRACE_TTL_SECONDS = 60 * 60;
+
 /** Sentinel that prevents previous-release code from observing a last holder. */
 export const LEGACY_HOLDER_LEASE_GUARD = "__gq2_lease_guard__";
 

@@ -17,6 +17,7 @@ import {
   readEnvelopeRetirement,
   splitEnvelope,
 } from "./jobEnvelope";
+import { gqBlobReleaseGraceTotal } from "./metrics";
 import { hasRedisHashTag } from "./redisHashTag";
 import { RedisJobBlobStore } from "./redisJobBlobStore";
 import { type ObjectStore, TieredBlobStore } from "./tieredBlobStore";
@@ -264,11 +265,18 @@ export class EnvelopeBlobLifecycle {
             return;
           }
           try {
-            await this.blobLeases.release({
+            const graced = await this.blobLeases.release({
               projectId: lease.ref.projectId,
               hash: lease.ref.hash,
               holderId: lease.holderId,
+              tier: lease.ref.tier,
             });
+            if (graced) {
+              gqBlobReleaseGraceTotal.inc({
+                queue_name: this.queueName,
+                tier: lease.ref.tier,
+              });
+            }
           } catch (err) {
             logger.warn(
               {
@@ -369,14 +377,21 @@ export class EnvelopeBlobLifecycle {
       return;
     }
     try {
-      await this.blobLeases.transfer({
+      const graced = await this.blobLeases.transfer({
         newProjectId: newLease.ref.projectId,
         newHash: newLease.ref.hash,
         newHolderId: newLease.holderId,
         oldProjectId: oldLease.ref.projectId,
         oldHash: oldLease.ref.hash,
         oldHolderId: oldLease.holderId,
+        oldTier: oldLease.ref.tier,
       });
+      if (graced) {
+        gqBlobReleaseGraceTotal.inc({
+          queue_name: this.queueName,
+          tier: oldLease.ref.tier,
+        });
+      }
     } catch (err) {
       logger.warn(
         {
@@ -403,6 +418,7 @@ export class EnvelopeBlobLifecycle {
       projectId: lease.ref.projectId,
       hash: lease.ref.hash,
       holderId: lease.holderId,
+      tier: lease.ref.tier,
     });
   }
 }

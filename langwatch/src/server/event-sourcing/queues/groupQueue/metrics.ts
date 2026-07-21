@@ -32,6 +32,8 @@ const metricNames = [
   // #5538
   "gq_jobs_dropped_total",
   "gq_group_attempt_read_failures_total",
+  // 2026-07-22 blob-retention fix
+  "gq_blob_release_grace_total",
 ] as const;
 
 for (const name of metricNames) {
@@ -278,4 +280,23 @@ export const gqJobsDroppedTotal = new Counter({
     "job_name",
     "reason",
   ] as const,
+});
+
+/**
+ * A release retired a blob's LAST lease, so its expiry dropped from the 4-day
+ * backstop to the release grace window.
+ *
+ * This is the liveness signal for blob reclaim, and it exists because the
+ * failure mode it guards against is silence. When releases left the full
+ * backstop on unreferenced blobs, nothing in this module said so; the only
+ * evidence was Redis memory climbing for four days, which the lease rollout had
+ * already told operators to expect. A rate near zero while jobs complete means
+ * reclaim is not happening — read it beside `gq_jobs_completed_total`, not
+ * alone. It counts only the TS release/transfer paths, so the Lua dedup-squash
+ * release does not appear here.
+ */
+export const gqBlobReleaseGraceTotal = new Counter({
+  name: "gq_blob_release_grace_total",
+  help: "Blobs whose last lease was retired, moving them from the 4-day backstop onto the release grace window",
+  labelNames: ["queue_name", "tier"] as const,
 });

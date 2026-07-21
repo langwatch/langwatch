@@ -80,6 +80,7 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
       projectId: lease.ref.projectId,
       hash: lease.ref.hash,
       holderId: lease.holderId,
+      tier: lease.ref.tier,
     });
   };
   const redisNowMs = async () => {

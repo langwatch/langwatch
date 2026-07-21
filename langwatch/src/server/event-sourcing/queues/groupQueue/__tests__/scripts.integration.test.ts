@@ -16,6 +16,10 @@ import {
   stopTestContainers,
 } from "../../../__tests__/integration/testContainers";
 import { createTenantId } from "../../../domain/tenantId";
+import {
+  BLOB_BACKSTOP_TTL_SECONDS,
+  BLOB_RELEASE_GRACE_TTL_SECONDS,
+} from "../blobConstants";
 import { BlobLeases } from "../blobLeases";
 import { encodeJobEnvelope } from "../jobEnvelope";
 import {
@@ -707,6 +711,7 @@ describe("GroupStagingScripts", () => {
         projectId: string;
         hash: string;
         holderId: string;
+        tier: "redis" | "s3";
       }) =>
         new BlobLeases({ redis, queueName: QUEUE_NAME }).release(
           args as Parameters<BlobLeases["release"]>[0],
@@ -843,6 +848,7 @@ describe("GroupStagingScripts", () => {
             projectId: TENANT,
             hash: SHARED,
             holderId: "t-a",
+            tier: "redis",
           });
 
           // B is still staged and still leases the blob — the bytes must live.
@@ -856,9 +862,14 @@ describe("GroupStagingScripts", () => {
         });
 
         /** @scenario "A sibling completing never strips a co-staged job's blob" */
-        it("keeps the blob even when the last lease is released, leaving reclaim to the backstop", async () => {
+        it("keeps the blob even when the last lease is released, moving it onto the grace window", async () => {
           const SHARED = "h-last";
-          await redis.set(blobKey({ hash: SHARED }), "gzipped-bytes");
+          await redis.set(
+            blobKey({ hash: SHARED }),
+            "gzipped-bytes",
+            "EX",
+            BLOB_BACKSTOP_TTL_SECONDS,
+          );
           await scripts.stage(
             makeJob({
               stagedJobId: "j-only",
@@ -871,14 +882,19 @@ describe("GroupStagingScripts", () => {
             projectId: TENANT,
             hash: SHARED,
             holderId: "t-only",
+            tier: "redis",
           });
 
           // Emptying the lease set drops the set, never the payload: a
-          // concurrent producer may already have re-staged this content.
+          // concurrent producer may already have re-staged this content. The
+          // deadline shortens so an unread blob doesn't hold Redis for days.
           expect(await redis.zrange(leaseKey({ hash: SHARED }), 0, -1)).toEqual(
             [],
           );
           expect(await redis.exists(blobKey({ hash: SHARED }))).toBe(1);
+          expect(await redis.ttl(blobKey({ hash: SHARED }))).toBeLessThanOrEqual(
+            BLOB_RELEASE_GRACE_TTL_SECONDS,
+          );
         });
       });
 
@@ -952,6 +968,93 @@ describe("GroupStagingScripts", () => {
             await redis.zrange(leaseKey({ hash: "h-shared" }), 0, -1),
           ).toEqual(["t-other"]);
           expect(await redis.exists(blobKey({ hash: "h-shared" }))).toBe(1);
+        });
+
+        // Track 5 of specs/event-sourcing/payload-store-content-addressed.feature.
+        // The squash release must grant the same grace window the standalone
+        // release eval does, or a displaced blob still occupies Redis for the
+        // full backstop.
+        describe("dedup squash grace window", () => {
+          it("shortens a displaced blob's expiry when nothing leases it", async () => {
+            const oldValue = gq2Value({ hash: "h-grace", token: "t1" });
+            await scripts.stage(
+              makeJob({
+                stagedJobId: "j1",
+                groupId: GROUP,
+                dedupId: "hold-grace",
+                dedupTtlMs: 60000,
+                jobDataJson: oldValue,
+              }),
+            );
+            await redis.set(
+              blobKey({ hash: "h-grace" }),
+              "gzipped-bytes",
+              "EX",
+              BLOB_BACKSTOP_TTL_SECONDS,
+            );
+            await redis.set(
+              blobKey({ hash: "h-grace-new" }),
+              "gzipped-bytes",
+              "EX",
+              BLOB_BACKSTOP_TTL_SECONDS,
+            );
+
+            await scripts.stage(
+              makeJob({
+                stagedJobId: "j2",
+                groupId: GROUP,
+                dedupId: "hold-grace",
+                dedupTtlMs: 60000,
+                jobDataJson: gq2Value({ hash: "h-grace-new", token: "t2" }),
+              }),
+            );
+
+            expect(await redis.exists(blobKey({ hash: "h-grace" }))).toBe(1);
+            expect(await redis.ttl(blobKey({ hash: "h-grace" }))).toBeLessThanOrEqual(
+              BLOB_RELEASE_GRACE_TTL_SECONDS,
+            );
+            expect(
+              await redis.ttl(blobKey({ hash: "h-grace-new" })),
+            ).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
+          });
+
+          it("withholds the grace window from a blob another stage still leases", async () => {
+            const shared = gq2Value({ hash: "h-grace-shared", token: "t1" });
+            await scripts.stage(
+              makeJob({
+                stagedJobId: "j1",
+                groupId: GROUP,
+                dedupId: "hold-grace-shared",
+                dedupTtlMs: 60000,
+                jobDataJson: shared,
+              }),
+            );
+            await redis.set(
+              blobKey({ hash: "h-grace-shared" }),
+              "gzipped-bytes",
+              "EX",
+              BLOB_BACKSTOP_TTL_SECONDS,
+            );
+            await redis.zadd(
+              leaseKey({ hash: "h-grace-shared" }),
+              Date.now() + 60_000,
+              "t-other",
+            );
+
+            await scripts.stage(
+              makeJob({
+                stagedJobId: "j2",
+                groupId: GROUP,
+                dedupId: "hold-grace-shared",
+                dedupTtlMs: 60000,
+                jobDataJson: gq2Value({ hash: "h2", token: "t2" }),
+              }),
+            );
+
+            expect(
+              await redis.ttl(blobKey({ hash: "h-grace-shared" })),
+            ).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
+          });
         });
 
         it("does not report an s3-tier displaced blob for eager deletion", async () => {
