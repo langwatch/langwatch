@@ -1,5 +1,4 @@
 import {
-  Alert,
   Button,
   Card,
   Container,
@@ -15,6 +14,7 @@ import { signIn, useSession } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { HandledErrorAlert } from "~/features/errors";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { Link } from "../../components/ui/link";
@@ -155,17 +155,10 @@ function SignUpForm() {
                 <Input type="password" {...form.register("confirmPassword")} />
               </HorizontalFormControl>
               {register.error && (
-                <Alert.Root
-                  borderStartWidth="4px"
-                  borderStartColor="colorPalette.solid"
-                  colorPalette="red"
-                >
-                  <Alert.Content>
-                    <Alert.Description>
-                      {register.error.message}
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
+                <HandledErrorAlert
+                  error={register.error}
+                  fallbackTitle="Couldn't create your account"
+                />
               )}
               <HStack width="full" paddingTop={4}>
                 <Link

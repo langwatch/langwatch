@@ -3,6 +3,7 @@ import { Box, Button, Card, HStack, Input, Spacer, Text } from "@chakra-ui/react
 import { Search } from "lucide-react";
 import type { PipelineNode } from "~/server/app-layer/ops/types";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
 import { filterTree } from "./pipelineUtils";
@@ -27,11 +28,11 @@ export function PipelineTreeCard({
 
   const pauseMutation = api.ops.pausePipeline.useMutation({
     onSuccess: () => { toaster.create({ title: "Pipeline paused", type: "success" }); void utils.ops.invalidate(); },
-    onError: (error) => { toaster.create({ title: "Failed to pause", description: error.message, type: "error" }); },
+    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't pause the pipeline" }),
   });
   const unpauseMutation = api.ops.unpausePipeline.useMutation({
     onSuccess: () => { toaster.create({ title: "Pipeline unpaused", type: "success" }); void utils.ops.invalidate(); },
-    onError: (error) => { toaster.create({ title: "Failed to unpause", description: error.message, type: "error" }); },
+    onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't unpause the pipeline" }),
   });
 
   function handleToggleExpand(path: string) {

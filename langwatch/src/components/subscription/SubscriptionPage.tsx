@@ -26,7 +26,7 @@ import { Select } from "~/components/ui/select";
 import { LabeledSwitch } from "~/components/ui/LabeledSwitch";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
+import { showErrorToast } from "~/features/errors";
 import {
   type Currency,
   type BillingInterval,
@@ -239,10 +239,8 @@ export function SubscriptionPage() {
           void pendingInvites.refetch();
           void organizationWithMembers.refetch();
         },
-        onError: (error) => {
-          if (isHandledByGlobalHandler(error)) return;
-          toaster.create({ title: "Failed to send invites", description: error.message, type: "error" });
-        },
+        onError: (error) =>
+          showErrorToast(error, { fallbackTitle: "Couldn't send invites" }),
       });
     }
 

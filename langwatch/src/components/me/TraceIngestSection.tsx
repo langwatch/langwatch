@@ -17,7 +17,7 @@ import {
 } from "~/components/me/IngestionTemplateInstallDrawer";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { Link } from "~/components/ui/link";
-import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 
@@ -83,25 +83,17 @@ export function TraceIngestSection() {
     onSuccess: () => {
       void utils.ingestionKey.list.invalidate();
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Install failed",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, {
+        fallbackTitle: "Couldn't install this integration",
+      }),
   });
   const rotateMutation = api.ingestionKey.rotate.useMutation({
     onSuccess: () => {
       void utils.ingestionKey.list.invalidate();
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Rotate failed",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't rotate this key" }),
   });
 
   const publicEnv = usePublicEnv();

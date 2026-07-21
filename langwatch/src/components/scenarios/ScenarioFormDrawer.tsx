@@ -12,8 +12,8 @@ import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
+import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
 import { api } from "../../utils/api";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import type { TypedAgent } from "../../server/agents/agent.repository";
 import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
 import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
@@ -142,14 +142,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       props.onSuccess?.(data);
     },
     onError: (error) => {
-      // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to create scenario",
-        description: error.message,
-        type: "error",
-        meta: { closable: true },
-      });
+      if (
+        formInstance &&
+        applyHandledErrorToForm({ error, form: formInstance })
+      )
+        return;
+      showErrorToast(error, { fallbackTitle: "Couldn't create scenario" });
     },
   });
   const updateMutation = api.scenarios.update.useMutation({
@@ -162,14 +160,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       props.onSuccess?.(data);
     },
     onError: (error) => {
-      // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to update scenario",
-        description: error.message,
-        type: "error",
-        meta: { closable: true },
-      });
+      if (
+        formInstance &&
+        applyHandledErrorToForm({ error, form: formInstance })
+      )
+        return;
+      showErrorToast(error, { fallbackTitle: "Couldn't save scenario" });
     },
   });
 
@@ -368,13 +364,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
       })();
     } catch (error) {
-      toaster.create({
-        title: "Failed to run scenario",
-        description:
-          error instanceof Error ? error.message : "An error occurred",
-        type: "error",
-        meta: { closable: true },
-      });
+      showErrorToast(error, { fallbackTitle: "Couldn't run scenario" });
     }
   }, [
     formInstance,

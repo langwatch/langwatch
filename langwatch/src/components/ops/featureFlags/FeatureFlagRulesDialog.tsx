@@ -30,6 +30,7 @@ import {
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import type { FeatureFlagRules } from "~/server/featureFlag";
 
@@ -109,13 +110,8 @@ export function FeatureFlagRulesDialog({
       await utils.ops.listFeatureFlags.invalidate();
       onOpenChange(false);
     },
-    onError: (error) => {
-      toaster.create({
-        title: "Failed to save rules",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't save the targeting rules" }),
   });
 
   // Re-seed the draft only when the dialog transitions from closed to

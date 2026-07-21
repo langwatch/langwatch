@@ -1,24 +1,42 @@
 /**
- * Domain-specific error types for suite operations.
+ * Handled errors for the suite domain (ADR-045).
  *
- * These errors represent business rule violations in the suite domain,
- * allowing callers to handle different failure modes precisely.
+ * These were plain `extends Error` classes, which meant the only thing that
+ * reached the client was prose — and the client duly branched on it
+ * (`err.message.includes("All scenarios")`). That is exactly the "parsing
+ * prose" the handled-error contract exists to remove: each of these now
+ * carries a stable `code` the UI keys its copy off.
  */
+import { HandledError, type HandledErrorOptions } from "@langwatch/handled-error";
 
-/** Base class for all suite domain errors */
-export class SuiteDomainError extends Error {
-  constructor(message: string) {
-    super(message);
+/**
+ * Base class for suite domain errors.
+ *
+ * Defaults to 404 because the original mapping in `suite.router.ts` turned any
+ * `SuiteDomainError` into a NOT_FOUND; subclasses that are not "missing" say so.
+ */
+export class SuiteDomainError extends HandledError {
+  constructor(
+    message: string,
+    options: HandledErrorOptions & { code?: string; httpStatus?: number } = {},
+  ) {
+    const { code = "suite_error", httpStatus = 404, ...rest } = options;
+    super(code, message, { ...rest, httpStatus });
     this.name = "SuiteDomainError";
   }
 }
 
 /** Thrown when a suite references scenarios that do not exist */
 export class InvalidScenarioReferencesError extends SuiteDomainError {
+  declare readonly code: "suite_invalid_scenario_references";
   readonly invalidIds: string[];
 
   constructor({ invalidIds }: { invalidIds: string[] }) {
-    super(`Invalid scenario references: ${invalidIds.join(", ")}`);
+    super(`Invalid scenario references: ${invalidIds.join(", ")}`, {
+      code: "suite_invalid_scenario_references",
+      httpStatus: 422,
+      meta: { invalidIds },
+    });
     this.name = "InvalidScenarioReferencesError";
     this.invalidIds = invalidIds;
   }
@@ -26,10 +44,15 @@ export class InvalidScenarioReferencesError extends SuiteDomainError {
 
 /** Thrown when a suite references targets that do not exist */
 export class InvalidTargetReferencesError extends SuiteDomainError {
+  declare readonly code: "suite_invalid_target_references";
   readonly invalidIds: string[];
 
   constructor({ invalidIds }: { invalidIds: string[] }) {
-    super(`Invalid target references: ${invalidIds.join(", ")}`);
+    super(`Invalid target references: ${invalidIds.join(", ")}`, {
+      code: "suite_invalid_target_references",
+      httpStatus: 422,
+      meta: { invalidIds },
+    });
     this.name = "InvalidTargetReferencesError";
     this.invalidIds = invalidIds;
   }
@@ -37,16 +60,26 @@ export class InvalidTargetReferencesError extends SuiteDomainError {
 
 /** Thrown when all scenarios in a suite are archived */
 export class AllScenariosArchivedError extends SuiteDomainError {
+  declare readonly code: "suite_all_scenarios_archived";
+
   constructor() {
-    super("All scenarios in this suite are archived. Update the suite to include active scenarios.");
+    super(
+      "All scenarios in this suite are archived. Update the suite to include active scenarios.",
+      { code: "suite_all_scenarios_archived", httpStatus: 422 },
+    );
     this.name = "AllScenariosArchivedError";
   }
 }
 
 /** Thrown when all targets in a suite are archived */
 export class AllTargetsArchivedError extends SuiteDomainError {
+  declare readonly code: "suite_all_targets_archived";
+
   constructor() {
-    super("All targets in this suite are archived. Update the suite to include active targets.");
+    super(
+      "All targets in this suite are archived. Update the suite to include active targets.",
+      { code: "suite_all_targets_archived", httpStatus: 422 },
+    );
     this.name = "AllTargetsArchivedError";
   }
 }

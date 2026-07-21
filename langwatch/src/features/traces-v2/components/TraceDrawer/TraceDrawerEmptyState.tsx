@@ -18,6 +18,11 @@ import {
   X,
 } from "lucide-react";
 import { Tooltip } from "~/components/ui/tooltip";
+import {
+  explainHandledError,
+  readHandledError,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "~/features/errors";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 
 interface TraceDrawerEmptyStateProps {
@@ -95,6 +100,11 @@ export function TraceDrawerEmptyState({
 }: TraceDrawerEmptyStateProps) {
   const kind = classifyError(error, traceId);
   const { Icon, title, description, palette } = KIND_CONFIG[kind];
+  // The headline above is deliberately generic; this is the one line that says
+  // what actually failed. Only a handled error has anything to add — an
+  // unhandled one has no copy beyond what KIND_CONFIG already said.
+  const handled = readHandledError(error);
+  const detail = handled ? explainHandledError(handled) : null;
   const { copied, copy } = useCopyToClipboard();
 
   const handleCopy = () => {
@@ -210,15 +220,11 @@ export function TraceDrawerEmptyState({
         </Button>
       </HStack>
 
-      {kind === "load-failed" && error instanceof Error && error.message && (
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          maxWidth="360px"
-          truncate
-          paddingTop={1}
-        >
-          {error.message}
+      {kind === "load-failed" && detail && (
+        <Text textStyle="2xs" color="fg.subtle" maxWidth="360px" paddingTop={1}>
+          {detail.description
+            ? `${detail.title}. ${detail.description}`
+            : detail.title}
         </Text>
       )}
     </VStack>

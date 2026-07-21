@@ -1,10 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { showErrorToast } from "~/features/errors";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import type { BaseComponent } from "../types/dsl";
 import type { StudioClientEvent, StudioServerEvent } from "../types/events";
 import { useWorkflowStore, type WorkflowStore } from "./useWorkflowStore";
@@ -87,14 +87,8 @@ export const usePostEvent = () => {
       setIsLoading(true);
 
       const onError = (error: Error) => {
-        if (isHandledByGlobalHandler(error)) return;
-        // Show error to user
-        toaster.create({
-          title: "Failed to post message",
-          description: error.message || "Unknown error",
-          type: "error",
-          duration: 5000,
-          meta: { closable: true },
+        showErrorToast(error, {
+          fallbackTitle: "Couldn't reach the workflow engine",
         });
 
         // Update evaluation state if relevant

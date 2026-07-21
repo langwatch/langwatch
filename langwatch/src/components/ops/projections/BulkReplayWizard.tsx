@@ -17,6 +17,7 @@ import {
 } from "@chakra-ui/react";
 import { Checkbox } from "~/components/ui/checkbox";
 import { api } from "~/utils/api";
+import { showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
 import { toaster } from "~/components/ui/toaster";
@@ -104,13 +105,8 @@ export function BulkReplayWizard({
       });
       onReplayStarted();
     },
-    onError: (error) => {
-      toaster.create({
-        title: "Failed to start replay",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't start the replay" }),
   });
 
   const [dryRunResult, setDryRunResult] = useState<{
@@ -129,13 +125,8 @@ export function BulkReplayWizard({
         type: "info",
       });
     },
-    onError: (error) => {
-      toaster.create({
-        title: "Dry run failed",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't complete the dry run" }),
   });
 
   function toggleProjection(name: string) {

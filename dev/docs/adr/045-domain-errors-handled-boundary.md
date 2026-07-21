@@ -301,6 +301,59 @@ For unhandled errors that is unchanged, but a handled one now shows its code
 slug. Each is a missing explainer entry — the fix is copy at the call site, and
 never re-widening the wire.
 
+## Amendment 2026-07-21: the client half — one registry, and types that enforce it
+
+§7 said "the client is the single place that decides presentation" and left it
+there. In practice the client decided nothing: three independent explainers
+existed (automations, Langy, experiments-v3), one of them covering six codes out
+of sixty, and ~105 call sites rendered `error.message` directly into a toast.
+
+That was survivable until #5984, which correctly established that **a handled
+error's free-text message never crosses the boundary** — it is server copy that
+names env vars and internal services — so the wire message became the stable
+`code`. Correct for the leak, and it turned every one of those 105 call sites
+into a slug renderer: a rejected form now told the customer `validation_error`.
+
+Three decisions close it:
+
+1. **One code-keyed registry owns all customer-facing copy.** Both the title and
+   the description are written client-side against the `code`. The server
+   contributes only structured fact (`code`, `meta`, `tips`, `docsUrl`, `fault`,
+   `traceId`). Where the server genuinely must author dynamic prose, it uses
+   `meta.message` — the deliberate opt-in channel, mirroring Go's
+   `Meta["message"]`. An unrecognised code degrades on `fault`, never on the
+   code slug. A call site may supply a *fallback* title naming the action that
+   failed; registry copy outranks it, because it describes the actual failure.
+
+2. **A customer sees message, tips, docs and a copyable error id — nothing
+   else.** Raw `meta` and the reason chain are not rendered: they exist for
+   agents and logs. This makes `meta` a per-code contract rather than a debug
+   dump — the registry reads a field only where its entry declares the shape.
+   Correspondingly, the boundary now attaches `data.traceId` for **unhandled**
+   errors too. An unhandled error deliberately tells the client nothing about
+   what failed, which previously left support with nothing to correlate on; an
+   opaque id is not a detail about the failure.
+
+3. **The type system enforces coverage, and tests enforce what it can't.** The
+   registry is exhaustive over `AppErrorCode | GoErrorCode`, so an error code
+   with no copy fails `pnpm typecheck`. `GoErrorCode` is generated from the
+   `herr.Code` declarations in the Go services by `cmd/herrgen`, which means a
+   Go engineer adding a code to the gateway breaks the TypeScript build until
+   someone writes the customer copy for it — the Go↔TS parity of §5 extended
+   from the wire to the words. Two things types cannot see are covered by tests
+   that scan source: that the enumerated app codes match the codes subclasses
+   actually raise (in both directions — a listed code nothing raises is dead
+   copy), and that no call site renders an error's raw message into a toast.
+
+Consequences: `src/features/errors` is the single client entry point
+(`readHandledError`, `explainHandledError`, `showErrorToast`,
+`HandledErrorAlert`, `applyHandledErrorToForm`); the automations explainer is
+deleted and Langy's builds on the shared reader while keeping its own
+card/inline/suppress renderer; `showErrorToast` absorbs the
+`isHandledByGlobalHandler` dedup that ~137 call sites were copy-pasting; and
+server-side validation errors are mapped back onto the fields that caused them
+rather than thrown into a toast the user has to translate.
+
 ## References
 
 - Code (TS): `packages/handled-error` (`HandledError`,
@@ -310,10 +363,14 @@ never re-widening the wire.
   `langwatch/src/server/app-layer/error-remediation.ts` (tips/docs registry),
   `langwatch/src/server/api/trpc.ts` (`handledErrorMiddleware`, `errorFormatter`),
   `langwatch/src/app/api/middleware/error-handler.ts` (`handleError`),
-  `langwatch/src/features/automations/logic/errorExplainer.ts`
-  (`readHandledError`/`explainHandledError`).
+  `langwatch/src/features/errors` (`readHandledError`, `explainHandledError`,
+  the presentation registry, `showErrorToast`, `HandledErrorAlert`,
+  `applyHandledErrorToForm`), `tools/herrgen` + `cmd/herrgen` (Go codes →
+  `packages/handled-error/src/codes.generated.ts`).
 - Code (Go): `pkg/herr/herr.go` (`E`, `New`), `pkg/herr/http.go`
   (`WriteHTTP`, code→status registry).
 - Related ADRs: [027](./027-typed-dispatcherror-contract.md) (typed
   `DispatchError` contract — a domain-specific precedent for this pattern).
-- Spec: `specs/features/domain-error-contract.feature`.
+- Specs: `specs/features/domain-error-contract.feature` (the boundary),
+  `specs/features/handled-error-presentation.feature` (what the customer reads),
+  `specs/ci/herr-codes-generation.feature` (Go code generation).

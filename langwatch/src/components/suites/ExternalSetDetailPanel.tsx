@@ -18,6 +18,11 @@ import {
 import { FlaskConical, RefreshCw, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "~/components/PeriodSelector";
+import {
+  explainHandledError,
+  readHandledError,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
@@ -110,6 +115,13 @@ export function ExternalSetDetailPanel({
   );
 
   const runData = runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
+
+  // The EmptyState below is this panel's whole error surface, so the copy is
+  // read straight out of the registry rather than wrapped in a second Alert.
+  const errorHandled = readHandledError(error);
+  const errorExplanation = errorHandled
+    ? explainHandledError(errorHandled)
+    : UNKNOWN_ERROR_PRESENTATION;
 
   useSuiteRunFreshness({
     scenarioSetId,
@@ -279,9 +291,13 @@ export function ExternalSetDetailPanel({
               <EmptyState.Indicator color="red.fg">
                 <TriangleAlert size={28} />
               </EmptyState.Indicator>
-              <EmptyState.Title>Couldn&apos;t load run data</EmptyState.Title>
+              <EmptyState.Title>
+                {errorExplanation.isRegistered
+                  ? errorExplanation.title
+                  : "Couldn't load run data"}
+              </EmptyState.Title>
               <EmptyState.Description maxWidth="360px" textAlign="center">
-                {error.message}
+                {errorExplanation.description}
               </EmptyState.Description>
               <Button
                 size="sm"

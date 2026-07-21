@@ -11,6 +11,11 @@ import {
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
+import {
+  explainHandledError,
+  readHandledError,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "~/features/errors";
 import { ConversationExpandContext } from "~/features/traces-v2/components/TraceDrawer/conversationView/expandContext";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
@@ -92,6 +97,13 @@ export function ScenarioRunDetailDrawer({
         getRunStatePollInterval({ status: data?.status, sseConnected }),
     },
   );
+
+  // The drawer body is the whole error surface here, so the copy is read
+  // straight out of the registry rather than wrapped in a second Alert.
+  const runStateHandled = readHandledError(runStateError);
+  const runStateExplanation = runStateHandled
+    ? explainHandledError(runStateHandled)
+    : UNKNOWN_ERROR_PRESENTATION;
 
   // Clear streaming messages once server data includes them
   useEffect(() => {
@@ -272,8 +284,14 @@ export function ScenarioRunDetailDrawer({
                 ) : (
                   <VStack gap={2} align="start" w="100%" pt={4}>
                     <Drawer.CloseTrigger />
-                    <Heading size="md" color="red.500">Failed to load run</Heading>
-                    <Text color="fg.muted" fontSize="sm">{runStateError.message}</Text>
+                    <Heading size="md" color="red.500">
+                      {runStateExplanation.isRegistered
+                        ? runStateExplanation.title
+                        : "Failed to load run"}
+                    </Heading>
+                    <Text color="fg.muted" fontSize="sm">
+                      {runStateExplanation.description}
+                    </Text>
                   </VStack>
                 )
               ) : (

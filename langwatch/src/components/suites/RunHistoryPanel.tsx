@@ -17,6 +17,12 @@ import {
 } from "@chakra-ui/react";
 import { FlaskConical, RefreshCw, TriangleAlert } from "lucide-react";
 import { toaster } from "~/components/ui/toaster";
+import {
+  explainHandledError,
+  readHandledError,
+  showErrorToast,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
@@ -179,23 +185,14 @@ export function RunHistoryPanel({
     onCancelJobError: (error) => {
       setCancellingJobId(null);
       void refetch();
-      toaster.create({
-        title: "Failed to cancel job",
-        description: error.message,
-        type: "error",
-      });
+      showErrorToast(error, { fallbackTitle: "Couldn't cancel job" });
     },
     onCancelBatchSuccess: () => {
       void refetch();
       toaster.create({ title: "Jobs cancelled", type: "success" });
     },
-    onCancelBatchError: (error) => {
-      toaster.create({
-        title: "Failed to cancel jobs",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onCancelBatchError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't cancel jobs" }),
   });
 
   // Apply filters to raw runs
@@ -328,15 +325,26 @@ export function RunHistoryPanel({
   // --- Render ---
 
   if (error) {
+    // The EmptyState is this panel's whole error surface, so the copy is read
+    // straight out of the registry rather than wrapped in a second Alert.
+    const handled = readHandledError(error);
+    const explanation = handled
+      ? explainHandledError(handled)
+      : UNKNOWN_ERROR_PRESENTATION;
+
     return (
       <EmptyState.Root paddingY={12}>
         <EmptyState.Content>
           <EmptyState.Indicator color="red.fg">
             <TriangleAlert size={28} />
           </EmptyState.Indicator>
-          <EmptyState.Title>Couldn&apos;t load runs</EmptyState.Title>
+          <EmptyState.Title>
+            {explanation.isRegistered
+              ? explanation.title
+              : "Couldn't load runs"}
+          </EmptyState.Title>
           <EmptyState.Description maxWidth="360px" textAlign="center">
-            {error.message}
+            {explanation.description}
           </EmptyState.Description>
           <Button size="sm" variant="outline" onClick={() => void refetch()}>
             <RefreshCw size={14} /> Try again

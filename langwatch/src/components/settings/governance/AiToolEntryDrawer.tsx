@@ -34,6 +34,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -357,11 +358,9 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
     onClose();
   };
 
-  const onError = (err: { message: string }) => {
-    toaster.create({
-      title: isEdit ? "Failed to update tile" : "Failed to publish tile",
-      description: err.message,
-      type: "error",
+  const onError = (err: unknown) => {
+    showErrorToast(err, {
+      fallbackTitle: isEdit ? "Couldn't update tile" : "Couldn't publish tile",
     });
   };
 

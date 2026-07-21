@@ -16,7 +16,7 @@ import { Settings2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
-import { toaster } from "~/components/ui/toaster";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import type { FeatureFlagRules } from "~/server/featureFlag";
@@ -54,25 +54,15 @@ export function FeatureFlagsContent() {
     onSuccess: async () => {
       await utils.ops.listFeatureFlags.invalidate();
     },
-    onError: (error) => {
-      toaster.create({
-        title: "Failed to update flag",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't update the flag" }),
   });
   const clearFlag = api.ops.clearFeatureFlag.useMutation({
     onSuccess: async () => {
       await utils.ops.listFeatureFlags.invalidate();
     },
-    onError: (error) => {
-      toaster.create({
-        title: "Failed to clear override",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't clear the override" }),
   });
 
   const grouped = useMemo(() => groupByScope(query.data?.flags ?? []), [query.data]);
@@ -88,7 +78,10 @@ export function FeatureFlagsContent() {
   if (query.error) {
     return (
       <Center paddingY={20}>
-        <Text color="red.500">{query.error.message}</Text>
+        <HandledErrorAlert
+          error={query.error}
+          fallbackTitle="Couldn't load feature flags"
+        />
       </Center>
     );
   }

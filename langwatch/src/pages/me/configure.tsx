@@ -10,12 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Checkbox } from "~/components/ui/checkbox";
-import {
-  Copy,
-  Laptop,
-  Monitor,
-  Server,
-} from "lucide-react";
+import { Copy, Laptop, Monitor, Server } from "lucide-react";
 import { useState } from "react";
 import Head from "~/utils/compat/next-head";
 
@@ -28,6 +23,7 @@ import {
   usePersonalContext,
 } from "~/components/me/usePersonalContext";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 const fmtRelative = (iso: string | null): string => {
@@ -78,13 +74,8 @@ function MySettingsPage() {
         type: "success",
       });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to issue key",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast(err, { fallbackTitle: "Couldn't issue the personal key" }),
   });
 
   const personalContextQuery = api.user.personalContext.useQuery(
@@ -104,8 +95,8 @@ function MySettingsPage() {
     featuresQuery.data?.annotations &&
     featuresQuery.data?.automations
   );
-  const enableAllMutation =
-    api.personalWorkspaceFeatures.enableAll.useMutation({
+  const enableAllMutation = api.personalWorkspaceFeatures.enableAll.useMutation(
+    {
       onSuccess: () => {
         if (personalProjectId) {
           void utils.personalWorkspaceFeatures.get.invalidate({
@@ -119,14 +110,12 @@ function MySettingsPage() {
           type: "success",
         });
       },
-      onError: (err) => {
-        toaster.create({
-          title: "Failed to enable features",
-          description: err.message,
-          type: "error",
-        });
-      },
-    });
+      onError: (err) =>
+        showErrorToast(err, {
+          fallbackTitle: "Couldn't enable advanced features",
+        }),
+    },
+  );
   const disableAllMutation =
     api.personalWorkspaceFeatures.disableAll.useMutation({
       onSuccess: () => {
@@ -142,13 +131,10 @@ function MySettingsPage() {
           type: "success",
         });
       },
-      onError: (err) => {
-        toaster.create({
-          title: "Failed to disable features",
-          description: err.message,
-          type: "error",
-        });
-      },
+      onError: (err) =>
+        showErrorToast(err, {
+          fallbackTitle: "Couldn't disable advanced features",
+        }),
     });
 
   const revokeMutation = api.personalVirtualKeys.revokePersonal.useMutation({
@@ -163,13 +149,8 @@ function MySettingsPage() {
         type: "success",
       });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to revoke key",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast(err, { fallbackTitle: "Couldn't revoke the key" }),
   });
 
   const onIssue = () => {
@@ -449,11 +430,7 @@ function Field({
         {label}
       </Text>
       <VStack align="start" gap={0}>
-        {typeof value === "string" ? (
-          <Text fontSize="sm">{value}</Text>
-        ) : (
-          value
-        )}
+        {typeof value === "string" ? <Text fontSize="sm">{value}</Text> : value}
         {hint && (
           <Text fontSize="xs" color="fg.muted">
             {hint}
@@ -592,12 +569,7 @@ function RevealedSecretBanner({
           borderWidth="1px"
           borderColor="border.muted"
         >
-          <Text
-            fontSize="xs"
-            fontFamily="mono"
-            flex={1}
-            wordBreak="break-all"
-          >
+          <Text fontSize="xs" fontFamily="mono" flex={1} wordBreak="break-all">
             {secret.secret}
           </Text>
           <Button

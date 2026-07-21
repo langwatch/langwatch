@@ -29,6 +29,7 @@ import {
 import { InstallCliCard } from "~/components/me/InstallCliCard";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -470,13 +471,10 @@ function SessionPolicySection({ organizationId }: { organizationId: string }) {
       void utils.sessionPolicy.get.invalidate({ organizationId });
       toaster.create({ title: "Session policy saved", type: "success" });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to save",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast(err, {
+        fallbackTitle: "Couldn't save the session policy",
+      }),
   });
 
   const persisted = policyQuery.data?.maxSessionDurationDays ?? 0;

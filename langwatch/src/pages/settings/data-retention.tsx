@@ -42,6 +42,7 @@ import SettingsLayout from "~/components/SettingsLayout";
 import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
@@ -230,10 +231,8 @@ function DataRetentionPage({
       });
     },
     onError: (error) =>
-      toaster.create({
-        title: "Failed to cancel",
-        description: error.message,
-        type: "error",
+      showErrorToast(error, {
+        fallbackTitle: "Couldn't cancel the retroactive update",
       }),
   });
 
@@ -291,10 +290,8 @@ function DataRetentionPage({
       const firstError = failed.find(
         (r): r is { ok: false; error: Error } => !r.ok,
       );
-      toaster.create({
-        title: "Failed to remove policy",
-        description: firstError?.error.message,
-        type: "error",
+      showErrorToast(firstError?.error, {
+        fallbackTitle: "Couldn't remove the retention policy",
       });
     }
   };
@@ -566,13 +563,11 @@ function DataRetentionPage({
                     error: Error;
                   } => !r.ok,
                 );
-                toaster.create({
-                  title:
+                showErrorToast(firstError?.error, {
+                  fallbackTitle:
                     failed.length === pairs.length
-                      ? "Failed to save retention policy"
+                      ? "Couldn't save the retention policy"
                       : `Saved ${pairs.length - failed.length} of ${pairs.length} updates`,
-                  description: firstError?.error.message,
-                  type: "error",
                 });
                 return {
                   success: failed.length === 0,
@@ -655,10 +650,8 @@ function DataRetentionPage({
                       const firstError = triggerFailed.find(
                         (r): r is { ok: false; error: Error } => !r.ok,
                       );
-                      toaster.create({
-                        title: "Some retroactive updates failed",
-                        description: firstError?.error.message,
-                        type: "error",
+                      showErrorToast(firstError?.error, {
+                        fallbackTitle: "Some retroactive updates failed",
                       });
                     }
                   }

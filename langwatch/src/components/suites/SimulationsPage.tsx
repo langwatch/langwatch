@@ -39,6 +39,12 @@ import {
   useSuiteRouting,
 } from "~/components/suites/useSuiteRouting";
 import { toaster } from "~/components/ui/toaster";
+import {
+  explainHandledError,
+  readHandledError,
+  showErrorToast,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "~/features/errors";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useDrawer } from "~/hooks/useDrawer";
 import { NowProvider } from "./NowProvider";
@@ -196,14 +202,8 @@ export default function SimulationsPage() {
         meta: { closable: true },
       });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to archive run plan",
-        description: err.message,
-        type: "error",
-        meta: { closable: true },
-      });
-    },
+    onError: (err) =>
+      showErrorToast(err, { fallbackTitle: "Couldn't archive run plan" }),
   });
 
   const duplicateMutation = api.suites.duplicate.useMutation({
@@ -216,14 +216,8 @@ export default function SimulationsPage() {
         meta: { closable: true },
       });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to duplicate run plan",
-        description: err.message,
-        type: "error",
-        meta: { closable: true },
-      });
-    },
+    onError: (err) =>
+      showErrorToast(err, { fallbackTitle: "Couldn't duplicate run plan" }),
   });
 
   const { requestRun, isPending: isRunPending, pendingBatchRunId, dialogProps: runDialogProps } = useRunSuite({
@@ -431,7 +425,7 @@ function MainPanel({
   suiteNameMap,
   highlightBatchId,
 }: {
-  error: { message: string } | null;
+  error: unknown;
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
   selectedSuite: SimulationSuite | null;
   selectedExternalSetId: string | null;
@@ -446,15 +440,26 @@ function MainPanel({
   highlightBatchId: string | null;
 }) {
   if (error) {
+    // The EmptyState is the page's whole error surface, so the copy is read
+    // straight out of the registry rather than wrapped in a second Alert.
+    const handled = readHandledError(error);
+    const explanation = handled
+      ? explainHandledError(handled)
+      : UNKNOWN_ERROR_PRESENTATION;
+
     return (
       <EmptyState.Root paddingY={12}>
         <EmptyState.Content>
           <EmptyState.Indicator color="red.fg">
             <TriangleAlert size={28} />
           </EmptyState.Indicator>
-          <EmptyState.Title>Couldn&apos;t load simulations</EmptyState.Title>
+          <EmptyState.Title>
+            {explanation.isRegistered
+              ? explanation.title
+              : "Couldn't load simulations"}
+          </EmptyState.Title>
           <EmptyState.Description maxWidth="360px" textAlign="center">
-            {error.message}
+            {explanation.description}
           </EmptyState.Description>
         </EmptyState.Content>
       </EmptyState.Root>

@@ -16,14 +16,13 @@ import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import { toaster } from "~/components/ui/toaster";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { trackEvent } from "~/utils/tracking";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { blankTemplate } from "~/optimization_studio/templates/blank";
@@ -98,15 +97,8 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
       void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
       onSave?.(agent);
     },
-    onError: (error) => {
-      // Skip toast if error was already handled by global license modal
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error creating agent",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't create agent" }),
   });
 
   const isSaving =
@@ -157,13 +149,9 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
           `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
         );
       } catch (error) {
-        // Skip toast if error was already handled by global license modal
-        if (isHandledByGlobalHandler(error)) return;
         console.error("Error creating workflow agent:", error);
-        toaster.create({
-          title: "Error",
-          description: "Failed to create workflow agent",
-          type: "error",
+        showErrorToast(error, {
+          fallbackTitle: "Couldn't create workflow agent",
         });
       }
     },

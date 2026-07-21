@@ -33,10 +33,16 @@ const SRC_ROOT = join(
  */
 const PACKAGE_OWNED_CODES = new Set(["validation_error"]);
 
-/** `super("some_code", …)` and `declare readonly code: "some_code"`. */
+/**
+ * The three shapes a code is declared in:
+ *   `super("some_code", …)`                    — the common case
+ *   `declare readonly code: "some_code"`        — subclass narrowing
+ *   `const { code = "some_code" } = options`    — a base class's default
+ */
 const CODE_PATTERNS = [
   /super\(\s*"([a-z][a-z0-9_]*)"/g,
   /declare\s+(?:readonly\s+)?code:\s*"([a-z][a-z0-9_]*)"/g,
+  /\bcode\s*=\s*"([a-z][a-z0-9_]*)"/g,
 ];
 
 function isTestFile(path: string): boolean {

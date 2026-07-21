@@ -41,6 +41,7 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { docsUrl } from "~/utils/docsUrl";
@@ -162,11 +163,7 @@ function RoutingPoliciesPage() {
     },
     onError: (e) => {
       setDrawerError(e.message);
-      toaster.create({
-        title: "Failed to create policy",
-        description: e.message,
-        type: "error",
-      });
+      showErrorToast(e, { fallbackTitle: "Couldn't create routing policy" });
     },
   });
 
@@ -180,11 +177,7 @@ function RoutingPoliciesPage() {
     },
     onError: (e) => {
       setDrawerError(e.message);
-      toaster.create({
-        title: "Failed to update policy",
-        description: e.message,
-        type: "error",
-      });
+      showErrorToast(e, { fallbackTitle: "Couldn't update routing policy" });
     },
   });
 
@@ -194,11 +187,7 @@ function RoutingPoliciesPage() {
       toaster.create({ title: "Default policy updated", type: "success" });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to set default",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast(e, { fallbackTitle: "Couldn't set the default policy" }),
   });
 
   const deleteMutation = api.routingPolicy.delete.useMutation({
@@ -208,11 +197,7 @@ function RoutingPoliciesPage() {
       toaster.create({ title: "Routing policy deleted", type: "success" });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to delete policy",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast(e, { fallbackTitle: "Couldn't delete routing policy" }),
   });
 
   const grouped = useMemo(() => {
@@ -241,12 +226,9 @@ function RoutingPoliciesPage() {
     setDrawerError(null);
     setEditingId("new");
     const seedType = scope.toUpperCase() as ScopeTriadEntry["scopeType"];
-    const seedId =
-      seedType === "ORGANIZATION" ? orgId : scopeIdDefault;
+    const seedId = seedType === "ORGANIZATION" ? orgId : scopeIdDefault;
     setComposer({
-      scopes: seedId
-        ? [{ scopeType: seedType, scopeId: seedId }]
-        : [],
+      scopes: seedId ? [{ scopeType: seedType, scopeId: seedId }] : [],
       name: "",
       description: "",
       strategy: "priority",
@@ -331,14 +313,13 @@ function RoutingPoliciesPage() {
   };
 
   const hasAnyPolicy =
-    grouped.organization.length +
-      grouped.team.length +
-      grouped.project.length >
+    grouped.organization.length + grouped.team.length + grouped.project.length >
     0;
-  const hasAnyDefault =
-    [...grouped.organization, ...grouped.team, ...grouped.project].some(
-      (p) => p.isDefault,
-    );
+  const hasAnyDefault = [
+    ...grouped.organization,
+    ...grouped.team,
+    ...grouped.project,
+  ].some((p) => p.isDefault);
 
   return (
     <GovernanceLayout pageTitle="Routing Policies · AI Governance · LangWatch">
@@ -349,9 +330,9 @@ function RoutingPoliciesPage() {
               Routing Policies
             </Heading>
             <Text color="fg.muted" fontSize="sm">
-              Define which providers and models personal, team, and project
-              keys route through. The hierarchy is project → team →
-              organization; first match wins.
+              Define which providers and models personal, team, and project keys
+              route through. The hierarchy is project → team → organization;
+              first match wins.
             </Text>
           </VStack>
           <Spacer />
@@ -378,17 +359,17 @@ function RoutingPoliciesPage() {
                     : "Publish a default policy to unblock end-user keys"}
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
-                  When at least one model provider is reachable from a
-                  user's personal team, personal keys still mint
-                  without a default and the gateway picks providers in {" "}
+                  When at least one model provider is reachable from a user's
+                  personal team, personal keys still mint without a default and
+                  the gateway picks providers in{" "}
                   <Text as="span" fontFamily="mono">
                     fallbackPriorityGlobal
                   </Text>{" "}
-                  order. Orgs with zero accessible providers still hit
-                  a 409 at issue time; configure a model provider first.
-                  Publish an explicit default to pin a deterministic
-                  chain at the organization level, then override
-                  per-team or per-project as needed.
+                  order. Orgs with zero accessible providers still hit a 409 at
+                  issue time; configure a model provider first. Publish an
+                  explicit default to pin a deterministic chain at the
+                  organization level, then override per-team or per-project as
+                  needed.
                 </Text>
                 <HStack gap={3} paddingTop={1}>
                   <Button
@@ -435,10 +416,7 @@ function RoutingPoliciesPage() {
                 size="sm"
                 variant="outline"
                 onClick={() =>
-                  startNew(
-                    scope,
-                    scope === "organization" ? orgId : "",
-                  )
+                  startNew(scope, scope === "organization" ? orgId : "")
                 }
               >
                 <Plus size={14} /> New
@@ -613,7 +591,8 @@ function PolicyRow({
         )}
         <Text fontSize="xs" color="fg.muted">
           {providerCount} provider{providerCount === 1 ? "" : "s"}
-          {allowCount > 0 && ` · ${allowCount} model glob${allowCount === 1 ? "" : "s"} allow-listed`}
+          {allowCount > 0 &&
+            ` · ${allowCount} model glob${allowCount === 1 ? "" : "s"} allow-listed`}
           {allowCount === 0 && " · no model restrictions"}
         </Text>
       </VStack>
@@ -730,10 +709,14 @@ function policyRulesFromServer(
     if (!dimRaw || typeof dimRaw !== "object") continue;
     const dimObj = dimRaw as { deny?: unknown; allow?: unknown };
     const deny = Array.isArray(dimObj.deny)
-      ? (dimObj.deny as unknown[]).filter((x): x is string => typeof x === "string")
+      ? (dimObj.deny as unknown[]).filter(
+          (x): x is string => typeof x === "string",
+        )
       : [];
     const allow = Array.isArray(dimObj.allow)
-      ? (dimObj.allow as unknown[]).filter((x): x is string => typeof x === "string")
+      ? (dimObj.allow as unknown[]).filter(
+          (x): x is string => typeof x === "string",
+        )
       : [];
     out[dim] = { deny: deny.join("\n"), allow: allow.join("\n") };
   }
@@ -978,8 +961,8 @@ function ProviderCredentialPicker({
             No model providers yet
           </Text>
           <Text fontSize="xs" color="fg.muted">
-            A routing policy points at one or more model providers.
-            Configure at least one before saving this policy.
+            A routing policy points at one or more model providers. Configure at
+            least one before saving this policy.
           </Text>
           {modelProvidersAdminPath && (
             <Link
@@ -1012,9 +995,9 @@ function ProviderCredentialPicker({
           <Text fontSize="xs" color="fg.muted">
             {available.length === 1
               ? "The org has 1 model provider, but it's disabled."
-              : `The org has ${available.length} model providers, but all are disabled.`}
-            {" "}Re-enable one (or add a fresh one) before this policy can
-            route traffic.
+              : `The org has ${available.length} model providers, but all are disabled.`}{" "}
+            Re-enable one (or add a fresh one) before this policy can route
+            traffic.
           </Text>
           {modelProvidersAdminPath && (
             <Link
@@ -1212,9 +1195,8 @@ function RoutingPolicyDrawer({
                       scopes={resolveScopeEntriesWithNames(composer.scopes)}
                     />
                     <Field.HelperText>
-                      Scope is fixed after create. Delete and recreate to
-                      change which org / team / project this policy
-                      applies to.
+                      Scope is fixed after create. Delete and recreate to change
+                      which org / team / project this policy applies to.
                     </Field.HelperText>
                   </>
                 )}
@@ -1299,7 +1281,8 @@ function RoutingPolicyDrawer({
                   inputAriaLabel="Add model allowlist glob"
                 />
                 <Field.HelperText>
-                  Empty = no restriction. Globs match against the requested model name.
+                  Empty = no restriction. Globs match against the requested
+                  model name.
                 </Field.HelperText>
               </Field.Root>
 
@@ -1354,9 +1337,7 @@ function RoutingPolicyDrawer({
                       onClick={() =>
                         setComposer({
                           ...composer,
-                          aliases: composer.aliases.filter(
-                            (_, i) => i !== idx,
-                          ),
+                          aliases: composer.aliases.filter((_, i) => i !== idx),
                         })
                       }
                     >
@@ -1370,10 +1351,7 @@ function RoutingPolicyDrawer({
                   onClick={() =>
                     setComposer({
                       ...composer,
-                      aliases: [
-                        ...composer.aliases,
-                        { from: "", to: "" },
-                      ],
+                      aliases: [...composer.aliases, { from: "", to: "" }],
                     })
                   }
                 >

@@ -9,11 +9,20 @@ import { readErrorTraceId, readHandledError } from "./readHandledError";
 
 export interface ShowErrorToastOptions {
   /**
-   * Overrides the registry title. Use only where the surrounding context makes
-   * a better headline than the generic one — "Couldn't save your changes"
-   * beats "Check your input" on a settings form.
+   * Headline for a failure we have no specific copy for.
    *
-   * Do NOT use it to paper over a missing registry entry; add the entry.
+   * This is the option you almost always want. It names the action that
+   * failed ("Couldn't create project") so an unrecognised or unhandled error
+   * still says what the user was doing — but a code the registry knows keeps
+   * its own, better title ("That name is taken"), because the specific fact
+   * beats the generic one every time.
+   */
+  fallbackTitle?: string;
+  /**
+   * Hard override of the title, registry entry or not.
+   *
+   * Rare, and usually a smell: if the registry's copy is wrong for this code,
+   * fix the registry rather than papering over it at one call site.
    */
   title?: string;
   /** Toast id, for deduping repeated failures of the same action. */
@@ -34,7 +43,7 @@ export interface ShowErrorToastOptions {
  * also toast.
  *
  * ```ts
- * onError: (error) => showErrorToast(error, { title: "Couldn't create project" }),
+ * onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't create project" }),
  * ```
  */
 export function showErrorToast(
@@ -50,9 +59,20 @@ export function showErrorToast(
     ? explainHandledError(handled)
     : UNKNOWN_ERROR_PRESENTATION;
 
+  // A code the registry recognises has copy written for this exact failure, so
+  // it wins over the caller's generic "couldn't do the thing". Everything else
+  // — an unhandled error, or a code newer than this client — takes the
+  // caller's headline, which at least names what the user was trying to do.
+  const isRecognised = handled !== null && explanation.isRegistered;
+  const title =
+    options.title ??
+    (isRecognised
+      ? explanation.title
+      : (options.fallbackTitle ?? explanation.title));
+
   toaster.create({
     ...(options.id ? { id: options.id } : {}),
-    title: options.title ?? explanation.title,
+    title,
     description: describeWithTips(explanation.description, handled?.tips),
     type: "error",
     meta: {

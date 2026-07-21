@@ -17,6 +17,7 @@ import { InstallCliCard } from "~/components/me/InstallCliCard";
 import MyLayout from "~/components/me/MyLayout";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 const fmtRelative = (ms: number | null | undefined): string => {
@@ -69,13 +70,8 @@ function MySessionsPage() {
         type: "success",
       });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to revoke session",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast(err, { fallbackTitle: "Couldn't revoke the session" }),
   });
 
   const revokeAllMutation = api.personalSessions.revokeAll.useMutation({
@@ -90,13 +86,8 @@ function MySessionsPage() {
         type: "success",
       });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to revoke all sessions",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast(err, { fallbackTitle: "Couldn't revoke all sessions" }),
   });
 
   const sessions = sessionsQuery.data ?? [];
@@ -206,9 +197,7 @@ function MySessionsPage() {
                   revokeMutation.isPending &&
                   pendingRevokeId === s.sessionStartedAtMs
                 }
-                onRequestRevoke={() =>
-                  setPendingRevokeId(s.sessionStartedAtMs)
-                }
+                onRequestRevoke={() => setPendingRevokeId(s.sessionStartedAtMs)}
                 onCancelRevoke={() => setPendingRevokeId(null)}
                 onConfirmRevoke={() => {
                   if (!ctx.organizationId) return;
@@ -250,9 +239,7 @@ function SessionRow({
   onConfirmRevoke: () => void;
 }) {
   const Icon = platformIcon(session.platform);
-  const sub = [session.hostname, session.uname]
-    .filter(Boolean)
-    .join(" · ");
+  const sub = [session.hostname, session.uname].filter(Boolean).join(" · ");
 
   return (
     <VStack
@@ -308,8 +295,8 @@ function SessionRow({
           borderRadius="sm"
         >
           <Text fontSize="xs" color="red.700" flex={1}>
-            Revoke this session? The CLI on{" "}
-            {session.hostname ?? "this device"} will start failing immediately.
+            Revoke this session? The CLI on {session.hostname ?? "this device"}{" "}
+            will start failing immediately.
           </Text>
           <Button
             size="xs"

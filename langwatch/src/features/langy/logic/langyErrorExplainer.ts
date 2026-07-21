@@ -1,7 +1,4 @@
-import {
-  readHandledError,
-  type HandledErrorShape,
-} from "~/features/automations/logic/errorExplainer";
+import { readHandledError, type HandledErrorShape } from "~/features/errors";
 
 /**
  * Langy error explainer (ADR-045).
@@ -51,8 +48,13 @@ export interface LangyErrorPresentation {
   reasons?: LangySerializedReason[];
 }
 
-/** Richer than the automations shape: also carries trace id + reason chain. */
-export interface LangyDomainError extends HandledErrorShape {
+/**
+ * The shared shape, with the reason chain narrowed to Langy's own parsed
+ * representation — Langy is the one surface that renders reasons (in a card,
+ * for an engineer debugging an agent turn) rather than hiding them.
+ */
+export interface LangyDomainError
+  extends Omit<HandledErrorShape, "reasons" | "traceId"> {
   traceId?: string;
   reasons?: LangySerializedReason[];
 }
@@ -167,19 +169,9 @@ export function readLangyStreamError(
 export function readLangyTrpcError(err: unknown): LangyDomainError | null {
   const domain = readHandledError(err);
   if (!domain) return null;
-  const serialized = (
-    err as {
-      data?: {
-        error?: { traceId?: unknown; reasons?: unknown };
-      };
-    }
-  )?.data?.error;
-  const traceId = serialized?.traceId;
-  return {
-    ...domain,
-    traceId: typeof traceId === "string" ? traceId : undefined,
-    reasons: parseReasons(serialized?.reasons),
-  };
+  // The shared reader already lifted and validated traceId; only the reason
+  // chain needs Langy's own parse, since it renders them.
+  return { ...domain, reasons: parseReasons(domain.reasons) };
 }
 
 export function explainLangyError(

@@ -11,7 +11,13 @@ import { ErrorActions } from "./ErrorActions";
 export interface HandledErrorAlertProps {
   /** Any error — handled or not. Renders nothing when null/undefined. */
   error: unknown;
-  /** Overrides the registry title where the surrounding context says it better. */
+  /**
+   * Headline for a failure we have no specific copy for — "Couldn't load
+   * replicas". A code the registry knows keeps its own, better title.
+   * This is the one you usually want.
+   */
+  fallbackTitle?: string;
+  /** Hard override of the title, registry entry or not. Rare. */
   title?: string;
   /**
    * Show every remediation tip as a list rather than folding the first into
@@ -32,6 +38,7 @@ export interface HandledErrorAlertProps {
 export function HandledErrorAlert({
   error,
   title,
+  fallbackTitle,
   showAllTips = true,
 }: HandledErrorAlertProps) {
   if (!error) return null;
@@ -42,11 +49,19 @@ export function HandledErrorAlert({
     : UNKNOWN_ERROR_PRESENTATION;
   const tips = handled?.tips ?? [];
 
+  // Registry copy describes this exact failure, so it beats the caller's
+  // generic headline. See `showErrorToast` for the same rule.
+  const heading =
+    title ??
+    (explanation.isRegistered
+      ? explanation.title
+      : (fallbackTitle ?? explanation.title));
+
   return (
     <Alert.Root status="error" alignItems="flex-start">
       <Alert.Indicator />
       <Alert.Content gap={1}>
-        <Alert.Title>{title ?? explanation.title}</Alert.Title>
+        <Alert.Title>{heading}</Alert.Title>
         {explanation.description && (
           <Alert.Description>{explanation.description}</Alert.Description>
         )}

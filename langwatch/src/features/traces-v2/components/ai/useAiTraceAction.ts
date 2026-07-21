@@ -1,4 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  explainHandledError,
+  readHandledError,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { api } from "~/utils/api";
@@ -110,10 +115,20 @@ export function useAiTraceAction({
     onError: (e) => {
       if (cancelledRef.current) return;
       // tRPC-layer failures (network blip, ModelNotConfiguredError, etc.)
-      // arrive here with a string message. Wrap them in the same
-      // structured shape the server returns for handled failures so the
-      // composer renders a single error path.
-      setError({ code: "unknown", message: e.message });
+      // arrive here without the server's structured `AiActionError`. Their
+      // wire message is the error code, so the words come from the registry
+      // instead — wrapped in the same shape the server returns for handled
+      // failures so the composer renders a single error path.
+      const handled = readHandledError(e);
+      const explanation = handled
+        ? explainHandledError(handled)
+        : UNKNOWN_ERROR_PRESENTATION;
+      setError({
+        code: "unknown",
+        message: explanation.description
+          ? `${explanation.title}. ${explanation.description}`
+          : explanation.title,
+      });
     },
   });
 

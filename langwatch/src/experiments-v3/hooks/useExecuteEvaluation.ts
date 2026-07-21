@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import type {
@@ -318,10 +319,8 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             // Fatal error
             setError(event.message);
             setResults({ status: "error" });
-            toaster.create({
-              title: "Execution Error",
-              description: event.message,
-              type: "error",
+            showErrorToast(event, {
+              fallbackTitle: "Couldn't finish the evaluation",
             });
           }
           break;
@@ -711,10 +710,8 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             setError(err.message);
             setIsAborting(false); // Clear aborting state on error
             cleanupThisExecution();
-            toaster.create({
-              title: "Execution Failed",
-              description: err.message,
-              type: "error",
+            showErrorToast(err, {
+              fallbackTitle: "Couldn't run the evaluation",
             });
           },
         });
@@ -782,12 +779,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     } catch (err) {
       // On error, reset aborting state since abort failed
       setIsAborting(false);
-      const message = err instanceof Error ? err.message : "Failed to abort";
-      toaster.create({
-        title: "Abort Failed",
-        description: message,
-        type: "error",
-      });
+      showErrorToast(err, { fallbackTitle: "Couldn't stop the run" });
     }
     // Note: No finally block - isAborting stays true until `stopped` event
   }, [project?.id, runId]);

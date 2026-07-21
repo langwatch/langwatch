@@ -9,6 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { api } from "~/utils/api";
+import { showErrorToast } from "~/features/errors";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
 import { toaster } from "~/components/ui/toaster";
 
@@ -42,13 +43,8 @@ export function SingleAggregateReplay({
       });
       onReplayStarted();
     },
-    onError: (error) => {
-      toaster.create({
-        title: "Failed to start replay",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast(error, { fallbackTitle: "Couldn't start the replay" }),
   });
 
   function toggleProjection(name: string) {

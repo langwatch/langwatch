@@ -34,8 +34,8 @@ import {
 } from "~/hooks/useDrawer";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { AgentHttpEditorDrawer } from "../agents/AgentHttpEditorDrawer";
 import { ScenarioFormDrawer } from "../scenarios/ScenarioFormDrawer";
 import { SimulationModelSelect } from "../scenarios/SimulationModelSelect";
@@ -157,14 +157,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     },
     onError: (err) => {
       saveAndRunRef.current = false;
-      // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalHandler(err)) return;
-      toaster.create({
-        title: "Failed to create run plan",
-        description: err.message,
-        type: "error",
-        meta: { closable: true },
-      });
+      if (applyHandledErrorToForm({ error: err, form })) return;
+      showErrorToast(err, { fallbackTitle: "Couldn't create run plan" });
     },
   });
 
@@ -191,12 +185,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     },
     onError: (err) => {
       saveAndRunRef.current = false;
-      toaster.create({
-        title: "Failed to update run plan",
-        description: err.message,
-        type: "error",
-        meta: { closable: true },
-      });
+      if (applyHandledErrorToForm({ error: err, form })) return;
+      showErrorToast(err, { fallbackTitle: "Couldn't update run plan" });
     },
   });
 

@@ -16,8 +16,8 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { slugify } from "~/utils/slugify";
 import { Drawer } from "../components/ui/drawer";
 import { Popover } from "../components/ui/popover";
@@ -179,17 +179,12 @@ export const AddAnnotationQueueDrawer = ({
           handleClose();
           reset();
         },
-        onError: (error) => {
-          if (isHandledByGlobalHandler(error)) return;
-          toaster.create({
-            title: "Error creating annotation score",
-            description: error.message,
-            type: "error",
-            meta: {
-              closable: true,
-            },
-          });
-        },
+        onError: (error) =>
+          showErrorToast(error, {
+            fallbackTitle: queueId
+              ? "Couldn't update annotation queue"
+              : "Couldn't create annotation queue",
+          }),
       },
     );
   };

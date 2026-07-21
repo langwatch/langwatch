@@ -57,10 +57,6 @@ import {
   type TemplateContext,
 } from "@langwatch/automations/templating/templateContext";
 import { api } from "~/utils/api";
-import {
-  errorDisplayMessage,
-  isHandledByGlobalHandler,
-} from "~/utils/trpcError";
 import { MainSectionList } from "./components/MainSectionList";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
 import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
@@ -80,7 +76,12 @@ import {
   subjectIsSet,
   templatesFromDraft,
 } from "./logic/draftReducer";
-import { explainHandledError, readHandledError } from "./logic/errorExplainer";
+import {
+  explainHandledError,
+  readHandledError,
+  showErrorToast,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "~/features/errors";
 import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { useAutomationStore } from "./state/automationStore";
 import {
@@ -779,22 +780,17 @@ export function AutomationDrawer({
         },
         onError: (err) => {
           const domain = readHandledError(err);
-          const { title, description } = domain
+          const { title, description, isRegistered } = domain
             ? explainHandledError(domain)
-            : { title: "Test fire failed", description: errorDisplayMessage(err) };
+            : UNKNOWN_ERROR_PRESENTATION;
           pushAttempt({
             at: Date.now(),
             channel,
             status: "failure",
-            errorTitle: title,
-            errorDetail: description || errorDisplayMessage(err),
+            errorTitle: isRegistered ? title : "Test fire failed",
+            errorDetail: description,
           });
-          toaster.create({
-            title,
-            type: "error",
-            description: description || errorDisplayMessage(err),
-            meta: { closable: true },
-          });
+          showErrorToast(err, { fallbackTitle: "Test fire failed" });
         },
       },
     );
@@ -861,22 +857,8 @@ export function AutomationDrawer({
           void queryClient.graphs.getById.invalidate();
           closeDrawer();
         },
-        onError: (err) => {
-          if (isHandledByGlobalHandler(err)) return;
-          const domain = readHandledError(err);
-          const { title, description } = domain
-            ? explainHandledError(domain)
-            : {
-                title: "Could not save automation",
-                description: errorDisplayMessage(err),
-              };
-          toaster.create({
-            title,
-            type: "error",
-            description: description || errorDisplayMessage(err),
-            meta: { closable: true },
-          });
-        },
+        onError: (err) =>
+          showErrorToast(err, { fallbackTitle: "Couldn't save automation" }),
       },
     );
   }, [

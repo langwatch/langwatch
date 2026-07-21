@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import type { VersionedPrompt } from "~/server/prompt-config";
@@ -37,10 +38,8 @@ export const useRenamePromptHandle = ({
 
   const renameHandle = useCallback(() => {
     if (!promptId) {
-      toaster.create({
-        title: "Error changing prompt handle",
-        description: "Prompt ID is required",
-        type: "error",
+      showErrorToast(void 0, {
+        fallbackTitle: "Couldn't change the prompt handle",
       });
       return;
     }
@@ -55,14 +54,10 @@ export const useRenamePromptHandle = ({
       onSuccess?.(prompt);
     };
 
-    const handleError = (error: Error) => {
-      console.error(error);
-      toaster.create({
-        title: "Error changing prompt handle",
-        description: error.message,
-        type: "error",
+    const handleError = (error: Error) =>
+      showErrorToast(error, {
+        fallbackTitle: "Couldn't change the prompt handle",
       });
-    };
 
     triggerChangeHandle({
       id: promptId,

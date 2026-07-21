@@ -2,7 +2,7 @@
 // Internal pages don't need to be server rendering
 
 import { useCallback, useMemo, useState } from "react";
-import { HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import { HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
 import { Plus } from "lucide-react";
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -12,9 +12,13 @@ import { ScenarioArchiveDialog } from "~/components/scenarios/ScenarioArchiveDia
 import { ScenarioCreateModal } from "~/components/scenarios/ScenarioCreateModal";
 import { ScenarioEmptyState } from "~/components/scenarios/ScenarioEmptyState";
 import { ScenarioTable } from "~/components/scenarios/ScenarioTable";
-import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "~/components/scenarios/ScenarioWelcomeScreen";
+import {
+  ScenarioWelcomeModal,
+  ScenarioWelcomeScreen,
+} from "~/components/scenarios/ScenarioWelcomeScreen";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useLabelFilter } from "~/hooks/scenarios/useLabelFilter";
 import { useNewScenarioFlow } from "~/hooks/scenarios/useNewScenarioFlow";
@@ -58,14 +62,8 @@ function ScenarioLibraryPage() {
 
   const archiveMutation = api.scenarios.archive.useMutation({
     onSuccess: handleArchiveSuccess,
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to archive scenario",
-        description: err.message,
-        type: "error",
-        meta: { closable: true },
-      });
-    },
+    onError: (err) =>
+      showErrorToast(err, { fallbackTitle: "Couldn't archive scenario" }),
   });
 
   const batchArchiveMutation = api.scenarios.batchArchive.useMutation({
@@ -82,14 +80,8 @@ function ScenarioLibraryPage() {
       deselectAll();
       setArchiveTarget(null);
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to archive scenarios",
-        description: err.message,
-        type: "error",
-        meta: { closable: true },
-      });
-    },
+    onError: (err) =>
+      showErrorToast(err, { fallbackTitle: "Couldn't archive scenarios" }),
   });
 
   const {
@@ -184,20 +176,26 @@ function ScenarioLibraryPage() {
 
         {error && !scenarios?.length && (
           <VStack gap={4} align="center" py={8}>
-            <Text color="red.500">Error loading scenarios</Text>
-            <Text fontSize="sm" color="fg.muted">
-              {error.message}
-            </Text>
+            <HandledErrorAlert
+              error={error}
+              fallbackTitle="Couldn't load scenarios"
+            />
           </VStack>
         )}
 
-        {!isLoading && !error && scenarios?.length === 0 && showInlineWelcome && (
-          <ScenarioWelcomeScreen onProceed={handleWelcomeProceed} />
-        )}
+        {!isLoading &&
+          !error &&
+          scenarios?.length === 0 &&
+          showInlineWelcome && (
+            <ScenarioWelcomeScreen onProceed={handleWelcomeProceed} />
+          )}
 
-        {!isLoading && !error && scenarios?.length === 0 && !showInlineWelcome && (
-          <ScenarioEmptyState onCreateClick={handleNewScenario} />
-        )}
+        {!isLoading &&
+          !error &&
+          scenarios?.length === 0 &&
+          !showInlineWelcome && (
+            <ScenarioEmptyState onCreateClick={handleNewScenario} />
+          )}
 
         {scenarios && scenarios.length > 0 && (
           <>
