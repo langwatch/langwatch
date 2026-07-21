@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -19,6 +20,20 @@ func HumanBytes(b int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f%cB", float64(b)/float64(div), "KMGTPE"[exp])
+}
+
+// DBChips renders a worktree's owned per-slug databases as compact chips — "ch"
+// for ClickHouse, "pg" for Postgres — space-joined, or "" when it owns neither.
+// Shared so the picker and the report label databases identically.
+func DBChips(hasClickHouse, hasPostgres bool) string {
+	var chips []string
+	if hasClickHouse {
+		chips = append(chips, "ch")
+	}
+	if hasPostgres {
+		chips = append(chips, "pg")
+	}
+	return strings.Join(chips, " ")
 }
 
 // HumanAge formats a duration as the coarsest single unit that fits (7d, 13h,

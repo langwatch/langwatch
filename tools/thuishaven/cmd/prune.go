@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -60,8 +60,9 @@ func pruneStaleThreshold(rest []string) time.Duration {
 }
 
 func parseNonNegInt(s string) (int, bool) {
-	var n int
-	if _, err := fmt.Sscanf(s, "%d", &n); err == nil && n >= 0 {
+	// Atoi (not Sscanf) so trailing garbage like "5abc" is rejected rather than
+	// silently read as 5 — a stale-days value must be a whole number or nothing.
+	if n, err := strconv.Atoi(s); err == nil && n >= 0 {
 		return n, true
 	}
 	return 0, false
@@ -130,7 +131,7 @@ func printPruneReport(ctx context.Context, d deps, rows []app.PruneRow, threshol
 			defaults++
 		}
 		fmt.Printf(" %s %-26s %-9s  %-6s %s\n",
-			mark, truncateCell(reportName(r), 26), reportIdle(meta), reportDBs(meta), reportFlags(r, meta))
+			mark, truncateCell(domain.SlugOrBase(r.Slug, r.Dir), 26), reportIdle(meta), domain.DBChips(meta.HasCHDB, meta.HasPGDB), reportFlags(r, meta))
 	}
 
 	days := int(threshold / (24 * time.Hour))
@@ -140,29 +141,11 @@ func printPruneReport(ctx context.Context, d deps, rows []app.PruneRow, threshol
 	return nil
 }
 
-func reportName(r app.PruneRow) string {
-	if r.Slug != "" {
-		return r.Slug
-	}
-	return filepath.Base(r.Dir)
-}
-
 func reportIdle(meta app.PruneMeta) string {
 	if meta.LastActive.IsZero() {
 		return "idle ?"
 	}
 	return "idle " + domain.HumanAge(meta.StaleFor)
-}
-
-func reportDBs(meta app.PruneMeta) string {
-	var chips []string
-	if meta.HasCHDB {
-		chips = append(chips, "ch")
-	}
-	if meta.HasPGDB {
-		chips = append(chips, "pg")
-	}
-	return strings.Join(chips, " ")
 }
 
 func reportFlags(r app.PruneRow, meta app.PruneMeta) string {

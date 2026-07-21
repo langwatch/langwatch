@@ -106,14 +106,13 @@ func (Hygiene) LastActivity(worktreeDir string) (time.Time, bool) {
 // DiskUsage returns how much disk a path occupies, via `du -sk` — far faster than
 // a Go tree-walk on a big worktree (node_modules), which is what the prune picker
 // sizes across every worktree at once. It reports allocated blocks (KiB), the
-// "space you'd actually get back", and ok=false when du cannot read the path (it
-// does not exist, or is unreadable). Partial per-file errors du prints to stderr
-// are ignored: it still exits 0 with a usable total.
+// "space you'd actually get back". The exit code is deliberately ignored: du exits
+// non-zero when it hits an unreadable subdirectory (permission denied, or a file
+// that vanished mid-walk) yet still prints a usable grand total to stdout — so the
+// verdict is "did it print a number", not "did it exit 0". ok=false only when
+// there is nothing to parse (the path is gone, or du is missing).
 func (Hygiene) DiskUsage(path string) (int64, bool) {
-	out, err := exec.Command("du", "-sk", path).Output()
-	if err != nil {
-		return 0, false
-	}
+	out, _ := exec.Command("du", "-sk", path).Output()
 	fields := strings.Fields(string(out))
 	if len(fields) == 0 {
 		return 0, false
