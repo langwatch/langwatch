@@ -558,7 +558,7 @@ describe("Voice agent — angry billing", () => {
         scenario.openAIRealtimeAgent({
           voice: "alloy",
           instructions: AGENT_INSTRUCTIONS,
-          // tools: AGENT_TOOLS,
+          tools: AGENT_TOOLS,
         }),
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
