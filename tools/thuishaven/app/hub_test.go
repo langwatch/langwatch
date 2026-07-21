@@ -123,17 +123,45 @@ func (f *fakeDBServer) Stop()                                       {}
 type fakeHygiene struct {
 	worktrees        []Worktree
 	removedWorktrees []string
+	// The scan facts, keyed by worktree dir. All optional: a nil map yields the
+	// original always-clean / zero-size / unknown-activity behaviour the existing
+	// tests rely on, so only the prune-scan tests need to populate them.
+	dirSizes     map[string]int64
+	dirtyDirs    map[string]bool
+	lastActivity map[string]time.Time
+	goneDirs     map[string]bool
 }
 
 func (f *fakeHygiene) Worktrees(string) ([]Worktree, error) { return f.worktrees, nil }
-func (f *fakeHygiene) Dirty(string) bool                    { return false }
-func (f *fakeHygiene) DirSize(string) (int64, bool)         { return 0, false }
-func (f *fakeHygiene) Remove(string) error                  { return nil }
-func (f *fakeHygiene) PruneGitWorktrees(string)             {}
+func (f *fakeHygiene) Dirty(dir string) bool                { return f.dirtyDirs[dir] }
+func (f *fakeHygiene) DirSize(dir string) (int64, bool) {
+	if f.dirSizes == nil {
+		return 0, false
+	}
+	sz, ok := f.dirSizes[dir]
+	return sz, ok
+}
+func (f *fakeHygiene) DiskUsage(dir string) (int64, bool) {
+	if f.dirSizes == nil {
+		return 0, false
+	}
+	sz, ok := f.dirSizes[dir]
+	return sz, ok
+}
+func (f *fakeHygiene) Remove(string) error      { return nil }
+func (f *fakeHygiene) PruneGitWorktrees(string) {}
 func (f *fakeHygiene) RemoveWorktree(_, dir string) error {
 	f.removedWorktrees = append(f.removedWorktrees, dir)
 	return nil
 }
+func (f *fakeHygiene) LastActivity(dir string) (time.Time, bool) {
+	if f.lastActivity == nil {
+		return time.Time{}, false
+	}
+	t, ok := f.lastActivity[dir]
+	return t, ok
+}
+func (f *fakeHygiene) UpstreamGone(dir, _ string) bool { return f.goneDirs[dir] }
 
 func hubOrchestrator(store *fakeStore, sys *fakeSystem, proxy *fakeProxy, ch, pg *fakeDBServer, hyg *fakeHygiene) *Orchestrator {
 	return &Orchestrator{
