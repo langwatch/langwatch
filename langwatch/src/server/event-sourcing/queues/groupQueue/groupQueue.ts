@@ -1712,16 +1712,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // the log cannot claim one thing while the code does another.
     const bodyIsGone = reason === "missing_blob";
 
-    this.recordDrop({
-      groupId,
-      stagedJobId,
-      jobDataJson,
-      err,
-      reason,
-      message,
-      bodyPreserved: !bodyIsGone,
-    });
-
     if (!bodyIsGone) {
       // Body present but unreadable to THIS worker (codec skew, malformed frame):
       // preserve it in the job-scoped dead-letter BEFORE freeing the slot, so an
@@ -1743,6 +1733,23 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         reason,
       });
     }
+
+    // Recorded AFTER the dead-letter write succeeds (not before): recordDrop is
+    // the metric/log's claim that the drop happened and, when bodyPreserved is
+    // true, that the value actually landed in the dead-letter. Firing it before
+    // the write above completes would let a rejected preserveForDlq/writeJobToDlq
+    // — which throws and skips complete() below, leaving the job live for a
+    // retry — masquerade as a successful, counted, "preserved" drop while
+    // nothing was actually persisted yet (review #5853, Minor).
+    this.recordDrop({
+      groupId,
+      stagedJobId,
+      jobDataJson,
+      err,
+      reason,
+      message,
+      bodyPreserved: !bodyIsGone,
+    });
 
     // `dropped: true` keeps the group advancing WITHOUT counting a thrown-away
     // job as a completion or clearing the group's stored error (#5538).

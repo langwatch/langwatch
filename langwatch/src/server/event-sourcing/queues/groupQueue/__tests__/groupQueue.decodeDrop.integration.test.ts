@@ -773,9 +773,13 @@ describe.skipIf(!hasTestcontainers)(
             objectStore,
           });
 
-          // Poll the recovery SIDE EFFECT (DLQ written, live value gone), not the
-          // drop metric: recordDrop increments BEFORE the DLQ write finishes, so
-          // gating on the metric races the write (RaiMc).
+          // Poll the recovery SIDE EFFECT (DLQ written, live value gone) rather
+          // than the drop metric directly: waiting on the side effect is the
+          // robust condition regardless of exactly when recordDrop fires
+          // relative to the DLQ write (review #5853 moved recordDrop to fire
+          // only after the write succeeds, so the metric below is no longer
+          // racing it either — but the side effect remains the thing this test
+          // is actually about).
           await vi.waitFor(
             async () => {
               expect(await dlqValue(name, groupId, "victim")).not.toBeNull();
@@ -793,8 +797,9 @@ describe.skipIf(!hasTestcontainers)(
           expect(await dlqReason(name, groupId, "victim")).toBe("body_unreadable");
           // AC-718.2: the quarantined reactor job is addressable by its event id.
           expect(readJobRecoveryKey(preserved!)).toBe("evt-1");
-          // The drop is counted (the metric fires before the side effect above,
-          // so it is present by now — no race).
+          // The drop is counted: recordDrop now fires only after the DLQ write
+          // above succeeded, so by the time the side effect is observed the
+          // metric is already incremented — no race.
           expect(await dropsFor(name)).toHaveLength(1);
         });
       });
