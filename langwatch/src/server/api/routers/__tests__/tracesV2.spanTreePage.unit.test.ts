@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import { mapSpanSummaryPage } from "../tracesV2";
 
-const row = (spanId: string, startTimeMs: number): SpanSummaryRow => ({
+const row = (
+  spanId: string,
+  startTimeMs: number,
+  updatedAtMs = startTimeMs,
+): SpanSummaryRow => ({
   spanId,
   parentSpanId: null,
   spanName: spanId,
@@ -16,6 +20,7 @@ const row = (spanId: string, startTimeMs: number): SpanSummaryRow => ({
   cacheReadTokens: null,
   cacheCreationTokens: null,
   startTimeMs,
+  updatedAtMs,
 });
 
 describe("mapSpanSummaryPage", () => {
