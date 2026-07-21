@@ -9,22 +9,21 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Checkbox } from "~/components/ui/checkbox";
 import { Copy, Laptop, Monitor, Server } from "lucide-react";
 import { useState } from "react";
-import Head from "~/utils/compat/next-head";
-
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import MyLayout from "~/components/me/MyLayout";
 import { HomePagePicker } from "~/components/me/HomePagePicker";
+import MyLayout from "~/components/me/MyLayout";
 import { PersonalOtlpEndpointPanel } from "~/components/me/PersonalOtlpEndpointPanel";
 import {
   type PersonalApiKeyRow,
   usePersonalContext,
 } from "~/components/me/usePersonalContext";
+import { Checkbox } from "~/components/ui/checkbox";
 import { toaster } from "~/components/ui/toaster";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
+import Head from "~/utils/compat/next-head";
 
 const fmtRelative = (iso: string | null): string => {
   if (!iso) return "Never";

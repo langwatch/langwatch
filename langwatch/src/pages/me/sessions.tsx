@@ -10,15 +10,14 @@ import {
 } from "@chakra-ui/react";
 import { Laptop, Monitor, Server, Smartphone } from "lucide-react";
 import { useState } from "react";
-import Head from "~/utils/compat/next-head";
-
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { InstallCliCard } from "~/components/me/InstallCliCard";
 import MyLayout from "~/components/me/MyLayout";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { toaster } from "~/components/ui/toaster";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
+import Head from "~/utils/compat/next-head";
 
 const fmtRelative = (ms: number | null | undefined): string => {
   if (!ms) return "Never";

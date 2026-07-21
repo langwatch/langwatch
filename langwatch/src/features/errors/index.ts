@@ -17,6 +17,7 @@ export {
   FORM_SERVER_ERROR,
 } from "./logic/applyHandledErrorToForm";
 export {
+  describeError,
   explainHandledError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "./logic/presentation";

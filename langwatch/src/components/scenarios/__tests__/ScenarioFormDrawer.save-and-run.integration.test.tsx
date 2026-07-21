@@ -374,7 +374,9 @@ describe("<ScenarioFormDrawer /> save-and-run data-loss regression", () => {
         await waitFor(() => {
           expect(mockToasterCreate).toHaveBeenCalledWith(
             expect.objectContaining({
-              title: "Failed to update scenario",
+              // No handled payload on this failure, so the caller's fallback
+              // names the action; a recognised code would title itself.
+              title: "Couldn't save scenario",
               type: "error",
             }),
           );

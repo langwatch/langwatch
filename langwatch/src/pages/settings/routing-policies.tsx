@@ -28,20 +28,20 @@ import {
 import { useMemo, useState } from "react";
 
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import {
   ScopeChipPicker,
   type ScopeTriadEntry,
 } from "~/components/settings/ScopeChipPicker";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Drawer } from "~/components/ui/drawer";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
-import { showErrorToast } from "~/features/errors";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { describeError, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { docsUrl } from "~/utils/docsUrl";
@@ -162,7 +162,9 @@ function RoutingPoliciesPage() {
       toaster.create({ title: "Routing policy created", type: "success" });
     },
     onError: (e) => {
-      setDrawerError(e.message);
+      setDrawerError(
+        describeError(e, { fallbackTitle: "Couldn't create routing policy" }),
+      );
       showErrorToast(e, { fallbackTitle: "Couldn't create routing policy" });
     },
   });
@@ -176,7 +178,9 @@ function RoutingPoliciesPage() {
       toaster.create({ title: "Routing policy updated", type: "success" });
     },
     onError: (e) => {
-      setDrawerError(e.message);
+      setDrawerError(
+        describeError(e, { fallbackTitle: "Couldn't update routing policy" }),
+      );
       showErrorToast(e, { fallbackTitle: "Couldn't update routing policy" });
     },
   });

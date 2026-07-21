@@ -1,13 +1,14 @@
 "use client";
+
 // Internal pages don't need to be server rendering
 
-import { useCallback, useMemo, useState } from "react";
 import { HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
 import { Plus } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
 import { BatchActionBar } from "~/components/scenarios/BatchActionBar";
+import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
 import { ScenarioArchiveDialog } from "~/components/scenarios/ScenarioArchiveDialog";
 import { ScenarioCreateModal } from "~/components/scenarios/ScenarioCreateModal";
 import { ScenarioEmptyState } from "~/components/scenarios/ScenarioEmptyState";
@@ -18,8 +19,8 @@ import {
 } from "~/components/scenarios/ScenarioWelcomeScreen";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
-import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useLabelFilter } from "~/hooks/scenarios/useLabelFilter";
 import { useNewScenarioFlow } from "~/hooks/scenarios/useNewScenarioFlow";
 import { useScenarioSelection } from "~/hooks/scenarios/useScenarioSelection";

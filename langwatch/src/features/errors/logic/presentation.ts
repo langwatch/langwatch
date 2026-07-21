@@ -558,6 +558,33 @@ export function explainHandledError(error: HandledErrorShape): ErrorExplanation 
   };
 }
 
+/**
+ * The whole explanation as one string, for slots that can only take text —
+ * a `title=` tooltip, a state field typed `string`, an aria-label.
+ *
+ * Prefer `HandledErrorAlert` or `showErrorToast` wherever a component can be
+ * rendered: they show the remediation tips, the docs link and the error id,
+ * all of which are lost here. This exists so the awkward slots have something
+ * better than `error.message`, not as a general-purpose escape hatch.
+ */
+export function describeError(
+  error: unknown,
+  options: { fallbackTitle?: string } = {},
+): string {
+  const handled = readHandledError(error);
+  const explanation = handled
+    ? explainHandledError(handled)
+    : UNKNOWN_ERROR_PRESENTATION;
+
+  const title = explanation.isRegistered
+    ? explanation.title
+    : (options.fallbackTitle ?? explanation.title);
+
+  return explanation.description
+    ? `${title}. ${explanation.description}`
+    : title;
+}
+
 /** Copy for a failure with no handled payload at all. See ADR-045. */
 export const UNKNOWN_ERROR_PRESENTATION: ErrorExplanation = {
   title: "Something went wrong",

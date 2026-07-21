@@ -7,22 +7,22 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Bot, Plus } from "lucide-react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useState } from "react";
 import { AgentCard } from "~/components/agents/AgentCard";
-import { getAgentEditorDrawer } from "~/components/agents/getAgentEditorDrawer";
 import { CopyAgentDialog } from "~/components/agents/CopyAgentDialog";
+import { getAgentEditorDrawer } from "~/components/agents/getAgentEditorDrawer";
 import { PushToCopiesDialog } from "~/components/agents/PushToCopiesDialog";
 import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
-import { showErrorToast } from "~/features/errors";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
 /**
  * Agents management page
