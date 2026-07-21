@@ -4,7 +4,7 @@ import type {
 } from "@langwatch/handled-error";
 
 import type { AppErrorCode } from "./codes";
-import type { HandledErrorShape } from "./readHandledError";
+import { readHandledError, type HandledErrorShape } from "./readHandledError";
 
 /**
  * The customer-facing copy for every handled-error code, keyed by code.
@@ -121,6 +121,10 @@ const presentations = {
         ? `Map a value to "${field}" before running this evaluator.`
         : "Map all of its required fields before running it.";
     },
+  },
+  evaluator_input_too_large: {
+    title: "That's too much text for this evaluator",
+    describe: () => "Shorten the input and try again.",
   },
   experiment_not_found: { title: "Experiment not found" },
   dspy_step_not_found: { title: "Optimization step not found" },
@@ -242,6 +246,18 @@ const presentations = {
   langy_conversation_not_found: { title: "Conversation not found" },
   langy_conversation_not_owned: {
     title: "You don't have access to this conversation",
+  },
+  langy_empty_message: {
+    title: "Nothing to send",
+    describe: () => "Type a message first.",
+  },
+  langy_idempotency_mismatch: {
+    title: "That message was already sent",
+    describe: () => "Refresh to see the conversation as it stands.",
+  },
+  langy_dispatch_rejected: {
+    title: "That request couldn't be understood",
+    describe: () => "Rephrase and try again.",
   },
   langy_turn_in_progress: {
     title: "Still answering",
@@ -479,6 +495,10 @@ const presentations = {
   bad_request: {
     title: "Check your input",
     describe: () => "Some of the values sent weren't valid.",
+  },
+  unprocessable_entity: {
+    title: "Check your input",
+    describe: () => "The request was understood, but some values aren't valid.",
   },
   payload_too_large: {
     title: "That's too large to send",

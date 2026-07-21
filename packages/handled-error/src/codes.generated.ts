@@ -142,7 +142,7 @@ export const goErrorCodes = {
    *
    * @source services/langyagent/domain/errors.go
    */
-  invalid_conversation_id: { service: "langyagent", httpStatus: 400 },
+  invalid_conversation_id: { service: "langyagent", httpStatus: 422 },
   /**
    * ErrInvalidDataset — signals dataset-specific validation failures (column
    * length mismatch, entry_selection out of range, split sizes exceeding row
@@ -276,6 +276,13 @@ export const goErrorCodes = {
    * @source services/nlpgo/domain/errors.go
    */
   unauthorized: { service: "langyagent", httpStatus: 401 },
+  /**
+   * CodeUnprocessable — is a syntactically valid request whose fields fail
+   * validation — 422, distinct from CodeBadRequest (unreadable/unparseable).
+   *
+   * @source pkg/rpc/decode.go
+   */
+  unprocessable_entity: { service: "rpc", httpStatus: 422 },
   /**
    * ErrUnsupportedNodeKind — signals the workflow contains a node kind not yet
    * supported by the Go engine (agent, evaluator, retriever, custom). Triggers
