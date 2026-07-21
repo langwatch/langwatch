@@ -212,6 +212,48 @@ export function resolveClaudeTurnLogCap(raw: string | undefined): number {
 }
 
 /**
+ * How long the span-sync reactor keeps retrying a log CONTRIBUTION whose
+ * canonical log records are not visible in ClickHouse yet, before it gives up.
+ *
+ * The canonical log and its compact trace contribution travel through separate
+ * durable pipelines, so a contribution can reach the reactor a beat before the
+ * log projection lands — the reactor throws to retry until it does. But if the
+ * records NEVER materialize (dropped upstream, or a partition-window miss), that
+ * throw is a poison pill: every re-emitted contribution for the trace burns the
+ * full 25-attempt retry ladder, and a pathological turn re-emits thousands,
+ * wedging the per-trace group and burning a large share of the shared
+ * event-sourcing queue (prod incident 2026-07-20). This deadline bounds it: once
+ * a contribution has been unfoldable for this long — measured from the log's
+ * ingest time (`event.occurredAt`) — the reactor stops retrying and completes
+ * the job so the group drains. Generous enough that the normal cross-pipeline
+ * race (seconds) never trips it; tune via
+ * `LANGWATCH_CLAUDE_LOG_VISIBILITY_DEADLINE_MS`.
+ */
+export const CLAUDE_LOG_VISIBILITY_DEADLINE_MS = 10 * 60 * 1000;
+
+/**
+ * Upper bound on the visibility-retry deadline, so an operator-supplied
+ * `LANGWATCH_CLAUDE_LOG_VISIBILITY_DEADLINE_MS` can't re-open the unbounded-retry
+ * poison-pill failure mode this deadline exists to close.
+ */
+export const MAX_CLAUDE_LOG_VISIBILITY_DEADLINE_MS = 60 * 60 * 1000;
+
+/**
+ * Resolve the operator-configured visibility-retry deadline (ms) from an env
+ * value, clamped to `[1, MAX_CLAUDE_LOG_VISIBILITY_DEADLINE_MS]`. Absent,
+ * non-numeric, or below-one values fall back to
+ * {@link CLAUDE_LOG_VISIBILITY_DEADLINE_MS}. Mirrors {@link resolveClaudeTurnLogCap}.
+ */
+export function resolveClaudeLogVisibilityDeadlineMs(
+  raw: string | undefined,
+): number {
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1)
+    return CLAUDE_LOG_VISIBILITY_DEADLINE_MS;
+  return Math.min(parsed, MAX_CLAUDE_LOG_VISIBILITY_DEADLINE_MS);
+}
+
+/**
  * The span kind a claude_code log event feeds, or null when the event is not
  * folded into a span (so it stays a plain, visible log). The receiver marks +
  * saves every event with a non-null kind; the reactor folds them; the read path

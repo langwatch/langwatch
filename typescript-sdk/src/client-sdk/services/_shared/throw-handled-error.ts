@@ -13,12 +13,12 @@
  * generic path already built is handed in and reused rather than rebuilt.
  */
 import {
-  domainErrorFrom,
-  type LangWatchDomainError,
+  handledErrorFrom,
+  type LangWatchHandledError,
 } from "@/internal/api/errors";
 import { extractStatusFromResponse } from "./format-api-error";
 
-export interface ThrowIfDomainErrorParams {
+export interface ThrowIfHandledErrorParams {
   /** What was being attempted, e.g. `get trace "abc"`. */
   operation: string;
   /** The error body the HTTP client handed back. */
@@ -32,25 +32,25 @@ export interface ThrowIfDomainErrorParams {
 }
 
 /**
- * Throws a {@link LangWatchDomainError} when the platform named the failure.
+ * Throws a {@link LangWatchHandledError} when the platform named the failure.
  * Returns — deliberately, so the caller throws its own error — when it did not.
  */
-export function throwIfDomainError({
+export function throwIfHandledError({
   operation,
   error,
   response,
   status,
   message,
-}: ThrowIfDomainErrorParams): void {
+}: ThrowIfHandledErrorParams): void {
   const resolved =
     status ?? response?.status ?? extractStatusFromResponse(error);
 
-  const domainError: LangWatchDomainError | null = domainErrorFrom({
+  const handledError: LangWatchHandledError | null = handledErrorFrom({
     operation,
     body: error,
     status: resolved,
     message,
   });
 
-  if (domainError) throw domainError;
+  if (handledError) throw handledError;
 }

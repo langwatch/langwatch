@@ -84,7 +84,10 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
         aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         upToEvent: e2,
       });
-      expect(store.store).toHaveBeenCalledWith(result, context);
+      expect(store.store).toHaveBeenCalledWith(
+        result,
+        expect.objectContaining({ aggregateId: context.aggregateId }),
+      );
     });
 
     it("does not double-apply the delivered event when the history already contains it", async () => {
@@ -288,7 +291,10 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
         upToEvent: e3,
       });
       expect(result.ids).toEqual(["e1", "e2", "e3"]);
-      expect(store.store).toHaveBeenCalledWith(result, context);
+      expect(store.store).toHaveBeenCalledWith(
+        result,
+        expect.objectContaining({ aggregateId: context.aggregateId }),
+      );
     });
 
     it("merges a delivered event missing from the middle of the history back into occurredAt order", async () => {

@@ -116,16 +116,17 @@ describe("listSuitesCommand()", () => {
     });
   });
 
-  describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
+  describe("when a machine format is requested", () => {
+    it("returns the raw suite list as the payload instead of printing", async () => {
       const suites = [makeSuite()];
       mockGetAll.mockResolvedValue(suites);
 
-      await listSuitesCommand({ format: "json" });
+      const result = await listSuitesCommand();
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(suites, null, 2),
-      );
+      // The command no longer decides the format — it hands the payload to
+      // the output port, which renders json/yaml/agents/--jq from this value.
+      expect(result?.data).toEqual(suites);
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 
@@ -170,16 +171,15 @@ describe("getSuiteCommand()", () => {
     });
   });
 
-  describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
+  describe("when a machine format is requested", () => {
+    it("returns the raw suite as the payload instead of printing", async () => {
       const suite = makeSuite();
       mockGet.mockResolvedValue(suite);
 
-      await getSuiteCommand("suite_abc123", { format: "json" });
+      const result = await getSuiteCommand("suite_abc123");
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(suite, null, 2),
-      );
+      expect(result?.data).toEqual(suite);
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 
@@ -322,16 +322,15 @@ describe("duplicateSuiteCommand()", () => {
     });
   });
 
-  describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
+  describe("when a machine format is requested", () => {
+    it("returns the duplicated suite as the payload instead of printing", async () => {
       const copy = makeSuite({ name: "Test Suite (copy)" });
       mockDuplicate.mockResolvedValue(copy);
 
-      await duplicateSuiteCommand("suite_abc123", { format: "json" });
+      const result = await duplicateSuiteCommand("suite_abc123");
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(copy, null, 2),
-      );
+      expect(result?.data).toEqual(copy);
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 });
@@ -388,6 +387,28 @@ describe("runSuiteCommand()", () => {
       await runSuiteCommand("suite_abc123", {});
 
       expect(mockRun).toHaveBeenCalledWith("suite_abc123");
+    });
+  });
+
+  // A run that scheduled nothing can never see a completion arrive, so the
+  // poll loop ran the full 10-minute timeout and then reported a TIMEOUT for a
+  // run that was already over. Asserting on `fetch` is what makes this a real
+  // regression test: it is the poll itself that must not happen.
+  describe("when the run scheduled no jobs and --wait was passed", () => {
+    it("returns without polling instead of waiting out the timeout", async () => {
+      mockRun.mockResolvedValue(
+        makeRunResult({
+          jobCount: 0,
+          skippedArchived: { scenarios: ["archived_scenario"], targets: [] },
+        }),
+      );
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response("{}", { status: 200 }));
+
+      await runSuiteCommand("suite_abc123", { wait: true });
+
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 

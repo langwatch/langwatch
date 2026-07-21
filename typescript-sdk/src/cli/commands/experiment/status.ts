@@ -4,6 +4,7 @@ import { ExperimentsApiService } from "@/client-sdk/services/experiments/experim
 import { deriveRunStatus } from "@/client-sdk/services/experiments/run-status";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 import { resolveRunId } from "./resolve-run";
 
 const statusColor = (status: string) =>
@@ -61,8 +62,8 @@ const statusFromResults = async ({
 
 export const experimentStatusCommand = async (
   experimentSlug: string,
-  options?: { format?: string; runId?: string },
-): Promise<void> => {
+  options?: { runId?: string },
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new ExperimentsApiService();
@@ -114,45 +115,45 @@ export const experimentStatusCommand = async (
     const color = statusColor(status.status);
     spinner.succeed(`Run ${chalk.cyan(runId)}: ${color(status.status)}`);
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(status, null, 2));
-      return;
-    }
+    return {
+      data: status,
+      table: () => {
+        console.log();
+        console.log(`  ${chalk.gray("Status:")}   ${color(status.status)}`);
+        console.log(`  ${chalk.gray("Progress:")} ${status.progress}/${status.total} cells`);
 
-    console.log();
-    console.log(`  ${chalk.gray("Status:")}   ${color(status.status)}`);
-    console.log(`  ${chalk.gray("Progress:")} ${status.progress}/${status.total} cells`);
+        if (status.startedAt) {
+          console.log(`  ${chalk.gray("Started:")}  ${new Date(status.startedAt).toLocaleString()}`);
+        }
+        if (status.finishedAt) {
+          console.log(`  ${chalk.gray("Finished:")} ${new Date(status.finishedAt).toLocaleString()}`);
+        }
+        if (status.stoppedAt) {
+          console.log(`  ${chalk.gray("Stopped:")}  ${new Date(status.stoppedAt).toLocaleString()}`);
+        }
 
-    if (status.startedAt) {
-      console.log(`  ${chalk.gray("Started:")}  ${new Date(status.startedAt).toLocaleString()}`);
-    }
-    if (status.finishedAt) {
-      console.log(`  ${chalk.gray("Finished:")} ${new Date(status.finishedAt).toLocaleString()}`);
-    }
-    if (status.stoppedAt) {
-      console.log(`  ${chalk.gray("Stopped:")}  ${new Date(status.stoppedAt).toLocaleString()}`);
-    }
+        if (status.summary) {
+          console.log();
+          console.log(chalk.bold("  Summary:"));
+          if (status.summary.completedCells !== undefined) {
+            console.log(`    ${chalk.gray("Completed:")} ${chalk.green(String(status.summary.completedCells))}`);
+          }
+          if (status.summary.failedCells) {
+            console.log(`    ${chalk.gray("Failed:")}    ${chalk.red(String(status.summary.failedCells))}`);
+          }
+          if (status.summary.duration) {
+            console.log(`    ${chalk.gray("Duration:")}  ${(status.summary.duration / 1000).toFixed(1)}s`);
+          }
+          if (status.summary.runUrl) {
+            console.log(`    ${chalk.gray("View:")}      ${status.summary.runUrl}`);
+          }
+        }
 
-    if (status.summary) {
-      console.log();
-      console.log(chalk.bold("  Summary:"));
-      if (status.summary.completedCells !== undefined) {
-        console.log(`    ${chalk.gray("Completed:")} ${chalk.green(String(status.summary.completedCells))}`);
-      }
-      if (status.summary.failedCells) {
-        console.log(`    ${chalk.gray("Failed:")}    ${chalk.red(String(status.summary.failedCells))}`);
-      }
-      if (status.summary.duration) {
-        console.log(`    ${chalk.gray("Duration:")}  ${(status.summary.duration / 1000).toFixed(1)}s`);
-      }
-      if (status.summary.runUrl) {
-        console.log(`    ${chalk.gray("View:")}      ${status.summary.runUrl}`);
-      }
-    }
-
-    console.log();
+        console.log();
+      },
+    };
   } catch (error) {
-    failSpinner({ spinner, error, action: "check experiment status", format: options?.format });
+    failSpinner({ spinner, error, action: "check experiment status" });
     process.exit(1);
   }
 };

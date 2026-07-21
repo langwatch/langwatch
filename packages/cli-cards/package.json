@@ -1,7 +1,7 @@
 {
   "name": "@langwatch/cli-cards",
   "version": "0.1.0",
-  "description": "The shared contract between the LangWatch CLI and the Langy UI: Zod schemas for every CLI result that renders as a card, and the domain-error shape the CLI reports failures with.",
+  "description": "The shared contract between the LangWatch CLI and the Langy UI: Zod schemas for every CLI result that renders as a card, and the handled-error shape the CLI reports failures with.",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -9,9 +9,9 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./domain-error": {
-      "types": "./src/domain-error.ts",
-      "default": "./src/domain-error.ts"
+    "./handled-error": {
+      "types": "./src/handled-error.ts",
+      "default": "./src/handled-error.ts"
     }
   },
   "main": "./src/index.ts",

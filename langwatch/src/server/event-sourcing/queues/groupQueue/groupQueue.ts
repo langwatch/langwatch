@@ -32,6 +32,7 @@ import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
+  JobDelivery,
   QueueAuditAdapter,
   QueueSendOptions,
 } from "../../queues";
@@ -42,6 +43,7 @@ import {
   QueueError,
 } from "../../services/errorHandling";
 import { getBackoffMs, JOB_RETRY_CONFIG } from "../shared";
+
 import { GroupQueueDispatcher } from "./dispatcher";
 import { EnvelopeBlobLifecycle } from "./envelopeBlobLifecycle";
 import {
@@ -52,6 +54,7 @@ import {
   readJobRoutingMeta,
 } from "./jobEnvelope";
 import {
+  gqGroupAttemptReadFailuresTotal,
   gqGroupsBlockedTotal,
   gqGroupsPoisonParkedTotal,
   gqJobDelayMilliseconds,
@@ -74,8 +77,23 @@ import {
   type DrainedJob,
   GroupStagingScripts,
   readClaimStrikeThreshold,
+  readGroupQuarantineThreshold,
 } from "./scripts";
 import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore";
+
+/**
+ * How long the group's retry-chain counter survives without a refresh.
+ *
+ * It is re-set on every retry, so it only has to outlive ONE backoff — but it
+ * MUST outlive the longest one. Derived from the retry config rather than
+ * picked: a fixed 600s is exactly `maxBackoffMs`, so from roughly attempt 12
+ * the counter would expire during the wait, the retry would read as a fresh
+ * delivery, and the fold would re-apply the batch it had already folded.
+ * Pinned by retryChainInvariants.unit.test.ts.
+ */
+export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil(
+  (JOB_RETRY_CONFIG.maxBackoffMs / 1000) * 3,
+);
 
 /**
  * Configuration for the group queue.
@@ -214,8 +232,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   );
   private readonly queueName: string;
   private readonly jobName: string;
-  private readonly process: (payload: Payload) => Promise<void>;
-  private readonly processBatch?: (payloads: Payload[]) => Promise<void>;
+  private readonly process: (
+    payload: Payload,
+    delivery?: JobDelivery,
+  ) => Promise<void>;
+  private readonly processBatch?: (
+    payloads: Payload[],
+    delivery?: JobDelivery,
+  ) => Promise<void>;
   private readonly coalesceMaxBatch?: (payload: Payload) => number | undefined;
   private readonly spanAttributes?: (payload: Payload) => SemConvAttributes;
   private readonly processingQueue: fastq.queueAsPromised<DispatchResult, void>;
@@ -233,6 +257,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private readonly consumerEnabled: boolean;
   private readonly dispatcher: GroupQueueDispatcher | null;
   private readonly metricsCollector: GroupQueueMetricsCollector | null;
+  /**
+   * Consecutive-failure count that quarantines (blocks) a group. Read once at
+   * construction; 0 disables the breaker. See {@link readGroupQuarantineThreshold}.
+   */
+  private readonly quarantineFailStreakThreshold = readGroupQuarantineThreshold();
 
   private shutdownRequested = false;
   /** Tracks in-flight jobs for active count metrics. */
@@ -792,8 +821,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     }
 
     const contextMetadata = jobData.__context as JobContextMetadata | undefined;
-    const attempt =
+    const jobAttempt =
       typeof jobData.__attempt === "number" ? jobData.__attempt : 1;
+    // A re-staged sibling carries no __attempt of its own, so fall back to the
+    // group's chain counter rather than reading it as a fresh delivery.
+    const attempt = Math.max(jobAttempt, await this.readGroupAttempt(groupId));
     const pipelineName = (jobData.__pipelineName as string) ?? "unknown";
     const jobType = (jobData.__jobType as string) ?? "unknown";
     const jobName = (jobData.__jobName as string) ?? "unknown";
@@ -911,6 +943,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "queue.group_id": groupId,
         "queue.staged_job_id": stagedJobId,
         "queue.attempt": attempt,
+        // Which source won `Math.max(jobAttempt, groupAttempt)`. Distinguishes
+        // a genuine first delivery from a chain whose counter was lost.
+        "queue.attempt_source":
+          attempt === 1 ? "fresh" : jobAttempt >= attempt ? "job" : "group",
       };
 
       // Add custom span attributes from the definition
@@ -995,9 +1031,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     "queue.coalesced_batch_size",
                     batchPayloads.length,
                   );
-                  await this.processBatch(batchPayloads);
+                  await this.processBatch(batchPayloads, { attempt });
                 } else {
-                  await this.process(payload);
+                  await this.process(payload, { attempt });
                 }
               });
 
@@ -1047,6 +1083,19 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   "Group job completed, slot freed",
                 );
 
+                // A success means the group is draining, so it must not carry a
+                // stale failure streak toward the quarantine threshold. Ordered
+                // after the counter and the audit deliberately: this is a Redis
+                // write on a job that is already done, so a blip here must cost
+                // the streak reset (bounded by its TTL) rather than the
+                // bookkeeping above.
+                if (this.quarantineFailStreakThreshold > 0) {
+                  await this.scripts.clearGroupFailures(groupId);
+                }
+
+                // The chain is over: anything it recorded is no longer live.
+                await this.clearGroupAttempt(groupId);
+
                 await this.blobLifecycle.releaseLease({
                   values: [
                     jobDataJson,
@@ -1081,7 +1130,61 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 await this.restageDrainedSiblings(groupId, drainedSiblings);
               }
 
-              if (isRetryable && attempt < JOB_RETRY_CONFIG.maxAttempts) {
+              // Group-quarantine circuit breaker (prod incident 2026-07-20). A
+              // producer that mints fresh jobs for ONE group faster than they
+              // drain never trips the per-JOB `maxAttempts` cap — every failure
+              // is a new attempt-1 job — so the group churns indefinitely and can
+              // starve the shared queue. Count consecutive retryable failures
+              // across the group's jobs (cleared on any success); once the streak
+              // crosses the threshold, route this job through the SAME
+              // exhausted-retry path that blocks the group, so it stops
+              // dispatching and an operator can inspect + drain it.
+              let quarantined = false;
+              let quarantineError: Error | undefined;
+              if (isRetryable && this.quarantineFailStreakThreshold > 0) {
+                const failStreak =
+                  await this.scripts.recordGroupFailure(groupId);
+                if (failStreak > this.quarantineFailStreakThreshold) {
+                  quarantined = true;
+                  // Clear the streak as we park. Every ops recovery path
+                  // (unblock / drain / dead-letter) resets the poison guard's
+                  // claim strikes so a recovered group gets a FRESH run; the
+                  // failure streak must not outlive the park either, or an
+                  // operator who unblocks would see the group re-quarantine on
+                  // its very next failure instead of getting that fresh run.
+                  // Best-effort: we are already on the failure path, so a blip
+                  // clearing it must not derail parking the group.
+                  await this.scripts.clearGroupFailures(groupId).catch(() => {});
+                  // Carried into handleExhaustedRetries as the group's stored
+                  // error so /ops shows WHY it was blocked (a run of failures),
+                  // not just the last job's error.
+                  quarantineError = new Error(
+                    `Poison guard: group quarantined after ${failStreak} consecutive failures (threshold ${this.quarantineFailStreakThreshold}) with no success. Last error: ${error.message}. Inspect the staged jobs, then unblock the group.`,
+                  );
+                  gqGroupsPoisonParkedTotal.inc({
+                    queue_name: this.queueName,
+                    reason: "failure_streak",
+                  });
+                  this.logger.error(
+                    {
+                      queueName: this.queueName,
+                      projectId: tenantIdFromGroupId(groupId),
+                      groupId,
+                      stagedJobId,
+                      failStreak,
+                      threshold: this.quarantineFailStreakThreshold,
+                      error: error.message,
+                    },
+                    "Group quarantined after a run of failures with no success; blocking it to protect the shared queue",
+                  );
+                }
+              }
+
+              if (
+                isRetryable &&
+                attempt < JOB_RETRY_CONFIG.maxAttempts &&
+                !quarantined
+              ) {
                 // Re-stage with backoff — frees the worker slot immediately
                 gqJobsRetriedTotal.inc(routingLabels);
 
@@ -1141,6 +1244,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   return;
                 }
 
+                await this.recordGroupAttempt({
+                  groupId,
+                  attempt: attempt + 1,
+                });
                 const restaged = await this.scripts.retryRestage({
                   groupId,
                   stagedJobId,
@@ -1225,7 +1332,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   stagedJobId,
                   payload,
                   originalScore,
-                  lastError: error,
+                  // When the group tripped the quarantine breaker, block it with
+                  // the descriptive quarantine error rather than the raw job
+                  // error, so /ops shows why the group is blocked.
+                  lastError: quarantineError ?? error,
                   contextMetadata,
                   routingLabels,
                 });
@@ -1368,6 +1478,73 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * raw job data (context metadata preserved). Best-effort: a re-stage failure
    * is logged, not thrown, so it never masks the original processing error.
    */
+  /**
+   * Per-group retry-chain counter.
+   *
+   * The per-JOB `__attempt` is stamped into the job data, but a re-staged
+   * sibling is re-queued with its ORIGINAL data and no `__attempt` of its own.
+   * If such a sibling leads the next batch the attempt reads as 1 — a fresh
+   * delivery — which both restarts the retry budget and tells the fold that
+   * nothing in this chain has been applied yet. This counter is what makes a
+   * sibling-led retry still look like a retry.
+   */
+  private groupAttemptKey(groupId: string): string {
+    return `${this.queueName}:gq:group:${groupId}:attempt`;
+  }
+
+  private async readGroupAttempt(groupId: string): Promise<number> {
+    try {
+      const raw = await this.redisConnection.get(this.groupAttemptKey(groupId));
+      const parsed = raw === null ? 0 : Number.parseInt(raw, 10);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    } catch (err) {
+      // NOT silent. Returning 0 makes a sibling-led retry resolve to attempt 1,
+      // which is indistinguishable from a fresh delivery everywhere downstream:
+      // the retry budget restarts, and the fold treats it as fresh and discards
+      // its record of what the chain already applied.
+      gqGroupAttemptReadFailuresTotal.inc({ queue_name: this.queueName });
+      this.logger.warn(
+        { queueName: this.queueName, groupId, err },
+        "Could not read the group retry-chain counter — a sibling-led retry may read as a fresh delivery and re-apply already-folded events",
+      );
+      return 0;
+    }
+  }
+
+  private async recordGroupAttempt({
+    groupId,
+    attempt,
+  }: {
+    groupId: string;
+    attempt: number;
+  }): Promise<void> {
+    try {
+      await this.redisConnection.set(
+        this.groupAttemptKey(groupId),
+        String(attempt),
+        "EX",
+        GROUP_ATTEMPT_TTL_SECONDS,
+      );
+    } catch (err) {
+      // Not best-effort. Losing this makes a sibling-led batch read as a fresh
+      // delivery, which restarts the retry budget AND lets a fold discard the
+      // record of what the chain already applied — so the same events get
+      // folded twice.
+      this.logger.error(
+        { queueName: this.queueName, groupId, attempt, err },
+        "Failed to record the group retry attempt — a sibling-led retry may re-apply already-folded events",
+      );
+    }
+  }
+
+  private async clearGroupAttempt(groupId: string): Promise<void> {
+    try {
+      await this.redisConnection.del(this.groupAttemptKey(groupId));
+    } catch {
+      // The TTL reclaims it.
+    }
+  }
+
   private async restageDrainedSiblings(
     groupId: string,
     siblings: DrainedJob[],
