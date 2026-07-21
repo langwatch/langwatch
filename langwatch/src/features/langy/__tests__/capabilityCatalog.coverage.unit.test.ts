@@ -32,6 +32,9 @@ const CLI_PROGRAM_PATH = fileURLToPath(
  * Top-level commands that deliberately have NO catalog entry. Each is a CLI
  * utility a result card would be meaningless for — none of them read or write
  * a platform resource a user could open a surface on.
+ *
+ * Keep it in sync with PLUMBING_COMMANDS in the SDK's
+ * `cli/utils/commandCatalog.ts` (the mirror of this list).
  */
 const EXCLUDED_COMMANDS = new Set([
   // Auth/session plumbing: acts on the CLI's own credentials, not on a
@@ -50,6 +53,9 @@ const EXCLUDED_COMMANDS = new Set([
   // docs helpers already render as clean activity lines.
   "docs",
   "scenario-docs",
+  // Local agent-skill installer (~/.agents/skills): manages files on the
+  // machine the CLI runs on, not a platform resource a card could deep-link.
+  "skills",
   // Gateway tool wrappers: they exec another AI tool (claude/codex/cursor/
   // gemini/opencode) rather than returning a LangWatch result.
   "claude",
@@ -59,6 +65,14 @@ const EXCLUDED_COMMANDS = new Set([
   "opencode",
   // The CLI's own background process management — pure local plumbing.
   "daemon",
+  // The catalog itself — self-referential: a card for the command that lists
+  // commands would describe the CLI's own meta surface, not a platform
+  // resource.
+  "commands",
+  "help-tree",
+  // Help topics: renders other commands' help or a static topic page — no
+  // platform resource a card could deep-link.
+  "help",
 ]);
 
 /**

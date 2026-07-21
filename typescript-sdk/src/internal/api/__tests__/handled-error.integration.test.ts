@@ -8,7 +8,7 @@
  *
  * The wire shapes below are not invented. They are what
  * `langwatch/src/app/api/middleware/error-handler.ts` emits — the handler every
- * `SecuredApp` mounts via `onError` — which flattens a `DomainError` to
+ * `SecuredApp` mounts via `onError` — which flattens a `HandledError` to
  * `{ error: <kind>, message, ...meta }` at its `httpStatus`.
  */
 import {
@@ -25,7 +25,7 @@ import { setupServer } from "msw/node";
 
 import { TracesApiService, TracesApiError } from "@/client-sdk/services/traces/traces-api.service";
 import { createLangWatchApiClient } from "../client";
-import { LangWatchDomainError, isLangWatchDomainError } from "../errors";
+import { LangWatchHandledError, isLangWatchHandledError } from "../errors";
 
 const TEST_ENDPOINT = "http://localhost:5560";
 const server = setupServer();
@@ -62,15 +62,15 @@ describe("given the API returns a handled domain error", () => {
 
     it("throws a typed domain error rather than a generic HTTP error", async () => {
       await expect(getTrace(serviceWithApiKey())).rejects.toBeInstanceOf(
-        LangWatchDomainError,
+        LangWatchHandledError,
       );
     });
 
     it("carries the platform's kind, status and meta", async () => {
       const error = await getTrace(serviceWithApiKey()).catch((e: unknown) => e);
 
-      expect(isLangWatchDomainError(error)).toBe(true);
-      const domain = error as LangWatchDomainError;
+      expect(isLangWatchHandledError(error)).toBe(true);
+      const domain = error as LangWatchHandledError;
 
       expect(domain.kind).toBe("trace_not_found");
       expect(domain.httpStatus).toBe(404);
@@ -80,7 +80,7 @@ describe("given the API returns a handled domain error", () => {
     it("keeps the platform's sentence as the message", async () => {
       const error = (await getTrace(serviceWithApiKey()).catch(
         (e: unknown) => e,
-      )) as LangWatchDomainError;
+      )) as LangWatchHandledError;
 
       expect(error.message).toBe("Trace not found: trace-abc");
     });
@@ -88,13 +88,13 @@ describe("given the API returns a handled domain error", () => {
     it("keeps the raw body reachable as an escape hatch", async () => {
       const error = (await getTrace(serviceWithApiKey()).catch(
         (e: unknown) => e,
-      )) as LangWatchDomainError;
+      )) as LangWatchHandledError;
 
       expect(error.body).toMatchObject({ error: "trace_not_found" });
     });
   });
 
-  describe("when the route forwards the serialised DomainError verbatim", () => {
+  describe("when the route forwards the serialised HandledError verbatim", () => {
     beforeEach(() => {
       server.use(
         http.get(`${TEST_ENDPOINT}/api/traces/:traceId`, () =>
@@ -124,7 +124,7 @@ describe("given the API returns a handled domain error", () => {
     it("populates the trace id so support can correlate the failure", async () => {
       const error = (await getTrace(serviceWithApiKey()).catch(
         (e: unknown) => e,
-      )) as LangWatchDomainError;
+      )) as LangWatchHandledError;
 
       expect(error.traceId).toBe("4bf92f3577b34da6a3ce929d0e0e4736");
     });
@@ -132,7 +132,7 @@ describe("given the API returns a handled domain error", () => {
     it("populates the reason chain behind the failure", async () => {
       const error = (await getTrace(serviceWithApiKey()).catch(
         (e: unknown) => e,
-      )) as LangWatchDomainError;
+      )) as LangWatchHandledError;
 
       expect(error.kind).toBe("model_provider_unavailable");
       expect(error.meta).toEqual({ provider: "openai" });
@@ -162,7 +162,7 @@ describe("given the API fails WITHOUT naming a domain error", () => {
 
       // A 5xx is OUR failure, not the caller's. Typing it as a domain error
       // would present an outage as something the user did wrong.
-      expect(isLangWatchDomainError(error)).toBe(false);
+      expect(isLangWatchHandledError(error)).toBe(false);
       expect(error).toBeInstanceOf(TracesApiError);
       expect((error as TracesApiError).status).toBe(500);
     });
@@ -180,7 +180,7 @@ describe("given the API fails WITHOUT naming a domain error", () => {
     it("throws the generic service error", async () => {
       const error = await getTrace(serviceWithApiKey()).catch((e: unknown) => e);
 
-      expect(isLangWatchDomainError(error)).toBe(false);
+      expect(isLangWatchHandledError(error)).toBe(false);
       expect(error).toBeInstanceOf(TracesApiError);
     });
   });
@@ -202,7 +202,7 @@ describe("given the API fails WITHOUT naming a domain error", () => {
     it("throws the generic service error without crashing on the unparseable body", async () => {
       const error = await getTrace(serviceWithApiKey()).catch((e: unknown) => e);
 
-      expect(isLangWatchDomainError(error)).toBe(false);
+      expect(isLangWatchHandledError(error)).toBe(false);
       expect(error).toBeInstanceOf(TracesApiError);
     });
   });
@@ -224,7 +224,7 @@ describe("given the API fails WITHOUT naming a domain error", () => {
     it("falls through to the generic error rather than throwing on the parse", async () => {
       const error = await getTrace(serviceWithApiKey()).catch((e: unknown) => e);
 
-      expect(isLangWatchDomainError(error)).toBe(false);
+      expect(isLangWatchHandledError(error)).toBe(false);
       expect(error).toBeInstanceOf(TracesApiError);
     });
   });

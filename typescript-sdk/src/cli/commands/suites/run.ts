@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { SuitesApiService } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { resolveOutputFormat } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -69,15 +70,28 @@ export const runSuiteCommand = async (
     let lastStatus = "";
     const startTime = Date.now();
     const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+    // A status endpoint that is down used to be indistinguishable from a suite
+    // that is merely slow: every poll error was swallowed and the wait ran the
+    // full ten minutes before reporting a timeout.
+    const MAX_CONSECUTIVE_POLL_FAILURES = 5;
+    let consecutivePollFailures = 0;
 
     while (!completed) {
       if (Date.now() - startTime > TIMEOUT_MS) {
-        pollSpinner.fail("Suite run timed out after 10 minutes");
-        console.log(
-          chalk.yellow(
-            `Check results in the dashboard. Batch ID: ${result.batchRunId}`,
-          ),
-        );
+        failSpinner({
+          spinner: pollSpinner,
+          error: new Error("Suite run timed out after 10 minutes"),
+          action: "run suite",
+        });
+        // Follow-up prose is human-only — in a machine format the structured
+        // document above must keep stdout to itself.
+        if (resolveOutputFormat() === "text") {
+          console.log(
+            chalk.yellow(
+              `Check results in the dashboard. Batch ID: ${result.batchRunId}`,
+            ),
+          );
+        }
         process.exit(1);
       }
 
@@ -93,49 +107,68 @@ export const runSuiteCommand = async (
           },
         );
 
-        if (statusResponse.ok) {
-          const statusData = await statusResponse.json() as {
-            totalCount?: number;
-            completedCount?: number;
-            passedCount?: number;
-            failedCount?: number;
-            status?: string;
-          };
+        if (!statusResponse.ok) {
+          throw new Error(`status endpoint answered ${statusResponse.status}`);
+        }
 
-          const total = statusData.totalCount ?? result.jobCount;
-          const completedCount = statusData.completedCount ?? 0;
-          const passed = statusData.passedCount ?? 0;
-          const failed = statusData.failedCount ?? 0;
+        const statusData = await statusResponse.json() as {
+          totalCount?: number;
+          completedCount?: number;
+          passedCount?: number;
+          failedCount?: number;
+          status?: string;
+        };
 
-          const newStatus = `${completedCount}/${total} completed (${passed} passed, ${failed} failed)`;
-          if (newStatus !== lastStatus) {
-            pollSpinner.text = `Running... ${newStatus}`;
-            lastStatus = newStatus;
-          }
+        const total = statusData.totalCount ?? result.jobCount;
+        const completedCount = statusData.completedCount ?? 0;
+        const passed = statusData.passedCount ?? 0;
+        const failed = statusData.failedCount ?? 0;
 
-          if (completedCount >= total && total > 0) {
-            completed = true;
-            if (failed > 0) {
-              pollSpinner.warn(
-                `Suite run completed: ${passed}/${total} passed, ${chalk.red(`${failed} failed`)}`,
-              );
-            } else {
-              pollSpinner.succeed(
-                `Suite run completed: ${chalk.green(`${passed}/${total} passed`)}`,
-              );
-            }
+        const newStatus = `${completedCount}/${total} completed (${passed} passed, ${failed} failed)`;
+        if (newStatus !== lastStatus) {
+          pollSpinner.text = `Running... ${newStatus}`;
+          lastStatus = newStatus;
+        }
+
+        if (completedCount >= total && total > 0) {
+          completed = true;
+          if (failed > 0) {
+            pollSpinner.warn(
+              `Suite run completed: ${passed}/${total} passed, ${chalk.red(`${failed} failed`)}`,
+            );
+            // The whole point of `--wait` is to find out whether the suite
+            // passed. Reporting failures on stderr and still exiting 0 makes
+            // that answer invisible to every machine caller — a CI step goes
+            // green on a red suite, and an agent reads "success".
+            process.exitCode = 1;
+          } else {
+            pollSpinner.succeed(
+              `Suite run completed: ${chalk.green(`${passed}/${total} passed`)}`,
+            );
           }
         }
       } catch {
-        // Polling error — continue waiting
+        // Polling error — continue waiting. Bounded below, so a status endpoint
+        // that is down ends the wait instead of spinning out the full timeout.
+        consecutivePollFailures++;
+        if (consecutivePollFailures >= MAX_CONSECUTIVE_POLL_FAILURES) {
+          pollSpinner.warn(
+            `Stopped waiting: the run status endpoint failed ${consecutivePollFailures} times in a row. ` +
+              `The suite is still running — check batch ${result.batchRunId}.`,
+          );
+          process.exitCode = 1;
+          break;
+        }
+        continue;
       }
+      consecutivePollFailures = 0;
     }
 
     console.log();
     console.log(`  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`);
     console.log();
   } catch (error) {
-    failSpinner({ spinner, error, action: "run suite", format: options?.format });
+    failSpinner({ spinner, error, action: "run suite" });
     process.exit(1);
   }
 };

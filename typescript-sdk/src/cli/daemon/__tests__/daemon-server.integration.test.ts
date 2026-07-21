@@ -21,10 +21,12 @@ import * as path from "node:path";
 import { Writable } from "node:stream";
 
 import { execViaDaemon, requestStatus, requestStop } from "../client";
+import { secureSocketFile, UntrustedSocketDirError } from "../identity";
 import {
   cleanStaleSocket,
   createDaemonServer,
   DaemonAlreadyRunningError,
+  isSocketAlive,
   type DaemonServer,
 } from "../server";
 import { encodeFrame, FrameDecoder, PROTOCOL_VERSION, type ClientFrame } from "../protocol";
@@ -135,6 +137,7 @@ describe("daemon over a unix socket", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await server?.stop("stop-requested");
     server = undefined;
     fs.rmSync(dir, { recursive: true, force: true });
@@ -613,6 +616,262 @@ describe("daemon over a unix socket", () => {
     });
   });
 
+  /**
+   * The daemon's whole trust model is filesystem permissions. The server half
+   * (0600 socket in a 0700 directory) is worthless if the CLIENT will talk to
+   * any socket at that path — it pipelines `exec` before the handshake is
+   * answered, so a squatter is handed the caller's args, cwd and forwarded
+   * LANGWATCH_* env, API key included.
+   */
+  describe("given a socket the caller cannot trust", () => {
+    describe("when its directory is writable by other users", () => {
+      it("refuses to connect and reports not-served, so the CLI runs in-process", async () => {
+        const executor = vi.fn(scriptedExecutor(() => ({ stdout: "leaked\n" })));
+        await startDaemon({ executor });
+
+        // Anyone who can write the directory can unlink our socket and bind
+        // their own in its place.
+        fs.chmodSync(dir, 0o777);
+
+        const { outcome, stdout } = await exec(["trace", "search"]);
+
+        expect(outcome).toEqual({
+          served: false,
+          reason: "socket-dir-loose-mode",
+        });
+        expect(stdout).toBe("");
+        expect(executor).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the socket itself is world-connectable", () => {
+      it("refuses it rather than drive a daemon anyone else can drive too", async () => {
+        const executor = vi.fn(scriptedExecutor(() => ({ stdout: "leaked\n" })));
+        await startDaemon({ executor });
+
+        fs.chmodSync(socketPath, 0o666);
+
+        const { outcome } = await exec(["trace", "search"]);
+
+        expect(outcome).toEqual({ served: false, reason: "socket-loose-mode" });
+        expect(executor).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when it is owned by another user", () => {
+      it("refuses it, and reports no daemon for status and stop as well", async () => {
+        const executor = vi.fn(scriptedExecutor(() => ({ stdout: "leaked\n" })));
+        await startDaemon({ executor });
+
+        // chown needs root; moving OUR uid makes the same comparison fail.
+        vi.spyOn(process, "getuid").mockReturnValue(
+          (process.getuid?.() ?? 0) + 1,
+        );
+
+        const { outcome, stdout } = await exec(["trace", "search"]);
+
+        expect(outcome).toEqual({
+          served: false,
+          reason: "socket-dir-foreign-owner",
+        });
+        expect(stdout).toBe("");
+        expect(executor).not.toHaveBeenCalled();
+        // A stranger's listener is not our daemon: nothing to report, and
+        // nothing to send an unauthenticated `stop` to.
+        expect(await requestStatus(socketPath)).toBeNull();
+        expect(await requestStop(socketPath)).toBe(false);
+
+        vi.restoreAllMocks();
+      });
+    });
+  });
+
+  describe("given somebody else already holds the socket path", () => {
+    describe("when the real daemon tries to start", () => {
+      it("names the squat instead of reporting a daemon that is already running", async () => {
+        // The DoS the trust check has to prevent. `isSocketAlive` used to
+        // connect blind, so a squatter binding the path first — reachable via
+        // LANGWATCH_DAEMON_DIR, XDG_RUNTIME_DIR or the tmp fallback — made
+        // `listen()` throw DaemonAlreadyRunningError, forever. Nothing is
+        // disclosed (no bytes are sent), but the daemon could never start again
+        // and nothing would ever say why: a permanent, silent denial of service.
+        // A stranger's listener, bound to our socket path first.
+        const squatter = net.createServer();
+        await new Promise<void>((resolve) =>
+          squatter.listen(socketPath, resolve),
+        );
+        secureSocketFile(socketPath);
+
+        // chown needs root; moving OUR uid makes the same comparison fail.
+        vi.spyOn(process, "getuid").mockReturnValue(
+          (process.getuid?.() ?? 0) + 1,
+        );
+
+        // A foreign socket is not "alive", because it is not ours...
+        expect(await isSocketAlive(socketPath)).toBe(false);
+
+        // ...and starting reports the actual problem, actionably.
+        const created = createDaemonServer({
+          socketPath,
+          socketDir: dir,
+          fingerprint: FINGERPRINT,
+          cliVersion: CLI_VERSION,
+          build: BUILD,
+          idleTimeoutMs: 60_000,
+          executor: scriptedExecutor(() => ({ stdout: "ok\n" })),
+        });
+
+        const failure = await created.listen().catch((error: unknown) => error);
+        expect(failure).toBeInstanceOf(UntrustedSocketDirError);
+        // The distinction that matters: NOT "already running", which is the
+        // misdiagnosis no amount of restarting could ever clear.
+        expect(failure).not.toBeInstanceOf(DaemonAlreadyRunningError);
+        // (`ensureSocketDir` is what fires here — under a foreign uid the
+        // containing directory fails first. The socket-level check in
+        // `listen()` covers the narrower window where the directory was
+        // repaired but the squatter's socket file survived inside it.)
+        expect((failure as Error).message).toContain("owned by another user");
+
+        vi.restoreAllMocks();
+        await new Promise<void>((resolve) => squatter.close(() => resolve()));
+      });
+    });
+  });
+
+  describe("given a daemon asked to stop while it is still serving", () => {
+    describe("when a request is in flight", () => {
+      it("waits for it before tearing the execution window down", async () => {
+        // What actually goes wrong without the drain is NOT a missing exit
+        // frame — the frame still arrives, and the client still reports exit 0.
+        // It is that `window.reset()` restores the daemon's OWN cwd and
+        // environment underneath a command that has not finished, so the
+        // command resolves its remaining paths and reads its credentials
+        // against the wrong globals and then reports a status the client
+        // trusts. That is invisible to the transcript, so the transcript is not
+        // what this asserts on: the executor records what it SEES at the moment
+        // it completes, the way `resumableProgram` does in the runner tests.
+        const seen: { cwd?: string; token?: string } = {};
+        const savedCwd = process.cwd();
+        const callerCwd = fs.realpathSync(dir);
+
+        const running = await startDaemon({
+          shutdownGraceMs: 5_000,
+          executor: (request): CommandExecution => {
+            // Stand in for ExecutionWindow.applyWindow, which the real executor
+            // would have run: put the process into the caller's window.
+            process.chdir(request.cwd);
+            process.env.LW_TEST_WINDOW_TOKEN = "caller";
+            return {
+              completed: new Promise<number>((resolve) => {
+                setTimeout(() => {
+                  seen.cwd = process.cwd();
+                  seen.token = process.env.LW_TEST_WINDOW_TOKEN;
+                  request.sink("stdout", Buffer.from("finished\n"));
+                  resolve(0);
+                }, 60);
+              }),
+              cancel: () => undefined,
+            };
+          },
+        });
+
+        const inFlight = exec(["slow"]);
+        // Let the exec frame land so the request is genuinely counted.
+        await vi.waitFor(() => expect(running.stats().inflight).toBe(1));
+
+        await running.stop("stop-requested");
+
+        // Version-skew eviction makes this a routine dev-loop event; the
+        // request must not finish against the daemon's restored globals.
+        expect(running.stats().inflight).toBe(0);
+
+        const { outcome, stdout } = await inFlight;
+        expect(outcome).toEqual({ served: true, exitCode: 0 });
+        expect(stdout).toBe("finished\n");
+
+        // The load-bearing assertions: the command finished inside its OWN
+        // window, not the daemon's restored one.
+        expect(seen.cwd).toBe(callerCwd);
+        expect(seen.token).toBe("caller");
+
+        process.chdir(savedCwd);
+        delete process.env.LW_TEST_WINDOW_TOKEN;
+      });
+    });
+
+    describe("when the in-flight request will not finish in time", () => {
+      it("cuts the connection so the client falls back instead of trusting the result", async () => {
+        const running = await startDaemon({
+          shutdownGraceMs: 30,
+          executor: (): CommandExecution => ({
+            completed: new Promise<number>(() => undefined),
+            cancel: () => undefined,
+          }),
+        });
+
+        const inFlight = exec(["forever"]);
+        await vi.waitFor(() => expect(running.stats().inflight).toBe(1));
+
+        await running.stop("stop-requested");
+
+        // No `exit` frame ever reached the client, and nothing was committed to
+        // its stdout, so re-running in-process is safe and correct.
+        const { outcome, stdout } = await inFlight;
+        expect(outcome).toMatchObject({ served: false });
+        expect(stdout).toBe("");
+      });
+    });
+
+    describe("when the in-flight request has already flushed output to the caller", () => {
+      it("reports the truncation honestly instead of pretending it can re-run", async () => {
+        // The case the drain-timeout guarantee does NOT cover. Once output
+        // crosses the client's buffer cap it is on the caller's real stdout,
+        // so the clean in-process re-run is off the table — re-running would
+        // print it twice. `trace search`, `analytics query` and any large
+        // `--format json` land here, and routine version-skew eviction
+        // (dispatch.ts requestStop) is what triggers it.
+        const running = await startDaemon({
+          shutdownGraceMs: 30,
+          executor: (request): CommandExecution => {
+            request.sink("stdout", Buffer.from("partial results\n"));
+            return {
+              completed: new Promise<number>(() => undefined),
+              cancel: () => undefined,
+            };
+          },
+        });
+
+        const out = collector();
+        const err = collector();
+        const inFlight = execViaDaemon({
+          socketPath,
+          fingerprint: FINGERPRINT,
+          cliVersion: CLI_VERSION,
+          build: BUILD,
+          args: ["trace", "search"],
+          cwd: dir,
+          env: {},
+          colorLevel: 0,
+          // Commit on the first byte, as a real large-output command would.
+          maxBufferBytes: 1,
+          stdout: out.stream,
+          stderr: err.stream,
+        });
+        await vi.waitFor(() => expect(running.stats().inflight).toBe(1));
+
+        await running.stop("stop-requested");
+
+        // NOT `served: false`: a re-run would duplicate what is already printed.
+        expect(await inFlight).toEqual({ served: true, exitCode: 1 });
+        expect(out.text()).toBe("partial results\n");
+        // And the caller is told plainly that both halves of what they got are
+        // untrustworthy — the output is cut short, and the status is ours.
+        expect(err.text()).toContain("incomplete");
+        expect(err.text()).toContain("not the command's");
+      });
+    });
+  });
+
   describe("given a daemon that declines the request", () => {
     describe("when the caller's working directory no longer exists", () => {
       it("tells the client to run it in-process, having emitted no output", async () => {
@@ -684,6 +943,11 @@ describe("given a daemon that dies mid-command", () => {
       });
     });
     await new Promise<void>((resolve) => rogue.listen(socketPath, resolve));
+    // A real daemon tightens its socket to 0600 the moment it binds; the client
+    // will not talk to one that has not (see inspectSocketTrust), so the rogue
+    // has to look like a genuine daemon for these tests to exercise the
+    // mid-command death they are actually about.
+    secureSocketFile(socketPath);
   };
 
   describe("when it dies before any output reaches the caller", () => {

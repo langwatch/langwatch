@@ -107,23 +107,25 @@ describe("queryAnalyticsCommand()", () => {
     });
   });
 
-  describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
+  describe("when a machine format is requested", () => {
+    it("returns the timeseries labelled with the resolved series as the payload", async () => {
       const result = {
         currentPeriod: [{ date: 123, val: 1 }],
         previousPeriod: [],
       };
       mockTimeseries.mockResolvedValue(result);
 
-      await queryAnalyticsCommand({ format: "json" });
+      const commandResult = await queryAnalyticsCommand({});
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(
-          { ...result, metric: "metadata.trace_id", aggregation: "cardinality" },
-          null,
-          2,
-        ),
-      );
+      // The command no longer decides the format — it hands the payload to
+      // the output port. The resolved metric/aggregation ride along so a
+      // consumer can label the result without guessing from numeric keys.
+      expect(commandResult?.data).toEqual({
+        ...result,
+        metric: "metadata.trace_id",
+        aggregation: "cardinality",
+      });
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 

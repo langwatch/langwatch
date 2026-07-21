@@ -89,7 +89,7 @@ export const exportTracesCommand = async (options: {
       });
       await events.flush();
 
-      spinner.fail(`Export failed: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "export traces" });
       process.exit(1);
     }
 
@@ -128,7 +128,10 @@ export const exportTracesCommand = async (options: {
   } catch (error) {
     events.failed({ error, message: "Trace export failed" });
     await events.flush();
-    failSpinner({ spinner, error, action: "export traces", format: options?.format });
+    // No explicit `format`: this command's `--format` is a FILE format (jsonl
+    // etc.), not an error-output format — the preAction hook already recorded
+    // the resolved output format, which correctly stays human here.
+    failSpinner({ spinner, error, action: "export traces" });
     process.exit(1);
   } finally {
     await events.flush();
