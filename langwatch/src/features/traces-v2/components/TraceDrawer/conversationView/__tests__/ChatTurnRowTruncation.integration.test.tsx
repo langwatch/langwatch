@@ -38,6 +38,23 @@ vi.mock("~/components/Markdown", () => ({
   Markdown: ({ children }: { children: string }) => <span>{children}</span>,
 }));
 
+// ChatTurnRow always calls useTextTranslation(), which fires
+// api.translate.translate.useMutation() — mock the tRPC boundary the same
+// way ChatTurnRowTranslate.integration.test.tsx does so rendering the row
+// doesn't need a live tRPC context. Translation itself is out of scope here.
+vi.mock("~/utils/api", () => ({
+  api: {
+    translate: {
+      translate: {
+        useMutation: () => ({
+          mutateAsync: vi.fn(),
+          isLoading: false,
+        }),
+      },
+    },
+  },
+}));
+
 // A visible turn never renders RedactedInline, but keep the org lookup stubbed
 // to mirror the proven ChatTurnRow harness and stay resilient to leaf changes.
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
