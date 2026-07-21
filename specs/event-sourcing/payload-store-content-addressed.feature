@@ -273,8 +273,8 @@ Feature: GroupQueue content-addressed tiered payload store
   # Track 3 removed eager reclaim to stop a completion racing a live sibling into
   # deleting a shared blob. It left nothing shorter than the 4-day backstop in its
   # place, so a blob nothing referenced any more still occupied Redis for four
-  # days. At ingestion volume the steady state that implies is several times the
-  # queue instance's memory, which is a leak whatever its label. These scenarios
+  # days. Nothing drains a retired blob before it ages out, so retention runs the
+  # full four days deep — a leak whatever its label. These scenarios
   # bound that retention without restoring the race: the release does not delete
   # the bytes, it only shortens their deadline, and any subsequent take restores
   # the full backstop.
