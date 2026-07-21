@@ -1,5 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import type React from "react";
 
 import { useSidebarSectionState } from "./useSidebarSectionState";
@@ -79,26 +79,16 @@ const SidebarSectionToggle = ({
         _hover={{ color: "nav.fg" }}
       >
         {showExpanded && (
-          <>
-            <Text
-              fontSize="11px"
-              fontWeight="medium"
-              textTransform="uppercase"
-              whiteSpace="nowrap"
-            >
-              {label}
-            </Text>
-            {/* Rendered unwrapped so the caret is the label's direct
-                sibling — the collapse spec pins it "immediately beside
-                its section label". */}
-            {isExpanded ? (
-              <ChevronDown size={13} aria-hidden="true" opacity={0.5} />
-            ) : (
-              <ChevronRight size={13} aria-hidden="true" opacity={0.5} />
-            )}
-          </>
+          <Text
+            fontSize="11px"
+            fontWeight="medium"
+            textTransform="uppercase"
+            whiteSpace="nowrap"
+          >
+            {label}
+          </Text>
         )}
-        {!showExpanded && !isExpanded && (
+        {!isExpanded && (
           <Box opacity={0.5} display="flex">
             <ChevronRight size={13} aria-hidden="true" />
           </Box>

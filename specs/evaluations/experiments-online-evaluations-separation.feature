@@ -22,10 +22,11 @@ Feature: Separate experiments from online evaluations
 
   Scenario: Collapse primary navigation sections
     Given the project navigation is expanded
-    Then every primary section has a visible caret and an accessible expand or collapse control
-    And each caret is positioned immediately beside its section label
+    Then every primary section has an accessible expand or collapse control
+    And expanded section headings stay decluttered with no caret
     When I collapse a section
     Then its destinations are hidden
+    And a dim caret appears beside the collapsed section's label
     And the preference is restored after I reload the application
 
   Scenario: Focus automation work by purpose
