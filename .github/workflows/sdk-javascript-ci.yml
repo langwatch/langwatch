@@ -223,6 +223,11 @@ jobs:
 
       - name: Start LangWatch server and worker
         working-directory: langwatch
+        env:
+          # The workflow-global LANGWATCH_API_KEY is for the SDK under test.
+          # Platform processes refuse to boot with it set (the self-referencing
+          # ingest guard in langwatchPlatformGuard.ts), so blank it here.
+          LANGWATCH_API_KEY: ""
         run: |
           NODE_ENV=production pnpm run start &
           # Start the worker process so the event-sourcing pipeline

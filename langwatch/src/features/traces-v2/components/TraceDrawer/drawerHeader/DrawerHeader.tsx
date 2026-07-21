@@ -61,6 +61,7 @@ import { ModelsTooltip } from "../../TraceTable/registry/cells/trace/ModelCell";
 import { Chip } from "../Chip";
 import { splitChipsForOverflow } from "../ChipBar";
 import { ExceptionsContent } from "../ExceptionsContent";
+import { isTerminalOrigin } from "../../../utils/terminalOrigin";
 import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
 import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
@@ -71,6 +72,7 @@ import {
   type PinCategory,
   renderPinPills,
 } from "./PinStrip";
+import { SyntheticTraceBadge } from "./SyntheticTraceBadge";
 import { TraceOverflowMenu } from "./TraceOverflowMenu";
 import { useRetainedTraceHeader } from "./useRetainedTraceHeader";
 import {
@@ -947,6 +949,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             titleIsFallback={titleIsFallback}
           />
           <StatusChip trace={trace} statusColor={statusColor} />
+          <SyntheticTraceBadge attributes={trace.attributes} />
         </HStack>
 
         {/* Negative marginRight cancels the header's paddingX so the
@@ -1223,6 +1226,10 @@ export const DrawerHeader = memo(function DrawerHeader({
             conversationContext.turns.length === 0
           }
           traceId={trace.traceId}
+          showTerminal={isTerminalOrigin({
+            serviceName: trace.serviceName,
+            origin: trace.origin,
+          })}
           endSlot={
             <HStack gap={2}>
               {/* Presence avatars sit at the trailing edge of the mode-tab

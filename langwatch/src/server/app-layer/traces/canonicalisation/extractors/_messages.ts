@@ -2,6 +2,7 @@
  * Message Normalization & System Instruction Extraction
  */
 import { isMessageLike, isRecord, type MessageLike } from "./_guards";
+import { isReplyTextPart } from "./_parts";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Shared message content extraction
@@ -66,6 +67,7 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
     if (part && typeof part === "object") {
       const p = part as Record<string, unknown>;
       if (typeof p.text === "string") {
+        if (!isReplyTextPart(p)) continue;
         texts.push(p.text);
       } else if (typeof p.content === "string") {
         texts.push(p.content);

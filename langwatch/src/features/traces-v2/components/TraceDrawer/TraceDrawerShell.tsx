@@ -6,6 +6,7 @@ import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { useLangyContextTarget } from "~/features/langy/hooks/useLangyContextTarget";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { DrawerSpotlights } from "../../onboarding/spotlights/DrawerSpotlights";
 import {
   DRAWER_DEFAULT_WIDTH_PX,
@@ -22,6 +23,8 @@ import { PaneLayout } from "./panes/PaneLayout";
 import { ResizeRail } from "./panes/ResizeRail";
 import { usePaneLayout } from "./panes/usePaneLayout";
 import { ScenarioRoleProvider } from "./scenarioRoles";
+import { SessionTab } from "./sessionView";
+import { TerminalTab } from "./terminalView";
 import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
 import { TraceDrawerSkeleton } from "./TraceDrawerSkeleton";
 import { TraceAccordions } from "./traceAccordions";
@@ -45,6 +48,7 @@ export interface TraceV2DrawerShellProps {
 
 export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const { colorMode } = useColorMode();
+  const { project } = useOrganizationTeamProject();
   // One Shiki adapter for the whole drawer. All `<RenderedMarkdown>`,
   // `<ShikiCodeBlock>`, and the JSON tokenizer consume this — without it,
   // each consumer span up its own highlighter (theme + lang JSON +
@@ -310,7 +314,36 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                         )
                       }
                     >
-                      {viewMode === "conversation" && trace.conversationId ? (
+                      {viewMode === "session" ? (
+                        <IsolatedErrorBoundary
+                          scope="Couldn't render session overview"
+                          resetKeys={[trace.traceId]}
+                        >
+                          <Box flex={1} minHeight={0}>
+                            <SessionTab
+                              projectId={project?.id ?? ""}
+                              traceId={trace.traceId}
+                              occurredAtMs={trace.timestamp}
+                            />
+                          </Box>
+                        </IsolatedErrorBoundary>
+                      ) : viewMode === "terminal" ? (
+                        <IsolatedErrorBoundary
+                          scope="Couldn't render terminal session"
+                          resetKeys={[trace.traceId]}
+                        >
+                          <Box flex={1} minHeight={0}>
+                            <TerminalTab
+                              projectId={project?.id ?? ""}
+                              traceId={trace.traceId}
+                              occurredAtMs={trace.timestamp}
+                              sessionName={
+                                trace.traceName?.trim() || trace.name?.trim() || null
+                              }
+                            />
+                          </Box>
+                        </IsolatedErrorBoundary>
+                      ) : viewMode === "conversation" && trace.conversationId ? (
                         <IsolatedErrorBoundary
                           scope="Couldn't render conversation view"
                           resetKeys={[trace.conversationId, trace.traceId]}

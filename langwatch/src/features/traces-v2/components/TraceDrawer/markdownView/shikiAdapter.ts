@@ -191,3 +191,25 @@ export async function codeToHtml({
     theme: "github-light",
   });
 }
+
+/**
+ * Same as {@link codeToHtml}, themed `github-dark` — for the one surface in
+ * the drawer that is ALWAYS dark regardless of the app's own colour mode
+ * (the Terminal tab's recreation of a real terminal screen).
+ */
+export async function codeToHtmlDark({
+  code,
+  lang,
+}: {
+  code: string;
+  lang: string;
+}): Promise<string> {
+  const canonical = normalizeShikiLang(lang);
+  await ensureShikiLangLoaded(canonical);
+  const highlighter = await getSharedHighlighter();
+  ensureDisposeNeutered(highlighter);
+  return highlighter.codeToHtml(code, {
+    lang: canonical,
+    theme: "github-dark",
+  });
+}

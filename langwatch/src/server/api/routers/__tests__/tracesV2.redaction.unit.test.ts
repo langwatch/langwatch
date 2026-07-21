@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { ContentCategory } from "~/server/data-privacy/dataPrivacy.types";
 import type { CategoryVisibility } from "~/server/traces/protections";
-import { buildContentPrivacy, redactV2Content } from "../tracesV2";
+import {
+  buildContentPrivacy,
+  gateTraceLogVisibility,
+  redactTraceLogContent,
+  redactV2Content,
+  type TraceLogRecordDto,
+} from "../tracesV2";
 
 const visible: CategoryVisibility = { canSee: true, restrictVisibleTo: null };
 
@@ -327,5 +333,287 @@ describe("buildContentPrivacy", () => {
       new Set(["system"]),
     );
     expect(privacy.system.state).toBe("dropped");
+  });
+});
+
+/**
+ * R2 security gap: the `traceLogs` procedure returned raw log bodies (captured
+ * prompts / responses) with NO content-privacy enforcement, unlike the sibling
+ * span endpoints. `redactTraceLogContent` closes that — a viewer without
+ * captured-input / captured-output visibility must not read the raw content
+ * through this procedure.
+ */
+describe("redactTraceLogContent", () => {
+  function logRow(
+    attributes: Record<string, string>,
+    body = attributes["event.name"] ?? "",
+  ): TraceLogRecordDto {
+    return {
+      spanId: "77bb432be48046f6",
+      timeUnixMs: 100,
+      body,
+      attributes,
+      resourceAttributes: { "langwatch.origin": "coding_agent" },
+      scopeName: "com.anthropic.claude_code.events",
+      scopeVersion: null,
+    };
+  }
+
+  // Real wire shapes: on the default (LIGHT) telemetry path Claude Code puts
+  // the prompt under the `prompt` attribute and the reply under `response` —
+  // NOT under `body`, which only the opt-in RAW `api_*_body` events use. The
+  // fixtures must match that or they green-light a redaction that strips the
+  // one key these records never carry.
+  const userPrompt = logRow({
+    "event.name": "user_prompt",
+    query_source: "repl_main_thread",
+    prompt: "summarise the private repo",
+  });
+  const assistantResponse = logRow({
+    "event.name": "assistant_response",
+    request_id: "req_1",
+    query_source: "repl_main_thread",
+    response: "Here is the secret summary.",
+  });
+  const apiResponseBody = logRow({
+    "event.name": "api_response_body",
+    request_id: "req_1",
+    body: '{"content":[{"type":"text","text":"Here is the secret summary."}]}',
+    // Stamped at ingest by deriveLogContentAttributes — captured output,
+    // re-shaped, so it must fall with the body.
+    "langwatch.gen_ai.output.text": "Here is the secret summary.",
+    "langwatch.gen_ai.output.tool_calls": '[{"id":"t1","name":"Bash"}]',
+    "langwatch.gen_ai.output.tool_call_count": "1",
+    "langwatch.gen_ai.response.stop_reason": "tool_use",
+  });
+  const apiRequestBody = logRow({
+    "event.name": "api_request_body",
+    request_id: "req_1",
+    body: '{"messages":[{"role":"user","content":"summarise the private repo"}]}',
+    "langwatch.gen_ai.input.message_count": "1",
+  });
+
+  describe("given a viewer without captured-content visibility", () => {
+    const blind = { canSeeCapturedInput: false, canSeeCapturedOutput: false };
+
+    it("withholds the prompt of a default-path user_prompt record", () => {
+      const out = redactTraceLogContent(userPrompt, blind);
+
+      expect(out.attributes.prompt).toBeUndefined();
+      expect(out.bodyRedacted).toBe(true);
+      expect(JSON.stringify(out)).not.toContain("summarise the private repo");
+    });
+
+    it("withholds the reply of a default-path assistant_response record", () => {
+      const out = redactTraceLogContent(assistantResponse, blind);
+
+      expect(out.attributes.response).toBeUndefined();
+      expect(out.bodyRedacted).toBe(true);
+      expect(JSON.stringify(out)).not.toContain("Here is the secret summary.");
+    });
+
+    it("withholds the raw response body AND the ingest-derived output attrs", () => {
+      const out = redactTraceLogContent(apiResponseBody, blind);
+
+      expect(out.attributes.body).toBeUndefined();
+      expect(out.attributes["langwatch.gen_ai.output.text"]).toBeUndefined();
+      expect(
+        out.attributes["langwatch.gen_ai.output.tool_calls"],
+      ).toBeUndefined();
+      expect(
+        out.attributes["langwatch.gen_ai.output.tool_call_count"],
+      ).toBeUndefined();
+      // Operational metadata, not content — passes through like cost_usd.
+      expect(out.attributes["langwatch.gen_ai.response.stop_reason"]).toBe(
+        "tool_use",
+      );
+      expect(out.bodyRedacted).toBe(true);
+      expect(JSON.stringify(out)).not.toContain("Here is the secret summary.");
+    });
+
+    it("withholds the raw request body and its derived input attrs", () => {
+      const out = redactTraceLogContent(apiRequestBody, blind);
+
+      expect(out.attributes.body).toBeUndefined();
+      expect(
+        out.attributes["langwatch.gen_ai.input.message_count"],
+      ).toBeUndefined();
+      expect(JSON.stringify(out)).not.toContain("summarise the private repo");
+    });
+
+    it("keeps the record's metadata (event name, request id, cost)", () => {
+      const anchor = logRow({
+        "event.name": "api_request",
+        request_id: "req_1",
+        cost_usd: "0.0421",
+      });
+
+      const out = redactTraceLogContent(anchor, blind);
+
+      // The cost anchor carries no content body, so it passes through intact —
+      // cost is governed by its own permission, not captured-content visibility.
+      expect(out.attributes.cost_usd).toBe("0.0421");
+      expect(out.attributes["event.name"]).toBe("api_request");
+      expect(out.bodyRedacted).toBeUndefined();
+    });
+
+    it("carries the restrict audience label for a restricted input", () => {
+      const out = redactTraceLogContent(userPrompt, {
+        canSeeCapturedInput: false,
+        canSeeCapturedOutput: false,
+        capturedInputVisibleTo: "Admins, Security group",
+      });
+
+      expect(out.bodyVisibleTo).toBe("Admins, Security group");
+    });
+
+    it("fails closed on an unclassified content-of-record body", () => {
+      // A generic emitter with content in the top-level body and no event.name.
+      const generic = logRow({ some_attr: "x" }, "raw secret content");
+
+      const out = redactTraceLogContent(generic, blind);
+
+      expect(out.body).toBe("");
+      expect(out.bodyRedacted).toBe(true);
+    });
+  });
+
+  describe("given a viewer with full captured-content visibility", () => {
+    const full = { canSeeCapturedInput: true, canSeeCapturedOutput: true };
+
+    it("returns the prompt unchanged", () => {
+      const out = redactTraceLogContent(userPrompt, full);
+
+      expect(out.attributes.prompt).toBe("summarise the private repo");
+      expect(out.bodyRedacted).toBeUndefined();
+    });
+
+    it("returns the reply and its derived output attrs unchanged", () => {
+      const out = redactTraceLogContent(assistantResponse, full);
+      expect(out.attributes.response).toBe("Here is the secret summary.");
+      expect(out.bodyRedacted).toBeUndefined();
+
+      const raw = redactTraceLogContent(apiResponseBody, full);
+      expect(raw.attributes["langwatch.gen_ai.output.text"]).toBe(
+        "Here is the secret summary.",
+      );
+      expect(raw.bodyRedacted).toBeUndefined();
+    });
+  });
+
+  describe("given input is visible but output is not", () => {
+    const inputOnly = {
+      canSeeCapturedInput: true,
+      canSeeCapturedOutput: false,
+    };
+
+    it("reveals the prompt but withholds the response", () => {
+      expect(
+        redactTraceLogContent(userPrompt, inputOnly).attributes.prompt,
+      ).toBe("summarise the private repo");
+      expect(
+        redactTraceLogContent(assistantResponse, inputOnly).attributes.response,
+      ).toBeUndefined();
+    });
+  });
+});
+
+/**
+ * R2 teaser window: the sibling span reads teaser-redact spans older than the
+ * free-plan visibility cutoff, but the `traceLogs` read applied only the
+ * captured-content permission gate — so a free-plan viewer WITH captured-content
+ * permission could read raw prompts / responses older than their window through
+ * the logs endpoint, a bypass of the teaser the span reads enforce.
+ * `gateTraceLogVisibility` closes that.
+ */
+describe("gateTraceLogVisibility", () => {
+  function logRow(
+    attributes: Record<string, string>,
+    timeUnixMs: number,
+    body = attributes.body ?? attributes["event.name"] ?? "",
+  ): TraceLogRecordDto {
+    return {
+      spanId: "77bb432be48046f6",
+      timeUnixMs,
+      body,
+      attributes,
+      resourceAttributes: { "langwatch.origin": "coding_agent" },
+      scopeName: "com.anthropic.claude_code.events",
+      scopeVersion: null,
+    };
+  }
+
+  const full = { canSeeCapturedInput: true, canSeeCapturedOutput: true };
+  const CUTOFF = 1_000;
+
+  describe("given a free-plan cutoff and a record older than the window", () => {
+    // Real wire key: assistant_response carries its reply on `response`.
+    const stale = logRow(
+      { "event.name": "assistant_response", response: "old private answer" },
+      CUTOFF - 1,
+    );
+
+    it("withholds the content even for a viewer allowed to see it", () => {
+      const out = gateTraceLogVisibility(stale, full, CUTOFF);
+
+      expect(out.attributes.response).toBeUndefined();
+      expect(out.bodyRedacted).toBe(true);
+      expect(JSON.stringify(out)).not.toContain("old private answer");
+    });
+
+    it("offers no audience label — a plan gate is not an audience gate", () => {
+      const out = gateTraceLogVisibility(
+        stale,
+        { ...full, capturedOutputVisibleTo: "Admins" },
+        CUTOFF,
+      );
+
+      expect(out.bodyVisibleTo).toBeNull();
+    });
+
+    it("keeps a stale cost anchor's metadata (no content body to withhold)", () => {
+      const anchor = logRow(
+        { "event.name": "api_request", request_id: "req_1", cost_usd: "0.19" },
+        CUTOFF - 1,
+      );
+
+      const out = gateTraceLogVisibility(anchor, full, CUTOFF);
+
+      expect(out.attributes.cost_usd).toBe("0.19");
+      expect(out.bodyRedacted).toBeUndefined();
+    });
+  });
+
+  describe("given a free-plan cutoff and a record inside the window", () => {
+    const fresh = logRow(
+      { "event.name": "assistant_response", response: "recent answer" },
+      CUTOFF + 1,
+    );
+
+    it("falls through to the viewer's captured-content permission", () => {
+      expect(
+        gateTraceLogVisibility(fresh, full, CUTOFF).attributes.response,
+      ).toBe("recent answer");
+      expect(
+        gateTraceLogVisibility(
+          fresh,
+          { canSeeCapturedInput: false, canSeeCapturedOutput: false },
+          CUTOFF,
+        ).attributes.response,
+      ).toBeUndefined();
+    });
+  });
+
+  describe("given a paid plan with no window (cutoff null)", () => {
+    it("leaves the permission gate in sole control, even for an old record", () => {
+      const old = logRow(
+        { "event.name": "assistant_response", response: "answer" },
+        1,
+      );
+
+      expect(gateTraceLogVisibility(old, full, null).attributes.response).toBe(
+        "answer",
+      );
+    });
   });
 });

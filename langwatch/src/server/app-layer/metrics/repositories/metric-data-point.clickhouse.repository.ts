@@ -17,6 +17,7 @@ import type {
   MetricDataPointBulkWrite,
   MetricDataPointRepository,
   MetricDataPointWrite,
+  SeriesTotalByPointAttribute,
 } from "./metric-data-point.repository";
 import {
   fromRaw,
@@ -223,6 +224,76 @@ export class MetricDataPointClickHouseRepository implements MetricDataPointRepos
       ? await this.resolveClient(query.tenantId)
       : await this.resolveOrganizationClient(query.organizationId);
     return await queryMetricUsageEstimates({ client, query });
+  }
+
+  async getSeriesTotalsByPointAttribute({
+    tenantId,
+    attributeKey,
+    attributeValue,
+    fromMs,
+  }: {
+    tenantId: string;
+    attributeKey: string;
+    attributeValue: string;
+    fromMs: number;
+  }): Promise<SeriesTotalByPointAttribute[]> {
+    if (!tenantId) {
+      throw new SecurityError(
+        "MetricDataPointClickHouseRepository.getSeriesTotalsByPointAttribute",
+        "tenantId is required",
+      );
+    }
+    const client = await this.resolveClient(tenantId);
+    // Two hops in one query: the series catalog names the label-matched
+    // SeriesIds (deduped with argMax per the catalog's documented
+    // partition/dedup mismatch — its reader must never rely on the engine
+    // having merged), then the rollups, whose buckets are delta-converged,
+    // sum to the series total. `has(PointAttributeKeys, ...)` gates the JSON
+    // extraction to rows that can match at all.
+    const result = await client.query({
+      query: `
+        WITH matched AS (
+          SELECT
+            SeriesId,
+            argMax(MetricName, LastSeenAt) AS MetricName,
+            argMax(PointAttributesJson, LastSeenAt) AS PointAttributesJson
+          FROM metric_series
+          WHERE TenantId = {tenantId:String}
+            AND has(PointAttributeKeys, {attributeKey:String})
+            AND JSONExtractString(PointAttributesJson, {attributeKey:String}) = {attributeValue:String}
+          GROUP BY SeriesId
+        )
+        SELECT
+          matched.MetricName AS MetricName,
+          matched.PointAttributesJson AS PointAttributesJson,
+          sum(coalesce(rollups.Sum, 0)) AS Total
+        FROM metric_time_rollups AS rollups
+        INNER JOIN matched ON rollups.SeriesId = matched.SeriesId
+        WHERE rollups.TenantId = {tenantId:String}
+          AND rollups.BucketStart >= {fromMs:DateTime64(3)}
+        GROUP BY matched.SeriesId, matched.MetricName, matched.PointAttributesJson
+      `,
+      query_params: {
+        tenantId,
+        attributeKey,
+        attributeValue,
+        fromMs: new Date(fromMs),
+      },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<{
+      MetricName: string;
+      PointAttributesJson: string;
+      Total: number | string;
+    }>();
+    return rows.map((row) => ({
+      metricName: row.MetricName,
+      total: Number(row.Total),
+      pointAttributes: JSON.parse(row.PointAttributesJson) as Record<
+        string,
+        string
+      >,
+    }));
   }
 
   private async immediateNeighbors(

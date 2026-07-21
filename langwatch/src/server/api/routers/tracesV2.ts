@@ -9,9 +9,21 @@ import {
   generateTraceAction,
   generateTraceQueryFromPrompt,
 } from "~/server/app-layer/traces/ai-query";
+import {
+  contentAttrKeys,
+  enrichCodingAgentSpansFromLogs,
+} from "~/server/app-layer/traces/claude-code-log-enrichment";
+import {
+  buildCodingAgentTranscript,
+  type CodingAgentTranscript,
+} from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import {
+  DERIVED_INPUT_ATTR_PREFIX,
+  DERIVED_OUTPUT_ATTR_PREFIX,
+} from "~/server/app-layer/traces/log-content-derivation";
 import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-cost-span-preview.service";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import {
@@ -725,6 +737,98 @@ const sortSchema = z.object({
 // Router
 // ---------------------------------------------------------------------------
 
+/**
+ * Load one trace's spans, enriched and REDACTED.
+ *
+ * Extracted so `spansFull` and `codingAgentTranscript` cannot drift apart. The
+ * transcript endpoint returning content that had skipped this pass would be a way
+ * around the data-privacy policy the span reads enforce, so there is exactly one
+ * way in.
+ */
+async function loadProtectedSpansFull({
+  input,
+  ctx,
+}: {
+  input: { projectId: string; traceId: string; occurredAtMs?: number };
+  ctx: { session: unknown; prisma: unknown } & Record<string, unknown>;
+}): Promise<SpanDetail[]> {
+  const app = getApp();
+  const protections = await getUserProtectionsForProject(ctx as never, {
+    projectId: input.projectId,
+  });
+  const storedSpans = await app.traces.spans.getSpansByTraceId({
+    tenantId: input.projectId,
+    traceId: input.traceId,
+    visibilityCutoffMs: await getVisibilityCutoffMsForProject(input.projectId),
+    ...occurredAtFromInput(input),
+  });
+  // Claude Code's real `llm_request` spans carry tokens + `request_id` but NO
+  // message content and NO cost — both live in the trace's OTLP log records.
+  // Join them on BEFORE protections run, so the joined content goes through the
+  // same redaction pass as any other span content rather than bypassing it.
+  const spans = await enrichCodingAgentSpansFromLogs({
+    logRecords: app.traces.logRecords,
+    tenantId: input.projectId,
+    traceId: input.traceId,
+    spans: storedSpans,
+    occurredAtMs: input.occurredAtMs,
+  });
+
+  const redactions = buildSpanContentRedactions(spans, protections);
+  return spans.map((span) => {
+    const detail = mapSpanToDetail(
+      applySpanProtections(span, protections, redactions),
+      [],
+    );
+    const redacted = redactV2Content(detail, protections);
+    const detailParams = detail.params as Record<string, unknown> | null;
+    redacted.contentPrivacy = buildContentPrivacy(
+      protections,
+      readDroppedFromParams(detailParams),
+    );
+    redacted.piiAnalysisIncomplete = readPiiIncompleteFromParams(detailParams);
+    redacted.restrictedAttributes = protections.restrictedAttributes ?? null;
+    return redacted;
+  });
+}
+
+/** Load one trace's log records, gated by the viewer's visibility exactly as `traceLogs` does. */
+async function loadProtectedTraceLogs({
+  input,
+  ctx,
+}: {
+  input: { projectId: string; traceId: string; occurredAtMs?: number };
+  ctx: { session: unknown; prisma: unknown } & Record<string, unknown>;
+}): Promise<TraceLogRecordDto[]> {
+  const app = getApp();
+  const protections = await getUserProtectionsForProject(ctx as never, {
+    projectId: input.projectId,
+  });
+  const visibilityCutoffMs = await getVisibilityCutoffMsForProject(
+    input.projectId,
+  );
+  const rows = await app.traces.logRecords.getLogsByTraceId(
+    input.projectId,
+    input.traceId,
+    input.occurredAtMs,
+  );
+  return rows.map((row) =>
+    gateTraceLogVisibility(
+      {
+        spanId: row.spanId,
+        timeUnixMs: row.timeUnixMs,
+        body: row.body,
+        attributes: row.attributes,
+        resourceAttributes: row.resourceAttributes,
+        scopeName: row.scopeName,
+        scopeVersion: row.scopeVersion,
+      },
+      protections,
+      visibilityCutoffMs,
+    ),
+  );
+}
+
 export const tracesV2Router = createTRPCRouter({
   list: protectedProcedure
     .input(
@@ -1328,37 +1432,43 @@ export const tracesV2Router = createTRPCRouter({
     )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }): Promise<SpanDetail[]> => {
-      const app = getApp();
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      });
-      const spans = await app.traces.spans.getSpansByTraceId({
-        tenantId: input.projectId,
-        traceId: input.traceId,
-        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
-          input.projectId,
-        ),
-        ...occurredAtFromInput(input),
-      });
-      // Span-level protections first (category visibility, restricted custom
-      // attributes, hidden content scrubbed out of params), then the DTO pass.
-      const redactions = buildSpanContentRedactions(spans, protections);
-      return spans.map((span) => {
-        const detail = mapSpanToDetail(
-          applySpanProtections(span, protections, redactions),
-          [],
-        );
-        const redacted = redactV2Content(detail, protections);
-        const detailParams = detail.params as Record<string, unknown> | null;
-        redacted.contentPrivacy = buildContentPrivacy(
-          protections,
-          readDroppedFromParams(detailParams),
-        );
-        redacted.piiAnalysisIncomplete =
-          readPiiIncompleteFromParams(detailParams);
-        redacted.restrictedAttributes =
-          protections.restrictedAttributes ?? null;
-        return redacted;
+      return loadProtectedSpansFull({ input, ctx });
+    }),
+
+  /**
+   * The coding-agent TRANSCRIPT for one trace — what the agent did, in order.
+   *
+   * The Terminal view used to assemble this in the browser out of three modules.
+   * It lives here now because a transcript is not a rendering concern: the CLI
+   * wants it, an MCP server wants it, and an export wants it, and none of them
+   * are going to run React to get one. One derivation, one answer.
+   *
+   * Reads spans AND logs through the same loaders the sibling endpoints use, so
+   * its content has been through the identical redaction pass — a transcript
+   * endpoint that did its own reads would be a way around the data-privacy
+   * policy, which is precisely why it does not.
+   */
+  codingAgentTranscript: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        ...spanReadHintShape,
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input, ctx }): Promise<CodingAgentTranscript> => {
+      const [spans, logs] = await Promise.all([
+        loadProtectedSpansFull({ input, ctx }),
+        loadProtectedTraceLogs({ input, ctx }),
+      ]);
+
+      return buildCodingAgentTranscript({
+        spans,
+        logs: logs.map((row) => ({
+          timestampMs: row.timeUnixMs,
+          attributes: (row.attributes ?? {}) as Record<string, unknown>,
+        })),
       });
     }),
 
@@ -1555,4 +1665,240 @@ export const tracesV2Router = createTRPCRouter({
       const app = getApp();
       return app.evaluations.runs.findByTraceId(input.projectId, input.traceId);
     }),
+
+  /**
+   * The pre-folded coding-agent session rollup for one trace (ADR-041).
+   *
+   * Returns null for an ordinary LLM trace — the fold writes no row for those,
+   * so null is the normal answer rather than an error, and the caller simply
+   * doesn't offer the Session view.
+   *
+   * Unlike the sibling span / log reads this needs NO content redaction: the row
+   * is counters, bounded sets and ids by construction. It carries no prompt, no
+   * reply and no tool output, so there is nothing here for the data-privacy
+   * policy to gate. (If that ever stops being true, this comment is the thing
+   * that has to change first.)
+   */
+  codingAgentSession: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input }) => {
+      const app = getApp();
+      // Two keyed seeks (ADR-056 §4): the (trace → session) map, then the
+      // session row — which already spans every trace of the run, so no
+      // conversation-membership fan-out is needed here anymore.
+      return app.codingAgents.sessions.getSessionForTrace({
+        projectId: input.projectId,
+        traceId: input.traceId,
+      });
+    }),
+
+  /**
+   * Every log record correlated to one trace (generic — not Claude-specific).
+   * Logs key by traceId (to spans only via `request_id`), so this is a
+   * trace-level read: the raw-log inspector renders untruncated bodies on
+   * demand, and the dashboard frontend join composes span content client-side
+   * from these logs. `occurredAtMs` is threaded as a `TimeUnixMs`
+   * partition-pruning hint like the sibling span reads.
+   *
+   * These records carry raw captured content (prompts / responses) in their
+   * `body`, so — exactly like the sibling span reads — the read is gated behind
+   * the viewer's captured-input / captured-output visibility via
+   * {@link redactTraceLogContent}, or the raw-log procedure would be a bypass of
+   * the data-privacy policy the span endpoints enforce.
+   */
+  traceLogs: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        ...spanReadHintShape,
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input, ctx }): Promise<TraceLogRecordDto[]> => {
+      // The free-plan teaser window and the viewer's captured-content
+      // permissions are both applied inside the loader, which the transcript
+      // endpoint shares — so the two reads cannot diverge on what they hide.
+      return loadProtectedTraceLogs({ input, ctx });
+    }),
 });
+
+/**
+ * One trace-correlated log record as returned to the frontend raw-log
+ * inspector. The `traceId` is implied by the query; `attributes` carries the
+ * emitter's event payload (`body`, `event.name`, `request_id`, `cost_usd`, …).
+ */
+export interface TraceLogRecordDto {
+  spanId: string;
+  timeUnixMs: number;
+  body: string;
+  attributes: Record<string, string>;
+  resourceAttributes: Record<string, string>;
+  scopeName: string;
+  scopeVersion: string | null;
+  /**
+   * True when this record carried captured content the viewer may not see, so
+   * the content was withheld — the top-level body, the per-event content
+   * attributes (`prompt` / `response` / `body`), and the ingest-derived
+   * `langwatch.gen_ai.*` content attrs. The UI renders the redacted
+   * placeholder, mirroring the span endpoints' `inputRedacted` /
+   * `outputRedacted`.
+   */
+  bodyRedacted?: boolean;
+  /** Audience label naming who CAN see the withheld content, when restricted. */
+  bodyVisibleTo?: string | null;
+}
+
+/** The log-record attribute carrying the emitter's event name. */
+const LOG_EVENT_NAME_ATTR = "event.name";
+
+/**
+ * Log `event.name` values whose content payload is captured INPUT — the user's
+ * prompt or the model-call request payload. Gated behind captured-input
+ * visibility. Mirrors the input events the read-path Claude enrichment joins.
+ */
+const LOG_INPUT_CONTENT_EVENTS: ReadonlySet<string> = new Set([
+  "user_prompt",
+  "api_request_body",
+]);
+
+/**
+ * Log `event.name` values whose content payload is captured OUTPUT — the
+ * assistant's reply or the model-call response payload. Gated behind
+ * captured-output visibility.
+ */
+const LOG_OUTPUT_CONTENT_EVENTS: ReadonlySet<string> = new Set([
+  "assistant_response",
+  "api_response_body",
+]);
+
+/**
+ * Enforce captured-content visibility on one trace-correlated log record before
+ * it leaves the API. The raw log records carry prompt / response content under
+ * PER-EVENT attribute keys — `prompt` for `user_prompt`, `response` for
+ * `assistant_response`, `body` for the raw `api_*_body` payloads — plus the
+ * top-level OTLP body for content-of-record emitters. This procedure must
+ * withhold every one of those keys behind the SAME `canSeeCapturedInput` /
+ * `canSeeCapturedOutput` visibility the sibling span endpoints enforce, so the
+ * key list comes from {@link contentAttrKeys}, the very mapping the read-path
+ * enrichment and transcript derivation surface content from — a key stripped
+ * from one list but not the other is a policy bypass.
+ *
+ * Ingest also stamps DERIVED content onto the attributes
+ * (`langwatch.gen_ai.output.text`, `…output.tool_calls`, …input counts): the
+ * same captured content re-shaped, so it is stripped by prefix alongside the
+ * raw keys.
+ *
+ * Input-category events gate on input visibility, output-category events on
+ * output visibility, and any UNCLASSIFIED record that still carries a content
+ * body fails closed (both visibilities required). Only content is withheld:
+ * event name, `request_id`, `cost_usd`, `query_source` and every other
+ * metadata attribute (and cost, governed by its own permission) pass through
+ * untouched, so a structural record like the `api_request` cost anchor is
+ * returned intact.
+ */
+export function redactTraceLogContent(
+  row: TraceLogRecordDto,
+  protections: {
+    canSeeCapturedInput?: boolean | null;
+    canSeeCapturedOutput?: boolean | null;
+    capturedInputVisibleTo?: string | null;
+    capturedOutputVisibleTo?: string | null;
+  },
+): TraceLogRecordDto {
+  const eventName = row.attributes[LOG_EVENT_NAME_ATTR] ?? "";
+  const presentContentKeys = contentAttrKeys(eventName).filter((key) => {
+    const value = row.attributes[key];
+    return typeof value === "string" && value.length > 0;
+  });
+  const derivedContentKeys = Object.keys(row.attributes).filter(
+    (key) =>
+      key.startsWith(DERIVED_INPUT_ATTR_PREFIX) ||
+      key.startsWith(DERIVED_OUTPUT_ATTR_PREFIX),
+  );
+  // The top-level OTLP body is content only when it is NOT merely echoing the
+  // event-name marker (claude_code stamps the marker there; a generic
+  // content-of-record emitter puts the record's content there).
+  const topBodyIsContent = row.body.length > 0 && row.body !== eventName;
+  if (
+    presentContentKeys.length === 0 &&
+    derivedContentKeys.length === 0 &&
+    !topBodyIsContent
+  ) {
+    return row;
+  }
+
+  const isInput = LOG_INPUT_CONTENT_EVENTS.has(eventName);
+  const isOutput = LOG_OUTPUT_CONTENT_EVENTS.has(eventName);
+  const canSeeInput = protections.canSeeCapturedInput === true;
+  const canSeeOutput = protections.canSeeCapturedOutput === true;
+  const hidden = isInput
+    ? !canSeeInput
+    : isOutput
+      ? !canSeeOutput
+      : // Unclassified content record — reveal only to a viewer allowed BOTH.
+        !(canSeeInput && canSeeOutput);
+  if (!hidden) return row;
+
+  const attributes = { ...row.attributes };
+  for (const key of presentContentKeys) delete attributes[key];
+  // Derived attrs are stripped by the category they were computed from; an
+  // unclassified hidden record sheds both, mirroring its fail-closed gate.
+  for (const key of derivedContentKeys) {
+    const isDerivedInput = key.startsWith(DERIVED_INPUT_ATTR_PREFIX);
+    if (isInput ? isDerivedInput : isOutput ? !isDerivedInput : true) {
+      delete attributes[key];
+    }
+  }
+  return {
+    ...row,
+    body: topBodyIsContent ? "" : row.body,
+    attributes,
+    bodyRedacted: true,
+    bodyVisibleTo: isInput
+      ? (protections.capturedInputVisibleTo ?? null)
+      : isOutput
+        ? (protections.capturedOutputVisibleTo ?? null)
+        : null,
+  };
+}
+
+/**
+ * Apply BOTH gates to one trace-correlated log record: the free-plan teaser
+ * window and the viewer's captured-content permission.
+ *
+ * A record older than the plan `visibilityCutoffMs` has its captured content
+ * withheld regardless of the viewer's permission — a plan gate, not an audience
+ * gate, so it offers no "visible to …" label (there is no group that can see
+ * it, only a plan upgrade). This mirrors the sibling span reads, which
+ * teaser-redact pre-cutoff spans via `applyVisibilityGate`. Post-cutoff records
+ * (and every record when `visibilityCutoffMs` is null — a paid plan with no
+ * window) fall through to the viewer's real captured-input / captured-output
+ * visibility. Fails closed: a pre-cutoff record is gated as if no captured
+ * content were visible.
+ */
+export function gateTraceLogVisibility(
+  row: TraceLogRecordDto,
+  protections: {
+    canSeeCapturedInput?: boolean | null;
+    canSeeCapturedOutput?: boolean | null;
+    capturedInputVisibleTo?: string | null;
+    capturedOutputVisibleTo?: string | null;
+  },
+  visibilityCutoffMs: number | null,
+): TraceLogRecordDto {
+  const isBeforeCutoff =
+    visibilityCutoffMs !== null && row.timeUnixMs < visibilityCutoffMs;
+  return redactTraceLogContent(
+    row,
+    isBeforeCutoff
+      ? { canSeeCapturedInput: false, canSeeCapturedOutput: false }
+      : protections,
+  );
+}

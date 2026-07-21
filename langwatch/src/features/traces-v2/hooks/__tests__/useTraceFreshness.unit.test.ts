@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ─── Mocks set up before the module-under-test is imported ──────────────────
 
@@ -142,10 +142,22 @@ import { useTraceFreshness } from "../useTraceFreshness";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers();
   capturedOnTraceSummaryUpdated = null;
   liveUpdatesMode = "live";
   visibleIdsResult = { ids: new Set(), topTimestamp: undefined, page: 1 };
 });
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/** newCount invalidation is coalesced (NEWCOUNT_INVALIDATE_DEBOUNCE_MS) — advance past it. */
+async function flushNewCountDebounce() {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10_000);
+  });
+}
 
 // ─── Tests ────────────────────────────────────────────────────────────────
 
@@ -169,6 +181,7 @@ describe("useTraceFreshness", () => {
 
         expect(pulseMock).toHaveBeenCalledWith("trace-visible");
         expect(mockListInvalidate).not.toHaveBeenCalled();
+        await flushNewCountDebounce();
         expect(mockNewCountInvalidate).toHaveBeenCalled();
       });
     });
@@ -191,6 +204,7 @@ describe("useTraceFreshness", () => {
 
         expect(mockListCancel).toHaveBeenCalled();
         expect(mockListInvalidate).toHaveBeenCalled();
+        await flushNewCountDebounce();
         expect(mockNewCountInvalidate).toHaveBeenCalled();
       });
     });
@@ -213,6 +227,7 @@ describe("useTraceFreshness", () => {
 
         expect(mockListCancel).not.toHaveBeenCalled();
         expect(mockListInvalidate).not.toHaveBeenCalled();
+        await flushNewCountDebounce();
         expect(mockNewCountInvalidate).toHaveBeenCalled();
       });
     });
@@ -253,7 +268,32 @@ describe("useTraceFreshness", () => {
         });
 
         expect(mockListInvalidate).not.toHaveBeenCalled();
+        await flushNewCountDebounce();
         expect(mockNewCountInvalidate).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a burst of trace_summary_updated events for existing traces", () => {
+    describe("when several events land inside the coalescing window", () => {
+      it("invalidates newCount once, not once per event", async () => {
+        visibleIdsResult = {
+          ids: new Set(["trace-a"]),
+          topTimestamp: Date.now(),
+          page: 1,
+        };
+
+        renderHook(() => useTraceFreshness());
+
+        await act(async () => {
+          for (let i = 0; i < 5; i++) {
+            capturedOnTraceSummaryUpdated!(["trace-a"]);
+          }
+        });
+        expect(mockNewCountInvalidate).not.toHaveBeenCalled();
+
+        await flushNewCountDebounce();
+        expect(mockNewCountInvalidate).toHaveBeenCalledTimes(1);
       });
     });
   });
