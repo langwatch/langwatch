@@ -48,7 +48,7 @@ function DepartmentsPage() {
       await refresh();
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't create department" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't create department" }),
   });
 
   const departments = listQuery.data ?? [];
@@ -233,7 +233,7 @@ function DepartmentList({
       await onChanged();
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't archive department" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't archive department" }),
   });
 
   return (

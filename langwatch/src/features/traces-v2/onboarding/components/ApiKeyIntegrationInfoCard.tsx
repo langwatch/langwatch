@@ -137,7 +137,7 @@ export function ApiKeyIntegrationInfoCard({
           onTokenGenerated(result.token);
         },
         onError: (error) =>
-          showErrorToast(error, { fallbackTitle: "Couldn't create API key" }),
+          showErrorToast({ error, fallbackTitle: "Couldn't create API key" }),
       },
     );
   };

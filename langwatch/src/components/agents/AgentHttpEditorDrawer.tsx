@@ -336,7 +336,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       onClose();
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't create agent" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
   });
 
   const updateMutation = api.agents.update.useMutation({
@@ -350,7 +350,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       onClose();
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't save agent" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't save agent" }),
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;

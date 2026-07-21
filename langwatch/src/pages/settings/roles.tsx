@@ -155,7 +155,7 @@ function RolesManagement({
       onClose();
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't create role" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't create role" }),
   });
 
   const deleteRole = api.role.delete.useMutation({
@@ -167,7 +167,7 @@ function RolesManagement({
       });
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't delete role" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't delete role" }),
   });
 
   const updateRole = api.role.update.useMutation({
@@ -181,7 +181,7 @@ function RolesManagement({
       setEditingRole(null);
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't update role" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't update role" }),
   });
 
   const handleEditRole = async (roleId: string) => {
@@ -195,7 +195,7 @@ function RolesManagement({
       });
       onEditOpen();
     } catch (error) {
-      showErrorToast(error, { fallbackTitle: "Couldn't load role details" });
+      showErrorToast({ error, fallbackTitle: "Couldn't load role details" });
     }
   };
 
@@ -210,7 +210,7 @@ function RolesManagement({
       });
       onViewOpen();
     } catch (error) {
-      showErrorToast(error, { fallbackTitle: "Couldn't load role details" });
+      showErrorToast({ error, fallbackTitle: "Couldn't load role details" });
     }
   };
 

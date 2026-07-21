@@ -240,7 +240,7 @@ export function SubscriptionPage() {
           void organizationWithMembers.refetch();
         },
         onError: (error) =>
-          showErrorToast(error, { fallbackTitle: "Couldn't send invites" }),
+          showErrorToast({ error, fallbackTitle: "Couldn't send invites" }),
       });
     }
 

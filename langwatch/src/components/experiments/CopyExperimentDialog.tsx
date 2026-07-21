@@ -110,9 +110,7 @@ export const CopyExperimentDialog = ({
 
       onClose();
     } catch (error) {
-      showErrorToast(error, {
-        fallbackTitle: "Couldn't replicate the experiment",
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't replicate the experiment" });
     }
   };
 

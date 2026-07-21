@@ -70,7 +70,7 @@ function MySessionsPage() {
       });
     },
     onError: (err) =>
-      showErrorToast(err, { fallbackTitle: "Couldn't revoke the session" }),
+      showErrorToast({ error: err, fallbackTitle: "Couldn't revoke the session" }),
   });
 
   const revokeAllMutation = api.personalSessions.revokeAll.useMutation({
@@ -86,7 +86,7 @@ function MySessionsPage() {
       });
     },
     onError: (err) =>
-      showErrorToast(err, { fallbackTitle: "Couldn't revoke all sessions" }),
+      showErrorToast({ error: err, fallbackTitle: "Couldn't revoke all sessions" }),
   });
 
   const sessions = sessionsQuery.data ?? [];

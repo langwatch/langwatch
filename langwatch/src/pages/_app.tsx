@@ -1135,71 +1135,79 @@ const appConfig = defineConfig({
           size: "xl",
         },
       }),
+      /**
+       * Toasts are surface cards, not coloured slabs.
+       *
+       * They used to be a translucent wash of the status colour with white
+       * text — the message set on the paint, which is both loud and harder to
+       * read than the colour behind it. This follows the language Langy
+       * already established (`features/asaplangy/tokens.ts`,
+       * `features/langy/components/LangyError.tsx`): panel material, ONE
+       * hairline carrying the tone, the status colour spent on a small icon,
+       * and the accent reserved for the way forward — never on the trouble.
+       *
+       * It has to live here rather than as props on `<Toast.Root>`: Chakra's
+       * defaults are attribute selectors (`&[data-type=error]`), which a style
+       * prop cannot outrank. The per-status hairline and icon are applied in
+       * `components/ui/toaster.tsx`.
+       */
       toast: defineSlotRecipe({
-        slots: ["root"],
+        slots: ["root", "title", "description"],
         base: {
           root: {
-            borderRadius: "xl",
-            backdropFilter: "blur(12px)",
+            bg: { _light: "white", _dark: "rgba(24, 24, 28, 0.92)" },
+            color: "fg",
+            borderRadius: "14px",
             border: "1px solid",
-            boxShadow: "lg",
-            "&[data-type=info]": {
-              bg: {
-                _light: "blue.solid/85",
-                _dark: "rgba(37, 99, 235, 0.8)",
-              },
-              borderColor: {
-                _light: "blue.solid/30",
-                _dark: "rgba(96, 165, 250, 0.25)",
-              },
-              color: "white",
-              "--toast-trigger-bg": "{white/10}",
-              "--toast-border-color": "{white/40}",
+            borderColor: { _light: "black/8", _dark: "rgba(255,255,255,0.10)" },
+            backdropFilter: "blur(12px)",
+            padding: "14px",
+            paddingInlineEnd: "14px",
+            gap: "2.5",
+            alignItems: "flex-start",
+            // A soft lift on light; on dark a raised surface is the same
+            // ground with more light on it, so the shadow goes away.
+            boxShadow: {
+              _light:
+                "0 1px 2px rgba(16,17,20,.05), 0 12px 28px -14px rgba(16,17,20,.25)",
+              _dark: "none",
+            },
+            "--toast-trigger-bg": "colors.bg.muted",
+            // Every status shares the one material; the tone is carried by the
+            // border and the icon, set per-status in `toaster.tsx`. These keys
+            // must match Chakra's own selectors EXACTLY — the app recipe is
+            // merged into the default by key, so a compound selector would sit
+            // alongside `&[data-type=error]` at equal specificity and lose on
+            // source order rather than replacing it.
+            "&[data-type=warning]": {
+              bg: { _light: "white", _dark: "rgba(24, 24, 28, 0.92)" },
+              color: "fg",
             },
             "&[data-type=success]": {
-              bg: {
-                _light: "green.solid/85",
-                _dark: "rgba(22, 163, 74, 0.8)",
-              },
-              borderColor: {
-                _light: "green.solid/30",
-                _dark: "rgba(74, 222, 128, 0.25)",
-              },
-              color: "white",
+              bg: { _light: "white", _dark: "rgba(24, 24, 28, 0.92)" },
+              color: "fg",
             },
             "&[data-type=error]": {
-              bg: {
-                _light: "red.solid/88",
-                _dark: "rgba(220, 38, 38, 0.8)",
-              },
-              borderColor: {
-                _light: "red.solid/30",
-                _dark: "rgba(248, 113, 113, 0.25)",
-              },
-              color: "white",
+              bg: { _light: "white", _dark: "rgba(24, 24, 28, 0.92)" },
+              color: "fg",
             },
-            "&[data-type=warning]": {
-              bg: {
-                _light: "yellow.solid/88",
-                _dark: "rgba(217, 119, 6, 0.8)",
-              },
-              borderColor: {
-                _light: "yellow.solid/30",
-                _dark: "rgba(251, 191, 36, 0.25)",
-              },
-              color: "white",
+            "&[data-type=info]": {
+              bg: { _light: "white", _dark: "rgba(24, 24, 28, 0.92)" },
+              color: "fg",
             },
-            "&[data-type=loading]": {
-              bg: {
-                _light: "white/80",
-                _dark: "rgba(30, 30, 36, 0.8)",
-              },
-              borderColor: {
-                _light: "black/8",
-                _dark: "rgba(255, 255, 255, 0.1)",
-              },
-              color: { _light: "gray.800", _dark: "gray.100" },
-            },
+          },
+          title: {
+            fontSize: "13.5px",
+            fontWeight: "640",
+            lineHeight: "1.35",
+            letterSpacing: "-0.005em",
+            marginEnd: "0",
+          },
+          description: {
+            fontSize: "13px",
+            lineHeight: "1.5",
+            color: "fg.muted",
+            opacity: "1",
           },
         },
       }),

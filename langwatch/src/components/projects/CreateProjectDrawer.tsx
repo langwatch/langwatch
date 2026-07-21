@@ -101,7 +101,7 @@ export function CreateProjectDrawer({
             handleClose();
           },
           onError: (error) =>
-            showErrorToast(error, { fallbackTitle: "Couldn't create project" }),
+            showErrorToast({ error, fallbackTitle: "Couldn't create project" }),
         },
       );
     });

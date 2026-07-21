@@ -155,7 +155,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
         });
       },
       onError: (error) =>
-        showErrorToast(error, { fallbackTitle: "Couldn't generate license" }),
+        showErrorToast({ error, fallbackTitle: "Couldn't generate license" }),
     });
 
     const handlePlanTypeChange = (newPlanType: PlanType) => {

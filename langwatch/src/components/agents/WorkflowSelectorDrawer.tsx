@@ -98,7 +98,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
       onSave?.(agent);
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't create agent" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
   });
 
   const isSaving =
@@ -150,9 +150,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
         );
       } catch (error) {
         console.error("Error creating workflow agent:", error);
-        showErrorToast(error, {
-          fallbackTitle: "Couldn't create workflow agent",
-        });
+        showErrorToast({ error, fallbackTitle: "Couldn't create workflow agent" });
       }
     },
     [

@@ -3,9 +3,15 @@
  *
  * Tier-1: known error shapes → specific, actionable copy.
  * Tier-2 (unknown): generic copy + raw backend message verbatim.
+ *
+ * Deliberately does NOT read the handled-error registry. Its inputs come from
+ * `generateScenarioWithAI` — a plain `fetch` to /api/scenario/generate — so a
+ * handled payload never arrives here; and the tiers below are decided by regex
+ * over the extracted message, so feeding registry copy in would make a copy
+ * edit in a different file silently reclassify an error. Assert on `code`, not
+ * on prose: if this endpoint ever emits handled errors, switch on
+ * `readHandledError(error)?.code` here rather than on the rendered sentence.
  */
-import { explainHandledError, readHandledError } from "~/features/errors";
-
 import { ScenarioGenerationError } from "../services/scenarioGeneration";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -54,15 +60,6 @@ function extractMessage(error: unknown): string {
 
   if (error instanceof ScenarioGenerationError) {
     return describeGenerationError(error);
-  }
-
-  // A handled error carries no prose — since #5984 its wire message is the
-  // code slug — so the registry is the only place its words exist. This path
-  // matters because the tier-2 fallback renders whatever comes back verbatim.
-  const handled = readHandledError(error);
-  if (handled) {
-    const { title, description } = explainHandledError(handled);
-    return description ? `${title}. ${description}` : title;
   }
 
   if (error instanceof Error) {

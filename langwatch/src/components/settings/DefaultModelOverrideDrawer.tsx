@@ -323,11 +323,9 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       onSaved();
       onClose();
     } catch (err) {
-      showErrorToast(err, {
-        fallbackTitle: editing
+      showErrorToast({ error: err, fallbackTitle: editing
           ? "Couldn't update the config"
-          : "Couldn't add the config",
-      });
+          : "Couldn't add the config" });
     } finally {
       setBusy(false);
     }

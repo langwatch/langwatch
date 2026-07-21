@@ -47,13 +47,13 @@ export interface ShowErrorToastOptions {
  * also toast.
  *
  * ```ts
- * onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't create project" }),
+ * onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't create project" }),
  * ```
  */
-export function showErrorToast(
-  error: unknown,
-  options: ShowErrorToastOptions = {},
-): void {
+export function showErrorToast({
+  error,
+  ...options
+}: ShowErrorToastOptions & { error: unknown }): void {
   // Already surfaced as a modal or a bespoke toast by the global interceptors
   // in `utils/api.tsx` — a second toast would be a duplicate report.
   if (isHandledByGlobalHandler(error)) return;

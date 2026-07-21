@@ -117,7 +117,7 @@ export function useInviteActions({
           refetchInvites();
           invalidateLimits();
         },
-        onError: (error) => showErrorToast(error),
+        onError: (error) => showErrorToast({ error: error }),
       },
     );
   };
@@ -156,7 +156,7 @@ export function useInviteActions({
           refetchInvites();
           invalidateLimits();
         },
-        onError: (error) => showErrorToast(error),
+        onError: (error) => showErrorToast({ error: error }),
       },
     );
   };
@@ -228,7 +228,7 @@ export function useInviteActions({
             });
             performMutation(data);
           } catch (err) {
-            showErrorToast(err, { fallbackTitle: "Couldn't expand seats" });
+            showErrorToast({ error: err, fallbackTitle: "Couldn't expand seats" });
           }
         },
       });
@@ -256,7 +256,7 @@ export function useInviteActions({
           refetchInvites();
           invalidateLimits();
         },
-        onError: (error) => showErrorToast(error),
+        onError: (error) => showErrorToast({ error: error }),
       },
     );
   };
@@ -276,7 +276,7 @@ export function useInviteActions({
           refetchInvites();
           invalidateLimits();
         },
-        onError: (error) => showErrorToast(error),
+        onError: (error) => showErrorToast({ error: error }),
       },
     );
   };
@@ -296,7 +296,7 @@ export function useInviteActions({
           refetchInvites();
           invalidateLimits();
         },
-        onError: (error) => showErrorToast(error),
+        onError: (error) => showErrorToast({ error: error }),
       },
     );
   };

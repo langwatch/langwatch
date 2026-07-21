@@ -314,9 +314,7 @@ function OrganizationEditDrawer({
           onClose();
         },
         onError: (err) =>
-          showErrorToast(err, {
-            fallbackTitle: "Couldn't update the organization",
-          }),
+          showErrorToast({ error: err, fallbackTitle: "Couldn't update the organization" }),
       },
     );
   };

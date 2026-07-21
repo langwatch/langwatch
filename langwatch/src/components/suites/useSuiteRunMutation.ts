@@ -82,7 +82,7 @@ export function useSuiteRunMutation({
         return;
       }
 
-      showErrorToast(err, { fallbackTitle: "Couldn't execute run plan" });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't execute run plan" });
     },
   });
 

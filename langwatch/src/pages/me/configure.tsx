@@ -74,7 +74,7 @@ function MySettingsPage() {
       });
     },
     onError: (err) =>
-      showErrorToast(err, { fallbackTitle: "Couldn't issue the personal key" }),
+      showErrorToast({ error: err, fallbackTitle: "Couldn't issue the personal key" }),
   });
 
   const personalContextQuery = api.user.personalContext.useQuery(
@@ -110,9 +110,7 @@ function MySettingsPage() {
         });
       },
       onError: (err) =>
-        showErrorToast(err, {
-          fallbackTitle: "Couldn't enable advanced features",
-        }),
+        showErrorToast({ error: err, fallbackTitle: "Couldn't enable advanced features" }),
     },
   );
   const disableAllMutation =
@@ -131,9 +129,7 @@ function MySettingsPage() {
         });
       },
       onError: (err) =>
-        showErrorToast(err, {
-          fallbackTitle: "Couldn't disable advanced features",
-        }),
+        showErrorToast({ error: err, fallbackTitle: "Couldn't disable advanced features" }),
     });
 
   const revokeMutation = api.personalVirtualKeys.revokePersonal.useMutation({
@@ -149,7 +145,7 @@ function MySettingsPage() {
       });
     },
     onError: (err) =>
-      showErrorToast(err, { fallbackTitle: "Couldn't revoke the key" }),
+      showErrorToast({ error: err, fallbackTitle: "Couldn't revoke the key" }),
   });
 
   const onIssue = () => {

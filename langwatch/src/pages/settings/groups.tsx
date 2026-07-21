@@ -50,7 +50,7 @@ function GroupsSettings() {
       setGroupToDelete(null);
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't delete the group" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't delete the group" }),
   });
 
   const groups = api.group.listAll.useQuery(

@@ -158,7 +158,7 @@ function VirtualKeysPage() {
       });
       setRotating(null);
     } catch (err) {
-      showErrorToast(err, { fallbackTitle: "Couldn't rotate the key" });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't rotate the key" });
     }
   };
 
@@ -171,7 +171,7 @@ function VirtualKeysPage() {
       });
       setRevoking(null);
     } catch (err) {
-      showErrorToast(err, { fallbackTitle: "Couldn't revoke the key" });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't revoke the key" });
     }
   };
 

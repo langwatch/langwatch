@@ -59,9 +59,7 @@ export const useRenamePromptHandle = ({
     };
 
     const handleError = (error: Error) =>
-      showErrorToast(error, {
-        fallbackTitle: "Couldn't change the prompt handle",
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't change the prompt handle" });
 
     triggerChangeHandle({
       id: promptId,

@@ -34,7 +34,7 @@ export function markAsHandledByLicenseHandler(error: Error): void {
  * const mutation = api.prompts.create.useMutation({
  *   onError: (error) => {
  *     if (isHandledByGlobalLicenseHandler(error)) return;
- *     showErrorToast(error, { fallbackTitle: "Couldn't save" });
+ *     showErrorToast({ error, fallbackTitle: "Couldn't save" });
  *   },
  * });
  * ```
@@ -76,7 +76,7 @@ export function isHandledByLiteMemberHandler(error: unknown): boolean {
  * @example
  * ```tsx
  * const mutation = api.prompts.create.useMutation({
- *   onError: (error) => showErrorToast(error, { fallbackTitle: "Couldn't save" }),
+ *   onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save" }),
  * });
  * ```
  */

@@ -54,7 +54,7 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
   if (!docsUrl && !traceId) return null;
 
   return (
-    <HStack gap={4} marginTop={1.5} fontSize="xs">
+    <HStack gap={3} marginTop={2} fontSize="11.5px" color="fg.subtle">
       {docsUrl && (
         <Link
           href={docsUrl}
@@ -63,11 +63,16 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
           display="inline-flex"
           alignItems="center"
           gap={1}
-          fontSize="xs"
-          textDecoration="underline"
+          fontSize="11.5px"
+          fontWeight="560"
+          // The one accent, spent on the action — matching Langy's rule that
+          // colour goes on the way forward, not on the trouble.
+          color="orange.fg"
+          textDecoration="none"
+          _hover={{ textDecoration: "underline" }}
         >
           Read the docs
-          <ExternalLinkIcon width={11} height={11} />
+          <ExternalLinkIcon width={10} height={10} />
         </Link>
       )}
       {traceId && canCopy && (
@@ -77,9 +82,9 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
           display="inline-flex"
           alignItems="center"
           gap={1}
-          opacity={0.75}
           cursor="pointer"
-          _hover={{ opacity: 1 }}
+          transition="color .12s ease"
+          _hover={{ color: "fg.muted" }}
           aria-label={
             failed
               ? "Couldn't copy the error ID"
@@ -89,9 +94,9 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
           }
         >
           {copied ? (
-            <CheckIcon width={11} height={11} />
+            <CheckIcon width={10} height={10} />
           ) : (
-            <CopyIcon width={11} height={11} />
+            <CopyIcon width={10} height={10} />
           )}
           {failed ? "Couldn't copy" : copied ? "Copied" : "Copy error ID"}
         </chakra.button>

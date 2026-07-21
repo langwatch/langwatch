@@ -99,9 +99,7 @@ export function EditProjectDrawer({
           },
           onError: (error) => {
             if (applyHandledErrorToForm({ error, form })) return;
-            showErrorToast(error, {
-              fallbackTitle: "Couldn't update the project",
-            });
+            showErrorToast({ error, fallbackTitle: "Couldn't update the project" });
           },
         },
       );

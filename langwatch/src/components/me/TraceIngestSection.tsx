@@ -84,16 +84,14 @@ export function TraceIngestSection() {
       void utils.ingestionKey.list.invalidate();
     },
     onError: (error) =>
-      showErrorToast(error, {
-        fallbackTitle: "Couldn't install this integration",
-      }),
+      showErrorToast({ error, fallbackTitle: "Couldn't install this integration" }),
   });
   const rotateMutation = api.ingestionKey.rotate.useMutation({
     onSuccess: () => {
       void utils.ingestionKey.list.invalidate();
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't rotate this key" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't rotate this key" }),
   });
 
   const publicEnv = usePublicEnv();

@@ -639,10 +639,13 @@ export function explainHandledError(error: HandledErrorShape): ErrorExplanation 
  * all of which are lost here. This exists so the awkward slots have something
  * better than `error.message`, not as a general-purpose escape hatch.
  */
-export function describeError(
-  error: unknown,
-  options: { fallbackTitle?: string } = {},
-): string {
+export function describeError({
+  error,
+  fallbackTitle,
+}: {
+  error: unknown;
+  fallbackTitle?: string;
+}): string {
   const handled = readHandledError(error);
   const authored = readAuthoredMessage(error);
   const explanation = handled
@@ -653,7 +656,7 @@ export function describeError(
 
   const title = explanation.isRegistered
     ? explanation.title
-    : (options.fallbackTitle ?? explanation.title);
+    : (fallbackTitle ?? explanation.title);
 
   return explanation.description
     ? `${title}. ${explanation.description}`

@@ -73,7 +73,7 @@ export function CreateGroupDialog({
       reset();
       onClose();
     } catch (e) {
-      showErrorToast(e, { fallbackTitle: "Couldn't create the group" });
+      showErrorToast({ error: e, fallbackTitle: "Couldn't create the group" });
     }
   }
 

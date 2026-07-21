@@ -55,14 +55,14 @@ export function FeatureFlagsContent() {
       await utils.ops.listFeatureFlags.invalidate();
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't update the flag" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't update the flag" }),
   });
   const clearFlag = api.ops.clearFeatureFlag.useMutation({
     onSuccess: async () => {
       await utils.ops.listFeatureFlags.invalidate();
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't clear the override" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't clear the override" }),
   });
 
   const grouped = useMemo(() => groupByScope(query.data?.flags ?? []), [query.data]);

@@ -147,7 +147,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         applyHandledErrorToForm({ error, form: formInstance })
       )
         return;
-      showErrorToast(error, { fallbackTitle: "Couldn't create scenario" });
+      showErrorToast({ error, fallbackTitle: "Couldn't create scenario" });
     },
   });
   const updateMutation = api.scenarios.update.useMutation({
@@ -165,7 +165,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         applyHandledErrorToForm({ error, form: formInstance })
       )
         return;
-      showErrorToast(error, { fallbackTitle: "Couldn't save scenario" });
+      showErrorToast({ error, fallbackTitle: "Couldn't save scenario" });
     },
   });
 
@@ -364,7 +364,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
       })();
     } catch (error) {
-      showErrorToast(error, { fallbackTitle: "Couldn't run scenario" });
+      showErrorToast({ error, fallbackTitle: "Couldn't run scenario" });
     }
   }, [
     formInstance,

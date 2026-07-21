@@ -177,15 +177,13 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   const createMutation = api.evaluators.create.useMutation({
     onSuccess: finishSave,
     onError: (error) =>
-      showErrorToast(error, {
-        fallbackTitle: "Couldn't create code evaluator",
-      }),
+      showErrorToast({ error, fallbackTitle: "Couldn't create code evaluator" }),
   });
 
   const updateMutation = api.evaluators.update.useMutation({
     onSuccess: finishSave,
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't save code evaluator" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't save code evaluator" }),
   });
 
   const handleSave = () => {

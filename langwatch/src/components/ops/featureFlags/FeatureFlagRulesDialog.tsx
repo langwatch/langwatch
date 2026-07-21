@@ -111,7 +111,7 @@ export function FeatureFlagRulesDialog({
       onOpenChange(false);
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't save the targeting rules" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't save the targeting rules" }),
   });
 
   // Re-seed the draft only when the dialog transitions from closed to

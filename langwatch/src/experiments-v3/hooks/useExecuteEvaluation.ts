@@ -718,9 +718,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             setError(err.message);
             setIsAborting(false); // Clear aborting state on error
             cleanupThisExecution();
-            showErrorToast(err, {
-              fallbackTitle: "Couldn't run the evaluation",
-            });
+            showErrorToast({ error: err, fallbackTitle: "Couldn't run the evaluation" });
           },
         });
 
@@ -787,7 +785,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     } catch (err) {
       // On error, reset aborting state since abort failed
       setIsAborting(false);
-      showErrorToast(err, { fallbackTitle: "Couldn't stop the run" });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't stop the run" });
     }
     // Note: No finally block - isAborting stays true until `stopped` event
   }, [project?.id, runId]);

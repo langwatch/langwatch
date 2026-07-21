@@ -94,7 +94,7 @@ export function BudgetEditDrawer({
       onSaved();
       onOpenChange(false);
     } catch (error) {
-      showErrorToast(error, { fallbackTitle: "Couldn't update the budget" });
+      showErrorToast({ error, fallbackTitle: "Couldn't update the budget" });
     }
   };
 

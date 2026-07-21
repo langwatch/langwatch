@@ -113,9 +113,7 @@ export function OttlEditor({
         setValidationStatus(
           next.map(() => ({
             ok: true,
-            message: describeError(err, {
-              fallbackTitle: "Couldn't check these statements",
-            }),
+            message: describeError({ error: err, fallbackTitle: "Couldn't check these statements" }),
           })),
         );
       } finally {

@@ -44,7 +44,7 @@ export function SingleAggregateReplay({
       onReplayStarted();
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't start the replay" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't start the replay" }),
   });
 
   function toggleProjection(name: string) {

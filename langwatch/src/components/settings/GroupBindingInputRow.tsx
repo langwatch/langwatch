@@ -373,7 +373,7 @@ export function AddBindingForm({
       onAdded();
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't add the binding" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't add the binding" }),
   });
 
   return (

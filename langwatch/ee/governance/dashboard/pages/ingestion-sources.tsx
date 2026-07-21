@@ -272,7 +272,7 @@ function IngestionSourcesPage() {
       });
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't create the source" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
   });
 
   const rotateMutation = api.ingestionSources.rotateSecret.useMutation({
@@ -287,7 +287,7 @@ function IngestionSourcesPage() {
       });
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't rotate the secret" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
   });
 
   const updateMutation = api.ingestionSources.update.useMutation({
@@ -297,7 +297,7 @@ function IngestionSourcesPage() {
       toaster.create({ title: "Source updated", type: "success" });
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't update the source" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't update the source" }),
   });
 
   const archiveMutation = api.ingestionSources.archive.useMutation({
@@ -306,7 +306,7 @@ function IngestionSourcesPage() {
       toaster.create({ title: "Source archived", type: "success" });
     },
     onError: (e) =>
-      showErrorToast(e, { fallbackTitle: "Couldn't archive the source" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't archive the source" }),
   });
 
   const onSubmit = () => {

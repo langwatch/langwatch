@@ -203,7 +203,7 @@ export default function SimulationsPage() {
       });
     },
     onError: (err) =>
-      showErrorToast(err, { fallbackTitle: "Couldn't archive run plan" }),
+      showErrorToast({ error: err, fallbackTitle: "Couldn't archive run plan" }),
   });
 
   const duplicateMutation = api.suites.duplicate.useMutation({
@@ -217,7 +217,7 @@ export default function SimulationsPage() {
       });
     },
     onError: (err) =>
-      showErrorToast(err, { fallbackTitle: "Couldn't duplicate run plan" }),
+      showErrorToast({ error: err, fallbackTitle: "Couldn't duplicate run plan" }),
   });
 
   const { requestRun, isPending: isRunPending, pendingBatchRunId, dialogProps: runDialogProps } = useRunSuite({

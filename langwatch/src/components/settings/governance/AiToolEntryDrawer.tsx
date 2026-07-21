@@ -359,9 +359,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   };
 
   const onError = (err: unknown) => {
-    showErrorToast(err, {
-      fallbackTitle: isEdit ? "Couldn't update tile" : "Couldn't publish tile",
-    });
+    showErrorToast({ error: err, fallbackTitle: isEdit ? "Couldn't update tile" : "Couldn't publish tile" });
   };
 
   const createMutation = api.aiTools.create.useMutation({ onSuccess, onError });

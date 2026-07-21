@@ -107,7 +107,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
       });
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't create evaluator" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't create evaluator" }),
   });
 
   const isSaving =
@@ -154,9 +154,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
         );
       } catch (error) {
         console.error("Error creating workflow evaluator:", error);
-        showErrorToast(error, {
-          fallbackTitle: "Couldn't create workflow evaluator",
-        });
+        showErrorToast({ error, fallbackTitle: "Couldn't create workflow evaluator" });
       }
     },
     [

@@ -185,14 +185,14 @@ export function RunHistoryPanel({
     onCancelJobError: (error) => {
       setCancellingJobId(null);
       void refetch();
-      showErrorToast(error, { fallbackTitle: "Couldn't cancel job" });
+      showErrorToast({ error, fallbackTitle: "Couldn't cancel job" });
     },
     onCancelBatchSuccess: () => {
       void refetch();
       toaster.create({ title: "Jobs cancelled", type: "success" });
     },
     onCancelBatchError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't cancel jobs" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't cancel jobs" }),
   });
 
   // Apply filters to raw runs

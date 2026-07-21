@@ -144,7 +144,7 @@ export function DefaultModelsSection({
         meta: { closable: true },
       });
     } catch (err) {
-      showErrorToast(err, { fallbackTitle: "Couldn't delete the config" });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't delete the config" });
     }
   };
 

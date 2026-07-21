@@ -211,7 +211,7 @@ export function DatasetEditorTable({
       // value on return (the edit is persisted per-record, not into this cache).
       staleTime: 0,
       onError: (error) =>
-        showErrorToast(error, { fallbackTitle: "Couldn't load dataset" }),
+        showErrorToast({ error, fallbackTitle: "Couldn't load dataset" }),
     },
   );
 
@@ -603,7 +603,7 @@ export function DatasetEditorTable({
           fullColumnTypes,
         );
       } catch (error) {
-        showErrorToast(error, { fallbackTitle: "Couldn't download dataset" });
+        showErrorToast({ error, fallbackTitle: "Couldn't download dataset" });
         return;
       }
     }

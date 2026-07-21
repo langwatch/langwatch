@@ -378,12 +378,10 @@ function SubscriptionDrawer({
       onClose();
     };
     const onError = (err: Error) =>
-      showErrorToast(err, {
-        fallbackTitle:
+      showErrorToast({ error: err, fallbackTitle:
           mode === "edit"
             ? "Couldn't update the subscription"
-            : "Couldn't create the subscription",
-      });
+            : "Couldn't create the subscription" });
 
     if (mode === "edit" && subscription) {
       update.mutate({ id: subscription.id, data: payload }, { onSuccess, onError });

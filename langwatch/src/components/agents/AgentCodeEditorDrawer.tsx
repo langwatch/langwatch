@@ -200,7 +200,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       onClose();
     },
     onError: (error) =>
-      showErrorToast(error, { fallbackTitle: "Couldn't create agent" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
   });
 
   const updateMutation = api.agents.update.useMutation({

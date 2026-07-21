@@ -1,4 +1,5 @@
-import { Alert, Box, List, Text } from "@chakra-ui/react";
+import { Box, HStack, List, Stack, Text } from "@chakra-ui/react";
+import { AlertCircle } from "lucide-react";
 
 import {
   UNKNOWN_ERROR_PRESENTATION,
@@ -11,6 +12,14 @@ import {
 } from "../logic/readHandledError";
 
 import { ErrorActions } from "./ErrorActions";
+
+/**
+ * The same restrained hairline the toast wears — the tone lives in the border
+ * and the icon, never in a filled wash. See `components/ui/toaster.tsx` and
+ * `features/asaplangy/tokens.ts`.
+ */
+const HAIRLINE =
+  "color-mix(in srgb, var(--chakra-colors-red-solid) 26%, var(--chakra-colors-border-muted))";
 
 export interface HandledErrorAlertProps {
   /** Any error — handled or not. Renders nothing when null/undefined. */
@@ -72,34 +81,61 @@ export function HandledErrorAlert({
       : (fallbackTitle ?? explanation.title));
 
   return (
-    <Alert.Root status="error" alignItems="flex-start">
-      <Alert.Indicator />
-      <Alert.Content gap={1}>
-        <Alert.Title>{heading}</Alert.Title>
-        {explanation.description && (
-          <Alert.Description>{explanation.description}</Alert.Description>
-        )}
+    <Box
+      role="alert"
+      borderWidth="1px"
+      borderColor={HAIRLINE}
+      borderRadius="12px"
+      bg="bg.surface"
+      _dark={{ bg: "bg.panel" }}
+      paddingX="14px"
+      paddingY="12px"
+    >
+      <HStack gap="2.5" alignItems="flex-start">
+        <Box color="red.fg" display="flex" flexShrink={0} marginTop="1px">
+          <AlertCircle size={15} aria-hidden="true" />
+        </Box>
 
-        {showAllTips && tips.length > 0 && (
-          <List.Root gap={0.5} marginTop={1} fontSize="sm" paddingLeft={4}>
-            {tips.map((tip) => (
-              <List.Item key={tip}>{tip}</List.Item>
-            ))}
-          </List.Root>
-        )}
-        {!showAllTips && tips[0] && (
-          <Text fontSize="sm" marginTop={1}>
-            {tips[0]}
+        <Stack gap="0.5" flex="1" minWidth={0}>
+          <Text
+            fontSize="13.5px"
+            fontWeight="640"
+            lineHeight="1.35"
+            letterSpacing="-0.005em"
+          >
+            {heading}
           </Text>
-        )}
+          {explanation.description && (
+            <Text fontSize="13px" lineHeight="1.5" color="fg.muted">
+              {explanation.description}
+            </Text>
+          )}
 
-        <Box>
+          {showAllTips && tips.length > 0 && (
+            <List.Root
+              gap={0.5}
+              marginTop={1.5}
+              fontSize="12.5px"
+              color="fg.muted"
+              paddingLeft={4}
+            >
+              {tips.map((tip) => (
+                <List.Item key={tip}>{tip}</List.Item>
+              ))}
+            </List.Root>
+          )}
+          {!showAllTips && tips[0] && (
+            <Text fontSize="12.5px" marginTop={1} color="fg.muted">
+              {tips[0]}
+            </Text>
+          )}
+
           <ErrorActions
             docsUrl={handled?.docsUrl}
             traceId={readErrorTraceId(error)}
           />
-        </Box>
-      </Alert.Content>
-    </Alert.Root>
+        </Stack>
+      </HStack>
+    </Box>
   );
 }

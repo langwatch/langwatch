@@ -209,11 +209,9 @@ function LLMModelCostForm({
           void llmModelCostsQuery.refetch();
         },
         onError: (error) =>
-          showErrorToast(error, {
-            fallbackTitle: id
+          showErrorToast({ error, fallbackTitle: id
               ? "Couldn't update model cost"
-              : "Couldn't create model cost",
-          }),
+              : "Couldn't create model cost" }),
       },
     );
   };

@@ -51,7 +51,7 @@ export function DepartmentEditDrawer({
       onSaved();
       onOpenChange(false);
     } catch (error) {
-      showErrorToast(error, { fallbackTitle: "Couldn't rename the department" });
+      showErrorToast({ error, fallbackTitle: "Couldn't rename the department" });
     }
   };
 

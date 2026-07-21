@@ -288,7 +288,7 @@ function ProjectEditDrawer({
           onClose();
         },
         onError: (err) =>
-          showErrorToast(err, { fallbackTitle: "Couldn't update the project" }),
+          showErrorToast({ error: err, fallbackTitle: "Couldn't update the project" }),
       },
     );
   };
