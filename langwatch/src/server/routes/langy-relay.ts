@@ -20,6 +20,7 @@ import { getApp } from "~/server/app-layer/app";
 import { connection } from "~/server/redis";
 import { createLangyFrameDedup } from "~/server/app-layer/langy/streaming/langyFrameDedup";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { LangyTurnRelay } from "~/server/app-layer/langy/streaming/langyTurnRelay";
 import { createLogger } from "@langwatch/observability";
 import { getLangyRelayFramesCounter } from "~/server/metrics";
@@ -60,11 +61,18 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
   const body = c.req.raw.body;
   if (!body) return c.json({ error: "missing body" }, 400);
 
+  const handoffStore = createLangyTurnHandoffStore({ redis: connection });
   const relay = new LangyTurnRelay({
     conversations: getApp().langy.conversations,
     buffer: createLangyTokenBuffer({ redis: connection }),
     reserveFrameNonce: createLangyFrameDedup({ redis: connection })
       .reserveFrameNonce,
+    // Authenticate frames against the synchronous per-turn handoff token first
+    // (the exact one the worker signs with), so a first turn whose RunToken
+    // projection is still landing isn't dropped as no-run-token. Empty token
+    // (legacy conversation) falls through to the projection.
+    readHandoffRunToken: async ({ conversationId, turnId }) =>
+      (await handoffStore.read({ conversationId, turnId }))?.runToken || null,
     logger,
   });
 

@@ -51,6 +51,10 @@ function makeRelay(
   over: {
     conversations?: ReturnType<typeof fakeConversations>;
     fresh?: boolean;
+    readHandoffRunToken?: (a: {
+      conversationId: string;
+      turnId: string;
+    }) => Promise<string | null>;
   } = {},
 ) {
   const buffer = fakeBuffer();
@@ -60,6 +64,9 @@ function makeRelay(
     buffer,
     conversations,
     reserveFrameNonce,
+    ...(over.readHandoffRunToken
+      ? { readHandoffRunToken: over.readHandoffRunToken }
+      : {}),
   });
   return { relay, buffer, conversations, reserveFrameNonce };
 }
@@ -466,6 +473,50 @@ describe("LangyTurnRelay", () => {
       await relay.handle(frame({ type: "delta", text: "b" }));
       await relay.handle(frame({ type: "final", text: "done" }));
       expect(conversations.getRunToken).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given the run-token handoff races the projection", () => {
+    it("authenticates against the handoff token before the RunToken projection lands", async () => {
+      // First-turn reality: the async RunToken projection is still queued (null),
+      // but the synchronous handoff carries the token the worker signed with.
+      const conversations = fakeConversations(null);
+      const readHandoffRunToken = vi.fn(async () => RUN_TOKEN);
+      const { relay, buffer } = makeRelay({ conversations, readHandoffRunToken });
+
+      const out = await relay.handle(frame({ type: "delta", text: "hi" }));
+
+      expect(out).toEqual({ status: "applied" });
+      expect(buffer.appendChunk).toHaveBeenCalledTimes(1);
+      expect(readHandoffRunToken).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+      });
+      // The lagging projection is never consulted once the handoff has the token.
+      expect(conversations.getRunToken).not.toHaveBeenCalled();
+    });
+
+    it("does not cache a transient null, so a later frame authenticates once the token appears", async () => {
+      // No handoff wired; the projection is null on the first read, then lands.
+      const getRunToken = vi
+        .fn(
+          async (_a: {
+            projectId: string;
+            conversationId: string;
+          }): Promise<string | null> => RUN_TOKEN,
+        )
+        .mockResolvedValueOnce(null);
+      const conversations = { ...fakeConversations(), getRunToken };
+      const { relay, buffer } = makeRelay({ conversations });
+
+      const first = await relay.handle(frame({ type: "delta", text: "one" }));
+      expect(first).toEqual({ status: "rejected", reason: "no-run-token" });
+
+      const second = await relay.handle(frame({ type: "delta", text: "two" }));
+      expect(second).toEqual({ status: "applied" });
+      expect(buffer.appendChunk).toHaveBeenCalledTimes(1);
+      // Re-queried because the first null was NOT cached (the bug this fixes).
+      expect(getRunToken).toHaveBeenCalledTimes(2);
     });
   });
 });

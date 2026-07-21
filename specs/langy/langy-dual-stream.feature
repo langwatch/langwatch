@@ -140,6 +140,28 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     Then the relay handles that frame before the next frame is even sent
     And non-streaming request bodies are still delivered whole, exactly as before
 
+  # The worker signs its relay frames with the runToken it got synchronously from
+  # the per-turn handoff at dispatch, but the relay used to VERIFY them against the
+  # async `RunToken` projection — which, on a brand-new conversation, has not landed
+  # when the first frames arrive. The relay looked the token up once, cached the
+  # null, and dropped EVERY frame of that turn as `no-run-token` (prod: a first turn
+  # showed nothing for ~5 minutes while it was actually working). The relay now
+  # reads the handoff token first, and never caches a null.
+  @unit
+  Scenario: The first frames of a new turn authenticate against the handoff before the projection lands
+    Given a brand-new conversation whose worker is pushing frames
+    And the durable runToken projection has not landed yet
+    When the worker's first frame reaches the relay
+    Then the relay authenticates it against the synchronous handoff token
+    And the frame is applied to the durable buffer instead of dropped as no-run-token
+
+  @unit
+  Scenario: A transient runToken miss does not poison the whole connection
+    Given the relay's first runToken lookup for a turn returns nothing
+    When a later frame arrives after the token has become readable
+    Then the relay re-reads the token instead of reusing the cached miss
+    And the later frame is authenticated and applied
+
   # The durable token buffer used to hold tokens until ~64 words accumulated,
   # so short answers rendered nothing until the turn was nearly over.
   @unit
