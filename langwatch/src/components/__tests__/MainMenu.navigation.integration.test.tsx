@@ -106,7 +106,7 @@ describe("<MainMenu /> navigation", () => {
     expect(sectionControls).toEqual([
       "Collapse Observe",
       "Collapse Test",
-      "Expand Library",
+      "Expand Build",
       "Expand Govern",
     ]);
 
@@ -124,13 +124,13 @@ describe("<MainMenu /> navigation", () => {
   });
 
   /** @scenario Use sensible section defaults without a saved preference */
-  it("reveals the Library destinations in their existing order", async () => {
+  it("reveals the Build destinations in their existing order", async () => {
     const user = userEvent.setup();
     render(<MainMenu />, { wrapper: Wrapper });
 
     expect(screen.queryByRole("link", { name: "Prompts" })).toBeNull();
 
-    await user.click(screen.getByRole("button", { name: "Expand Library" }));
+    await user.click(screen.getByRole("button", { name: "Expand Build" }));
 
     const labels = visibleLinkLabels();
     const libraryStart = labels.indexOf("Prompts");

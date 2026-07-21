@@ -99,16 +99,16 @@ describe("<SidebarSection />", () => {
   });
 
   /** @scenario Use sensible section defaults without a saved preference */
-  it("supports Library being collapsed by default", () => {
+  it("supports Build being collapsed by default", () => {
     renderSection({
       id: "library",
-      label: "Library",
+      label: "Build",
       defaultExpanded: false,
     });
 
     expect(screen.queryByText("Section destination")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Expand Library" }),
+      screen.getByRole("button", { name: "Expand Build" }),
     ).toBeInTheDocument();
   });
 
@@ -118,13 +118,13 @@ describe("<SidebarSection />", () => {
 
     renderSection({
       id: "library",
-      label: "Library",
+      label: "Build",
       defaultExpanded: false,
     });
 
     expect(screen.getByText("Section destination")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Collapse Library" }),
+      screen.getByRole("button", { name: "Collapse Build" }),
     ).toBeInTheDocument();
   });
 });
