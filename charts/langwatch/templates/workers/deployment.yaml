@@ -133,14 +133,34 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
+          # Probe the worker metrics server (port 2999) rather than just PID 1
+          # liveness — this catches a wedged event loop, not only a dead
+          # process. When a metrics API key is configured the endpoint requires
+          # `Authorization: Bearer <key>` (same key Prometheus scrapes with, see
+          # prometheus.yaml), so the probe must send it or it gets 401 and the
+          # pod crash-loops. The header is only emitted when the key is set as a
+          # plain value; a bare (unauthenticated) endpoint answers 200 either way.
           startupProbe:
-            exec:
-              command: ["sh", "-c", "kill -0 1"]
+            httpGet:
+              path: /metrics
+              port: 2999
+              {{- if include "langwatch.metricsApiKey" . }}
+              httpHeaders:
+                - name: Authorization
+                  value: "Bearer {{ include "langwatch.metricsApiKey" . }}"
+              {{- end }}
             failureThreshold: 12
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
-            exec:
-              command: ["sh", "-c", "kill -0 1"]
+            httpGet:
+              path: /metrics
+              port: 2999
+              {{- if include "langwatch.metricsApiKey" . }}
+              httpHeaders:
+                - name: Authorization
+                  value: "Bearer {{ include "langwatch.metricsApiKey" . }}"
+              {{- end }}
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
