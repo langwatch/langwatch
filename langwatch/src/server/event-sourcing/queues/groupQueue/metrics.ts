@@ -206,7 +206,7 @@ export const gqPayloadTooLargeTotal = new Counter({
  */
 export const gqGroupsPoisonParkedTotal = new Counter({
   name: "gq_groups_poison_parked_total",
-  help: "Groups parked into the blocked set by the claim-side poison guard",
+  help: "Groups parked into the blocked set by a poison guard (reason: claim_strikes | oversized_payload | failure_streak)",
   labelNames: ["queue_name", "reason"] as const,
 });
 

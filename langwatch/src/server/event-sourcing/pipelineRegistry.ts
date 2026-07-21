@@ -22,7 +22,10 @@ import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import { resolveClaudeTurnLogCap } from "~/server/app-layer/traces/claude-code-log-to-span";
+import {
+  resolveClaudeLogVisibilityDeadlineMs,
+  resolveClaudeTurnLogCap,
+} from "~/server/app-layer/traces/claude-code-log-to-span";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
 import {
   createDatasetNormalizeHandler,
@@ -889,6 +892,16 @@ export class PipelineRegistry {
       // seize the worker; the root span is marked truncated when the cap bites.
       turnLogCap: resolveClaudeTurnLogCap(
         process.env.LANGWATCH_CLAUDE_TURN_LOG_CAP,
+      ),
+      // Bound the retry-until-visible gate: once a contribution has been
+      // unfoldable for this long, its canonical logs are never coming (dropped
+      // upstream / partition-window miss), so the reactor gives up instead of
+      // re-burning the retry ladder and wedging the per-trace group while
+      // starving the shared queue (prod incident 2026-07-20). Env
+      // LANGWATCH_CLAUDE_LOG_VISIBILITY_DEADLINE_MS, default
+      // CLAUDE_LOG_VISIBILITY_DEADLINE_MS.
+      visibilityDeadlineMs: resolveClaudeLogVisibilityDeadlineMs(
+        process.env.LANGWATCH_CLAUDE_LOG_VISIBILITY_DEADLINE_MS,
       ),
       recordSpan: recordSpanDispatch.fn,
     });

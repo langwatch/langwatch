@@ -232,6 +232,121 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
+    describe("given the failure-streak quarantine breaker", () => {
+      const failStreakKey = (name: string, groupId: string) =>
+        `${name}:gq:group:${groupId}:failstreak`;
+      const ENV = "LANGWATCH_GQ_QUARANTINE_FAILSTREAK_THRESHOLD";
+
+      describe("when one group's jobs keep failing with no success", () => {
+        /** @scenario a runaway group is quarantined once its failure streak crosses the threshold */
+        it("blocks the group so one poison producer can't monopolise the shared queue", async () => {
+          const previous = process.env[ENV];
+          process.env[ENV] = "2";
+          try {
+            const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+            processed.mockRejectedValue(new Error("downstream always down"));
+            const { queue, name } = createQueue(processed);
+            await queue.waitUntilReady();
+
+            // Distinct jobs for ONE group, none of which can succeed. Each
+            // failure adds to the group's streak; once it exceeds 2 the group is
+            // blocked (via the exhausted-retry path) instead of churning — the
+            // per-JOB maxAttempts cap never fires because these are fresh jobs.
+            // (A generous timeout: failures accrue at the group's re-dispatch
+            // cadence, not instantly.)
+            for (let i = 0; i < 10; i++) {
+              await queue.send({
+                id: `job-${i}`,
+                groupId: "runaway",
+                value: "x",
+              });
+            }
+
+            await vi.waitFor(
+              async () => {
+                expect(await blockedMembers(name)).toContain("runaway");
+              },
+              { timeout: 25000, interval: 100 },
+            );
+
+            const error = await storedError(name, "runaway");
+            expect(error).toContain("quarantined");
+            // The job is re-staged for inspection, not dropped.
+            expect(
+              await redis.zcard(`${name}:gq:group:runaway:jobs`),
+            ).toBeGreaterThan(0);
+          } finally {
+            if (previous === undefined) delete process.env[ENV];
+            else process.env[ENV] = previous;
+          }
+        });
+      });
+
+      describe("given the quarantine kill switch is set to 0", () => {
+        /** @scenario the failure-streak breaker is disabled by setting the threshold to 0 */
+        it("keeps dispatching a persistently-failing group instead of quarantining it", async () => {
+          const previous = process.env[ENV];
+          process.env[ENV] = "0";
+          try {
+            const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+            processed.mockRejectedValue(new Error("downstream always down"));
+            const { queue, name } = createQueue(processed);
+            await queue.waitUntilReady();
+
+            // Pre-seed a streak far above the old default; with the breaker off
+            // it is never consulted and never enforced.
+            await redis.set(failStreakKey(name, "runaway"), "999");
+            for (let i = 0; i < 4; i++) {
+              await queue.send({
+                id: `job-${i}`,
+                groupId: "runaway",
+                value: "x",
+              });
+            }
+
+            await vi.waitFor(
+              () => {
+                expect(processed).toHaveBeenCalled();
+              },
+              { timeout: 5000, interval: 50 },
+            );
+            // The group is retried, never parked into the blocked set.
+            expect(await blockedMembers(name)).not.toContain("runaway");
+          } finally {
+            if (previous === undefined) delete process.env[ENV];
+            else process.env[ENV] = previous;
+          }
+        });
+      });
+
+      describe("when a group's job succeeds", () => {
+        /** @scenario a success clears the group's failure streak so blips never accumulate to quarantine */
+        it("clears the failure streak", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          // A streak left by earlier failures, below the (default) threshold.
+          await redis.set(failStreakKey(name, "group-a"), "2");
+          await queue.send({ id: "job-1", groupId: "group-a", value: "x" });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          await vi.waitFor(
+            async () => {
+              expect(await redis.get(failStreakKey(name, "group-a"))).toBeNull();
+            },
+            { timeout: 5000, interval: 50 },
+          );
+        });
+      });
+    });
+
     describe("given a group whose job always throws", () => {
       describe("when an attempt fails with the process alive", () => {
         /** @scenario a failing-but-not-crashing job does not accumulate claim strikes */

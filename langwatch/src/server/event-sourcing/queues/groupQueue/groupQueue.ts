@@ -76,6 +76,7 @@ import {
   type DrainedJob,
   GroupStagingScripts,
   readClaimStrikeThreshold,
+  readGroupQuarantineThreshold,
 } from "./scripts";
 import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore";
 
@@ -235,6 +236,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private readonly consumerEnabled: boolean;
   private readonly dispatcher: GroupQueueDispatcher | null;
   private readonly metricsCollector: GroupQueueMetricsCollector | null;
+  /**
+   * Consecutive-failure count that quarantines (blocks) a group. Read once at
+   * construction; 0 disables the breaker. See {@link readGroupQuarantineThreshold}.
+   */
+  private readonly quarantineFailStreakThreshold = readGroupQuarantineThreshold();
 
   private shutdownRequested = false;
   /** Tracks in-flight jobs for active count metrics. */
@@ -1051,6 +1057,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               });
               gqJobsCompletedTotal.inc(routingLabels);
 
+              // A success means the group is draining, so it must not carry a
+              // stale failure streak toward the quarantine threshold.
+              if (this.quarantineFailStreakThreshold > 0) {
+                await this.scripts.clearGroupFailures(groupId);
+              }
+
               // Audit hook: onDispatched fires once per dispatched payload
               // (dispatched + every drained sibling on success).
               const dispatchedAt = new Date();
@@ -1087,7 +1099,52 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 await this.restageDrainedSiblings(groupId, drainedSiblings);
               }
 
-              if (isRetryable && attempt < JOB_RETRY_CONFIG.maxAttempts) {
+              // Group-quarantine circuit breaker (prod incident 2026-07-20). A
+              // producer that mints fresh jobs for ONE group faster than they
+              // drain never trips the per-JOB `maxAttempts` cap — every failure
+              // is a new attempt-1 job — so the group churns indefinitely and can
+              // starve the shared queue. Count consecutive retryable failures
+              // across the group's jobs (cleared on any success); once the streak
+              // crosses the threshold, route this job through the SAME
+              // exhausted-retry path that blocks the group, so it stops
+              // dispatching and an operator can inspect + drain it.
+              let quarantined = false;
+              let quarantineError: Error | undefined;
+              if (isRetryable && this.quarantineFailStreakThreshold > 0) {
+                const failStreak =
+                  await this.scripts.recordGroupFailure(groupId);
+                if (failStreak > this.quarantineFailStreakThreshold) {
+                  quarantined = true;
+                  // Carried into handleExhaustedRetries as the group's stored
+                  // error so /ops shows WHY it was blocked (a run of failures),
+                  // not just the last job's error.
+                  quarantineError = new Error(
+                    `Poison guard: group quarantined after ${failStreak} consecutive failures (threshold ${this.quarantineFailStreakThreshold}) with no success. Last error: ${error.message}. Inspect the staged jobs, then unblock the group.`,
+                  );
+                  gqGroupsPoisonParkedTotal.inc({
+                    queue_name: this.queueName,
+                    reason: "failure_streak",
+                  });
+                  this.logger.error(
+                    {
+                      queueName: this.queueName,
+                      projectId: tenantIdFromGroupId(groupId),
+                      groupId,
+                      stagedJobId,
+                      failStreak,
+                      threshold: this.quarantineFailStreakThreshold,
+                      error: error.message,
+                    },
+                    "Group quarantined after a run of failures with no success; blocking it to protect the shared queue",
+                  );
+                }
+              }
+
+              if (
+                isRetryable &&
+                attempt < JOB_RETRY_CONFIG.maxAttempts &&
+                !quarantined
+              ) {
                 // Re-stage with backoff — frees the worker slot immediately
                 gqJobsRetriedTotal.inc(routingLabels);
 
@@ -1220,7 +1277,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   stagedJobId,
                   payload,
                   originalScore,
-                  lastError: error,
+                  // When the group tripped the quarantine breaker, block it with
+                  // the descriptive quarantine error rather than the raw job
+                  // error, so /ops shows why the group is blocked.
+                  lastError: quarantineError ?? error,
                   contextMetadata,
                   routingLabels,
                 });

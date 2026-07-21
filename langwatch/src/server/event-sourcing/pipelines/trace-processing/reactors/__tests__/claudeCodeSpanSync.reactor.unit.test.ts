@@ -298,7 +298,10 @@ function capSetup(
   };
 }
 
-function setup(rows: StoredLogRecordRow[]) {
+function setup(
+  rows: StoredLogRecordRow[],
+  opts?: { now?: () => number; visibilityDeadlineMs?: number },
+) {
   const getMarkedClaudeCodeLogs = vi.fn(async () => rows);
   const countMarkedClaudeCodeLogs = vi.fn(async () => rows.length);
   const recorded: RecordSpanCommandData[] = [];
@@ -309,6 +312,10 @@ function setup(rows: StoredLogRecordRow[]) {
     getMarkedClaudeCodeLogs,
     countMarkedClaudeCodeLogs,
     recordSpan,
+    ...(opts?.now ? { now: opts.now } : {}),
+    ...(opts?.visibilityDeadlineMs !== undefined
+      ? { visibilityDeadlineMs: opts.visibilityDeadlineMs }
+      : {}),
   });
   return {
     reactor,
@@ -390,6 +397,60 @@ describe("createClaudeCodeSpanSyncReactor", () => {
         1_700_000_000_000,
         expect.any(Number),
       );
+    });
+
+    describe("when the canonical logs never become visible", () => {
+      // contributionEvent().occurredAt — the log's ingest wall-clock, which the
+      // deadline measures age from.
+      const CONTRIBUTION_AT = 1_800_000_000_000;
+      const DEADLINE_MS = 600_000;
+
+      it("keeps retrying while the contribution is younger than the deadline", async () => {
+        const { reactor, recordSpan } = setup([], {
+          visibilityDeadlineMs: DEADLINE_MS,
+          now: () => CONTRIBUTION_AT + DEADLINE_MS - 1,
+        });
+        await expect(
+          reactor.handle(contributionEvent(), {
+            tenantId: TENANT,
+            aggregateId: TRACE,
+            foldState: undefined,
+          }),
+        ).rejects.toThrow("not visible yet");
+        expect(recordSpan).not.toHaveBeenCalled();
+      });
+
+      it("still retries at exactly the deadline (inclusive boundary)", async () => {
+        const { reactor } = setup([], {
+          visibilityDeadlineMs: DEADLINE_MS,
+          now: () => CONTRIBUTION_AT + DEADLINE_MS,
+        });
+        await expect(
+          reactor.handle(contributionEvent(), {
+            tenantId: TENANT,
+            aggregateId: TRACE,
+            foldState: undefined,
+          }),
+        ).rejects.toThrow("not visible yet");
+      });
+
+      it("gives up without retrying once the contribution outlives the deadline, so the poison group drains", async () => {
+        const { reactor, recordSpan, getMarkedClaudeCodeLogs } = setup([], {
+          visibilityDeadlineMs: DEADLINE_MS,
+          now: () => CONTRIBUTION_AT + DEADLINE_MS + 1,
+        });
+        // Resolves — NOT a throw — so the group-queue completes the job instead
+        // of re-staging it forever (prod incident 2026-07-20).
+        await expect(
+          reactor.handle(contributionEvent(), {
+            tenantId: TENANT,
+            aggregateId: TRACE,
+            foldState: undefined,
+          }),
+        ).resolves.toBeUndefined();
+        expect(getMarkedClaudeCodeLogs).toHaveBeenCalled();
+        expect(recordSpan).not.toHaveBeenCalled();
+      });
     });
 
     it("ignores non-log events so the spans it emits never re-trigger it", async () => {
