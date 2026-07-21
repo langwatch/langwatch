@@ -791,3 +791,16 @@ export type DatasetSpan =
       RAGSpan,
       "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"
     > & { params: Record<string, any>; model?: string | null });
+
+/**
+ * A trace enriched with its most recent guardrail evaluation and annotation
+ * counts — the shape the trace list/messages surfaces render and the trace
+ * services return.
+ */
+export type TraceWithGuardrail = Trace & {
+  lastGuardrail: (EvaluationResult & { name?: string }) | undefined;
+  annotations?: {
+    hasAnnotation: boolean;
+    count: number;
+  };
+};

@@ -29,8 +29,8 @@ import {
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
+import { addEnvs } from "~/server/optimization-studio/addEnvs";
+import { loadDatasets } from "~/server/optimization-studio/loadDatasets";
 import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";

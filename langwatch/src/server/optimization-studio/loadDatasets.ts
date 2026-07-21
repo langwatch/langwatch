@@ -1,13 +1,13 @@
 import type { Node } from "@xyflow/react";
-import { getFullDataset } from "../../server/api/routers/datasetRecord.utils";
-import type { Component, Workflow } from "../types/dsl";
-import type { StudioClientEvent } from "../types/events";
+import { getFullDataset } from "~/server/api/routers/datasetRecord.utils";
+import type { Component, Workflow } from "~/optimization_studio/types/dsl";
+import type { StudioClientEvent } from "~/optimization_studio/types/events";
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   inMemoryDatasetToNodeDataset,
   transposeColumnsFirstToRowsFirstWithId,
   transpostRowsFirstToColumnsFirstWithoutId,
-} from "../utils/datasetUtils";
+} from "~/optimization_studio/utils/datasetUtils";
 import { applyEntryInputDefaults } from "./entryInputDefaults";
 
 export const loadDatasets = async (

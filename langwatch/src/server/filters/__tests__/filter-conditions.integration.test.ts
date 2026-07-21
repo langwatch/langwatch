@@ -1,7 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
 import {
   cleanupTestData,
   getTestClickHouseClient,

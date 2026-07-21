@@ -18,7 +18,7 @@ import { ConditionBuilder } from "./ConditionBuilder";
 import { queryIsStructurable } from "../logic/conditionQuery";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
 import {
   type FilterField,
   sanitizeTriggerFilters,

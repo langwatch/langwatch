@@ -93,3 +93,13 @@ export type FilterDefinition = {
     filter: FilterField;
   };
 };
+
+/**
+ * The wire shape of a single filter's URL/query value: a plain list of
+ * selected values, one level of sub-keying, or two (key -> subkey -> values).
+ * Shared by the filter UI's URL state and the server-side filter pipeline.
+ */
+export type FilterParam =
+  | string[]
+  | Record<string, string[]>
+  | Record<string, Record<string, string[]>>;

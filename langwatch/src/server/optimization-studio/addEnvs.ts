@@ -2,13 +2,13 @@ import crypto from "crypto";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
-} from "../../server/api/routers/modelProviders.utils";
-import { prisma } from "../../server/db";
-import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
-import { decrypt } from "../../utils/encryption";
-import { normalizeToSnakeCase } from "../components/properties/llm-configs/normalizeToSnakeCase";
-import type { LLMConfig, ServerWorkflow, Workflow } from "../types/dsl";
-import type { StudioClientEvent } from "../types/events";
+} from "~/server/api/routers/modelProviders.utils";
+import { prisma } from "~/server/db";
+import type { MaybeStoredModelProvider } from "~/server/modelProviders/registry";
+import { decrypt } from "~/utils/encryption";
+import { normalizeToSnakeCase } from "~/utils/normalizeToSnakeCase";
+import type { LLMConfig, ServerWorkflow, Workflow } from "~/optimization_studio/types/dsl";
+import type { StudioClientEvent } from "~/optimization_studio/types/events";
 
 /**
  * An llm parameter reached dispatch without a model. Persisted DSLs are

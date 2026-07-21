@@ -68,7 +68,8 @@ import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
-import { type FilterParam, useFilterParams } from "~/hooks/useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
+import { useFilterParams } from "~/hooks/useFilterParams";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useRouter } from "~/utils/compat/next-router";
 import {

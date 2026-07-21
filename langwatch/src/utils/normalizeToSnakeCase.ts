@@ -1,4 +1,4 @@
-import type { LLMConfig } from "../../../types/dsl";
+import type { LLMConfig } from "~/optimization_studio/types/dsl";
 
 /**
  * camelCase → snake_case mapping for LLM config parameters.

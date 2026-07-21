@@ -1,4 +1,4 @@
-import type { Entry, Field, NodeDataset, Workflow } from "../types/dsl";
+import type { Entry, Field, NodeDataset, Workflow } from "~/optimization_studio/types/dsl";
 
 type Inline = NonNullable<NodeDataset["inline"]>;
 

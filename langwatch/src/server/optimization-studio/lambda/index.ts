@@ -21,7 +21,7 @@ import {
 } from "../../../server/s3/stagePayload";
 import { TtlCache } from "../../../server/utils/ttlCache";
 import { captureException } from "../../../utils/posthogErrorCapture";
-import type { StudioClientEvent } from "../../types/events";
+import type { StudioClientEvent } from "~/optimization_studio/types/events";
 
 const logger = createLogger("langwatch:langwatch-nlp-lambda");
 

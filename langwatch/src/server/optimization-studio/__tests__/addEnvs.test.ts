@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StudioClientEvent } from "../../types/events";
+import type { StudioClientEvent } from "~/optimization_studio/types/events";
 
 vi.mock("../../../server/db", () => ({
   prisma: {

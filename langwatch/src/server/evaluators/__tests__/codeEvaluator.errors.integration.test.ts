@@ -17,7 +17,7 @@ vi.mock("~/server/nlpgo/nlpgoFetch", () => ({
   nlpgoFetch: nlpgoFetchMock,
 }));
 
-vi.mock("~/optimization_studio/server/addEnvs", () => ({
+vi.mock("~/server/optimization-studio/addEnvs", () => ({
   addEnvs: vi.fn(async (event: unknown) => event),
 }));
 

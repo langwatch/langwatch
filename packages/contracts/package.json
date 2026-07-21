@@ -12,7 +12,8 @@
     "./filters": "./src/filters.ts",
     "./scenarios/enums": "./src/scenarios/enums.ts",
     "./scenarios/types": "./src/scenarios/types.ts",
-    "./scenarios/schemas": "./src/scenarios/schemas/index.ts"
+    "./scenarios/schemas": "./src/scenarios/schemas/index.ts",
+    "./llm-parameters": "./src/llm-parameters.ts"
   },
   "scripts": {
     "typecheck": "tsc --build",

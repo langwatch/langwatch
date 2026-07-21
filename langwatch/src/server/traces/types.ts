@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
+import type { TraceWithGuardrail } from "@langwatch/contracts/tracer";
 import type { sharedFiltersInputSchema } from "~/server/analytics/types";
 import type {
   ChatMessage,

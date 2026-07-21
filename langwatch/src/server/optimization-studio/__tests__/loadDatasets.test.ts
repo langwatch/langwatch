@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StudioClientEvent } from "../../types/events";
+import type { StudioClientEvent } from "~/optimization_studio/types/events";
 
 vi.mock("../../../server/api/routers/datasetRecord.utils", () => ({
   getFullDataset: vi.fn(),
 }));
 
-vi.mock("../../utils/datasetUtils", async () => {
-  const actual = await vi.importActual<typeof import("../../utils/datasetUtils")>(
-    "../../utils/datasetUtils",
+vi.mock("~/optimization_studio/utils/datasetUtils", async () => {
+  const actual = await vi.importActual<typeof import("~/optimization_studio/utils/datasetUtils")>(
+    "~/optimization_studio/utils/datasetUtils",
   );
   return actual;
 });

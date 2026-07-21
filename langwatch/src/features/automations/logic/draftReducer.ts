@@ -10,7 +10,7 @@ import {
   type SliceFor,
 } from "~/features/automations/providers/registry";
 import { isNotifyEntry } from "~/features/automations/providers/types";
-import type { FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
 import {
   type GraphAlertOperator,
   type GraphAlertTimePeriod,

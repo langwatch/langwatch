@@ -61,7 +61,7 @@ import { Tooltip } from "../ui/tooltip";
 import { ExportConfigDialog } from "./ExportConfigDialog";
 import { ExportProgress } from "./ExportProgress";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
-import type { TraceWithGuardrail } from "./MessageCard";
+import type { TraceWithGuardrail } from "@langwatch/contracts/tracer";
 import { useExportTraces } from "./useExportTraces";
 
 export interface MessagesTableProps {

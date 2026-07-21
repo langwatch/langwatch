@@ -27,7 +27,8 @@ import { useDrawer } from "~/hooks/useDrawer";
 import {
 	useOrganizationTeamProject,
 } from "~/hooks/useOrganizationTeamProject";
-import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
+import { useFilterParams } from "../../hooks/useFilterParams";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";
 import type { AppRouter } from "../../server/api/root";
 import { availableFilters } from "../../server/filters/registry";

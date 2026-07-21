@@ -12,7 +12,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
 import type { FilterField } from "@langwatch/contracts/filters";
 import { AutomationDrawer } from "../AutomationDrawer";
 import { useAutomationStore } from "../state/automationStore";

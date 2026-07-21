@@ -10,7 +10,7 @@ import dynamic from "~/utils/compat/next-dynamic";
 import { useCallback, useRef, useState } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { useDrawer } from "~/hooks/useDrawer";
-import type { FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   type FilterField,

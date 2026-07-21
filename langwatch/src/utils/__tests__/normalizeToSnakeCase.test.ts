@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import type { LLMConfig } from "../../../../types/dsl";
+import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import { normalizeToSnakeCase } from "../normalizeToSnakeCase";
 
 const BASE_CONFIG = { model: DEFAULT_MODEL };

@@ -18,8 +18,8 @@ import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-even
 import {
   addEnvs,
   LlmModelNotSetError,
-} from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
+} from "~/server/optimization-studio/addEnvs";
+import { loadDatasets } from "~/server/optimization-studio/loadDatasets";
 import {
   type StudioClientEvent,
   type StudioServerEvent,

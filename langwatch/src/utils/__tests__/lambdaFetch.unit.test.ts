@@ -36,7 +36,7 @@ vi.mock("@aws-sdk/client-lambda", () => ({
   },
 }));
 
-vi.mock("../../optimization_studio/server/lambda", () => ({
+vi.mock("~/server/optimization-studio/lambda", () => ({
   createLambdaClient: () => ({
     send: vi.fn(async (cmd: { input: { Payload: string } }) => {
       invokePayloads.push(cmd.input.Payload);

@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { useEffect, useRef } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
+import { LLM_PARAMETER_MAP } from "@langwatch/contracts/llm-parameters";
 import { formSchema } from "~/prompts/schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";

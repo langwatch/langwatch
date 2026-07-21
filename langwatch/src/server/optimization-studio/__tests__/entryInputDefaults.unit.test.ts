@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Field, Workflow } from "../../types/dsl";
+import type { Field, Workflow } from "~/optimization_studio/types/dsl";
 import {
   applyEntryInputDefaults,
   entryInlineWithDefaults,

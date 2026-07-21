@@ -49,13 +49,7 @@ import { RedactedField } from "../ui/RedactedField";
 import { Tooltip } from "../ui/tooltip";
 import { EventsCounter } from "./EventsCounter";
 
-export type TraceWithGuardrail = Trace & {
-  lastGuardrail: (EvaluationResult & { name?: string }) | undefined;
-  annotations?: {
-    hasAnnotation: boolean;
-    count: number;
-  };
-};
+import type { TraceWithGuardrail } from "@langwatch/contracts/tracer";
 
 export function MessageCard({
   linkActive,
