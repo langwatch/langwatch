@@ -40,7 +40,25 @@ If the user's request is about **voice** ("add voice testing", "test my voice ag
 
 ## Detect Context
 
-If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **Code approach** (Scenario SDK). If there is no codebase → use the **Platform approach** (`langwatch` CLI). If ambiguous, ask the user.
+If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **Code approach** (Scenario SDK). If there is no codebase → use the **Platform approach** (`langwatch` CLI).
+
+If it is genuinely ambiguous, ask — but ask in whatever the surface's answerable format is, not in prose. Where `langy-card` blocks render, that is a `choices` block, the only format the reader can actually click:
+
+````markdown
+```langy-card
+{
+  "kind": "choices",
+  "blockId": "scenario-approach",
+  "question": "How should these scenarios run?",
+  "options": [
+    { "id": "code", "label": "In this codebase, with the Scenario SDK" },
+    { "id": "platform", "label": "On the platform, with the CLI" }
+  ]
+}
+```
+````
+
+Where blocks do not render, ask the same question as one short line of prose. And when the question is which agent to run against, give each option a `ref` — `{"type": "agent", "id": "..."}` — so the rows resolve to real agents and one that no longer exists cannot be picked.
 
 ## The Agent Testing Pyramid
 

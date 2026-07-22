@@ -780,7 +780,7 @@ Do not recreate the companion skill's instructions from memory. Load the focused
         </span>
         <div className="lw-prompt-source">
 
-````text
+`````text
 Add scenario tests for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
@@ -817,7 +817,25 @@ If the user's request is about **voice** ("add voice testing", "test my voice ag
 
 ## Detect Context
 
-If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **Code approach** (Scenario SDK). If there is no codebase → use the **Platform approach** (`langwatch` CLI). If ambiguous, ask the user.
+If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **Code approach** (Scenario SDK). If there is no codebase → use the **Platform approach** (`langwatch` CLI).
+
+If it is genuinely ambiguous, ask — but ask in whatever the surface's answerable format is, not in prose. Where `langy-card` blocks render, that is a `choices` block, the only format the reader can actually click:
+
+````markdown
+```langy-card
+{
+  "kind": "choices",
+  "blockId": "scenario-approach",
+  "question": "How should these scenarios run?",
+  "options": [
+    { "id": "code", "label": "In this codebase, with the Scenario SDK" },
+    { "id": "platform", "label": "On the platform, with the CLI" }
+  ]
+}
+```
+````
+
+Where blocks do not render, ask the same question as one short line of prose. And when the question is which agent to run against, give each option a `ref` — `{"type": "agent", "id": "..."}` — so the rows resolve to real agents and one that no longer exists cannot be picked.
 
 ## The Agent Testing Pyramid
 
@@ -1688,7 +1706,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do NOT comma-separate `--targets` on `suite create` — it is space-separated and variadic, and a comma silently parses into one malformed target. `--scenarios` is the comma-separated one, and `scenario run` uses `--target`, singular, exactly one value
 - Do NOT choose the agent or prompt on the user's behalf, and do NOT decide for them between a one-off run and a run plan. Ask one short question and wait
 - Do NOT `--wait` inside an interactive turn — trigger, hand over the link, let results stream in. Save `--wait` for CI, where its non-zero exit on failure is the whole point
-````
+`````
 
         </div>
       </div>
@@ -2000,7 +2018,7 @@ If you find yourself reaching for `"What is the capital of [country]?"`, `"Expla
 
 This is an **interactive** skill. Don't dump everything in one message. Follow this rhythm:
 
-1. **First response:** Explore the codebase silently (read files, check prompts, search traces, check git log). Then summarize what you found and ask the user 2-3 targeted questions:
+1. **First response:** Explore the codebase silently (read files, check prompts, search traces, check git log). Then summarize what you found and ask what you still need. Where `langy-card` blocks render, each question is a `choices` block and they arrive one at a time — a numbered prose interview is unanswerable there, and the absolute rules against prose questions win over this step's wording. Elsewhere, 2-3 targeted questions:
    - "I see your bot is a \[X]. Are there specific failure modes you've seen?"
    - "Do you have any PDFs or docs I should read for domain context?"
    - "What evaluator are you planning to run? This affects column design."
@@ -2115,7 +2133,7 @@ Then propose: should we augment the existing dataset, generate a complementary s
 
 ## Phase 2: Plan (ALWAYS present this to the user)
 
-Based on discovery, present a structured plan. Ask the user to confirm before proceeding.
+Based on discovery, present a structured plan, and ask for confirmation in the surface's answerable format — where `langy-card` blocks render, a `choices` block rather than a prose "shall I proceed?", which is a question the reader cannot click.
 
 **Template:**
 
@@ -2454,7 +2472,7 @@ Then propose: should we augment it, generate a complementary set, or start fresh
         </span>
         <div className="lw-prompt-source">
 
-````text
+`````text
 Take my agent to the next level
 
 You are using LangWatch for your AI agent project. Follow these instructions.
@@ -3049,7 +3067,25 @@ If the user's request is about **voice** ("add voice testing", "test my voice ag
 
 ## Detect Context
 
-If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **Code approach** (Scenario SDK). If there is no codebase → use the **Platform approach** (`langwatch` CLI). If ambiguous, ask the user.
+If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **Code approach** (Scenario SDK). If there is no codebase → use the **Platform approach** (`langwatch` CLI).
+
+If it is genuinely ambiguous, ask — but ask in whatever the surface's answerable format is, not in prose. Where `langy-card` blocks render, that is a `choices` block, the only format the reader can actually click:
+
+````markdown
+```langy-card
+{
+  "kind": "choices",
+  "blockId": "scenario-approach",
+  "question": "How should these scenarios run?",
+  "options": [
+    { "id": "code", "label": "In this codebase, with the Scenario SDK" },
+    { "id": "platform", "label": "On the platform, with the CLI" }
+  ]
+}
+```
+````
+
+Where blocks do not render, ask the same question as one short line of prose. And when the question is which agent to run against, give each option a `ref` — `{"type": "agent", "id": "..."}` — so the rows resolve to real agents and one that no longer exists cannot be picked.
 
 ## The Agent Testing Pyramid
 
@@ -3881,7 +3917,7 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 - Do NOT comma-separate `--targets` on `suite create` — it is space-separated and variadic, and a comma silently parses into one malformed target. `--scenarios` is the comma-separated one, and `scenario run` uses `--target`, singular, exactly one value
 - Do NOT choose the agent or prompt on the user's behalf, and do NOT decide for them between a one-off run and a run plan. Ask one short question and wait
 - Do NOT `--wait` inside an interactive turn — trigger, hand over the link, let results stream in. Save `--wait` for CI, where its non-zero exit on failure is the whole point
-````
+`````
 
         </div>
       </div>

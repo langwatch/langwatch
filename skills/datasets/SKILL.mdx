@@ -30,7 +30,7 @@ If you find yourself reaching for `"What is the capital of [country]?"`, `"Expla
 
 This is an **interactive** skill. Don't dump everything in one message. Follow this rhythm:
 
-1. **First response:** Explore the codebase silently (read files, check prompts, search traces, check git log). Then summarize what you found and ask the user 2-3 targeted questions:
+1. **First response:** Explore the codebase silently (read files, check prompts, search traces, check git log). Then summarize what you found and ask what you still need. Where `langy-card` blocks render, each question is a `choices` block and they arrive one at a time — a numbered prose interview is unanswerable there, and the absolute rules against prose questions win over this step's wording. Elsewhere, 2-3 targeted questions:
    - "I see your bot is a [X]. Are there specific failure modes you've seen?"
    - "Do you have any PDFs or docs I should read for domain context?"
    - "What evaluator are you planning to run? This affects column design."
@@ -138,7 +138,7 @@ Then propose: should we augment the existing dataset, generate a complementary s
 
 ## Phase 2: Plan (ALWAYS present this to the user)
 
-Based on discovery, present a structured plan. Ask the user to confirm before proceeding.
+Based on discovery, present a structured plan, and ask for confirmation in the surface's answerable format — where `langy-card` blocks render, a `choices` block rather than a prose "shall I proceed?", which is a question the reader cannot click.
 
 **Template:**
 
