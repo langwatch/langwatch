@@ -1,19 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { AdminWorkspaceViewAuditService } from "@ee/governance/services/adminWorkspaceViewAudit.service";
-import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
-import { GovernanceOcsfExportService } from "@ee/governance/services/governanceOcsfExport.service";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import {
-  type PersonaResolution,
-  resolvePersonaHomeSafe,
-} from "@ee/governance/services/personaResolver.service";
-import {
-  QUARANTINE_DEFAULT_THRESHOLD,
-  QUARANTINE_DEFAULT_WINDOW_SECONDS,
-  QuarantineFillEvaluator,
-} from "@ee/governance/services/quarantineFillEvaluator.service";
-import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 /**
  * tRPC router for cross-cutting governance read-side queries that
  * don't fit neatly under the more focused governance routers
@@ -29,6 +15,21 @@ import { GovernanceSetupStateService } from "@ee/governance/services/setupState.
  *       specs/ai-gateway/governance/persona-home-resolver.feature
  *       specs/ai-gateway/governance/siem-export.feature
  */
+
+import { AdminWorkspaceViewAuditService } from "@ee/governance/services/adminWorkspaceViewAudit.service";
+import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import { GovernanceOcsfExportService } from "@ee/governance/services/governanceOcsfExport.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import {
+  type PersonaResolution,
+  resolvePersonaHomeSafe,
+} from "@ee/governance/services/personaResolver.service";
+import {
+  QUARANTINE_DEFAULT_THRESHOLD,
+  QUARANTINE_DEFAULT_WINDOW_SECONDS,
+  QuarantineFillEvaluator,
+} from "@ee/governance/services/quarantineFillEvaluator.service";
+import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { z } from "zod";
 import {
   ENTERPRISE_FEATURE_ERRORS,

@@ -11,10 +11,28 @@
  *
  * Spec: specs/ai-gateway/governance/anomaly-rules.feature
  */
+import { NotFoundError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 import type { AnomalyRule, Prisma, PrismaClient } from "@prisma/client";
 
 import { validateDestinationConfig } from "./destinationConfig.schema";
 import { validateThresholdConfig } from "./thresholdConfig.schema";
+
+const logger = createLogger("langwatch:governance:anomaly-rule");
+
+/**
+ * Thrown when a mutation names a rule this org doesn't have.
+ *
+ * Usually a stale tab: the rule was archived elsewhere and this list still
+ * shows it. Known cause, obvious action (reload), so it is handled rather
+ * than a 500. `meta.id` carries the rule id; the org id goes to the log.
+ */
+export class AnomalyRuleNotFoundError extends NotFoundError {
+  constructor(ruleId: string) {
+    super("anomaly_rule_not_found", "Anomaly rule", ruleId);
+    this.name = "AnomalyRuleNotFoundError";
+  }
+}
 
 export type RuleSeverity = "critical" | "warning" | "info";
 export type RuleScope =
@@ -88,6 +106,27 @@ export class AnomalyRuleService {
     return row;
   }
 
+  /**
+   * `findById`, for the mutations that cannot proceed without the row.
+   *
+   * Which org asked is a debugging detail — it goes to the log, not into an
+   * error a customer reads (see {@link AnomalyRuleNotFoundError}).
+   */
+  private async requireById(
+    id: string,
+    organizationId: string,
+  ): Promise<AnomalyRule> {
+    const existing = await this.findById(id, organizationId);
+    if (!existing) {
+      logger.warn(
+        { ruleId: id, organizationId },
+        "AnomalyRule not found for organization",
+      );
+      throw new AnomalyRuleNotFoundError(id);
+    }
+    return existing;
+  }
+
   async createRule(input: CreateAnomalyRuleInput): Promise<AnomalyRule> {
     if (!SUPPORTED_SEVERITIES.includes(input.severity)) {
       throw new Error(`Unsupported severity: ${input.severity}`);
@@ -130,12 +169,7 @@ export class AnomalyRuleService {
   }
 
   async updateRule(input: UpdateAnomalyRuleInput): Promise<AnomalyRule> {
-    const existing = await this.findById(input.id, input.organizationId);
-    if (!existing) {
-      throw new Error(
-        `AnomalyRule ${input.id} not found in org ${input.organizationId}`,
-      );
-    }
+    const existing = await this.requireById(input.id, input.organizationId);
     const data: Prisma.AnomalyRuleUpdateInput = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.description !== undefined) data.description = input.description;
@@ -193,10 +227,7 @@ export class AnomalyRuleService {
   }
 
   async archive(id: string, organizationId: string): Promise<AnomalyRule> {
-    const existing = await this.findById(id, organizationId);
-    if (!existing) {
-      throw new Error(`AnomalyRule ${id} not found in org ${organizationId}`);
-    }
+    const existing = await this.requireById(id, organizationId);
     return this.prisma.anomalyRule.update({
       where: { id: existing.id },
       data: { archivedAt: new Date(), status: "disabled" },

@@ -44,7 +44,7 @@ import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { showErrorToast } from "~/features/errors";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -425,6 +425,15 @@ function IngestionSourcesPage() {
 
         {sourcesQuery.isLoading && <Spinner size="sm" />}
 
+        {/* The list is the page. Without this the three mode sections below
+            render "No push-mode sources configured." off an empty `?? []`,
+            which tells an admin their entire ingest fleet is gone when all
+            that actually happened was a 403 or a DB blip. */}
+        <HandledErrorAlert
+          error={sourcesQuery.error}
+          fallbackTitle="Couldn't load ingestion sources"
+        />
+
         {(["push", "pull", "s3"] as const).map((mode) => (
           <Box
             key={mode}
@@ -453,7 +462,10 @@ function IngestionSourcesPage() {
               <Spacer />
             </HStack>
             <VStack align="stretch" gap={2}>
-              {grouped[mode].length === 0 && (
+              {/* "None configured" is a claim about the fleet, and we can
+                  only make it when we actually know. The alert above says
+                  what went wrong instead. */}
+              {grouped[mode].length === 0 && !sourcesQuery.error && (
                 <Text fontSize="sm" color="fg.muted">
                   No {mode}-mode sources configured.
                 </Text>

@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import {
-  AnomalyRuleService,
-  SUPPORTED_SCOPES,
-  SUPPORTED_SEVERITIES,
-} from "@ee/governance/services/activity-monitor/anomalyRule.service";
 /**
  * tRPC router for AnomalyRule admin CRUD.
  *
@@ -21,6 +16,12 @@ import {
  *
  * Spec: specs/ai-gateway/governance/anomaly-rules.feature
  */
+
+import {
+  AnomalyRuleService,
+  SUPPORTED_SCOPES,
+  SUPPORTED_SEVERITIES,
+} from "@ee/governance/services/activity-monitor/anomalyRule.service";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -36,15 +37,17 @@ const enterpriseGate = requireEnterprisePlan(
 );
 
 /**
- * Translate threshold-config validation failures from the service
- * layer into a TRPCError BAD_REQUEST. Mirrors the aiTools router
- * pattern (`5a3219ae0`). Two error shapes are expected:
- *   - z.ZodError when the config shape is wrong (missing fields, wrong
- *     types, negative numbers)
- *   - plain Error when ruleType is unknown
+ * Translate threshold-config shape failures from the service layer into a
+ * TRPCError BAD_REQUEST, naming which config the issues belong to.
  *
- * Anything else re-throws unchanged so genuine internal errors stay
- * visible.
+ * Only ZodErrors are handled here. An unknown ruleType now arrives as a
+ * `ValidationError` from `thresholdConfig.schema.ts`, which is already on the
+ * handled channel — it falls through the re-throw below and the boundary
+ * serialises it with its own `meta`, so there is nothing to translate. The
+ * branch that used to sniff `/Unsupported ruleType/` off a plain Error's
+ * message is gone with it.
+ *
+ * Anything else re-throws unchanged so genuine internal errors stay visible.
  */
 function translateConfigValidationError(
   err: unknown,
@@ -67,13 +70,6 @@ function translateConfigValidationError(
       message: `Invalid ${configName}${
         !isDestinationConfig && ruleType ? ` for ${ruleType}` : ""
       }: ${err.issues.map((i) => i.message).join("; ")}`,
-      cause: err,
-    });
-  }
-  if (err instanceof Error && /Unsupported ruleType/i.test(err.message)) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: err.message,
       cause: err,
     });
   }

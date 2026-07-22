@@ -191,8 +191,12 @@ describe("AnomalyRule.thresholdConfig — structured schema", () => {
       });
     });
 
-    it("rejects an unknown ruleType with BAD_REQUEST", async () => {
+    it("rejects an unknown ruleType as a handled validation error", async () => {
       const caller = callerFor(adminUserId);
+      // On `code`, not on prose: the sentence is copy and will change, and
+      // this one now crosses the handled-error boundary. A typo in a
+      // free-text field is the customer's to fix, so it must not arrive as
+      // an unnamed 500.
       await expect(
         caller.anomalyRules.create({
           ...baseInput("unknown-type"),
@@ -200,8 +204,8 @@ describe("AnomalyRule.thresholdConfig — structured schema", () => {
           thresholdConfig: validSpendSpikeConfig,
         }),
       ).rejects.toMatchObject({
-        code: "BAD_REQUEST",
-        message: expect.stringMatching(/Unsupported ruleType/i),
+        code: "UNPROCESSABLE_CONTENT",
+        cause: { code: "validation_error" },
       });
 
       const persisted = await prisma.anomalyRule.findFirst({
@@ -247,8 +251,8 @@ describe("AnomalyRule.thresholdConfig — structured schema", () => {
           ruleType: "future_rule_type",
         }),
       ).rejects.toMatchObject({
-        code: "BAD_REQUEST",
-        message: expect.stringMatching(/Unsupported ruleType/i),
+        code: "UNPROCESSABLE_CONTENT",
+        cause: { code: "validation_error" },
       });
 
       const persisted = await prisma.anomalyRule.findUnique({

@@ -20,6 +20,7 @@
  *
  * Spec: specs/ai-gateway/governance/anomaly-rule-threshold-schema.feature
  */
+import { ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 /**
@@ -72,9 +73,9 @@ export type SpendSpikeThresholdConfigParsed = z.infer<
 
 /**
  * Validate a `thresholdConfig` payload against the schema for the
- * named `ruleType`. Throws ZodError on shape failure; throws a generic
- * Error on unknown ruleType (callers should translate that to
- * BAD_REQUEST at the router layer).
+ * named `ruleType`. Throws ZodError on shape failure (the tRPC boundary
+ * promotes it to `validation_error`); throws `ValidationError` directly
+ * on an unknown ruleType.
  */
 export function validateThresholdConfig({
   ruleType,
@@ -85,10 +86,23 @@ export function validateThresholdConfig({
 }): SpendSpikeThresholdConfigParsed | null {
   // Reject genuinely unknown types — saves the admin from a typo
   // landing as a forever-dead rule.
+  //
+  // Handled, not a plain Error: the cause is exactly known and the admin can
+  // act on it (pick a listed type). As a plain Error it reached the customer
+  // as "Something went wrong — we've been notified", which is a promise
+  // nobody can keep about a typo. `validation_error` is already in the client
+  // registry, so the words come from one place; the specific complaint rides
+  // in `meta` — `formErrors` is what the registry's copy renders, and
+  // `fieldErrors.ruleType` is what `applyHandledErrorToForm` puts on the
+  // offending input.
   if (!ALLOWED_RULE_TYPES.includes(ruleType as AllowedRuleType)) {
-    throw new Error(
-      `Unsupported ruleType "${ruleType}". Allowed: ${ALLOWED_RULE_TYPES.join(", ")}.`,
-    );
+    const complaint = `Unsupported ruleType "${ruleType}". Allowed: ${ALLOWED_RULE_TYPES.join(", ")}.`;
+    throw new ValidationError(complaint, {
+      meta: {
+        fieldErrors: { ruleType: [complaint] },
+        formErrors: [complaint],
+      },
+    });
   }
   // Allowed but not yet detected — preview mode. Admin can save the
   // rule, the UI's ThresholdPreview surfaces "Won't fire" honestly,

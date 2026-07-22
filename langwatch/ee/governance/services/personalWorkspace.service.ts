@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { generate } from "@langwatch/ksuid";
 /**
  * PersonalWorkspaceService — owns the lifecycle of a user's "Personal
  * Workspace" inside an organization.
@@ -23,6 +22,8 @@ import { generate } from "@langwatch/ksuid";
  * `ensure()` directly (creates if missing) or use `findExisting()` for
  * read-only paths that should not allocate.
  */
+
+import { generate } from "@langwatch/ksuid";
 import {
   Prisma,
   type PrismaClient,

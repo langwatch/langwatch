@@ -10,7 +10,11 @@
  *   - POST        /api/admin/:resource   (ra-data-simple-prisma)
  */
 
-import { HandledError } from "@langwatch/handled-error";
+import {
+  HandledError,
+  NotFoundError,
+  ValidationError,
+} from "@langwatch/handled-error";
 import { PlanTypes, type Prisma, SubscriptionStatus } from "@prisma/client";
 import {
   defaultHandler,
@@ -39,6 +43,35 @@ const adminAuth = handlerManagedAuth(
   "super-admin session validated in-handler via isAdmin",
 );
 
+/**
+ * The answer to "you are not an admin", which deliberately says nothing more.
+ *
+ * A 404 rather than a 403 so the admin surface doesn't confirm its own
+ * existence to whoever is probing it, and the generic `not_found` code rather
+ * than something naming the backoffice, for the same reason. It goes through
+ * the handled channel anyway so the response carries a trace id — an operator
+ * whose session quietly stopped being an admin has something to quote.
+ */
+function adminSurfaceHidden(): NotFoundError {
+  return new NotFoundError("not_found", "Route", "/api/admin");
+}
+
+/**
+ * The caller has an app session but no live auth session behind it.
+ *
+ * Known cause, and the customer can act on it — sign in again — which is
+ * exactly what the registry's `unauthorized` copy says. Not a 500.
+ */
+class AdminSessionExpiredError extends HandledError {
+  constructor() {
+    super("unauthorized", "No active auth session for this admin request", {
+      httpStatus: 401,
+      fault: "customer",
+    });
+    this.name = "AdminSessionExpiredError";
+  }
+}
+
 const ALLOWED_RESOURCES = new Set([
   "user",
   "organization",
@@ -55,8 +88,8 @@ const ALLOWED_RESOURCES = new Set([
 // Both verbs share the same admin guard + BetterAuth session lookup, so we
 // route them through a single helper and let the service do the real work.
 // The service throws `HandledError` subclasses for business-rule rejections;
-// the helper below maps those to HTTP status codes, keeping the route
-// thin and leaving the rules in one testable place.
+// they travel untouched to `createServiceApp`'s `onError`, which is the one
+// place that serialises them — code, meta, tips, docs link and trace id.
 
 secured
   .access(adminAuth)
@@ -70,7 +103,7 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
   const user = session?.user.impersonator ?? session?.user;
 
   if (!session || !user || !isAdmin(user)) {
-    return c.json({ message: "Not Found" }, 404);
+    throw adminSurfaceHidden();
   }
 
   const rawHeaders = new Headers();
@@ -81,7 +114,7 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
     headers: rawHeaders,
   });
   if (!rawBetterAuth) {
-    return c.json({ message: "Unauthorized" }, 401);
+    throw new AdminSessionExpiredError();
   }
   const sessionId = rawBetterAuth.session.id;
 
@@ -96,39 +129,59 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
     return c.json({ message: "Impersonation ended" });
   }
 
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
+  const body = await readJsonBody(c);
 
   const { userIdToImpersonate, reason } = body;
-  if (!userIdToImpersonate || !reason) {
-    return c.json({ message: "Missing required fields" }, 400);
+  const missing = [
+    ...(userIdToImpersonate ? [] : ["userIdToImpersonate"]),
+    ...(reason ? [] : ["reason"]),
+  ];
+  if (missing.length > 0) {
+    throw new ValidationError("Impersonation request is missing fields", {
+      httpStatus: 400,
+      // `fieldErrors` is the validation_error contract the client reads —
+      // `applyHandledErrorToForm` puts each one on its own input.
+      meta: {
+        fieldErrors: Object.fromEntries(
+          missing.map((field) => [field, ["This is required."]]),
+        ),
+      },
+    });
   }
 
-  try {
-    await service.start({
-      sessionId,
-      impersonatorUserId: user.id,
-      userIdToImpersonate,
-      reason,
-      req: c.req.raw,
-    });
-  } catch (err) {
-    // Handled errors carry client-safe copy: narrow with isHandled, then return
-    // { message, httpStatus }; anything else re-throws to the global handler.
-    // isHandled is an instanceof check, reliable here since the error is thrown
-    // and caught in the same server module graph. See handled-error.ts's doc
-    // comment for when the serialisable `code` discriminant is needed instead.
-    if (HandledError.isHandled(err)) {
-      return c.json({ message: err.message }, err.httpStatus as any);
-    }
-    throw err;
-  }
+  // No catch: a `HandledError` from the service reaches `onError` unchanged,
+  // which serialises the whole payload. Catching it here to re-emit
+  // `{ message }` threw away the code, the meta and the trace id — leaving
+  // the client with a sentence it is not allowed to render.
+  await service.start({
+    sessionId,
+    impersonatorUserId: user.id,
+    userIdToImpersonate,
+    reason,
+    req: c.req.raw,
+  });
 
   return c.json({ message: "Impersonation started" });
+}
+
+/**
+ * The request body, or a handled 400.
+ *
+ * Both admin routes parse a body the same way, and both used to answer an
+ * unparseable one with a bare `{ message: "Bad request" }` — no code, so the
+ * client had nothing to recognise and fell back to "we've been notified"
+ * about a malformed request that will never repair itself.
+ */
+async function readJsonBody(c: any): Promise<Record<string, any>> {
+  try {
+    return (await c.req.json()) as Record<string, any>;
+  } catch {
+    throw new ValidationError("Request body is not valid JSON", {
+      // 400, not `ValidationError`'s 422: nothing was validated, because
+      // nothing parsed.
+      httpStatus: 400,
+    });
+  }
 }
 
 // ---------- POST /api/admin/:resource ----------
@@ -136,15 +189,10 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   const user = session?.user.impersonator ?? session?.user;
   if (!session || !user || !isAdmin(user)) {
-    return c.json({ message: "Not Found" }, 404);
+    throw adminSurfaceHidden();
   }
 
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
+  const body = await readJsonBody(c);
 
   // The request body carries resource + method inside it, but the
   // URL also has the resource param. We use the body's resource field
@@ -154,7 +202,17 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
   }
 
   if (!ALLOWED_RESOURCES.has(body.resource)) {
-    return c.json({ message: "Unknown resource" }, 400);
+    throw new ValidationError(
+      `Unknown admin resource "${String(body.resource)}"`,
+      {
+        httpStatus: 400,
+        meta: {
+          fieldErrors: {
+            resource: ["This isn't a resource the admin API serves."],
+          },
+        },
+      },
+    );
   }
 
   if (body.resource === "organizations") body.resource = "organization";

@@ -1,11 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import {
-  IngestionTemplateService,
-  InvalidSourceTypeError,
-  PlatformTemplateImmutableError,
-  TemplateNotFoundError,
-} from "@ee/governance/services/ingestionTemplate.service";
 /**
  * tRPC router for IngestionTemplate (admin/platform-curated catalog).
  *
@@ -18,6 +12,13 @@ import {
  *
  * Spec: specs/ai-gateway/governance/ingestion-templates-catalog.feature
  */
+
+import {
+  IngestionTemplateService,
+  InvalidSourceTypeError,
+  PlatformTemplateImmutableError,
+  TemplateNotFoundError,
+} from "@ee/governance/services/ingestionTemplate.service";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 /**
  * tRPC router for the Activity Monitor read-side queries that power
  * the /governance admin dashboard. Replaces Alexis's MOCK_* fixtures
@@ -15,6 +14,8 @@ import { ActivityMonitorService } from "@ee/governance/services/activity-monitor
  *
  * Spec: specs/ai-gateway/governance/activity-monitor.feature
  */
+
+import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 import { z } from "zod";
 
 import {
