@@ -80,6 +80,7 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 		return 0, err
 	}
 
+	recreated := false
 	switch state := s.containerState(ctx, dockerHost); {
 	case state == stateRunningCorrectImage && !configChanged:
 		if err := s.waitHealthy(ctx, ep.HTTPPort, 5*time.Second); err == nil {
@@ -96,10 +97,24 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 		if err := s.start(ctx, dockerHost, ep); err != nil {
 			return 0, err
 		}
+		recreated = true
 	}
 
 	if err := s.waitHealthy(ctx, ep.HTTPPort, 40*time.Second); err != nil {
-		return 0, err
+		if recreated {
+			return 0, err
+		}
+		// The container claims to be running but never answers — wedged. Recreate
+		// it once over the same bind-mounted data dir (every database survives)
+		// rather than reporting a dead stack the developer must repair by hand.
+		fmt.Println("clickhouse container is not answering — recreating it (data is kept)…")
+		_ = s.rt.Docker(ctx, dockerHost, "rm", "-f", domain.ClickHouseContainer).Run()
+		if err := s.start(ctx, dockerHost, ep); err != nil {
+			return 0, err
+		}
+		if err := s.waitHealthy(ctx, ep.HTTPPort, 40*time.Second); err != nil {
+			return 0, err
+		}
 	}
 	// Every Ensure, not just when the config changed: the statements are a
 	// handful of idempotent DDLs, and gating them on configChanged made the

@@ -21,9 +21,12 @@ type Proxy interface {
 	// `npx` fallback — so `haven setup` can tell the user to install it once.
 	Installed() bool
 	// EnsureReady boots the proxy if it is not already running and trusts its CA
-	// on first run, so `haven up` self-bootstraps without a prior `haven setup`.
+	// on first run, so `haven up` self-bootstraps with no setup command at all.
 	// Idempotent; the CA trust is guarded so it does not re-prompt on every launch.
 	EnsureReady() error
+	// Install installs portless itself — `up`'s bootstrap when Installed() is
+	// false, so a fresh machine needs nothing but `haven up`.
+	Install() error
 	// Endpoint reports how the proxy is reachable (scheme, port) so URLs are
 	// correct on the default 443 or an unprivileged port.
 	Endpoint() (scheme string, port int)

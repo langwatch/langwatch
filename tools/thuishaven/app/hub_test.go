@@ -117,6 +117,7 @@ func (f *fakeProxy) EnsureReady() error                 { return nil }
 func (f *fakeProxy) Endpoint() (string, int)            { return "https", 443 }
 func (f *fakeProxy) CACertPath() string                 { return "" }
 func (f *fakeProxy) Shutdown() error                    { return nil }
+func (f *fakeProxy) Install() error                     { return nil }
 
 type fakeDBServer struct {
 	databases []string
