@@ -327,5 +327,35 @@ describe("session_metric_series converged totals (migration 00052)", () => {
       (t) => t.metricName === "claude_code.cost.usage",
     );
     expect(costAfterRedelivery?.total).toBeCloseTo(0.9);
+
+    // A correction at the SAME AsOf but a different value must converge on
+    // the newest write (UpdatedAt breaks the AsOf tie), not an arbitrary row.
+    await metricSeries.ensure(
+      [
+        {
+          tenantId,
+          sessionId,
+          seriesId: "cumulative-cost",
+          metricName: "claude_code.cost.usage",
+          metricUnit: "USD",
+          agent: "claude_code",
+          attributes: {},
+          value: 1.1,
+          dataPointCount: 4,
+          asOfUnixMs: baseMs + 5000,
+        },
+      ],
+      30,
+    );
+    const corrected = await metricSeries.findTotalsBySessionIds({
+      tenantId,
+      sessionIds: [sessionId],
+      fromMs: baseMs - 60_000,
+      toMs: baseMs + 60_000,
+    });
+    const costAfterCorrection = corrected.find(
+      (t) => t.metricName === "claude_code.cost.usage",
+    );
+    expect(costAfterCorrection?.total).toBeCloseTo(1.1);
   });
 });

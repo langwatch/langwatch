@@ -205,9 +205,9 @@ export class CodingAgentSessionService {
       .map((row) => row.startedAtMs)
       .filter((ms) => ms > 0);
     const fromMs =
-      range?.fromMs ??
-      (startedAts.length > 0 ? Math.min(...startedAts) : Date.now()) -
-        60 * 60 * 1000;
+      (range?.fromMs ??
+        (startedAts.length > 0 ? Math.min(...startedAts) : Date.now())) -
+      60 * 60 * 1000;
     const toMs =
       (range?.toMs ??
         (startedAts.length > 0 ? Math.max(...startedAts) : Date.now())) +

@@ -11,12 +11,12 @@ const BASE_URL = process.env.BASE_URL ?? "http://localhost:5570";
 const PROJECT = "local-dev-project-jcq4ii";
 const OUTER_TRACE = "8b0d370605a5a40bf7f154abfb09faa9";
 const CHILD_TRACE = "1d73629e2a03ee6c5cda994c69599a1a";
-const AGENT_TRACES: Array<[string, string]> = [
+const AGENT_TRACES = [
   ["05-gemini-terminal", "b404e584f528005751647820c85f20d8"],
   ["06-opencode-terminal", "a1f8c1e86872d49fc24dcf9d8aff8591"],
   ["07-codex-terminal", "8e439e2cf9dd5896b5ce29f1d1cff749"],
   ["08-copilot-terminal", "714eee94aefad959915d499893508a01"],
-];
+] as const;
 // A trace whose agent contributes no span facts to the session aggregate:
 // its Session tab must show the honest empty state, never a zeroed summary.
 const STUB_SESSION_TRACE = "a1f8c1e86872d49fc24dcf9d8aff8591";
@@ -57,7 +57,8 @@ void (async () => {
       await shoot(page, "00-login-debug");
       console.log("login stuck at", page.url());
       console.log((await page.textContent("body"))?.slice(0, 400));
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     console.log("logged in ->", page.url());
 
@@ -72,7 +73,15 @@ void (async () => {
       "text=/reported tokens|Claude Code v|Gemini CLI v|opencode v|Codex v|Copilot v/";
     const SESSION_READY = "text=/model calls|no usage summary/i";
 
-    async function capture(url: string, selector: string, name: string) {
+    async function capture({
+      url,
+      selector,
+      name,
+    }: {
+      url: string;
+      selector: string;
+      name: string;
+    }) {
       for (let attempt = 1; ; attempt++) {
         await page.goto(url);
         // The first-visit product tour overlays a spotlight veil that washes
@@ -94,39 +103,39 @@ void (async () => {
       await shoot(page, name);
     }
 
-    await capture(
-      `${BASE_URL}/${PROJECT}/traces`,
-      "text=telemetry dogfood",
-      "01-traces-list",
-    );
-    await capture(
-      `${BASE_URL}/${PROJECT}/traces/${OUTER_TRACE}?drawer.mode=terminal`,
-      TERMINAL_READY,
-      "02-claude-terminal",
-    );
-    await capture(
-      `${BASE_URL}/${PROJECT}/traces/${OUTER_TRACE}?drawer.mode=session`,
-      SESSION_READY,
-      "03-claude-session",
-    );
+    await capture({
+      url: `${BASE_URL}/${PROJECT}/traces`,
+      selector: "text=telemetry dogfood",
+      name: "01-traces-list",
+    });
+    await capture({
+      url: `${BASE_URL}/${PROJECT}/traces/${OUTER_TRACE}?drawer.mode=terminal`,
+      selector: TERMINAL_READY,
+      name: "02-claude-terminal",
+    });
+    await capture({
+      url: `${BASE_URL}/${PROJECT}/traces/${OUTER_TRACE}?drawer.mode=session`,
+      selector: SESSION_READY,
+      name: "03-claude-session",
+    });
     // The child claude session proves sub-sessions record independently.
-    await capture(
-      `${BASE_URL}/${PROJECT}/traces/${CHILD_TRACE}?drawer.mode=session`,
-      SESSION_READY,
-      "04-child-session",
-    );
+    await capture({
+      url: `${BASE_URL}/${PROJECT}/traces/${CHILD_TRACE}?drawer.mode=session`,
+      selector: SESSION_READY,
+      name: "04-child-session",
+    });
     for (const [name, traceId] of AGENT_TRACES) {
-      await capture(
-        `${BASE_URL}/${PROJECT}/traces/${traceId}?drawer.mode=terminal`,
-        TERMINAL_READY,
+      await capture({
+        url: `${BASE_URL}/${PROJECT}/traces/${traceId}?drawer.mode=terminal`,
+        selector: TERMINAL_READY,
         name,
-      );
+      });
     }
-    await capture(
-      `${BASE_URL}/${PROJECT}/traces/${STUB_SESSION_TRACE}?drawer.mode=session`,
-      SESSION_READY,
-      "09-opencode-session-empty",
-    );
+    await capture({
+      url: `${BASE_URL}/${PROJECT}/traces/${STUB_SESSION_TRACE}?drawer.mode=session`,
+      selector: SESSION_READY,
+      name: "09-opencode-session-empty",
+    });
     // The personal usage card sits at the bottom of /me — scroll it into view
     // so the shot shows the card, not the page header.
     await page.goto(`${BASE_URL}/me`);

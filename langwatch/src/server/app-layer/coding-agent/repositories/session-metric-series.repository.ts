@@ -164,7 +164,8 @@ export class SessionMetricSeriesClickHouseRepository
     // converged values. An IN-tuple filter on (SeriesId, max(AsOf)) is not
     // enough here: a byte-identical re-delivery leaves two un-merged rows
     // sharing the winning AsOf, both pass the filter, and a plain sum counts
-    // the unit twice.
+    // the unit twice. UpdatedAt breaks AsOf ties so a same-timestamp
+    // correction converges on the newest write instead of an arbitrary row.
     const result = await client.query({
       query: `
         SELECT
@@ -177,7 +178,7 @@ export class SessionMetricSeriesClickHouseRepository
             SessionId,
             MetricName,
             Attributes['type'] AS Bucket,
-            argMax(Value, AsOf) AS SeriesValue
+            argMax(Value, tuple(AsOf, UpdatedAt)) AS SeriesValue
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND SessionId IN {sessionIds:Array(String)}
