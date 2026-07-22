@@ -11,6 +11,7 @@ import {
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
 import {
   LANGY_CONVERSATION_TURN_STATUS,
+  type LangyConversationTurnStatus,
   LANGY_TURN_TOOL_CALL_STATUS,
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
 import { langyPlanItemSchema } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
@@ -33,9 +34,14 @@ import {
  * as one, and every consumer would have to guess.
  */
 const turnStatusSchema = z.enum(
-  Object.values(LANGY_CONVERSATION_TURN_STATUS) as [string, ...string[]],
+  // Cast to the UNION, not to `[string, ...string[]]`: the latter is enough for
+  // `z.enum` to validate but makes `parse` return a plain string, which is
+  // exactly the narrowing the read path needs back.
+  Object.values(LANGY_CONVERSATION_TURN_STATUS) as [
+    LangyConversationTurnStatus,
+    ...LangyConversationTurnStatus[],
+  ],
 );
-
 
 const messagePartsSchema = z.array(langyMessagePartSchema);
 const planSchema = z.array(langyPlanItemSchema);
