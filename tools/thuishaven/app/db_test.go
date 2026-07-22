@@ -63,6 +63,8 @@ func liveStackStore() *fakeStore {
 }
 
 // @scenario "Fresh data is an explicit, confirmed noun"
+// @scenario "The default seed is unchanged"
+// @scenario "The demo preset needs the stack for its traces"
 func TestDBReset(t *testing.T) {
 	params := UpParams{ExplicitSlug: "feat-x", WorktreeDir: "/wt/feat-x", LwDir: "/wt/feat-x/langwatch"}
 

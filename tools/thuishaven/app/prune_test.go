@@ -32,6 +32,7 @@ func pruneOrch(store *fakeStore, sys *fakeSystem, ch, pg *fakeDBServer, hyg Hygi
 
 // --- Prune database reclaim ---------------------------------------------------
 
+// @scenario "The standing main database survives bulk cleanup"
 func TestPruneDatabaseReclaim(t *testing.T) {
 	repoRoot := "/repos/langwatch"
 	victim := "/repos/worktrees/feat-x"
