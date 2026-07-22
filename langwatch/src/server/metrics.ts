@@ -1005,6 +1005,20 @@ const langyRateLimitTotal = new Counter({
 export const getLangyRateLimitCounter = (outcome: "rejected" | "fail_open") =>
   langyRateLimitTotal.labels(outcome);
 
+// Model-emitted ```langy-card blocks at the relay stamp (ADR-060 §8). The
+// failure outcomes are the drift alarm for prompt regressions in block
+// emission — a rising unsalvageable/invalid rate means the agent's emission
+// quality slipped, exactly like ADR-059's probe-miss counter for cards.
+register.removeSingleMetric("langwatch_langy_blocks_total");
+const langyBlocksTotal = new Counter({
+  name: "langwatch_langy_blocks_total",
+  help: "Model-emitted langy-card blocks stamped by the relay, by outcome",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyBlocksCounter = (
+  outcome: "stamped" | "unsalvageable" | "invalid",
+) => langyBlocksTotal.labels(outcome);
+
 // ============================================================================
 // Fold redelivery
 // ============================================================================

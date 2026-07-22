@@ -516,6 +516,49 @@ describe("LangyConversationService", () => {
       });
     });
 
+    describe("when the completed turn's reply carries a langy-card fence", () => {
+      it("records the stamped typed part in place of the fence (ADR-060)", async () => {
+        const recordAgentResponse = vi.fn<
+          LangyConversationCommands["recordAgentResponse"]
+        >(async () => {});
+        const svc = new LangyConversationService(
+          makeRepo(),
+          makeCommands({ recordAgentResponse }),
+        );
+
+        await svc.ingestAgentTurnResult({
+          projectId: "p1",
+          conversationId: "c1",
+          turnId: "turn-9",
+          status: "completed",
+          text: [
+            "Plotted:",
+            "```langy-card",
+            '{"kind": "stats", "blockId": "b7", "items": [{"label": "runs", "value": 3}]}',
+            "```",
+          ].join("\n"),
+        });
+
+        const arg = recordAgentResponse.mock.calls[0]![0];
+        // The durable event carries the DECISION, not the fence: downstream
+        // (fold, browser, time travel) reads the part and never re-parses text.
+        expect(arg.parts).toEqual([
+          { type: "text", text: "Plotted:", role: "assistant" },
+          {
+            type: "langy-card",
+            blockId: "b7",
+            kind: "stats",
+            provenance: "derived",
+            card: {
+              kind: "stats",
+              blockId: "b7",
+              items: [{ label: "runs", value: 3 }],
+            },
+          },
+        ]);
+      });
+    });
+
     describe("when the agent posts a failed turn", () => {
       it("dispatches failAgentResponse with a serialized domain error, never raw prose", async () => {
         const failAgentResponse = vi.fn<

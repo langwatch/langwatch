@@ -13,3 +13,4 @@ export * from "./blocks/salvage";
 export * from "./blocks/fence";
 export * from "./blocks/preview";
 export * from "./blocks/choices";
+export * from "./blocks/parts";
