@@ -1,5 +1,4 @@
 import { Box, HStack, Link, Text } from "@chakra-ui/react";
-import { createLogger } from "@langwatch/observability";
 import {
   type ColumnDef,
   type ColumnSizingState,
@@ -8,7 +7,6 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { nanoid } from "nanoid";
 import {
   useCallback,
   useEffect,
@@ -23,7 +21,6 @@ import { datasetTableCss } from "~/components/datasets/editor/datasetTableStyles
 import type { ColumnType } from "~/components/datasets/editor/TableCell";
 import { useTableKeyboardNavigation } from "~/components/datasets/editor/useTableKeyboardNavigation";
 import { VirtualizedTableBody } from "~/components/datasets/editor/VirtualizedTableBody";
-import { toaster } from "~/components/ui/toaster";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import {
   getFlowCallbacks,
@@ -86,10 +83,7 @@ import {
   convertHttpComponentConfig,
 } from "../utils/httpAgentUtils";
 import { evaluatorHasMissingMappings } from "../utils/mappingValidation";
-import {
-  applyForkedAgentToTarget,
-  planDuplicateTarget,
-} from "../utils/duplicateTarget";
+import { executeForkAgentDuplicate } from "../utils/executeForkAgentDuplicate";
 import {
   toTargetOutputFields,
   type PromptOutputField,
@@ -202,8 +196,6 @@ export const buildTargetEvaluatorsForRow = (
 // ============================================================================
 // Main Component
 // ============================================================================
-
-const logger = createLogger("EvaluationsV3Table");
 
 type EvaluationsV3TableProps = {
   isLoadingExperiment?: boolean;
@@ -824,6 +816,11 @@ export function EvaluationsV3Table({
   // On fork failure we log and skip adding the column rather than silently
   // falling back to a shallow copy, which would reintroduce the original bug
   // (two columns pointing at the same dbAgentId).
+  //
+  // The ordered `agents.copy → workflow.publish → addTarget` sequence and
+  // the best-effort `agents.delete` rollback on post-copy failure live in
+  // `utils/executeForkAgentDuplicate.ts` so they can be exercised by an
+  // integration test with mocked mutations (see #5935 P2 review).
   const handleDuplicateTarget = useCallback(
     async (target: TargetConfig) => {
       // The component only renders inside a project-scoped route, so `project`
@@ -832,65 +829,14 @@ export function EvaluationsV3Table({
       const projectId = project?.id;
       if (!projectId) return;
 
-      const plan = planDuplicateTarget(target);
-      const newTargetId = `target-${nanoid(8)}`;
-
-      if (plan.kind === "fork-agent") {
-        try {
-          const copied = await copyAgent.mutateAsync({
-            agentId: plan.sourceAgentId,
-            projectId,
-            sourceProjectId: projectId,
-          });
-          try {
-            if (copied.workflowId && copied.workflowVersionId) {
-              await publishWorkflow.mutateAsync({
-                projectId,
-                workflowId: copied.workflowId,
-                versionId: copied.workflowVersionId,
-              });
-            }
-            addTarget(
-              applyForkedAgentToTarget({
-                baseTarget: target,
-                forked: copied,
-                newTargetId,
-              }),
-            );
-          } catch (postCopyErr) {
-            // Best-effort rollback: don't leave an orphaned Agent/Workflow
-            // counted against the license quota with no target referencing
-            // it. Swallow rollback errors — the post-copy failure is the
-            // primary signal and we don't want to mask it with a secondary
-            // rollback failure.
-            await deleteAgent
-              .mutateAsync({ id: copied.id, projectId })
-              .catch((rollbackErr) => {
-                logger.error(
-                  { rollbackErr, orphanedAgentId: copied.id },
-                  "Rollback failed after post-copy failure; orphaned Agent row remains",
-                );
-              });
-            throw postCopyErr;
-          }
-        } catch (err) {
-          logger.error(
-            { err, sourceAgentId: plan.sourceAgentId },
-            "Failed to fork agent target on duplicate; not adding the column",
-          );
-          toaster.create({
-            title: "Failed to duplicate target",
-            type: "error",
-          });
-        }
-        return;
-      }
-
-      const newTarget: TargetConfig = { ...target, id: newTargetId };
-      addTarget(newTarget);
-      if (newTarget.type === "prompt") {
-        void openTargetEditor(newTarget);
-      }
+      await executeForkAgentDuplicate(target, {
+        copyAgent,
+        publishWorkflow,
+        deleteAgent,
+        addTarget,
+        openTargetEditor,
+        projectId,
+      });
     },
     [
       addTarget,
