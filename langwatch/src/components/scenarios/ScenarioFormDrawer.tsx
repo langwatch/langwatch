@@ -4,7 +4,7 @@ import { generate } from "@langwatch/ksuid";
 import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { KSUID_RESOURCES } from "../../utils/constants";
-import { type UseFormReturn, useWatch } from "react-hook-form";
+import { type UseFormReturn, useFormState, useWatch } from "react-hook-form";
 import { getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
 import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
@@ -22,6 +22,7 @@ import { TagList } from "../ui/TagList";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
+import { ScenarioDiscardChangesDialog } from "./ScenarioDiscardChangesDialog";
 import { ScenarioRunModelDialog } from "./ScenarioRunModelDialog";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
 import { ScenarioForm, type ScenarioFormData, type ScenarioInitialData } from "./ScenarioForm";
@@ -136,6 +137,27 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     { projectId: project?.id ?? "", id: scenarioId ?? "" },
     { enabled: !!project && !!scenarioId },
   );
+  // Closing is destructive for a scenario that was never saved, so every
+  // close route asks first once there is something to lose. `onClose` stays
+  // the unguarded exit — a successful save uses it directly, having already
+  // put the work somewhere permanent.
+  const [hasUnsavedWork, setHasUnsavedWork] = useState(false);
+  const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
+
+  const requestClose = useCallback(() => {
+    if (hasUnsavedWork) {
+      setDiscardPromptOpen(true);
+      return;
+    }
+    onClose();
+  }, [hasUnsavedWork, onClose]);
+
+  const discardAndClose = useCallback(() => {
+    setDiscardPromptOpen(false);
+    setHasUnsavedWork(false);
+    onClose();
+  }, [onClose]);
+
   const createMutation = api.scenarios.create.useMutation({
     onSuccess: (data: Scenario) => {
       void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
@@ -424,9 +446,16 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   return (
     <Drawer.Root
       open={isOpen}
-      onOpenChange={({ open }) => !open && onClose()}
+      onOpenChange={({ open }) => !open && requestClose()}
       size="xl"
     >
+      {formInstance && (
+        <UnsavedWorkWatcher
+          form={formInstance}
+          isEditing={!!scenario}
+          onChange={setHasUnsavedWork}
+        />
+      )}
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header borderBottomWidth="1px">
@@ -461,7 +490,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             <FooterLabels form={formInstance} />
           )}
           <HStack gap={2} flexShrink={0}>
-            <Button variant="outline" size="sm" onClick={onClose}>
+            <Button variant="outline" size="sm" onClick={requestClose}>
               Cancel
             </Button>
             <SaveAndRunMenu
@@ -476,6 +505,13 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
+
+      <ScenarioDiscardChangesDialog
+        open={discardPromptOpen}
+        isEditing={!!scenario}
+        onKeepEditing={() => setDiscardPromptOpen(false)}
+        onDiscard={discardAndClose}
+      />
 
       {/* Run-model dialog: choose user-simulator + judge models before running */}
       <ScenarioRunModelDialog
@@ -513,6 +549,45 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       />
     </Drawer.Root>
   );
+}
+
+/**
+ * Reports whether closing the editor right now would lose something.
+ *
+ * A leaf that renders nothing: react-hook-form only tracks `isDirty` for forms
+ * that subscribe to it during render, so reading it from a close handler alone
+ * would return a value nobody ever computed.
+ *
+ * Editing a saved scenario, "something to lose" is exactly dirtiness. Creating
+ * one it is not — an AI draft arrives as the form's own defaults and so reads
+ * as pristine, while closing on it still throws away a generated scenario. So
+ * a new scenario counts as unsaved work the moment it holds any content at
+ * all, typed or drafted.
+ */
+function UnsavedWorkWatcher({
+  form,
+  isEditing,
+  onChange,
+}: {
+  form: UseFormReturn<ScenarioFormData>;
+  isEditing: boolean;
+  onChange: (hasUnsavedWork: boolean) => void;
+}) {
+  const { isDirty } = useFormState({ control: form.control });
+  const [name, situation, criteria] = useWatch({
+    control: form.control,
+    name: ["name", "situation", "criteria"],
+  });
+
+  const hasContent =
+    !!name?.trim() || !!situation?.trim() || (criteria?.length ?? 0) > 0;
+  const hasUnsavedWork = isEditing ? isDirty : hasContent;
+
+  useEffect(() => {
+    onChange(hasUnsavedWork);
+  }, [hasUnsavedWork, onChange]);
+
+  return null;
 }
 
 function FooterLabels({ form }: { form: UseFormReturn<ScenarioFormData> }) {
