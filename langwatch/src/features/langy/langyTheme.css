@@ -648,22 +648,24 @@
 }
 
 /* ── The minimised peek's brand seam ───────────────────────────────────────
-   The minimised panel is a PEEK of itself at the viewport edge (see
-   LangyPeekDock): a sliver of the card's header lip along the bottom in
-   floating mode, a sliver of the dock's spine on the right edge in sidebar
-   mode. The seam is the sliver's identity — a faint warm line along the
-   exposed edge, the fold's own tones, so the 6–10px at rest read as Langy
-   rather than as stray chrome. It brightens with the proximity pop, and
-   BREATHES on the fold's pulse period while a turn is still running under
-   the minimised panel — the creature is sunk, not gone. */
-.langy-peek::before {
+   Minimised, the panel slides down (floating) or right (sidebar) until only a
+   sliver of its OWN header shows — same element, same surface, just moved.
+   These rules ride on that element (`data-langy-peek` carries the phase), so
+   the seam is a property of the panel rather than of a stand-in.
+
+   The seam is a faint warm line along whichever edge is exposed, in the fold's
+   own tones, so the resting sliver reads as Langy rather than as stray chrome.
+   It brightens with the proximity rise, and BREATHES on the fold's pulse
+   period while a turn is still running underneath — the creature is minimised,
+   not gone. */
+.langy-root[data-langy-peek]::before {
   content: "";
   position: absolute;
   pointer-events: none;
   opacity: 0.55;
   transition: opacity 240ms ease;
 }
-.langy-peek[data-peek-mode="floating"]::before {
+.langy-root[data-langy-peek][data-langy-peek-mode="floating"]::before {
   top: 0;
   left: 18px;
   right: 18px;
@@ -677,7 +679,7 @@
     transparent
   );
 }
-.langy-peek[data-peek-mode="sidebar"]::before {
+.langy-root[data-langy-peek][data-langy-peek-mode="sidebar"]::before {
   left: 0;
   top: 14px;
   bottom: 14px;
@@ -691,8 +693,8 @@
     transparent
   );
 }
-.dark .langy-peek[data-peek-mode="floating"]::before,
-:root.dark .langy-peek[data-peek-mode="floating"]::before {
+.dark .langy-root[data-langy-peek][data-langy-peek-mode="floating"]::before,
+:root.dark .langy-root[data-langy-peek][data-langy-peek-mode="floating"]::before {
   background: linear-gradient(
     90deg,
     transparent,
@@ -701,8 +703,8 @@
     transparent
   );
 }
-.dark .langy-peek[data-peek-mode="sidebar"]::before,
-:root.dark .langy-peek[data-peek-mode="sidebar"]::before {
+.dark .langy-root[data-langy-peek][data-langy-peek-mode="sidebar"]::before,
+:root.dark .langy-root[data-langy-peek][data-langy-peek-mode="sidebar"]::before {
   background: linear-gradient(
     180deg,
     transparent,
@@ -711,13 +713,13 @@
     transparent
   );
 }
-.langy-peek[data-peek-phase="near"]::before {
+.langy-root[data-langy-peek="near"]::before {
   opacity: 1;
 }
 /* A turn is in flight under the minimised panel: the seam breathes on the
    fold's own pulse period (WAVE_PULSE_PERIOD_S), the same clock the open
    panel's tool pulse keeps. */
-.langy-peek-working::before {
+.langy-root[data-langy-peek][data-langy-peek-working]::before {
   animation: langy-peek-breathe 2.6s ease-in-out infinite;
 }
 @keyframes langy-peek-breathe {
@@ -730,10 +732,10 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .langy-peek::before {
+  .langy-root[data-langy-peek]::before {
     transition: none;
   }
-  .langy-peek-working::before {
+  .langy-root[data-langy-peek][data-langy-peek-working]::before {
     animation: none;
     opacity: 0.9;
   }
@@ -895,7 +897,7 @@
   }
 
   /* The minimised peek's brand seam — the fold's warm tones on wide gamuts. */
-  .langy-peek[data-peek-mode="floating"]::before {
+  .langy-root[data-langy-peek][data-langy-peek-mode="floating"]::before {
     background: linear-gradient(
       90deg,
       transparent,
@@ -904,7 +906,7 @@
       transparent
     );
   }
-  .langy-peek[data-peek-mode="sidebar"]::before {
+  .langy-root[data-langy-peek][data-langy-peek-mode="sidebar"]::before {
     background: linear-gradient(
       180deg,
       transparent,
@@ -913,8 +915,8 @@
       transparent
     );
   }
-  .dark .langy-peek[data-peek-mode="floating"]::before,
-  :root.dark .langy-peek[data-peek-mode="floating"]::before {
+  .dark .langy-root[data-langy-peek][data-langy-peek-mode="floating"]::before,
+  :root.dark .langy-root[data-langy-peek][data-langy-peek-mode="floating"]::before {
     background: linear-gradient(
       90deg,
       transparent,
@@ -923,8 +925,8 @@
       transparent
     );
   }
-  .dark .langy-peek[data-peek-mode="sidebar"]::before,
-  :root.dark .langy-peek[data-peek-mode="sidebar"]::before {
+  .dark .langy-root[data-langy-peek][data-langy-peek-mode="sidebar"]::before,
+  :root.dark .langy-root[data-langy-peek][data-langy-peek-mode="sidebar"]::before {
     background: linear-gradient(
       180deg,
       transparent,

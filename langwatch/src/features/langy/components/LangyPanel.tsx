@@ -74,6 +74,7 @@ import { useLangyDevMode } from "../hooks/useLangyDevMode";
 import { useLangyExternalLinkGuard } from "../hooks/useLangyExternalLinkGuard";
 import { useLangyFreshness } from "../hooks/useLangyFreshness";
 import { useLangyOrbProximity } from "../hooks/useLangyOrbProximity";
+import { useLangyPeekProximity } from "../hooks/useLangyPeekProximity";
 import { useLangyPageContext } from "../hooks/useLangyPageContext";
 import { useLangyContextDropZone } from "../hooks/useLangyContextDropZone";
 import { useLangyStickToBottom } from "../hooks/useLangyStickToBottom";
@@ -104,10 +105,16 @@ import {
   APP_HEADER_HEIGHT,
   FLOATING_PANEL_CSS_WIDTH,
   FLOATING_PANEL_INSET,
+  LANGY_TRANSITION,
   PANEL_LAYOUT_TRANSITION,
   resolveFloatingPanelWidth,
   SIDEBAR_PANEL_WIDTH,
 } from "../logic/langyPanelLayout";
+import {
+  FLOATING_PEEK_NEAR_PX,
+  type LangyPeekPhase,
+  resolvePeekTranslate,
+} from "../logic/langyPeekDock";
 import { resolveLangyStopTarget } from "../logic/langyStopTarget";
 import { deriveWaveActivity } from "../logic/langyWaveMotion";
 import {
@@ -133,7 +140,6 @@ import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
 import { LangyError } from "./LangyError";
 import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";
 import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
-import { LangyPeekDock } from "./LangyPeekDock";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { RecentChatsView } from "./RecentChatsView";
 import { LangyThinkingLine } from "./LangyThinkingLine";
@@ -269,7 +275,8 @@ export function LangySidecar({ proposalHandlersRef }: LangySidecarProps) {
   const openPanel = useLangyStore((s) => s.openPanel);
   useGlobalLangyShortcut(toggle);
   // The minimised affordance is mid-rollout: flag ON, minimise sinks the
-  // panel to an edge peek of itself (LangyPeekDock); flag OFF keeps the
+  // panel to a sliver of its own header (see the peek wiring in LangyPanel);
+  // flag OFF keeps the
   // classic corner launcher orb. ONE renders at a time — never both — and
   // only the closed state differs: opening, the panel and Cmd/Ctrl+I are
   // identical on either side of the flag.
@@ -278,13 +285,19 @@ export function LangySidecar({ proposalHandlersRef }: LangySidecarProps) {
   return (
     <>
       <LangyMarkGradientDefs />
-      {peekDock.enabled ? (
-        <LangyPeekDock isOpen={isOpen} onOpen={openPanel} />
-      ) : (
+      {/* Flag ON, the panel IS the minimised affordance — it slides down to a
+          sliver of its own header rather than handing off to anything else,
+          so there is nothing to render here. Flag OFF keeps the classic
+          corner launcher orb. Exactly one, never both. */}
+      {peekDock.enabled ? null : (
         <LangyLauncher isOpen={isOpen} onOpen={toggle} />
       )}
       <LangyContextTargetLayer />
-      <LangyPanel proposalHandlersRef={proposalHandlersRef} />
+      <LangyPanel
+        proposalHandlersRef={proposalHandlersRef}
+        peekEnabled={peekDock.enabled}
+        onOpen={openPanel}
+      />
     </>
   );
 }
@@ -292,7 +305,8 @@ export function LangySidecar({ proposalHandlersRef }: LangySidecarProps) {
 /**
  * The FLAG-OFF closed-state opener — a single circular launcher in the
  * bottom-right corner (the Notion-AI model). Retires in favour of the edge
- * peek (LangyPeekDock, `release_ui_langy_peek_dock_enabled`); until that
+ * peek — the panel sliding down to its own header sliver
+ * (`release_ui_langy_peek_dock_enabled`); until that
  * flag ships, this remains the minimised affordance. Restrained on purpose —
  * the LangWatch mark on a plain surface with a soft neutral shadow, no mesh,
  * no loud colour. Hidden while the panel is open.
@@ -388,8 +402,18 @@ function LangyLauncher({
 
 function LangyPanel({
   proposalHandlersRef,
+  peekEnabled,
+  onOpen,
 }: {
   proposalHandlersRef?: React.RefObject<ProposalHandlers>;
+  /**
+   * Minimising slides this panel down to a sliver of its own header instead
+   * of hiding it outright (`release_ui_langy_peek_dock_enabled`). Flag off,
+   * closed still means invisible and the launcher orb does the opening.
+   */
+  peekEnabled: boolean;
+  /** Activating the peeking sliver — its click, its Enter/Space. */
+  onOpen: () => void;
 }) {
   const { organization, project } = useOrganizationTeamProject();
   const projectId = project?.id;
@@ -525,9 +549,68 @@ function LangyPanel({
   const viewportWidth = useViewportWidth();
   const floatingPanelWidth = resolveFloatingPanelWidth(viewportWidth);
 
+  // ── The minimised peek: this panel, slid down to a sliver of itself ───────
+  // `peeking` is the whole state. When it is on, the panel is CLOSED but
+  // VISIBLE — a sliver of its own header resting at the viewport edge — so it
+  // keeps pointer events, drops `aria-hidden`, and makes its own body inert
+  // (below) so nothing behind the edge is tabbable. When it is off, closed
+  // means what it always meant: invisible, and the launcher orb opens it.
+  const peeking = peekEnabled && !isOpen;
+  // The pointer approaching the sliver raises it a little further. One passive
+  // rAF-throttled listener with hysteresis; off entirely under reduced motion,
+  // where hover/focus alone does the raising.
+  const peekNear = useLangyPeekProximity({
+    enabled: peeking && !reduceMotion,
+    mode: panelMode,
+    // A right-anchored drawer owns the bottom-right corner, so the floating
+    // panel dodges left — and the proximity zone has to follow it there.
+    dodgeLeft: !!currentDrawer && floating,
+  });
+  const [peekHovered, setPeekHovered] = useState(false);
+  const [peekFocused, setPeekFocused] = useState(false);
+  const peekPhase: LangyPeekPhase =
+    peekNear || peekHovered || peekFocused ? "near" : "rest";
+  // Leaving the peek behind must not strand a stale raise on the next minimise.
+  useEffect(() => {
+    if (isOpen) {
+      setPeekHovered(false);
+      setPeekFocused(false);
+    }
+  }, [isOpen]);
+  // The ONE continuous motion. `translate` is its own CSS property, so it
+  // composes with the `transform` framer owns (the layout morph, the open
+  // variant) rather than fighting it — and it takes calc(), so the sliver is
+  // exact without measuring the panel.
+  const peekTranslate = peeking
+    ? resolvePeekTranslate({ mode: panelMode, phase: peekPhase })
+    : "none";
+  /**
+   * The panel's own body, made INERT while it peeks.
+   *
+   * Most of the panel is below the viewport edge when minimised, but "off
+   * screen" is not "unreachable": without this, Tab walks straight into the
+   * composer and the message log of a panel nobody can see, and a screen
+   * reader reads a conversation that is not on screen. `inert` takes the whole
+   * subtree out of focus order and out of the accessibility tree in one move,
+   * leaving exactly one reachable thing — the open control above.
+   *
+   * Set through a ref rather than a prop so it works whatever this React
+   * version does with `inert` (it only became a first-class prop in 19).
+   */
+  const peekInertRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = peekInertRef.current;
+    if (!node) return;
+    node.inert = peeking;
+  }, [peeking]);
+
   const variants = useMemo(
     () => ({
       open: { opacity: 1, scale: 1, x: 0, y: 0 },
+      // Peeking, the panel stays fully opaque and un-offset: the sliver IS the
+      // panel, and its position is the `translate` above. Only the flag-off
+      // closed state still fades and hops out of the way.
+      peek: { opacity: 1, scale: 1, x: 0, y: 0 },
       closed: floating ? FLOATING_CLOSED : SIDEBAR_CLOSED,
     }),
     [floating],
@@ -1787,10 +1870,21 @@ function LangyPanel({
         // only the panel — never the page behind it. Both layouts: the effect
         // runs on the dock too.
         isolation="isolate"
-        pointerEvents={isOpen ? "auto" : "none"}
-        aria-hidden={!isOpen}
+        // A peeking panel is visible and clickable — it is the affordance.
+        pointerEvents={isOpen || peeking ? "auto" : "none"}
+        // ...and therefore must NOT be hidden from assistive tech; its body is
+        // made inert instead (see the content wrapper below), so the only
+        // thing reachable behind the edge is the open control.
+        aria-hidden={!isOpen && !peeking}
         role="complementary"
         aria-label="Langy assistant"
+        // The peek's identity for CSS (langyTheme.css): the phase drives the
+        // seam's brightness, the mode picks which edge it runs along, and
+        // `working` breathes it while a turn is still running underneath — so
+        // a minimised panel still shows that it is busy.
+        data-langy-peek={peeking ? peekPhase : undefined}
+        data-langy-peek-mode={peeking ? panelMode : undefined}
+        data-langy-peek-working={peeking && turnActive ? "" : undefined}
         // The box framer transforms. The home page's send has to measure this
         // panel's composer while the panel is still CLOSED, and closed is a
         // transform on exactly this element — so it needs to be able to find
@@ -1800,8 +1894,12 @@ function LangyPanel({
         // edge its peek sliver rests on.
         transformOrigin={floating ? "bottom right" : "right center"}
         initial={false}
-        animate={isOpen ? "open" : "closed"}
+        animate={isOpen ? "open" : peeking ? "peek" : "closed"}
         variants={variants}
+        // The peek's whole motion, on the one element: rest → near → open is
+        // a single property easing on the panel's own curve. Never set while
+        // open ("none"), so an opened panel carries no residue.
+        style={{ translate: peekTranslate }}
         transition={
           reduceMotion
             ? { duration: 0 }
@@ -1822,8 +1920,7 @@ function LangyPanel({
                 ...(reduceMotion
                   ? {}
                   : {
-                      transition:
-                        "min-height 340ms cubic-bezier(0.32, 0.72, 0, 1), max-height 340ms cubic-bezier(0.32, 0.72, 0, 1)",
+                      transition: `min-height 340ms cubic-bezier(0.32, 0.72, 0, 1), max-height 340ms cubic-bezier(0.32, 0.72, 0, 1), translate ${LANGY_TRANSITION}`,
                     }),
                 // The capped silhouette is handsome on a normal display, but on a
                 // short split terminal/browser it leaves no actual conversation
@@ -1835,7 +1932,11 @@ function LangyPanel({
                   maxHeight: "calc(100dvh - 24px)",
                 },
               }
-            : undefined
+            : // The dock peeks on X, and needs the same eased travel. (It has
+              // no size-floor transition to share the declaration with.)
+              reduceMotion
+              ? undefined
+              : { transition: `translate ${LANGY_TRANSITION}` }
         }
         {...(isDrawerCompanion
           ? {
@@ -1949,11 +2050,49 @@ function LangyPanel({
           compact={!floating}
           reduceMotion={reduceMotion}
         />
+        {/* THE PEEK'S ONLY CONTROL. While the panel rests as a sliver, this
+            covers it: a real button, so Tab reaches it and Enter/Space opens,
+            sitting over the panel's own header rather than replacing it (what
+            you see is still the panel's header — this is just the hit area).
+            It is a CHILD of the panel, so the thing that slides is still one
+            element. Gone entirely once open, where the header's own controls
+            take over. */}
+        {peeking ? (
+          <chakra.button
+            type="button"
+            onClick={onOpen}
+            onPointerEnter={() => setPeekHovered(true)}
+            onPointerLeave={() => setPeekHovered(false)}
+            onFocus={() => setPeekFocused(true)}
+            onBlur={() => setPeekFocused(false)}
+            aria-label="Open Langy assistant"
+            aria-keyshortcuts="Meta+I Control+I"
+            position="absolute"
+            top={0}
+            left={0}
+            right={0}
+            // Tall enough to cover the risen sliver too, so the pointer never
+            // falls off the target as the panel rises to meet it.
+            height={`${FLOATING_PEEK_NEAR_PX}px`}
+            zIndex={3}
+            cursor="pointer"
+            background="transparent"
+            borderWidth={0}
+            borderRadius="inherit"
+            _focusVisible={{
+              outline: "2px solid",
+              outlineColor: "orange.emphasized",
+              outlineOffset: "-2px",
+            }}
+          />
+        ) : null}
         {/* Fills whatever height the panel resolved to (min 440px floating, full
           viewport docked). Header and composer are flexShrink=0; the message
           list between them takes the slack — so the composer is ALWAYS the
           bottom edge, however short the conversation. */}
         <VStack
+          ref={peekInertRef}
+          data-langy-peek-body=""
           gap={0}
           align="stretch"
           flex={1}
@@ -2692,7 +2831,7 @@ function PanelHeader({
               It says MINIMISE, because that is what it does. The panel stays
               mounted (unmounting would tear down the in-flight stream), the
               conversation is untouched, `isOpen` persists across a reload, and
-              the panel sinks to its edge peek (see LangyPeekDock) — so the
+              the panel sinks to a sliver of its own header — so the
               honest word is minimise, and a second "minimise" control beside
               a "close" that did the same thing would only be two names for
               one behaviour. */}
