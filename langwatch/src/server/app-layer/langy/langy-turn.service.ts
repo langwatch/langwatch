@@ -440,6 +440,11 @@ export class LangyTurnService {
           ...(credentials.egressAllowlist
             ? { egressAllowlist: credentials.egressAllowlist }
             : {}),
+          // ADR-061 mirror tier is part of the worker signature, so a tier
+          // change must be a probe MISS (re-warm) rather than a stale mirror.
+          ...(credentials.mirrorTier
+            ? { mirrorTier: credentials.mirrorTier }
+            : {}),
         });
 
       // With no GitHub capability, the signature is already final; overlap the

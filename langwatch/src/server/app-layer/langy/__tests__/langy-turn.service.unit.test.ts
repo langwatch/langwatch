@@ -79,6 +79,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   const credentials = {
     getOrProvision: vi.fn(async () => ({ organizationId: "org-1" })),
     getEgressAllowlist: vi.fn(async () => null),
+    resolveMirrorTier: vi.fn(async () => "content" as const),
     getModelsAllowed: vi.fn(async () => null),
   };
 
