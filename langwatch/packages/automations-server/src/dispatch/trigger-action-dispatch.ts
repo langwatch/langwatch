@@ -1,0 +1,328 @@
+import { createLogger } from "@langwatch/observability";
+import { TriggerAction } from "@langwatch/automations/enums";
+import {
+  CADENCE_WINDOW_MS,
+  type NotificationCadence,
+} from "@langwatch/automations/cadences";
+import type { TriggerFilters } from "@langwatch/automations/domain/filters";
+import type { TriggerSummary } from "@langwatch/automations/repositories/trigger.repository";
+import { DispatchError } from "@langwatch/dispatch-error";
+
+/** The filter-analysis pair `triggerReadsEvaluations` consumes — the app
+ *  supplies its liqe `queryNeeds` and structured-filter classifier. */
+export interface TriggerFilterQueryKit {
+  queryNeeds(filterQuery: string): ReadonlySet<string>;
+  classifyTriggerFilters(filters: TriggerFilters): {
+    hasEvaluationFilters: boolean;
+  };
+}
+
+/** The slice of a trace this dispatcher touches: identity, the span presence
+ *  gate, and whatever else rides along opaquely to the injected mapper. */
+export interface TraceLike {
+  trace_id: string;
+  spans?: readonly unknown[] | null;
+}
+
+/** One dataset row as this module writes it. The app's DatasetRecordEntry
+ *  is structurally satisfied by these objects. */
+export type DatasetRecordEntryLike = {
+  id: string;
+  selected: boolean;
+} & Record<string, unknown>;
+
+const logger = createLogger("langwatch:trigger-action-dispatch");
+
+/**
+ * Trigger actions split into two classes that dispatch on different schedules.
+ * See dev/docs/adr/026-per-trigger-dispatch-timing.md.
+ *
+ * - Notify actions land in front of a human; they may be batched into a digest
+ *   window to avoid notification storms.
+ * - Persist actions write durable data the customer asked for; batching them
+ *   would defeat the intent, so they always dispatch immediately.
+ *
+ * The two sets must together cover every TriggerAction value, with no overlap
+ * (enforced by the unit test). A new action type must be classified here at the
+ * point it is introduced.
+ */
+export const NOTIFY_TRIGGER_ACTIONS = new Set<TriggerAction>([
+  TriggerAction.SEND_EMAIL,
+  TriggerAction.SEND_SLACK_MESSAGE,
+  TriggerAction.SEND_WEBHOOK,
+]);
+
+export const PERSIST_TRIGGER_ACTIONS = new Set<TriggerAction>([
+  TriggerAction.ADD_TO_DATASET,
+  TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+]);
+
+/**
+ * Whether a trigger's subject reads evaluation results — either via the legacy
+ * structured evaluation filters, or an ADR-043 trace-subject `filterQuery` that
+ * references an evaluator field. Such triggers are ALSO enqueued from the
+ * evaluation pipeline so they re-check when an evaluation lands: a trace may
+ * settle (and its trace-pipeline settle match run) before the evaluation ran,
+ * which is exactly when the eval half of the query is still false. The
+ * at-most-once `TriggerSent(triggerId, traceId)` gate dedupes the two enqueues,
+ * so whichever pipeline confirms the match first wins and the other no-ops.
+ */
+export function triggerReadsEvaluations(
+  trigger: {
+    filters: TriggerSummary["filters"];
+    filterQuery: TriggerSummary["filterQuery"];
+  },
+  kit: TriggerFilterQueryKit,
+): boolean {
+  if (trigger.filterQuery != null) {
+    return kit.queryNeeds(trigger.filterQuery).has("evaluations");
+  }
+  return kit.classifyTriggerFilters(trigger.filters).hasEvaluationFilters;
+}
+
+/**
+ * Resolves when a matched trigger should dispatch. This is the contract the
+ * outbox dispatch layer reads:
+ *
+ * - Persist actions and immediate-cadence notify actions fire now.
+ * - Digest-cadence notify actions snap to the **next wall-clock boundary**
+ *   for their window (e.g. for `5min_digest`, the next UTC multiple of
+ *   5 minutes since the epoch). All matches inside the same boundary share
+ *   one dispatch time, which is what lets the GroupQueue's `processBatch`
+ *   + `coalesceMaxBatch` collapse them into a single digest invocation.
+ *
+ * Snapping (not `now + window`) is load-bearing — `now + window` gives every
+ * match its own scheduled-for, so concurrent matches end up at slightly
+ * different times and never coalesce. See ADR-026.
+ */
+export function computeScheduledFor({
+  action,
+  cadence,
+  now,
+}: {
+  action: TriggerAction;
+  cadence: NotificationCadence;
+  now: Date;
+}): Date {
+  if (PERSIST_TRIGGER_ACTIONS.has(action)) return now;
+  if (cadence === "immediate") return now;
+  const windowMs = CADENCE_WINDOW_MS[cadence];
+  const nowMs = now.getTime();
+  // Next wall-clock boundary: ceil(nowMs / window) * window.
+  // If now is already exactly on a boundary, advance one full window so two
+  // matches at the same instant don't dispatch "now" on the boundary and
+  // skip the digest behavior the operator picked.
+  const nextBoundaryMs = (Math.floor(nowMs / windowMs) + 1) * windowMs;
+  return new Date(nextBoundaryMs);
+}
+
+export interface TriggerActionDispatchDeps<TTrace extends TraceLike = TraceLike> {
+  triggers: {
+    updateLastRunAt(triggerId: string, projectId: string): Promise<void>;
+  };
+  /** Existence gate only — a dispatch against a deleted project is dropped. */
+  projects: { getById(projectId: string): Promise<object | null> };
+  traceById: (
+    projectId: string,
+    traceId: string,
+  ) => Promise<TTrace | undefined>;
+  addToAnnotationQueue: (params: {
+    traceIds: string[];
+    projectId: string;
+    annotators: string[];
+    userId: string;
+  }) => Promise<void>;
+  addToDataset: (params: {
+    datasetId: string;
+    projectId: string;
+    datasetRecords: DatasetRecordEntryLike[];
+  }) => Promise<void>;
+  /** The app's trace→dataset mapping machinery, injected whole: expansion
+   *  vocabulary membership plus the row mapper itself. */
+  datasetMapping: {
+    isTraceExpansion(key: string): boolean;
+    mapTraceToDatasetEntry(
+      trace: TTrace,
+      mapping: Record<string, { source: string; key: string; subkey: string }>,
+      expansions: ReadonlySet<string>,
+    ): Record<string, unknown>[];
+  };
+}
+
+interface ActionParams {
+  members?: string[] | null;
+  slackWebhook?: string | null;
+  datasetId?: string;
+  datasetMapping?: {
+    mapping: Record<string, { source: string; key: string; subkey: string }>;
+    expansions: string[];
+  };
+  annotators?: { id: string; name: string }[];
+  createdByUserId?: string;
+}
+
+export async function dispatchTriggerAction<TTrace extends TraceLike>({
+  deps,
+  trigger,
+  traceId,
+  tenantId,
+}: {
+  deps: TriggerActionDispatchDeps<TTrace>;
+  trigger: TriggerSummary;
+  traceId: string;
+  tenantId: string;
+  // Part of the dispatch envelope (the settled fold), accepted so callers can
+  // pass it uniformly, but not read here: the persist actions (annotation
+  // queue, dataset) work off the full trace, not the fold projection.
+  foldState: unknown;
+}): Promise<void> {
+  const project = await deps.projects.getById(tenantId);
+
+  if (!project) {
+    logger.warn({ tenantId, triggerId: trigger.id }, "Project not found");
+    return;
+  }
+
+  // Fetch full trace once — used by Slack (events), email (events), and ADD_TO_DATASET (mapping).
+  // Best-effort: if trace not found, actions that only need input/output still work with a stub.
+  const fullTrace =
+    (await deps.traceById(tenantId, traceId)) ??
+    ({ trace_id: traceId } as TTrace);
+
+  const params = (trigger.actionParams ?? {}) as ActionParams;
+
+  let dispatched = true;
+
+  switch (trigger.action) {
+    case TriggerAction.SEND_EMAIL:
+    case TriggerAction.SEND_SLACK_MESSAGE:
+    case TriggerAction.SEND_WEBHOOK:
+      // Notify-class actions never dispatch inline — they ride the outbox
+      // (settle → cadence) so debounce, cadence coalescing, and the typed
+      // retry contract apply. Both callers pre-filter on
+      // NOTIFY_TRIGGER_ACTIONS; reaching this case means a caller dropped
+      // its filter, and sending here would bypass the entire timing model.
+      throw new DispatchError({
+        message: `dispatchTriggerAction cannot dispatch notify action ${trigger.action} inline — notify actions ride the outbox (trigger ${trigger.id})`,
+        retryable: false,
+      });
+
+    case TriggerAction.ADD_TO_ANNOTATION_QUEUE:
+      if (!params.createdByUserId) {
+        // Mirror the missing-datasetId guard: an empty-string userId would
+        // create queue items attributed to no valid user.
+        logger.warn(
+          { tenantId, triggerId: trigger.id },
+          "ADD_TO_ANNOTATION_QUEUE trigger missing createdByUserId; skipping action",
+        );
+        dispatched = false;
+        break;
+      }
+      await deps.addToAnnotationQueue({
+        traceIds: [traceId],
+        projectId: tenantId,
+        annotators: (params.annotators ?? []).map((a) => a.id),
+        userId: params.createdByUserId,
+      });
+      break;
+
+    case TriggerAction.ADD_TO_DATASET:
+      dispatched = await addTraceToDataset({
+        deps,
+        trigger,
+        traceId,
+        tenantId,
+        params,
+        fullTrace,
+      });
+      break;
+  }
+
+  if (!dispatched) {
+    // The action did not actually run (missing config / trace data) —
+    // don't record the trigger as having fired.
+    logger.warn(
+      { tenantId, traceId, triggerId: trigger.id, action: trigger.action },
+      "Trigger action skipped; not updating lastRunAt",
+    );
+    return;
+  }
+
+  await deps.triggers.updateLastRunAt(trigger.id, tenantId);
+
+  logger.info(
+    { tenantId, traceId, triggerId: trigger.id, action: trigger.action },
+    "Trigger fired",
+  );
+}
+
+async function addTraceToDataset<TTrace extends TraceLike>({
+  deps,
+  trigger,
+  traceId,
+  tenantId,
+  params,
+  fullTrace,
+}: {
+  deps: TriggerActionDispatchDeps<TTrace>;
+  trigger: TriggerSummary;
+  traceId: string;
+  tenantId: string;
+  params: ActionParams;
+  fullTrace: TTrace;
+}): Promise<boolean> {
+  if (!params.datasetId || !params.datasetMapping) {
+    logger.warn(
+      { tenantId, triggerId: trigger.id },
+      "ADD_TO_DATASET trigger missing datasetId or datasetMapping",
+    );
+    return false;
+  }
+
+  // Full trace was already fetched by dispatchTriggerAction; check it has spans
+  if (!fullTrace.spans || fullTrace.spans.length === 0) {
+    logger.warn(
+      { tenantId, traceId, triggerId: trigger.id },
+      "Trace not found or has no spans for ADD_TO_DATASET action",
+    );
+    return false;
+  }
+
+  const trace = fullTrace;
+
+  const { mapping, expansions: expansionsArray } = params.datasetMapping;
+  const expansions = new Set(
+    expansionsArray.filter((e) => deps.datasetMapping.isTraceExpansion(e)),
+  );
+
+  const entries: DatasetRecordEntryLike[] = [];
+
+  const mappedEntries = deps.datasetMapping.mapTraceToDatasetEntry(
+    trace,
+    mapping,
+    expansions,
+  );
+
+  for (let i = 0; i < mappedEntries.length; i++) {
+    const entry = mappedEntries[i]!;
+    const sanitizedEntry = Object.fromEntries(
+      Object.entries(entry).map(([key, value]) => [
+        key,
+        typeof value === "string" ? value.replace(/\u0000/g, "") : value,
+      ]),
+    );
+    entries.push({
+      id: `${trigger.id}-${traceId}-${i}`,
+      selected: true,
+      ...sanitizedEntry,
+    });
+  }
+
+  await deps.addToDataset({
+    datasetId: params.datasetId,
+    projectId: tenantId,
+    datasetRecords: entries,
+  });
+
+  return true;
+}

@@ -33,9 +33,9 @@ import {
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
-import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";
+import { isNoDataPredicate } from "@langwatch/automations-server/services/evaluate-custom-graph-threshold.service";
 import type { GraphTriggerEvaluationReason } from "./graph-trigger-evaluation.service";
-import { parseSeriesIndex } from "./seriesName";
+import { parseSeriesIndex } from "@langwatch/automations-server/services/seriesName";
 import type { TriggerService } from "./trigger.service";
 
 const logger = createLogger(

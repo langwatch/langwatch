@@ -17,11 +17,13 @@ import type { FoldProjectionStore } from "~/server/event-sourcing/projections/fo
 import { RedisCachedFoldStore } from "~/server/event-sourcing/projections/redisCachedFoldStore";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { TraceService } from "~/server/traces/trace.service";
-import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
-import { sendWebhook } from "~/server/app-layer/automations/delivery/sendWebhook";
-import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
+import { sendRenderedSlackMessage } from "@langwatch/automations-server/clients/slack/incoming-webhook.client";
+import { sendWebhook } from "~/server/app-layer/automations/delivery/appWebhookSender";
+import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/appSlackWebApi";
 
-import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
+import { WebhookDeliveryService } from "@langwatch/automations-server/services/webhook-delivery.service";
+import { PrismaAutomationCustomGraphRepository } from "~/server/app-layer/automations/repositories/custom-graph.prisma.repository";
+import { PrismaWebhookDeliveryRepository } from "~/server/app-layer/automations/repositories/webhook-delivery.prisma.repository";
 import {
   evaluateGraphTrigger,
   type GraphTriggerEvaluationDeps,
@@ -33,14 +35,19 @@ import {
   defaultGraphTriggerHeartbeatDeps,
   type GraphTriggerSweepCandidate,
 } from "~/server/app-layer/automations/graph-trigger-heartbeat";
-import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
+import { AutomationCustomGraphService } from "@langwatch/automations-server/services/custom-graph.service";
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
-import { dispatchGraphAlertAction } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
+import { dispatchGraphAlertAction } from "@langwatch/automations-server/dispatch/graph-alert-dispatch";
+import { decryptWebhookHeaders } from "~/server/app-layer/automations/providers/webhook/server";
+import {
+  appDatasetMapping,
+  appSettledMatchKit,
+} from "~/server/app-layer/automations/dispatch/appDispatchPorts";
 import {
   consumeEmailCapSlot,
   consumeTenantEmailCapSlot,
-} from "~/server/app-layer/automations/dispatch/emailCaps";
+} from "~/server/app-layer/automations/dispatch/appEmailCaps";
 import type { TriggerSettlementDispatchDeps } from "../../../event-sourcing/pipelines/automations/process-manager/triggerSettlementIntentHandlers";
 
 /**
@@ -134,14 +141,14 @@ export function buildAutomationDispatchPorts({
   const graphTriggerSentRepo = new PrismaGraphTriggerSentRepository(prisma);
   // ADR-040 §6: one delivery-log writer shared by the digest dispatch and
   // the graph-alert path.
-  const webhookDeliveries = WebhookDeliveryService.create(prisma);
+  const webhookDeliveries = new WebhookDeliveryService(new PrismaWebhookDeliveryRepository(prisma));
   const recordWebhookDelivery = (
     input: Parameters<typeof webhookDeliveries.record>[0],
   ) => webhookDeliveries.record(input);
   // Graph-config loads go through the automations-owned service, not raw
   // prisma — same query shape, service/repository layering (no direct
   // prisma in composition-root closures).
-  const customGraphs = AutomationCustomGraphService.create(prisma);
+  const customGraphs = new AutomationCustomGraphService(new PrismaAutomationCustomGraphRepository(prisma));
   const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
     loadTrigger: async ({ triggerId, projectId }) =>
       triggers.getById({ triggerId, projectId }),
@@ -161,6 +168,7 @@ export function buildAutomationDispatchPorts({
             sendSlackBot: postSlackChatMessage,
             sendWebhook,
             recordWebhookDelivery,
+            decryptWebhookHeaders,
             // ADR-031: honour the same suppression list + hard caps the
             // digest path consumes; claims keyed on the fire digest so a
             // retry re-reads the count instead of burning a second slot.
@@ -231,6 +239,8 @@ export function buildAutomationDispatchPorts({
     traceSummaryStore,
     evaluationRuns: evaluations.runs,
     deriveEvents: (params) => traceReadDerivation.deriveEvents(params),
+    filters: appSettledMatchKit,
+    datasetMapping: appDatasetMapping,
     emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
     consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
       consumeEmailCapSlot({

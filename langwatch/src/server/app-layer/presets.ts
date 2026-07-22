@@ -22,7 +22,7 @@ import { getPostHogInstance } from "~/server/posthog";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { createS3Client } from "~/server/storage";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
-import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
+import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/appTriggerNotifier";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
@@ -60,8 +60,8 @@ import { toReportTraceRow } from "./reports/trace-report-row";
 import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
-import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
-import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
+import { sendRenderedSlackMessage } from "@langwatch/automations-server/clients/slack/incoming-webhook.client";
+import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/appSlackWebApi";
 import { EventSourcing } from "../event-sourcing";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
@@ -239,7 +239,7 @@ import { traced } from "./tracing";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { ClickHouseAutomationAuditRepository } from "./automations/repositories/automation-audit.clickhouse.repository";
-import { NullAutomationAuditRepository } from "./automations/repositories/automation-audit.repository";
+import { NullAutomationAuditRepository } from "@langwatch/automations/repositories/automation-audit.repository";
 import {
   PrismaEmailSuppressionNameLookupRepository,
   PrismaEmailSuppressionRepository,
@@ -247,9 +247,9 @@ import {
 import {
   NullEmailSuppressionNameLookupRepository,
   NullEmailSuppressionRepository,
-} from "./automations/repositories/emailSuppression.repository";
+} from "@langwatch/automations/repositories/emailSuppression.repository";
 import { PrismaTriggerRepository } from "./automations/repositories/trigger.prisma.repository";
-import { NullTriggerRepository } from "./automations/repositories/trigger.repository";
+import { NullTriggerRepository } from "@langwatch/automations/repositories/trigger.repository";
 import { TriggerService } from "./automations/trigger.service";
 import { testFireTrigger } from "./automations/trigger-template.service";
 import { UsageService } from "./usage/usage.service";

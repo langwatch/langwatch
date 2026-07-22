@@ -5,7 +5,7 @@ import {
   type ReportScheduleTarget,
   type TriggerRepository,
   type TriggerSummary,
-} from "../repositories/trigger.repository";
+} from "@langwatch/automations/repositories/trigger.repository";
 import { TriggerService } from "../trigger.service";
 
 function makeSummary(

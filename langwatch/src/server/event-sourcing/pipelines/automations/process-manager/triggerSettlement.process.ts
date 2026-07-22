@@ -7,7 +7,7 @@ import type {
 } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 import { settleWindowBucket } from "~/server/event-sourcing/pipelines/automations/settleWindow";
 
-import { computeScheduledFor } from "../../../../app-layer/automations/dispatch/triggerActionDispatch";
+import { computeScheduledFor } from "@langwatch/automations-server/dispatch/trigger-action-dispatch";
 import {
   createLogOverflowHandler,
   createNotifyDigestHandler,

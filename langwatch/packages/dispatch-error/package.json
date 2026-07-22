@@ -1,0 +1,28 @@
+{
+	"name": "@langwatch/dispatch-error",
+	"version": "0.0.1",
+	"private": true,
+	"description": "The typed retryable-vs-terminal dispatch error contract (ADR-027) shared by the queue substrate and dispatch endpoints",
+	"type": "module",
+	"packageManager": "pnpm@10.24.0",
+	"main": "src/index.ts",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"test": "vitest",
+		"test:unit": "vitest run"
+	},
+	"keywords": [
+		"langwatch",
+		"dispatch",
+		"errors"
+	],
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^26.0.1",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.9"
+	}
+}

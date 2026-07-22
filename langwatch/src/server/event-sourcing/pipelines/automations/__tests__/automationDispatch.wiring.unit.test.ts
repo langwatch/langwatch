@@ -49,16 +49,16 @@ vi.mock("~/server/api/utils", () => ({
   getProtectionsForProject: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock("~/server/app-layer/automations/webhook-delivery.service", () => ({
-  WebhookDeliveryService: {
-    create: vi.fn(() => ({
+vi.mock("@langwatch/automations-server/services/webhook-delivery.service", () => ({
+  WebhookDeliveryService: vi.fn(function () {
+    return {
       record: vi.fn().mockResolvedValue(undefined),
       pruneExpired: pruneExpiredMock,
-    })),
-  },
+    };
+  }),
 }));
 
-vi.mock("~/server/app-layer/automations/dispatch/emailCaps", () => ({
+vi.mock("~/server/app-layer/automations/dispatch/appEmailCaps", () => ({
   consumeEmailCapSlot: vi.fn().mockResolvedValue({ allowed: true, count: 1 }),
   consumeTenantEmailCapSlot: vi
     .fn()

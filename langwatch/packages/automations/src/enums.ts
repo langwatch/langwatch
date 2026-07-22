@@ -22,3 +22,19 @@ export const AlertType = {
   INFO: "INFO",
 } as const;
 export type AlertType = (typeof AlertType)[keyof typeof AlertType];
+
+export const TriggerKind = {
+  AUTOMATION: "AUTOMATION",
+  ALERT: "ALERT",
+  REPORT: "REPORT",
+} as const;
+export type TriggerKind = (typeof TriggerKind)[keyof typeof TriggerKind];
+
+export const WebhookDeliveryOutcome = {
+  success: "success",
+  retryable: "retryable",
+  terminal: "terminal",
+  pending: "pending",
+} as const;
+export type WebhookDeliveryOutcome =
+  (typeof WebhookDeliveryOutcome)[keyof typeof WebhookDeliveryOutcome];

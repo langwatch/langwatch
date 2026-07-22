@@ -4,7 +4,7 @@ import { RecordTriggerMatchCommand } from "~/server/event-sourcing/pipelines/aut
 import { settleWindowBucket } from "~/server/event-sourcing/pipelines/automations/settleWindow";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
+import type { TriggerSummary } from "@langwatch/automations/repositories/trigger.repository";
 import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { EvaluationProcessingEvent } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/events";
 import { createEvaluationAlertTriggerMatchHandler } from "../evaluationAlertTriggerMatch.subscriber";

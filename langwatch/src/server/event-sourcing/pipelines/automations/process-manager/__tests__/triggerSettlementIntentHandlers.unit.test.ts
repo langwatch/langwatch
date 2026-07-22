@@ -1,9 +1,13 @@
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
+import type { TriggerSummary } from "@langwatch/automations/repositories/trigger.repository";
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { Trace } from "~/server/tracer/types";
+import {
+  appDatasetMapping,
+  appSettledMatchKit,
+} from "~/server/app-layer/automations/dispatch/appDispatchPorts";
 import {
   createLogOverflowHandler,
   createNotifyDigestHandler,
@@ -18,8 +22,11 @@ const { deliverWebhookMock, loggerWarnMock, sendRenderedTriggerEmailMock } =
     sendRenderedTriggerEmailMock: vi.fn().mockResolvedValue(undefined),
   }));
 
-vi.mock("~/server/app-layer/automations/delivery/deliverWebhook", () => ({
+vi.mock("@langwatch/automations-server/clients/http/deliver-webhook", () => ({
   deliverWebhook: deliverWebhookMock,
+}));
+vi.mock("~/server/app-layer/automations/delivery/appWebhookSender", () => ({
+  sendWebhook: vi.fn(),
 }));
 
 vi.mock("~/server/mailer/triggerEmail", () => ({
@@ -137,6 +144,8 @@ function makeDeps(activeTrigger: TriggerSummary) {
     updateLastRunAt: vi.fn().mockResolvedValue(undefined),
   };
   const deps = {
+    filters: appSettledMatchKit,
+    datasetMapping: appDatasetMapping,
     triggers,
     projects: {
       getById: vi.fn().mockResolvedValue({

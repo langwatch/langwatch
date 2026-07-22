@@ -4,7 +4,7 @@ import type {
   EmailSuppressionRepository,
   EmailSuppressionRow,
   UnsubscribeNames,
-} from "./repositories/emailSuppression.repository";
+} from "@langwatch/automations/repositories/emailSuppression.repository";
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 

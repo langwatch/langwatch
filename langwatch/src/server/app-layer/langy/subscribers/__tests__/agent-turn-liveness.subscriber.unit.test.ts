@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { LangyTurnDispatchRetry } from "~/server/app-layer/langy/langy-turn-retry.error";
 import type { LangyTurnHandoff } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { LANGY_LIVENESS } from "~/server/app-layer/langy/streaming/langy.streaming.constants";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "@langwatch/dispatch-error";
 import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {

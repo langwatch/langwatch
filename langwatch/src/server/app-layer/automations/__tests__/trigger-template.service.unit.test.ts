@@ -6,7 +6,7 @@ import {
 } from "@langwatch/automations/templating/banner";
 import { DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE } from "@langwatch/automations/templating/defaults";
 import graphAlertDetailedSource from "~/features/automations/providers/slack/templates/graph_alert_detailed.liquid?raw";
-import { TemplateValidationError, TestFireUnavailableError } from "../errors";
+import { TemplateValidationError, TestFireUnavailableError } from "@langwatch/automations-server/errors";
 import {
   type DraftIdentity,
   type DraftProject,

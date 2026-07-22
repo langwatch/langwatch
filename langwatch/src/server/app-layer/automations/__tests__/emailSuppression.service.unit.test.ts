@@ -10,7 +10,7 @@ import type {
   EmailSuppressionRepository,
   EmailSuppressionRow,
   UnsubscribeNames,
-} from "../repositories/emailSuppression.repository";
+} from "@langwatch/automations/repositories/emailSuppression.repository";
 
 class FakeRepo implements EmailSuppressionRepository {
   rows: EmailSuppressionRow[] = [];

@@ -8,7 +8,7 @@ import {
   NullTriggerRepository,
   type ReportScheduleTarget,
   type TriggerRepository,
-} from "../repositories/trigger.repository";
+} from "@langwatch/automations/repositories/trigger.repository";
 import { TriggerService } from "../trigger.service";
 
 function makeScheduledJobs(

@@ -22,8 +22,8 @@ import type { FilterParam } from "~/hooks/useFilterParams";
 import {
   type FilterField,
   sanitizeTriggerFilters,
-  type TriggerFilterValue,
 } from "~/server/filters/types";
+import type { TriggerFilterValue } from "@langwatch/automations/domain/filters";
 import { api } from "~/utils/api";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { NotificationCadence } from "@langwatch/automations/cadences";

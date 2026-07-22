@@ -2,8 +2,8 @@ import type { CustomGraph, Project, Trigger } from "@prisma/client";
 import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TimeseriesResult } from "~/server/analytics/types";
-import type { GraphAlertDispatchResult } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import type { GraphAlertDispatchResult } from "@langwatch/automations-server/dispatch/graph-alert-dispatch";
+import { DispatchError } from "@langwatch/dispatch-error";
 import {
   evaluateGraphTrigger,
   type GraphTriggerEvaluationDeps,
@@ -12,7 +12,7 @@ import {
   graphAlertIncidentKey,
   type GraphTriggerSentRepository,
   type OpenGraphTriggerSent,
-} from "../repositories/trigger.repository";
+} from "@langwatch/automations/repositories/trigger.repository";
 
 const PROJECT_ID = "proj-1";
 const TRIGGER_ID = "trig-1";

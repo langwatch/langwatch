@@ -41,23 +41,23 @@ import type {
   TimeseriesInputType,
 } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "@langwatch/dispatch-error";
 import {
   graphAlertFireDigest,
   type GraphAlertDispatchInput,
   type GraphAlertDispatchResult,
-} from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
+} from "@langwatch/automations-server/dispatch/graph-alert-dispatch";
 import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
 import {
   evaluateCustomGraphThreshold,
   isNoDataPredicate,
-} from "./evaluate-custom-graph-threshold.service";
+} from "@langwatch/automations-server/services/evaluate-custom-graph-threshold.service";
 import type {
   GraphTriggerSentRepository,
   OpenGraphTriggerSent,
-} from "./repositories/trigger.repository";
-import { parseSeriesIndex } from "./seriesName";
+} from "@langwatch/automations/repositories/trigger.repository";
+import { parseSeriesIndex } from "@langwatch/automations-server/services/seriesName";
 
 const logger = createLogger("langwatch:graph-trigger-evaluation");
 

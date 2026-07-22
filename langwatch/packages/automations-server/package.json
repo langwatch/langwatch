@@ -1,0 +1,49 @@
+{
+	"name": "@langwatch/automations-server",
+	"version": "0.0.1",
+	"private": true,
+	"description": "Automations service layer: domain services, delivery clients, dispatch, event-sourcing logic, and the versioned customer API factory. Database-free — repository implementations are injected by the app.",
+	"type": "module",
+	"packageManager": "pnpm@10.24.0",
+	"main": "src/index.ts",
+	"exports": {
+		".": "./src/index.ts",
+		"./api": "./src/api/service.ts",
+		"./errors": "./src/errors.ts",
+		"./services/*": "./src/services/*.ts",
+		"./clients/*": "./src/clients/*.ts",
+		"./dispatch/*": "./src/dispatch/*.ts",
+		"./event-sourcing/*": "./src/event-sourcing/*.ts",
+		"./testing": "./src/testing/fakes.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"test": "vitest",
+		"test:unit": "vitest run"
+	},
+	"keywords": [
+		"langwatch",
+		"automations",
+		"services",
+		"api"
+	],
+	"license": "MIT",
+	"dependencies": {
+		"@langwatch/api": "workspace:*",
+		"@langwatch/automations": "workspace:*",
+		"@langwatch/dispatch-error": "workspace:*",
+		"@langwatch/handled-error": "workspace:*",
+		"@langwatch/observability": "workspace:*",
+		"@langwatch/ssrf": "workspace:*",
+		"@slack/webhook": "^7.1.0"
+	},
+	"peerDependencies": {
+		"zod": "^3.25.0"
+	},
+	"devDependencies": {
+		"@types/node": "^26.0.1",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.9",
+		"zod": "^3.25.76"
+	}
+}

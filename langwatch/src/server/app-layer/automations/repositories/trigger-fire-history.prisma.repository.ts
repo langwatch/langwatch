@@ -3,7 +3,7 @@ import type {
   TriggerFire,
   TriggerFireHistoryRepository,
   TriggerFireStats,
-} from "./trigger-fire-history.repository";
+} from "@langwatch/automations/repositories/trigger-fire-history.repository";
 
 export class PrismaTriggerFireHistoryRepository
   implements TriggerFireHistoryRepository

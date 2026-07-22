@@ -1,8 +1,9 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
-import { sendHttpDestination } from "../httpDestination";
+import { DispatchError } from "@langwatch/dispatch-error";
+import { sendHttpDestination } from "@langwatch/automations-server/clients/http/destination";
+import { appHttpEgress } from "../appHttpEgress";
 
 /**
  * This file deliberately does NOT mock `~/utils/ssrfProtection`. The sibling
@@ -51,6 +52,7 @@ describe("sendHttpDestination against a real endpoint", () => {
         const startedAt = Date.now();
 
         const error = (await sendHttpDestination({
+    egress: appHttpEgress,
           url: `${baseUrl}/never-responds`,
           body: "{}",
           timeoutMs,

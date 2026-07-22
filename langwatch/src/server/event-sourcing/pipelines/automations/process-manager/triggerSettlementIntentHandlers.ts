@@ -21,16 +21,17 @@ import type { Trace } from "~/server/tracer/types";
 import {
   deliverWebhook,
   type WebhookDeliveryRecorder,
-} from "~/server/app-layer/automations/delivery/deliverWebhook";
+} from "@langwatch/automations-server/clients/http/deliver-webhook";
+import { sendWebhook } from "~/server/app-layer/automations/delivery/appWebhookSender";
 import {
   DispatchError,
   isDispatchError,
-} from "~/server/event-sourcing/queues/dispatchError";
+} from "@langwatch/dispatch-error";
 import {
   sendRenderedSlackMessage,
-  sendSlackWebhook,
-} from "~/server/app-layer/automations/delivery/sendSlackWebhook";
-import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
+} from "@langwatch/automations-server/clients/slack/incoming-webhook.client";
+import { sendSlackWebhook } from "~/server/app-layer/automations/delivery/appSlackIncomingWebhook";
+import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/appSlackWebApi";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
 import { renderTriggerSlack } from "@langwatch/automations/templating/renderSlack";
 import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
@@ -43,8 +44,15 @@ import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   type ConfirmSettledMatchDeps,
   confirmSettledMatch,
-} from "../../../../app-layer/automations/dispatch/confirmSettledMatch";
-import { dispatchTriggerAction } from "../../../../app-layer/automations/dispatch/triggerActionDispatch";
+} from "@langwatch/automations-server/dispatch/confirm-settled-match";
+import {
+  dispatchTriggerAction,
+  type DatasetRecordEntryLike,
+} from "@langwatch/automations-server/dispatch/trigger-action-dispatch";
+import {
+  appDatasetMapping,
+  appSettledMatchKit,
+} from "../../../../app-layer/automations/dispatch/appDispatchPorts";
 import {
   type LogOverflowIntent,
   type NotifyDigestIntent,
@@ -102,6 +110,16 @@ export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
   baseHost: string;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   evaluationRuns: EvaluationRunService;
+  deriveEvents: (params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    foldVersion?: number;
+  }) => Promise<DerivedTraceEvent[]>;
+  /** The app's settle-recheck machinery (ADR-063 §1). */
+  filters: typeof appSettledMatchKit;
+  /** The app's trace→dataset mapping machinery (ADR-063 §1). */
+  datasetMapping: typeof appDatasetMapping;
   traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
   addToAnnotationQueue: (params: {
     traceIds: string[];
@@ -112,7 +130,7 @@ export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
   addToDataset: (params: {
     datasetId: string;
     projectId: string;
-    datasetRecords: DatasetRecordEntry[];
+    datasetRecords: DatasetRecordEntryLike[];
   }) => Promise<void>;
   /** ADR-040 §6 delivery-log writer. Optional: absent in tests. */
   recordWebhookDelivery?: WebhookDeliveryRecorder;
@@ -566,6 +584,7 @@ async function dispatchNotifyDigest({
         "evt_" +
         createHash("sha256").update(messageKey).digest("hex").slice(0, 32);
       await deliverWebhook({
+        send: sendWebhook,
         recorder: deps.recordWebhookDelivery,
         projectId,
         triggerId,
