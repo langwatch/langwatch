@@ -68,7 +68,7 @@ Each field earns its place:
 | `fault` | Who can act. Drives **log level and alerting**, not UI. Defaults to `customer` — so any subclass with a 5xx status must set `platform` or `provider` explicitly, or a real incident logs as routine noise. |
 | `meta` | Structured context the **client can actually use**. Not a debug dump. If no UI reads a field, it does not belong here — put it in the log instead. |
 | `tips` | Short, actionable, imperative. Written for an agent driving the API/CLI/MCP with no UI to fall back on. |
-| `docsUrl` | Canonical `docs.langwatch.ai` link. CI asserts every one resolves. |
+| `docsUrl` | Canonical `docs.langwatch.ai` link, built from a static path in `error-remediation.ts` — never interpolated from request data. The client renders it as an `href` and drops anything that isn't absolute `https:`, because a relayed Go error's `docs_url` is parsed from an upstream response body. |
 | `reasons` | The cause chain. Non-handled links serialise as `{ code: "unknown" }` automatically — safe to pass an internal error here. |
 
 `tips` and `docsUrl` are centralised in
@@ -110,9 +110,12 @@ Rendering it directly puts `validation_error` in front of a customer.
 The server emits the typed fact; the client decides presentation. Principles,
 in order of how often they are violated:
 
-1. **Never toast a raw `error.message`.** For a handled error it is the code
-   slug; for an unhandled one it is unsafe. Read the handled payload and render
-   from the registry; fall back to the generic unknown state.
+1. **Never toast a raw `error.message` yourself.** For a handled error it is the
+   code slug; for an unhandled one it is unsafe. Call `showErrorToast` and let
+   it decide — it reads the handled payload, renders from the registry, and
+   falls back to the generic unknown state. The one narrow exception is handled
+   *inside* that helper and described under "The 4xx authored-prose channel"
+   below; it is not something to reimplement at a call site.
 2. **Title and description both come from the `code`**, not the server. The
    registry owns the customer-facing copy, with a `fault`-based fallback for
    codes it doesn't know (customer → "Check your input", platform/provider →
@@ -120,18 +123,76 @@ in order of how often they are violated:
 3. **Render `tips` and `docsUrl`.** They exist; showing them is the whole point of
    the remediation channel.
 4. **Never render raw `meta` or the reason chain in the UI.** They are for agents
-   and logs. A customer sees message, tips, docs, and a copyable error id.
+   and logs. A customer sees message, tips, docs, and a copyable error id. The
+   registry may read a *named* `meta` field where its entry declares the shape
+   and the value is something the customer supplied or chose — a filter field
+   they typed, a notification channel they picked. That is the whole of the
+   exception: a registry entry reads `meta.field`, never `error.meta`.
 5. **Validation errors belong on the form, not in a toast.** Map
    `meta.fieldErrors` onto the offending fields and make it visually obvious the
    server rejected the submission.
 6. **Unhandled errors get one calm generic state** plus the copyable error id —
    never the raw text.
 
-Everything lives in `langwatch/src/features/errors`: `readHandledError` to lift
-the payload, the code-keyed registry for the words, `showErrorToast` and
-`<HandledErrorAlert>` to render them, and `applyHandledErrorToForm` for a
-rejected submit. Do not hand-roll `error.data?.error` at a call site — three
-separate ad-hoc readers is how this got inconsistent the first time.
+Everything lives in `langwatch/src/features/errors`:
+
+| export | use it for |
+|---|---|
+| `showErrorToast` | The only sanctioned error toast. Absorbs the global-handler dedup check. |
+| `<HandledErrorAlert>` | The inline counterpart. A toast is for something that just happened; an alert is for something that is still true. |
+| `applyHandledErrorToForm` + `<FormServerError>` | A rejected submit. See the warning below — they ship as a pair. |
+| `describeError` | Slots that can only take a string: a `title=` tooltip, an `aria-label`, a state field typed `string`. It loses the tips, the docs link and the error id, so prefer a component wherever one can be rendered. |
+| `explainSerializedError` | A handled error that arrived already-structured on an event payload (a `target_result.domainError`) rather than off a transport envelope. |
+| `readHandledError` / `readErrorTraceId` | Lifting the payload when you need to branch on `code` yourself. |
+
+Do not hand-roll `error.data?.error` at a call site — three separate ad-hoc
+readers is how this got inconsistent the first time. In particular, do not
+hand-roll the read → explain → fall back sequence: it has a third branch
+(below) that is easy to miss, and every site that missed it silently downgraded
+its own copy.
+
+### The 4xx authored-prose channel
+
+`showErrorToast`, `<HandledErrorAlert>` and `describeError` all branch three
+ways, not two: handled → registry, **plain non-5xx with an authored message →
+that message**, everything else → the generic unknown state.
+
+The middle branch exists because #5984 collapsed the wire message to the code
+for *handled* errors but deliberately left a plain non-5xx `TRPCError`'s message
+alone. Several hundred procedures throw one with real copy in it — "You've
+already used this invite", "That name is taken" — and replacing those with
+"we've been notified" tells the user to wait for something that will never
+change. That is a worse failure than the slug it would be avoiding.
+
+It is guarded, because plenty of routers also write
+`new TRPCError({ code: "BAD_REQUEST", message: error.message })` around a caught
+failure, which would drag a driver diagnostic through the same hole at 4xx that
+#5984 closed at 5xx. `readAuthoredMessage` drops anything 5xx, anything handled,
+anything slug-shaped, anything over 200 characters, and anything carrying the
+vocabulary of a machine rather than a person (a stack frame, a SQL fragment, a
+socket errno, a URL, an IP). None of that is a substitute for throwing a
+`HandledError` — **if you can name the failure, name it** and write its copy in
+the registry. The channel is there to stop the migration destroying copy that
+was already good, not to be a place to put new copy.
+
+### `applyHandledErrorToForm` and `<FormServerError>` ship together
+
+The bridge claims an error — returning `true` so the caller skips its toast —
+only for complaints it can actually put on screen. That check is not something
+it can make on its own for form-level complaints (`meta.formErrors`): they go to
+`root.serverError`, and `setError` succeeds whether or not anything renders it.
+
+So it takes `hasFormErrorSlot`, defaulting to `false`. Pass `true` **only** if
+the form renders `<FormServerError form={form} />`. Get this wrong in the
+optimistic direction and the user presses Save and nothing happens at all — no
+toast, no field text, nothing — which is strictly worse than the raw-message
+toast this module replaced.
+
+The same trap applies per field: the bridge tests that the form owns a *leaf*
+value before claiming a field error, but it cannot tell whether you render an
+error slot for it. If a field is in the schema but has no visible input — the
+prompt forms collect `handle` in a separate dialog — don't route validation
+errors to that form at all.
 
 ## Non-tRPC transports
 

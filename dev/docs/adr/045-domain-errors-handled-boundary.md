@@ -335,7 +335,7 @@ Three decisions close it:
    opaque id is not a detail about the failure.
 
 3. **The type system enforces coverage, and tests enforce what it can't.** The
-   registry is exhaustive over `AppErrorCode | GoErrorCode`, so an error code
+   registry is exhaustive over `AppErrorCode | GoErrorCode | NodeErrorCode`, so an error code
    with no copy fails `pnpm typecheck`. `GoErrorCode` is generated from the
    `herr.Code` declarations in the Go services by `cmd/herrgen`, which means a
    Go engineer adding a code to the gateway breaks the TypeScript build until
