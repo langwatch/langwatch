@@ -6,7 +6,7 @@ import {
   useAllModelProvidersList,
 } from "../hooks/useAllModelProvidersList";
 import { useModelProvidersSettings } from "../hooks/useModelProvidersSettings";
-import { modelProviderIcons } from "../server/modelProviders/iconsMap";
+import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { modelProviders } from "../server/modelProviders/registry";
 import { EditModelProviderForm } from "./settings/ModelProviderForm";
 import { Drawer } from "./ui/drawer";

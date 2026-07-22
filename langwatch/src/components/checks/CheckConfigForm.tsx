@@ -55,7 +55,8 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Tooltip } from "../ui/tooltip";
 import DynamicZodForm from "./DynamicZodForm";
 import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
-import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
+import { evaluatorTempNameMap } from "../../server/evaluations/evaluatorDisplayNames";
+import { EvaluatorSelection } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
 

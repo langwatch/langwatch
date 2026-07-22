@@ -5,29 +5,6 @@
 import "./langwatchPlatformGuard.boot";
 
 import { metrics } from "@opentelemetry/api";
-import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import {
-  CompositePropagator,
-  W3CBaggagePropagator,
-  W3CTraceContextPropagator,
-} from "@opentelemetry/core";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-proto";
-import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-proto";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
-import { HostMetrics } from "@opentelemetry/host-metrics";
-import { awsEksDetector } from "@opentelemetry/resource-detector-aws";
-import {
-  detectResources,
-  envDetector,
-  resourceFromAttributes,
-} from "@opentelemetry/resources";
-import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
-import {
-  MeterProvider,
-  PeriodicExportingMetricReader,
-} from "@opentelemetry/sdk-metrics";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
-import { setupObservability } from "langwatch/observability/node";
 
 const isEnvTrue = (value: string | undefined) => value === "true";
 
@@ -39,37 +16,67 @@ const explicitEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.replace(
 );
 const langwatchTracingEnabled = !!process.env.LANGWATCH_API_KEY;
 
-const spanProcessors = [] as Array<BatchSpanProcessor>;
-const logRecordProcessors = [] as Array<BatchLogRecordProcessor>;
+// Load the OTel SDK + instrumentation packages ONLY when observability is
+// actually configured (an OTLP endpoint or a LangWatch API key). When neither
+// is set — the common local-dev / self-hosted case — none of these modules
+// (SDK, exporters, resource detectors, and the instrumentation packages with
+// their transitive deps) load at boot at all.
+//
+// Loaded via `require` (not a static `import`, not top-level `await import`):
+// this module compiles to CJS — where top-level await is illegal — so a gated
+// synchronous `require` is the way to make the load conditional while keeping
+// the tracer registered before ./start evaluates. Same pattern as workers.ts.
+if (explicitEndpoint || langwatchTracingEnabled) {
+  const { CompositePropagator, W3CBaggagePropagator, W3CTraceContextPropagator } =
+    require("@opentelemetry/core") as typeof import("@opentelemetry/core");
+  const { OTLPLogExporter } =
+    require("@opentelemetry/exporter-logs-otlp-proto") as typeof import("@opentelemetry/exporter-logs-otlp-proto");
+  const { OTLPTraceExporter } =
+    require("@opentelemetry/exporter-trace-otlp-proto") as typeof import("@opentelemetry/exporter-trace-otlp-proto");
+  const { awsEksDetector } =
+    require("@opentelemetry/resource-detector-aws") as typeof import("@opentelemetry/resource-detector-aws");
+  const { detectResources, envDetector } =
+    require("@opentelemetry/resources") as typeof import("@opentelemetry/resources");
+  const { BatchLogRecordProcessor } =
+    require("@opentelemetry/sdk-logs") as typeof import("@opentelemetry/sdk-logs");
+  const { BatchSpanProcessor } =
+    require("@opentelemetry/sdk-trace-node") as typeof import("@opentelemetry/sdk-trace-node");
+  const { setupObservability } =
+    require("langwatch/observability/node") as typeof import("langwatch/observability/node");
+  const { AwsInstrumentation } =
+    require("@opentelemetry/instrumentation-aws-sdk") as typeof import("@opentelemetry/instrumentation-aws-sdk");
+  const { IORedisInstrumentation } =
+    require("@opentelemetry/instrumentation-ioredis") as typeof import("@opentelemetry/instrumentation-ioredis");
+  const { OpenAIInstrumentation } =
+    require("@opentelemetry/instrumentation-openai") as typeof import("@opentelemetry/instrumentation-openai");
+  const { PinoInstrumentation } =
+    require("@opentelemetry/instrumentation-pino") as typeof import("@opentelemetry/instrumentation-pino");
+  const { RuntimeNodeInstrumentation } =
+    require("@opentelemetry/instrumentation-runtime-node") as typeof import("@opentelemetry/instrumentation-runtime-node");
 
-if (explicitEndpoint) {
-  // OTLPExporters automatically reads OTEL_EXPORTER_OTLP_HEADERS from environment
-  // Format: "key1=value1,key2=value2" (e.g., "Authorization=Bearer token")
+  const spanProcessors = [] as Array<InstanceType<typeof BatchSpanProcessor>>;
+  const logRecordProcessors = [] as Array<
+    InstanceType<typeof BatchLogRecordProcessor>
+  >;
 
-  spanProcessors.push(
-    new BatchSpanProcessor(
-      new OTLPTraceExporter({
-        url: `${explicitEndpoint}/v1/traces`,
-      }),
-    ),
-  );
-
-  if (isEnvTrue(process.env.PINO_OTEL_ENABLED)) {
-    logRecordProcessors.push(
-      new BatchLogRecordProcessor(
-        new OTLPLogExporter({
-          url: `${explicitEndpoint}/v1/logs`,
-        }),
+  if (explicitEndpoint) {
+    // OTLPExporters automatically read OTEL_EXPORTER_OTLP_HEADERS from environment
+    // Format: "key1=value1,key2=value2" (e.g., "Authorization=Bearer token")
+    spanProcessors.push(
+      new BatchSpanProcessor(
+        new OTLPTraceExporter({ url: `${explicitEndpoint}/v1/traces` }),
       ),
     );
-  }
-}
 
-if (
-  spanProcessors.length > 0 ||
-  logRecordProcessors.length > 0 ||
-  langwatchTracingEnabled
-) {
+    if (isEnvTrue(process.env.PINO_OTEL_ENABLED)) {
+      logRecordProcessors.push(
+        new BatchLogRecordProcessor(
+          new OTLPLogExporter({ url: `${explicitEndpoint}/v1/logs` }),
+        ),
+      );
+    }
+  }
+
   setupObservability({
     langwatch: langwatchTracingEnabled ? undefined : "disabled",
     attributes: {
@@ -96,51 +103,32 @@ if (
         new W3CBaggagePropagator(),
       ],
     }),
+    // Explicit instrumentations instead of @opentelemetry/auto-instrumentations-node:
+    // the aggregate loads all ~41 instrumentation packages at import time even
+    // though the old config disabled most and the rest target frameworks this
+    // server doesn't run (express, koa, hapi, connect, grpc, nest, restify, pg).
+    // These five are the ones that actually emit telemetry here; the emitted
+    // spans/metrics are unchanged. Add a new library worth tracing by adding its
+    // instrumentation package to the Promise.all above and a `new …()` here.
     instrumentations: [
-      ...getNodeAutoInstrumentations({
-        // disable everything noisy by default
-        "@opentelemetry/instrumentation-aws-lambda": { enabled: false },
-        "@opentelemetry/instrumentation-undici": { enabled: false },
-        "@opentelemetry/instrumentation-http": { enabled: false },
-        "@opentelemetry/instrumentation-mongodb": { enabled: false },
-        "@opentelemetry/instrumentation-mongoose": { enabled: false },
-        "@opentelemetry/instrumentation-mysql": { enabled: false },
-        "@opentelemetry/instrumentation-mysql2": { enabled: false },
-        "@opentelemetry/instrumentation-redis": { enabled: false },
-        "@opentelemetry/instrumentation-tedious": { enabled: false },
-        "@opentelemetry/instrumentation-oracledb": { enabled: false },
-        "@opentelemetry/instrumentation-memcached": { enabled: false },
-        "@opentelemetry/instrumentation-cassandra-driver": { enabled: false },
-        "@opentelemetry/instrumentation-knex": { enabled: false },
-        "@opentelemetry/instrumentation-dns": { enabled: false },
-        "@opentelemetry/instrumentation-net": { enabled: false },
-        "@opentelemetry/instrumentation-socket.io": { enabled: false },
-        "@opentelemetry/instrumentation-generic-pool": { enabled: false },
-        "@opentelemetry/instrumentation-bunyan": { enabled: false },
-        "@opentelemetry/instrumentation-winston": { enabled: false },
-        "@opentelemetry/instrumentation-graphql": { enabled: false },
-        "@opentelemetry/instrumentation-dataloader": { enabled: false },
-        "@opentelemetry/instrumentation-amqplib": { enabled: false },
-        "@opentelemetry/instrumentation-kafkajs": { enabled: false },
-        "@opentelemetry/instrumentation-lru-memoizer": { enabled: false },
-        "@opentelemetry/instrumentation-cucumber": { enabled: false },
-        "@opentelemetry/instrumentation-router": { enabled: false },
-
-        // Truncate ioredis db.statement to command + first key
-        // (avoid logging content + large attributes)
-        "@opentelemetry/instrumentation-ioredis": {
-          // Redis calls are only interesting as part of some larger operation.
-          // Without this, the connection pool's `connect`/`auth`/`info` and the
-          // queue dispatcher's blocking `brpop`/`xread` — none of which have a
-          // parent — each became a root span, burying real traces in noise.
-          requireParentSpan: true,
-          dbStatementSerializer: (
-            cmdName: string,
-            cmdArgs: Array<string | Buffer | number | unknown[]>,
-          ) => {
-            const key = typeof cmdArgs[0] === "string" ? cmdArgs[0] : "";
-            return key ? `${cmdName} ${key}` : cmdName;
-          },
+      new AwsInstrumentation(),
+      new OpenAIInstrumentation(),
+      new PinoInstrumentation(),
+      new RuntimeNodeInstrumentation(),
+      // Truncate ioredis db.statement to command + first key
+      // (avoid logging content + large attributes)
+      new IORedisInstrumentation({
+        // Redis calls are only interesting as part of some larger operation.
+        // Without this, the connection pool's `connect`/`auth`/`info` and the
+        // queue dispatcher's blocking `brpop`/`xread` — none of which have a
+        // parent — each became a root span, burying real traces in noise.
+        requireParentSpan: true,
+        dbStatementSerializer: (
+          cmdName: string,
+          cmdArgs: Array<string | Buffer | number | unknown[]>,
+        ) => {
+          const key = typeof cmdArgs[0] === "string" ? cmdArgs[0] : "";
+          return key ? `${cmdName} ${key}` : cmdName;
         },
       }),
     ],
@@ -151,8 +139,18 @@ if (
 // traces + logs). Gated on OTEL_METRICS_ENABLED so it stays off by default and
 // only pushes to a collector that's actually configured. Emits Node/host
 // runtime metrics (CPU, memory, event loop, GC) — enough to correlate with the
-// traces + logs when debugging local dev in Grafana.
+// traces + logs when debugging local dev in Grafana. Same gated-dynamic-import
+// treatment: the metrics SDK + host-metrics only load when this path is live.
 if (explicitEndpoint && isEnvTrue(process.env.OTEL_METRICS_ENABLED)) {
+  const { OTLPMetricExporter } =
+    require("@opentelemetry/exporter-metrics-otlp-proto") as typeof import("@opentelemetry/exporter-metrics-otlp-proto");
+  const { HostMetrics } =
+    require("@opentelemetry/host-metrics") as typeof import("@opentelemetry/host-metrics");
+  const { detectResources, envDetector, resourceFromAttributes } =
+    require("@opentelemetry/resources") as typeof import("@opentelemetry/resources");
+  const { MeterProvider, PeriodicExportingMetricReader } =
+    require("@opentelemetry/sdk-metrics") as typeof import("@opentelemetry/sdk-metrics");
+
   const metricAttrs: Record<string, string> = {
     "service.name": process.env.OTEL_SERVICE_NAME ?? "langwatch-app",
   };

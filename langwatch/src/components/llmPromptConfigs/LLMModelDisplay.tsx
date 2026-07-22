@@ -1,7 +1,7 @@
 import { Box, HStack, type StackProps, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
 
-import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
+import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { Tooltip } from "../ui/tooltip";
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { OverflownTextWithTooltip } from "../OverflownText";

@@ -6,7 +6,7 @@ import { promptContextChip } from "~/features/langy/logic/langyContextChips";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
-import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
+import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { api } from "~/utils/api";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { PublishedPromptContent } from "./PublishedPromptContent";

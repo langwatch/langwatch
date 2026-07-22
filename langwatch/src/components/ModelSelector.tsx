@@ -19,7 +19,7 @@ import {
 import {
   modelProviderIcons,
   ProviderIconGlyph,
-} from "../server/modelProviders/iconsMap";
+} from "~/components/modelProviders/iconsMap";
 import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
 import { allLitellmModels } from "../server/modelProviders/registry";
 import { api } from "../utils/api";

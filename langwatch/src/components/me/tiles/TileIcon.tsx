@@ -2,7 +2,7 @@ import { Box, Image } from "@chakra-ui/react";
 import { Bot, Boxes, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { modelProviderIcons } from "../../../server/modelProviders/iconsMap";
+import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 
 import {
   ASSISTANT_PRESETS,

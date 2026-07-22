@@ -54,6 +54,12 @@ fi
 # that port. Mirror start.sh / start.ts exactly: the in-process gate only
 # applies when NODE_ENV is development AND WORKERS_IN_PROCESS is true/1;
 # otherwise reserve the port whenever START_WORKERS enables workers.
+# Mirror start.sh's dev default: with a workers topology requested and no
+# explicit WORKERS_IN_PROCESS, dev hosts the workers in-process.
+if [ "$NODE_ENV_VAL" = "development" ] && [ -z "$WORKERS_IN_PROCESS" ] &&
+   { [ "$START_WORKERS_VAL" = "true" ] || [ "$START_WORKERS_VAL" = "1" ]; }; then
+  WORKERS_IN_PROCESS=1
+fi
 IN_PROCESS_WORKERS=false
 if [ "$NODE_ENV_VAL" = "development" ] &&
    { [ "$WORKERS_IN_PROCESS" = "true" ] || [ "$WORKERS_IN_PROCESS" = "1" ]; }; then

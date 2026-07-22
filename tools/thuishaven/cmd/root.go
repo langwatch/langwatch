@@ -162,6 +162,10 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		LocalAPIKey:               envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
 		RepoRoot:                  worktree,
 		ObservabilityConsoleLevel: obsConsoleLevel,
+		// Google DLP off by default locally — no local workflow should ship trace
+		// text to Google, and the app then skips loading the @google-cloud/dlp SDK.
+		// LANGWATCH_DISABLE_GOOGLE_DLP=false opts back in to exercise it for real.
+		ShouldDisableGoogleDLP: os.Getenv("LANGWATCH_DISABLE_GOOGLE_DLP") != "false",
 	}
 
 	return deps{

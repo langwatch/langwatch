@@ -78,6 +78,12 @@ func (s Stack) OverlayEnv() []string {
 	if s.LocalAPIKey != "" {
 		env = append(env, "HAVEN_SEED_LANGWATCH_API_KEY="+s.LocalAPIKey)
 	}
+	// Google DLP off by default locally: no local workflow wants trace text leaving
+	// for Google, and the app skips loading @google-cloud/dlp (grpc + generated
+	// protos) entirely when this is set. False emits nothing, leaving .env to decide.
+	if s.DisableGoogleDLP {
+		env = append(env, "LANGWATCH_DISABLE_GOOGLE_DLP=true")
+	}
 	// The rest of the static seeded identity (see prisma/seed.ts's header comment
 	// for the full rationale) — same story: fixed values so any worktree or agent
 	// can log in / authenticate without rediscovering them.

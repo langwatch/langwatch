@@ -29,7 +29,7 @@ import { TriggerAnchor } from "../../components/ui/TriggerAnchor";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { buildCustomModelDisplayNames } from "../../server/modelProviders/customModelDisplayNames";
-import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
+import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { modelProviders as modelProvidersRegistry } from "../../server/modelProviders/registry";
 import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
 

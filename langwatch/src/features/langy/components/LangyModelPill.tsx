@@ -25,7 +25,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import {
   modelProviderIcons,
   ProviderIconGlyph,
-} from "~/server/modelProviders/iconsMap";
+} from "~/components/modelProviders/iconsMap";
 import { getModelById } from "~/server/modelProviders/registry";
 import {
   type LangyModelGroup,

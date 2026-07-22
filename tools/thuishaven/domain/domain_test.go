@@ -148,6 +148,21 @@ func TestOverlayEmitsClickHouseURLOnlyWhenManaged(t *testing.T) {
 	}
 }
 
+func TestOverlayDisablesGoogleDLPWhenAsked(t *testing.T) {
+	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
+	}}
+	// Opted back in (LANGWATCH_DISABLE_GOOGLE_DLP=false): emit nothing so .env decides.
+	if hasKey(base.OverlayEnv(), "LANGWATCH_DISABLE_GOOGLE_DLP") {
+		t.Fatalf("stack that opted back in must leave LANGWATCH_DISABLE_GOOGLE_DLP to .env")
+	}
+	disabled := base
+	disabled.DisableGoogleDLP = true
+	if got := valueOf(disabled.OverlayEnv(), "LANGWATCH_DISABLE_GOOGLE_DLP"); got != "true" {
+		t.Errorf("LANGWATCH_DISABLE_GOOGLE_DLP = %q, want %q", got, "true")
+	}
+}
+
 func TestOverlayEmitsPostgresURLOnlyWhenManaged(t *testing.T) {
 	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
 		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
