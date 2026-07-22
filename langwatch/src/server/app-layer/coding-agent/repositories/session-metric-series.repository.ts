@@ -160,25 +160,30 @@ export class SessionMetricSeriesClickHouseRepository
     );
     const client = await this.resolveClient(tenantId);
 
+    // Converge each unit FIRST (argMax by AsOf per SeriesId), then sum the
+    // converged values. An IN-tuple filter on (SeriesId, max(AsOf)) is not
+    // enough here: a byte-identical re-delivery leaves two un-merged rows
+    // sharing the winning AsOf, both pass the filter, and a plain sum counts
+    // the unit twice.
     const result = await client.query({
       query: `
         SELECT
           SessionId,
           MetricName,
-          Attributes['type'] AS Bucket,
-          sum(Value) AS Total
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          AND SessionId IN {sessionIds:Array(String)}
-          AND AsOf BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
-          AND (TenantId, SessionId, SeriesId, AsOf) IN (
-            SELECT TenantId, SessionId, SeriesId, max(AsOf)
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND SessionId IN {sessionIds:Array(String)}
-              AND AsOf BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
-            GROUP BY TenantId, SessionId, SeriesId
-          )
+          Bucket,
+          sum(SeriesValue) AS Total
+        FROM (
+          SELECT
+            SessionId,
+            MetricName,
+            Attributes['type'] AS Bucket,
+            argMax(Value, AsOf) AS SeriesValue
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND SessionId IN {sessionIds:Array(String)}
+            AND AsOf BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})
+          GROUP BY TenantId, SessionId, SeriesId, MetricName, Bucket
+        )
         GROUP BY SessionId, MetricName, Bucket
       `,
       query_params: { tenantId, sessionIds, from: fromMs, to: toMs },

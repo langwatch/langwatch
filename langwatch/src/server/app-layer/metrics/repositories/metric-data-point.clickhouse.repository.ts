@@ -22,12 +22,12 @@ import type {
 import {
   fromRaw,
   RAW_SELECT,
+  type RawMetricRow,
   rawRow,
   rollupRow,
   seriesRow,
   usageEstimateRow,
   validatePoint,
-  type RawMetricRow,
 } from "./metric-data-point.rows";
 import { queryMetricUsageEstimates } from "./metric-data-point.usage";
 
@@ -37,7 +37,9 @@ const logger = createLogger(
 
 const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
 
-export class MetricDataPointClickHouseRepository implements MetricDataPointRepository {
+export class MetricDataPointClickHouseRepository
+  implements MetricDataPointRepository
+{
   /**
    * Both resolvers are required on purpose. The organization-wide usage query
    * relies on its client being resolved from the organization — that is what
@@ -286,14 +288,24 @@ export class MetricDataPointClickHouseRepository implements MetricDataPointRepos
       PointAttributesJson: string;
       Total: number | string;
     }>();
-    return rows.map((row) => ({
-      metricName: row.MetricName,
-      total: Number(row.Total),
-      pointAttributes: JSON.parse(row.PointAttributesJson) as Record<
-        string,
-        string
-      >,
-    }));
+    return rows.map((row) => {
+      // Stored by our own write path, but one malformed row must degrade to
+      // an attribute-less point rather than throw away the whole read.
+      let pointAttributes: Record<string, string> = {};
+      try {
+        pointAttributes = JSON.parse(row.PointAttributesJson) as Record<
+          string,
+          string
+        >;
+      } catch {
+        pointAttributes = {};
+      }
+      return {
+        metricName: row.MetricName,
+        total: Number(row.Total),
+        pointAttributes,
+      };
+    });
   }
 
   private async immediateNeighbors(

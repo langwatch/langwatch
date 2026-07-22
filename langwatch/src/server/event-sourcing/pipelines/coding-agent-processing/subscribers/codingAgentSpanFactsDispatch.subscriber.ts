@@ -39,10 +39,14 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
       deduplication: {
         makeId: (event) => {
           const spanId =
-            isSpanReceivedEvent(event) && typeof event.data.span.spanId === "string"
+            isSpanReceivedEvent(event) &&
+            typeof event.data.span.spanId === "string"
               ? event.data.span.spanId
-              : String(event.aggregateId);
-          return `coding-agent-span-facts:${event.tenantId}:${spanId}`;
+              : "";
+          // aggregateId is the trace id — span ids are only unique WITHIN a
+          // trace, so the key needs both or two traces' spans can collide
+          // inside the TTL and silently drop facts.
+          return `coding-agent-span-facts:${event.tenantId}:${String(event.aggregateId)}:${spanId}`;
         },
         ttlMs: 60_000,
       },
@@ -50,7 +54,10 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
     handle: async (event) => {
       if (!isSpanReceivedEvent(event)) return;
       const rawName = (event.data.span as { name?: unknown } | undefined)?.name;
-      if (typeof rawName !== "string" || !CODING_AGENT_SPAN_NAMES.has(rawName)) {
+      if (
+        typeof rawName !== "string" ||
+        !CODING_AGENT_SPAN_NAMES.has(rawName)
+      ) {
         return;
       }
 

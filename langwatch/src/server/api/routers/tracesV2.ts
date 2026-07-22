@@ -1,10 +1,10 @@
 import { on } from "node:events";
+import { ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getVisibilityCutoffMsForProject } from "~/server/api/utils";
 import { getApp } from "~/server/app-layer/app";
-import { ValidationError } from "@langwatch/handled-error";
 import {
   generateTraceAction,
   generateTraceQueryFromPrompt,
@@ -1724,7 +1724,7 @@ export const tracesV2Router = createTRPCRouter({
     }),
 
   /**
-   * The pre-folded coding-agent session rollup for one trace (ADR-041).
+   * The pre-folded coding-agent session rollup for one trace (ADR-056).
    *
    * Returns null for an ordinary LLM trace — the fold writes no row for those,
    * so null is the normal answer rather than an error, and the caller simply

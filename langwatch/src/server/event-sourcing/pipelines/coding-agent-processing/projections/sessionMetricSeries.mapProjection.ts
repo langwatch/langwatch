@@ -29,6 +29,15 @@ export interface SessionMetricSeriesRecord {
   asOfUnixMs: number;
 }
 
+/**
+ * The attribute keys the session read actually consumes (the overlay's
+ * `type` / `decision` / `language` dimensions). Series identity is already
+ * fixed upstream in `seriesId`, so persisting anything beyond these would
+ * only copy provider-supplied attributes — which can carry identity like
+ * `user.id` / `user.email` — verbatim into a durable table.
+ */
+const PERSISTED_ATTRIBUTE_KEYS = new Set(["type", "decision", "language"]);
+
 const events = [metricFactsContributedEventSchema] as const;
 
 export class SessionMetricSeriesMapProjection
@@ -56,10 +65,9 @@ export class SessionMetricSeriesMapProjection
       metricUnit: data.unit ?? "",
       agent: data.agent,
       attributes: Object.fromEntries(
-        Object.entries(data.attributes).map(([key, value]) => [
-          key,
-          String(value),
-        ]),
+        Object.entries(data.attributes)
+          .filter(([key]) => PERSISTED_ATTRIBUTE_KEYS.has(key))
+          .map(([key, value]) => [key, String(value)]),
       ),
       value: data.value,
       dataPointCount: data.dataPointCount,

@@ -1,5 +1,3 @@
-import { hasAnsi } from "./ansi/ansi";
-
 /**
  * Signals that tell us a trace came from a coding agent running in a real
  * terminal — the cue to offer the Terminal view. These come off the trace /
@@ -46,6 +44,3 @@ export function isTerminalOrigin(signals: TerminalOriginSignals): boolean {
   if (terminalType.length > 0) return true;
   return false;
 }
-
-/** Re-exported so callers can cheaply test whether output carries ANSI codes. */
-export { hasAnsi };

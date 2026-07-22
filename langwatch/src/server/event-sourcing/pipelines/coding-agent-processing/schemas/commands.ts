@@ -1,3 +1,4 @@
+import type { z } from "zod";
 import {
   logFactsContributionSchema,
   metricFactsContributionSchema,
@@ -5,17 +6,17 @@ import {
 } from "./contributions";
 
 export const contributeSpanFactsCommandDataSchema = spanFactsContributionSchema;
-export type ContributeSpanFactsCommandData = ReturnType<
-  typeof contributeSpanFactsCommandDataSchema.parse
+export type ContributeSpanFactsCommandData = z.infer<
+  typeof contributeSpanFactsCommandDataSchema
 >;
 
 export const contributeLogFactsCommandDataSchema = logFactsContributionSchema;
-export type ContributeLogFactsCommandData = ReturnType<
-  typeof contributeLogFactsCommandDataSchema.parse
+export type ContributeLogFactsCommandData = z.infer<
+  typeof contributeLogFactsCommandDataSchema
 >;
 
 export const contributeMetricFactsCommandDataSchema =
   metricFactsContributionSchema;
-export type ContributeMetricFactsCommandData = ReturnType<
-  typeof contributeMetricFactsCommandDataSchema.parse
+export type ContributeMetricFactsCommandData = z.infer<
+  typeof contributeMetricFactsCommandDataSchema
 >;

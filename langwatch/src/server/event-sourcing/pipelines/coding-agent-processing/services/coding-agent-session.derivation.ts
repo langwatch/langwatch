@@ -239,6 +239,19 @@ function str(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+/**
+ * A scalar rendered as its string form. Contribution facts carry RAW scalars
+ * (the lift preserves booleans and numbers), so flag and status comparisons
+ * must not go through `str()` — it nulls anything non-string, silently
+ * missing `success: false`, a numeric 429, or `server_fallback_hop: true`.
+ */
+function scalarStr(value: unknown): string | null {
+  if (typeof value === "string") return value.length > 0 ? value : null;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return String(value);
+  return null;
+}
+
 function num(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : 0;
@@ -294,6 +307,19 @@ function appendStep(
     return [...steps.slice(0, index - 1), merged, ...steps.slice(index)];
   }
 
+  // A late arrival can also land just BEFORE an existing same-name step —
+  // merging only backward would leave two adjacent same-name runs unmerged.
+  const next = steps[index];
+  if (next && next.name === step.name) {
+    const merged: SessionStep = {
+      ...next,
+      startedAtMs: step.startedAtMs,
+      count: next.count + 1,
+      failed: next.failed || step.failed,
+    };
+    return [...steps.slice(0, index), merged, ...steps.slice(index + 1)];
+  }
+
   if (steps.length >= MAX_STEPS) return steps;
   return [
     ...steps.slice(0, index),
@@ -343,7 +369,10 @@ function withIdentity(
     entrypoint: state.entrypoint ?? str(attrs["app.entrypoint"]),
     // Claude stamps user identity on log events, not spans; other agents send
     // none at all, so a session they produce honestly keeps null here.
-    userId: state.userId ?? str(attrs["user.id"]) ?? str(attrs["user.email"]),
+    // `user.id` only — it is the provider's opaque hash. `user.email` also
+    // rides those events but is raw human identity, and this value lands
+    // verbatim in a durable row.
+    userId: state.userId ?? str(attrs["user.id"]),
   };
 }
 
@@ -409,7 +438,8 @@ export function applySpanToCodingAgentSession({
         ? Math.max(next.largestCacheRebuildTokens, cacheCreationTokens)
         : next.largestCacheRebuildTokens,
       previousCallContextTokens: contextTokens,
-      models: model !== null ? addToBoundedSet(next.models, model) : next.models,
+      models:
+        model !== null ? addToBoundedSet(next.models, model) : next.models,
       // The pointer back to the body that ended the session. Last call wins.
       finalRequestId: requestId ?? next.finalRequestId,
       // Only the LAST call's stop reason is the session's: the earlier ones all
@@ -580,7 +610,7 @@ export function applyLogToCodingAgentSession({
           base.toolResultBytes + num(attrs.tool_result_size_bytes),
         toolInputBytes: base.toolInputBytes + num(attrs.tool_input_size_bytes),
         errorTypes:
-          errorType !== null && str(attrs.success) === "false"
+          errorType !== null && scalarStr(attrs.success) === "false"
             ? bump(base.errorTypes, errorType)
             : base.errorTypes,
       };
@@ -603,7 +633,7 @@ export function applyLogToCodingAgentSession({
         apiErrors: base.apiErrors + 1,
         rateLimited:
           base.rateLimited +
-          (str(attrs.status_code) === RATE_LIMIT_STATUS ? 1 : 0),
+          (scalarStr(attrs.status_code) === RATE_LIMIT_STATUS ? 1 : 0),
       };
 
     case CLAUDE.EVENT.RETRIES_EXHAUSTED:
@@ -618,7 +648,7 @@ export function applyLogToCodingAgentSession({
       // A server-side fallback hop already retried on another model, so the user
       // never saw that refusal. Counting it would overstate how often the agent
       // actually refused the human.
-      if (str(attrs.server_fallback_hop) === "true") return base;
+      if (scalarStr(attrs.server_fallback_hop) === "true") return base;
       const category = str(attrs.category);
       return {
         ...base,
@@ -738,7 +768,10 @@ export function applyMetricToCodingAgentSession({
   if (normalizeMetricName(metric.metricName) === null) return base;
 
   const isNewUnit = state.metricSeries[metric.seriesId] === undefined;
-  if (isNewUnit && Object.keys(state.metricSeries).length >= MAX_METRIC_SERIES) {
+  if (
+    isNewUnit &&
+    Object.keys(state.metricSeries).length >= MAX_METRIC_SERIES
+  ) {
     return base;
   }
 

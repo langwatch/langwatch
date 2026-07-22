@@ -44,8 +44,7 @@ const codingAgentSessionEvents = [
 ] as const;
 
 /** Schema-snapshot version (calendar date). Bump when the derivation changes. */
-export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST =
-  "2026-07-21" as const;
+export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-07-21";
 
 /**
  * The fold's state: the derived session plus the bookkeeping the abstract fold

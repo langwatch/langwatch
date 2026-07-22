@@ -75,34 +75,40 @@ describe("TurnSteps", () => {
   });
 
   describe("given a coding-agent turn that ran steps", () => {
-    it("reports how many steps ran without fetching them", () => {
-      renderStrip();
+    describe("when the strip renders collapsed", () => {
+      it("reports how many steps ran without fetching them", () => {
+        renderStrip();
 
-      expect(screen.getByText("2 steps ran")).toBeInTheDocument();
-      // The whole point: collapsed rows in a long thread cost no query.
-      expect(mockUseQuery.mock.calls[0]?.[1]).toMatchObject({ enabled: false });
+        expect(screen.getByText("2 steps ran")).toBeInTheDocument();
+        // The whole point: collapsed rows in a long thread cost no query.
+        expect(mockUseQuery.mock.calls[0]?.[1]).toMatchObject({
+          enabled: false,
+        });
+      });
     });
 
-    it("reveals the model call and the tool run once opened", async () => {
-      renderStrip();
+    describe("when the strip is opened", () => {
+      it("reveals the model call and the tool run", async () => {
+        renderStrip();
 
-      await userEvent.click(
-        screen.getByRole("button", { name: /2 steps ran/ }),
-      );
+        await userEvent.click(
+          screen.getByRole("button", { name: /2 steps ran/ }),
+        );
 
-      expect(screen.getByText("Bash")).toBeInTheDocument();
-      expect(screen.getByText("pnpm test")).toBeInTheDocument();
-      expect(screen.getByText(/2\.4s/)).toBeInTheDocument();
-    });
+        expect(screen.getByText("Bash")).toBeInTheDocument();
+        expect(screen.getByText("pnpm test")).toBeInTheDocument();
+        expect(screen.getByText(/2\.4s/)).toBeInTheDocument();
+      });
 
-    it("fetches the spans only after it is opened", async () => {
-      renderStrip();
-      await userEvent.click(
-        screen.getByRole("button", { name: /2 steps ran/ }),
-      );
+      it("fetches the spans only then", async () => {
+        renderStrip();
+        await userEvent.click(
+          screen.getByRole("button", { name: /2 steps ran/ }),
+        );
 
-      const lastCall = mockUseQuery.mock.calls.at(-1);
-      expect(lastCall?.[1]).toMatchObject({ enabled: true });
+        const lastCall = mockUseQuery.mock.calls.at(-1);
+        expect(lastCall?.[1]).toMatchObject({ enabled: true });
+      });
     });
   });
 

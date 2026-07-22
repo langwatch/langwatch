@@ -74,7 +74,9 @@ export function deriveSessionBanner({
   spans: SpanDetail[];
 }): SessionBanner {
   let model: string | null = null;
-  for (const span of spans) {
+  // Chronological order is the contract "last model call" depends on — the
+  // caller may hand spans in tree order.
+  for (const span of [...spans].sort((a, b) => a.startTimeMs - b.startTimeMs)) {
     if (!isModelCallSpan(span.name)) continue;
     // readString resolves dotted keys against BOTH attribute shapes — the
     // span mapper unflattens params into nested objects, so a flat lookup

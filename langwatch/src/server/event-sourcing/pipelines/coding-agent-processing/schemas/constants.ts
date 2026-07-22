@@ -7,19 +7,16 @@
  */
 
 export const SPAN_FACTS_CONTRIBUTED_EVENT_TYPE =
-  "lw.obs.coding_agent_session.span_facts_contributed" as const;
-export const SPAN_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST =
-  "2026-07-21" as const;
+  "lw.obs.coding_agent_session.span_facts_contributed";
+export const SPAN_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST = "2026-07-21";
 
 export const LOG_FACTS_CONTRIBUTED_EVENT_TYPE =
-  "lw.obs.coding_agent_session.log_facts_contributed" as const;
-export const LOG_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST =
-  "2026-07-21" as const;
+  "lw.obs.coding_agent_session.log_facts_contributed";
+export const LOG_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST = "2026-07-21";
 
 export const METRIC_FACTS_CONTRIBUTED_EVENT_TYPE =
-  "lw.obs.coding_agent_session.metric_facts_contributed" as const;
-export const METRIC_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST =
-  "2026-07-21" as const;
+  "lw.obs.coding_agent_session.metric_facts_contributed";
+export const METRIC_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST = "2026-07-21";
 
 export const CODING_AGENT_PROCESSING_EVENT_TYPES = [
   SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
@@ -28,11 +25,11 @@ export const CODING_AGENT_PROCESSING_EVENT_TYPES = [
 ] as const;
 
 export const CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE =
-  "lw.obs.coding_agent_session.contribute_span_facts" as const;
+  "lw.obs.coding_agent_session.contribute_span_facts";
 export const CONTRIBUTE_LOG_FACTS_COMMAND_TYPE =
-  "lw.obs.coding_agent_session.contribute_log_facts" as const;
+  "lw.obs.coding_agent_session.contribute_log_facts";
 export const CONTRIBUTE_METRIC_FACTS_COMMAND_TYPE =
-  "lw.obs.coding_agent_session.contribute_metric_facts" as const;
+  "lw.obs.coding_agent_session.contribute_metric_facts";
 
 export const CODING_AGENT_PROCESSING_COMMAND_TYPES = [
   CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE,

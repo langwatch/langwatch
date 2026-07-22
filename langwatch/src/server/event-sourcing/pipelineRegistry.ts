@@ -1,4 +1,7 @@
-import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
+import {
+  type EnterprisePipelineSetConfig,
+  registerEnterprisePipelineSet,
+} from "@ee/event-sourcing/pipelineSet";
 import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
@@ -11,10 +14,7 @@ import {
   createGovernanceOcsfEventsSyncReactor,
   type GovernanceOcsfEventsSyncReactorDeps,
 } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
-import {
-  registerEnterprisePipelineSet,
-  type EnterprisePipelineSetConfig,
-} from "@ee/event-sourcing/pipelineSet";
+import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
@@ -34,8 +34,13 @@ import { createStoredObjectsService } from "~/server/stored-objects/stored-objec
 import { TraceService } from "~/server/traces/trace.service";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
+import type { AutomationAuditRepository } from "../app-layer/automations/repositories/automation-audit.repository";
+import type { TriggerService } from "../app-layer/automations/trigger.service";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
+import type { CodingAgentSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-session.repository";
+import type { CodingAgentTraceSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
+import type { SessionMetricSeriesRepository } from "../app-layer/coding-agent/repositories/session-metric-series.repository";
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
@@ -43,14 +48,26 @@ import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-in
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
-import type { CodingAgentSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-session.repository";
-import type { CodingAgentTraceSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
-import type { SessionMetricSeriesRepository } from "../app-layer/coding-agent/repositories/session-metric-series.repository";
+import type { LangyTitleGenerator } from "../app-layer/langy/langy-title-generation.service";
+import {
+  mintLangySessionApiKeyForUser,
+  revokeLangySessionApiKey,
+} from "../app-layer/langy/langyApiKey";
+import type { LangyWorkerPort } from "../app-layer/langy/langyWorker";
+import type { LangyTurnAdmissionRepository } from "../app-layer/langy/repositories/langy-turn-admission.repository";
+import type { LangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBuffer";
+import type { LangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
+import {
+  createAgentTurnLivenessSubscriber,
+  createLangyConversationUpdateBroadcastSubscriber,
+  createLangyTurnAdmissionLifecycleSubscriber,
+} from "../app-layer/langy/subscribers";
 import type { CanonicalLogRecordRepository } from "../app-layer/logs/repositories/canonical-log-record.repository";
 import type { MetricDataPointRepository } from "../app-layer/metrics/repositories/metric-data-point.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
+import { createRateLimitedBootstrap } from "../app-layer/topic-clustering/topicClusteringBootstrapGate";
 import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
 import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
 import type { TraceAnalyticsRollupRepository } from "../app-layer/traces/repositories/trace-analytics-rollup.repository";
@@ -59,17 +76,23 @@ import type { SpanStorageService } from "../app-layer/traces/span-storage.servic
 import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../app-layer/traces/types";
-import type { TriggerService } from "../app-layer/automations/trigger.service";
-import type { AutomationAuditRepository } from "../app-layer/automations/repositories/automation-audit.repository";
+import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
+import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
-import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
-import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
+import { createLangyEffectPorts } from "../event-sourcing/pipelines/langy-conversation-processing/process-manager/langyEffectPorts";
+import type {
+  TopicClusteringOutcomeCommands,
+  TopicClusteringRunPort,
+} from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
 import { type CommandDispatcher, Deferred } from "./deferred";
+import { createTenantId } from "./domain/tenantId";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
 import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
+import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
+import { AutomationAuditAppendStore } from "./pipelines/automations/projections/automationAudit.store";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
   BILLING_REPORTING_PIPELINE_NAME,
@@ -101,6 +124,11 @@ import type { ExperimentRunStateData } from "./pipelines/experiment-run-processi
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
+import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
+import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
+import type { LangyConversationStateData } from "./pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
+import type { LangyConversationTurnData } from "./pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
+import type { LangyMessageProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyMessageOperational.mapProjection";
 import { resolveLogCommandShardCount as resolveCanonicalLogCommandShardCount } from "./pipelines/log-processing/canonicalLog";
 import { createLogProcessingPipeline } from "./pipelines/log-processing/pipeline";
 import { CanonicalLogAppendStore } from "./pipelines/log-processing/projections/stores";
@@ -126,47 +154,22 @@ import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
-import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
-import { type LangyConversationStateData } from "./pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
-import type { LangyConversationTurnData } from "./pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
-import type { LangyMessageProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyMessageOperational.mapProjection";
-import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
-import type { LangyTitleGenerator } from "../app-layer/langy/langy-title-generation.service";
-import type { LangyWorkerPort } from "../app-layer/langy/langyWorker";
-import {
-  mintLangySessionApiKeyForUser,
-  revokeLangySessionApiKey,
-} from "../app-layer/langy/langyApiKey";
-import { createLangyEffectPorts } from "../event-sourcing/pipelines/langy-conversation-processing/process-manager/langyEffectPorts";
-import type { LangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBuffer";
-import type { LangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
-import {
-  createAgentTurnLivenessSubscriber,
-  createLangyConversationUpdateBroadcastSubscriber,
-  createLangyTurnAdmissionLifecycleSubscriber,
-} from "../app-layer/langy/subscribers";
-import type { LangyTurnAdmissionRepository } from "../app-layer/langy/repositories/langy-turn-admission.repository";
-import {
-  type TopicClusteringOutcomeCommands,
-  type TopicClusteringRunPort,
-} from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
-import { type ProcessStore } from "./process-manager";
-import { createTopicClusteringProcessingPipeline } from "./pipelines/topic-clustering-processing/pipeline";
-import type { TopicClusteringRunHistoryData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
-import type { TopicClusteringRunStatusData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
-import type { TopicModelData } from "./pipelines/topic-clustering-processing/projections/topicModel.foldProjection";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
+import { createTopicClusteringProcessingPipeline } from "./pipelines/topic-clustering-processing/pipeline";
+import type { TopicClusteringRunHistoryData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
+import type { TopicClusteringRunStatusData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
+import type { TopicModelData } from "./pipelines/topic-clustering-processing/projections/topicModel.foldProjection";
 import { resolveLogCommandShardCount } from "./pipelines/trace-processing/commands/logCommandGroupKey";
 import { resolveSpanCommandShardCount } from "./pipelines/trace-processing/commands/spanCommandGroupKey";
 import {
   createTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,
 } from "./pipelines/trace-processing/pipeline";
-import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
+import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
@@ -187,18 +190,14 @@ import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing
 import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
 import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
+import type { ProcessStore } from "./process-manager";
 import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { AppendStore } from "./projections/mapProjection.types";
-import type { StateProjectionStore } from "./projections/stateProjection.types";
-import { createTenantId } from "./domain/tenantId";
-import { createRateLimitedBootstrap } from "../app-layer/topic-clustering/topicClusteringBootstrapGate";
 import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
-import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
-import { AutomationAuditAppendStore } from "./pipelines/automations/projections/automationAudit.store";
+import type { StateProjectionStore } from "./projections/stateProjection.types";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
-
 
 /**
  * Creates an in-memory setTimeout-based fallback for deferred job processing.
@@ -401,16 +400,12 @@ export class PipelineRegistry {
           decideSweepCandidates: automationPorts.decideSweepCandidates,
           evaluateGraphTrigger: automationPorts.evaluateGraphTrigger,
           deleteDispatchedBefore: (params) =>
-            this.deps.repositories.processStore.deleteDispatchedBefore(
-              params,
-            ),
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },
         prune: {
           pruneExpired: automationPorts.pruneWebhookDeliveries,
           deleteDispatchedBefore: (params) =>
-            this.deps.repositories.processStore.deleteDispatchedBefore(
-              params,
-            ),
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },
       }),
     );
@@ -727,8 +722,7 @@ export class PipelineRegistry {
    * write surface; the session fold and the (trace → session) map are its
    * projections. The dispatch subscribers that feed it mount on the source
    * pipelines and close over this pipeline's commands, so this registers
-   * first. The metric contributor and the lifecycle process manager mount in
-   * later slices.
+   * first.
    */
   private registerCodingAgentPipeline() {
     return this.deps.eventSourcing.register(
@@ -738,7 +732,9 @@ export class PipelineRegistry {
         // on a cache miss the fold's refoldOnStoreMiss option rebuilds state
         // from the event log. Same wiring as trace_summaries.
         codingAgentSessionStore: this.cached<CodingAgentSessionState>(
-          new CodingAgentSessionStore(this.deps.repositories.codingAgentSession),
+          new CodingAgentSessionStore(
+            this.deps.repositories.codingAgentSession,
+          ),
           "coding_agent_sessions",
         ),
         codingAgentTraceSessionAppendStore:

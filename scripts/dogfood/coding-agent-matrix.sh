@@ -125,6 +125,8 @@ GEMINI_ENV
         ;;
     esac
   } >"$f"
+  # The file carries the project API key — keep it owner-only.
+  chmod 600 "$f"
   echo "$f"
 }
 

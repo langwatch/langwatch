@@ -30,7 +30,9 @@ const tag = nanoid();
 const tenantId = `${tag}-project`;
 const baseMs = Date.now();
 
-function sessionRow(over: Partial<CodingAgentSessionRow> = {}): CodingAgentSessionRow {
+function sessionRow(
+  over: Partial<CodingAgentSessionRow> = {},
+): CodingAgentSessionRow {
   return {
     tenantId,
     sessionId: `${tag}-s`,
@@ -118,7 +120,9 @@ beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
   sessions = new CodingAgentSessionClickHouseRepository(async () => ch);
-  traceSessions = new CodingAgentTraceSessionClickHouseRepository(async () => ch);
+  traceSessions = new CodingAgentTraceSessionClickHouseRepository(
+    async () => ch,
+  );
   metricSeries = new SessionMetricSeriesClickHouseRepository(async () => ch);
 }, 60_000);
 
@@ -140,7 +144,10 @@ afterAll(async () => {
 
 describe("coding_agent_sessions round-trip (migration 00051)", () => {
   it("writes every column and reads the session back by its key", async () => {
-    const row = sessionRow({ sessionId: `${tag}-rt`, traceIds: [`${tag}-a`, `${tag}-b`] });
+    const row = sessionRow({
+      sessionId: `${tag}-rt`,
+      traceIds: [`${tag}-a`, `${tag}-b`],
+    });
     await sessions.upsert(row, 30);
 
     const read = await sessions.findBySessionId({
@@ -281,12 +288,44 @@ describe("session_metric_series converged totals (migration 00052)", () => {
     });
 
     const linesAdded = totals.find(
-      (t) => t.metricName === "claude_code.lines_of_code.count" && t.bucket === "added",
+      (t) =>
+        t.metricName === "claude_code.lines_of_code.count" &&
+        t.bucket === "added",
     );
     const cost = totals.find((t) => t.metricName === "claude_code.cost.usage");
     // 10 + 5 across two delta units.
     expect(linesAdded?.total).toBe(15);
     // The newer converged cost wins (0.9), the stale 0.5 is deduped away.
     expect(cost?.total).toBeCloseTo(0.9);
+
+    // A byte-identical re-delivery (same unit, same AsOf) must also dedup —
+    // the exact shape a subscriber retry produces.
+    await metricSeries.ensure(
+      [
+        {
+          tenantId,
+          sessionId,
+          seriesId: "cumulative-cost",
+          metricName: "claude_code.cost.usage",
+          metricUnit: "USD",
+          agent: "claude_code",
+          attributes: {},
+          value: 0.9,
+          dataPointCount: 3,
+          asOfUnixMs: baseMs + 5000,
+        },
+      ],
+      30,
+    );
+    const redelivered = await metricSeries.findTotalsBySessionIds({
+      tenantId,
+      sessionIds: [sessionId],
+      fromMs: baseMs - 60_000,
+      toMs: baseMs + 60_000,
+    });
+    const costAfterRedelivery = redelivered.find(
+      (t) => t.metricName === "claude_code.cost.usage",
+    );
+    expect(costAfterRedelivery?.total).toBeCloseTo(0.9);
   });
 });
