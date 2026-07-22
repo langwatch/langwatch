@@ -173,13 +173,20 @@ export type LangyTitleSource =
  * Lifecycle status of a single turn, held on the langyConversationTurn fold —
  * the per-turn render document. `pending` = the turn document exists but the
  * agent has not started (init default); `running` = the agent is working;
- * `completed`/`failed` = terminal. A turn reaches exactly one terminal.
+ * `completed`/`failed`/`stopped` = terminal. A turn reaches exactly one terminal.
+ *
+ * `stopped` is a user-initiated stop (ADR-058): the agent was mid-answer and the
+ * user halted it, so the turn keeps the partial answer it had written and renders
+ * distinctly from both a clean `completed` and a red `failed` — it is the anchor
+ * for the Continue affordance. It is the render-doc face of an `agent_responded`
+ * whose `outcome` is `stopped`; the conversation spine simply reads it as idle.
  */
 export const LANGY_CONVERSATION_TURN_STATUS = {
   PENDING: "pending",
   RUNNING: "running",
   COMPLETED: "completed",
   FAILED: "failed",
+  STOPPED: "stopped",
 } as const;
 
 export type LangyConversationTurnStatus =

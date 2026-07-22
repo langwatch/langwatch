@@ -1,7 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { CustomGraph, Prisma } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
@@ -146,7 +147,8 @@ secured.access(requires("analytics:view")).get(
 );
 
 // ── Create Graph ───────────────────────────────────────────
-secured.access(requires("analytics:manage")).post(
+// Creating asks for `analytics:create`; `:manage` still implies it.
+secured.access(requires("analytics:create")).post(
   "/",
   resourceLimitMiddleware("customGraphs"),
   describeRoute({
@@ -209,7 +211,7 @@ secured.access(requires("analytics:manage")).post(
 );
 
 // ── Update Graph ───────────────────────────────────────────
-secured.access(requires("analytics:manage")).patch(
+secured.access(requires("analytics:update")).patch(
   "/:id",
   describeRoute({
       description: "Update a custom graph's name, definition, or filters",
@@ -259,6 +261,7 @@ secured.access(requires("analytics:manage")).patch(
 );
 
 // ── Delete Graph ───────────────────────────────────────────
+// Destruction deliberately stays at `:manage`.
 secured.access(requires("analytics:manage")).delete(
   "/:id",
   describeRoute({

@@ -685,6 +685,31 @@ func toolTextFromRaw(raw json.RawMessage) string {
 	return string(raw)
 }
 
+// carriesFailureDocument reports whether stdout holds the LangWatch CLI's own
+// failure document — `{"ok": false, "error": {"code": …}}`.
+//
+// `ok: false` is the CLI's discriminant and no successful result carries it, so
+// this asks the one question that matters and reads nothing else: is there
+// structure here worth keeping in preference to the human summary? Anything it
+// cannot parse is not a document, and the summary wins as before.
+func carriesFailureDocument(output string) bool {
+	trimmed := strings.TrimSpace(output)
+	if start := strings.IndexByte(trimmed, '{'); start > 0 {
+		trimmed = trimmed[start:]
+	}
+	if !strings.HasPrefix(trimmed, "{") {
+		return false
+	}
+	var doc struct {
+		OK    *bool           `json:"ok"`
+		Error json.RawMessage `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(trimmed), &doc); err != nil {
+		return false
+	}
+	return doc.OK != nil && !*doc.OK && len(doc.Error) > 0
+}
+
 // truncateToolOutput caps a result at maxToolOutputBytes so one huge tool return
 // cannot bloat the stream — WITHOUT severing a JSON document mid-token.
 //
@@ -834,7 +859,18 @@ func toolStartFrame(id string, part *ssePart) (frames.Frame, bool) {
 func toolEndFrame(id string, part *ssePart, isError bool) (frames.Frame, bool) {
 	output := toolTextFromRaw(part.State.Output)
 	if isError {
-		if msg := toolTextFromRaw(part.State.Error); msg != "" {
+		// The error message is what the card shows for a failed call — UNLESS
+		// the command already said, precisely, what went wrong.
+		//
+		// A LangWatch CLI command that fails under a machine format writes its
+		// failure DOCUMENT to stdout — the code, the offending field or
+		// permission, the platform's own next steps — and a one-line human
+		// summary to stderr. Overwriting stdout with that summary threw all of
+		// it away at the first hop, and the panel, which reads the document
+		// structurally, was left with a sentence it could not act on. It then
+		// showed the user "This step couldn't be completed" for a failure the
+		// platform had explained in full.
+		if msg := toolTextFromRaw(part.State.Error); msg != "" && !carriesFailureDocument(output) {
 			output = msg
 		}
 	}

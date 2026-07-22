@@ -68,6 +68,10 @@ import {
   redactObject,
 } from "~/server/traces/mappers/redaction";
 import type { CategoryVisibility } from "~/server/traces/protections";
+import {
+  RESERVED_INPUT_MEDIA_REFS,
+  RESERVED_OUTPUT_MEDIA_REFS,
+} from "~/shared/traces/media-refs";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
@@ -576,6 +580,8 @@ export function redactV2Content<
     outputRedacted?: boolean | null;
     inputVisibleTo?: string | null;
     outputVisibleTo?: string | null;
+    inputMediaRefs?: unknown;
+    outputMediaRefs?: unknown;
     attributes?: Record<string, string>;
     params?: Record<string, unknown> | null;
   },
@@ -613,6 +619,18 @@ export function redactV2Content<
       ? (protections.capturedOutputVisibleTo ?? null)
       : null,
   };
+  // Media refs point at the exact content that was just redacted, and the
+  // /api/files URLs they carry are fetchable on their own — so the parsed ref
+  // fields AND their reserved-attribute copies must be dropped alongside the
+  // text, never just hidden by the UI.
+  if (inputRedacted) delete redacted.inputMediaRefs;
+  if (outputRedacted) delete redacted.outputMediaRefs;
+  if ((inputRedacted || outputRedacted) && redacted.attributes) {
+    const attributes = { ...redacted.attributes };
+    if (inputRedacted) delete attributes[RESERVED_INPUT_MEDIA_REFS];
+    if (outputRedacted) delete attributes[RESERVED_OUTPUT_MEDIA_REFS];
+    redacted.attributes = attributes;
+  }
   // Custom attribute rules with a restrict disposition, plus the standalone
   // system/tools attribute keys when those categories are hidden: replace the
   // matched attribute values (header attributes, span params, span-event
@@ -1185,6 +1203,10 @@ export const tracesV2Router = createTRPCRouter({
           visibilityCutoffMs: await getVisibilityCutoffMsForProject(
             input.projectId,
           ),
+          // Single-trace read (the drawer opening) — resolve any offloaded
+          // (ADR-022) input/output in full, matching legacy traces.getById's
+          // unconditional { full: true }. Never set this for a list/page read.
+          full: true,
         },
       );
       if (!summary) {

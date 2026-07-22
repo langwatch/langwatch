@@ -11,7 +11,13 @@
  * through `cliResultDocument`. The markdown-digest parse below it is the older
  * MCP transport's shape, kept so a conversation recorded under it still replays.
  */
-import { Text, VStack } from "@chakra-ui/react";
+import { Button, Text, VStack } from "@chakra-ui/react";
+import { Search } from "lucide-react";
+import { useRouter } from "~/utils/compat/next-router";
+import {
+  buildTraceExplorerHref,
+  readTraceSearchQuery,
+} from "../../logic/traceExplorerLink";
 import {
   buildSurfaceHref,
   extractPrimaryId,
@@ -141,6 +147,19 @@ export function LangyTracesCard({
   projectSlug,
 }: CapabilityCardInput) {
   const isSingle = descriptor.render === "trace";
+  // The search Langy actually ran, offered back as somewhere to GO.
+  //
+  // `logic/traceExplorerLink` owns this, and reusing it is not tidiness: the
+  // CLI's `--query` is FREE TEXT while the Explorer's `q` is a liqe expression,
+  // so an unquoted `status:error` silently stops being a text search and
+  // becomes a field filter — the user lands on a different result set than the
+  // card just showed them. That module quotes the term and carries the time
+  // window; a local copy of it did neither.
+  const router = useRouter();
+  const search = readTraceSearchQuery(input);
+  const queryHref = search.query
+    ? buildTraceExplorerHref({ projectSlug, search })
+    : null;
 
   if (isSingle) {
     const id = extractPrimaryId(input, output);
@@ -202,6 +221,12 @@ export function LangyTracesCard({
       }
       projectSlug={projectSlug}
     >
+      {queryHref ? (
+        <OpenSearchButton
+          query={search.query!}
+          onOpen={() => void router.push(queryHref)}
+        />
+      ) : null}
       {shown.length > 0 ? (
         <VStack align="stretch" gap={0}>
           {shown.map((trace) => (
@@ -228,5 +253,39 @@ export function LangyTracesCard({
         </Text>
       )}
     </LangyCapabilityCard>
+  );
+}
+
+/**
+ * "Search this in Traces" — the query Langy wrote, handed to the Trace
+ * Explorer's search bar.
+ *
+ * It shows the query itself rather than a bare verb, because the query IS the
+ * claim: the user is about to hand a filter to a page they trust, and they
+ * should be able to read it before they do. A truncated one still reads as a
+ * query; a button labelled only "Open" asks them to take it on faith.
+ */
+function OpenSearchButton({
+  query,
+  onOpen,
+}: {
+  query: string;
+  onOpen: () => void;
+}) {
+  return (
+    <Button
+      size="2xs"
+      variant="outline"
+      onClick={onOpen}
+      marginBottom={2}
+      maxWidth="100%"
+      justifyContent="flex-start"
+      title={`Search Traces for: ${query}`}
+    >
+      <Search size={11} />
+      <Text truncate fontFamily="mono" textStyle="2xs">
+        {query}
+      </Text>
+    </Button>
   );
 }

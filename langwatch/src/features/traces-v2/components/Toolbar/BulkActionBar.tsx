@@ -5,7 +5,7 @@ import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDi
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { SelectionActionBar } from "~/components/ui/SelectionActionBar";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
+import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -37,7 +37,9 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
   const clear = useSelectionStore((s) => s.clear);
   const { openDrawer } = useDrawer();
   const datasetGate = usePersonalFeatureGate("datasets");
-  const showLangy = useShowLangy();
+  // `langy:create`, not `langy:view`. This control exists to prime a question —
+  // filling a composer that cannot send is a dead end that looks like a feature.
+  const showLangy = useCanAskLangy();
   const attachContext = useLangyStore((s) => s.attachContext);
   const openLangyPanel = useLangyStore((s) => s.openPanel);
 

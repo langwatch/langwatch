@@ -10,7 +10,7 @@ import { useLangyStore } from "../stores/langyStore";
  */
 describe("askLangy — command-bar → panel handoff", () => {
   beforeEach(() => {
-    useLangyStore.getState().resetForProject();
+    useLangyStore.getState().resetForProject("project-test");
   });
 
   describe("given a question typed in the command bar", () => {

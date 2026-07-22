@@ -14,7 +14,28 @@ import { emptyStateMetrics } from "./emptyStateMetrics";
 import { LangyMark } from "./LangyMark";
 
 /** Structural, so a lucide icon and a react-feather one can sit in one list. */
-type SuggestionIcon = ComponentType<{ size?: string | number }>;
+export type SuggestionIcon = ComponentType<{ size?: string | number }>;
+
+/**
+ * What a project must already have for an ask to be able to succeed.
+ *
+ * Ordered by how much of the product the reader has reached, because that is
+ * exactly what governs which asks are honest to offer them: "compare my last
+ * two runs" is a dead end until there are two runs.
+ */
+export type SuggestionRequirement =
+  | "nothing"
+  | "traces"
+  | "evaluations"
+  | "experiments";
+
+export interface LangySuggestion {
+  icon: SuggestionIcon;
+  label: string;
+  prompt: string;
+  /** Absent means it works from a standing start. */
+  requires?: SuggestionRequirement;
+}
 
 /**
  * The suggested actions double as onboarding: each one names a different thing
@@ -25,23 +46,37 @@ type SuggestionIcon = ComponentType<{ size?: string | number }>;
  * EVERY ROW MUST BE A THING LANGY CAN ACTUALLY DO. A suggestion that reliably
  * fails is worse than no suggestion — it is the product lying on its own home
  * screen. See the GitHub row for what that constraint cost.
+ *
+ * Exported because the home page's lit block offers a few of these as its
+ * capability row. It reads THIS array rather than keeping a parallel copy, so
+ * home can never promise an ask the panel does not offer.
+ *
+ * The `requires` field is what lets the home page offer a DIFFERENT few to a
+ * project that has nothing than to one that has months of runs. The panel's own
+ * list below is not filtered by it: by the time someone has opened the panel
+ * they have chosen to be here, and the four rows together are how they learn
+ * the range. The home page is the surface that meets people who did not choose
+ * it, so that is the one that has to earn every row.
  */
-const SUGGESTIONS: { icon: SuggestionIcon; label: string; prompt: string }[] = [
+export const SUGGESTIONS: LangySuggestion[] = [
   {
     icon: ScanSearch,
     label: "Find failing traces",
     prompt:
       "Find recent traces that are failing their evaluations and tell me why.",
+    requires: "evaluations",
   },
   {
     icon: ShieldCheck,
     label: "Set up an evaluator",
     prompt: "Suggest an evaluator for my agent and set it up.",
+    requires: "traces",
   },
   {
     icon: GitCompare,
     label: "Compare two runs",
     prompt: "Compare my last two experiment runs and summarise what changed.",
+    requires: "experiments",
   },
   {
     // The GitHub glyph, not a generic pull-request icon — this row is the only
@@ -62,41 +97,58 @@ const SUGGESTIONS: { icon: SuggestionIcon; label: string; prompt: string }[] = [
     label: "Investigate an issue and open a PR",
     prompt:
       "Investigate a problem in my agent using my traces, then open a GitHub PR that fixes it.",
+    requires: "traces",
   },
 ];
 
 /**
- * The opening line rotates: mostly it just asks, but now and then it's a little
- * warmer or cheekier. Kept dry, never cutesy — Langy is a competent teammate
- * having a good day, not a mascot. A fresh one is picked each time the empty
- * state mounts (every new/opened-empty conversation).
+ * What to offer a project that has no data yet.
+ *
+ * The four above all start from traces, evaluations or experiment runs, so on
+ * an empty project every one of them is a dead end — exactly the "suggestion
+ * that reliably fails" the note above rules out. These ask Langy to help set
+ * the project up instead, which it can do from a standing start, and they live
+ * beside their siblings so the same constraint governs both lists.
+ */
+export const SETUP_SUGGESTIONS: LangySuggestion[] = [
+  {
+    icon: ScanSearch,
+    label: "Send my first trace",
+    prompt: "How do I send my first trace to this project?",
+  },
+  {
+    icon: ShieldCheck,
+    label: "Choose what to measure",
+    prompt:
+      "What should I measure about my agent, and which evaluators would you start with?",
+  },
+  {
+    icon: GitCompare,
+    label: "Show me around",
+    prompt: "What can you do for me on this project, and where should I start?",
+  },
+];
+
+/**
+ * The opening line, of which there are three.
+ *
+ * There were twenty-three. A rotation that wide stops reading as personality
+ * and starts reading as a slot machine: nobody sees the same panel twice, so no
+ * line ever becomes Langy's, and the weakest of them set the tone as often as
+ * the best. Three lines get remembered.
+ *
+ * They deliberately do three different jobs, and the split is the point: the
+ * first INTRODUCES him and is the joke, the second says what he is actually
+ * FOR and is not, the third ASKS for something. Rotating registers rather than
+ * lines is what stops a second reading landing as the same gag twice.
+ *
+ * Kept dry, never cutesy: Langy is a competent teammate having a good day, not
+ * a mascot. A fresh one is picked each time the empty state mounts.
  */
 const GREETINGS = [
-  "How can I help?",
-  "What are we digging into?",
-  "Where should we look first?",
-  "What's misbehaving today?",
-  "Point me at something.",
-  "What can I take off your plate?",
-  "Let's find the gremlin.",
-  "Got a hunch? Let's chase it.",
-  "What are we shipping today?",
+  "Hey, I'm Langy. Haven't hallucinated since 1969.",
   "I read the logs so you don't have to.",
   "Show me where it hurts.",
-  "What's the story with your traces?",
-  "What's on your mind?",
-  "Ready when you are.",
-  "Let's make something pass.",
-  "What are we fixing?",
-  "What would make today easier?",
-  "Let's ask the ghost in the machine.",
-  "Let's save you an entire afternoon.",
-  "Hallucination-free since 1969.",
-  "Follow the white rabbit.",
-  // A Rickroll for the trace-reading crowd: the cadence echoes "You know the
-  // rules and so do I" — logs standing in for rules.
-  "You've read the logs, and so have I.",
-  "I've read everything. Ask away.",
 ];
 
 export function EmptyState({

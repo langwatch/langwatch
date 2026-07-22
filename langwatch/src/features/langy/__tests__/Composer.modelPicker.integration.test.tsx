@@ -1,18 +1,21 @@
 /**
  * @vitest-environment jsdom
  *
- * The Langy composer is one integrated surface: the field, the reused
- * ModelSelector and the send / stop control share a single rounded card,
- * with the model picker and send sitting on the bottom rail. This test pins
- * that structure — the picker is always visible (no collapse-on-hover), and
- * the send control swaps to a stop control while Langy is working.
+ * The Langy composer is one integrated surface: the field with send / stop
+ * beside it, and the reused ModelSelector on the rail below, all inside a
+ * single rounded card. This test pins that structure — the picker is always
+ * visible (no collapse-on-hover), and the send control swaps to a stop control
+ * while Langy is working.
+ *
+ * "Working" comes from the store's turn phase (ADR-058), the composer's single
+ * source for the send/stop affordance — there is no `isBusy` prop.
  *
  * The shared model-option hook is mocked at its module boundary so the test
  * stays about the composer's rail, not the project-provider query.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/components/ModelSelector", () => ({
   ModelSelector: ({ model }: { model: string }) => (
@@ -38,9 +41,10 @@ vi.mock("~/features/traces-v2/components/ai/useTypewriterPlaceholder", () => ({
 }));
 
 import { Composer } from "../components/Composer";
+import { useLangyStore } from "../stores/langyStore";
 
 function renderComposer(
-  overrides: Partial<{ isBusy: boolean; model: string; modelOptions: string[] }> = {},
+  overrides: Partial<{ model: string; modelOptions: string[] }> = {},
 ) {
   return render(
     <ChakraProvider value={defaultSystem}>
@@ -50,14 +54,20 @@ function renderComposer(
         onModelChange={() => {}}
         onSend={() => {}}
         onStop={() => {}}
-        isBusy={overrides.isBusy ?? false}
         disabled={false}
       />
     </ChakraProvider>,
   );
 }
 
-afterEach(cleanup);
+const resetPhase = () =>
+  useLangyStore.setState({ turnPhase: "idle", draft: "" });
+
+beforeEach(resetPhase);
+afterEach(() => {
+  cleanup();
+  resetPhase();
+});
 
 describe("given the integrated Langy composer", () => {
   describe("when idle", () => {
@@ -73,7 +83,8 @@ describe("given the integrated Langy composer", () => {
 
   describe("when Langy is working", () => {
     it("swaps the send control for a stop control", () => {
-      renderComposer({ isBusy: true });
+      useLangyStore.setState({ turnPhase: "active" });
+      renderComposer();
 
       expect(screen.getByLabelText("Stop")).toBeTruthy();
       expect(screen.queryByLabelText("Send")).toBeNull();

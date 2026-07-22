@@ -1,6 +1,6 @@
 import type { Organization } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
-import { validator as zValidator } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import {
   createOrgApp,
@@ -53,27 +53,6 @@ const updateProjectSchema = z.object({
   framework: z.string().optional(),
   teamId: z.string().min(1).optional(),
 });
-
-function validationHook(
-  result: {
-    success: boolean;
-    error?: { issues: Array<{ message?: string; path?: (string | number)[] }> };
-  },
-  c: { json: (body: unknown, status: number) => Response },
-): Response | undefined {
-  if (!result.success) {
-    const issue = result.error?.issues?.[0];
-    return c.json(
-      {
-        error: "Unprocessable Entity",
-        message: issue?.message ?? "Validation failed",
-        path: issue?.path,
-      },
-      422,
-    );
-  }
-  return undefined;
-}
 
 function projectResponse(project: {
   id: string;
@@ -137,7 +116,7 @@ secured.access(requires("project:create")).post(
     description:
       "Create a new project in an existing team or create a new team inline",
   }),
-  zValidator("json", createProjectSchema, validationHook),
+  zValidator("json", createProjectSchema),
   async (c) => {
     const organization = c.get("organization") as Organization;
     const body = c.req.valid("json");
@@ -219,7 +198,7 @@ secured.access(requires("project:update")).patch(
     description:
       "Update a project by its id, including moving it to another team with teamId",
   }),
-  zValidator("json", updateProjectSchema, validationHook),
+  zValidator("json", updateProjectSchema),
   async (c) => {
     const { id } = c.req.param();
     const organization = c.get("organization") as Organization;

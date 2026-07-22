@@ -92,6 +92,7 @@ node_modules/
 licenses.json
 .pnpm-store/
 server.log
+server-qa.log
 server.*.log
 screenshot-*.png
 
