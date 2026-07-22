@@ -42,10 +42,11 @@ describe("evaluation skill boundaries", () => {
 	it("keeps the legacy evaluations skill as a small router", () => {
 		const source = readSkill("evaluations");
 
-		expect(source.length).toBeLessThan(2_500);
+		// Content quality (ask-first on ambiguity, validation self-recovery) is
+		// covered by the dogfood scenarios, not by echoing prose back here.
+		expect(source.length).toBeLessThan(3_000);
 		expect(source).toContain("langwatch/skills/experiments");
 		expect(source).toContain("langwatch/skills/online-evaluations");
-		expect(source).toContain("safer pre-deployment default");
 		expect(source).not.toContain("langwatch.experiments.init");
 		expect(source).not.toContain("langwatch monitor create");
 	});

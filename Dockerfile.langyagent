@@ -126,6 +126,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY langwatch/src/server/tracer/types.ts             /src/langwatch/src/server/tracer/types.ts
 COPY langwatch/src/server/filters/types.ts            /src/langwatch/src/server/filters/types.ts
 COPY langwatch/src/server/evaluations/types.ts        /src/langwatch/src/server/evaluations/types.ts
+COPY langwatch/src/server/evaluations/evaluators.native.ts /src/langwatch/src/server/evaluations/evaluators.native.ts
 COPY langwatch/src/server/modelProviders/llmModels.json /src/langwatch/src/server/modelProviders/llmModels.json
 COPY langwatch/src/app/api/openapiLangWatch.json      /src/langwatch/src/app/api/openapiLangWatch.json
 COPY langevals/ts-integration/evaluators.generated.ts /src/langevals/ts-integration/evaluators.generated.ts

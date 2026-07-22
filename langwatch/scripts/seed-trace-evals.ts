@@ -71,9 +71,9 @@ async function main() {
       error: null,
     },
     {
-      evaluatorId: "ragas/answer_relevancy",
-      evaluatorType: "ragas/answer_relevancy",
-      evaluatorName: "Answer Relevancy",
+      evaluatorId: "ragas/response_relevancy",
+      evaluatorType: "ragas/response_relevancy",
+      evaluatorName: "Response Relevancy",
       status: "processed",
       passed: false,
       score: 0.34,

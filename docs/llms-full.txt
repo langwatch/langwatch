@@ -24779,9 +24779,9 @@ for idx, row in evaluation.loop(df.iterrows()):
         }
     )
 
-    # This runs 'ragas/answer_relevancy' to check if the answer is relevant to the question.
+    # This runs 'ragas/response_relevancy' to check if the answer is relevant to the question.
     evaluation.run(
-        "ragas/answer_relevancy",
+        "ragas/response_relevancy",
         index=idx,
         data={
             "question": question,
