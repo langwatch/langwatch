@@ -31,7 +31,10 @@ export function ManagerPanel({
   );
 
   const managers = query.data ?? [];
-  if (query.isLoading || managers.length === 0) return null;
+  if (query.isLoading) return null;
+  // A failed fetch must not collapse the panel the way "no managers" does —
+  // this is a debugging tool, so its own failures have to be visible.
+  if (!query.error && managers.length === 0) return null;
 
   return (
     <Box
@@ -58,11 +61,19 @@ export function ManagerPanel({
           Process Managers
         </Text>
       </Box>
-      <VStack align="stretch" gap={3} padding={3}>
-        {managers.map((manager) => (
-          <ManagerCard key={manager.processName} manager={manager} />
-        ))}
-      </VStack>
+      {query.error ? (
+        <Box paddingX={3} paddingY={4}>
+          <Text textStyle="xs" color="red.500">
+            Could not load process managers: {query.error.message}
+          </Text>
+        </Box>
+      ) : (
+        <VStack align="stretch" gap={3} padding={3}>
+          {managers.map((manager) => (
+            <ManagerCard key={manager.processName} manager={manager} />
+          ))}
+        </VStack>
+      )}
     </Box>
   );
 }

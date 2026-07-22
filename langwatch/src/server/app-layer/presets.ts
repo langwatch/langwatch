@@ -1175,7 +1175,7 @@ export function initializeDefaultApp(options?: {
       new PrismaScheduledJobRepository(prisma),
     ),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
-    managerExplorer: new ManagerExplorerService(new PrismaProcessStore(prisma)),
+    managerExplorer: new ManagerExplorerService(repositories.processStore),
     replay: new ReplayService(replayRepo),
     metricsCollector: redis
       ? getOpsMetricsCollector({ redis, queueRepo })
