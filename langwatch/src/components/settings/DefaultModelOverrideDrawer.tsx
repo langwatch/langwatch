@@ -320,8 +320,8 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       showErrorToast({
         error: err,
         fallbackTitle: editing
-          ? "Couldn't update the config"
-          : "Couldn't add the config",
+          ? "Couldn't save the default model"
+          : "Couldn't add the default model",
       });
     } finally {
       setBusy(false);

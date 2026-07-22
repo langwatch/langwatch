@@ -3,9 +3,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { showErrorToast } from "~/features/errors";
+import { api } from "../../utils/api";
 import { Dialog } from "../ui/dialog";
 import { toaster } from "../ui/toaster";
-import { api } from "../../utils/api";
 
 const changePasswordSchema = z
   .object({
@@ -66,13 +67,7 @@ export function ChangePasswordDialog({
       });
       onClose();
     } catch (error) {
-      toaster.create({
-        title: "Failed to change password",
-        description:
-          error instanceof Error ? error.message : "Please try again",
-        type: "error",
-        meta: { closable: true },
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't change your password" });
     }
   };
 
@@ -98,9 +93,7 @@ export function ChangePasswordDialog({
               <Text fontSize="sm" color="fg.muted">
                 Password must be at least 8 characters long.
               </Text>
-              <Field.Root
-                invalid={!!form.formState.errors.currentPassword}
-              >
+              <Field.Root invalid={!!form.formState.errors.currentPassword}>
                 <Field.Label>Current Password</Field.Label>
                 <Input
                   type="password"

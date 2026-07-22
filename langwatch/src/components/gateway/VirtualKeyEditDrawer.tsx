@@ -15,16 +15,16 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { ModelMultiSelect } from "~/components/ModelMultiSelect";
 import { Drawer } from "~/components/ui/drawer";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-
 import {
   ConfigureModelProvidersLink,
   EligibleModelProvidersPreview,
   EligibleModelProvidersSummary,
 } from "./EligibleModelProvidersPreview";
-import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import {
   type VirtualKeyScopeEntry,
   VirtualKeyScopePicker,
@@ -168,13 +168,7 @@ export function VirtualKeyEditDrawer({
       onSaved();
       onOpenChange(false);
     } catch (error) {
-      toaster.create({
-        title:
-          error instanceof Error
-            ? error.message
-            : "Failed to update virtual key",
-        type: "error",
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't save the key" });
     }
   };
 

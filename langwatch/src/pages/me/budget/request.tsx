@@ -9,18 +9,18 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { Mail, TrendingUp, CheckCircle2, AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Mail, TrendingUp } from "lucide-react";
 import { useState } from "react";
-import Head from "~/utils/compat/next-head";
-import { useRouter } from "~/utils/compat/next-router";
-
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import MyLayout from "~/components/me/MyLayout";
 import { toaster } from "~/components/ui/toaster";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
+import Head from "~/utils/compat/next-head";
+import { useRouter } from "~/utils/compat/next-router";
 
 const fmtUsd = (n: number) => formatBudgetUsd(n);
 
@@ -52,7 +52,12 @@ function RequestBudgetIncreasePage() {
   const limitUsd = parseUsd(limitUsdRaw);
   const spentUsd = parseUsd(spentUsdRaw);
   const period = periodRaw || "current period";
-  const hasContext = !!(scope && scopeId && limitUsd !== null && spentUsd !== null);
+  const hasContext = !!(
+    scope &&
+    scopeId &&
+    limitUsd !== null &&
+    spentUsd !== null
+  );
 
   const adminQuery = api.user.personalBudget.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -60,13 +65,13 @@ function RequestBudgetIncreasePage() {
   );
   const adminEmail =
     adminQuery.data && "adminEmail" in adminQuery.data
-      ? adminQuery.data.adminEmail ?? null
+      ? (adminQuery.data.adminEmail ?? null)
       : null;
 
   const [message, setMessage] = useState("");
-  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "sent">(
-    "idle",
-  );
+  const [submitState, setSubmitState] = useState<
+    "idle" | "submitting" | "sent"
+  >("idle");
 
   const requestMutation = api.user.requestBudgetIncrease.useMutation({
     onSuccess: () => {
@@ -74,23 +79,23 @@ function RequestBudgetIncreasePage() {
     },
     onError: (err) => {
       setSubmitState("idle");
-      toaster.create({
-        title:
-          err.message === "no_admin_found"
-            ? "No organization admin is configured"
-            : "Could not send request",
-        description:
-          err.message === "no_admin_found"
-            ? "Contact LangWatch support to configure an admin."
-            : adminEmail
-              ? `Try again, or email ${adminEmail} directly.`
-              : "Try again or contact your organization admin directly.",
-        type: "error",
-        duration: 7000,
+      // The wire message is the failure's code, never prose (#5984). This one
+      // code has copy of its own because we know exactly what to tell the user.
+      if (err.message === "no_admin_found") {
+        toaster.create({
+          title: "No organization admin is configured",
+          description: "Contact LangWatch support to configure an admin.",
+          type: "error",
+          duration: 7000,
+        });
+        return;
+      }
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't send your request",
       });
     },
   });
-
 
   const noOrg = !!session && !organization;
 
@@ -121,8 +126,8 @@ function RequestBudgetIncreasePage() {
               Request budget increase
             </Heading>
             <Text color="fg.muted" fontSize="sm">
-              Send the request to your organization admin with the current
-              spend and limit context.
+              Send the request to your organization admin with the current spend
+              and limit context.
             </Text>
           </VStack>
           <Spacer />
@@ -135,8 +140,7 @@ function RequestBudgetIncreasePage() {
               <Alert.Title>Personal account — no admin to email</Alert.Title>
               <Alert.Description fontSize="sm">
                 Budget-increase requests only apply to organization-managed
-                accounts. Personal accounts manage their own limits in
-                Settings.
+                accounts. Personal accounts manage their own limits in Settings.
               </Alert.Description>
             </Box>
           </Alert.Root>
@@ -151,8 +155,8 @@ function RequestBudgetIncreasePage() {
               <Alert.Title>Request sent</Alert.Title>
               <Alert.Description fontSize="sm">
                 We emailed {adminEmail ?? "your organization admin"} with the
-                spend context. They'll review and update the budget in
-                Settings → AI Governance → Budgets.
+                spend context. They'll review and update the budget in Settings
+                → AI Governance → Budgets.
               </Alert.Description>
             </Box>
           </Alert.Root>
@@ -199,9 +203,9 @@ function RequestBudgetIncreasePage() {
                 <Box>
                   <Alert.Title>No context attached</Alert.Title>
                   <Alert.Description fontSize="sm">
-                    The page was opened without a budget block context.
-                    You can still send a free-form message — the admin will
-                    review and decide.
+                    The page was opened without a budget block context. You can
+                    still send a free-form message — the admin will review and
+                    decide.
                   </Alert.Description>
                 </Box>
               </Alert.Root>

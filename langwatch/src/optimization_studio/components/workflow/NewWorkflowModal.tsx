@@ -1,10 +1,4 @@
-import {
-  Button,
-  Grid,
-  Heading,
-  HStack,
-  Separator,
-} from "@chakra-ui/react";
+import { Button, Grid, Heading, HStack, Separator } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, File, Upload } from "react-feather";
 import { Dialog } from "../../../components/ui/dialog";
@@ -102,22 +96,31 @@ export const NewWorkflowModal = ({
       reader.onload = (e) => {
         try {
           const content = e.target?.result as string;
-          const jsonContent = JSON.parse(content);
-          const result = workflowJsonSchema.safeParse(jsonContent);
+          const result = workflowJsonSchema.safeParse(JSON.parse(content));
 
           if (!result.success) {
-            const errorMessage = result.error.errors
-              .map((err) => `${err.path.join(".")}: ${err.message}`)
+            // Schema complaints about the file the user picked, not a server
+            // failure: the offending field and why is what they need to fix it.
+            const problems = result.error.errors
+              .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
               .join("\n");
-            throw new Error(errorMessage);
+            toaster.create({
+              title: "Invalid workflow file",
+              description: problems,
+              type: "error",
+              meta: { closable: true },
+            });
+            return;
           }
 
           setStep({ step: "create", template: result.data as Workflow });
-        } catch (error) {
+        } catch (parseFailure) {
+          // Local `JSON.parse` of the file the user picked — nothing crossed the
+          // wire, and the syntax detail is what tells them what to fix.
           toaster.create({
             title: "Invalid workflow file",
             description:
-              error instanceof Error ? error.message : "Unknown error occurred",
+              parseFailure instanceof SyntaxError ? parseFailure.message : "",
             type: "error",
             meta: { closable: true },
           });

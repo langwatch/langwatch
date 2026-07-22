@@ -39,6 +39,7 @@ import { Menu } from "~/components/ui/menu";
 import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -1120,16 +1121,10 @@ function LangyPanel({
           meta: { closable: true },
         });
       } catch (error) {
-        if (!isHandledByGlobalHandler(error)) {
-          toaster.create({
-            title: "Failed to apply",
-            description:
-              error instanceof Error ? error.message : "Unknown error",
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        }
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't apply this suggestion",
+        });
       } finally {
         clearProposalApplying(proposalId);
       }
@@ -1758,7 +1753,9 @@ function LangyPanel({
                           index === messages.length - 1
                         }
                         shouldAskFeedback={shouldAskFeedback}
-                        isFeedbackPinned={pinnedFeedbackMessageId === message.id}
+                        isFeedbackPinned={
+                          pinnedFeedbackMessageId === message.id
+                        }
                         // (No connect-card prop: MessageContent no longer sniffs
                         // the prose for `[langy:connect-github]`. The connect card
                         // is driven by the structured `langy_github_not_connected`

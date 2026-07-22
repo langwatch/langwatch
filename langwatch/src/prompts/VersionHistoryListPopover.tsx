@@ -19,6 +19,7 @@ import { HistoryIcon } from "~/components/icons/History";
 import { Popover } from "~/components/ui/popover";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { api } from "~/utils/api";
@@ -404,10 +405,9 @@ export function VersionHistoryListPopover({
           });
         } catch (error) {
           logger.error({ error }, "Error loading version");
-          toaster.error({
-            title: "Failed to load version",
-            description:
-              error instanceof Error ? error.message : "Unknown error",
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't load this version",
           });
         }
       })();

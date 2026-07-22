@@ -146,7 +146,7 @@ export function DefaultModelsSection({
     } catch (err) {
       showErrorToast({
         error: err,
-        fallbackTitle: "Couldn't delete the config",
+        fallbackTitle: "Couldn't remove the default model",
       });
     }
   };

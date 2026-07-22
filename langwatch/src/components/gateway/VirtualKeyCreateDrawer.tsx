@@ -14,11 +14,12 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
-import { Tooltip } from "~/components/ui/tooltip";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-
 import {
   ConfigureModelProvidersLink,
   EligibleModelProvidersPreview,
@@ -28,10 +29,9 @@ import {
   firstEligibleDefaultModel,
   type OrgModelProvider,
 } from "./eligibleModelProviders";
-import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import {
-  VirtualKeyScopePicker,
   type VirtualKeyScopeEntry,
+  VirtualKeyScopePicker,
 } from "./VirtualKeyScopePicker";
 
 type VirtualKeyCreateDrawerProps = {
@@ -60,8 +60,7 @@ export function VirtualKeyCreateDrawer({
   const [routingPolicyId, setRoutingPolicyId] = useState<string>("");
 
   const availableTeams = useMemo(
-    () =>
-      organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
+    () => organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
     [organization?.teams],
   );
   const availableProjects = useMemo(
@@ -83,10 +82,10 @@ export function VirtualKeyCreateDrawer({
     const seed: VirtualKeyScopeEntry | null = project?.id
       ? { scopeType: "PROJECT", scopeId: project.id }
       : team?.id
-      ? { scopeType: "TEAM", scopeId: team.id }
-      : organizationId
-      ? { scopeType: "ORGANIZATION", scopeId: organizationId }
-      : null;
+        ? { scopeType: "TEAM", scopeId: team.id }
+        : organizationId
+          ? { scopeType: "ORGANIZATION", scopeId: organizationId }
+          : null;
     if (seed) setScopes([seed]);
   }, [open, scopes.length, project?.id, team?.id, organizationId]);
 
@@ -96,10 +95,11 @@ export function VirtualKeyCreateDrawer({
       await utils.virtualKeys.list.invalidate({ organizationId });
     },
   });
-  const orgProvidersQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
-    { organizationId },
-    { enabled: open && !!organizationId },
-  );
+  const orgProvidersQuery =
+    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+      { organizationId },
+      { enabled: open && !!organizationId },
+    );
   const policiesQuery = api.routingPolicy.list.useQuery(
     { organizationId },
     { enabled: open && !!organizationId },
@@ -158,11 +158,7 @@ export function VirtualKeyCreateDrawer({
       reset();
       onOpenChange(false);
     } catch (error) {
-      toaster.create({
-        title:
-          error instanceof Error ? error.message : "Failed to create virtual key",
-        type: "error",
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't create the key" });
     }
   };
 
@@ -343,4 +339,3 @@ export function VirtualKeyCreateDrawer({
     </Drawer.Root>
   );
 }
-
