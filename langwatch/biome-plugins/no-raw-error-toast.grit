@@ -8,19 +8,34 @@ language js
 // hostnames). `showErrorToast` from `~/features/errors` reads the handled
 // payload and renders the code-keyed copy instead.
 //
+// `contains` rather than a literal value match: the leak is almost never
+// written flat. It hides inside a ternary (`err instanceof Error ? err.message
+// : "…"`), behind a cast (`(error as Error).message`), or inside a template
+// literal — three shapes an equality match misses and a customer still reads.
+//
 // See dev/docs/best_practices/error-handling.md and ADR-045.
-`toaster.create($props)` where {
-    $props <: contains `description: $description`,
-    $description <: or {
-        `$err.message`,
-        `$err?.message`,
-        `$err.message || $_`,
-        `$err.message ?? $_`
-    },
-    $err <: or { `error`, `err`, `e` },
-    register_diagnostic(
-        span = $description,
-        message = "Don't render an error's raw message in a toast — for a handled error this is the code slug (the customer reads `validation_error`), and for an unhandled one it can leak internals. Use showErrorToast(error, { fallbackTitle }) from ~/features/errors instead. See dev/docs/best_practices/error-handling.md.",
-        severity = "error"
-    )
+`$call($props)` where {
+    $call <: or { `toaster.create`, `showErrorToast` },
+    $props <: contains bubble `$key: $value` where {
+        $key <: or { `title`, `description`, `fallbackTitle` },
+        $value <: or {
+            contains bubble `$errish.message` where {
+                $errish <: or {
+                    `error`, `err`, `e`, `exception`, `cause`,
+                    `(error as $_)`, `(err as $_)`, `(e as $_)`
+                }
+            },
+            contains bubble `$errish?.message` where {
+                $errish <: or { `error`, `err`, `e`, `exception`, `cause` }
+            },
+            contains bubble `String($errish)` where {
+                $errish <: or { `error`, `err`, `e`, `exception`, `cause` }
+            }
+        },
+        register_diagnostic(
+            span = $value,
+            message = "Don't render an error's raw message in a toast — for a handled error this is the code slug (the customer reads `validation_error`), and for an unhandled one it can leak internals. Use showErrorToast({ error, fallbackTitle }) from ~/features/errors instead. See dev/docs/best_practices/error-handling.md.",
+            severity = "error"
+        )
+    }
 }
