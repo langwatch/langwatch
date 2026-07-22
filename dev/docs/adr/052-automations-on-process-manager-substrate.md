@@ -221,3 +221,17 @@ observability are outside this decision.
 - ADR-051 (event-sourced topic clustering scheduling — introduces the durable
   revision-fenced wake pattern this ADR generalises; in flight on PR #5902,
   not yet on main)
+
+## Amendment 2026-07-22 (ADR-063)
+
+The consolidation locations are superseded
+([ADR-063](./063-automations-domain-packages-customer-api-and-agent-surface.md)):
+services, dispatch helpers, delivery senders, and the provider server
+halves move from `server/app-layer/automations` into the
+`@langwatch/automations-server` workspace package, along with the pure
+evolve/wake logic and event/intent schemas. `server/app-layer/automations`
+retains only the Prisma and ClickHouse repository implementations, and
+`server/event-sourcing/pipelines/automations` retains the pipeline wiring
+that mounts the package's process logic. Every behavioral contract in this
+ADR — GroupQueue ordering, the transactional inbox, the leased outbox,
+evolve-handler purity, replay safety — is unchanged.
