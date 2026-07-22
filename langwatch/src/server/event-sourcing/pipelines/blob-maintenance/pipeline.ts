@@ -1,4 +1,4 @@
-import type { Event } from "../../events";
+import type { Event } from "../../domain/types";
 import { definePipeline } from "../../pipeline/staticBuilder";
 import { BLOB_SWEEP_INTERVAL_MS } from "../../queues/groupQueue/blobConstants";
 import {
@@ -31,7 +31,12 @@ export interface BlobMaintenancePipelineDeps {
 export function createBlobMaintenancePipeline(deps: BlobMaintenancePipelineDeps) {
   return definePipeline<Event>()
     .withName("blob_maintenance")
-    .withAggregateType("blob_maintenance")
+    // `global` rather than a new taxonomy entry: aggregate types are a
+    // ClickHouse partition key, and this pipeline appends no events, so minting
+    // an identifier that can never appear in the event store would be taxonomy
+    // debt for nothing. The sweep is genuinely global — it belongs to the queue,
+    // not to a tenant.
+    .withAggregateType("global")
     .withProcessManager(BLOB_CLEANUP_PROCESS_NAME, (pm) =>
       pm
         .state<BlobCleanupState>({ lastSweepAt: null })

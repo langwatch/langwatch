@@ -1,6 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis as IORedis } from "ioredis";
 
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+
 import { blobHolderSetKey, blobLeaseSetKey, redisBlobKeyPrefix } from "./blobKeys";
 import {
   BLOB_SWEEP_LUA,
@@ -176,11 +178,12 @@ export class BlobSweeper {
       // GQ2 blob whatever the glob matched. Skip rather than guess at its shape.
       if (!parsed) continue;
       const { projectId, hash } = parsed;
-      // TenantId is a branded string; these keys are read back out of Redis
-      // rather than minted from a tenant, so the key builders take them as-is.
+      // The brand exists so a caller cannot namespace a blob with an arbitrary
+      // user-controlled string. Minting here is legitimate: this value was read
+      // back out of a key the queue itself wrote, not off a request.
       const keyArgs = {
         queueName,
-        projectId: projectId as never,
+        projectId: createTenantId(projectId),
         hash,
       };
       try {
