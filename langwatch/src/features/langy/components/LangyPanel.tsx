@@ -112,6 +112,7 @@ import {
 } from "../logic/langyPanelLayout";
 import {
   FLOATING_PEEK_NEAR_PX,
+  SIDEBAR_PEEK_NEAR_PX,
   type LangyPeekPhase,
   resolvePeekTranslate,
 } from "../logic/langyPeekDock";
@@ -2094,12 +2095,24 @@ function LangyPanel({
             aria-label="Open Langy assistant"
             aria-keyshortcuts="Meta+I Control+I"
             position="absolute"
-            top={0}
-            left={0}
-            right={0}
-            // Tall enough to cover the risen sliver too, so the pointer never
-            // falls off the target as the panel rises to meet it.
-            height={`${FLOATING_PEEK_NEAR_PX}px`}
+            // The target covers the WHOLE visible sliver, which is a different
+            // shape in each mode: floating leaves a strip of header along the
+            // top, the dock leaves a strip of its edge running the entire
+            // height of the viewport. Sized to the RISEN sliver in both, so the
+            // pointer never falls off the target as the panel rises to meet it.
+            {...(floating
+              ? {
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: `${FLOATING_PEEK_NEAR_PX}px`,
+                }
+              : {
+                  top: 0,
+                  bottom: 0,
+                  left: 0,
+                  width: `${SIDEBAR_PEEK_NEAR_PX}px`,
+                })}
             zIndex={3}
             cursor="pointer"
             background="transparent"
