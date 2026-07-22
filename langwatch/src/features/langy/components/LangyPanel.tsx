@@ -555,13 +555,18 @@ function LangyPanel({
   // keeps pointer events, drops `aria-hidden`, and makes its own body inert
   // (below) so nothing behind the edge is tabbable. When it is off, closed
   // means what it always meant: invisible, and the launcher orb opens it.
-  // ...and stands down entirely while the home's ask field is in use. The
+  const peeking = peekEnabled && !isOpen;
+  // ...and it gets out of the way while the home's ask field is in use. The
   // field and this panel are two ways to say the same thing, so a peek sitting
-  // under the field's results is the page talking over itself. Dropping
-  // `peeking` puts the panel back in its ordinary closed state, so it leaves
-  // on its own close animation rather than blinking out.
+  // under the field's results is the page talking over itself.
+  //
+  // It FADES, and does not move. Standing the peek down by dropping it back to
+  // the ordinary closed state made it hop and scale away toward its corner —
+  // a departure, animated, for something the reader never asked to dismiss and
+  // is about to get back. Holding its position and taking it to zero opacity
+  // reads as the page quietly making room.
   const homeAskOpen = useLangyStore((s) => s.homeAskOpen);
-  const peeking = peekEnabled && !isOpen && !homeAskOpen;
+  const peekDismissed = peeking && homeAskOpen;
   // The pointer approaching the sliver raises it a little further. One passive
   // rAF-throttled listener with hysteresis; off entirely under reduced motion,
   // where hover/focus alone does the raising.
@@ -617,6 +622,9 @@ function LangyPanel({
       // panel, and its position is the `translate` above. Only the flag-off
       // closed state still fades and hops out of the way.
       peek: { opacity: 1, scale: 1, x: 0, y: 0 },
+      // Same position as `peek`, just invisible: the peek standing aside for
+      // the home's ask field must not read as the panel leaving.
+      peekDismissed: { opacity: 0, scale: 1, x: 0, y: 0 },
       closed: floating ? FLOATING_CLOSED : SIDEBAR_CLOSED,
     }),
     [floating],
@@ -1900,7 +1908,19 @@ function LangyPanel({
         // edge its peek sliver rests on.
         transformOrigin={floating ? "bottom right" : "right center"}
         initial={false}
-        animate={isOpen ? "open" : peeking ? "peek" : "closed"}
+        // Invisible must also mean untouchable: a peek faded to zero still
+        // covers its corner, and a click landing on nothing visible is worse
+        // than a peek that stayed.
+        pointerEvents={peekDismissed ? "none" : undefined}
+        animate={
+          isOpen
+            ? "open"
+            : peekDismissed
+              ? "peekDismissed"
+              : peeking
+                ? "peek"
+                : "closed"
+        }
         variants={variants}
         // The peek's whole motion, on the one element: rest → near → open is
         // a single property easing on the panel's own curve. Never set while
