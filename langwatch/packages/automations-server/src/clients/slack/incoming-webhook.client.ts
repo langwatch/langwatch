@@ -1,13 +1,19 @@
-import { type AlertType, AlertType as AlertTypeEnum } from "@prisma/client";
+import { AlertType } from "@langwatch/automations/enums";
 import {
   IncomingWebhook,
   type IncomingWebhookSendArguments,
 } from "@slack/webhook";
 import { toDispatchError } from "@langwatch/dispatch-error";
-import type { Trace } from "~/server/tracer/types";
 import type { SlackPayload } from "@langwatch/automations/templating/renderSlack";
-import { env } from "~/env.mjs";
-import { assertSlackWebhookUrl } from "@langwatch/automations-server/clients/slack/webhook-guard";
+import { assertSlackWebhookUrl } from "./webhook-guard";
+
+/** The slice of a trace this notification renders — structurally satisfied
+ *  by the app's full `Trace` type. */
+interface TraceEventSlice {
+  event_type?: unknown;
+  metrics?: Record<string, unknown>;
+  event_details?: Record<string, unknown>;
+}
 
 /**
  * Minimal Slack mrkdwn escaping. Slack only requires the three HTML-ish
@@ -27,10 +33,28 @@ interface TriggerData {
   graphId?: string;
   input: string;
   output: string;
-  fullTrace: Trace;
+  fullTrace: { events?: TraceEventSlice[] | null };
 }
 
-export const sendSlackWebhook = async ({
+export interface SlackIncomingWebhookSender {
+  sendSlackWebhook(params: {
+    triggerWebhook: string;
+    triggerData: TriggerData[];
+    triggerName: string;
+    projectSlug: string;
+    triggerType: AlertType | null;
+    triggerMessage: string;
+  }): Promise<void>;
+}
+
+/** The legacy-format incoming-webhook notifier. `baseHost` is the app's
+ *  public origin for the trace/graph links the message carries. */
+export function createSlackIncomingWebhookSender({
+  baseHost,
+}: {
+  baseHost: string;
+}): SlackIncomingWebhookSender {
+  const sendSlackWebhook = async ({
   triggerWebhook,
   triggerData,
   triggerName,
@@ -68,11 +92,11 @@ export const sendSlackWebhook = async ({
   const getLink = (data: { traceId?: string; graphId?: string }) => {
     // Check if this is a custom graph trigger
     if (data.graphId) {
-      return `${env.BASE_HOST}/${projectSlug}/analytics/custom/${data.graphId}`;
+      return `${baseHost}/${projectSlug}/analytics/custom/${data.graphId}`;
     }
     // Regular trace link
     if (data.traceId) {
-      return `${env.BASE_HOST}/${projectSlug}/traces/${data.traceId}`;
+      return `${baseHost}/${projectSlug}/traces/${data.traceId}`;
     }
     return "#";
   };
@@ -98,7 +122,7 @@ export const sendSlackWebhook = async ({
       ${
         !isCustomGraph &&
         (trace.events ?? [])
-          .map((event: any) => {
+          .map((event) => {
             return `\n*Event Type:* ${escapeMrkdwn(event.event_type)}
           ${Object.entries(event.metrics || {})
             .map(
@@ -121,11 +145,11 @@ export const sendSlackWebhook = async ({
 
   const alertIcon = (alertType: AlertType | null) => {
     switch (alertType) {
-      case AlertTypeEnum.INFO:
+      case AlertType.INFO:
         return "ℹ️";
-      case AlertTypeEnum.WARNING:
+      case AlertType.WARNING:
         return "⚠️";
-      case AlertTypeEnum.CRITICAL:
+      case AlertType.CRITICAL:
         return "🔴";
       default:
         return "🔔";
@@ -145,7 +169,10 @@ export const sendSlackWebhook = async ({
       message: `Slack webhook dispatch failed for trigger "${triggerName}"`,
     });
   }
-};
+  };
+
+  return { sendSlackWebhook };
+}
 
 /**
  * Sends a pre-rendered (customer-authored, ADR-036) Slack payload. Mirrors the

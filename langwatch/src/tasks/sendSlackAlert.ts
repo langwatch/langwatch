@@ -1,4 +1,4 @@
-import { sendSlackWebhook } from "../server/app-layer/automations/delivery/sendSlackWebhook";
+import { sendSlackWebhook } from "../server/app-layer/automations/delivery/appSlackIncomingWebhook";
 
 export default async function execute(webhook: string) {
   await sendSlackWebhook({

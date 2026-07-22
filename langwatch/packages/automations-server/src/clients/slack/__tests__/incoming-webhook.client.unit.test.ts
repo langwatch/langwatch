@@ -1,7 +1,6 @@
-import { AlertType } from "@prisma/client";
+import { AlertType } from "@langwatch/automations/enums";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DispatchError } from "@langwatch/dispatch-error";
-import type { Trace } from "~/server/tracer/types";
 
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }));
 
@@ -12,9 +11,13 @@ vi.mock("@slack/webhook", () => ({
 }));
 
 import {
+  createSlackIncomingWebhookSender,
   sendRenderedSlackMessage,
-  sendSlackWebhook,
-} from "../sendSlackWebhook";
+} from "../incoming-webhook.client";
+
+const { sendSlackWebhook } = createSlackIncomingWebhookSender({
+  baseHost: "https://app.test",
+});
 
 function callSlack() {
   return sendSlackWebhook({
@@ -24,7 +27,7 @@ function callSlack() {
         traceId: "trace-1",
         input: "in",
         output: "out",
-        fullTrace: { trace_id: "trace-1", events: [] } as unknown as Trace,
+        fullTrace: { events: [] },
       },
     ],
     triggerName: "Quality Alert",
@@ -134,7 +137,7 @@ describe("sendSlackWebhook", () => {
             traceId: "trace-1",
             input: "<script> & stuff",
             output: "a > b",
-            fullTrace: { trace_id: "trace-1", events: [] } as unknown as Trace,
+            fullTrace: { events: [] },
           },
         ],
         triggerName: "Quality Alert",

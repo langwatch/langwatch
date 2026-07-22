@@ -17,7 +17,7 @@ import type { FoldProjectionStore } from "~/server/event-sourcing/projections/fo
 import { RedisCachedFoldStore } from "~/server/event-sourcing/projections/redisCachedFoldStore";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { TraceService } from "~/server/traces/trace.service";
-import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
+import { sendRenderedSlackMessage } from "@langwatch/automations-server/clients/slack/incoming-webhook.client";
 import { sendWebhook } from "~/server/app-layer/automations/delivery/appWebhookSender";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/appSlackWebApi";
 

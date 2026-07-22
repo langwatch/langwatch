@@ -29,8 +29,8 @@ import {
 } from "@langwatch/dispatch-error";
 import {
   sendRenderedSlackMessage,
-  sendSlackWebhook,
-} from "~/server/app-layer/automations/delivery/sendSlackWebhook";
+} from "@langwatch/automations-server/clients/slack/incoming-webhook.client";
+import { sendSlackWebhook } from "~/server/app-layer/automations/delivery/appSlackIncomingWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/appSlackWebApi";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
 import { renderTriggerSlack } from "@langwatch/automations/templating/renderSlack";
