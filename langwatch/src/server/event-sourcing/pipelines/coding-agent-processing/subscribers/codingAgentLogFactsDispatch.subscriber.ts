@@ -9,9 +9,7 @@ import {
   resolveConversationKey,
 } from "../services/coding-agent-normalization";
 
-const logger = createLogger(
-  "langwatch:coding-agent:log-facts-dispatch",
-);
+const logger = createLogger("langwatch:coding-agent:log-facts-dispatch");
 
 /**
  * The log→session dispatcher (ADR-056 §2): a subscriber on log-processing's
@@ -102,13 +100,15 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
 }
 
 /** The canonical row stores attributes flattened as JSON — parse or skip. */
-function parseFlatAttributes(
-  json: string,
-): Record<string, unknown> | null {
+function parseFlatAttributes(json: string): Record<string, unknown> | null {
   if (!json) return null;
   try {
     const parsed: unknown = JSON.parse(json);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
       return null;
     }
     return parsed as Record<string, unknown>;

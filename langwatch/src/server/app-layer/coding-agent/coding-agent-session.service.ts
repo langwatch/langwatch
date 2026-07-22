@@ -201,7 +201,9 @@ export class CodingAgentSessionService {
     );
     if (needy.length === 0) return rows;
 
-    const startedAts = needy.map((row) => row.startedAtMs).filter((ms) => ms > 0);
+    const startedAts = needy
+      .map((row) => row.startedAtMs)
+      .filter((ms) => ms > 0);
     const fromMs =
       range?.fromMs ??
       (startedAts.length > 0 ? Math.min(...startedAts) : Date.now()) -

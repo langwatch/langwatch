@@ -27,7 +27,9 @@ describe("detectCodingAgent", () => {
       expect(detectCodingAgent({ recordName: "opencode.token.usage" })).toBe(
         "opencode",
       );
-      expect(detectCodingAgent({ recordName: "codex.tool.call" })).toBe("codex");
+      expect(detectCodingAgent({ recordName: "codex.tool.call" })).toBe(
+        "codex",
+      );
     });
   });
 
@@ -159,10 +161,16 @@ describe("resolveToolName", () => {
   describe("given Claude Code / Codex, which carry the tool in an attribute", () => {
     it("reads the attribute", () => {
       expect(
-        resolveToolName({ spanName: "claude_code.tool", attrs: { tool_name: "Bash" } }),
+        resolveToolName({
+          spanName: "claude_code.tool",
+          attrs: { tool_name: "Bash" },
+        }),
       ).toBe("Bash");
       expect(
-        resolveToolName({ spanName: "mcp.tools.call", attrs: { "tool.name": "search" } }),
+        resolveToolName({
+          spanName: "mcp.tools.call",
+          attrs: { "tool.name": "search" },
+        }),
       ).toBe("search");
     });
   });
@@ -170,24 +178,28 @@ describe("resolveToolName", () => {
   describe("given opencode, which puts the tool IN the span name", () => {
     // Reading only the attribute loses every opencode tool.
     it("reads it out of the span name", () => {
-      expect(resolveToolName({ spanName: "opencode.tool.bash", attrs: {} })).toBe(
-        "bash",
-      );
+      expect(
+        resolveToolName({ spanName: "opencode.tool.bash", attrs: {} }),
+      ).toBe("bash");
     });
   });
 
   it("returns null when there is no tool to name", () => {
     expect(resolveToolName({ spanName: "opencode.llm", attrs: {} })).toBeNull();
-    expect(resolveToolName({ spanName: "opencode.tool.", attrs: {} })).toBeNull();
+    expect(
+      resolveToolName({ spanName: "opencode.tool.", attrs: {} }),
+    ).toBeNull();
   });
 });
 
 describe("parseMcpToolName", () => {
   it("names the server and the tool from a real MCP tool name", () => {
-    expect(parseMcpToolName("mcp__claude-in-chrome__tabs_context_mcp")).toEqual({
-      server: "claude-in-chrome",
-      tool: "tabs_context_mcp",
-    });
+    expect(parseMcpToolName("mcp__claude-in-chrome__tabs_context_mcp")).toEqual(
+      {
+        server: "claude-in-chrome",
+        tool: "tabs_context_mcp",
+      },
+    );
   });
 
   it("keeps the rest of the name when the tool contains the separator", () => {
@@ -215,8 +227,12 @@ describe("Gemini CLI", () => {
 
     // Gemini's tool log carries success + duration — it IS the tool result.
     expect(normalizeEventName("gemini_cli.tool_call")).toBe("tool_result");
-    expect(normalizeEventName("gemini_cli.chat_compression")).toBe("compaction");
-    expect(normalizeMetricName("gemini_cli.lines.changed")).toBe("lines_of_code");
+    expect(normalizeEventName("gemini_cli.chat_compression")).toBe(
+      "compaction",
+    );
+    expect(normalizeMetricName("gemini_cli.lines.changed")).toBe(
+      "lines_of_code",
+    );
   });
 
   describe("given Gemini's token vocabulary", () => {
@@ -239,7 +255,9 @@ describe("GitHub Copilot CLI", () => {
    */
   it("is recognised through its org-prefixed namespace", () => {
     expect(detectCodingAgent({ scopeName: "github.copilot" })).toBe("copilot");
-    expect(detectCodingAgent({ serviceName: "github-copilot" })).toBe("copilot");
+    expect(detectCodingAgent({ serviceName: "github-copilot" })).toBe(
+      "copilot",
+    );
     expect(normalizeMetricName("github.copilot.tool.call.count")).toBe(
       "tool_call",
     );
@@ -248,9 +266,9 @@ describe("GitHub Copilot CLI", () => {
   it("finds the session on its spans, where the only copy of it lives", () => {
     // Copilot metrics are fleet-level and it emits NO log records at all — its
     // spans are the sole place a session id (or a cost) can be read.
-    expect(
-      resolveConversationKey({ "gen_ai.conversation.id": "conv-9" }),
-    ).toBe("conv-9");
+    expect(resolveConversationKey({ "gen_ai.conversation.id": "conv-9" })).toBe(
+      "conv-9",
+    );
   });
 });
 

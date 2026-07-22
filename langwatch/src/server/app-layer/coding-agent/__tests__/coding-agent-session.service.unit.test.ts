@@ -19,7 +19,9 @@ const PROJECT = "project-1";
 const SESSION = "sess-1";
 const TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
 
-function makeRow(overrides?: Partial<CodingAgentSessionRow>): CodingAgentSessionRow {
+function makeRow(
+  overrides?: Partial<CodingAgentSessionRow>,
+): CodingAgentSessionRow {
   const base = projectCodingAgentSessionToRow({
     state: {
       // A structurally-complete empty state via the projection itself would

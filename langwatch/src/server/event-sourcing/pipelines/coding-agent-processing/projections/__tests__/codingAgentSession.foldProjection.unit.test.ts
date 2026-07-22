@@ -6,16 +6,16 @@
  */
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "~/server/event-sourcing";
-import type {
-  LogFactsContributedEvent,
-  MetricFactsContributedEvent,
-  SpanFactsContributedEvent,
-} from "../../schemas/events";
 import {
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
   METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
   SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
 } from "../../schemas/constants";
+import type {
+  LogFactsContributedEvent,
+  MetricFactsContributedEvent,
+  SpanFactsContributedEvent,
+} from "../../schemas/events";
 import {
   CodingAgentSessionFoldProjection,
   type CodingAgentSessionState,

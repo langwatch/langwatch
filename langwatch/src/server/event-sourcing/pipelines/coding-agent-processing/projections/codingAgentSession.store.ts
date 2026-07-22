@@ -47,7 +47,9 @@ export class CodingAgentSessionStore
       return;
     }
     await Promise.all(
-      rows.map(({ row, retentionDays }) => this.repo.upsert(row, retentionDays)),
+      rows.map(({ row, retentionDays }) =>
+        this.repo.upsert(row, retentionDays),
+      ),
     );
   }
 

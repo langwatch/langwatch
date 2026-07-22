@@ -12,9 +12,7 @@ import type { SessionMetricSeriesRecord } from "./sessionMetricSeries.mapProject
 export class CodingAgentTraceSessionAppendStore
   implements AppendStore<CodingAgentTraceSessionRecord>
 {
-  constructor(
-    private readonly repository: CodingAgentTraceSessionRepository,
-  ) {}
+  constructor(private readonly repository: CodingAgentTraceSessionRepository) {}
 
   async append(
     record: CodingAgentTraceSessionRecord,

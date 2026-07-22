@@ -9,8 +9,8 @@ import {
   type CodingAgentSessionState,
 } from "./projections/codingAgentSession.foldProjection";
 import {
-  CodingAgentTraceSessionsMapProjection,
   type CodingAgentTraceSessionRecord,
+  CodingAgentTraceSessionsMapProjection,
 } from "./projections/codingAgentTraceSessions.mapProjection";
 import {
   SessionMetricSeriesMapProjection,
