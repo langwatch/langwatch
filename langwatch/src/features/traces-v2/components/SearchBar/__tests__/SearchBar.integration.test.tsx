@@ -27,9 +27,15 @@ import "@testing-library/jest-dom/vitest";
 const langyMock = {
   enabled: false,
   panelOpen: false,
+  // The composer draft the handoff seeds ("Find traces where ") — but never
+  // over something already half-written, so the fixture carries the value.
+  draft: "",
   ask: vi.fn(),
   open: vi.fn(),
   attach: vi.fn(),
+  setDraft: vi.fn((draft: string) => {
+    langyMock.draft = draft;
+  }),
 };
 vi.mock("~/features/langy/hooks/useShowLangy", () => ({
   useShowLangy: () => langyMock.enabled,
@@ -43,6 +49,8 @@ vi.mock("~/features/langy/stores/langyStore", () => {
     askLangy: langyMock.ask,
     openPanel: langyMock.open,
     attachContext: langyMock.attach,
+    draft: langyMock.draft,
+    setDraft: langyMock.setDraft,
   });
   const useLangyStore = (
     selector: (s: ReturnType<typeof state>) => unknown,
@@ -92,6 +100,7 @@ vi.mock("@paper-design/shaders-react", () => ({
 
 import { useFilterStore } from "../../../stores/filterStore";
 import { SearchBar } from "../SearchBar";
+import { SEARCH_HANDOFF_DRAFT } from "../searchLangyHandoff";
 
 afterEach(() => {
   cleanup();
@@ -102,9 +111,11 @@ beforeEach(() => {
   useFilterStore.getState().clearAll();
   langyMock.enabled = false;
   langyMock.panelOpen = false;
+  langyMock.draft = "";
   langyMock.ask.mockClear();
   langyMock.open.mockClear();
   langyMock.attach.mockClear();
+  langyMock.setDraft.mockClear();
 });
 
 function renderSearchBar() {
@@ -284,6 +295,9 @@ describe("<SearchBar /> ask affordance", () => {
         fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
 
         expect(langyMock.open).toHaveBeenCalled();
+        // Nothing typed, so the composer opens with the sentence already
+        // started — the handoff's seed, never over a half-written draft.
+        expect(langyMock.setDraft).toHaveBeenCalledWith(SEARCH_HANDOFF_DRAFT);
         expect(langyMock.attach).toHaveBeenCalledWith({
           type: "filter",
           id: applied,
