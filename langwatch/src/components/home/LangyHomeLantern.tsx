@@ -4,7 +4,7 @@ import { ComposerMorphGhost } from "~/features/langy/components/ComposerMorphGho
 import { Composer } from "~/features/langy/components/Composer";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useComposerMorph } from "~/features/langy/hooks/useComposerMorph";
-import { selectHomeSuggestions } from "~/features/langy/logic/langyHomeSuggestions";
+import { selectLangySuggestions } from "~/features/langy/logic/langyHomeSuggestions";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useHomeDevState } from "./dev/homeDevState";
 import { OnboardAgentPill } from "./OnboardAgentPill";
@@ -53,13 +53,14 @@ export function LangyHomeLantern() {
   const leadWithOnboarding = reachKnown && isNewProject;
   const suggestions = !reachKnown
     ? []
-    : selectHomeSuggestions(
-        devState === "empty"
-          ? { hasTraces: false, hasEvaluations: false, hasExperiments: false }
-          : devState === "populated"
-            ? { hasTraces: true, hasEvaluations: true, hasExperiments: true }
-            : reach,
-      );
+    : selectLangySuggestions({
+        reach:
+          devState === "empty"
+            ? { hasTraces: false, hasEvaluations: false, hasExperiments: false }
+            : devState === "populated"
+              ? { hasTraces: true, hasEvaluations: true, hasExperiments: true }
+              : reach,
+      });
 
   const modelOverride = useLangyStore((s) => s.modelOverride);
   const setModelOverride = useLangyStore((s) => s.setModelOverride);
@@ -108,32 +109,52 @@ export function LangyHomeLantern() {
         <Box
           minHeight="46px"
           display="flex"
+          position="relative"
           // The hero keeps its space while its bar is away, so nothing under
           // the block jumps when a conversation starts.
           visibility={flight ? "hidden" : "visible"}
         >
           {!canAsk ? (
             <ReadOnlyNotice />
-          ) : conversationOpen ? (
-            <ContinueLine stalled={stalled} onContinue={continueInLangy} />
           ) : (
-            <Box flex={1} minWidth={0}>
-              <Composer
-                variant="hero"
-                cardRef={heroCardRef}
-                model={modelOverride}
-                modelOptions={[]}
-                onModelChange={setModelOverride}
-                onSend={ask}
-                onStop={() => undefined}
-                disabled={false}
-                placeholder={
-                  isNewProject
-                    ? "Ask Langy how to get started"
-                    : "Ask Langy or describe what you want"
-                }
-              />
-            </Box>
+            <>
+              {/* The composer is hidden in place, never unmounted: the slot
+                  always holds the composer's own height, so swapping to the
+                  continue line cannot move anything below (the input is
+                  taller than the 46px floor). visibility also removes it
+                  from pointer + a11y trees while hidden. */}
+              <Box
+                flex={1}
+                minWidth={0}
+                visibility={conversationOpen ? "hidden" : "visible"}
+              >
+                <Composer
+                  variant="hero"
+                  cardRef={heroCardRef}
+                  model={modelOverride}
+                  modelOptions={[]}
+                  onModelChange={setModelOverride}
+                  onSend={ask}
+                  onStop={() => undefined}
+                  disabled={false}
+                  placeholder={
+                    isNewProject
+                      ? "Ask Langy how to get started"
+                      : "Ask Langy or describe what you want"
+                  }
+                />
+              </Box>
+              {conversationOpen ? (
+                <Box
+                  position="absolute"
+                  inset={0}
+                  display="flex"
+                  alignItems="center"
+                >
+                  <ContinueLine stalled={stalled} onContinue={continueInLangy} />
+                </Box>
+              ) : null}
+            </>
           )}
         </Box>
 
@@ -157,12 +178,17 @@ export function LangyHomeLantern() {
           {leadWithOnboarding ? (
             <OnboardAgentPill prominent onAskLangy={canAsk ? ask : undefined} />
           ) : null}
-          {canAsk && !conversationOpen ? (
+          {canAsk ? (
             suggestions.map((suggestion) => (
               <chakra.button
                 key={suggestion.label}
                 type="button"
                 onClick={() => ask(suggestion.prompt)}
+                // Hidden in place, never unmounted: the row keeps its exact
+                // height (wrapped lines included) when a conversation opens,
+                // so the lantern doesn't breathe every time the panel does.
+                // visibility also drops them from pointer + a11y trees.
+                visibility={conversationOpen ? "hidden" : "visible"}
                 display="inline-flex"
                 alignItems="center"
                 gap={1.5}

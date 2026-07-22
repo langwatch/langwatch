@@ -9,7 +9,6 @@ import {
   Filter,
   FlaskConical,
   FolderKanban,
-  Gauge,
   LayoutDashboard,
   ListChecks,
   type LucideIcon,
@@ -90,19 +89,16 @@ const COMPOSER_PLACEHOLDER = "Ask Langy or describe what you want…";
 /**
  * The composer rail — affordances that sit beside the model picker.
  *
- * The one entry left here is a PLACEHOLDER: reasoning effort has no backend
- * behind it, so it renders disabled rather than faked. This is the seam: when it
- * gets wiring it grows an `onClick` and drops out of the placeholder path, and
- * the layout does not change to accommodate it.
- *
- * Two buttons used to sit here and are gone, for the same reason in two
- * directions. "Skills" went because they became REAL — a catalogue, a chip, and
- * a `/` to summon them — and a dead button beside a live feature teaches people
- * that the buttons are decoration. "Attach a file" went because it is NOT
- * coming: there is no upload path at any layer (no write endpoint, no field on
- * the turn, no way to get bytes to the worker), so a greyed paperclip was
- * advertising a feature with nothing behind it and no plan to build it. A
- * placeholder is a promise; an indefinite one is a lie.
+ * The rail carries only REAL controls. Three buttons used to sit here and are
+ * gone, for the same reason in three directions. "Skills" went because they
+ * became REAL — a catalogue, a chip, and a `/` to summon them — and a dead
+ * button beside a live feature teaches people that the buttons are decoration.
+ * "Attach a file" went because it is NOT coming: there is no upload path at any
+ * layer (no write endpoint, no field on the turn, no way to get bytes to the
+ * worker), so a greyed paperclip was advertising a feature with nothing behind
+ * it and no plan to build it. "Reasoning effort" went last: it sat as a greyed
+ * "coming soon" placeholder with no backend behind it, and a placeholder is a
+ * promise; an indefinite one is a lie.
  */
 function ComposerImpl({
   model,
@@ -532,14 +528,16 @@ function ComposerImpl({
               affordances. Send is NOT here any more — it sits beside the input
               above, where the thing it acts on is.
 
-              The rail is built to GROW — one primitive, one array — but it only
-              ever shows what is real. Reasoning effort has no wiring behind it
-              today, so it renders as an explicitly disabled placeholder rather
-              than a button that lies: a greyed glyph with a "Coming soon"
-              tooltip. Page context is NOT here — it already has a better home
-              as the chips above the input, where you can see what's attached. */}
+              The rail only ever shows what is real — see COMPOSER_RAIL above.
+              Page context is NOT here — it already has a better home as the
+              chips above the input, where you can see what's attached. */}
           <HStack
             gap={1}
+            // ONE row, centers on one line: the model pill (28px control) and
+            // the sigil buttons share the rail, so the sigils carry the same
+            // control height (see SigilButton) and the row centers explicitly
+            // rather than by luck.
+            align="center"
             paddingLeft={2.5}
             paddingRight={2}
             paddingBottom={2}
@@ -558,7 +556,6 @@ function ComposerImpl({
               // wouldn't take.
               disabled={disabled || turnActive}
             />
-            <RailButton icon={Gauge} label="Reasoning effort" />
             <Box flex={1} />
             {/* The two keys, said out loud. A palette you can only reach by
                 guessing a keystroke is a palette most people never see, so the
@@ -629,7 +626,9 @@ function SigilButton({
         display="inline-flex"
         alignItems="center"
         gap={1}
-        height="22px"
+        // The model pill's control height, so the rail's controls share one
+        // vertical center instead of a 22px button hanging beside a 28px pill.
+        height="28px"
         paddingLeft={1}
         paddingRight={1.5}
         borderRadius="md"
@@ -708,44 +707,6 @@ function ContextGestureHint({ onDismiss }: { onDismiss: () => void }) {
         <X size={12} />
       </chakra.button>
     </HStack>
-  );
-}
-
-/**
- * One rail affordance. Disabled on purpose — see COMPOSER_RAIL. It keeps the
- * button semantics (and stays in the tab order via `aria-disabled` rather than
- * `disabled`, so it is discoverable and its tooltip is reachable) but does
- * nothing, and it says so.
- */
-function RailButton({
-  icon: Icon,
-  label,
-}: {
-  icon: LucideIcon;
-  label: string;
-}) {
-  return (
-    <Tooltip content={`${label} — coming soon`} openDelay={300} showArrow>
-      <chakra.button
-        type="button"
-        aria-label={`${label} (coming soon)`}
-        aria-disabled
-        onClick={(event) => event.preventDefault()}
-        display="grid"
-        placeItems="center"
-        width="26px"
-        height="26px"
-        borderRadius="full"
-        borderWidth={0}
-        background="transparent"
-        color="fg.subtle"
-        opacity={0.45}
-        cursor="not-allowed"
-        flexShrink={0}
-      >
-        <Icon size={14} />
-      </chakra.button>
-    </Tooltip>
   );
 }
 

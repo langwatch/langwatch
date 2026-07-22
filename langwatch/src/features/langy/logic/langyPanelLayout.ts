@@ -80,3 +80,92 @@ export function resolveFloatingPanelWidth(viewportWidth: number): number {
 }
 
 export const FLOATING_PANEL_CSS_WIDTH = `min(${FLOATING_PANEL_MAX_WIDTH}px, max(${FLOATING_PANEL_MIN_WIDTH}px, ${FLOATING_PANEL_VIEWPORT_SHARE * 100}vw), calc(100vw - ${FLOATING_PANEL_VIEWPORT_GUTTER}px))`;
+
+/**
+ * The floating card's symmetric viewport inset: a rounded card with a small,
+ * SYMMETRIC inset on every side. One definition — the panel and the inspector
+ * drawer both hang their geometry off it, and a one-pixel drift between the
+ * two is exactly the kind of seam the eye catches.
+ */
+export const FLOATING_PANEL_INSET = 12;
+
+/** The inspector drawer's visible width. */
+export const INSPECTOR_WIDTH = 380;
+
+/**
+ * How far the inspector slides UNDER the panel's left edge.
+ *
+ * Butted up exactly against the panel, the drawer's own rounded right corners
+ * stayed visible as two little notches against the panel's straight edge — the
+ * pair read as two cards that happened to be touching. Tucking it a few pixels
+ * behind (the panel sits at a higher z-index and paints over it) buries the
+ * seam, so the drawer reads as something the panel pulled out of itself.
+ */
+export const INSPECTOR_TUCK = 10;
+
+/**
+ * The inspector's placement box, per panel layout.
+ *
+ * ONE derivation for both modes, so the drawer always mirrors the panel it
+ * hangs off: same top and bottom edges (floating: the measured panel height,
+ * bottom-anchored on the same inset; docked: the same header-to-floor span the
+ * dock claims), and the seam edge landing exactly under the panel's left edge.
+ */
+export interface LangyInspectorFrame {
+  /** Offset from the viewport's right edge to the drawer's right edge. */
+  right: string;
+  /** Null when the frame is bottom-anchored with an explicit height. */
+  top: string | null;
+  bottom: string;
+  /** Null when top+bottom pin the height (the docked, full-height case). */
+  height: string | null;
+  /** A viewport safety cap for the explicit-height case; null otherwise. */
+  maxHeight: string | null;
+  /** The drawer's outward (left) corners; the tucked right edge stays square. */
+  borderTopLeftRadius: string;
+  borderBottomLeftRadius: string;
+}
+
+export function resolveInspectorFrame({
+  floating,
+  dockShellClaimed,
+  panelHeightPx,
+}: {
+  floating: boolean;
+  /** An app shell holds the dock below its header (sidebar mode only). */
+  dockShellClaimed: boolean;
+  /**
+   * The panel's real rendered height (floating mode), measured by the panel
+   * itself. Null before the first measurement — the frame falls back to the
+   * panel's own resting silhouette so nothing jumps when the number lands.
+   */
+  panelHeightPx: number | null;
+}): LangyInspectorFrame {
+  if (floating) {
+    return {
+      right: `calc(${FLOATING_PANEL_CSS_WIDTH} + ${FLOATING_PANEL_INSET * 2 - INSPECTOR_TUCK}px)`,
+      top: null,
+      bottom: `${FLOATING_PANEL_INSET}px`,
+      height:
+        panelHeightPx !== null
+          ? `${Math.round(panelHeightPx)}px`
+          : `min(560px, calc(80dvh - ${FLOATING_PANEL_INSET}px))`,
+      maxHeight: `calc(100dvh - ${FLOATING_PANEL_INSET * 2}px)`,
+      borderTopLeftRadius: "20px",
+      borderBottomLeftRadius: "20px",
+    };
+  }
+  return {
+    right: `${SIDEBAR_PANEL_WIDTH - INSPECTOR_TUCK}px`,
+    // Exactly the dock's own span: below the shell header when one claims the
+    // dock, the full viewport edge on a no-shell page.
+    top: `${dockShellClaimed ? APP_HEADER_HEIGHT : 0}px`,
+    bottom: "0px",
+    height: null,
+    maxHeight: null,
+    // The dock card's own top-left rounding (Chakra `xl`), so the pair reads
+    // as one widening card; the flush no-shell pane stays square.
+    borderTopLeftRadius: dockShellClaimed ? "12px" : "0px",
+    borderBottomLeftRadius: "0px",
+  };
+}

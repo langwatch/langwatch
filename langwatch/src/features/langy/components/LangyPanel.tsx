@@ -37,6 +37,7 @@ import {
 } from "react";
 import { allModelOptions } from "~/components/ModelSelector";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { Menu } from "~/components/ui/menu";
 import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
@@ -44,6 +45,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useProjectReach } from "~/components/home/useProjectReach";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 // ONE definition of the wire shape, server-side, imported by both ends, the
 // route spreads `langyTurnContextSchema.shape` into its body schema, and this
@@ -79,6 +81,10 @@ import {
   type LangyTurnRequestContext,
 } from "../logic/langyChatTransport";
 import { mergeContextChips } from "../logic/langyContextChips";
+import {
+  PANEL_SUGGESTION_COUNT,
+  selectLangySuggestions,
+} from "../logic/langyHomeSuggestions";
 import { SURFACE_PATH_FOR_KIND } from "../logic/langyContextKindIntent";
 import {
   explainLangyError,
@@ -89,6 +95,7 @@ import { PANEL_ROOT_ATTR } from "../logic/composerMorphGeometry";
 import {
   APP_HEADER_HEIGHT,
   FLOATING_PANEL_CSS_WIDTH,
+  FLOATING_PANEL_INSET,
   PANEL_LAYOUT_TRANSITION,
   resolveFloatingPanelWidth,
   SIDEBAR_PANEL_WIDTH,
@@ -99,7 +106,7 @@ import {
   type LangyRevealableKind,
   useLangyContextTargetStore,
 } from "../stores/langyContextTargetStore";
-import { useLangyDevLog } from "../stores/langyDevLog";
+import { tapeForConversation, useLangyDevLog } from "../stores/langyDevLog";
 import {
   attachedContextToChip,
   type LangyPanelEffect,
@@ -140,7 +147,9 @@ const LANGY_GATE_FEATURE_KEY = "prompt.create_default";
 
 // The floating card's symmetric viewport inset: a rounded card with a small,
 // SYMMETRIC inset on every side (a soft brand glow + shadow behind it).
-const PANEL_INSET = 12;
+// Shared with the inspector drawer via langyPanelLayout, so the two can
+// never drift apart by a pixel.
+const PANEL_INSET = FLOATING_PANEL_INSET;
 
 // A Chakra Box that also takes framer-motion props — used for the thinking
 // line's blur-crossfade when its text changes. `css` still routes through
@@ -451,6 +460,25 @@ function LangyPanel({
   useEffect(() => {
     if (!devMode) setDevDrawerOpen(false);
   }, [devMode]);
+  const devDrawerVisible = isOpen && devMode && devDrawerOpen;
+
+  // The floating card's REAL height, measured for the inspector: the drawer is
+  // a fixed sibling (the panel clips its own overflow), and "match the panel's
+  // silhouette exactly" cannot be written in CSS when that silhouette is
+  // content-driven. Observed only while the drawer is open, so a normal
+  // session never pays for a ResizeObserver.
+  const [panelHeightPx, setPanelHeightPx] = useState<number | null>(null);
+  useEffect(() => {
+    if (!devDrawerVisible) return;
+    const node = panelRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const measure = () =>
+      setPanelHeightPx(Math.round(node.getBoundingClientRect().height));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [devDrawerVisible]);
 
   // ── Opening a drawer beside the panel ─────────────────────────────────────
   // Two different moves, one per layout, so docked and floating stay visibly
@@ -714,9 +742,30 @@ function LangyPanel({
    * console and rendered nothing at all. Same rule as everywhere else — a
    * failure may never be quieter than a success.
    */
+  // A freshly-minted conversation may not be readable yet (see the store's
+  // `unconfirmedConversations`): the create command is accepted before the
+  // projection lands, and in that window the history read answers not-found.
+  const isActiveConversationUnconfirmed = useLangyStore((s) =>
+    s.activeConversationId
+      ? s.unconfirmedConversations[s.activeConversationId] === true
+      : false,
+  );
+  const suppressedNotFoundRef = useRef(false);
+
   const historyErrorPresentation = useMemo(() => {
     if (!hasHistoryError) return null;
     const domain = readLangyTrpcError(historyError);
+    // Not-found for a conversation THIS tab just minted is the projection
+    // lagging the accepted create — "not yet", never an error. The card would
+    // claim a conversation doesn't exist moments before its turn is accepted;
+    // render nothing and let the confirmation drive the refetch below.
+    if (
+      domain?.code === "langy_conversation_not_found" &&
+      isActiveConversationUnconfirmed
+    ) {
+      suppressedNotFoundRef.current = true;
+      return null;
+    }
     if (domain) return explainLangyError(domain);
     return {
       kind: "langy_history_unavailable",
@@ -726,7 +775,18 @@ function LangyPanel({
       render: "card" as const,
       action: { label: "Try again", kind: "retry" as const },
     };
-  }, [hasHistoryError, historyError]);
+  }, [hasHistoryError, historyError, isActiveConversationUnconfirmed]);
+
+  // Confirmation arrived (a signal named the conversation, or a read
+  // succeeded) while the history query still holds the suppressed not-found —
+  // refetch so the real history replaces the stale error. The ref keeps this
+  // from firing for genuine not-founds, which were never suppressed.
+  useEffect(() => {
+    if (!isActiveConversationUnconfirmed && suppressedNotFoundRef.current) {
+      suppressedNotFoundRef.current = false;
+      refetchHistory();
+    }
+  }, [isActiveConversationUnconfirmed, refetchHistory]);
 
   // The turn phase — the SINGLE, event-driven source of "is a turn in flight"
   // (ADR-058). It lives in the store as a machine (idle → active → stopping →
@@ -822,6 +882,7 @@ function LangyPanel({
       currentTurnId: snapshotCurrentTurnId,
     });
     useLangyDevLog.getState().recordSnapshot({
+      conversationId: activeConversationId,
       cursor: snapshotEventCursor,
       currentTurnId: snapshotCurrentTurnId,
     });
@@ -932,6 +993,32 @@ function LangyPanel({
   useLangyFreshness(activeConversationId);
 
   const isEmpty = messages.length === 0;
+
+  // The empty state's asks, picked from the project's reach — the same
+  // selection the home page runs (see logic/langyHomeSuggestions.ts), so a
+  // project with no traces is offered ways to get set up rather than four
+  // asks that can only dead-end. Empty until the reach is known: an ask that
+  // appears and is then withdrawn is worse than a beat of nothing.
+  const projectReach = useProjectReach();
+  const emptySuggestions = useMemo(
+    () =>
+      projectReach.isLoading
+        ? []
+        : selectLangySuggestions({
+            reach: {
+              hasTraces: projectReach.hasTraces,
+              hasEvaluations: projectReach.hasEvaluations,
+              hasExperiments: projectReach.hasExperiments,
+            },
+            count: PANEL_SUGGESTION_COUNT,
+          }),
+    [
+      projectReach.isLoading,
+      projectReach.hasTraces,
+      projectReach.hasEvaluations,
+      projectReach.hasExperiments,
+    ],
+  );
   // The floating card's resting floor. While a turn is in flight we never fall
   // back to the empty floor, so sending from an empty thread steps UP
   // (340 → 410 → 520) instead of dropping to the minimised floor first and
@@ -1423,11 +1510,14 @@ function LangyPanel({
   const timeTravel = useMemo(
     () =>
       buildTimeTravelView({
-        records: devRecords,
+        // The tape records every lane globally; the moment being rendered is
+        // this conversation's, so the view reads only its records (plus the
+        // unattributed pre-adoption ones — see tapeForConversation).
+        records: tapeForConversation(devRecords, activeConversationId),
         scrubSeq: devScrubSeq,
         historyMessages,
       }),
-    [devRecords, devScrubSeq, historyMessages],
+    [devRecords, devScrubSeq, historyMessages, activeConversationId],
   );
   const displayMessages = timeTravel
     ? (timeTravel.messages as unknown as typeof messages)
@@ -1557,9 +1647,11 @@ function LangyPanel({
           child. Only ever mounted while the panel is open — an inspector for a
           minimised panel inspects nothing. */}
       <LangyDevDrawer
-        open={isOpen && devMode && devDrawerOpen}
+        open={devDrawerVisible}
         onClose={() => setDevDrawerOpen(false)}
         floating={floating}
+        dockShellClaimed={dockShellClaimed}
+        panelHeightPx={panelHeightPx}
       />
       <LangyExternalLinkDialog {...externalLinkGuard.dialogProps} />
       <MotionBox
@@ -1786,6 +1878,14 @@ function LangyPanel({
           position="relative"
           zIndex={1}
         >
+          {/* A render crash anywhere in the panel's content draws an inline
+              error INSIDE the panel frame instead of white-screening the host
+              page. The panel chrome stays mounted (unmounting would tear down
+              the in-flight stream); switching conversation re-attempts. */}
+          <IsolatedErrorBoundary
+            scope="Langy hit a snag"
+            resetKeys={[activeConversationId]}
+          >
           <PanelHeader
             conversationTitle={conversationTitle}
             onNewChat={handleNewChat}
@@ -1879,7 +1979,19 @@ function LangyPanel({
                   tabIndex={0}
                   role="log"
                   aria-label="Langy conversation"
-                  css={{ "&:focus-visible": { outline: "none" } }}
+                  // Content dissolves at the column's edges instead of
+                  // hard-clipping against the header and composer seams — the
+                  // same mask-fade the thinking line uses for its overflow.
+                  // A mask (not an overlay strip) because the floating card is
+                  // translucent glass; painting a surface-coloured gradient
+                  // over it would read as a smear on the blur.
+                  css={{
+                    "&:focus-visible": { outline: "none" },
+                    maskImage:
+                      "linear-gradient(to bottom, transparent 0, black 28px, black calc(100% - 18px), transparent 100%)",
+                    WebkitMaskImage:
+                      "linear-gradient(to bottom, transparent 0, black 28px, black calc(100% - 18px), transparent 100%)",
+                  }}
                 >
                   {/* The ResizeObserver's subject: one stable element whose height IS
                 the content height, whatever happens to be rendering inside.
@@ -1970,6 +2082,7 @@ function LangyPanel({
                         panelWidth={
                           floating ? floatingPanelWidth : SIDEBAR_PANEL_WIDTH
                         }
+                        suggestions={emptySuggestions}
                         onPick={(prompt) => void send(prompt)}
                       />
                     ) : (
@@ -1988,8 +2101,16 @@ function LangyPanel({
                         // bottom and made history jump as it grew.
                       >
                         {displayMessages.map((message, index) => (
-                          <MessageContent
+                          // One message's render crash stays that message's:
+                          // a malformed tool part or card payload draws an
+                          // inline error where the message would have been,
+                          // and the rest of the conversation stands.
+                          <IsolatedErrorBoundary
                             key={message.id}
+                            scope="This message failed to render"
+                            resetKeys={[message.id]}
+                          >
+                          <MessageContent
                             message={message}
                             organizationId={organizationId}
                             appliedOutcomes={appliedOutcomes}
@@ -2035,6 +2156,7 @@ function LangyPanel({
                             // is driven by the structured `langy_github_not_connected`
                             // error below — one road, not two.)
                           />
+                          </IsolatedErrorBoundary>
                         ))}
                         {/* The question the reader has already asked but which
                             has not become a message yet.
@@ -2217,6 +2339,7 @@ function LangyPanel({
               </Box>
             </>
           )}
+          </IsolatedErrorBoundary>
         </VStack>
       </MotionBox>
     </Profiler>
