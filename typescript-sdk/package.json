@@ -81,7 +81,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.1.0",
     "@types/prompts": "^2.4.9",
-    "@typescript/native-preview": "7.0.0-dev.20260705.1",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vercel/otel": "^1.13.0",
     "@vitest/coverage-v8": "^4.1.0",
     "dotenv-cli": "^11.0.0",
