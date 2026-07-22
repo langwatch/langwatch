@@ -295,6 +295,47 @@ async function experimentByIds({
 }
 
 /**
+ * Agents, which the choices card needs more than most.
+ *
+ * `AGENTS.md` teaches the choices block using an agent ref by example — "which
+ * agent should this scenario run against?" is the question ADR-060 was written
+ * for — so this was the one kind the model was most likely to emit and the one
+ * the panel could not resolve. Unhydrated, a row falls back to `plain`: the
+ * raw id instead of the agent's name, and, worse, an ARCHIVED agent still
+ * offered as a live choice. `langy-choice-questions.feature` requires the
+ * opposite on both counts ("live rows", "A dead reference cannot be
+ * selected").
+ *
+ * Archived agents are dropped rather than listed-and-disabled: `getAll`
+ * excludes them, so an archived id simply finds no row, which is the same
+ * shape a deleted one takes and the same shape the other hydrators use.
+ */
+async function agentByIds({
+  utils,
+  projectId,
+  ids,
+}: {
+  utils: CapabilityTrpcUtils;
+  projectId: string;
+  ids: string[];
+}): Promise<CapabilityHydration> {
+  const agents = await utils.agents.getAll.fetch({ projectId });
+  const rows: CapabilityHydratedRow[] = [];
+  for (const id of ids) {
+    const agent = agents.find((candidate) => matchesId(candidate, id, ["id"]));
+    if (!agent) continue;
+    rows.push({
+      id: agent.id,
+      primary: agent.name,
+      // The kind of agent is what tells two similarly-named ones apart when
+      // the question is which to run against.
+      ...(agent.type ? { secondary: agent.type } : {}),
+    });
+  }
+  return { rows };
+}
+
+/**
  * One line per resource. Everything not listed here falls back to the digest /
  * stored-output rendering — deliberately, until a suitable procedure exists.
  */
@@ -303,4 +344,5 @@ export const CAPABILITY_HYDRATORS: Record<string, CapabilityHydrator> = {
   dataset: { byIds: datasetByIds },
   prompt: { byIds: promptByIds },
   experiment: { byIds: experimentByIds },
+  agent: { byIds: agentByIds },
 };
