@@ -1,6 +1,6 @@
 import type { Organization } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
-import { validator as zValidator } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createOrgApp, requires } from "~/server/api/security";
@@ -38,29 +38,6 @@ const createApiKeySchema = z.object({
   (data) => data.keyType === "service" || !data.projectIds || data.projectIds.length === 0,
   { message: "projectIds is only supported for service keys; use bindings instead", path: ["projectIds"] },
 );
-
-function validationHook(
-  result: {
-    success: boolean;
-    error?: {
-      issues: Array<{ message?: string; path?: (string | number)[] }>;
-    };
-  },
-  c: { json: (body: unknown, status: number) => Response },
-): Response | undefined {
-  if (!result.success) {
-    const issue = result.error?.issues?.[0];
-    return c.json(
-      {
-        error: "Unprocessable Entity",
-        message: issue?.message ?? "Validation failed",
-        path: issue?.path,
-      },
-      422,
-    );
-  }
-  return undefined;
-}
 
 const secured = createOrgApp<ApiKeyServiceMiddlewareVariables>({
   basePath: "/api/api-keys",
@@ -113,7 +90,7 @@ secured
     describeRoute({
       description: "Create a new API key",
     }),
-    zValidator("json", createApiKeySchema, validationHook),
+    zValidator("json", createApiKeySchema),
     async (c) => {
       const organization = c.get("organization") as Organization;
       const callerUserId = c.get("apiKeyUserId") as string | null;

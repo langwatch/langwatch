@@ -5,7 +5,7 @@ import {
 } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
 import { describeRoute } from "hono-openapi";
-import { validator as zValidator } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import {
   TeamNotFoundError,
@@ -39,24 +39,6 @@ const addMemberSchema = z.object({
   userId: z.string().min(1, "userId is required"),
   role: z.nativeEnum(TeamUserRole).optional().default(TeamUserRole.MEMBER),
 });
-
-function validationHook(
-  result: { success: boolean; error?: { issues: Array<{ message?: string; path?: (string | number)[] }> } },
-  c: { json: (body: unknown, status: number) => Response },
-): Response | undefined {
-  if (!result.success) {
-    const issue = result.error?.issues?.[0];
-    return c.json(
-      {
-        error: "Unprocessable Entity",
-        message: issue?.message ?? "Validation failed",
-        path: issue?.path,
-      },
-      422,
-    );
-  }
-  return undefined;
-}
 
 function teamResponse(team: {
   id: string;
@@ -117,7 +99,7 @@ secured
     describeRoute({
       description: "Create a new team that can group projects and members",
     }),
-    zValidator("json", createTeamSchema, validationHook),
+    zValidator("json", createTeamSchema),
     async (c) => {
       const organization = c.get("organization") as Organization;
       const body = c.req.valid("json");
@@ -165,7 +147,7 @@ secured
     describeRoute({
       description: "Update a team by its id",
     }),
-    zValidator("json", updateTeamSchema, validationHook),
+    zValidator("json", updateTeamSchema),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
@@ -271,7 +253,7 @@ secured
     "/:id/members",
     teamServiceMiddleware,
     describeRoute({ description: "Add a member to a team" }),
-    zValidator("json", addMemberSchema, validationHook),
+    zValidator("json", addMemberSchema),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;

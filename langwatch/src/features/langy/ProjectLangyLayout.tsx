@@ -4,6 +4,7 @@ import { Outlet } from "react-router";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { LangySidecar } from "./components/LangyPanel";
+import { useLangyScopeReset } from "./hooks/useLangyScopeReset";
 import { useShowLangy } from "./hooks/useShowLangy";
 import { LangyProvider, useLangy } from "./LangyContext";
 import {
@@ -27,6 +28,12 @@ import { useLangyStore } from "./stores/langyStore";
  * (conversations and memory are project-scoped). Visibility itself is
  * unchanged from the previous DashboardLayout gate — see useShowLangy.
  *
+ * The remount key is NOT the reset, though it reads like one: Langy's stores are
+ * module singletons and survive it on purpose. `useLangyScopeReset` is what
+ * actually draws the boundary, and it draws it around all three of user,
+ * organization and project — a key on the project id alone cannot see a change
+ * of account on the same project.
+ *
  * Spec: specs/langy/langy-navigation-persistence.feature
  */
 export default function ProjectLangyLayout() {
@@ -35,6 +42,7 @@ export default function ProjectLangyLayout() {
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
+  useLangyScopeReset();
 
   return (
     <LangyProvider key={project?.id ?? "no-project"}>

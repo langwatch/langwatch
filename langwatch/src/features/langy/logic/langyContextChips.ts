@@ -74,6 +74,192 @@ export function datasetContextChip({
 }
 
 /**
+ * Every other resource's chip has the same shape, so it is written once.
+ *
+ * The two rules that matter are both structural here rather than repeated at
+ * thirty call sites:
+ *
+ *   - The id is `<kind>:<ref>` and nothing else, which is what makes a chip the
+ *     SAME chip however it was picked up. `useLangyPageContext.routeChips` and
+ *     `drawerContextChips` mint exactly that key from the URL, so a card the
+ *     user clicked on a list page and the resource they then opened collapse
+ *     into one chip instead of stacking two.
+ *   - The label leads with the resource's human NAME. An id tells the person
+ *     reading the composer nothing; it stays in `ref`, where the agent's tools
+ *     want it. A shortened id is the fallback for the rows that genuinely have
+ *     no name.
+ */
+function namedResourceChip({
+  kind,
+  noun,
+  id,
+  name,
+  ref,
+}: {
+  kind: LangyContextChip["kind"];
+  /** How the chip reads to a person: "workflow: checkout triage". */
+  noun: string;
+  /** The key the chip id is built from — must match what the route derives. */
+  id: string;
+  name?: string | null;
+  /** What travels to the agent, when it differs from the id key. */
+  ref?: string;
+}): LangyContextChip {
+  const trimmed = name?.trim();
+  return {
+    id: `${kind}:${id}`,
+    kind,
+    label: trimmed ? `${noun}: ${trimmed}` : `${noun} ${shortenChipId(id)}`,
+    ref: ref ?? id,
+  };
+}
+
+/** A workflow or agent built in the optimization studio. */
+export function workflowContextChip({
+  workflowId,
+  name,
+}: {
+  workflowId: string;
+  name?: string | null;
+}): LangyContextChip {
+  return namedResourceChip({
+    kind: "workflow",
+    noun: "workflow",
+    id: workflowId,
+    name,
+  });
+}
+
+/** A configured agent. */
+export function agentContextChip({
+  agentId,
+  name,
+}: {
+  agentId: string;
+  name?: string | null;
+}): LangyContextChip {
+  return namedResourceChip({
+    kind: "agent",
+    noun: "agent",
+    id: agentId,
+    name,
+  });
+}
+
+/** A trigger / automation rule. */
+export function automationContextChip({
+  automationId,
+  name,
+}: {
+  automationId: string;
+  name?: string | null;
+}): LangyContextChip {
+  return namedResourceChip({
+    kind: "automation",
+    noun: "automation",
+    id: automationId,
+    name,
+  });
+}
+
+/** An annotation, or an annotation queue the user is working through. */
+export function annotationContextChip({
+  annotationId,
+  name,
+  noun = "annotation",
+}: {
+  annotationId: string;
+  name?: string | null;
+  /** "annotation queue" reads better than "annotation" on the queues list. */
+  noun?: string;
+}): LangyContextChip {
+  return namedResourceChip({
+    kind: "annotation",
+    noun,
+    id: annotationId,
+    name,
+  });
+}
+
+/**
+ * An evaluator / monitor — one configured evaluation, not an offline run. Same
+ * kind the evaluator and online-evaluation drawers derive, so the card and the
+ * drawer opened from it are one chip.
+ */
+export function evaluationContextChip({
+  evaluationId,
+  name,
+  noun = "evaluation",
+}: {
+  evaluationId: string;
+  name?: string | null;
+  /** "evaluator" on the evaluators page, "evaluation" for monitors. */
+  noun?: string;
+}): LangyContextChip {
+  return namedResourceChip({
+    kind: "evaluation",
+    noun,
+    id: evaluationId,
+    name,
+  });
+}
+
+/** A simulation: a scenario set, or one run inside it. */
+export function scenarioContextChip({
+  scenarioId,
+  name,
+  noun = "simulation",
+}: {
+  scenarioId: string;
+  name?: string | null;
+  noun?: string;
+}): LangyContextChip {
+  return namedResourceChip({
+    kind: "scenario",
+    noun,
+    id: scenarioId,
+    name,
+  });
+}
+
+/**
+ * An offline experiment. Keyed on the SLUG, because that is what
+ * `/experiments/<slug>` puts in the URL and therefore what the route-derived
+ * chip uses — keying on the database id here would produce two chips for one
+ * experiment.
+ */
+export function experimentContextChip({
+  slug,
+  name,
+}: {
+  slug: string;
+  name?: string | null;
+}): LangyContextChip {
+  return namedResourceChip({
+    kind: "experiment",
+    noun: "experiment",
+    id: slug,
+    name,
+  });
+}
+
+/** A dashboard / custom report. */
+export function dashboardContextChip({
+  dashboardId,
+  name,
+}: {
+  dashboardId: string;
+  name?: string | null;
+}): LangyContextChip {
+  return namedResourceChip({
+    kind: "dashboard",
+    noun: "dashboard",
+    id: dashboardId,
+    name,
+  });
+}
+
+/**
  * The stable chip a prompt becomes. Keyed on the prompt id (the same key the
  * prompt editor drawer derives), labelled by handle when one exists — the
  * handle is also what rides as `ref`, since it is the name the agent's own

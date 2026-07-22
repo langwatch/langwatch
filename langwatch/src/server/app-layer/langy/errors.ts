@@ -24,6 +24,31 @@ import { remediation } from "../error-remediation";
  * the same remediation the UI renders.
  */
 
+/**
+ * Langy is not rolled out to this account (HTTP 404). `release_langy_enabled`
+ * (langyAccessGate) is the only lever — there is no staff bypass. A denied
+ * caller gets NOT_FOUND, never FORBIDDEN, so the gate cannot double as a probe
+ * for whether Langy exists for the account.
+ *
+ * It is a typed handled error (kind `langy_not_enabled`), NOT a bare tRPC
+ * NOT_FOUND: a bare code carries no kind, so the panel could only fall back to a
+ * generic "conversations aren't loading, try again" — wrong for a rollout gate,
+ * which no retry fixes. With a kind the client can render a real "not enabled"
+ * state and tell a gate apart from a transient load failure.
+ */
+export class LangyNotEnabledError extends HandledError {
+  declare readonly code: "langy_not_enabled";
+
+  constructor() {
+    super(
+      "langy_not_enabled",
+      "Langy is not currently enabled for this account.",
+      { httpStatus: 404 },
+    );
+    this.name = "LangyNotEnabledError";
+  }
+}
+
 /** The requested conversation does not exist, or has been archived (HTTP 404). */
 export class LangyConversationNotFoundError extends NotFoundError {
   declare readonly code: "langy_conversation_not_found";
@@ -175,6 +200,35 @@ export class LangyTurnInProgressError extends HandledError {
       },
     );
     this.name = "LangyTurnInProgressError";
+  }
+}
+
+/**
+ * The stop names a turn this conversation does not have in flight (HTTP 409).
+ *
+ * A stop is the one client-supplied turn id that gets to write a DURABLE
+ * terminal, so it may not be taken on trust. The turn's own actor is proven by
+ * the live-access grant and needs nothing further; anyone else stopping a turn
+ * — a second tab, a rejoin after a refresh — has to name the turn the record
+ * actually has in flight, or the conversation's owner could terminate (and
+ * fabricate an assistant message on) an arbitrary turn id.
+ *
+ * Distinct from a stop that merely arrived late: that turn IS the one in
+ * flight until its terminal lands, and the terminal slot collapses the loser.
+ */
+export class LangyTurnNotStoppableError extends HandledError {
+  declare readonly code: "langy_turn_not_stoppable";
+  constructor(turnId: string) {
+    super(
+      "langy_turn_not_stoppable",
+      "That turn is not the one in progress on this conversation.",
+      {
+        httpStatus: 409,
+        meta: { turnId },
+        ...remediation("langy_turn_not_stoppable"),
+      },
+    );
+    this.name = "LangyTurnNotStoppableError";
   }
 }
 

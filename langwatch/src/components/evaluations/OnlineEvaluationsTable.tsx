@@ -18,6 +18,7 @@ import {
 } from "react-icons/lu";
 
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { evaluationContextChip } from "~/features/langy/logic/langyContextChips";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import Link from "~/utils/compat/next-link";
 
@@ -87,12 +88,10 @@ export const OnlineEvaluationsTable = ({
           <Table.Row key={row.id}>
             <Table.Cell>
               <LangyContextTarget
-                target={{
-                  id: `evaluation:${row.id}`,
-                  kind: "evaluation",
-                  label: `evaluation: ${row.name}`,
-                  ref: row.id,
-                }}
+                target={evaluationContextChip({
+                  evaluationId: row.id,
+                  name: row.name,
+                })}
               >
                 <VStack align="start" gap={0.5}>
                   <Text fontWeight="medium">{row.name}</Text>

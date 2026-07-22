@@ -32,6 +32,8 @@ import {
   cliToolResultSchema,
   parseCliJson,
   toCliTextResult,
+  readCliErrorDocument,
+  toCliErrorDocument,
   toCliToolResult,
   type CliResultDigest,
   type CliToolResult,
@@ -90,9 +92,27 @@ export class LangyCliEnvelopeService {
     const name = this.toolNameOf(invocation);
     if (frame.phase === "start") return { ...frame, name };
 
-    // A failed call's output is an error message, not a document — keep it as
-    // the CLI wrote it so the error card shows what the user would have seen.
-    if (frame.isError) return { ...frame, name };
+    // A FAILED CALL STILL PRINTED ITS FAILURE DOCUMENT.
+    //
+    // Under a machine format the CLI writes `{ok:false, error:{…}}` to stdout
+    // and a one-line human summary to stderr, then exits non-zero. This branch
+    // used to pass the frame straight through, so whichever of the two the
+    // worker happened to put in `output` was what the card got — and when that
+    // was the stderr line, every scrap of structure (the code, the meta, the
+    // tips) was gone before the panel ever saw it. Look for the document in
+    // both, and keep it whole when it is there.
+    if (frame.isError) {
+      const reportedOnFailure = readCliErrorDocument(
+        parseCliJson(frame.output ?? "") ?? frame.output,
+      );
+      return reportedOnFailure
+        ? {
+            ...frame,
+            name,
+            output: JSON.stringify(toCliErrorDocument(reportedOnFailure)),
+          }
+        : { ...frame, name };
+    }
 
     // Future workers can emit the canonical value directly. Validate it again
     // at this trust boundary, then retain exactly that value rather than parsing
@@ -120,6 +140,31 @@ export class LangyCliEnvelopeService {
     // flags as its query, honest counts); the reduced output stays alongside
     // as the fallback tier and the agent-history record.
     const document = parseCliJson(frame.output);
+
+    // A FAILURE THE CLI REPORTED IN ITS OWN DOCUMENT.
+    //
+    // `frame.isError` only catches what the WORKER marked as failed. A command
+    // that writes `{"ok":false,"error":{…}}` to stdout and exits cleanly is a
+    // failure the worker never noticed, so it fell through this success path,
+    // failed its card's schema, and landed on the raw `{kind:"json"}` receipt —
+    // which is how a validation error ended up rendered to the user as a wall of
+    // JSON instead of an error card. The CLI already has a reader for its own
+    // failure document; the boundary just never asked.
+    const reported = readCliErrorDocument(document ?? frame.output);
+    if (reported) {
+      return {
+        ...frame,
+        name,
+        isError: true,
+        // The failure document, whole. Keeping only `reported.message` here
+        // discarded the code, the meta, and the tips/docsUrl the platform sent
+        // for exactly this consumer — so the error card, which reads the
+        // document structurally, had nothing left to show and fell back to
+        // "This step couldn't be completed". The card renders the sentence and
+        // the next steps FROM the document; it never prints the JSON.
+        output: JSON.stringify(toCliErrorDocument(reported)),
+      };
+    }
     const digest = extractDigest({
       resource: invocation.resource,
       verb: invocation.verb,

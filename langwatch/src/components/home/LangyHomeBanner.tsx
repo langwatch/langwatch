@@ -1,8 +1,5 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
-import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { Box } from "@chakra-ui/react";
 import { LangyMark } from "~/features/langy/components/LangyMark";
-import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useColorModeValue } from "../ui/color-mode";
 // The panel's texture sheet — the banner borrows its signal grid (see
 // LangyBannerSignalGrid). Imported here too because the promo banner can
@@ -46,7 +43,6 @@ const INK_100 = "#e3e2dd";
 const BRAND_200 = "#cbc0ee";
 const BRAND_300 = "#b1a3e8";
 const BRAND_400 = "#8a76de";
-const BRAND_500 = "#6e57d2";
 const BRAND_600 = "#5b41c2";
 const BRAND_700 = "#4a33a4";
 
@@ -69,9 +65,6 @@ export interface LangyBannerTone {
   kbdBorder: string;
   kbdColor: string;
   markStops: [string, string];
-  askPrompt: string;
-  askText: string;
-  caret: string;
   /** The carousel chrome (dots / countdown ring / dismiss) over this slide. */
   chrome: {
     dot: string;
@@ -135,9 +128,6 @@ export function useLangyBannerTone(): LangyBannerTone {
       kbdBorder: "rgba(20,20,23,0.18)",
       kbdColor: INK_900,
       markStops: ["#f56b1a", "#ffb380"],
-      askPrompt: "#ffb380",
-      askText: "rgba(247,246,243,0.92)",
-      caret: "#ffb380",
       chrome: WHITE_CHROME,
     };
   }
@@ -162,9 +152,6 @@ export function useLangyBannerTone(): LangyBannerTone {
     kbdBorder: "rgba(255,255,255,0.25)",
     kbdColor: PAPER,
     markStops: [BRAND_600, BRAND_400],
-    askPrompt: BRAND_500,
-    askText: INK_700,
-    caret: BRAND_500,
     chrome: {
       dot: INK_900,
       dotIdle: "rgba(20,20,23,0.3)",
@@ -235,109 +222,5 @@ export function LangyBannerSignalGrid() {
   if (!tone.ink) return null;
   return (
     <Box className="langy-signal-grid langy-signal-grid--banner" aria-hidden />
-  );
-}
-
-// ---- The cycling ask-line ----------------------------------------------------
-
-/**
- * Example asks, mirroring the panel's EmptyState SUGGESTIONS (shortened to a
- * banner-friendly single line). Every line must be a thing Langy can actually
- * do — a banner that promises what the product then fails at is worse than no
- * banner. Keep in sync with `features/langy/components/EmptyState.tsx`.
- */
-const LANGY_ASKS = [
-  "Find traces that failed their evaluations and tell me why",
-  "Suggest an evaluator for my agent and set it up",
-  "Compare my last two experiment runs",
-] as const;
-
-/** Dwell per ask; each change is one calm crossfade, no typing. */
-const ASK_HOLD_MS = 4000;
-const ASK_FADE_S = 0.45;
-
-/** Index of the ask currently shown, advancing on a fixed clock. */
-function useCyclingAsk(enabled: boolean): number {
-  const [index, setIndex] = useState(0);
-  useEffect(() => {
-    if (!enabled) return;
-    const timer = setInterval(
-      () => setIndex((i) => (i + 1) % LANGY_ASKS.length),
-      ASK_HOLD_MS,
-    );
-    return () => clearInterval(timer);
-  }, [enabled]);
-  return index;
-}
-
-/**
- * A composer line quoting what you might ask: accent `›` prompt glyph, a
- * softly breathing caret, and the example ask crossfading on a slow clock —
- * a cycling input placeholder, not a typewriter (per-character typing read
- * as jittery). No ring and no fill: a quiet line resting straight on the
- * mesh's calm field. Deliberately NOT interactive — it demonstrates, the
- * CTA activates; two affordances for one action would compete. One line
- * high, so the carousel never resizes; long asks clip rather than wrap.
- */
-export function LangyBannerAskLine() {
-  const tone = useLangyBannerTone();
-  const reduceMotion = useReducedMotion();
-  const index = useCyclingAsk(!reduceMotion);
-  return (
-    <HStack gap={2.5} maxWidth="full" minWidth={0} aria-hidden>
-      <Text
-        textStyle="md"
-        fontWeight="600"
-        color={tone.askPrompt}
-        flexShrink={0}
-        lineHeight="24px"
-      >
-        ›
-      </Text>
-      {/* The caret sits where typing would begin; the ask reads as the
-			    input's suggestion. Breathing fade, not a hard on/off blink. */}
-      <Box flexShrink={0} display="flex" alignItems="center" height="24px">
-        {reduceMotion ? (
-          <Box width="2px" height="16px" bg={tone.caret} borderRadius="1px" />
-        ) : (
-          <motion.div
-            animate={{ opacity: [0.9, 0.3, 0.9] }}
-            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-            style={{
-              width: 2,
-              height: 16,
-              background: tone.caret,
-              borderRadius: 1,
-            }}
-          />
-        )}
-      </Box>
-      <Box position="relative" minWidth={0} flex={1} height="24px">
-        {/* True crossfade — outgoing and incoming ask overlap (absolute in
-            the same slot), so the line never blinks empty between them. */}
-        <AnimatePresence initial={false} mode="sync">
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: ASK_FADE_S, ease: "easeInOut" }}
-            style={{ position: "absolute", inset: 0 }}
-          >
-            <Text
-              textStyle="sm"
-              fontWeight="500"
-              color={tone.askText}
-              lineHeight="24px"
-              whiteSpace="nowrap"
-              overflow="hidden"
-              textOverflow="ellipsis"
-            >
-              {LANGY_ASKS[index]}
-            </Text>
-          </motion.div>
-        </AnimatePresence>
-      </Box>
-    </HStack>
   );
 }

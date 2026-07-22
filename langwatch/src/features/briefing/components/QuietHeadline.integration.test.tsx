@@ -21,8 +21,15 @@ const gates = { langy: false };
 const askLangy = vi.fn();
 const push = vi.fn();
 
+// The headline's action auto-sends, so the component asks `useCanAskLangy`
+// (`langy:create`) rather than `useShowLangy` (`langy:view`). Both are mocked
+// off the one gate: the distinction between them is exercised where it is
+// decided, not restated in every consumer's fixture.
 vi.mock("~/features/langy/hooks/useShowLangy", () => ({
   useShowLangy: () => gates.langy,
+}));
+vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
+  useCanAskLangy: () => gates.langy,
 }));
 vi.mock("~/features/langy/stores/langyStore", () => ({
   useLangyStore: (

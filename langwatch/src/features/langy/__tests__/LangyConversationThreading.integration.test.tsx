@@ -146,10 +146,8 @@ vi.mock("~/utils/api", () => ({
       renameConversation: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
       },
-      forkConversation: {
-        useMutation: () => ({
-          mutateAsync: () => Promise.resolve({ id: "forked-conversation" }),
-        }),
+      stopTurn: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
       },
       list: {
         useInfiniteQuery: () => ({

@@ -43,6 +43,7 @@
 :root {
   /* The cool half of the AI mark. The warm end is deliberately left out: on a
      page full of product chrome, orange reads as a warning. Cool reads as light. */
+  --langy-target-near-0: rgba(91, 141, 239, 0.03);
   --langy-target-near-1: rgba(91, 141, 239, 0.14);
   --langy-target-near-2: rgba(129, 116, 244, 0.24);
   --langy-target-near-3: rgba(168, 85, 247, 0.16);
@@ -57,6 +58,7 @@
 .dark,
 :root.dark {
   /* The 500-weight stops barely register against ink — lift them. */
+  --langy-target-near-0: rgba(95, 163, 255, 0.04);
   --langy-target-near-1: rgba(95, 163, 255, 0.18);
   --langy-target-near-2: rgba(139, 130, 255, 0.3);
   --langy-target-near-3: rgba(168, 85, 247, 0.2);
@@ -70,6 +72,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light):not(.dark) {
+    --langy-target-near-0: rgba(95, 163, 255, 0.04);
     --langy-target-near-1: rgba(95, 163, 255, 0.18);
     --langy-target-near-2: rgba(139, 130, 255, 0.3);
     --langy-target-near-3: rgba(168, 85, 247, 0.2);
@@ -98,11 +101,21 @@
    change — a registered target that nobody is pointing at is just the element. */
 .langy-target {
   --langy-target-color: rgba(0, 0, 0, 0);
+  /* A phase offset alone is not enough once a whole page lights up at once
+     (which is exactly what `#` does): every target still breathes at the SAME
+     tempo, so the field reads as one thing pulsing in formation. Deriving the
+     period from the same hashed offset gives each target its own speed as well
+     as its own phase, and the page twinkles instead of throbbing. No extra
+     plumbing: the offset is already there and already stable per id.
+
+     The offset spans -11000ms..0, so this lands in roughly 6.3s..9s. */
+  --langy-target-period: calc(9s + var(--langy-target-delay, 0ms) / 4);
   transition: outline-color 220ms ease;
 }
 
 .langy-target[data-langy-target-state] {
-  animation: langy-target-shimmer 11s ease-in-out infinite;
+  animation: langy-target-shimmer var(--langy-target-period) ease-in-out
+    infinite;
   /* The per-id phase offset. Without it, every lit target marches in lockstep
      and the field reads as a barcode; with it they drift out of phase, like
      light moving on water. It is the whole difference between the two. */
@@ -120,17 +133,26 @@
 }
 
 /* Blue -> indigo -> purple and back. A closed loop (0% == 100%), so the shimmer
-   never jumps when it wraps. Slow (11s) and low-alpha by design: you should
-   notice it only when you look for it, never while you're reading the row. */
+   never jumps when it wraps. Slow (see --langy-target-period) and low-alpha by
+   design: you should notice it only when you look for it, never while you're
+   reading the row. */
 @keyframes langy-target-shimmer {
+  /* The trough is nearly transparent, and that is what makes it a GLIMMER
+     rather than a hairline that happens to change hue: each target fades most
+     of the way out and comes back, on its own clock (see --langy-target-period)
+     and from its own starting phase. Lit rows catch the light one after another
+     instead of glowing in unison. */
   0%,
   100% {
+    --langy-target-color: var(--langy-target-near-0);
+  }
+  30% {
     --langy-target-color: var(--langy-target-near-1);
   }
-  50% {
+  55% {
     --langy-target-color: var(--langy-target-near-2);
   }
-  75% {
+  80% {
     --langy-target-color: var(--langy-target-near-3);
   }
 }
@@ -214,6 +236,35 @@ tr.langy-target > td:last-of-type {
   --langy-edge-right: -1px 0 0 var(--langy-target-color);
 }
 
+/* ── THE SPOTLIGHT: panel -> page ─────────────────────────────────────────
+   Hovering a context chip in the panel shines a light on the thing it names,
+   wherever that thing sits on the page. Drawn as an overlay by the layer, not
+   by the target itself, because a table row cannot paint its own outline (see
+   the sticky-column note above) and because this one has to READ from across
+   the page — it is an answer to "which one do you mean", not the deliberately
+   barely-there proximity field.
+
+   It generates no box on the page and takes no clicks: it is a fixed-position
+   sibling of <body>, sized to the element it is pointing at. */
+.langy-target-spotlight {
+  outline: 2px solid var(--langy-target-hover-2);
+  outline-offset: 1px;
+  box-shadow:
+    0 0 0 4px rgba(129, 116, 244, 0.14),
+    0 0 22px 2px rgba(129, 116, 244, 0.35);
+  animation: langy-spotlight-breathe 1.9s ease-in-out infinite;
+}
+
+@keyframes langy-spotlight-breathe {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 /* The affordance fades in rather than popping — it's an offer, not an alert.
    It anchors LEFT by default: the Langy panel is docked on the right, so a
    button on a target's right edge is the one that ends up underneath it. The
@@ -268,5 +319,11 @@ tr.langy-target > td:last-of-type {
   }
   .langy-target-affordance {
     animation: none;
+  }
+  /* The spotlight still SHOWS — it is an answer to a question the user asked
+     by hovering. It just stops breathing. */
+  .langy-target-spotlight {
+    animation: none;
+    opacity: 1;
   }
 }

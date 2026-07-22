@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
 import {
+  LangyConversationNotOwnedError,
   LangyModelNotAllowedError,
   LangyModelNotConfiguredError,
   LangyTurnInProgressError,
+  LangyTurnNotStoppableError,
 } from "../errors";
 import {
   LangyTurnService,
@@ -12,6 +14,7 @@ import {
 } from "../langy-turn.service";
 import { langyTurnIdentity } from "../langy-turn.service";
 import type { LangyTurnAdmissionClaim } from "../repositories/langy-turn-admission.repository";
+import type { LangyMessageRow } from "../repositories/langy-message.repository";
 
 const REQUEST_ID = "00000000-0000-4000-8000-000000000001";
 const SESSION = {
@@ -79,6 +82,8 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     getModelsAllowed: vi.fn(async () => null),
   };
 
+  const findAllByConversation = vi.fn(async () => [] as LangyMessageRow[]);
+
   const deps = {
     conversations:
       conversations as unknown as LangyTurnServiceDeps["conversations"],
@@ -98,6 +103,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     },
     accessStore: { grant } as unknown as LangyTurnServiceDeps["accessStore"],
     handoffStore: { stash } as unknown as LangyTurnServiceDeps["handoffStore"],
+    messages: { findAllByConversation },
     ...over,
   } as LangyTurnServiceDeps;
 
@@ -119,6 +125,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       claim,
       commit,
       abort,
+      findAllByConversation,
     },
   };
 }
@@ -408,6 +415,124 @@ describe("LangyTurnService.startConversationTurn", () => {
   });
 });
 
+/**
+ * THE "run it" BUG. The agent's memory of a conversation lives only inside its
+ * live worker process, and that process is reaped after ten idle minutes,
+ * killed when the turn's capabilities change, and gone whenever the fleet rolls.
+ * The control plane used to send a turn nothing but the latest user sentence, so
+ * after any of those events "run it" arrived with no "it" in sight — and the
+ * agent filled the hole with a trace search.
+ *
+ * These pin the plumbing: the conversation's own history reaches the system
+ * block, whatever the worker does or does not remember.
+ */
+describe("when a follow-up turn depends on what an earlier turn created", () => {
+  /** The tool part a scenario create leaves on the durable assistant message. */
+  const scenarioCreated: LangyMessageRow = {
+    id: "m1",
+    role: "assistant",
+    parts: [
+      {
+        type: "tool-langwatch.scenario.create",
+        toolCallId: "call-1",
+        state: "output-available",
+        digest: {
+          resource: "scenario",
+          verb: "create",
+          strategy: "id-ref",
+          primaryId: "scenario_0002E069Y90C5aaw1h325gUZ7TE0W",
+          ids: ["scenario_0002E069Y90C5aaw1h325gUZ7TE0W"],
+          name: "Customer support agent",
+        },
+      },
+      { type: "text", text: "", role: "assistant" },
+    ] as LangyMessageRow["parts"],
+    createdAt: new Date(),
+  };
+
+  const systemOf = (dispatch: ReturnType<typeof vi.fn>): string =>
+    (dispatch.mock.calls[0]![0] as { system: string }).system;
+
+  /** @scenario A follow-up turn carries what earlier turns created */
+  /** @scenario The memory survives the agent forgetting */
+  it("hands the agent the id its own earlier turn produced", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.findAllByConversation.mockResolvedValue([scenarioCreated]);
+    // A warm worker would still hold the session — the point is that this does
+    // not depend on it.
+    mocks.probe.mockResolvedValue(true);
+
+    await LangyTurnService.create(deps).startConversationTurn(
+      input({
+        messages: [{ role: "user", parts: [{ type: "text", text: "run it" }] }],
+      }),
+    );
+
+    const system = systemOf(mocks.dispatch);
+    expect(system).toContain("scenario_0002E069Y90C5aaw1h325gUZ7TE0W");
+    expect(system).toContain("Customer support agent");
+    expect(mocks.findAllByConversation).toHaveBeenCalledWith({
+      conversationId: "conv-1",
+      projectId: "p1",
+    });
+  });
+
+  /** @scenario Every turn carries the rule for resolving a bare reference */
+  /** @scenario The rule is read after everything it talks about */
+  it("carries the rule for resolving a bare reference, after the things it resolves against", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.findAllByConversation.mockResolvedValue([scenarioCreated]);
+
+    await LangyTurnService.create(deps).startConversationTurn(
+      input({
+        turnContext: {
+          pageContext: [
+            { kind: "trace", ref: "trace-abc", label: "trace abc" },
+          ],
+        },
+      }),
+    );
+
+    const system = systemOf(mocks.dispatch);
+    expect(system).toContain("RESOLVING WHAT THE USER MEANS");
+    // The policy says "described above", so both data blocks must precede it.
+    expect(
+      system.indexOf("WHAT THIS CONVERSATION HAS ALREADY DONE"),
+    ).toBeLessThan(system.indexOf("RESOLVING WHAT THE USER MEANS"));
+    expect(system.indexOf("WHAT THE USER IS LOOKING AT")).toBeLessThan(
+      system.indexOf("RESOLVING WHAT THE USER MEANS"),
+    );
+  });
+
+  /** @scenario A brand-new conversation carries no memory */
+  it("does not go looking for a history a fresh conversation cannot have", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.ensureConversation.mockResolvedValue({ id: "conv-1", isNew: true });
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    expect(mocks.findAllByConversation).not.toHaveBeenCalled();
+    expect(systemOf(mocks.dispatch)).not.toContain(
+      "WHAT THIS CONVERSATION HAS ALREADY DONE",
+    );
+  });
+
+  /** @scenario A conversation whose record cannot be read still answers */
+  it("still runs the turn when the durable record cannot be read", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.findAllByConversation.mockRejectedValue(new Error("projection down"));
+
+    const result =
+      await LangyTurnService.create(deps).startConversationTurn(input());
+
+    expect(result).toMatchObject({ conversationId: "conv-1" });
+    expect(mocks.dispatch).toHaveBeenCalledOnce();
+    expect(systemOf(mocks.dispatch)).not.toContain(
+      "WHAT THIS CONVERSATION HAS ALREADY DONE",
+    );
+  });
+});
+
 describe("langyTurnIdentity", () => {
   const base = {
     userId: "user-1",
@@ -468,5 +593,200 @@ describe("when the send carries no usable text", () => {
     ).rejects.toMatchObject({ code: "langy_empty_message" });
     expect(mocks.claim).not.toHaveBeenCalled();
     expect(mocks.dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("LangyTurnService.stopTurn", () => {
+  function makeStopDeps(
+    over: {
+      isTurnActor?: boolean;
+      isOwn?: boolean;
+      currentTurnId?: string | null;
+      deltas?: string[];
+      cancelRejects?: boolean;
+      noBuffer?: boolean;
+    } = {},
+  ) {
+    // Declared with its argument even though the body ignores it: a zero-arg
+    // `vi.fn` types `mock.calls` as an empty tuple, so reading `calls[0][0]` —
+    // which is the whole point of the assertions below — cannot typecheck.
+    const finalizeTurn = vi.fn(
+      async (_args: Record<string, unknown>) => ({ messageId: "a1" }),
+    );
+    const findByIdVisible = vi.fn(async () => ({
+      isOwn: over.isOwn ?? true,
+      currentTurnId:
+        over.currentTurnId === undefined ? "turn-1" : over.currentTurnId,
+    }));
+    const isTurnActor = vi.fn(async () => over.isTurnActor ?? true);
+    const markEnd = vi.fn(async () => {});
+    const cancel = vi.fn(async () => {
+      if (over.cancelRejects) throw new Error("worker unreachable");
+    });
+    const readTail = vi.fn(async () => ({
+      reads: (over.deltas ?? ["half ", "an answer"]).map((text, i) => ({
+        id: `${i}`,
+        entry: { type: "delta" as const, text },
+      })),
+      lastId: "9",
+    }));
+    const deps = {
+      conversations: {
+        finalizeTurn,
+        findByIdVisible,
+      } as unknown as LangyTurnServiceDeps["conversations"],
+      credentials: {} as unknown as LangyTurnServiceDeps["credentials"],
+      resolveModel: vi.fn(),
+      worker: { cancel } as unknown as LangyTurnServiceDeps["worker"],
+      tokenBuffer: over.noBuffer
+        ? null
+        : ({ readTail, markEnd } as unknown as LangyTurnServiceDeps["tokenBuffer"]),
+      reservePermit: vi.fn(),
+      releasePermit: vi.fn(),
+      perDayPrCap: 0,
+      mintSessionKey: vi.fn(),
+      revokeSessionKey: vi.fn(),
+      admission: {} as unknown as LangyTurnServiceDeps["admission"],
+      accessStore: {
+        isTurnActor,
+      } as unknown as LangyTurnServiceDeps["accessStore"],
+      handoffStore: null,
+      // A stop reads no history — it finalizes a turn already in flight.
+      messages: null,
+    } as LangyTurnServiceDeps;
+    return {
+      deps,
+      mocks: { finalizeTurn, findByIdVisible, isTurnActor, markEnd, cancel, readTail },
+    };
+  }
+
+  const stopArgs = {
+    projectId: "p1",
+    conversationId: "conv-1",
+    turnId: "turn-1",
+    userId: "user-1",
+  };
+
+  describe("given the caller is the turn's actor", () => {
+    /** @scenario Stopping a turn ends it on the backend, not just in my browser */
+    /** @scenario Stopping asks the worker to abandon the running generation */
+    it("records a stopped terminal carrying the partial answer, ends the stream, and asks the worker to cancel", async () => {
+      const { deps, mocks } = makeStopDeps({ isTurnActor: true });
+
+      await LangyTurnService.create(deps).stopTurn(stopArgs);
+
+      expect(mocks.finalizeTurn).toHaveBeenCalledTimes(1);
+      const call = mocks.finalizeTurn.mock.calls[0]![0] as {
+        outcome: string;
+        parts: Array<{ text?: string }>;
+      };
+      expect(call.outcome).toBe("stopped");
+      // The partial answer is the joined durable delta tail, preserved verbatim.
+      expect(call.parts.map((p) => p.text ?? "").join("")).toBe("half an answer");
+      expect(mocks.markEnd).toHaveBeenCalledTimes(1);
+      expect(mocks.cancel).toHaveBeenCalledWith(
+        expect.objectContaining({ conversationId: "conv-1", turnId: "turn-1" }),
+      );
+      // The actor short-circuits the ownership read.
+      expect(mocks.findByIdVisible).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the caller is neither the actor nor the owner", () => {
+    /** @scenario Only someone who can control the conversation may stop its turn */
+    it("refuses with a handled not-owned error and records no terminal", async () => {
+      const { deps, mocks } = makeStopDeps({ isTurnActor: false, isOwn: false });
+
+      await expect(
+        LangyTurnService.create(deps).stopTurn(stopArgs),
+      ).rejects.toBeInstanceOf(LangyConversationNotOwnedError);
+      expect(mocks.finalizeTurn).not.toHaveBeenCalled();
+      expect(mocks.cancel).not.toHaveBeenCalled();
+      expect(mocks.markEnd).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the caller owns the conversation but did not start the turn", () => {
+    it("allows the stop when they name the turn the record has in flight", async () => {
+      const { deps, mocks } = makeStopDeps({
+        isTurnActor: false,
+        isOwn: true,
+        currentTurnId: "turn-1",
+      });
+
+      await LangyTurnService.create(deps).stopTurn(stopArgs);
+
+      expect(mocks.finalizeTurn).toHaveBeenCalledTimes(1);
+    });
+
+    describe("when the named turn is not the one in flight", () => {
+      /** @scenario A stop naming a turn that is not the one in flight is refused */
+      it("refuses instead of writing a durable terminal for an unproven turn id", async () => {
+        const { deps, mocks } = makeStopDeps({
+          isTurnActor: false,
+          isOwn: true,
+          currentTurnId: "some-other-turn",
+        });
+
+        await expect(
+          LangyTurnService.create(deps).stopTurn(stopArgs),
+        ).rejects.toBeInstanceOf(LangyTurnNotStoppableError);
+        expect(mocks.finalizeTurn).not.toHaveBeenCalled();
+        expect(mocks.markEnd).not.toHaveBeenCalled();
+        expect(mocks.cancel).not.toHaveBeenCalled();
+      });
+
+      it("refuses when the conversation has no turn in flight at all", async () => {
+        const { deps, mocks } = makeStopDeps({
+          isTurnActor: false,
+          isOwn: true,
+          currentTurnId: null,
+        });
+
+        await expect(
+          LangyTurnService.create(deps).stopTurn(stopArgs),
+        ).rejects.toBeInstanceOf(LangyTurnNotStoppableError);
+        expect(mocks.finalizeTurn).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the caller IS the turn's actor", () => {
+    it("stops without consulting the record — the live-access grant already proved the turn", async () => {
+      const { deps, mocks } = makeStopDeps({
+        isTurnActor: true,
+        currentTurnId: null,
+      });
+
+      await LangyTurnService.create(deps).stopTurn(stopArgs);
+
+      expect(mocks.findByIdVisible).not.toHaveBeenCalled();
+      expect(mocks.finalizeTurn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the worker cancel fails", () => {
+    it("still records the stop — the durable terminal is what makes it truthful", async () => {
+      const { deps, mocks } = makeStopDeps({ cancelRejects: true });
+
+      await expect(
+        LangyTurnService.create(deps).stopTurn(stopArgs),
+      ).resolves.toBeUndefined();
+      expect(mocks.finalizeTurn).toHaveBeenCalledTimes(1);
+      expect(mocks.markEnd).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when there is no live buffer to read a partial from", () => {
+    it("still records a stopped terminal, with an empty answer", async () => {
+      const { deps, mocks } = makeStopDeps({ noBuffer: true });
+
+      await LangyTurnService.create(deps).stopTurn(stopArgs);
+
+      expect(mocks.finalizeTurn).toHaveBeenCalledTimes(1);
+      expect(mocks.finalizeTurn.mock.calls[0]![0]).toMatchObject({
+        outcome: "stopped",
+      });
+    });
   });
 });

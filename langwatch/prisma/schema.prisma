@@ -1209,7 +1209,13 @@ model LangyConversationTurnProjection {
   projectId         String
   ConversationId    String                    @map("conversationId")
   TurnId            String                    @map("turnId")
-  Status            LangyProjectionTurnStatus @map("status")
+  /// LangyConversationTurnStatus. Deliberately TEXT, not a Postgres enum: this
+  /// is a PROJECTION — one writer (the fold), rebuildable from the event log,
+  /// and nothing queries or indexes on it. An enum bought no selectivity here,
+  /// only typo protection, and charged a migration for every new status that
+  /// Postgres then could not remove. The one definition lives in
+  /// `LANGY_CONVERSATION_TURN_STATUS`; the repository validates against it.
+  Status            String                    @map("status")
   /// LangyMessagePart[] — the user question that opened the turn.
   QuestionParts     Json                      @map("questionParts")
   /// LangyMessagePart[] — the agent's whole final answer.
@@ -1255,13 +1261,6 @@ enum LangyProjectionTitleSource {
   derived
   auto
   user
-}
-
-enum LangyProjectionTurnStatus {
-  pending
-  running
-  completed
-  failed
 }
 
 model ProjectSecret {

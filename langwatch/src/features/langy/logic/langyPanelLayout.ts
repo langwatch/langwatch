@@ -31,6 +31,26 @@ export const APP_HEADER_HEIGHT = 56;
 
 export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 
+/**
+ * The spring a Langy surface moves on when it is being PLACED somewhere new,
+ * as opposed to opening or closing.
+ *
+ * Deliberately slower than open/close. Switching between the dock and the
+ * floating companion changes both the page's reserved gutter and the panel's
+ * geometry; treating that as one spring makes it feel picked up and placed,
+ * rather than a sidebar disappearing while a card pops in elsewhere.
+ *
+ * Lives here, not in LangyPanel, because it is no longer only the panel's:
+ * the home page's composer travels to the panel's floor on this same spring,
+ * so the two morphs read as one family. One definition, or they drift.
+ */
+export const PANEL_LAYOUT_TRANSITION = {
+  type: "spring",
+  stiffness: 330,
+  damping: 34,
+  mass: 0.82,
+} as const;
+
 /** Desktop ceiling for the floating companion. */
 export const FLOATING_PANEL_MAX_WIDTH = 432;
 

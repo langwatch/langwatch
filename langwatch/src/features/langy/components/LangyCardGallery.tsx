@@ -39,6 +39,7 @@ import { LangyFeedback } from "./LangyFeedback";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
+import { LangyPlanLimitCard } from "./LangyPlanLimitCard";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { LangyToolActivity } from "./LangyToolActivity";
 import { ProposalCard, type LangyProposal } from "./MessageContent";
@@ -558,6 +559,22 @@ export function LangyCardGallery() {
           conversationId="gallery"
           messageId="gallery-feedback"
           origin="preview"
+        />
+      </Section>
+
+      {/* A refusal the reader can DO something about — not a broken step, so
+          not a red card. Fixture only; the real one reads its numbers off the
+          failure's own meta, and the CTA only appears for whoever can change
+          the plan. */}
+      <Section title="Plan limits">
+        <LangyPlanLimitCard
+          presentation={{
+            title: "Creating scenario failed",
+            message: "Your plan includes 3 scenarios, and all 3 are in use.",
+            code: "resource_limit_exceeded",
+            limit: { label: "scenarios", type: "scenarios", current: 3, max: 3 },
+            terminal: true,
+          }}
         />
       </Section>
 

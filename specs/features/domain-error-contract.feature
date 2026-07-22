@@ -68,6 +68,56 @@ Feature: Handled errors — the handled-error boundary
     And the failing fields ride in its meta, not a separate zodError field
     So clients read validation detail exactly where they read every other fact
 
+  # --------------------------------------------------------------------------
+  # Request validation — the REST boundary's own schema failures
+  #
+  # `@hono/zod-validator` answers a schema failure itself, with a 400 carrying
+  # zod's whole safeParse output. That body names no code, so no consumer can
+  # read it: the CLI falls through to its status-derived reading and reports
+  # `request_failed` — or `network_error` when the status is lost on the way —
+  # and an agent told "network_error" retries the identical broken request. The
+  # shared validator wrapper closes that hole by throwing instead, so a schema
+  # failure reaches `onError` and becomes a handled error like everything else.
+  # --------------------------------------------------------------------------
+
+  @bdd @domain-errors
+  Scenario: A schema failure is a handled error, not the validator's own reply
+    Given a request body parses as JSON but does not satisfy the route's schema
+    When the route's validator rejects it
+    Then the response is a handled error of code "validation_error"
+    And the HTTP status is 422
+    And the body names the code, so a consumer never has to guess from the status
+
+  @bdd @domain-errors
+  Scenario: Every failing field is reported, not just the first
+    Given a request violates the schema in more than one place
+    Then the response carries one reason per violation
+    And each reason has code "schema_failure" with meta.field, meta.type and meta.message
+    And meta.fields on the error lists every offending path
+    So a caller fixes the whole request in one round trip
+
+  @bdd @domain-errors
+  Scenario: The expected values are structured data, not prose
+    Given a field fails because its value is outside a permitted set
+    Then the permitted values ride in that reason's meta.expected
+    And the message stays one short sentence naming the target, not the constraint
+    So the actionable part survives truncation on its way to an agent
+
+  @bdd @domain-errors
+  Scenario: A body that never parsed is a different failure from one that did
+    Given a request body is not well-formed at all
+    Then the response is a handled error of code "malformed_request"
+    And the HTTP status is 400, not 422
+    And it carries no field reasons, because no document existed to have fields
+    So a caller can tell "fix these fields" apart from "resend the request"
+
+  @bdd @domain-errors
+  Scenario: A route's own validation hook still wins
+    Given a route passes its own hook to the validator
+    When that hook answers the request itself
+    Then its response is used unchanged
+    So the shared behaviour is a default, never an override
+
   @bdd @domain-errors
   Scenario: Producers emit both names for the discriminant
     Given a handled error is serialised by Go or by the REST layer

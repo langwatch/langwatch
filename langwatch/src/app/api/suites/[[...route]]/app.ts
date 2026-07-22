@@ -1,7 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { SimulationSuite } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
@@ -190,7 +191,13 @@ secured.access(requires("scenarios:view")).get(
   );
 
 // ── Create Suite ───────────────────────────────────────────
-secured.access(requires("scenarios:manage")).post(
+// Creating a run plan asks for `scenarios:create`, not `scenarios:manage`.
+// `:manage` still implies `:create` through the RBAC hierarchy, so every role
+// and key that could create a suite yesterday still can; what changes is that a
+// credential issued at the CREATE grain — which the product does issue — is now
+// honoured instead of refused at the door. A viewer holds only `scenarios:view`
+// and is declined exactly as before.
+secured.access(requires("scenarios:create")).post(
     "/",
     resourceLimitMiddleware("experiments"),
     describeRoute({
@@ -236,7 +243,8 @@ secured.access(requires("scenarios:manage")).post(
   );
 
 // ── Update Suite ───────────────────────────────────────────
-secured.access(requires("scenarios:manage")).patch(
+// `:update` for the same reason as `:create` above.
+secured.access(requires("scenarios:update")).patch(
     "/:id",
     describeRoute({
       description: "Update a suite (run plan)",
@@ -289,7 +297,9 @@ secured.access(requires("scenarios:manage")).patch(
   );
 
 // ── Duplicate Suite ────────────────────────────────────────
-secured.access(requires("scenarios:manage")).post(
+// A duplicate is a create: it leaves the source suite untouched and produces a
+// new one, so it asks for `scenarios:create`.
+secured.access(requires("scenarios:create")).post(
     "/:id/duplicate",
     describeRoute({
       description: "Duplicate a suite (run plan)",
@@ -336,7 +346,15 @@ secured.access(requires("scenarios:manage")).post(
   );
 
 // ── Run Suite ──────────────────────────────────────────────
-secured.access(requires("scenarios:manage")).post(
+// RUNNING A SUITE IS NOT ADMINISTERING IT. The run creates scenario runs; the
+// suite definition, its scenarios and its targets are left exactly as they
+// were. `scenarios:manage` is the grain that also carries delete, so gating a
+// run on it meant "you may only execute this if you may also destroy it" — and
+// it refused every credential the product issues at the write grain. A run
+// creates a run, so it asks for `scenarios:create`. `:manage` still implies it,
+// so nobody who could run a suite yesterday loses that today, and a viewer is
+// declined as before.
+secured.access(requires("scenarios:create")).post(
     "/:id/run",
     describeRoute({
       description: "Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount.",
@@ -403,6 +421,8 @@ secured.access(requires("scenarios:manage")).post(
   );
 
 // ── Delete (Archive) Suite ─────────────────────────────────
+// Archiving deliberately stays at `:manage` — it is the only grain that carries
+// destruction, and a credential scoped to read-and-write must not inherit it.
 secured.access(requires("scenarios:manage")).delete(
     "/:id",
     describeRoute({
