@@ -206,6 +206,8 @@ import { ProjectService } from "./projects/project.service";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
+import { createShareViewDedupeService } from "./share/share-view-dedupe.service";
+import { createSharedTracePayloadCache } from "./share/shared-trace-cache.service";
 import { ShareService } from "./share/share.service";
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
@@ -590,12 +592,11 @@ export function initializeDefaultApp(options?: {
   const pinnedTraceService = new PinnedTraceService(
     pinnedTraceRepo,
     async ({ projectId, traceId }) => {
-      const share = await shareRepo.findByResource({
+      return shareRepo.hasActiveShareForResource({
         projectId,
         resourceType: "TRACE",
         resourceId: traceId,
       });
-      return share !== null;
     },
   );
   const retroactiveUpdateService = new RetroactiveUpdateService(
@@ -612,9 +613,20 @@ export function initializeDefaultApp(options?: {
   };
 
   const share = traced(
-    new ShareService(shareRepo, pinnedTraceService),
+    new ShareService(shareRepo, pinnedTraceService, {
+      // Effective sharing = org AND project. Off at either level blocks new
+      // links; existing links stop resolving via resolveForViewer. ADR-057.
+      isTraceSharingEnabled: async (projectId) => {
+        const config = await projects.getTraceSharingConfig(projectId);
+        return !!config && config.orgEnabled && config.projectEnabled;
+      },
+      // Makes `maxViews` count viewings rather than requests, so a recipient
+      // refreshing a single-view link doesn't lock themselves out. ADR-057.
+      viewDedupe: createShareViewDedupeService(redis),
+    }),
     "ShareService",
   );
+  const sharedTraceCache = createSharedTracePayloadCache(redis);
 
   const langyConversationRepository = new PrismaLangyConversationRepository(
     prisma,
@@ -1259,6 +1271,7 @@ export function initializeDefaultApp(options?: {
     retentionPolicyCache,
     dataRetention,
     share,
+    sharedTraceCache,
     commands,
     ops,
     _eventSourcing: es,
@@ -1610,7 +1623,31 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     share: new ShareService(
       new PrismaShareRepository(testPrisma),
       testPinnedTraceService,
+      {
+        isTraceSharingEnabled: async (projectId) => {
+          // Effective sharing = org AND project (ADR-057).
+          const project = await testPrisma.project.findUnique({
+            where: { id: projectId },
+            select: {
+              traceSharingEnabled: true,
+              team: {
+                select: {
+                  organization: { select: { traceSharingEnabled: true } },
+                },
+              },
+            },
+          });
+          return (
+            !!project &&
+            project.team.organization.traceSharingEnabled &&
+            project.traceSharingEnabled
+          );
+        },
+      },
     ),
+    // No Redis in the test preset: every open counts as a viewing and nothing
+    // is cached, which is the stricter behaviour of both.
+    sharedTraceCache: createSharedTracePayloadCache(null),
     ...overrides,
   });
 }

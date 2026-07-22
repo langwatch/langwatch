@@ -24,6 +24,12 @@ interface ModeSwitchProps {
    * as broken even though the data is en route.
    */
   isConversationLoading?: boolean;
+  /**
+   * Removes the Conversation tab entirely. Used by the read-only share view,
+   * where conversation mode is suppressed (its backing queries need a
+   * session) — a disabled tab would imply it could ever become available.
+   */
+  isConversationHidden?: boolean;
   /** Trace id used to scope the per-mode peer presence dots. */
   traceId?: string;
   /**
@@ -144,6 +150,7 @@ export function ModeSwitch({
   turnLabel,
   hasConversation = true,
   isConversationLoading = false,
+  isConversationHidden = false,
   traceId,
   endSlot,
 }: ModeSwitchProps) {
@@ -185,15 +192,17 @@ export function ModeSwitch({
         onClick={() => onViewModeChange("trace")}
         presence={presenceFor("trace")}
       />
-      <ModeTab
-        label="Conversation"
-        shortcut="C"
-        active={viewMode === "conversation"}
-        disabled={conversationDisabled}
-        disabledReason={conversationDisabledReason}
-        onClick={() => onViewModeChange("conversation")}
-        presence={presenceFor("conversation")}
-      />
+      {!isConversationHidden && (
+        <ModeTab
+          label="Conversation"
+          shortcut="C"
+          active={viewMode === "conversation"}
+          disabled={conversationDisabled}
+          disabledReason={conversationDisabledReason}
+          onClick={() => onViewModeChange("conversation")}
+          presence={presenceFor("conversation")}
+        />
+      )}
       {turnLabel && viewMode === "trace" && (
         <Text textStyle="xs" color="fg.muted" marginLeft="auto">
           {turnLabel}

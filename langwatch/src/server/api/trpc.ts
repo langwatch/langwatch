@@ -856,3 +856,20 @@ export const protectedProcedure = permissionProcedureBuilder(
  *
  */
 export const publicProcedure = permissionProcedureBuilder(t.procedure);
+
+const authMiddlewares = (
+  enforceUserIsAuthed as unknown as { _middlewares: unknown[] }
+)._middlewares;
+
+/**
+ * Whether a built procedure skips `enforceUserIsAuthed` — i.e. was built from
+ * `publicProcedure` and is callable without a session. Backs the
+ * public-surface allowlist test, the tripwire that makes adding a new
+ * unauthenticated endpoint a deliberate, reviewed act.
+ */
+export function isPublicProcedure(procedure: unknown): boolean {
+  const middlewares =
+    (procedure as { _def?: { middlewares?: unknown[] } })._def?.middlewares ??
+    [];
+  return !middlewares.some((middleware) => authMiddlewares.includes(middleware));
+}
