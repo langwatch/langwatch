@@ -2,7 +2,7 @@
 	"name": "@langwatch/react-rum",
 	"version": "0.0.1",
 	"private": true,
-	"description": "Real user monitoring for React apps: browser tracing that joins to backend traces, session identity, and a tRPC link that times individual procedure calls",
+	"description": "Real user monitoring for React apps: browser tracing that joins to backend traces, plus session identity",
 	"type": "module",
 	"packageManager": "pnpm@10.24.0",
 	"main": "src/index.ts",

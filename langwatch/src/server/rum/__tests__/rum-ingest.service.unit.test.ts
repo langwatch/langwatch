@@ -185,6 +185,40 @@ describe("given a browser posting telemetry", () => {
     });
   });
 
+  describe("when the payload nests a shape that cannot be walked", () => {
+    // Each of these used to reach code that indexes or iterates the bad value,
+    // so a caller could turn a body of their choosing into a 500. A payload we
+    // cannot read is the caller's mistake and has to answer as one.
+    it.each([
+      ["a body of bare null", "null"],
+      ["a resource span that is not an object", '{"resourceSpans":[null]}'],
+      [
+        "attributes that are not a list",
+        '{"resourceSpans":[{"resource":{"attributes":"service.name"},"scopeSpans":[{"spans":[{}]}]}]}',
+      ],
+      [
+        "an attribute that is not an object",
+        '{"resourceSpans":[{"resource":{"attributes":[null]},"scopeSpans":[{"spans":[{}]}]}]}',
+      ],
+      [
+        "scopeSpans that are not a list",
+        '{"resourceSpans":[{"scopeSpans":{"spans":[{}]}}]}',
+      ],
+      [
+        "spans that are not a list",
+        '{"resourceSpans":[{"scopeSpans":[{"spans":7}]}]}',
+      ],
+    ])("refuses %s rather than failing on it", async (_case, body) => {
+      const ingest = ingestBrowserTraces({
+        body,
+        callerKey: `unwalkable-${_case}`,
+      });
+
+      await expect(ingest).rejects.toBeInstanceOf(RumPayloadInvalidError);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the collector is unreachable", () => {
     it("accepts the report rather than inviting the browser to retry", async () => {
       vi.stubGlobal(

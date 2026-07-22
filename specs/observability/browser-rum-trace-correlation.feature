@@ -141,7 +141,7 @@ Feature: Browser RUM and full-stack trace correlation
 
     Scenario: An oversized report is rejected
       When a client reports telemetry larger than the accepted size
-      Then the report is rejected before it is read into memory
+      Then the report is rejected before it reaches the collector
 
     Scenario: A report carrying too many spans is rejected
       When a client reports far more spans than a browser produces

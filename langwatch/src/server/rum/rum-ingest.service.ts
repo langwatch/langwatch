@@ -200,6 +200,49 @@ export function stampIdentity(resourceSpans: OtlpResourceSpans[]): void {
   }
 }
 
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * Confirms the export is walkable before anything walks it.
+ *
+ * Checking that `resourceSpans` is an array is not enough on its own, because
+ * what runs next reaches inside it: `countSpans` iterates `scopeSpans` and
+ * `stampIdentity` calls `.filter` on `resource.attributes`. A payload that
+ * makes either of those a string or an object throws a `TypeError`, and the
+ * route answers 500 to a body the caller chose. On a public endpoint that is a
+ * way to provoke server errors at will, so a shape we cannot walk is refused as
+ * the malformed input it is. Only the fields we touch are checked; everything
+ * else still passes through to the collector untouched.
+ */
+export function assertWalkableExport(resourceSpans: unknown[]): void {
+  const invalid = () => new RumPayloadInvalidError("Malformed payload");
+
+  for (const resourceSpan of resourceSpans) {
+    if (!isObject(resourceSpan)) throw invalid();
+
+    const { resource, scopeSpans } = resourceSpan;
+
+    if (resource !== void 0) {
+      if (!isObject(resource)) throw invalid();
+      const { attributes } = resource;
+      if (attributes !== void 0) {
+        if (!Array.isArray(attributes)) throw invalid();
+        if (attributes.some((attribute) => !isObject(attribute))) throw invalid();
+      }
+    }
+
+    if (scopeSpans !== void 0) {
+      if (!Array.isArray(scopeSpans)) throw invalid();
+      for (const scopeSpan of scopeSpans) {
+        if (!isObject(scopeSpan)) throw invalid();
+        const { spans } = scopeSpan;
+        if (spans !== void 0 && !Array.isArray(spans)) throw invalid();
+      }
+    }
+  }
+}
+
 /**
  * Rate-limit buckets.
  *
@@ -244,17 +287,23 @@ export async function ingestBrowserTraces({
 
   await enforceRateLimits(callerKey);
 
-  let payload: OtlpTraceExport;
+  let parsed: unknown;
   try {
-    payload = JSON.parse(body) as OtlpTraceExport;
+    parsed = JSON.parse(body);
   } catch {
     throw new RumPayloadInvalidError("Malformed payload");
   }
+
+  // `JSON.parse` answers with any JSON value, not just an object — a body of
+  // `null` reads the property off nothing and throws.
+  if (!isObject(parsed)) throw new RumPayloadInvalidError("Malformed payload");
+  const payload = parsed as OtlpTraceExport;
 
   const resourceSpans = payload.resourceSpans;
   if (!Array.isArray(resourceSpans) || resourceSpans.length === 0) {
     throw new RumPayloadInvalidError("Malformed payload");
   }
+  assertWalkableExport(resourceSpans);
 
   const spans = countSpans(resourceSpans);
   if (spans === 0) throw new RumPayloadInvalidError("Malformed payload");
