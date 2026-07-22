@@ -88,6 +88,16 @@ export interface LangyConversationEventsReader {
  */
 const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
 
+/**
+ * How long a read will wait out the dispatch window — the gap between a
+ * create command being ACCEPTED and its projection row landing. The projector
+ * is typically hundreds of milliseconds behind; six beats of 250ms covers the
+ * real distribution with room, while keeping the worst added latency for a
+ * conversation that truly died mid-dispatch at 1.5s.
+ */
+const DISPATCH_LAG_RETRIES = 6;
+const DISPATCH_LAG_RETRY_MS = 250;
+
 const conversationServiceLogger = createLogger(
   "langwatch:langy:conversation-service",
 );
@@ -222,6 +232,55 @@ export class LangyConversationService {
   ) {}
 
   /**
+   * The visibility read, tolerant of the DISPATCH window.
+   *
+   * A conversation whose create was just accepted has a pending handoff —
+   * written synchronously at dispatch — before its projection row lands, so
+   * "missing row + pending handoff" means NOT YET, never "never". In that
+   * window this retries briefly instead of reporting the very lie the
+   * `getById` doc below spends three paragraphs on: the panel used to render
+   * "conversation not found" moments before the same conversation's turn was
+   * accepted. A miss with NO handoff stays an immediate not-found — an
+   * unknown id must not grow a probe-friendly delay, and the retried read
+   * still enforces visibility, so the handoff's existence never widens
+   * access.
+   */
+  private async findVisibleToleratingDispatchLag({
+    id,
+    projectId,
+    userId,
+  }: {
+    id: string;
+    projectId: string;
+    userId: string;
+  }) {
+    const row = await this.repository.findVisibleById({
+      id,
+      projectId,
+      userId,
+    });
+    if (row) return row;
+
+    const handoff = await this.repository
+      .findPendingHandoff({ projectId, conversationId: id })
+      .catch(() => null);
+    if (!handoff) return null;
+
+    for (let attempt = 0; attempt < DISPATCH_LAG_RETRIES; attempt++) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, DISPATCH_LAG_RETRY_MS),
+      );
+      const retried = await this.repository.findVisibleById({
+        id,
+        projectId,
+        userId,
+      });
+      if (retried) return retried;
+    }
+    return null;
+  }
+
+  /**
    * A conversation the caller may see.
    *
    * THROWS `LangyConversationNotFoundError` when there is no such conversation —
@@ -251,7 +310,7 @@ export class LangyConversationService {
     projectId: string;
     userId: string;
   }): Promise<ConversationDetail> {
-    const row = await this.repository.findVisibleById({
+    const row = await this.findVisibleToleratingDispatchLag({
       id,
       projectId,
       userId,
@@ -302,7 +361,7 @@ export class LangyConversationService {
     /** True when the tail was cut at the ceiling — fetch again from `cursor`. */
     truncated: boolean;
   }> {
-    const visible = await this.repository.findVisibleById({
+    const visible = await this.findVisibleToleratingDispatchLag({
       id: conversationId,
       projectId,
       userId,
