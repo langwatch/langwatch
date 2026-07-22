@@ -82,14 +82,42 @@ files inside the app project for the same reason.
 ### Phase 1 — shrink `AppRouter` until declarations emit
 
 Give the fat tRPC procedures explicit `.output()` schemas so the merged router
-type stops being an inference pile. `langwatch/tsconfig.emit-probe.json` from
-#6018 measures the remaining gap; the target is zero TS7056.
+type stops being an inference pile. `langwatch/tsconfig.emit-probe.json`
+measures the gap; the target is zero TS7056.
 
 This is first because it is the only hard blocker, it is on the critical path
 for every package that touches the router, and it needs no file moves — so it
 can proceed while the tree is otherwise stable. It is also independently
 valuable: explicit output schemas are what stop a router leaking internal
 shapes, which is the same discipline ADR-057's share DTO applies.
+
+**Measured 2026-07-22** (probe run on the Phase 0 branch). Two numbers frame
+the work. The router surface is 77 files and 469 procedures, and `.output()`
+appears **zero** times across all of them — every return type is inferred.
+But the emit failures are not spread across those 469: there are **five**
+TS7056 sites, and four of them inherit from the first.
+
+| site | what it is |
+|---|---|
+| `src/server/api/root.ts:176` | `appRouter` — the root cause |
+| `src/utils/api.tsx:329`, `:337` | the two client-side mirrors |
+| `src/hooks/useSSESubscription.ts:24` | generic hook over the router |
+| `src/components/experiments/BatchEvaluationV2/BatchEvaluationV2EvaluationResults.tsx:26` | a hook inferring off `api.*` |
+
+Plus five TS2883 "cannot be named without a reference to…" sites, which need an
+explicit annotation rather than any restructuring:
+`spanTreePagedQuery.ts:41`, `modelProviders/utils.ts:29`,
+`scenarios/execution/model.factory.ts:18`, and two overlapping the table above.
+
+So Phase 1 is not "annotate 469 procedures". It is: shrink `appRouter` enough to
+serialize, then re-measure — the other four TS7056 sites are expected to fall
+with it. Annotate the procedures whose inferred types dominate, not all of them.
+
+The probe also reports nine TS6307 and one TS6059. **Those are artifacts of the
+probe's own config**, not code defects: it sets `rootDir: "."`, so a JSON import
+in `ee/billing` and `scripts/generate-langy-skills.ts`'s import of
+`../../skills/_lib/frontmatter.ts` fall outside its file list. The app tsconfig
+is fine with both. Do not chase them.
 
 ### Phase 2 — break the `app-layer` ↔ `event-sourcing` cycle
 
