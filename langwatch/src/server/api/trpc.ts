@@ -221,6 +221,33 @@ export function errorFormatterForTesting({
     : isInternalServerError
       ? HandledError.toUserMessage(error.cause)
       : shape.message;
+  // Whether `message` is prose a procedure deliberately wrote for a person.
+  //
+  // The client renders this one (`readAuthoredMessage`) because #5984 left
+  // plain non-5xx messages alone on purpose: several hundred procedures throw
+  // a `TRPCError` carrying real copy, and replacing those with "we've been
+  // notified" tells the user to wait for something that will never change.
+  //
+  // But only the server can tell authored copy from an accident, and it needs
+  // `cause`, which never crosses the wire. Two accidents to exclude:
+  //
+  //   - `new TRPCError({ code: "NOT_FOUND" })` — tRPC defaults `message` to
+  //     the code NAME, so the customer would read "NOT_FOUND".
+  //   - `new TRPCError({ code: "BAD_REQUEST", cause: err })` — the message is
+  //     inherited from whatever was caught, so a driver string ("fetch
+  //     failed", "Invalid time value") would be presented as our own copy.
+  //     That is the leak #5984 closed at 5xx, reopened one status class down.
+  //
+  // Deciding this here rather than by sniffing the message client-side is the
+  // difference between a fact and a guess.
+  const isAuthoredMessage =
+    !handled &&
+    !isInternalServerError &&
+    error.cause === undefined &&
+    typeof shape.message === "string" &&
+    shape.message.length > 0 &&
+    shape.message !== error.code;
+
   const shapeData = { ...shape.data };
   if (isInternalServerError || handled) {
     // tRPC includes stacks in development error shapes. Local callers should
@@ -239,6 +266,9 @@ export function errorFormatterForTesting({
         aiCallFailedCause ??
         limitInfo,
       error: domainError,
+      // See `isAuthoredMessage`. Absent/false means the client must not render
+      // `message` — it degrades to the generic unknown state instead.
+      authored: isAuthoredMessage,
       // The trace id for EVERY failure, not just handled ones. An unhandled
       // error deliberately tells the client nothing about what went wrong
       // (ADR-045), which leaves support with nothing to correlate on — so the

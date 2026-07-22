@@ -190,20 +190,33 @@ const SLUG_SHAPED = /^[a-z0-9]+(_[a-z0-9]+)*$/;
  * notified" is worse than the slug problem this module set out to fix: it
  * tells a user to wait for something that will never change.
  *
- * Returns `undefined` for anything 5xx, anything handled (the registry owns
- * that copy), anything that looks like a code slug, and anything that looks
- * like it came from a driver rather than a person — see {@link MACHINE_PROSE}.
+ * The server decides what counts as authored — it needs `cause`, which never
+ * crosses the wire — and says so with `data.authored`. This function trusts
+ * that flag and then applies a second, independent layer: a message that
+ * somehow arrives marked authored but reads like a machine wrote it is still
+ * refused. Belt and braces, because the cost of being wrong here is a Prisma
+ * string in front of a customer.
  */
 export function readAuthoredMessage(err: unknown): string | undefined {
   if (readHandledError(err)) return undefined;
 
-  const status = (err as { data?: { httpStatus?: unknown } })?.data?.httpStatus;
+  const data = (err as { data?: { httpStatus?: unknown; authored?: unknown } })
+    ?.data;
+
+  // The fact, not a guess about it. Without this the channel also carried
+  // `new TRPCError({ code: "NOT_FOUND" })` — whose message tRPC defaults to
+  // the code NAME, so the customer read "NOT_FOUND" — and every 4xx built
+  // around a `cause`, whose message is the caught error's.
+  if (data?.authored !== true) return undefined;
+
+  const status = data.httpStatus;
   if (typeof status !== "number" || status >= 500) return undefined;
 
   const message = (err as { message?: unknown })?.message;
   if (typeof message !== "string" || message.length === 0) return undefined;
 
   if (KNOWN_CODES.has(message) || SLUG_SHAPED.test(message)) return undefined;
+  if (SCREAMING_CASE.test(message)) return undefined;
   if (message.length > MAX_AUTHORED_LENGTH) return undefined;
   if (MACHINE_PROSE.test(message)) return undefined;
 
@@ -219,35 +232,35 @@ export function readAuthoredMessage(err: unknown): string | undefined {
  */
 const MAX_AUTHORED_LENGTH = 200;
 
+/** `NOT_FOUND`, `UNAUTHORIZED` — a tRPC code name, not a sentence. */
+const SCREAMING_CASE = /^[A-Z][A-Z0-9_]*$/;
+
 /**
  * Shapes that mean a machine wrote this string, not a person.
  *
- * The 4xx channel exists because several hundred procedures throw a plain
- * `TRPCError` whose message is real copy, and #5984 deliberately left those
- * alone. But plenty of routers also do
- * `new TRPCError({ code: "BAD_REQUEST", message: error.message })` around a
- * caught failure — `routers/apiKey.ts`, `dataPrivacy.ts`, `routingPolicies.ts`,
- * `personalVirtualKeys.ts`, `datasetRecord.ts` all do — which drags a Prisma
- * or socket diagnostic through the same hole at 4xx that #5984 closed at 5xx.
+ * The second layer behind `data.authored`, and deliberately conservative in
+ * the other direction: every pattern here has to be something no product
+ * person would ever type, because a false positive silently replaces good
+ * copy with "we've been notified".
  *
- * Provenance would be the right discriminator, but the throw sites don't
- * record it, and inventing a flag they'd have to remember to set trades a
- * silent leak for a silently-forgotten annotation. Recognising the machine's
- * own vocabulary is narrower than it looks: none of these read as English a
- * product person would have written.
+ * That is why this is case-SENSITIVE. An earlier version matched SQL keywords
+ * case-insensitively and would have eaten "Select a template from the list
+ * before running this." — real copy, killed by a guard nobody would think to
+ * look at. Likewise the stack-frame pattern is anchored to a line start, and
+ * the address pattern requires a port, so "The IP 10.0.0.1 is not allowed as a
+ * webhook destination" survives.
  */
 const MACHINE_PROSE = new RegExp(
   [
     "\\bprisma\\.", // Invalid `prisma.user.create()` invocation
-    "\\bPrismaClient", //
-    "\\b(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE)\\b.*\\b(?:FROM|WHERE|VALUES|SET)\\b",
+    "\\bPrismaClient",
+    // Upper-case only: SQL is shouted, prose is not.
+    "\\b(?:SELECT|INSERT INTO|UPDATE|DELETE FROM)\\b.*\\b(?:FROM|WHERE|VALUES|SET)\\b",
     "\\b(?:ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EPIPE|EAI_AGAIN)\\b",
-    "\\bat\\s+\\w+[\\w.]*\\s+\\(", // a stack frame
-    "\\b\\w+Error:\\s", // "TypeError: ...", "SyntaxError: ..."
-    "://[^\\s]*", // a URL, which means a hostname
-    "\\b\\d{1,3}(?:\\.\\d{1,3}){3}\\b", // an IP address
+    "(?:^|\\n)\\s*at\\s+\\S+\\s+\\(", // a stack frame, at a line start
+    "\\b[A-Z]\\w*Error:\\s", // "TypeError: ...", "SyntaxError: ..."
     "\\bnode_modules\\b",
+    "\\b\\d{1,3}(?:\\.\\d{1,3}){3}:\\d+", // an address WITH a port
     "\\b(?:invocation|constraint failed|deadlock detected)\\b",
   ].join("|"),
-  "i",
 );
