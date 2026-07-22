@@ -50,6 +50,10 @@ export type CodexPollResult =
  * "keep waiting" cases from terminal ones.
  */
 export class CodexAuthError extends HandledError {
+  /** The issuer's HTTP status for kind "http" — what separates an OAuth
+   *  rejection (4xx + error body) from a retryable outage (5xx, network). */
+  public readonly status?: number;
+
   constructor(
     public readonly kind:
       | "http"
@@ -57,6 +61,7 @@ export class CodexAuthError extends HandledError {
       | "timed_out"
       | "refresh_rejected",
     message: string,
+    options?: { status?: number },
   ) {
     super("codex_auth_failed", message, {
       meta: { kind },
@@ -64,6 +69,7 @@ export class CodexAuthError extends HandledError {
       httpStatus: kind === "refresh_rejected" ? 401 : 502,
     });
     this.name = "CodexAuthError";
+    this.status = options?.status;
   }
 }
 
@@ -152,9 +158,13 @@ export class CodexAccountService {
   }
 
   /**
-   * Refresh an expired access token. A rejection here means the session is
-   * genuinely dead (revoked, or the refresh token aged out) and the user must
-   * sign in again — callers surface that, they don't retry.
+   * Refresh an expired access token. Only a CONFIRMED OAuth rejection (the
+   * issuer answering 4xx with `invalid_grant`: revoked, or the refresh token
+   * aged out) becomes `refresh_rejected` — the terminal signal that sends the
+   * user back to sign-in. A timeout, DNS failure, issuer 5xx, rate limit or
+   * malformed body stays a retryable failure: the session may be perfectly
+   * valid, and telling its owner to re-authenticate for OpenAI's outage
+   * would sign them out for nothing.
    */
   async refresh(keys: CodexTokenKeys): Promise<CodexTokenKeys> {
     const form = new URLSearchParams({
@@ -167,13 +177,26 @@ export class CodexAccountService {
     try {
       json = await this.postForm(`${this.issuer}/oauth/token`, form);
     } catch (error) {
+      if (isTerminalOAuthRejection(error)) {
+        logger.warn(
+          { error: error.message },
+          "codex token refresh rejected by the issuer",
+        );
+        throw new CodexAuthError(
+          "refresh_rejected",
+          "OpenAI session expired; sign in again",
+        );
+      }
       logger.warn(
         { error: error instanceof Error ? error.message : String(error) },
-        "codex token refresh rejected",
+        "codex token refresh failed transiently",
       );
+      if (error instanceof CodexAuthError) throw error;
+      // A raw fetch failure (DNS, timeout, reset) — wrap it so callers get
+      // the same retryable HandledError shape as an issuer 5xx.
       throw new CodexAuthError(
-        "refresh_rejected",
-        "OpenAI session expired; sign in again",
+        "http",
+        error instanceof Error ? error.message : String(error),
       );
     }
     const tokens = this.parseTokens(json, {
@@ -264,6 +287,7 @@ export class CodexAccountService {
       throw new CodexAuthError(
         "http",
         `HTTP ${response.status}: ${text.slice(0, 200)}`,
+        { status: response.status },
       );
     }
     try {
@@ -272,6 +296,23 @@ export class CodexAccountService {
       throw new CodexAuthError("malformed", "non-JSON auth response");
     }
   }
+}
+
+/**
+ * True only for the issuer's own rejection of the grant: a 4xx answer whose
+ * body names `invalid_grant` (revoked session / rotated-away refresh token).
+ * Everything else — 5xx, 429, network failures, malformed bodies — is a
+ * provider problem, not a dead session.
+ */
+function isTerminalOAuthRejection(error: unknown): error is CodexAuthError {
+  return (
+    error instanceof CodexAuthError &&
+    error.kind === "http" &&
+    error.status !== undefined &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    error.message.includes("invalid_grant")
+  );
 }
 
 /**
@@ -293,13 +334,29 @@ export class CodexGatewayRefreshService {
 
   constructor(
     private readonly repository: {
-      findByIdWithDecryptedKeys: (
-        id: string,
-      ) => Promise<{ provider: string; customKeys: unknown } | null>;
+      findByIdWithDecryptedKeys: (id: string) => Promise<{
+        provider: string;
+        organizationId: string;
+        customKeys: unknown;
+      } | null>;
       replaceCustomKeys: (args: {
         id: string;
         customKeys: Record<string, unknown>;
       }) => Promise<void>;
+    },
+    /**
+     * The gateway's cache-invalidation feed. A rotation MUST land here: the
+     * gateway resolves credentials into an in-memory bundle, and without a
+     * MODEL_PROVIDER_UPDATED event it keeps dispatching with the pre-rotation
+     * access token — every request 401s, refreshes again, and rotates the
+     * token in a loop.
+     */
+    private readonly changeEvents: {
+      append: (input: {
+        organizationId: string;
+        kind: "MODEL_PROVIDER_UPDATED";
+        modelProviderId: string;
+      }) => Promise<unknown>;
     },
     private readonly engine: CodexAccountService = new CodexAccountService(),
   ) {}
@@ -347,6 +404,15 @@ export class CodexGatewayRefreshService {
     await this.repository.replaceCustomKeys({
       id: providerRowId,
       customKeys: refreshed,
+    });
+    // Evict the gateway's cached bundle for this credential so the NEXT
+    // dispatch resolves the rotated token instead of replaying the stale one
+    // into another 401 -> refresh loop. The in-flight retry already carries
+    // the fresh token from this response.
+    await this.changeEvents.append({
+      organizationId: row.organizationId,
+      kind: "MODEL_PROVIDER_UPDATED",
+      modelProviderId: providerRowId,
     });
     return {
       status: "refreshed",

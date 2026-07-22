@@ -8,6 +8,7 @@ import type { CodexTokenKeys } from "../codexAccount.schema";
 import {
   CodexAccountService,
   CodexAuthError,
+  CodexGatewayRefreshService,
   decodeCodexClaims,
 } from "../codexAccount.service";
 
@@ -165,6 +166,31 @@ describe("CodexAccountService", () => {
         kind: "refresh_rejected",
       });
     });
+
+    it("keeps an issuer 5xx retryable instead of declaring the session dead", async () => {
+      const { impl } = scriptedFetch({
+        "/oauth/token": () => ({
+          status: 503,
+          json: { error: "temporarily_unavailable" },
+        }),
+      });
+      const service = new CodexAccountService(impl, "https://issuer.test");
+      await expect(service.refresh(storedKeys)).rejects.toMatchObject({
+        name: "CodexAuthError",
+        kind: "http",
+      });
+    });
+
+    it("keeps a network failure retryable instead of declaring the session dead", async () => {
+      const impl = (async () => {
+        throw new TypeError("fetch failed: getaddrinfo ENOTFOUND");
+      }) as unknown as typeof fetch;
+      const service = new CodexAccountService(impl, "https://issuer.test");
+      await expect(service.refresh(storedKeys)).rejects.toMatchObject({
+        name: "CodexAuthError",
+        kind: "http",
+      });
+    });
   });
 
   describe("decodeCodexClaims", () => {
@@ -197,6 +223,116 @@ describe("CodexAccountService", () => {
       await expect(service.startDeviceSignIn()).rejects.toBeInstanceOf(
         CodexAuthError,
       );
+    });
+  });
+});
+
+describe("CodexGatewayRefreshService", () => {
+  const storedKeys: CodexTokenKeys = {
+    CODEX_ACCESS_TOKEN: "old-access",
+    CODEX_REFRESH_TOKEN: "refresh-1",
+    CODEX_ID_TOKEN: ID_TOKEN,
+    CODEX_ACCOUNT_ID: "acct-123",
+    CODEX_PLAN: "pro",
+    CODEX_EMAIL: "dev@example.com",
+    // Long past the just-refreshed window, so the service really refreshes.
+    CODEX_TOKENS_SAVED_AT: "2026-07-01T00:00:00.000Z",
+  };
+
+  function harness(tokenEndpoint: () => { status: number; json: unknown }) {
+    const replaced: Record<string, unknown>[] = [];
+    const events: {
+      organizationId: string;
+      kind: string;
+      modelProviderId: string;
+    }[] = [];
+    const repository = {
+      findByIdWithDecryptedKeys: async () => ({
+        provider: "openai_codex",
+        organizationId: "org-1",
+        customKeys: storedKeys,
+      }),
+      replaceCustomKeys: async (args: {
+        id: string;
+        customKeys: Record<string, unknown>;
+      }) => {
+        replaced.push(args.customKeys);
+      },
+    };
+    const changeEvents = {
+      append: async (input: {
+        organizationId: string;
+        kind: "MODEL_PROVIDER_UPDATED";
+        modelProviderId: string;
+      }) => {
+        events.push(input);
+        return { revision: 1n };
+      },
+    };
+    const { impl } = scriptedFetch({ "/oauth/token": tokenEndpoint });
+    const engine = new CodexAccountService(impl, "https://issuer.test");
+    const service = new CodexGatewayRefreshService(
+      repository,
+      changeEvents,
+      engine,
+    );
+    return { service, replaced, events };
+  }
+
+  describe("when the refresh succeeds", () => {
+    it("persists the rotation AND evicts the gateway's cached credential", async () => {
+      // Without the change event the gateway keeps dispatching the stale
+      // token from its in-memory bundle: every request 401s, refreshes
+      // again, and the tokens rotate in a loop.
+      const { service, replaced, events } = harness(() => ({
+        status: 200,
+        json: { access_token: "new-access" },
+      }));
+
+      const result = await service.refreshForGateway("row-1");
+
+      expect(result).toMatchObject({
+        status: "refreshed",
+        accessToken: "new-access",
+      });
+      expect(replaced).toHaveLength(1);
+      expect(events).toEqual([
+        {
+          organizationId: "org-1",
+          kind: "MODEL_PROVIDER_UPDATED",
+          modelProviderId: "row-1",
+        },
+      ]);
+    });
+  });
+
+  describe("when the issuer rejects the grant", () => {
+    it("reports a dead session and leaves the stored tokens untouched", async () => {
+      const { service, replaced, events } = harness(() => ({
+        status: 400,
+        json: { error: "invalid_grant" },
+      }));
+
+      const result = await service.refreshForGateway("row-1");
+
+      expect(result).toEqual({ status: "session_expired" });
+      expect(replaced).toHaveLength(0);
+      expect(events).toHaveLength(0);
+    });
+  });
+
+  describe("when the issuer fails transiently", () => {
+    it("propagates the retryable failure instead of declaring the session dead", async () => {
+      const { service, replaced } = harness(() => ({
+        status: 503,
+        json: { error: "temporarily_unavailable" },
+      }));
+
+      await expect(service.refreshForGateway("row-1")).rejects.toMatchObject({
+        name: "CodexAuthError",
+        kind: "http",
+      });
+      expect(replaced).toHaveLength(0);
     });
   });
 });

@@ -381,6 +381,7 @@ secured.access(gatewayPolicy()).post("/codex/refresh", async (c) => {
   }
   const service = new CodexGatewayRefreshService(
     new ModelProviderRepository(prisma),
+    new ChangeEventRepository(prisma),
   );
   const result = await service.refreshForGateway(body.provider_row_id);
   if (result.status === "not_connected") {
