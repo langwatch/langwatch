@@ -174,7 +174,33 @@ describe("explainHandledError", () => {
         field: "projectId",
         query: "SELECT * FROM traces",
         syntaxError: "at line 4: unexpected token",
+        recipient: "ops-oncall@internal.example",
+        channel: "#platform-alerts-internal",
+        upstreamHost: "clickhouse-0.internal",
         fieldErrors: { projectId: ["Required"], organizationId: ["Required"] },
+      };
+
+      /**
+       * Values a registry entry is allowed to echo, each with its reason.
+       *
+       * An exemption is a decision, so it is written down here rather than
+       * expressed as an absence from the poison list — the previous version of
+       * this test asserted against four hand-picked strings, which meant the
+       * three entries that DO render meta verbatim (`syntaxError`,
+       * `recipient`, `channel`) were never checked at all and the test
+       * reported a coverage it didn't have.
+       */
+      const ALLOWED_ECHOES: Record<string, string> = {
+        // The user typed this filter field themselves; naming it back is the
+        // whole point of `filter_field_unknown`.
+        field: "echoed by filter_field_unknown, and it is the user's own input",
+        // The user pasted the template/config being validated, so the parser's
+        // position is the only thing that makes the error actionable.
+        syntaxError: "echoed by template_validation_error, from user input",
+        // The user chose the destination; naming it is how they know which
+        // one to fix.
+        recipient: "echoed by the notification codes, chosen by the user",
+        channel: "echoed by the notification codes, chosen by the user",
       };
 
       for (const code of ALL_CODES) {
@@ -183,16 +209,15 @@ describe("explainHandledError", () => {
         );
         const rendered = `${title} ${description}`;
 
-        // Values that could only have come from the server. Deliberately not
-        // `field` — echoing back a filter field the user typed themselves is
-        // correct, and `filter_field_unknown` does exactly that.
-        for (const leaked of [
-          "auth_failed",
-          "ECONNREFUSED",
-          "10.0.0.4",
-          "SELECT",
-        ]) {
-          expect(rendered, `${code} leaked ${leaked}`).not.toContain(leaked);
+        for (const [key, value] of Object.entries(poison)) {
+          if (typeof value !== "string") continue;
+          if (key in ALLOWED_ECHOES) continue;
+
+          expect(
+            rendered,
+            `${code} rendered meta.${key} ("${value}") to the customer. If that ` +
+              `is deliberate, add it to ALLOWED_ECHOES with the reason.`,
+          ).not.toContain(value);
         }
       }
     });

@@ -1,15 +1,8 @@
 import { toaster } from "~/components/ui/toaster";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
-import {
-  explainHandledError,
-  UNKNOWN_ERROR_PRESENTATION,
-} from "./presentation";
-import {
-  readAuthoredMessage,
-  readErrorTraceId,
-  readHandledError,
-} from "./readHandledError";
+import { explainAnyError } from "./presentation";
+import { readErrorTraceId, readHandledError } from "./readHandledError";
 
 export interface ShowErrorToastOptions {
   /**
@@ -59,12 +52,7 @@ export function showErrorToast({
   if (isHandledByGlobalHandler(error)) return;
 
   const handled = readHandledError(error);
-  const authored = readAuthoredMessage(error);
-  const explanation = handled
-    ? explainHandledError(handled)
-    : authored
-      ? { ...UNKNOWN_ERROR_PRESENTATION, description: authored }
-      : UNKNOWN_ERROR_PRESENTATION;
+  const explanation = explainAnyError(error);
 
   // A code the registry recognises has copy written for this exact failure, so
   // it wins over the caller's generic "couldn't do the thing". Everything else

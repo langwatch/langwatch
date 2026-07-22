@@ -1,15 +1,8 @@
 import { Box, HStack, List, Stack, Text } from "@chakra-ui/react";
 import { AlertCircle } from "lucide-react";
 
-import {
-  explainHandledError,
-  UNKNOWN_ERROR_PRESENTATION,
-} from "../logic/presentation";
-import {
-  readAuthoredMessage,
-  readErrorTraceId,
-  readHandledError,
-} from "../logic/readHandledError";
+import { explainAnyError } from "../logic/presentation";
+import { readErrorTraceId, readHandledError } from "../logic/readHandledError";
 
 import { ErrorActions } from "./ErrorActions";
 
@@ -57,12 +50,7 @@ export function HandledErrorAlert({
   if (!error) return null;
 
   const handled = readHandledError(error);
-  const authored = readAuthoredMessage(error);
-  const explanation = handled
-    ? explainHandledError(handled)
-    : authored
-      ? { ...UNKNOWN_ERROR_PRESENTATION, description: authored }
-      : UNKNOWN_ERROR_PRESENTATION;
+  const explanation = explainAnyError(error);
 
   // The registry description and the server's tips are competing authorings of
   // the same remediation — "Narrow the time range or add a filter" is both the

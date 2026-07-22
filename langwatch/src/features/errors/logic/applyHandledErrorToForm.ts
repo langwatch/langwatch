@@ -35,9 +35,21 @@ export const FORM_SERVER_ERROR = "root.serverError";
 export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   error,
   form,
+  hasFormErrorSlot = false,
 }: {
   error: unknown;
   form: UseFormReturn<TFieldValues>;
+  /**
+   * Whether this form renders `<FormServerError form={form} />`.
+   *
+   * Form-level complaints (`meta.formErrors`) have nowhere to go on a form
+   * that doesn't render the root slot: `setError("root.serverError")` succeeds,
+   * nothing displays it, and claiming the error suppresses the caller's toast
+   * — so the user clicks Save and absolutely nothing happens. That is strictly
+   * worse than the raw-message toast this module set out to replace, so the
+   * default is the safe one: don't claim what you can't show.
+   */
+  hasFormErrorSlot?: boolean;
 }): boolean {
   const handled = readHandledError(error);
   if (handled?.code !== "validation_error") return false;
@@ -66,7 +78,11 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   );
   const applicable = nonEmpty.filter(([field]) => ownsLeaf(field));
 
-  if (applicable.length === 0 && formErrors.length === 0) return false;
+  // Only the errors this form can actually put on screen count towards
+  // claiming it. See `hasFormErrorSlot`.
+  const showableFormErrors = hasFormErrorSlot ? formErrors : [];
+
+  if (applicable.length === 0 && showableFormErrors.length === 0) return false;
 
   applicable.forEach(([field, messages], index) => {
     form.setError(
@@ -77,16 +93,21 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
     );
   });
 
-  if (formErrors.length > 0) {
+  if (showableFormErrors.length > 0) {
     form.setError(FORM_SERVER_ERROR as Path<TFieldValues>, {
       type: "server",
-      message: formErrors.join(" "),
+      message: showableFormErrors.join(" "),
     });
   }
 
   // Claim the error only if the form showed ALL of it. On a partial match the
-  // unclaimed complaints would be shown nowhere, so the caller still toasts.
-  return applicable.length === nonEmpty.length;
+  // unclaimed complaints would be shown nowhere, so the caller still toasts —
+  // and an unshowable form-level complaint is never a partial match, it is a
+  // total one, so it fails this check too.
+  return (
+    applicable.length === nonEmpty.length &&
+    showableFormErrors.length === formErrors.length
+  );
 }
 
 /** An object/array value — a container, not something an input binds to. */

@@ -48,6 +48,28 @@ export interface ErrorPresentation {
   describe?: (error: HandledErrorShape) => string;
 }
 
+/**
+ * Server prose, clamped to something that can only ever be a sentence.
+ *
+ * The unregistered-code path is the one place a description comes from the
+ * payload rather than from this file, and the payload is not always ours: a
+ * handled error relayed from a Go service is parsed out of an upstream
+ * response body (`nlpgo/goHandledError.ts` forwards `message` and the whole of
+ * `meta` verbatim), and that body comes from whatever model-provider endpoint
+ * the customer configured. React escapes it, so this is not an injection —
+ * but an upstream should not get to write a paragraph inside LangWatch's own
+ * error chrome, and a driver diagnostic that lands here should be truncated
+ * rather than recited.
+ */
+function safeProse(value: string): string {
+  const collapsed = value.replace(/\s+/g, " ").trim();
+  if (collapsed.length === 0) return "";
+  if (collapsed.length <= MAX_PROSE_LENGTH) return collapsed;
+  return `${collapsed.slice(0, MAX_PROSE_LENGTH - 1).trimEnd()}…`;
+}
+
+const MAX_PROSE_LENGTH = 200;
+
 /** Reads a string out of `meta` without trusting it. */
 const str = (
   error: HandledErrorShape,
@@ -467,11 +489,38 @@ const presentations = {
   },
   upstream_http_error: {
     title: "A connected service returned an error",
-    describe: () => "Try again in a moment.",
+    // `meta.upstreamStatus` is attached by `nodeErrorDomain.ts` precisely so
+    // this entry can use it. A status is the one detail that changes what the
+    // customer should do: 401/403 is a key they can fix, 429 is a wait, 5xx is
+    // the other service's problem. Naming the number without the vocabulary
+    // around it keeps it useful without turning the toast into a stack trace.
+    describe: (error) => {
+      const status = error.meta.upstreamStatus;
+      if (typeof status !== "number") return "Try again in a moment.";
+      if (status === 401 || status === 403) {
+        return "Check the credentials for that service, then try again.";
+      }
+      if (status === 429) return "It's rate limiting us. Try again shortly.";
+      if (status >= 500) return "It's having trouble. Try again in a moment.";
+      return "Check its configuration, then try again.";
+    },
+  },
+  guardrail_attach_forbidden: {
+    title: "You don't have permission to attach guardrails",
+    describe: () => "Ask an admin on your team for access to this project.",
   },
   ssrf_blocked: {
     title: "That address isn't allowed",
     describe: () => "Use a public URL that isn't on an internal network.",
+  },
+  config_invalid: {
+    title: "A service isn't set up correctly",
+    // Deliberately says nothing more. `pkg/config` builds this error's meta by
+    // resolving each failed struct field to its environment variable name, so
+    // the detail here is literally a list of our env vars — the operator finds
+    // them in the service logs, where they belong. This is the clearest case
+    // in the registry of a code whose meta must never be rendered.
+    describe: () => "This one's on us — we've been notified.",
   },
 
   // ---- Langy agent ----
@@ -676,11 +725,11 @@ const presentations = {
 >;
 
 /**
- * Field names a customer can actually see and act on.
+ * Wire identifiers translated into the words the evaluator UI puts on screen.
  *
- * Anything not here is a wire identifier — `projectId`, `organizationId`,
- * `checkId` — and naming it in a toast is the same leak as showing a code
- * slug, just via `meta` instead of `message`.
+ * `meta.field` arrives as `candidate_a_id`; the customer is looking at a
+ * column labelled "Variant A". An unmapped field means we have no idea what
+ * the customer calls it, so the copy stays generic rather than guessing.
  */
 const EVALUATOR_FIELD_LABELS: Record<string, string> = {
   candidate_a_id: "Variant A",
@@ -691,6 +740,13 @@ const EVALUATOR_FIELD_LABELS: Record<string, string> = {
   contexts: "the contexts",
 };
 
+/**
+ * Field names a customer can actually see and act on.
+ *
+ * Anything not here is a wire identifier — `projectId`, `organizationId`,
+ * `checkId` — and naming it in a toast is the same leak as showing a code
+ * slug, just via `meta` instead of `message`.
+ */
 const USER_VISIBLE_FIELDS = new Set([
   "name",
   "slug",
@@ -760,8 +816,10 @@ export function explainHandledError(
       title: FAULT_TITLES[error.fault],
       // `meta.message` is the deliberate opt-in channel for server-authored
       // prose (it mirrors Go's `Meta["message"]`). It is the only place the
-      // server is allowed to put a sentence, so it is the only place we look.
-      description: str(error, "message", ""),
+      // server is allowed to put a sentence, so it is the only place we look
+      // — and even here it is only a sentence's worth, because the payload
+      // does not always originate with us. See `safeProse`.
+      description: safeProse(str(error, "message", "")),
       isRegistered: false,
     };
   }
@@ -785,6 +843,29 @@ export function explainSerializedError(
 }
 
 /**
+ * Explains ANY error — handled, authored, or neither.
+ *
+ * This is the three-way branch, in one place. It was previously inlined in
+ * `showErrorToast`, `describeError` and `<HandledErrorAlert>`, and hand-copied
+ * at seven more call sites — every one of which reproduced only two of the
+ * three branches and so silently threw away prose a procedure had written for
+ * the user. A branch that must be repeated is a branch that will be repeated
+ * wrong.
+ *
+ * Prefer `showErrorToast` or `<HandledErrorAlert>` where you can render
+ * something; reach for this when you need the title and description apart.
+ */
+export function explainAnyError(error: unknown): ErrorExplanation {
+  const handled = readHandledError(error);
+  if (handled) return explainHandledError(handled);
+
+  const authored = readAuthoredMessage(error);
+  return authored
+    ? { ...UNKNOWN_ERROR_PRESENTATION, description: authored }
+    : UNKNOWN_ERROR_PRESENTATION;
+}
+
+/**
  * The whole explanation as one string, for slots that can only take text —
  * a `title=` tooltip, a state field typed `string`, an aria-label.
  *
@@ -800,13 +881,7 @@ export function describeError({
   error: unknown;
   fallbackTitle?: string;
 }): string {
-  const handled = readHandledError(error);
-  const authored = readAuthoredMessage(error);
-  const explanation = handled
-    ? explainHandledError(handled)
-    : authored
-      ? { ...UNKNOWN_ERROR_PRESENTATION, description: authored }
-      : UNKNOWN_ERROR_PRESENTATION;
+  const explanation = explainAnyError(error);
 
   const title = explanation.isRegistered
     ? explanation.title

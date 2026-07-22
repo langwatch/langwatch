@@ -75,6 +75,15 @@ export function ErrorActions({ docsUrl, traceId }: ErrorActionsProps) {
           <ExternalLinkIcon width={10} height={10} />
         </Link>
       )}
+      {/*
+        No clipboard API — an insecure origin (a self-hosted instance on plain
+        http), or a browser that withholds it. The id is the only handle a
+        customer has to give support, so it is shown as text rather than
+        withheld along with the button that would have copied it.
+      */}
+      {traceId && !canCopy && (
+        <chakra.span userSelect="all">Error ID: {traceId}</chakra.span>
+      )}
       {traceId && canCopy && (
         <chakra.button
           type="button"

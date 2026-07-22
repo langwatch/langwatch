@@ -25,8 +25,8 @@ const validationError = (meta: Record<string, unknown>) => ({
 
 // The bridge only touches `getValues` and `setError`; the rest of
 // UseFormReturn is irrelevant to it.
-const apply = (error: unknown, form: FormStub) =>
-  applyHandledErrorToForm({ error, form: form as never });
+const apply = (error: unknown, form: FormStub, hasFormErrorSlot = false) =>
+  applyHandledErrorToForm({ error, form: form as never, hasFormErrorSlot });
 
 describe("applyHandledErrorToForm", () => {
   describe("given a validation error naming fields the form owns", () => {
@@ -70,13 +70,14 @@ describe("applyHandledErrorToForm", () => {
     });
   });
 
-  describe("given form-level errors", () => {
-    it("puts them on the form root", () => {
+  describe("given form-level errors and a form that renders the root slot", () => {
+    it("puts them on the form root and claims the error", () => {
       const form = formWithFields("name");
 
       const isConsumed = apply(
         validationError({ formErrors: ["Pick at least one channel."] }),
         form,
+        true,
       );
 
       expect(isConsumed).toBe(true);
@@ -84,6 +85,48 @@ describe("applyHandledErrorToForm", () => {
         type: "server",
         message: "Pick at least one channel.",
       });
+    });
+  });
+
+  describe("given form-level errors and a form with no root slot", () => {
+    /**
+     * The failure this protects against is silence, which is worse than the
+     * raw-message toast the module replaced: `setError("root.serverError")`
+     * succeeds whether or not anything renders it, so claiming the error
+     * suppressed the caller's toast and the user got no feedback at all from
+     * pressing Save. Every call site was in this state until now.
+     */
+    it("declines it so the caller still reports the failure", () => {
+      const form = formWithFields("name");
+
+      const isConsumed = apply(
+        validationError({ formErrors: ["Pick at least one channel."] }),
+        form,
+      );
+
+      expect(isConsumed).toBe(false);
+      expect(form.setError).not.toHaveBeenCalled();
+    });
+
+    it("still marks the fields it can show, so the form isn't left clean", () => {
+      const form = formWithFields("name");
+
+      const isConsumed = apply(
+        validationError({
+          fieldErrors: { name: ["Required"] },
+          formErrors: ["Pick at least one channel."],
+        }),
+        form,
+      );
+
+      expect(form.setError).toHaveBeenCalledWith(
+        "name",
+        { type: "server", message: "Required" },
+        { shouldFocus: true },
+      );
+      // Partial: the form-level complaint has nowhere to go, so the toast
+      // must still fire.
+      expect(isConsumed).toBe(false);
     });
   });
 

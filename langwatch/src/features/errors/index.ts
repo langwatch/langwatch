@@ -19,6 +19,7 @@ export { APP_ERROR_CODES } from "./logic/codes";
 export type { ErrorExplanation, ErrorPresentation } from "./logic/presentation";
 export {
   describeError,
+  explainAnyError,
   explainHandledError,
   explainSerializedError,
   UNKNOWN_ERROR_PRESENTATION,
