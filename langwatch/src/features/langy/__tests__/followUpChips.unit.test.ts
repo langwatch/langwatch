@@ -87,6 +87,50 @@ describe("deriveFollowUpChips", () => {
       });
     });
 
+    describe("when the search arrived through the CLI envelope", () => {
+      /**
+       * The live transport: opencode ran the CLI through `bash`, and the
+       * envelope retyped the call to `langwatch.trace.search` while keeping
+       * the shell payload as its input. The CLI's `trace search` has no
+       * field-filter flags at all (`--query/--start-date/--end-date/--limit`
+       * only), so nothing can be recompiled into the graph or the alert —
+       * every offer must resolve at the plain grade, as real links to real
+       * surfaces, never as silence and never as a carried label that lies.
+       */
+      it("offers the surfaces as plain chips with real destinations", () => {
+        const chips = deriveFollowUpChips({
+          call: traceSearch({
+            input: {
+              command:
+                "langwatch trace search --query 'checkout failed' --limit 25",
+            },
+          }),
+          projectSlug: "demo",
+        });
+
+        expect(chips).toEqual([
+          {
+            id: "traces:observability.analytics",
+            label: "Open in Analytics",
+            href: "/demo/analytics",
+            carried: false,
+          },
+          {
+            id: "traces:observability.annotations",
+            label: "Open in Annotations",
+            href: "/demo/annotations",
+            carried: false,
+          },
+          {
+            id: "traces:library.datasets",
+            label: "Open in Datasets",
+            href: "/demo/datasets",
+            carried: false,
+          },
+        ]);
+      });
+    });
+
     describe("when there is no project to build a link from", () => {
       it("offers nothing rather than a dead link", () => {
         const chips = deriveFollowUpChips({
