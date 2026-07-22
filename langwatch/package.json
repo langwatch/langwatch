@@ -267,7 +267,7 @@
     "@types/ws": "^8.18.1",
     "@typescript/native-preview": "7.0.0-dev.20260705.1",
     "@vitejs/plugin-react": "^6.0.3",
-    "@vitest/browser": "^4.1.9",
+    "@vitest/browser": "^4.1.10",
     "@vitest/browser-playwright": "^4.1.9",
     "@vitest/coverage-v8": "^4.1.9",
     "@vitest/ui": "^4.1.9",
