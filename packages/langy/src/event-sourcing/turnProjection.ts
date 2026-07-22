@@ -15,13 +15,16 @@
  * replaces the document (past turns are rendered from message history, not
  * from this projection).
  */
-import { compareLangyEventCursors, type LangyEventCursor } from "./cursor";
+import {
+  compareLangyEventCursors,
+  type LangyEventCursor,
+} from "./contracts/cursor";
+import type { LangyConversationTurnWireEvent } from "./contracts/turnWire";
 import {
   foldLangyConversationTurn,
   initLangyConversationTurnState,
   type LangyConversationTurnFoldState,
-  type LangyConversationTurnWireEvent,
-} from "./turnFold";
+} from "./folds/turnFold";
 
 export interface LangyTurnProjectionState {
   /** Position of the last folded event; null before the snapshot seeds it. */
