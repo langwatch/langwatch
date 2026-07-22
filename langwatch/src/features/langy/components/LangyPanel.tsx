@@ -555,7 +555,13 @@ function LangyPanel({
   // keeps pointer events, drops `aria-hidden`, and makes its own body inert
   // (below) so nothing behind the edge is tabbable. When it is off, closed
   // means what it always meant: invisible, and the launcher orb opens it.
-  const peeking = peekEnabled && !isOpen;
+  // ...and stands down entirely while the home's ask field is in use. The
+  // field and this panel are two ways to say the same thing, so a peek sitting
+  // under the field's results is the page talking over itself. Dropping
+  // `peeking` puts the panel back in its ordinary closed state, so it leaves
+  // on its own close animation rather than blinking out.
+  const homeAskOpen = useLangyStore((s) => s.homeAskOpen);
+  const peeking = peekEnabled && !isOpen && !homeAskOpen;
   // The pointer approaching the sliver raises it a little further. One passive
   // rAF-throttled listener with hysteresis; off entirely under reduced motion,
   // where hover/focus alone does the raising.

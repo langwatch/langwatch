@@ -130,6 +130,11 @@ function handleTracesPageCommand(
   }
 }
 
+/** Never collapse the results to a sliver, however little room is left. */
+const RESULTS_PANEL_MIN_HEIGHT = 180;
+/** Breathing room between the panel's bottom edge and the viewport's. */
+const RESULTS_PANEL_VIEWPORT_MARGIN = 24;
+
 /**
  * Where this palette is mounted.
  *
@@ -191,6 +196,50 @@ export function CommandPalette({
 }) {
   const inline = surface === "inline";
   const router = useRouter();
+
+  /**
+   * The inline results panel hangs off the bottom of the ask field, so how
+   * much room it has depends entirely on where that field sits — which moves
+   * with the viewport. Measured rather than guessed at: a fixed `vh` cap that
+   * looks right on a laptop still runs off the bottom of a short window.
+   */
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
+  useEffect(() => {
+    if (!inline || !active) return;
+    const measure = () => {
+      const node = panelRef.current;
+      if (!node) return;
+      const top = node.getBoundingClientRect().top;
+      setPanelMaxHeight(
+        Math.max(
+          RESULTS_PANEL_MIN_HEIGHT,
+          window.innerHeight - top - RESULTS_PANEL_VIEWPORT_MARGIN,
+        ),
+      );
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    // Capture: the page scrolls under the field, and the panel travels with it.
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [inline, active]);
+
+  /**
+   * The home's ask field and Langy's own panel are two ways to say the same
+   * thing, and offering both at once is the page talking over itself. While
+   * the field is in use, a minimised Langy stands down — the peek sinks away
+   * on its own close animation rather than sitting under the results.
+   */
+  const setHomeAskOpen = useLangyStore((s) => s.setHomeAskOpen);
+  useEffect(() => {
+    if (!inline) return;
+    setHomeAskOpen(active);
+    return () => setHomeAskOpen(false);
+  }, [inline, active, setHomeAskOpen]);
   const { data: session } = useSession();
   // Mounted on every route: this only consumes `project` + `organizations` to
   // show context and must NOT trigger the org-onboarding bouncer, or it races
@@ -522,6 +571,7 @@ export function CommandPalette({
           // layer over the page, so opening them cannot push the figures and
           // recent work down and closing them cannot pull them back up.
           <Box
+            ref={panelRef}
             position="absolute"
             top="calc(100% + 8px)"
             left={0}
@@ -534,9 +584,23 @@ export function CommandPalette({
             boxShadow="0 2px 8px rgba(20, 20, 23, 0.08), 0 24px 70px -20px rgba(20, 20, 23, 0.35)"
             overflow="hidden"
             paddingTop={2}
+            // Capped to the room actually left below the field, so a long list
+            // scrolls inside the panel instead of running off the page where
+            // its last rows — and the footer's shortcuts — cannot be reached.
+            {...(panelMaxHeight !== null
+              ? { maxHeight: `${panelMaxHeight}px` }
+              : {})}
+            display="flex"
+            flexDirection="column"
           >
-            {results}
-            <CommandBarFooter isMac={isMac} />
+            {/* The list is the part that scrolls; the footer stays put, since
+                a legend you have to scroll to reach teaches nobody anything. */}
+            <Box overflowY="auto" minHeight={0} flex="1 1 auto">
+              {results}
+            </Box>
+            <Box flexShrink={0}>
+              <CommandBarFooter isMac={isMac} />
+            </Box>
           </Box>
         ) : null
       ) : (
