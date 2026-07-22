@@ -253,12 +253,16 @@ function ComposerImpl({
   const onTextareaKeyDown = (
     event: React.KeyboardEvent<HTMLTextAreaElement>,
   ) => {
-    if (event.key === "#" && atWordBoundary()) {
+    // The sigils follow their buttons: while a turn is in flight there is
+    // nothing for a palette to attach to, so `#` and `/` type as the ordinary
+    // characters they are rather than opening a picker that cannot take.
+    const palettesOpen = !disabled && !turnActive;
+    if (palettesOpen && event.key === "#" && atWordBoundary()) {
       event.preventDefault();
       openPalette("context");
       return;
     }
-    if (event.key === "/" && atWordBoundary()) {
+    if (palettesOpen && event.key === "/" && atWordBoundary()) {
       event.preventDefault();
       openPalette("skills");
       return;
@@ -562,17 +566,7 @@ function ComposerImpl({
                 never depend on how wide the selected model's name happens to
                 be. */}
             <Box minWidth={0} flexShrink={1} flexGrow={0} overflow="hidden">
-              <LangyModelPill
-                model={model}
-                options={modelOptions}
-                langyDefaultModel={langyDefaultModel}
-                onChange={onModelChange}
-                // The model is locked in the moment a turn starts — it rode
-                // with the send and can't change mid-flight — so the picker
-                // greys out until the turn settles rather than offering a
-                // choice that wouldn't take.
-                disabled={disabled || turnActive}
-              />
+              
             </Box>
             <Box flex={1} minWidth={0} />
             {/* The two keys, said out loud. A palette you can only reach by
@@ -584,17 +578,30 @@ function ComposerImpl({
                 They keep a gap between them: at the rail's 4px they read as one
                 four-word control rather than as two things you can press. */}
             <HStack gap={2} flexShrink={0} align="center">
+              <LangyModelPill
+                model={model}
+                options={modelOptions}
+                langyDefaultModel={langyDefaultModel}
+                onChange={onModelChange}
+                // The model is locked in the moment a turn starts — it rode
+                // with the send and can't change mid-flight — so the picker
+                // greys out until the turn settles rather than offering a
+                // choice that wouldn't take.
+                disabled={disabled || turnActive}
+              />
               <SigilButton
                 sigil="#"
                 label="Context"
                 hint="Add something from this page. Press #"
                 onClick={() => openPalette("context")}
+                disabled={disabled || turnActive}
               />
               <SigilButton
                 sigil="/"
                 label="Skills"
                 hint="Pick what Langy should do. Press /"
                 onClick={() => openPalette("skills")}
+                disabled={disabled || turnActive}
               />
             </HStack>
           </HStack>
@@ -634,11 +641,19 @@ function SigilButton({
   label,
   hint,
   onClick,
+  disabled = false,
 }: {
   sigil: string;
   label: string;
   hint: string;
   onClick: () => void;
+  /**
+   * Greyed while a turn is in flight, alongside the model picker. Both change
+   * what the NEXT send carries, and the send has already gone — a palette that
+   * opened here would let someone attach context to a turn that cannot take
+   * it, and then look like it had done nothing.
+   */
+  disabled?: boolean;
 }) {
   return (
     <Tooltip content={hint} openDelay={300} showArrow>
@@ -646,6 +661,9 @@ function SigilButton({
         type="button"
         aria-label={hint}
         onClick={onClick}
+        disabled={disabled}
+        aria-disabled={disabled}
+        _disabled={{ opacity: 0.45, cursor: "not-allowed", background: "transparent" }}
         display="inline-flex"
         alignItems="center"
         gap={1}

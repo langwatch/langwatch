@@ -20,7 +20,6 @@ import {
   LuArrowLeft,
   LuArrowRight,
   LuMic,
-  LuX,
   LuZap,
 } from "react-icons/lu";
 import { SERIF } from "~/features/asaplangy";
@@ -131,8 +130,6 @@ const LANGY_SLIDE: Slide = {
     ),
 };
 
-const SNOOZE_DAYS = 7;
-const SNOOZE_MS = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
 /** Dwell per slide before it advances. */
 const DWELL_MS = 9000;
 /** One duration governs the whole slide change: the gradient morphs its palette
@@ -288,35 +285,6 @@ function useSlides(
   );
 }
 
-// ---- Snooze (per-slide, per-project) ------------------------------------
-
-const storageKey = (slide: Slide, projectId: string) =>
-  `${slide.storagePrefix}${projectId}`;
-
-function isSlideSnoozed(slide: Slide, projectId: string): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const raw = localStorage.getItem(storageKey(slide, projectId));
-    if (!raw) return false;
-    const expiresAt = Number(raw);
-    return Number.isFinite(expiresAt) && expiresAt > Date.now();
-  } catch {
-    return false;
-  }
-}
-
-function snoozeSlide(slide: Slide, projectId: string) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(
-      storageKey(slide, projectId),
-      String(Date.now() + SNOOZE_MS),
-    );
-  } catch {
-    // Best-effort dismissal.
-  }
-}
-
 // ---- Colour / shape interpolation ---------------------------------------
 
 const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
@@ -423,25 +391,16 @@ export function HomePageBanners({
   const askLangy = useLangyStore((s) => s.askLangy);
 
   const [hasMounted, setHasMounted] = useState(false);
-  const [snoozed, setSnoozed] = useState<Record<string, boolean>>({});
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (!projectId) return;
-    const next: Record<string, boolean> = {};
-    for (const slide of slides)
-      next[slide.id] = isSlideSnoozed(slide, projectId);
-    setSnoozed(next);
-  }, [projectId, slides]);
-
-  const eligible = useMemo(
-    () => slides.filter((slide) => !snoozed[slide.id]),
-    [snoozed, slides],
-  );
+  // Every slide, always. An announcement stands until it is taken out of the
+  // rotation in code — there is no per-reader dismissal to filter by, so
+  // there is nothing to work out here.
+  const eligible = slides;
   const active = eligible.length > 0 ? index % eligible.length : 0;
   const slide = eligible[active];
 
@@ -595,12 +554,6 @@ export function HomePageBanners({
   // been dismissed. It just renders without a chrome line.
   if (!hasMounted || !projectId) return null;
   if (variant !== "lantern" && (eligible.length === 0 || !slide)) return null;
-
-  const dismiss = (slideToHide: Slide) => {
-    if (projectId) snoozeSlide(slideToHide, projectId);
-    setSnoozed((s) => ({ ...s, [slideToHide.id]: true }));
-    setIndex(0);
-  };
 
   const handleCta = (slideToOpen: Slide) => {
     posthog.capture(slideToOpen.posthogEvent, {
@@ -766,18 +719,6 @@ export function HomePageBanners({
                   ))}
                 </HStack>
               ) : null}
-              <Tooltip content={`Hide for ${SNOOZE_DAYS} days`} openDelay={400}>
-                <IconButton
-                  aria-label="Hide this announcement"
-                  size="2xs"
-                  variant="ghost"
-                  color="fg.subtle"
-                  flexShrink={0}
-                  onClick={() => dismiss(slide)}
-                >
-                  <LuX size={13} />
-                </IconButton>
-              </Tooltip>
             </HStack>
           ) : null}
         </VStack>
@@ -1006,27 +947,6 @@ export function HomePageBanners({
             ))}
           </HStack>
         ) : null}
-
-        <Tooltip
-          content={`Hide for ${SNOOZE_DAYS} days`}
-          positioning={{ placement: "top" }}
-        >
-          <IconButton
-            size="sm"
-            variant="ghost"
-            color="white/80"
-            position="absolute"
-            top={2}
-            right={2}
-            zIndex={2}
-            _hover={{ bg: "white/20", color: "white" }}
-            _active={{ bg: "white/30" }}
-            onClick={() => dismiss(slide)}
-            aria-label="Dismiss"
-          >
-            <LuX />
-          </IconButton>
-        </Tooltip>
       </Box>
     );
   }
@@ -1272,28 +1192,6 @@ export function HomePageBanners({
               );
             })}
           </Box>
-
-          {/* Dismiss — quiet inline chrome, like every other card control.
-              Pinned to the TOP of the row (the row centres its items, which
-              otherwise floats the X to the vertical middle) so it reads as a
-              normal top-right card close. */}
-          <Tooltip
-            content={`Hide for ${SNOOZE_DAYS} days`}
-            positioning={{ placement: "top" }}
-          >
-            <IconButton
-              size="xs"
-              variant="ghost"
-              color="fg.subtle"
-              flexShrink={0}
-              alignSelf="flex-start"
-              _hover={{ bg: "bg.muted", color: "fg" }}
-              onClick={() => dismiss(slide)}
-              aria-label="Dismiss"
-            >
-              <LuX />
-            </IconButton>
-          </Tooltip>
         </HStack>
 
         {/* Countdown ring — sweeps to full over the dwell, and eases to a stop
