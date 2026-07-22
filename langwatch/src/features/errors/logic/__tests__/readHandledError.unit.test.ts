@@ -136,13 +136,18 @@ describe("readErrorTraceId", () => {
 });
 
 describe("readAuthoredMessage", () => {
+  // `authored` is stamped by the boundary (`src/server/api/trpc.ts`), which is
+  // the only place that can tell copy from an accident — it needs `cause`, and
+  // `cause` never crosses the wire. Default it on here so each test says what
+  // it is actually about.
   const trpcError = (
     httpStatus: number,
     message: string,
     error: unknown = null,
+    authored = true,
   ) => ({
     message,
-    data: { httpStatus, error },
+    data: { httpStatus, error, authored },
   });
 
   describe("given a plain non-5xx TRPCError", () => {
@@ -199,6 +204,62 @@ describe("readAuthoredMessage", () => {
       ["a bare Error", new Error("boom")],
     ])("declines %s", (_label, error) => {
       expect(readAuthoredMessage(error)).toBeUndefined();
+    });
+  });
+
+  describe("given a 4xx the boundary did not mark as authored", () => {
+    /**
+     * The two accidents the flag exists to exclude. Both used to reach a
+     * customer through this channel.
+     */
+    it("declines a message tRPC defaulted to the code NAME", () => {
+      // `new TRPCError({ code: "NOT_FOUND" })` with no message: tRPC uses the
+      // code name, so the customer read "NOT_FOUND".
+      expect(
+        readAuthoredMessage(trpcError(404, "NOT_FOUND", null, false)),
+      ).toBeUndefined();
+    });
+
+    it("declines a message inherited from a wrapped cause", () => {
+      // `new TRPCError({ code: "BAD_REQUEST", cause: err })` inherits the
+      // caught error's message — a driver string, presented as our own copy.
+      expect(
+        readAuthoredMessage(trpcError(400, "fetch failed", null, false)),
+      ).toBeUndefined();
+      expect(
+        readAuthoredMessage(trpcError(400, "Invalid time value", null, false)),
+      ).toBeUndefined();
+    });
+
+    it("declines SCREAMING_CASE even if something marked it authored", () => {
+      expect(readAuthoredMessage(trpcError(404, "NOT_FOUND"))).toBeUndefined();
+    });
+  });
+
+  describe("given copy that merely reads like a machine wrote it", () => {
+    /**
+     * The second layer must not eat real copy. An earlier version matched SQL
+     * keywords case-insensitively and would have suppressed every one of
+     * these, silently, with no test to notice.
+     */
+    it.each([
+      "Select a template from the list before running this.",
+      "Delete the existing default before you set a new one.",
+      "You can update this from the project settings page.",
+      "This is only available at Enterprise (contact sales).",
+      "The IP 10.0.0.1 is not allowed as a webhook destination.",
+    ])("keeps %s", (message) => {
+      expect(readAuthoredMessage(trpcError(400, message))).toBe(message);
+    });
+
+    it.each([
+      ["a driver diagnostic", "Invalid `prisma.user.create()` invocation"],
+      ["a socket errno", "connect ECONNREFUSED 10.0.0.4:5432"],
+      ["a real SQL fragment", "SELECT id FROM traces WHERE project_id = $1"],
+      ["a stack frame", "boom\n    at Object.handler (/app/index.js:1:1)"],
+      ["a runtime error prefix", "TypeError: cannot read properties of null"],
+    ])("still refuses %s", (_label, message) => {
+      expect(readAuthoredMessage(trpcError(400, message))).toBeUndefined();
     });
   });
 });

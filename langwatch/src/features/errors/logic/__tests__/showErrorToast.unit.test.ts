@@ -164,7 +164,8 @@ describe("showErrorToast", () => {
       showErrorToast({
         error: {
           message: "You've already used this invite.",
-          data: { httpStatus: 400 },
+          // Stamped by the boundary; see `readAuthoredMessage`.
+          data: { httpStatus: 400, authored: true },
         },
         fallbackTitle: "Couldn't accept the invite",
       });
@@ -179,7 +180,7 @@ describe("showErrorToast", () => {
         error: {
           message:
             "Invalid `prisma.project.create()` invocation: connect ECONNREFUSED 10.0.0.4:5432",
-          data: { httpStatus: 400 },
+          data: { httpStatus: 400, authored: true },
         },
         fallbackTitle: "Couldn't create the project",
       });
@@ -192,7 +193,7 @@ describe("showErrorToast", () => {
       showErrorToast({
         error: {
           message: "Unexpected token in JSON",
-          data: { httpStatus: 500 },
+          data: { httpStatus: 500, authored: true },
         },
         fallbackTitle: "Couldn't save",
       });
@@ -200,6 +201,21 @@ describe("showErrorToast", () => {
       expect(create.mock.calls[0]![0].description).not.toContain(
         "Unexpected token",
       );
+    });
+  });
+
+  describe("given a 4xx the boundary did not mark authored", () => {
+    it("degrades to the generic state rather than reciting it", () => {
+      showErrorToast({
+        // `new TRPCError({ code: "NOT_FOUND" })` — tRPC defaults the message
+        // to the code NAME, and there is no `authored` flag on it.
+        error: { message: "NOT_FOUND", data: { httpStatus: 404 } },
+        fallbackTitle: "Couldn't open the trace",
+      });
+
+      const toast = create.mock.calls[0]![0];
+      expect(toast.title).toBe("Couldn't open the trace");
+      expect(toast.description).not.toContain("NOT_FOUND");
     });
   });
 
