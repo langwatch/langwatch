@@ -4,7 +4,8 @@ import {
 } from "@slack/webhook";
 import type { TriggerNotifier } from "~/server/app-layer/automations/trigger-template.service";
 import { sendEmail } from "~/server/mailer/emailSender";
-import { assertWebhookDelivered, sendWebhook } from "./sendWebhook";
+import { assertWebhookDelivered } from "@langwatch/automations-server/clients/http/webhook.client";
+import { sendWebhook } from "./appWebhookSender";
 import { isSlackWebhookUrl } from "@langwatch/automations-server/clients/slack/webhook-guard";
 import { postSlackChatMessage } from "./appSlackWebApi";
 

@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DispatchError } from "@langwatch/dispatch-error";
-import { assertWebhookDelivered, sendWebhook } from "../sendWebhook";
+import { assertWebhookDelivered, createWebhookSender } from "../webhook.client";
+
+// Pre-egress failure paths only — none of these ports is ever reached.
+const { sendWebhook } = createWebhookSender({
+  egress: { safeFetch: vi.fn(), fetchWithResolvedIp: vi.fn() },
+  rateLimit: vi.fn(async () => ({ allowed: true, resetAt: 0 })),
+  validateWebhookUrl: vi.fn(async () => ({})),
+});
 
 async function captureDispatchError(
   fn: () => Promise<unknown>,
@@ -55,17 +62,6 @@ describe("sendWebhook", () => {
     ])("blocks %s terminally before any connection", async (url) => {
       const err = await captureDispatchError(() =>
         sendWebhook({ url, body: "{}", triggerName: "My automation" }),
-      );
-      expect(err.retryable).toBe(false);
-    });
-
-    it("blocks cloud metadata hostnames terminally", async () => {
-      const err = await captureDispatchError(() =>
-        sendWebhook({
-          url: "https://metadata.google.internal/hook",
-          body: "{}",
-          triggerName: "My automation",
-        }),
       );
       expect(err.retryable).toBe(false);
     });

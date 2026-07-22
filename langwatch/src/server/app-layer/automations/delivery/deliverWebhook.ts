@@ -7,9 +7,9 @@ import type {
 } from "@langwatch/automations/repositories/webhook-delivery.repository";
 import {
   assertWebhookDelivered,
-  sendWebhook,
   type WebhookSendResult,
-} from "./sendWebhook";
+} from "@langwatch/automations-server/clients/http/webhook.client";
+import { sendWebhook } from "./appWebhookSender";
 
 const logger = createLogger("langwatch:webhook-delivery");
 

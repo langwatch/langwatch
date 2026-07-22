@@ -7,25 +7,15 @@ import {
   type WebhookMethod,
 } from "@langwatch/automations/providers/webhook";
 import { DispatchError } from "@langwatch/dispatch-error";
-import { rateLimit } from "~/server/rateLimit";
-import {
-  createSSRFValidator,
-  isPrivateOrLocalhostIP,
-} from "~/utils/ssrfProtection";
-import { sendHttpDestination } from "@langwatch/automations-server/clients/http/destination";
-import { appHttpEgress } from "./appHttpEgress";
+import { classify } from "@langwatch/ssrf";
+import { sendHttpDestination, type HttpEgress } from "./destination";
 
-/**
- * The webhook channel's SSRF policy (ADR-040 §4): private-IP / localhost
- * blocking is FORCED ON regardless of the global BLOCK_LOCAL_HTTP_CALLS
- * toggle — a customer-supplied URL fired from our workers must never reach
- * `10.x` / `localhost`, even in deployments that relax the toggle for their
- * own internal integrations.
- */
-const validateWebhookUrl = createSSRFValidator({
-  blockLocal: true,
-  allowedHosts: [],
-});
+/** Per-window counter port the app backs with Redis (`~/server/rateLimit`). */
+export type RateLimitPort = (params: {
+  key: string;
+  windowSeconds: number;
+  max: number;
+}) => Promise<{ allowed: boolean; resetAt: number }>;
 
 /**
  * If the URL's host is an IP literal that is private / loopback / link-local,
@@ -44,7 +34,7 @@ function privateIpLiteral(url: string): string | null {
   }
   const bare =
     host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
-  return isIP(bare) !== 0 && isPrivateOrLocalhostIP(bare) ? bare : null;
+  return isIP(bare) !== 0 && classify(bare) !== "global" ? bare : null;
 }
 
 /**
@@ -99,7 +89,28 @@ export interface WebhookSendResult {
  * the drawer's test fire wants the raw status to show the author, dispatch
  * wants the DispatchError.
  */
-export async function sendWebhook({
+export interface WebhookSender {
+  sendWebhook(input: WebhookSendInput): Promise<WebhookSendResult>;
+}
+
+/**
+ * The webhook channel sender (ADR-040). The app injects its SSRF-fenced
+ * egress, the Redis-backed rate limiter, and the strict webhook validator —
+ * whose result type stays opaque here, exactly as in
+ * {@link sendHttpDestination}. The validator must enforce ADR-040 §4:
+ * private-IP / localhost blocking FORCED ON regardless of the global
+ * BLOCK_LOCAL_HTTP_CALLS toggle.
+ */
+export function createWebhookSender<V>({
+  egress,
+  rateLimit,
+  validateWebhookUrl,
+}: {
+  egress: HttpEgress<V>;
+  rateLimit: RateLimitPort;
+  validateWebhookUrl: (url: string) => Promise<V>;
+}): WebhookSender {
+  async function sendWebhook({
   url,
   method = "POST",
   headers = {},
@@ -157,7 +168,7 @@ export async function sendWebhook({
   // for a test fire, which has no retries to dedupe.
   const resolvedEventId = eventId ?? randomUUID();
   const response = await sendHttpDestination({
-    egress: appHttpEgress,
+    egress,
     url,
     method,
     headers: {
@@ -171,6 +182,9 @@ export async function sendWebhook({
     validateUrl: validateWebhookUrl,
   });
   return { ...response, eventId: resolvedEventId };
+  }
+
+  return { sendWebhook };
 }
 
 /** How much of the receiver's response rides in an error message. */

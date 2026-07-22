@@ -5,21 +5,26 @@ import { DispatchError } from "@langwatch/dispatch-error";
 // sendWebhook's ORCHESTRATION (event-id header, dispatch cap, Retry-After
 // threading) without a network call. The executed SSRF blocks live in
 // sendWebhook.unit.test.ts, which uses the real transport.
-vi.mock("@langwatch/automations-server/clients/http/destination", () => ({
+vi.mock("../destination", () => ({
   sendHttpDestination: vi.fn(),
 }));
-vi.mock("~/server/rateLimit", () => ({ rateLimit: vi.fn() }));
 
-import { rateLimit } from "~/server/rateLimit";
-import { sendHttpDestination } from "@langwatch/automations-server/clients/http/destination";
+import { sendHttpDestination } from "../destination";
 import {
   assertWebhookDelivered,
-  sendWebhook,
-  WEBHOOK_DISPATCH_HOURLY_CAP,
-} from "../sendWebhook";
+  createWebhookSender,
+  type RateLimitPort,
+} from "../webhook.client";
+import { WEBHOOK_DISPATCH_HOURLY_CAP } from "../webhook.client";
 
 const mockedSend = vi.mocked(sendHttpDestination);
-const mockedRateLimit = vi.mocked(rateLimit);
+const mockedRateLimit =
+  vi.fn<RateLimitPort>() as ReturnType<typeof vi.fn> & RateLimitPort;
+const { sendWebhook } = createWebhookSender({
+  egress: { safeFetch: vi.fn(), fetchWithResolvedIp: vi.fn() },
+  rateLimit: mockedRateLimit,
+  validateWebhookUrl: vi.fn(async () => ({})),
+});
 
 function sendResolves(overrides?: { status?: number; retryAfterMs?: number }) {
   mockedSend.mockResolvedValue({
