@@ -51,6 +51,7 @@ import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useProjectReach } from "~/components/home/useProjectReach";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
@@ -132,6 +133,7 @@ import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
 import { LangyError } from "./LangyError";
 import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";
 import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
+import { LangyPeekDock } from "./LangyPeekDock";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { RecentChatsView } from "./RecentChatsView";
 import { LangyThinkingLine } from "./LangyThinkingLine";
@@ -155,8 +157,8 @@ const LANGY_GATE_FEATURE_KEY = "prompt.create_default";
 
 // The floating card's symmetric viewport inset: a rounded card with a small,
 // SYMMETRIC inset on every side (a soft brand glow + shadow behind it).
-// Shared with the inspector drawer via langyPanelLayout, so the two can
-// never drift apart by a pixel.
+// Shared via langyPanelLayout with the inspector drawer and the minimised
+// peek, so none of the three can drift apart by a pixel.
 const PANEL_INSET = FLOATING_PANEL_INSET;
 
 // A Chakra Box that also takes framer-motion props — used for the thinking
@@ -190,10 +192,11 @@ const FLOATING_MAX_VIEWPORT_DVH = 90;
 const FLOATING_EDGE_GUTTER_PX = 12;
 const FLOATING_MAX_HEIGHT = `calc(${FLOATING_MAX_VIEWPORT_DVH}dvh - ${FLOATING_EDGE_GUTTER_PX}px)`;
 
-// Floating grows OUT OF the launcher it replaces: scaled down and offset toward
+// Floating grows OUT OF the peek it replaces: scaled down and offset toward
 // the bottom-right corner, then springing up to rest — the card feels like it
-// unfolds from the button you just pressed rather than sliding in from off-canvas.
-// Sidebar is a dock, so it does the honest thing and slides in from the edge.
+// rises out of the sliver you just clicked rather than sliding in from
+// off-canvas. Sidebar is a dock, so it does the honest thing and slides in
+// from the edge — exactly where its own peek sliver rests.
 const FLOATING_CLOSED = { opacity: 0, scale: 0.92, x: 10, y: 18 } as const;
 const SIDEBAR_CLOSED = {
   opacity: 0,
@@ -263,12 +266,23 @@ interface LangySidecarProps {
 export function LangySidecar({ proposalHandlersRef }: LangySidecarProps) {
   const isOpen = useLangyStore((s) => s.isOpen);
   const toggle = useLangyStore((s) => s.togglePanel);
+  const openPanel = useLangyStore((s) => s.openPanel);
   useGlobalLangyShortcut(toggle);
+  // The minimised affordance is mid-rollout: flag ON, minimise sinks the
+  // panel to an edge peek of itself (LangyPeekDock); flag OFF keeps the
+  // classic corner launcher orb. ONE renders at a time — never both — and
+  // only the closed state differs: opening, the panel and Cmd/Ctrl+I are
+  // identical on either side of the flag.
+  const peekDock = useFeatureFlag("release_ui_langy_peek_dock_enabled");
 
   return (
     <>
       <LangyMarkGradientDefs />
-      <LangyLauncher isOpen={isOpen} onOpen={toggle} />
+      {peekDock.enabled ? (
+        <LangyPeekDock isOpen={isOpen} onOpen={openPanel} />
+      ) : (
+        <LangyLauncher isOpen={isOpen} onOpen={toggle} />
+      )}
       <LangyContextTargetLayer />
       <LangyPanel proposalHandlersRef={proposalHandlersRef} />
     </>
@@ -276,11 +290,12 @@ export function LangySidecar({ proposalHandlersRef }: LangySidecarProps) {
 }
 
 /**
- * The closed-state opener — a single circular launcher in the bottom-right
- * corner (the Notion-AI model), NOT an edge chip. There is no reserved gutter
- * and no collapse tab: opening is this button, collapsing is the panel header's
- * Minimise. Restrained on purpose — the LangWatch mark on a plain surface with a soft
- * neutral shadow, no mesh, no loud colour. Hidden while the panel is open.
+ * The FLAG-OFF closed-state opener — a single circular launcher in the
+ * bottom-right corner (the Notion-AI model). Retires in favour of the edge
+ * peek (LangyPeekDock, `release_ui_langy_peek_dock_enabled`); until that
+ * flag ships, this remains the minimised affordance. Restrained on purpose —
+ * the LangWatch mark on a plain surface with a soft neutral shadow, no mesh,
+ * no loud colour. Hidden while the panel is open.
  */
 function LangyLauncher({
   isOpen,
@@ -1781,8 +1796,8 @@ function LangyPanel({
         // transform on exactly this element — so it needs to be able to find
         // it and suppress it for one synchronous read.
         {...{ [PANEL_ROOT_ATTR]: "" }}
-        // Floating unfolds from the launcher's corner; sidebar slides from the
-        // edge it docks to.
+        // Floating rises from the peek's corner; sidebar slides from the
+        // edge its peek sliver rests on.
         transformOrigin={floating ? "bottom right" : "right center"}
         initial={false}
         animate={isOpen ? "open" : "closed"}
@@ -2677,9 +2692,10 @@ function PanelHeader({
               It says MINIMISE, because that is what it does. The panel stays
               mounted (unmounting would tear down the in-flight stream), the
               conversation is untouched, `isOpen` persists across a reload, and
-              the launcher orb comes back — so the honest word is minimise, and
-              a second "minimise" control beside a "close" that did the same
-              thing would only be two names for one behaviour. */}
+              the panel sinks to its edge peek (see LangyPeekDock) — so the
+              honest word is minimise, and a second "minimise" control beside
+              a "close" that did the same thing would only be two names for
+              one behaviour. */}
           {hideClose ? null : (
             <>
               <Box

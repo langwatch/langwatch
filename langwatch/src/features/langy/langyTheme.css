@@ -559,13 +559,14 @@
   fill: currentColor;
 }
 
-/* ── The closed orb's proximity glow ───────────────────────────────────────
+/* ── The closed orb's proximity glow (flag-off launcher) ───────────────────
    A soft warm field that bleeds out around the launcher orb and leans toward
    the cursor as it approaches. `z-index: -1` tucks it behind the orb's opaque
    body, so only the part reaching PAST the orb edge (toward the pointer) shows
    — light spilling out, not a disc under the button. Opacity + transform are
    driven imperatively by useLangyOrbProximity (0 at rest). Light panel: warm
-   amber; dark panel: a warm-white that screen-blends onto the page corner. */
+   amber; dark panel: a warm-white that screen-blends onto the page corner.
+   Retires with the orb once release_ui_langy_peek_dock_enabled ships. */
 .langy-root .langy-orb-glow {
   position: absolute;
   inset: -30px;
@@ -598,7 +599,7 @@
   }
 }
 
-/* ── The orb click bloom ───────────────────────────────────────────────────
+/* ── The orb click bloom (flag-off launcher) ───────────────────────────────
    A quick warm bloom that expands and fades from the orb's centre on the click
    that opens the panel — the "it heard you" beat. Spawned as a detached element
    on <body> by useLangyOrbProximity (so it survives the orb unmounting) and
@@ -643,6 +644,98 @@
 @media (prefers-reduced-motion: reduce) {
   .langy-orb-burst {
     display: none;
+  }
+}
+
+/* ── The minimised peek's brand seam ───────────────────────────────────────
+   The minimised panel is a PEEK of itself at the viewport edge (see
+   LangyPeekDock): a sliver of the card's header lip along the bottom in
+   floating mode, a sliver of the dock's spine on the right edge in sidebar
+   mode. The seam is the sliver's identity — a faint warm line along the
+   exposed edge, the fold's own tones, so the 6–10px at rest read as Langy
+   rather than as stray chrome. It brightens with the proximity pop, and
+   BREATHES on the fold's pulse period while a turn is still running under
+   the minimised panel — the creature is sunk, not gone. */
+.langy-peek::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.55;
+  transition: opacity 240ms ease;
+}
+.langy-peek[data-peek-mode="floating"]::before {
+  top: 0;
+  left: 18px;
+  right: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(214, 140, 74, 0.5) 30%,
+    rgba(201, 123, 58, 0.55) 70%,
+    transparent
+  );
+}
+.langy-peek[data-peek-mode="sidebar"]::before {
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(214, 140, 74, 0.5) 30%,
+    rgba(201, 123, 58, 0.55) 70%,
+    transparent
+  );
+}
+.dark .langy-peek[data-peek-mode="floating"]::before,
+:root.dark .langy-peek[data-peek-mode="floating"]::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 214, 165, 0.4) 30%,
+    rgba(255, 180, 120, 0.45) 70%,
+    transparent
+  );
+}
+.dark .langy-peek[data-peek-mode="sidebar"]::before,
+:root.dark .langy-peek[data-peek-mode="sidebar"]::before {
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(255, 214, 165, 0.4) 30%,
+    rgba(255, 180, 120, 0.45) 70%,
+    transparent
+  );
+}
+.langy-peek[data-peek-phase="near"]::before {
+  opacity: 1;
+}
+/* A turn is in flight under the minimised panel: the seam breathes on the
+   fold's own pulse period (WAVE_PULSE_PERIOD_S), the same clock the open
+   panel's tool pulse keeps. */
+.langy-peek-working::before {
+  animation: langy-peek-breathe 2.6s ease-in-out infinite;
+}
+@keyframes langy-peek-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .langy-peek::before {
+    transition: none;
+  }
+  .langy-peek-working::before {
+    animation: none;
+    opacity: 0.9;
   }
 }
 
@@ -798,6 +891,46 @@
       color(display-p3 1 0.839 0.647 / 0.5) 0%,
       color(display-p3 1 0.706 0.471 / 0.24) 45%,
       transparent 70%
+    );
+  }
+
+  /* The minimised peek's brand seam — the fold's warm tones on wide gamuts. */
+  .langy-peek[data-peek-mode="floating"]::before {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color(display-p3 0.839 0.549 0.29 / 0.5) 30%,
+      color(display-p3 0.788 0.482 0.227 / 0.55) 70%,
+      transparent
+    );
+  }
+  .langy-peek[data-peek-mode="sidebar"]::before {
+    background: linear-gradient(
+      180deg,
+      transparent,
+      color(display-p3 0.839 0.549 0.29 / 0.5) 30%,
+      color(display-p3 0.788 0.482 0.227 / 0.55) 70%,
+      transparent
+    );
+  }
+  .dark .langy-peek[data-peek-mode="floating"]::before,
+  :root.dark .langy-peek[data-peek-mode="floating"]::before {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color(display-p3 1 0.839 0.647 / 0.4) 30%,
+      color(display-p3 1 0.706 0.471 / 0.45) 70%,
+      transparent
+    );
+  }
+  .dark .langy-peek[data-peek-mode="sidebar"]::before,
+  :root.dark .langy-peek[data-peek-mode="sidebar"]::before {
+    background: linear-gradient(
+      180deg,
+      transparent,
+      color(display-p3 1 0.839 0.647 / 0.4) 30%,
+      color(display-p3 1 0.706 0.471 / 0.45) 70%,
+      transparent
     );
   }
 }

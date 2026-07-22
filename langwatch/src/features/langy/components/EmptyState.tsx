@@ -218,7 +218,7 @@ export function EmptyState({
         marginBottom={`${metrics.heroMarginBottom}px`}
       >
         {/* The LangWatch mark, in the brand gradient — and the ONLY place it
-            appears inside the panel (the launcher is the other). Bare, no tile:
+            appears inside the panel (the minimised peek is the other). Bare, no tile:
             the orange chip that used to box it in was old-brand chrome, a
             saturated block competing with the display line right under it. It
             shrinks with the card but never below 34px, the smallest size at
