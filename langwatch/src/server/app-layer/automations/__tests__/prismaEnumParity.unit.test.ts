@@ -1,10 +1,12 @@
 import {
   AlertType as PackageAlertType,
   TriggerAction as PackageTriggerAction,
+  TriggerKind as PackageTriggerKind,
 } from "@langwatch/automations";
 import {
   AlertType as PrismaAlertType,
   TriggerAction as PrismaTriggerAction,
+  TriggerKind as PrismaTriggerKind,
 } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
@@ -29,6 +31,10 @@ const _alertTypeParity: AssertMutuallyAssignable<
   PackageAlertType,
   PrismaAlertType
 > = true;
+const _triggerKindParity: AssertMutuallyAssignable<
+  PackageTriggerKind,
+  PrismaTriggerKind
+> = true;
 
 describe("prisma enum parity", () => {
   describe("when the package enums are compared to the Prisma enums", () => {
@@ -41,6 +47,12 @@ describe("prisma enum parity", () => {
     it("keeps AlertType values identical", () => {
       expect(Object.values(PackageAlertType).sort()).toEqual(
         Object.values(PrismaAlertType).sort(),
+      );
+    });
+
+    it("keeps TriggerKind values identical", () => {
+      expect(Object.values(PackageTriggerKind).sort()).toEqual(
+        Object.values(PrismaTriggerKind).sort(),
       );
     });
   });

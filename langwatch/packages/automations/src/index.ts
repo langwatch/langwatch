@@ -15,7 +15,7 @@
  * dispatch) under `server/app-layer/automations/providers`.
  */
 
-export { AlertType, TriggerAction } from "./enums";
+export { AlertType, TriggerAction, TriggerKind } from "./enums";
 export type {
   Category,
   PreviewEnvelope,
