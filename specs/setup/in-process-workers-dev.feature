@@ -8,7 +8,8 @@ Feature: In-process workers for local development
   # adds an OPT-IN single-process mode for developers who'd rather run one
   # thing. Under haven (`pnpm dev:haven`) the default is INVERTED — single
   # process — because a laptop juggling several worktrees can't afford a second
-  # Node process per stack; opt back out with WORKERS_IN_PROCESS=0. Production is
+  # Node process per stack; opt back out with `haven up +workers` (sticky,
+  # ADR-064; WORKERS_IN_PROCESS=0 bridges for one release). Production is
   # untouched — it always runs web and worker as separate deployments
   # (charts/langwatch/templates/{app,workers}) and never honours the flag.
   #
@@ -23,12 +24,12 @@ Feature: In-process workers for local development
   #                               startWorkers({ shouldStartMetricsServer: false })
   #                               after the server is listening
   #   - tools/thuishaven (haven) — the hostname-routing launcher (`pnpm dev:haven`)
-  #                               DEFAULTS to in-process: it drops its separate
-  #                               `workers` child and hosts them in the app child
-  #                               (PlanOptions.ShouldRunWorkersInProcess, flipped on
-  #                               in cmd/root.go optionsFromEnv). Opt back into a
-  #                               standalone `workers` lane with WORKERS_IN_PROCESS=0
-  #                               (`pnpm dev:workers:haven`).
+  #                               DEFAULTS to in-process: the sticky selection's
+  #                               Workers field is off unless `haven up +workers`
+  #                               turned it on (domain.Selection, ADR-064), so the
+  #                               plan hosts the workers in the app child. Opt into
+  #                               a standalone lane with `haven up +workers`
+  #                               (`pnpm dev:workers:haven` wraps it).
   #
   # The "all" role runs the same worker-side wiring as "worker" via
   # `roleRunsWorkers(role)` (src/server/app-layer/config.ts): the GroupQueue
@@ -72,9 +73,9 @@ Feature: In-process workers for local development
     And the workers keep their "langwatch:workers" logger name, so their lines stay identifiable
 
   @unimplemented
-  Scenario: WORKERS_IN_PROCESS=0 opts haven back into a separate workers lane
-    Given NODE_ENV is "development" and WORKERS_IN_PROCESS is "0"
-    When I run "pnpm dev:workers:haven"
+  Scenario: haven up +workers opts into a separate workers lane
+    Given the worktree's sticky selection includes workers
+    When I run "haven up" (or "pnpm dev:workers:haven")
     Then haven adds a separate "workers" child running "pnpm run start:workers"
     And the app child boots without hosting workers in-process
 
