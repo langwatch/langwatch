@@ -18,11 +18,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GraphicsQualityProvider } from "../GraphicsQualityProvider";
 import { useGraphicsQuality } from "~/hooks/useGraphicsQuality";
 
-let prefersReducedMotion = false;
-vi.mock("~/hooks/useReducedMotion", () => ({
-  useReducedMotion: () => prefersReducedMotion,
-}));
-
 let pendingCallback: FrameRequestCallback | null = null;
 let rafCallCount = 0;
 
@@ -55,6 +50,14 @@ function runWindow({
   }
 }
 
+function setDocumentHidden(hidden: boolean) {
+  Object.defineProperty(document, "hidden", {
+    configurable: true,
+    value: hidden,
+  });
+  document.dispatchEvent(new Event("visibilitychange"));
+}
+
 function Consumer() {
   const { reducedGraphics } = useGraphicsQuality();
   return <div data-testid="consumer">{String(reducedGraphics)}</div>;
@@ -62,7 +65,6 @@ function Consumer() {
 
 describe("<GraphicsQualityProvider/>", () => {
   beforeEach(() => {
-    prefersReducedMotion = false;
     pendingCallback = null;
     rafCallCount = 0;
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
@@ -78,19 +80,33 @@ describe("<GraphicsQualityProvider/>", () => {
     cleanup();
     vi.unstubAllGlobals();
     document.documentElement.removeAttribute("data-reduced-graphics");
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      value: false,
+    });
   });
 
   describe("when the background probe is running", () => {
     /** @scenario "Blur effects turn off when the device can't keep a smooth frame rate" */
-    it("marks reduced-graphics mode after a struggling sample window", () => {
+    it("marks reduced-graphics mode after consecutive struggling sample windows", () => {
       render(
-        <GraphicsQualityProvider sampleWindowMs={1000} minFps={50}>
+        <GraphicsQualityProvider
+          sampleWindowMs={1000}
+          resampleIntervalMs={1000}
+          minFps={50}
+          consecutiveStrugglingSamples={2}
+        >
           <Consumer />
         </GraphicsQualityProvider>,
       );
 
-      // 2 frames over 1000ms => ~2fps, well below the 50fps floor.
+      // 2 frames over 1000ms => ~2fps, well below the 50fps floor, twice in
+      // a row — the confirmation the debounce requires before degrading.
+      // The second window starts at 2000 (not 1000): the first window's
+      // close pushes the next allowed sample start to
+      // close(1000) + resampleIntervalMs(1000).
       runWindow({ startAt: 0, windowMs: 1000, frames: 2 });
+      runWindow({ startAt: 2000, windowMs: 1000, frames: 2 });
 
       expect(
         document.documentElement.getAttribute("data-reduced-graphics"),
@@ -113,6 +129,27 @@ describe("<GraphicsQualityProvider/>", () => {
       ).toBe(false);
       expect(screen.getByTestId("consumer").textContent).toBe("false");
     });
+
+    it("does not mark reduced-graphics mode after a single stray struggling window", () => {
+      render(
+        <GraphicsQualityProvider
+          sampleWindowMs={1000}
+          resampleIntervalMs={1000}
+          minFps={50}
+          consecutiveStrugglingSamples={2}
+        >
+          <Consumer />
+        </GraphicsQualityProvider>,
+      );
+
+      // One bad window (e.g. a one-off GC pause) followed by a clean one —
+      // the streak resets, so this alone must not flip the fallback on.
+      runWindow({ startAt: 0, windowMs: 1000, frames: 2 });
+      expect(screen.getByTestId("consumer").textContent).toBe("false");
+
+      runWindow({ startAt: 2000, windowMs: 1000, frames: 90 });
+      expect(screen.getByTestId("consumer").textContent).toBe("false");
+    });
   });
 
   describe("when the app is currently in reduced-graphics mode", () => {
@@ -123,18 +160,57 @@ describe("<GraphicsQualityProvider/>", () => {
           sampleWindowMs={1000}
           resampleIntervalMs={1000}
           minFps={50}
+          consecutiveStrugglingSamples={2}
         >
           <Consumer />
         </GraphicsQualityProvider>,
       );
 
-      // First window: struggling. Closes at t=1000, next window scheduled
-      // to start at t=1000+resampleIntervalMs=2000.
+      // Two struggling windows in a row to enter reduced-graphics mode.
       runWindow({ startAt: 0, windowMs: 1000, frames: 2 });
+      runWindow({ startAt: 2000, windowMs: 1000, frames: 2 });
       expect(screen.getByTestId("consumer").textContent).toBe("true");
 
-      // Second window: smooth. Starts exactly at the scheduled t=2000.
-      runWindow({ startAt: 2000, windowMs: 1000, frames: 90 });
+      // Recovery only needs one smooth window.
+      runWindow({ startAt: 4000, windowMs: 1000, frames: 90 });
+
+      expect(
+        document.documentElement.hasAttribute("data-reduced-graphics"),
+      ).toBe(false);
+      expect(screen.getByTestId("consumer").textContent).toBe("false");
+    });
+  });
+
+  describe("when the tab is backgrounded during a sample window", () => {
+    /** @scenario "A sample window straddling a hidden tab is discarded" */
+    it("discards the in-progress window instead of reporting a false struggling rate", () => {
+      render(
+        <GraphicsQualityProvider
+          sampleWindowMs={1000}
+          minFps={50}
+          consecutiveStrugglingSamples={1}
+        >
+          <Consumer />
+        </GraphicsQualityProvider>,
+      );
+
+      // Sample opens while the tab is visible.
+      fireFrame(0);
+
+      // Tab gets backgrounded mid-window — the in-progress sample must be
+      // discarded immediately, not left to close on a stale start time.
+      setDocumentHidden(true);
+
+      // requestAnimationFrame is throttled while hidden; when a callback
+      // does eventually fire, its timestamp is still real wall-clock time
+      // (here, 30s later). This must not be treated as "0 frames over 30s".
+      fireFrame(30_000);
+      expect(screen.getByTestId("consumer").textContent).toBe("false");
+
+      // Tab becomes visible again — probe should start a clean window, not
+      // conclude the straddled gap was a struggling sample.
+      setDocumentHidden(false);
+      runWindow({ startAt: 31_000, windowMs: 1000, frames: 90 });
 
       expect(
         document.documentElement.hasAttribute("data-reduced-graphics"),
@@ -144,18 +220,34 @@ describe("<GraphicsQualityProvider/>", () => {
   });
 
   describe("when the user's system preference is set to reduce motion", () => {
-    /** @scenario "A user who prefers reduced motion never triggers the probe" */
-    it("never starts the background frame-rate probe", () => {
-      prefersReducedMotion = true;
+    /** @scenario "The probe still runs for users who prefer reduced motion" */
+    it("still marks reduced-graphics mode on a struggling device", () => {
+      // Backdrop-filter is a static effect, not motion — unlike
+      // HomePageBanners' animated GPU probe, there is no reduced-motion
+      // fallback that already forces the same outcome, so this probe must
+      // keep running (and keep helping) regardless of the preference.
+      vi.stubGlobal("matchMedia", (query: string) => ({
+        matches: query.includes("prefers-reduced-motion"),
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }));
 
       render(
-        <GraphicsQualityProvider>
+        <GraphicsQualityProvider
+          sampleWindowMs={1000}
+          resampleIntervalMs={1000}
+          minFps={50}
+          consecutiveStrugglingSamples={2}
+        >
           <Consumer />
         </GraphicsQualityProvider>,
       );
 
-      expect(pendingCallback).toBeNull();
-      expect(screen.getByTestId("consumer").textContent).toBe("false");
+      runWindow({ startAt: 0, windowMs: 1000, frames: 2 });
+      runWindow({ startAt: 2000, windowMs: 1000, frames: 2 });
+
+      expect(screen.getByTestId("consumer").textContent).toBe("true");
     });
   });
 });

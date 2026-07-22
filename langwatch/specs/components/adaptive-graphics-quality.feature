@@ -5,12 +5,16 @@ Feature: The app backs off decorative blur effects on a struggling device
 
   # ---------------------------------------------------------------------------
   # A background probe periodically samples real frame rate. When the device
-  # can't sustain a smooth frame rate, decorative blur/backdrop effects across
-  # the app (sticky run-history headers, dialogs, drawers, menus, toasts,
-  # tooltips) switch to a plain background instead — same layout, no blur.
-  # The probe keeps re-checking, so the app recovers automatically once the
-  # device is no longer under load. Users who already asked for reduced motion
-  # skip the effect (and the probe) entirely.
+  # can't sustain a smooth frame rate across consecutive sample windows,
+  # decorative blur/backdrop effects across the app (sticky run-history
+  # headers, dialogs, drawers, menus, toasts, tooltips) switch to a plain
+  # background instead — same layout, no blur. The probe keeps re-checking,
+  # so the app recovers automatically once the device is no longer under
+  # load. Backdrop-filter is a static effect rather than motion, so the probe
+  # runs (and can still help) even for users who prefer reduced motion. A
+  # sample window is discarded rather than counted if the tab was backgrounded
+  # partway through it, since a backgrounded tab's real elapsed time no longer
+  # reflects how many frames it should have rendered.
   # ---------------------------------------------------------------------------
 
   @unit
@@ -34,9 +38,16 @@ Feature: The app backs off decorative blur effects on a struggling device
   @integration
   Scenario: Blur effects turn off when the device can't keep a smooth frame rate
     Given the background probe is running
-    When a sample window measures frames well below the smooth floor
+    When consecutive sample windows measure frames well below the smooth floor
     Then the app marks itself as running in reduced-graphics mode
     And decorative blur effects across the app stop rendering their blur
+
+  @integration
+  Scenario: A single stray struggling window is not enough to degrade
+    Given the background probe is running
+    When one sample window measures frames well below the smooth floor
+    And the following sample window measures a smooth frame rate
+    Then the app never marks itself as running in reduced-graphics mode
 
   @integration
   Scenario: Blur effects come back once the device recovers
@@ -46,7 +57,15 @@ Feature: The app backs off decorative blur effects on a struggling device
     And decorative blur effects render normally again
 
   @integration
-  Scenario: A user who prefers reduced motion never triggers the probe
+  Scenario: The probe still runs for users who prefer reduced motion
     Given the user's system preference is set to reduce motion
-    When the app loads
-    Then the background frame-rate probe does not run
+    When consecutive sample windows measure frames well below the smooth floor
+    Then the app marks itself as running in reduced-graphics mode
+
+  @integration
+  Scenario: A sample window straddling a hidden tab is discarded
+    Given the background probe has an in-progress sample window
+    When the tab is backgrounded partway through that window
+    And the tab becomes visible again
+    Then that sample window is discarded instead of counted
+    And the app does not mark itself as running in reduced-graphics mode
