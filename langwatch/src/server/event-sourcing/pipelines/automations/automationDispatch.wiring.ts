@@ -38,7 +38,8 @@ import {
 import { AutomationCustomGraphService } from "@langwatch/automations-server/services/custom-graph.service";
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
-import { dispatchGraphAlertAction } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
+import { dispatchGraphAlertAction } from "@langwatch/automations-server/dispatch/graph-alert-dispatch";
+import { decryptWebhookHeaders } from "~/server/app-layer/automations/providers/webhook/server";
 import {
   consumeEmailCapSlot,
   consumeTenantEmailCapSlot,
@@ -163,6 +164,7 @@ export function buildAutomationDispatchPorts({
             sendSlackBot: postSlackChatMessage,
             sendWebhook,
             recordWebhookDelivery,
+            decryptWebhookHeaders,
             // ADR-031: honour the same suppression list + hard caps the
             // digest path consumes; claims keyed on the fire digest so a
             // retry re-reads the count instead of burning a second slot.

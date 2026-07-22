@@ -28,11 +28,11 @@ import {
 import { isDispatchError } from "@langwatch/dispatch-error";
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import { type SlackActionParams } from "@langwatch/automations/providers/slack";
+import { decryptWebhookHeaders } from "~/server/app-layer/automations/providers/webhook/server";
 import {
-  decryptWebhookHeaders,
+  WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookStoredActionParams,
-} from "~/server/app-layer/automations/providers/webhook/server";
-import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
+} from "@langwatch/automations/providers/webhook";
 import {
   buildGraphAlertTriggerData,
   type GraphAlertActionParams,

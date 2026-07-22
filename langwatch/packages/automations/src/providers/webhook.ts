@@ -113,6 +113,16 @@ export const webhookActionParamsSchema = z.object({
 
 export type WebhookActionParams = z.infer<typeof webhookActionParamsSchema>;
 
+/** The shape webhook actionParams take AT REST: the plaintext `headers`
+ *  record is replaced by one ciphertext blob. The server half owns the
+ *  encrypt/decrypt; this is the vocabulary both sides read. */
+export type WebhookStoredActionParams = Omit<WebhookActionParams, "headers"> & {
+  headersEncrypted?: string;
+  /** Legacy plain record — only ever present on rows saved before encryption
+   *  landed; superseded by `headersEncrypted` on the next save. */
+  headers?: Record<string, string>;
+};
+
 /** The render-time preview shape this provider's ConfigForm consumes: the
  *  request the dispatch would make, with the rendered JSON body. */
 export interface WebhookPreview extends PreviewEnvelope {

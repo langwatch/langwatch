@@ -46,7 +46,7 @@ import {
   graphAlertFireDigest,
   type GraphAlertDispatchInput,
   type GraphAlertDispatchResult,
-} from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
+} from "@langwatch/automations-server/dispatch/graph-alert-dispatch";
 import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
 import {

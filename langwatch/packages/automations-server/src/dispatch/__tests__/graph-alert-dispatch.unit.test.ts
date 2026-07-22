@@ -1,22 +1,29 @@
-import type { Project, Trigger } from "@prisma/client";
-import { TriggerAction } from "@prisma/client";
+import type { TriggerRow } from "@langwatch/automations/domain/trigger";
+import { TriggerAction } from "@langwatch/automations/enums";
 import { describe, expect, it, vi } from "vitest";
-
-// Fake cipher so the webhook-headers tests exercise the decrypt-at-dispatch
-// seam (ADR-040 §3) without real AES/env plumbing.
-vi.mock("~/utils/encryption", () => ({
-  encrypt: (s: string) => `enc(${s})`,
-  decrypt: (s: string) => s.replace(/^enc\(/, "").replace(/\)$/, ""),
-}));
 import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
 import {
   dispatchGraphAlertAction,
   graphAlertFireDigest,
-} from "../graphAlertActionDispatch";
+} from "../graph-alert-dispatch";
+
+// Fake cipher, mirroring what the app's decryptWebhookHeaders does over the
+// mocked crypto it used to reach through: strip the enc() wrapper, parse.
+const fakeDecryptWebhookHeaders = (params: {
+  headersEncrypted?: string;
+  headers?: Record<string, string>;
+}): Record<string, string> => {
+  if (params.headersEncrypted) {
+    return JSON.parse(
+      params.headersEncrypted.replace(/^enc\(/, "").replace(/\)$/, ""),
+    ) as Record<string, string>;
+  }
+  return params.headers ?? {};
+};
 
 const NOW = new Date("2026-06-21T10:00:00.000Z");
 
-function makeTrigger(overrides: Partial<Trigger> = {}): Trigger {
+function makeTrigger(overrides: Partial<TriggerRow> = {}): TriggerRow {
   return {
     id: "trg_1",
     projectId: "proj_1",
@@ -39,15 +46,15 @@ function makeTrigger(overrides: Partial<Trigger> = {}): Trigger {
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
-  } as unknown as Trigger;
+  } as unknown as TriggerRow;
 }
 
-function makeProject(): Project {
+function makeProject(): { id: string } {
   return {
     id: "proj_1",
     name: "Acme",
     slug: "acme",
-  } as unknown as Project;
+  } as unknown as { id: string };
 }
 
 function makeContext() {
@@ -125,6 +132,7 @@ function makeDeps() {
       tenantDailyCap: 10_000,
       isRecipientSent,
       recordRecipientSent,
+      decryptWebhookHeaders: fakeDecryptWebhookHeaders,
     } as unknown as Parameters<typeof dispatchGraphAlertAction>[0]["deps"],
     sendEmail,
     sendSlack,

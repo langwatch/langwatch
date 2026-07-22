@@ -1,18 +1,26 @@
-import type { Project, Trigger } from "@prisma/client";
 import { createHash } from "crypto";
 import { DispatchError } from "@langwatch/dispatch-error";
-import {
-  decryptWebhookHeaders,
-  type WebhookStoredActionParams,
-} from "~/server/app-layer/automations/providers/webhook/server";
-import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
-import type { sendRenderedSlackMessage } from "@langwatch/automations-server/clients/slack/incoming-webhook.client";
-import type { sendWebhook } from "~/server/app-layer/automations/delivery/appWebhookSender";
+import type { TriggerRow } from "@langwatch/automations/domain/trigger";
+import type { WebhookStoredActionParams } from "@langwatch/automations/providers/webhook";
+import type { sendRenderedSlackMessage } from "../clients/slack/incoming-webhook.client";
+import type { SlackWebApiClient } from "../clients/slack/web-api.client";
+import type { WebhookSender } from "../clients/http/webhook.client";
 import {
   deliverWebhook,
   type WebhookDeliveryRecorder,
-} from "@langwatch/automations-server/clients/http/deliver-webhook";
-import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/appSlackWebApi";
+} from "../clients/http/deliver-webhook";
+
+/** Per-recipient rendered-email sender — the app's `sendRenderedTriggerEmail`
+ *  satisfies this; injected so the module carries no mailer dependency. */
+export type RenderedTriggerEmailSender = (args: {
+  triggerEmails: string[];
+  triggerId: string;
+  projectId: string;
+  subject: string;
+  html: string;
+  isRecipientSent?: (recipientHash: string) => Promise<boolean>;
+  recordRecipientSent?: (recipientHash: string) => Promise<void>;
+}) => Promise<void>;
 import { ALERT_TRIGGER_DEFAULTS } from "@langwatch/automations/templating/defaults";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
 import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
@@ -80,8 +88,10 @@ function destinationHash(destination: string): string {
  * the cron-page `ActionParams` type import.
  */
 export interface GraphAlertDispatchInput {
-  trigger: Trigger;
-  project: Project;
+  trigger: TriggerRow;
+  /** Only the identity is needed here — the template context carries the
+   *  display fields the message renders. */
+  project: { id: string };
   /** ADR-034 Phase 8.1 template-variable context. The evaluator builds
    *  it via `buildGraphAlertTemplateContext` and hands it in. */
   context: GraphAlertTemplateContext;
@@ -105,20 +115,25 @@ export interface GraphAlertDispatchDeps {
    * trace cadence dispatcher uses. Injected so this module is free of
    * mailer dependencies and easy to unit-test.
    */
-  sendEmail: typeof sendRenderedTriggerEmail;
+  sendEmail: RenderedTriggerEmailSender;
   /** Slack sender — same `sendRenderedSlackMessage` the trace cadence
    *  dispatcher uses. */
   sendSlack: typeof sendRenderedSlackMessage;
   /** Slack Web API sender for bot connections — same `postSlackChatMessage`
    *  the trace cadence dispatcher uses. */
-  sendSlackBot: typeof postSlackChatMessage;
+  sendSlackBot: SlackWebApiClient["postSlackChatMessage"];
   /** ADR-040 SSRF-fenced webhook sender — same `sendWebhook` the trace
    *  cadence dispatcher uses. */
-  sendWebhook: typeof sendWebhook;
+  sendWebhook: WebhookSender["sendWebhook"];
   /** ADR-040 §6 delivery-log writer — records one row per attempt. Optional:
    *  when absent (tests, cron before wiring), deliveries aren't logged but
    *  dispatch is unchanged. */
   recordWebhookDelivery?: WebhookDeliveryRecorder;
+  /** Decrypts the stored webhook header blob (app-owned crypto) — see the
+   *  provider server half's `decryptWebhookHeaders`. */
+  decryptWebhookHeaders: (
+    params: Pick<WebhookStoredActionParams, "headersEncrypted" | "headers">,
+  ) => Record<string, string>;
   /**
    * ADR-031 email suppression gate. The event-sourced graph-alert path
    * renders the SAME one-click-unsubscribe footer + `List-Unsubscribe`
@@ -600,7 +615,7 @@ export async function dispatchGraphAlertAction({
       eventId: `evt_${destinationHash(`event:${input.fireDigest}`)}`,
       url: params.url,
       method: params.method,
-      headers: decryptWebhookHeaders(params),
+      headers: deps.decryptWebhookHeaders(params),
       body: rendered.body,
       triggerName: trigger.name,
     });

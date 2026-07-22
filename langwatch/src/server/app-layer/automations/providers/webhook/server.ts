@@ -2,6 +2,7 @@ import { TriggerAction } from "@prisma/client";
 import {
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookActionParams,
+  type WebhookStoredActionParams,
 } from "@langwatch/automations/providers/webhook";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { InvalidActionParamsError } from "@langwatch/automations-server/errors";
@@ -18,14 +19,7 @@ import type { PersistActionParamsArgs, ServerDef } from "../types";
  *  - deliver: decrypt just before the SSRF-fenced send.
  */
 
-/** The shape webhook actionParams take AT REST: the plaintext `headers`
- *  record is replaced by one ciphertext blob. */
-export type WebhookStoredActionParams = Omit<WebhookActionParams, "headers"> & {
-  headersEncrypted?: string;
-  /** Legacy plain record — only ever present on rows saved before encryption
-   *  landed; superseded by `headersEncrypted` on the next save. */
-  headers?: Record<string, string>;
-};
+
 
 /** Decrypt the stored header record for a dispatch or test fire. Empty when
  *  none are configured. Falls back to a legacy plaintext record if present. */
