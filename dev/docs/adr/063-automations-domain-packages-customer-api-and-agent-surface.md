@@ -294,10 +294,12 @@ export function buildAutomationsApi(deps: {
   webhook or installed app + channel), HTTP webhook (ADR-040 semantics),
   email, dataset, annotation queue.
 - **Auth is the project API key.** Every operation authenticates with the
-  existing project-scoped API-key middleware (`X-Auth-Token`), the same
-  convention as the other customer REST surfaces (ADR-032's precedent). The
-  key grants the project's full automations surface; finer-grained key
-  scopes are a platform-wide follow-up, not invented here.
+  existing project-scoped API-key middleware (`X-Auth-Token`) — the same
+  key the SDKs and the existing customer REST surfaces already use. No ADR
+  owns that mechanism (it predates the corpus); this ADR adopts it rather
+  than originates it. The key grants the project's full automations
+  surface; finer-grained key scopes are a platform-wide follow-up, not
+  invented here.
 - **Secrets are write-only.** Read DTOs in `contracts/` structurally exclude
   secret material: webhook URLs and tokens return masked
   (`"https://hooks.slack.com/…/••••"`, header values as `"••••"`), reusing

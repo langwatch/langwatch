@@ -74,7 +74,7 @@ Feature: Automations page — one page, four states
       Then the incident presentation clears without user action
       And the header returns to the quiet summary
 
-  Rule: Creation always starts from one entry point
+  Rule: The new-rule entry always opens composing
 
     Scenario: The new-rule action opens composing regardless of state
       When the user chooses to create a new rule

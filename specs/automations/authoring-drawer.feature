@@ -20,7 +20,9 @@ Feature: Staged automation authoring drawer
   "Edit details" escape hatch and the editor for existing automations. The
   scenarios below — including the type picker and the cadence-review save
   gate — describe the form path; a plan approved in composing states its
-  cadence on the plan card instead.
+  cadence on the plan card instead. The settings- and traces-view entries
+  below remain as secondary creation shortcuts straight into this form,
+  pre-filled where noted; the page's own new-rule action opens composing.
 
   Background:
     Given a user authoring an automation in a project
