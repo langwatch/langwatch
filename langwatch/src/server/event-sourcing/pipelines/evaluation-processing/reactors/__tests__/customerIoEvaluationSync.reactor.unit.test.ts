@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationRunData } from "~/server/domain/evaluations/types";
 import type { NurturingService } from "../../../../../../../ee/billing/nurturing/nurturing.service";
-import type { ProjectService } from "../../../../../app-layer/projects/project.service";
+import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { EvaluationProcessingEvent } from "../../schemas/events";
 import {
@@ -97,7 +97,7 @@ function createMockNurturing(): NurturingService {
 
 function createMockProjectService(
   overrides: Partial<{ resolveOrgAdmin: ReturnType<typeof vi.fn> }> = {},
-): ProjectService {
+): ProjectServicePort {
   return {
     resolveOrgAdmin: vi.fn().mockResolvedValue({
       userId: "user-1",
@@ -105,7 +105,7 @@ function createMockProjectService(
       firstMessage: false,
     }),
     ...overrides,
-  } as unknown as ProjectService;
+  } as unknown as ProjectServicePort;
 }
 
 function createDeps(

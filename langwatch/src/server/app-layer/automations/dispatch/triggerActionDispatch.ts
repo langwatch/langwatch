@@ -4,7 +4,7 @@ import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
-import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import { queryNeeds } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
@@ -103,7 +103,7 @@ export function computeScheduledFor({
 
 export interface TriggerActionDispatchDeps {
   triggers: TriggerService;
-  projects: ProjectService;
+  projects: ProjectServicePort;
   traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
   addToAnnotationQueue: (params: {
     traceIds: string[];

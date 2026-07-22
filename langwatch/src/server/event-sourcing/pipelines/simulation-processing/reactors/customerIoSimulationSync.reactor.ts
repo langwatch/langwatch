@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { NurturingService } from "../../../../../../ee/billing/nurturing/nurturing.service";
 import { captureException, toError } from "../../../../../utils/posthogErrorCapture";
-import type { ProjectService } from "../../../../app-layer/projects/project.service";
+import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import { CIO_REACTOR_DEBOUNCE_TTL_MS } from "../../trace-processing/reactors/customerIoTraceSync.reactor";
 import type { SimulationRunStateData } from "../projections/simulationRunState.foldProjection";
@@ -13,7 +13,7 @@ const logger = createLogger(
 );
 
 export interface CustomerIoSimulationSyncReactorDeps {
-  projects: ProjectService;
+  projects: ProjectServicePort;
   nurturing: NurturingService;
   /** Returns the count of existing finished simulation runs for the org, or null on failure. */
   simulationCountFn: (organizationId: string) => Promise<number | null>;

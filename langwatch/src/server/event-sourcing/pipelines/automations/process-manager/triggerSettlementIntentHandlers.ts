@@ -6,7 +6,7 @@ import { slackDeliveryMethodOf } from "@langwatch/automations/providers/slack";
 import { decryptWebhookHeaders } from "~/server/app-layer/automations/providers/webhook/server";
 import type { WebhookMethod } from "@langwatch/automations/providers/webhook";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
-import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { DatasetRecordEntry } from "@langwatch/contracts/datasets";
@@ -97,7 +97,7 @@ interface ActionParams {
  */
 export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
   triggers: TriggerService;
-  projects: ProjectService;
+  projects: ProjectServicePort;
   /** Base host for deep links inside rendered customer templates (ADR-036). */
   baseHost: string;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;

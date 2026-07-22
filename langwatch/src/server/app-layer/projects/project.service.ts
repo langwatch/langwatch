@@ -1,6 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { Project } from "@prisma/client";
+import type { OrgAdminResolution } from "~/server/domain/projects/project-service.port";
 import { nanoid } from "nanoid";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
@@ -22,11 +23,9 @@ const logger = createLogger("langwatch:project-service");
 /** All boolean fields on Project whose name starts with "feature". */
 export type ProjectFeatureFlag = Extract<keyof Project, `feature${string}`>;
 
-export interface OrgAdminResolution {
-  userId: string | null;
-  organizationId: string | null;
-  firstMessage: boolean;
-}
+// Defined in the domain layer so event-sourcing pipelines can name it without
+// importing app-layer (ADR-063). Re-declared nowhere; imported from the port.
+export type { OrgAdminResolution } from "~/server/domain/projects/project-service.port";
 
 const NULL_RESOLUTION: OrgAdminResolution = {
   userId: null,

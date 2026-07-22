@@ -51,7 +51,7 @@ import type { CanonicalLogRecordRepository } from "../app-layer/logs/repositorie
 import type { MetricDataPointRepository } from "../app-layer/metrics/repositories/metric-data-point.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
-import type { ProjectService } from "../app-layer/projects/project.service";
+import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type {
   LogRecordStorageRepository,
   StoredLogRecordRow,
@@ -333,7 +333,7 @@ export interface PipelineRegistryDeps {
     runPort: TopicClusteringRunPort;
   };
   enterprisePipelines: EnterprisePipelineSetConfig;
-  projects: ProjectService;
+  projects: ProjectServicePort;
   monitors: MonitorService;
   triggers: TriggerService;
   automations: { ports: AutomationDispatchPorts };

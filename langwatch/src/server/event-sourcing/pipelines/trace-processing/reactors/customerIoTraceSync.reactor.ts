@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { NurturingService } from "../../../../../../ee/billing/nurturing/nurturing.service";
 import { captureException, toError } from "../../../../../utils/posthogErrorCapture";
-import type { ProjectService } from "../../../../app-layer/projects/project.service";
+import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
@@ -14,7 +14,7 @@ const logger = createLogger(
 export const CIO_REACTOR_DEBOUNCE_TTL_MS = 300_000;
 
 export interface CustomerIoTraceSyncReactorDeps {
-  projects: ProjectService;
+  projects: ProjectServicePort;
   nurturing: NurturingService;
 }
 

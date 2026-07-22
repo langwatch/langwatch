@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
@@ -9,7 +9,7 @@ const logger = createLogger(
 );
 
 export interface ProjectMetadataReactorDeps {
-  projects: ProjectService;
+  projects: ProjectServicePort;
   /**
    * ADR-051: ensures the project's topic clustering process exists and has a
    * scheduled daily wake.

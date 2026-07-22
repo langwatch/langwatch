@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { EvaluationRunData } from "~/server/domain/evaluations/types";
 import type { NurturingService } from "../../../../../../ee/billing/nurturing/nurturing.service";
 import { captureException, toError } from "../../../../../utils/posthogErrorCapture";
-import type { ProjectService } from "../../../../app-layer/projects/project.service";
+import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import { CIO_REACTOR_DEBOUNCE_TTL_MS } from "../../trace-processing/reactors/customerIoTraceSync.reactor";
 import type { EvaluationProcessingEvent } from "../schemas/events";
@@ -13,7 +13,7 @@ const logger = createLogger(
 );
 
 export interface CustomerIoEvaluationSyncReactorDeps {
-  projects: ProjectService;
+  projects: ProjectServicePort;
   nurturing: NurturingService;
   /** Returns the count of existing completed evaluations for the org, or null on failure. */
   evaluationCountFn: (organizationId: string) => Promise<number | null>;

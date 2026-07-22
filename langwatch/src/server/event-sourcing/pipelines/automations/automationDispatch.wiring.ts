@@ -6,7 +6,7 @@ import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.uti
 import { getProtectionsForProject } from "~/server/api/utils";
 import { getAnalyticsService } from "~/server/app-layer/analytics";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
-import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
 import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read-derivation.service";
@@ -79,7 +79,7 @@ export function buildAutomationDispatchPorts({
   redis: Redis | Cluster | null;
   triggers: TriggerService;
   emailSuppressions: EmailSuppressionService;
-  projects: ProjectService;
+  projects: ProjectServicePort;
   evaluations: { runs: EvaluationRunService };
   traces: { spans: SpanStorageService };
   traceSummaryRepository: TraceSummaryRepository;
