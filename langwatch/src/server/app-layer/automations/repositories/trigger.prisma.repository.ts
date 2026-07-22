@@ -11,7 +11,7 @@ import {
   type ReportScheduleTarget,
   type TriggerRepository,
   type TriggerSummary,
-} from "./trigger.repository";
+} from "@langwatch/automations/repositories/trigger.repository";
 
 export class PrismaTriggerRepository implements TriggerRepository {
   constructor(private readonly prisma: PrismaClient) {}

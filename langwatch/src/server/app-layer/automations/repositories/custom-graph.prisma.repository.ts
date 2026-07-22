@@ -2,7 +2,7 @@ import type { CustomGraph, PrismaClient } from "@prisma/client";
 import type {
   AutomationCustomGraphRepository,
   CustomGraphNameRef,
-} from "./custom-graph.repository";
+} from "@langwatch/automations/repositories/custom-graph.repository";
 
 export class PrismaAutomationCustomGraphRepository
   implements AutomationCustomGraphRepository

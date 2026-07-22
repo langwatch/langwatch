@@ -17,8 +17,8 @@ import {
   sanitizeTriggerFilters,
   triggerFiltersPermissiveSchema,
   type TriggerFilters,
-  type TriggerFilterValue,
 } from "~/server/filters/types";
+import type { TriggerFilterValue } from "@langwatch/automations/domain/filters";
 import { api } from "~/utils/api";
 import { Drawer } from "../components/ui/drawer";
 import { Switch } from "../components/ui/switch";

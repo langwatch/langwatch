@@ -3,11 +3,20 @@ import {
   TriggerAction as PackageTriggerAction,
   TriggerKind as PackageTriggerKind,
 } from "@langwatch/automations";
-import type { TriggerRow } from "@langwatch/automations/domain/trigger";
+import type { CustomGraphRow } from "@langwatch/automations/domain/custom-graph";
+import type {
+  TriggerCreateData,
+  TriggerRow,
+  TriggerUpdateData,
+} from "@langwatch/automations/domain/trigger";
+import { WebhookDeliveryOutcome as PackageWebhookDeliveryOutcome } from "@langwatch/automations";
 import {
   AlertType as PrismaAlertType,
   TriggerAction as PrismaTriggerAction,
   TriggerKind as PrismaTriggerKind,
+  WebhookDeliveryOutcome as PrismaWebhookDeliveryOutcome,
+  type CustomGraph as PrismaCustomGraph,
+  type Prisma,
   type Trigger as PrismaTrigger,
 } from "@prisma/client";
 import { describe, expect, it } from "vitest";
@@ -47,6 +56,25 @@ const _triggerRowKeysParity: AssertMutuallyAssignable<
   keyof PrismaTrigger,
   keyof TriggerRow
 > = true;
+const _webhookOutcomeParity: AssertMutuallyAssignable<
+  PackageWebhookDeliveryOutcome,
+  PrismaWebhookDeliveryOutcome
+> = true;
+const _customGraphRowAssignable: PrismaCustomGraph extends CustomGraphRow
+  ? true
+  : never = true;
+const _customGraphRowKeysParity: AssertMutuallyAssignable<
+  keyof PrismaCustomGraph,
+  keyof CustomGraphRow
+> = true;
+// Write shapes pass through to Prisma unchanged — they must stay assignable
+// to the generated input types.
+const _triggerCreateAssignable: TriggerCreateData extends Prisma.TriggerUncheckedCreateInput
+  ? true
+  : never = true;
+const _triggerUpdateAssignable: TriggerUpdateData extends Prisma.TriggerUncheckedUpdateInput
+  ? true
+  : never = true;
 
 describe("prisma enum parity", () => {
   describe("when the package enums are compared to the Prisma enums", () => {
@@ -65,6 +93,12 @@ describe("prisma enum parity", () => {
     it("keeps TriggerKind values identical", () => {
       expect(Object.values(PackageTriggerKind).sort()).toEqual(
         Object.values(PrismaTriggerKind).sort(),
+      );
+    });
+
+    it("keeps WebhookDeliveryOutcome values identical", () => {
+      expect(Object.values(PackageWebhookDeliveryOutcome).sort()).toEqual(
+        Object.values(PrismaWebhookDeliveryOutcome).sort(),
       );
     });
   });

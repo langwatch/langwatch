@@ -1,12 +1,11 @@
+import type { NotificationCadence } from "../cadences";
 import type {
-  AlertType,
-  Prisma,
-  Trigger,
-  TriggerAction,
-  TriggerKind,
-} from "@prisma/client";
-import type { NotificationCadence } from "@langwatch/automations/cadences";
-import type { TriggerFilters } from "~/server/filters/types";
+  TriggerCreateData,
+  TriggerRow,
+  TriggerUpdateData,
+} from "../domain/trigger";
+import type { TriggerFilters } from "../domain/filters";
+import type { AlertType, TriggerAction, TriggerKind } from "../enums";
 
 export interface TriggerSummary {
   id: string;
@@ -104,13 +103,13 @@ export interface TriggerRepository {
   findById(params: {
     triggerId: string;
     projectId: string;
-  }): Promise<Trigger | null>;
+  }): Promise<TriggerRow | null>;
 
   /**
    * Every non-(soft-)deleted trigger for a project, newest first — the
    * automations list. Includes inactive (paused) rows by design.
    */
-  findAllByProjectId(params: { projectId: string }): Promise<Trigger[]>;
+  findAllByProjectId(params: { projectId: string }): Promise<TriggerRow[]>;
 
   /**
    * The trigger occupying a custom graph's unique alert slot — deleted or
@@ -121,17 +120,17 @@ export interface TriggerRepository {
   findFirstByCustomGraphId(params: {
     projectId: string;
     customGraphId: string;
-  }): Promise<Trigger | null>;
+  }): Promise<TriggerRow | null>;
 
   /** Persist a new trigger row. `data` must carry `projectId` (multitenancy). */
-  create(params: { data: Prisma.TriggerUncheckedCreateInput }): Promise<Trigger>;
+  create(params: { data: TriggerCreateData }): Promise<TriggerRow>;
 
   /** Update a trigger row, scoped to the calling project. */
   update(params: {
     triggerId: string;
     projectId: string;
-    data: Prisma.TriggerUncheckedUpdateInput;
-  }): Promise<Trigger>;
+    data: TriggerUpdateData;
+  }): Promise<TriggerRow>;
 }
 
 /**
@@ -285,24 +284,24 @@ export class NullTriggerRepository implements TriggerRepository {
   async findById(_params: {
     triggerId: string;
     projectId: string;
-  }): Promise<Trigger | null> {
+  }): Promise<TriggerRow | null> {
     return null;
   }
 
-  async findAllByProjectId(_params: { projectId: string }): Promise<Trigger[]> {
+  async findAllByProjectId(_params: { projectId: string }): Promise<TriggerRow[]> {
     return [];
   }
 
   async findFirstByCustomGraphId(_params: {
     projectId: string;
     customGraphId: string;
-  }): Promise<Trigger | null> {
+  }): Promise<TriggerRow | null> {
     return null;
   }
 
   async create(_params: {
-    data: Prisma.TriggerUncheckedCreateInput;
-  }): Promise<Trigger> {
+    data: TriggerCreateData;
+  }): Promise<TriggerRow> {
     // Loud by design: there is no honest Trigger row to fabricate. Wiring
     // that reaches authoring writes must inject a real repository.
     throw new Error("Trigger authoring is not supported by NullTriggerRepository");
@@ -311,8 +310,8 @@ export class NullTriggerRepository implements TriggerRepository {
   async update(_params: {
     triggerId: string;
     projectId: string;
-    data: Prisma.TriggerUncheckedUpdateInput;
-  }): Promise<Trigger> {
+    data: TriggerUpdateData;
+  }): Promise<TriggerRow> {
     throw new Error("Trigger authoring is not supported by NullTriggerRepository");
   }
 }

@@ -38,8 +38,8 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   type FilterField,
   sanitizeTriggerFilters,
-  type TriggerFilterValue,
 } from "~/server/filters/types";
+import type { TriggerFilterValue } from "@langwatch/automations/domain/filters";
 import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
 import {
   EXAMPLE_MATCHES,

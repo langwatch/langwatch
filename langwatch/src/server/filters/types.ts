@@ -1,3 +1,4 @@
+import type { TriggerFilterValue } from "@langwatch/automations/domain/filters";
 import { z } from "zod";
 
 export const filterFieldsEnum = z.enum([
@@ -34,9 +35,7 @@ export const filterFieldsEnum = z.enum([
 export type FilterField = z.infer<typeof filterFieldsEnum>;
 
 // Schema for trigger filter values - can be nested up to 2 levels deep
-const filterValueSchema: z.ZodType<
-  string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
-> = z.lazy(() =>
+const filterValueSchema: z.ZodType<TriggerFilterValue> = z.lazy(() =>
   z.union([
     z.array(z.string()),
     z.record(z.string(), z.array(z.string())),
@@ -44,7 +43,6 @@ const filterValueSchema: z.ZodType<
   ]),
 );
 
-export type TriggerFilterValue = z.infer<typeof filterValueSchema>;
 export type TriggerFilters = Partial<Record<FilterField, TriggerFilterValue>>;
 
 // Schema for validating trigger filter JSON structure — rejects unknown fields

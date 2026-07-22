@@ -4,7 +4,7 @@ import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type {
   WebhookDeliveryInput,
   WebhookFailureResponse,
-} from "~/server/app-layer/automations/repositories/webhook-delivery.repository";
+} from "@langwatch/automations/repositories/webhook-delivery.repository";
 import {
   assertWebhookDelivered,
   sendWebhook,

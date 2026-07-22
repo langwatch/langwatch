@@ -1,4 +1,4 @@
-import type { WebhookDeliveryOutcome } from "@prisma/client";
+import type { WebhookDeliveryOutcome } from "../enums";
 
 /**
  * Read + write repository over `WebhookDelivery` — the per-attempt delivery

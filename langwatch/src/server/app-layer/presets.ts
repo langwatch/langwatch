@@ -249,7 +249,7 @@ import {
   NullEmailSuppressionRepository,
 } from "@langwatch/automations/repositories/emailSuppression.repository";
 import { PrismaTriggerRepository } from "./automations/repositories/trigger.prisma.repository";
-import { NullTriggerRepository } from "./automations/repositories/trigger.repository";
+import { NullTriggerRepository } from "@langwatch/automations/repositories/trigger.repository";
 import { TriggerService } from "./automations/trigger.service";
 import { testFireTrigger } from "./automations/trigger-template.service";
 import { UsageService } from "./usage/usage.service";

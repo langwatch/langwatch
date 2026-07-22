@@ -4,7 +4,7 @@ import type {
   WebhookDeliveryInput,
   WebhookDeliveryRepository,
   WebhookDeliveryRow,
-} from "./repositories/webhook-delivery.repository";
+} from "@langwatch/automations/repositories/webhook-delivery.repository";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 

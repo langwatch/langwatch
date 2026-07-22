@@ -16,7 +16,7 @@ import {
   type GraphTriggerHeartbeatDeps,
   type HeartbeatCandidateSources,
 } from "../graph-trigger-heartbeat";
-import type { TriggerSummary } from "../repositories/trigger.repository";
+import type { TriggerSummary } from "@langwatch/automations/repositories/trigger.repository";
 import type { TriggerService } from "../trigger.service";
 
 const PROJECT = "proj-mixed";

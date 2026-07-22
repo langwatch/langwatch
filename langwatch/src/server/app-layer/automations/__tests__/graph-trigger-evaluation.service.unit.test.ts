@@ -12,7 +12,7 @@ import {
   graphAlertIncidentKey,
   type GraphTriggerSentRepository,
   type OpenGraphTriggerSent,
-} from "../repositories/trigger.repository";
+} from "@langwatch/automations/repositories/trigger.repository";
 
 const PROJECT_ID = "proj-1";
 const TRIGGER_ID = "trig-1";

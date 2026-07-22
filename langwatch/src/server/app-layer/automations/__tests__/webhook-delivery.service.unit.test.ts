@@ -3,7 +3,7 @@ import type {
   WebhookDeliveryInput,
   WebhookDeliveryRepository,
   WebhookDeliveryRow,
-} from "../repositories/webhook-delivery.repository";
+} from "@langwatch/automations/repositories/webhook-delivery.repository";
 import { WebhookDeliveryService } from "../webhook-delivery.service";
 
 function makeRepo(overrides?: Partial<WebhookDeliveryRepository>) {

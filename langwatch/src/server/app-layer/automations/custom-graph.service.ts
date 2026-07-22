@@ -3,7 +3,7 @@ import { PrismaAutomationCustomGraphRepository } from "./repositories/custom-gra
 import type {
   AutomationCustomGraphRepository,
   CustomGraphNameRef,
-} from "./repositories/custom-graph.repository";
+} from "@langwatch/automations/repositories/custom-graph.repository";
 
 /**
  * The automations feature's read surface over custom graphs: the graph-alert

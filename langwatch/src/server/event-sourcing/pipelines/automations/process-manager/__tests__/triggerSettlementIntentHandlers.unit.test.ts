@@ -1,7 +1,7 @@
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
+import type { TriggerSummary } from "@langwatch/automations/repositories/trigger.repository";
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { Trace } from "~/server/tracer/types";
 import {

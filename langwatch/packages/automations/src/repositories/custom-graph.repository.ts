@@ -1,4 +1,4 @@
-import type { CustomGraph } from "@prisma/client";
+import type { CustomGraphRow } from "../domain/custom-graph";
 
 /** The id/name pair the automations list renders for a graph-alert row. */
 export interface CustomGraphNameRef {
@@ -18,7 +18,7 @@ export interface AutomationCustomGraphRepository {
   findById(params: {
     customGraphId: string;
     projectId: string;
-  }): Promise<CustomGraph | null>;
+  }): Promise<CustomGraphRow | null>;
 
   /**
    * Tenancy guard for graph-alert upsert: does this graph belong to the

@@ -29,3 +29,12 @@ export const TriggerKind = {
   REPORT: "REPORT",
 } as const;
 export type TriggerKind = (typeof TriggerKind)[keyof typeof TriggerKind];
+
+export const WebhookDeliveryOutcome = {
+  success: "success",
+  retryable: "retryable",
+  terminal: "terminal",
+  pending: "pending",
+} as const;
+export type WebhookDeliveryOutcome =
+  (typeof WebhookDeliveryOutcome)[keyof typeof WebhookDeliveryOutcome];

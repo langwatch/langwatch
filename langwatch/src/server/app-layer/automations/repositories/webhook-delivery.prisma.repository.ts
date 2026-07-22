@@ -4,7 +4,7 @@ import type {
   WebhookDeliveryRepository,
   WebhookDeliveryRow,
   WebhookFailureResponse,
-} from "./webhook-delivery.repository";
+} from "@langwatch/automations/repositories/webhook-delivery.repository";
 
 export class PrismaWebhookDeliveryRepository
   implements WebhookDeliveryRepository

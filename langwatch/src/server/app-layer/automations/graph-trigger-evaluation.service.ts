@@ -56,7 +56,7 @@ import {
 import type {
   GraphTriggerSentRepository,
   OpenGraphTriggerSent,
-} from "./repositories/trigger.repository";
+} from "@langwatch/automations/repositories/trigger.repository";
 import { parseSeriesIndex } from "@langwatch/automations-server/services/seriesName";
 
 const logger = createLogger("langwatch:graph-trigger-evaluation");

@@ -11,7 +11,7 @@ import {
 import type {
   TriggerRepository,
   TriggerSummary,
-} from "./repositories/trigger.repository";
+} from "@langwatch/automations/repositories/trigger.repository";
 
 export class TriggerService {
   private static readonly TTL_MS = 60_000;
