@@ -27,7 +27,7 @@ Feature: Handled errors — the handled-error boundary
   Background:
     Given the HandledError base and its serialisation are available in the app layer
     And tRPC attaches a serialised handled error to `data.error`
-    And Hono's `onError` normalises a HandledError to `{ code, message: code, ...meta }`
+    And Hono's `onError` normalises a HandledError to `{ error: code, message, ...meta }`
 
   # ==========================================================================
   # Handled: known, user-relevant failures cross the boundary with meaning
@@ -43,13 +43,22 @@ Feature: Handled errors — the handled-error boundary
     And its httpStatus is 404
 
   @bdd @domain-errors
-  Scenario: A handled error's free-text message never crosses the tRPC boundary
-    Given a procedure throws a HandledError whose message names server configuration
+  Scenario: A handled error's free-text message does not cross the tRPC boundary
+    Given a procedure throws a HandledError
     When the client calls that procedure
     Then the tRPC wire message is the error's stable code, not the free-text message
     And no part of the response contains the free-text message
     And `data.error` (code, meta, tips, docsUrl) is the entire client contract
-    So client copy comes from the code-keyed explainers, never from server-authored strings
+    So client copy comes from the code-keyed registry, never from server-authored strings
+
+  @bdd @domain-errors
+  Scenario: A handled error's message is written to be safe to show
+    Given an author writes a HandledError's message
+    Then it names no environment variable, host or internal service
+      # those go in the log line beside the throw, where the trace id ties them
+      # back; nothing on a handled error is sensitive, by definition
+    And it reads as a sentence a customer could be shown
+      # because a REST caller IS shown it — see the scenario below
 
   @bdd @domain-errors
   Scenario: A known failure is normalised by Hono to a client-safe body
@@ -57,7 +66,9 @@ Feature: Handled errors — the handled-error boundary
     When the client calls that route
     Then the HTTP status is 403
     And the response body carries code "conversation_not_owned" with its meta
-    And the body's message is that code, not the error's own free text
+    And the body's `error` field is that code, so a consumer never guesses from the status
+    And the body's `message` field is the error's own sentence, which is why it
+      must be written customer-safe
     And no stack trace or internal detail is present
 
   @bdd @domain-errors
@@ -126,11 +137,16 @@ Feature: Handled errors — the handled-error boundary
     So an OpenAI-compatible consumer and a LangWatch one both read it natively
 
   @bdd @domain-errors
-  Scenario: A displayed message prefers copy that was authored to be shown
-    Given a client needs one line to show a user
+  Scenario: A consumer with no copy of its own reads the most specific line available
+    Given a consumer that has no presentation registry — the CLI, an SDK, an
+      agent reading a REST body — needs one line to show a user
+      # the app is not this consumer: it keys its copy off the code, and is
+      # pinned by specs/features/handled-error-presentation.feature
     Then it reads meta.message, then message, then code
-    And meta.message is the only channel carrying server-authored prose
-    And a handled error's own message stays server-side and is never a source
+    And meta.message is the channel for prose the server deliberately authored
+    And the handled error's own message is customer-safe, so it may be shown
+    And the code is an acceptable last resort, because a bare slug names the
+      failure where a generic "the request failed" names nothing
 
   @bdd @domain-errors
   Scenario: An external contract wins over cross-transport symmetry
@@ -199,10 +215,14 @@ Feature: Handled errors — the handled-error boundary
 
   @bdd @domain-errors
   Scenario: A streamed response carries the serialised handled error on its error event
-    Given a streamed endpoint (e.g. the Langy chat stream) hits a known failure mid-stream
+    Given an SSE subscription hits a known failure mid-stream
     Then its error event carries the SerializedHandledError, not a plain string
     And the frame's message is the error's code, never its free text
     And the client applies the same handled/unknown logic as for a tRPC error
+      # the Langy chat and studio execution streams do NOT do this yet: their
+      # error frames carry a raw string and no payload, so a consumer has no
+      # code to key copy off. ADR-045 §6 is the standing decision; those two
+      # are the outstanding adopters, not evidence of it
 
   # ==========================================================================
   # Client presentation is decided in one place, keyed on code

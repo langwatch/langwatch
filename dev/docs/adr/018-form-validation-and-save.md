@@ -30,13 +30,16 @@ In code form:
 </Button>
 ```
 
-Validation responsibility is split:
+Validation responsibility is split. *(Amended 2026-07-22 — see below: server
+errors go through `showErrorToast`, never `toaster.create`, and a rejection that
+names fields lands on those fields via `applyHandledErrorToForm`.)*
 
 | Layer | Where | Tool | Surface |
 |---|---|---|---|
 | Field-level (sync schema rules) | `react-hook-form` + `zodResolver` | Schema | `<Field.ErrorText>` inline |
 | Cross-field (one input depends on another) | Submit handler | Manual | `toaster.create({type:"error"})` + `return` before mutation |
-| Server-side (uniqueness, auth, business rules) | Mutation `onError` | tRPC error | `toaster.create({type:"error"})` |
+| Server-side field rejection (a `validation_error` naming fields) | Mutation `onError` | `applyHandledErrorToForm` | The offending fields, marked in place, plus `<FormServerError>` for form-level complaints |
+| Server-side, everything else (auth, conflicts, business rules) | Mutation `onError` | `showErrorToast` | Toast, with copy from the code-keyed presentation registry |
 
 A submit handler that detects an invalid cross-field state **must `return` before any mutation fires** and **must surface why** through a toast or inline error. Silent no-ops are forbidden — they are the failure mode that produced #3785.
 
@@ -73,6 +76,50 @@ A submit handler that detects an invalid cross-field state **must `return` befor
 - The design guideline (`dev/docs/design/guidelines.md` §6) summarises the rule with code patterns; this ADR captures the *why* and the alternatives considered.
 - We accept the risk that a user clicks Save on an obviously-broken form and only discovers the error after the click. In practice the click is cheap; the cost of a confusing disabled button is higher.
 
+## Amendment 2026-07-22: server rejections go back on the form, not into a toast
+
+This ADR's third row originally said "server-side (uniqueness, auth, business
+rules) → `toaster.create({type:"error"})`", and that stopped being right twice
+over.
+
+First, **never call `toaster.create` for an error directly.** Since
+[#5984](https://github.com/langwatch/langwatch/pull/5984) a handled error's tRPC
+wire message is its stable `code`, so `description: error.message` renders
+`validation_error` at the customer. Use `showErrorToast({ error, fallbackTitle })`
+from `~/features/errors`: it reads the handled payload, takes its copy from the
+code-keyed presentation registry, absorbs the global-handler dedup check, and
+degrades unrecognised failures to one calm generic state plus a copyable error
+id. A test (`features/errors/logic/__tests__/noRawErrorToasts.unit.test.ts`)
+fails the build if a raw `error.message` reaches a toast's copy slot.
+
+```tsx
+onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save the team" }),
+```
+
+Second, **a rejection that names fields belongs on those fields.** A toast makes
+the user hunt for what to change and is gone by the time they find it — the same
+"silent no-op" family of failure this ADR was written against. `applyHandledErrorToForm`
+maps a `validation_error`'s `meta.fieldErrors` onto the fields the form owns and
+focuses the first; it returns `true` only when it can display the *whole*
+rejection, so the caller still toasts whatever it couldn't show:
+
+```tsx
+onError: (error) => {
+  if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
+  showErrorToast({ error, fallbackTitle: "Couldn't save the team" });
+},
+```
+
+`hasFormErrorSlot` defaults to `false` and **must only be `true` if the form
+actually renders `<FormServerError form={form} />`.** Form-level complaints go
+to `root.serverError`, and `setError` succeeds whether or not anything displays
+it — so claiming the error without the slot suppresses the toast and shows
+nothing, and Save appears to do nothing at all. That is the exact failure mode
+of #3785, reintroduced by a default. The pair ships together.
+
+See `dev/docs/best_practices/error-handling.md` and
+[ADR-045](./045-domain-errors-handled-boundary.md).
+
 ## Alternatives considered
 
 1. **Hard-disable on `!isValid`.** Rejected because it hides reasons and conflicts with async validation; see Rationale §1-3.
@@ -88,3 +135,8 @@ A submit handler that detects an invalid cross-field state **must `return` befor
 - #3785 — bug that triggered this ADR: provider-default silent no-op
 - `dev/docs/design/guidelines.md` §6 — implementation summary
 - `langwatch/src/hooks/useProviderFormSubmit.ts` — canonical implementation of cross-field submit-time validation
+- [ADR-045](./045-domain-errors-handled-boundary.md) and
+  `dev/docs/best_practices/error-handling.md` — the handled-error boundary and
+  how a server rejection reaches the user
+- `langwatch/src/features/errors` — `showErrorToast`,
+  `applyHandledErrorToForm`, `<FormServerError>`

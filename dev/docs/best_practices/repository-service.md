@@ -110,29 +110,44 @@ export class DatasetService {
 
 ## Domain Errors
 
-Services throw framework-agnostic errors that routers map to HTTP/tRPC errors:
+Services throw framework-agnostic errors from a per-domain `errors.ts`. **Read
+[`error-handling.md`](./error-handling.md) and
+[ADR-045](../adr/045-domain-errors-handled-boundary.md) before adding one** —
+they own the decision of *when* an error is a `HandledError` and what goes on it.
+The short version, and the part that concerns this pattern:
+
+A failure the caller can act on is a `HandledError` subclass with a stable
+`code`. It crosses the boundary with meaning, and no router has to hand-map it:
 
 ```typescript
 // langwatch/src/server/datasets/errors.ts
-export class DatasetNotFoundError extends Error {
-  constructor(message = "Dataset not found") {
-    super(message);
-    this.name = "DatasetNotFoundError";
+export class DatasetNameTakenError extends HandledError {
+  declare readonly code: "dataset_name_taken";
+
+  constructor() {
+    super("dataset_name_taken", "A dataset with this name already exists", {
+      httpStatus: 409,
+      fault: "customer",
+    });
+    this.name = "DatasetNameTakenError";
   }
 }
 ```
 
-```typescript
-// In router - map to tRPC errors
-try {
-  return await service.upsertDataset(input);
-} catch (error) {
-  if (error instanceof DatasetNotFoundError) {
-    throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-  }
-  throw error;
-}
-```
+Both boundaries serialise it on their own — tRPC's `errorFormatter` and Hono's
+`onError` — so a router does not catch it, does not translate it, and above all
+does not rebuild a `TRPCError` around the caught message. That older shape
+(`extends Error`, then `new TRPCError({ code, message: error.message })` in the
+router) is exactly what ADR-045 replaced: it puts server prose on the wire as if
+it were API copy, and it has to be rewritten at every call site that rethrows.
+
+Anything you *cannot* name — a dropped connection, a bug — stays a plain `Error`
+and correctly degrades to "unknown" at the boundary. Do not dress it up.
+
+Adding a handled code is three edits, not one: the subclass here, the code in
+`features/errors/logic/codes.ts`, and its customer copy in
+`features/errors/logic/presentation.ts`. See `error-handling.md` §"Authoring
+one".
 
 ## File Structure
 
