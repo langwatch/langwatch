@@ -20,6 +20,25 @@ describe("cardKindFor, given a CLI resource and verb", () => {
     });
   });
 
+  describe("when the command touches simulation runs", () => {
+    it("draws ONE run for a get, a SET for listings and launches — never evalRun", () => {
+      // evalRun is evaluations/experiments only; a simulation run is its own
+      // kind so the panel can live-render it by its structured id.
+      expect(cardKindFor({ resource: "simulation-run", verb: "get" })).toBe(
+        "simulationRun",
+      );
+      expect(cardKindFor({ resource: "simulation-run", verb: "list" })).toBe(
+        "simulationSetRun",
+      );
+      expect(cardKindFor({ resource: "scenario", verb: "run" })).toBe(
+        "simulationSetRun",
+      );
+      expect(cardKindFor({ resource: "suite", verb: "run" })).toBe(
+        "simulationSetRun",
+      );
+    });
+  });
+
   describe("when the command runs an experiment", () => {
     it("draws the run card for run/results/status", () => {
       expect(cardKindFor({ resource: "experiment", verb: "run" })).toBe(

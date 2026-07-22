@@ -397,6 +397,12 @@ function derivedBodyWidget({
       return "facts";
     case "dashboard":
       return "rows";
+    // ONE run reads as facts (the live card overrides rendering anyway); a
+    // SET of runs — a listing or a launched batch — reads as rows.
+    case "simulationRun":
+      return "facts";
+    case "simulationSetRun":
+      return "rows";
     case "promptDiff":
       return "diff";
     case "resourceCreated":

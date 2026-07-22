@@ -20,6 +20,32 @@ describe("CLI tool result contract", () => {
     expect(parseCliToolResult('{"value":"previous tool output"}')).toBeNull();
   });
 
+  it("types a simulation-run get as the simulationRun card when it carries the run id", () => {
+    expect(
+      toCliToolResult({
+        resource: "simulation-run",
+        verb: "get",
+        payload: { scenarioRunId: "run_1", status: "SUCCESS" },
+      }),
+    ).toEqual({
+      kind: "card",
+      card: "simulationRun",
+      payload: { scenarioRunId: "run_1", status: "SUCCESS" },
+    });
+  });
+
+  it("degrades a simulation-run get WITHOUT the structured run id to a json receipt", () => {
+    // The id is the card's contract — the panel fetches live state by it. A
+    // payload that lacks it must never become a live card off a guess.
+    expect(
+      toCliToolResult({
+        resource: "simulation-run",
+        verb: "get",
+        payload: { status: "SUCCESS" },
+      }),
+    ).toEqual({ kind: "json", payload: { status: "SUCCESS" } });
+  });
+
   it("retains an un-carded JSON response as a typed receipt", () => {
     expect(
       toCliToolResult({

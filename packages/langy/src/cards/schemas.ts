@@ -280,6 +280,34 @@ export const scenarioCardSchema = z.looseObject({
   status: z.string().optional(),
 });
 
+/**
+ * `simulation-run get` — ONE scenario run. `scenarioRunId` is required on
+ * purpose: it is the structured reference the panel's live card fetches fresh
+ * state by (never regexed out of prose), so a payload without it is not this
+ * card.
+ */
+export const simulationRunCardSchema = z.looseObject({
+  scenarioRunId: z.string(),
+  scenarioId: z.string().optional(),
+  batchRunId: z.string().optional(),
+  scenarioSetId: z.string().optional(),
+  name: z.string().optional(),
+  status: z.string().optional(),
+  platformUrl: z.string().optional(),
+});
+
+/**
+ * A SET of scenario runs: `simulation-run list` (the listed set) or a
+ * `scenario run` / `suite run` launch (the receipt naming the batch the set
+ * runs under).
+ */
+export const simulationSetRunCardSchema = z.union([
+  z.looseObject({
+    runs: z.array(z.looseObject({ scenarioRunId: z.string().optional() })),
+  }),
+  z.looseObject({ batchRunId: z.string() }),
+]);
+
 /** `prompt push|sync` — the diff card. */
 export const promptDiffCardSchema = z.looseObject({
   name: z.string().optional(),
@@ -452,6 +480,8 @@ export const CARD_KINDS = [
   "evalRun",
   "dataset",
   "scenario",
+  "simulationRun",
+  "simulationSetRun",
   "promptDiff",
   "spend",
   "evaluatorConfig",
@@ -547,6 +577,8 @@ export const SCHEMA_BY_CARD_KIND: Record<MeasuredCardKind, z.ZodType> = {
   evalRun: evalRunCardSchema,
   dataset: datasetCardSchema,
   scenario: scenarioCardSchema,
+  simulationRun: simulationRunCardSchema,
+  simulationSetRun: simulationSetRunCardSchema,
   promptDiff: promptDiffCardSchema,
   spend: spendCardSchema,
   evaluatorConfig: evaluatorConfigCardSchema,
