@@ -83,3 +83,10 @@ Feature: Custom (OpenAI-compatible) provider routing to customer endpoints
     When a /v1/messages request is dispatched through it
     Then the dispatch does not fail credential validation
     And the upstream request carries no x-api-key header
+
+  Scenario: An endpoint that fell out of recent use still works when dispatched to again
+    Given an "anthropic" model provider with a base URL that has not been dispatched to recently
+    And many other Anthropic-compatible endpoints have been dispatched to since
+    When a /v1/messages request is dispatched through it again
+    Then the upstream request reaches its configured endpoint
+    And endpoints outside the recently used set hold no gateway resources in the meantime

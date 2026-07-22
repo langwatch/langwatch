@@ -2,11 +2,14 @@ package providers
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"go.uber.org/zap"
@@ -66,7 +69,8 @@ func TestMapProvider_AnthropicBaseURLDerivesCompatProvider(t *testing.T) {
 //
 // Spec: specs/ai-gateway/custom-provider-base-url.feature
 func TestGetConfigForProvider_AnthropicCompatCarriesBaseURL(t *testing.T) {
-	provider := mapProvider(domain.Credential{
+	reg := newAnthropicCompatRegistry(anthropicCompatMaxEndpoints)
+	provider := reg.register(domain.Credential{
 		ProviderID: domain.ProviderAnthropic,
 		APIKey:     "sk-ant",
 		// Conventional "/v1" suffix: Bifrost's Anthropic provider appends
@@ -75,7 +79,7 @@ func TestGetConfigForProvider_AnthropicCompatCarriesBaseURL(t *testing.T) {
 		Extra: map[string]string{"base_url": "http://vllm:8000/v1"},
 	})
 
-	cfg, err := (&account{}).GetConfigForProvider(provider)
+	cfg, err := (&account{anthropicCompat: reg}).GetConfigForProvider(provider)
 	if err != nil {
 		t.Fatalf("GetConfigForProvider(%q) error: %v", provider, err)
 	}
@@ -112,13 +116,14 @@ func TestGetConfigForProvider_AnthropicCompatKeylessWhenNoAPIKey(t *testing.T) {
 	withoutKey := withKey
 	withoutKey.APIKey = ""
 
-	keyedProvider := mapProvider(withKey)
-	keylessProvider := mapProvider(withoutKey)
+	reg := newAnthropicCompatRegistry(anthropicCompatMaxEndpoints)
+	keyedProvider := reg.register(withKey)
+	keylessProvider := reg.register(withoutKey)
 	if keyedProvider == keylessProvider {
 		t.Fatal("keyed and keyless creds for the same endpoint must not share a provider key: the keyless flag lives on the provider config")
 	}
 
-	cfg, err := (&account{}).GetConfigForProvider(keylessProvider)
+	cfg, err := (&account{anthropicCompat: reg}).GetConfigForProvider(keylessProvider)
 	if err != nil {
 		t.Fatalf("GetConfigForProvider(%q) error: %v", keylessProvider, err)
 	}
@@ -127,13 +132,70 @@ func TestGetConfigForProvider_AnthropicCompatKeylessWhenNoAPIKey(t *testing.T) {
 	}
 }
 
-// A compat-prefixed provider key that was never derived by mapProvider has
-// no endpoint to dial — surfacing a config error beats silently dispatching
-// to api.anthropic.com.
+// A compat-prefixed provider key that was never registered has no endpoint
+// to dial — surfacing a config error beats silently dispatching to
+// api.anthropic.com. Holds for an empty registry and for an account built
+// without one.
 func TestGetConfigForProvider_UnregisteredAnthropicCompatKeyErrors(t *testing.T) {
-	_, err := (&account{}).GetConfigForProvider(bfschemas.ModelProvider(anthropicCompatPrefix + "deadbeefdeadbeef"))
-	if err == nil {
+	unknown := bfschemas.ModelProvider(anthropicCompatPrefix + "deadbeefdeadbeef")
+
+	reg := newAnthropicCompatRegistry(anthropicCompatMaxEndpoints)
+	if _, err := (&account{anthropicCompat: reg}).GetConfigForProvider(unknown); err == nil {
 		t.Fatal("unregistered compat provider key must error, not fall through to a URL-less config")
+	}
+	if _, err := (&account{}).GetConfigForProvider(unknown); err == nil {
+		t.Fatal("account without a registry must error for compat keys, not panic or fall through")
+	}
+}
+
+// The registry is what keeps endpoint rotation from leaking bifrost worker
+// pools: it must stay at its capacity, evict the least-recently-dispatched
+// endpoint first (a dispatch refreshes recency), report every eviction so
+// the provider behind the key can be torn down, and accept an evicted
+// endpoint back as if it were new.
+//
+// Spec: specs/ai-gateway/custom-provider-base-url.feature
+func TestAnthropicCompatRegistry_EvictsLeastRecentlyDispatchedBeyondCap(t *testing.T) {
+	credFor := func(url string) domain.Credential {
+		return domain.Credential{
+			ProviderID: domain.ProviderAnthropic,
+			APIKey:     "sk-ant",
+			Extra:      map[string]string{"base_url": url},
+		}
+	}
+
+	var evicted []bfschemas.ModelProvider
+	reg := newAnthropicCompatRegistry(2)
+	reg.onEvict = func(key bfschemas.ModelProvider) { evicted = append(evicted, key) }
+
+	keyA := reg.register(credFor("http://a:8000"))
+	keyB := reg.register(credFor("http://b:8000"))
+	if len(evicted) != 0 {
+		t.Fatalf("no eviction expected at capacity, got %v", evicted)
+	}
+
+	// Dispatching to A again must refresh its recency: the next overflow
+	// evicts B, not A.
+	reg.register(credFor("http://a:8000"))
+	keyC := reg.register(credFor("http://c:8000"))
+	if len(evicted) != 1 || evicted[0] != keyB {
+		t.Fatalf("evicted = %v, want exactly [%q] (least recently dispatched)", evicted, keyB)
+	}
+	if _, ok := reg.lookup(string(keyB)); ok {
+		t.Fatal("evicted endpoint must not resolve")
+	}
+	for _, key := range []bfschemas.ModelProvider{keyA, keyC} {
+		if _, ok := reg.lookup(string(key)); !ok {
+			t.Fatalf("retained endpoint %q must still resolve", key)
+		}
+	}
+
+	// An evicted endpoint re-registers cleanly, displacing the now-oldest.
+	if again := reg.register(credFor("http://b:8000")); again != keyB {
+		t.Fatalf("re-registered endpoint derived %q, want the original key %q", again, keyB)
+	}
+	if len(evicted) != 2 || evicted[1] != keyA {
+		t.Fatalf("evicted = %v, want [%q %q]", evicted, keyB, keyA)
 	}
 }
 
@@ -274,6 +336,86 @@ func TestDispatchStream_MessagesStreamsFromKeylessAnthropicCompatEndpoint(t *tes
 	}
 	if string(received) != sseBody {
 		t.Fatalf("SSE frames were not forwarded byte-for-byte:\n got: %q\nwant: %q", received, sseBody)
+	}
+}
+
+// Endpoint rotation end-to-end: when an endpoint ages out of the bounded
+// registry, the bifrost provider behind it (worker pool + queue) must be
+// torn down — that is the resource-leak fix — and a later dispatch to the
+// same endpoint must transparently re-register it and succeed. Exercises
+// the full evict → RemoveProvider → lazy re-creation cycle against a real
+// bifrost instance.
+//
+// Spec: specs/ai-gateway/custom-provider-base-url.feature
+func TestDispatch_EvictedAnthropicCompatEndpointRecoversOnNextDispatch(t *testing.T) {
+	const upstreamResponse = `{"id":"msg_test","type":"message","role":"assistant","model":"claude-sonnet-5","content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":{"input_tokens":3,"output_tokens":1}}`
+
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(upstreamResponse))
+	}))
+	defer srv.Close()
+
+	router, err := NewBifrostRouter(context.Background(), BifrostOptions{Logger: zap.NewNop(), InitialPoolSize: 10})
+	if err != nil {
+		t.Fatalf("NewBifrostRouter: %v", err)
+	}
+	defer router.Close()
+
+	cred := domain.Credential{
+		ID:         "mp-ant-rotate",
+		ProviderID: domain.ProviderAnthropic,
+		APIKey:     "sk-local",
+		Extra:      map[string]string{"base_url": srv.URL},
+	}
+	req := &domain.Request{
+		Type:  domain.RequestTypeMessages,
+		Model: "claude-sonnet-5",
+		Body:  []byte(`{"model":"claude-sonnet-5","max_tokens":8,"messages":[{"role":"user","content":"hi"}]}`),
+	}
+	if _, err := router.Dispatch(context.Background(), req, cred); err != nil {
+		t.Fatalf("initial Dispatch returned error: %v", err)
+	}
+	if got := hits.Load(); got != 1 {
+		t.Fatalf("upstream hits after initial dispatch = %d, want 1", got)
+	}
+	key := anthropicCompatProviderKey(cred)
+
+	// Rotate through enough other endpoints to push this one past the
+	// registry capacity: it becomes the least-recently-dispatched entry
+	// and gets evicted on the final insert.
+	for i := 0; i < anthropicCompatMaxEndpoints; i++ {
+		router.anthropicCompat.register(domain.Credential{
+			ProviderID: domain.ProviderAnthropic,
+			APIKey:     "sk-rotated",
+			Extra:      map[string]string{"base_url": fmt.Sprintf("http://rotated-%d:8000", i)},
+		})
+	}
+	if _, ok := router.anthropicCompat.lookup(string(key)); ok {
+		t.Fatal("endpoint should have been evicted after rotating past the registry capacity")
+	}
+
+	// Teardown is asynchronous (RemoveProvider drains in-flight work);
+	// wait until the provider behind the evicted key is gone. With the
+	// registry entry evicted, GetProviderByKey cannot lazily re-create it.
+	deadline := time.Now().Add(10 * time.Second)
+	for router.bf.GetProviderByKey(key) != nil {
+		if time.Now().After(deadline) {
+			t.Fatal("bifrost provider behind the evicted endpoint was never torn down")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Dispatching to the evicted endpoint again must re-register it and
+	// lazily re-create the provider — rotation must never strand an
+	// endpoint that comes back into use.
+	if _, err := router.Dispatch(context.Background(), req, cred); err != nil {
+		t.Fatalf("Dispatch after eviction returned error: %v", err)
+	}
+	if got := hits.Load(); got != 2 {
+		t.Fatalf("upstream hits after re-dispatch = %d, want 2", got)
 	}
 }
 
