@@ -3,9 +3,8 @@ import { api } from "~/utils/api";
 
 interface CleanupVariables {
   // Optional to match the tRPC input, where `dryRun` carries a Zod default and
-  // so is not required at the call site. At runtime both mutate() calls pass it
-  // explicitly; `!dryRun` treats the absent case as the destructive run, which
-  // is the safe reading for closing the confirm prompt.
+  // so is not required at the call site. The caller keys off `dryRun === false`,
+  // so only the destructive run — never a preview — clears the confirm prompt.
   dryRun?: boolean;
 }
 

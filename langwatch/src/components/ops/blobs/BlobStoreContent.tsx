@@ -21,11 +21,14 @@ export function BlobStoreContent() {
     // Only the destructive run owns the prompt; a resolving preview must not
     // close a Run dialog the operator opened in the meantime.
     onCleanupSuccess: (variables) => {
-      if (!variables.dryRun) setReclaimConfirm(null);
+      if (variables.dryRun === false) setReclaimConfirm(null);
     },
-    // Close only if the resolved delete is the one still on screen.
+    // Close only if the resolved delete is the one still on screen — the blob
+    // is identified by all three key parts, so a delete in another queue with
+    // the same project + hash cannot close this queue's dialog.
     onDeleteSuccess: (variables) => {
       setDeleteTarget((current) =>
+        current?.queueName === variables.queueName &&
         current?.projectId === variables.projectId &&
         current?.hash === variables.hash
           ? null

@@ -114,8 +114,8 @@ export function useFilteredCommands(
         id: "action-toggle-ops-pin",
         label: pinned ? "Unpin Ops from sidebar" : "Pin Ops in sidebar",
         description: pinned
-          ? "Stop keeping the Ops section in the sidebar on every page (this browser)"
-          : "Always keep the Ops section in the sidebar (this browser)",
+          ? "Remove the Ops sidebar pin"
+          : "Keep Ops visible in the sidebar",
         icon: pinned ? PinOff : Pin,
         category: "actions",
         keywords: [
@@ -128,7 +128,6 @@ export function useFilteredCommands(
           "menu",
         ],
         action: () => {
-          // Clearing the override (undefined) unpins; setting true pins.
           setFeatureFlagOverride(
             "ops_ui_ops_menu_pinned",
             pinned ? undefined : true,

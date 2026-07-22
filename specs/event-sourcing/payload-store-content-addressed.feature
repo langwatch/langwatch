@@ -382,7 +382,7 @@ Feature: GroupQueue content-addressed tiered payload store
     Given a Redis-tier blob just written by a producer that has not staged yet
     When the reclaim runner runs
     Then the blob is still readable
-    And no delete is issued for it
+    And a producer that stages it later still finds it
 
   @integration @track6
   Scenario: A blob whose grace window has been running past the safety margin is destroyed
@@ -390,7 +390,7 @@ Feature: GroupQueue content-addressed tiered payload store
     And its grace window has been running longer than the reclaim safety margin
     When the reclaim runner runs
     Then the blob is deleted
-    And its lease and holder bookkeeping are deleted with it
+    And it leaves no trace behind
 
   @integration @track6
   Scenario: A dry run reports what it would reclaim without deleting anything
