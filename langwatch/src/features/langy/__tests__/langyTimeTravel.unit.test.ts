@@ -206,6 +206,93 @@ describe("buildTimeTravelView", () => {
     });
   });
 
+  describe("scrubbed into the settle gap", () => {
+    // The answer's history row lands on the server clock; the closing event
+    // reaches the tape a catch-up round-trip later. Positions inside that gap
+    // used to double-render the answer (settled row + its own partial) under
+    // a thinking line that never ended.
+    it("shows the settled answer once, with nothing claiming Langy still works", () => {
+      seq = 0;
+      const records = [
+        send(1_000, "hey"),
+        accepted(1_100, "t1", 1_100),
+        status(1_150, "t1", "Giving Langy a pep talk…"),
+        delta(1_300, "t1", "How can "),
+        delta(1_400, "t1", "I help?"),
+        // No terminal on the tape yet — catch-up has not run at this moment.
+      ];
+      const view = buildTimeTravelView({
+        records,
+        scrubSeq: 5,
+        historyMessages: [
+          historyRow("q1", "user", 990, "hey"),
+          // Server clock: stamped just BEFORE the client saw the last delta.
+          historyRow("a1", "assistant", 1_390, "How can I help?"),
+        ],
+      });
+      expect(
+        view!.messages.filter((m) => m.role === "assistant"),
+      ).toHaveLength(1);
+      expect(view!.messages.find((m) => m.role === "assistant")?.id).toBe(
+        "a1",
+      );
+      expect(view!.isTurnInFlight).toBe(false);
+      expect(view!.signals.status).toBeNull();
+    });
+
+    it("still shows the partial at a moment before the answer landed", () => {
+      seq = 0;
+      const records = [
+        send(1_000, "hey"),
+        accepted(1_100, "t1", 1_100),
+        delta(1_300, "t1", "How can "),
+        delta(1_400, "t1", "I help?"),
+      ];
+      const view = buildTimeTravelView({
+        records,
+        // The FIRST delta: the row (1_390) is later than this moment (1_300).
+        scrubSeq: 3,
+        historyMessages: [
+          historyRow("q1", "user", 990, "hey"),
+          historyRow("a1", "assistant", 1_390, "How can I help?"),
+        ],
+      });
+      const assistants = view!.messages.filter((m) => m.role === "assistant");
+      expect(assistants).toHaveLength(1);
+      expect(assistants[0]!.parts).toEqual([
+        { type: "text", text: "How can " },
+      ]);
+      expect(view!.isTurnInFlight).toBe(true);
+    });
+
+    it("keeps the NEXT send in flight even though the previous answer landed", () => {
+      seq = 0;
+      const records = [
+        send(1_000, "hey"),
+        accepted(1_100, "t1", 1_100),
+        delta(1_300, "t1", "How can I help?"),
+        send(1_600, "and now?"),
+      ];
+      const view = buildTimeTravelView({
+        records,
+        scrubSeq: 4,
+        historyMessages: [
+          historyRow("q1", "user", 990, "hey"),
+          historyRow("a1", "assistant", 1_390, "How can I help?"),
+        ],
+      });
+      // The landed answer suppresses ITS partial, not the follow-up question.
+      expect(
+        view!.messages.filter((m) => m.role === "assistant"),
+      ).toHaveLength(1);
+      expect(view!.messages.at(-1)?.role).toBe("user");
+      expect(view!.messages.at(-1)?.parts).toEqual([
+        { type: "text", text: "and now?" },
+      ]);
+      expect(view!.isTurnInFlight).toBe(true);
+    });
+  });
+
   describe("history beyond the moment", () => {
     it("hides rows created after the scrubbed instant", () => {
       seq = 0;

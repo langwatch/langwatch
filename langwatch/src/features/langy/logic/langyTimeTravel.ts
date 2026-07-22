@@ -189,16 +189,39 @@ export function buildTimeTravelView({
         if (entry.message) status = entry.message;
       }
     }
-    if (streamedText) {
-      messages.push({
-        id: `tt-partial-${fold.turnId ?? "pending"}`,
-        role: "assistant",
-        parts: [{ type: "text", text: streamedText }],
-      });
-    }
   }
 
-  const isTurnInFlight = running || pendingSend || (!terminal && !!streamedText);
+  // THE SETTLE GAP. The answer's history row lands on the SERVER clock, but
+  // the fold only turns terminal once the closing event reaches the tape — a
+  // catch-up round-trip later. A scrub position inside that gap has the
+  // settled answer among the rows AND a non-terminal fold, which double-
+  // rendered the answer (settled + its own partial) under a still-going
+  // thinking line. The streamed prose IS the persisted prose, so a settled
+  // assistant text that extends the streamed text means the answer landed —
+  // drop the partial and let the working indicators end.
+  const lastSettledAssistant = [...messages]
+    .reverse()
+    .find((message) => message.role === "assistant");
+  const answerLanded =
+    !!streamedText &&
+    !!lastSettledAssistant &&
+    settledPartsText(lastSettledAssistant.parts).startsWith(
+      streamedText.trimEnd(),
+    );
+
+  if (streamedText && !answerLanded) {
+    messages.push({
+      id: `tt-partial-${fold.turnId ?? "pending"}`,
+      role: "assistant",
+      parts: [{ type: "text", text: streamedText }],
+    });
+  }
+
+  // A pending send is the NEXT turn knocking — it stays in flight even when
+  // the previous answer has landed.
+  const isTurnInFlight =
+    pendingSend ||
+    ((running || (!terminal && !!streamedText)) && !answerLanded);
 
   return {
     atMs,
@@ -211,4 +234,17 @@ export function buildTimeTravelView({
     },
     cursor: fold.cursor,
   };
+}
+
+/** The message's prose — its text parts, concatenated in order. */
+function settledPartsText(parts: unknown[]): string {
+  let text = "";
+  for (const part of parts) {
+    if (!part || typeof part !== "object") continue;
+    const candidate = part as { type?: unknown; text?: unknown };
+    if (candidate.type !== "text") continue;
+    if (typeof candidate.text !== "string") continue;
+    text += candidate.text;
+  }
+  return text;
 }

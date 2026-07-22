@@ -198,3 +198,33 @@ Feature: Langy's view of a conversation is the recorded conversation itself
     And another member has it open
     When Langy records progress
     Then the other member sees the progress without reloading
+
+  # ===========================================================================
+  # Developer inspector: scrubbing the tape replays the moment faithfully
+  # ===========================================================================
+
+  # The scrubbed view is a reconstruction of one moment, so it must obey the
+  # same honesty rules as the live panel: an answer appears once, prose reads
+  # in the order it streamed, and the working indicators end when the answer
+  # is on screen.
+
+  @unit
+  Scenario: A settled answer never shows beside its own partial
+    Given a turn whose answer has reached the conversation history
+    But whose closing record has not reached the tape yet
+    When I scrub to that moment
+    Then the answer appears exactly once
+    And nothing claims Langy is still working
+
+  @unit
+  Scenario: Scrubbing to mid-answer shows the prose as far as it had streamed
+    Given a turn that was mid-answer at the scrubbed moment
+    When I scrub to that moment
+    Then the partial answer shows in the order it streamed
+    And the working indicators from that moment show
+
+  @unit
+  Scenario: Multi-line prose keeps its reading order while streaming
+    Given an answer whose prose spans multiple lines and bullets
+    When it renders at the streaming edge
+    Then every line reads in the order it was written
