@@ -76,17 +76,35 @@ describe("explainHandledError", () => {
   });
 
   describe("given a code the registry has never seen", () => {
-    it("falls back on fault rather than showing the code", () => {
-      const customer = explainHandledError(
-        shape({ code: "some_future_code", fault: "customer" }),
-      );
-      const platform = explainHandledError(
-        shape({ code: "some_future_code", fault: "platform" }),
+    /**
+     * The fallback used to be `FAULT_TITLES[fault]`, which is a guess dressed
+     * as a fact: `fault` defaults to `customer` server-side, so a platform
+     * failure on a payload that predates the field told the customer to "check
+     * your input", and a `provider` fault told them "a connected service
+     * didn't respond" about their own Python error. The code is the one thing
+     * we actually know, and a customer can quote it to support.
+     */
+    it("degrades to the code itself rather than a guess at whose fault it is", () => {
+      const { title, isRegistered } = explainHandledError(
+        shape({ code: "dataset_import_stalled" }),
       );
 
-      expect(customer.title).toBe("Check your input");
-      expect(platform.title).toBe("Something went wrong on our end");
-      expect(customer.title).not.toContain("some_future_code");
+      expect(title).toBe("Dataset import stalled");
+      expect(isRegistered).toBe(false);
+    });
+
+    it("says the same thing whatever the fault claims", () => {
+      const titleFor = (fault: HandledErrorShape["fault"] | undefined) =>
+        explainHandledError(
+          shape({ code: "dataset_import_stalled", fault: fault ?? "customer" }),
+        ).title;
+
+      expect(titleFor("provider")).toBe("Dataset import stalled");
+      expect(titleFor("platform")).toBe("Dataset import stalled");
+      // An older payload with no fault at all: the reader defaults it to
+      // `customer`, which is exactly the case that used to read "Check your
+      // input" for a failure the customer had no part in.
+      expect(titleFor(undefined)).toBe("Dataset import stalled");
     });
 
     it("renders server prose only from the explicit meta.message channel", () => {
@@ -98,6 +116,17 @@ describe("explainHandledError", () => {
       );
 
       expect(description).toBe("The widget is out of stock.");
+    });
+  });
+
+  describe("given a failure with no code at all", () => {
+    it("falls back on fault, which is then the only thing known about it", () => {
+      const { title, isRegistered } = explainHandledError(
+        shape({ code: "", fault: "platform" }),
+      );
+
+      expect(title).toBe("Something went wrong on our end");
+      expect(isRegistered).toBe(false);
     });
   });
 
@@ -120,7 +149,9 @@ describe("explainHandledError", () => {
       expect(description).toBe("Some of the values aren't valid.");
     });
 
-    it("says which ones", () => {
+    it("names them the way the screen does, not the way the schema does", () => {
+      // `slug` is the wire key; the field the user is looking at is labelled
+      // "URL slug". Quoting the key back reads as a different thing entirely.
       const { title, description } = explainHandledError(
         shape({
           code: "validation_error",
@@ -130,7 +161,70 @@ describe("explainHandledError", () => {
       );
 
       expect(title).toBe("Check your input");
-      expect(description).toBe('There\'s a problem with "name" and "slug".');
+      expect(description).toBe(
+        "There's a problem with the name and the URL slug.",
+      );
+    });
+  });
+
+  describe("given a node failure carrying the upstream's status", () => {
+    /**
+     * The engine attaches `meta.upstreamStatus` for every node code that can
+     * have one. Without reading it, an expired key, a rate limit and a
+     * provider outage all read identically — and only one of the three is
+     * something the customer can act on.
+     */
+    it.each([
+      ["llm_error", 401, /API key/i],
+      ["llm_error", 429, /rate limiting/i],
+      ["llm_error", 503, /trouble/i],
+      ["evaluator_error", 403, /API key/i],
+      ["agent_workflow_error", 429, /rate limiting/i],
+      ["custom_workflow_error", 500, /trouble/i],
+    ])("tells %s at %i what to do about it", (code, status, expected) => {
+      const { description } = explainHandledError(
+        shape({ code, meta: { upstreamStatus: status } }),
+      );
+
+      expect(description).toMatch(expected);
+    });
+
+    it("keeps the general advice when no status came with it", () => {
+      const { description } = explainHandledError(shape({ code: "llm_error" }));
+
+      expect(description).toBe(
+        "Try again, or check the node's model configuration.",
+      );
+    });
+  });
+
+  describe("given an evaluator that failed on a rejected key", () => {
+    /**
+     * Two producers, two spellings: the experiments-v3 mapper sets
+     * `reason: "auth_failed"`, the langevals HTTP client attaches only
+     * `meta.httpStatus`. Reading one meant half of these said "try running it
+     * again" — advice that cannot work on a rejected key.
+     */
+    it.each([
+      ["the mapper's reason", { reason: "auth_failed" }],
+      ["the HTTP client's 401", { httpStatus: 401 }],
+      ["the HTTP client's 403", { httpStatus: 403 }],
+    ])("points at the key for %s", (_label, meta) => {
+      const { description } = explainHandledError(
+        shape({ code: "evaluator_execution_error", meta }),
+      );
+
+      expect(description).toBe(
+        "Check the API key for this evaluator's model provider.",
+      );
+    });
+
+    it("says to retry for a failure that isn't about credentials", () => {
+      const { description } = explainHandledError(
+        shape({ code: "evaluator_execution_error", meta: { httpStatus: 502 } }),
+      );
+
+      expect(description).toBe("Try running it again.");
     });
   });
 
@@ -192,6 +286,11 @@ describe("explainHandledError", () => {
         // value of this error — "invite the bot with /invite @LangWatch".
         // Authored server-side by `explainSlackPostError`, never relayed.
         notification_delivery_error: new Set(["message"]),
+        // Here `reason` is not a machine sub-classifier: it is the sentence
+        // the service wrote for this exact case ("This automation has no email
+        // recipients to test-fire to."), and it names WHICH piece is missing.
+        // Authored in `trigger-template.service.ts`, never relayed.
+        test_fire_unavailable: new Set(["reason"]),
       };
 
       /**
@@ -237,15 +336,17 @@ describe("explainHandledError", () => {
       }
     });
 
-    it("degrades on fault for a code that resolves to an inherited property", () => {
+    it("declines a code that resolves to an inherited property", () => {
       // `code` is untrusted. A bare index lookup finds Object.prototype
       // members, which are truthy — that reported itself as registered copy
       // and rendered a blank headline.
       for (const code of ["toString", "constructor", "hasOwnProperty"]) {
-        const { title } = explainHandledError(
+        const { title, isRegistered } = explainHandledError(
           shape({ code, fault: "platform" }),
         );
-        expect(title, code).toBe("Something went wrong on our end");
+
+        expect(isRegistered, code).toBe(false);
+        expect(title.length, code).toBeGreaterThan(0);
       }
     });
 

@@ -11,6 +11,7 @@ import {
   handledShapeFromSerialized,
   readAuthoredMessage,
   readHandledError,
+  safeProse,
 } from "./readHandledError";
 
 /**
@@ -47,31 +48,6 @@ export interface ErrorPresentation {
    */
   describe?: (error: HandledErrorShape) => string;
 }
-
-/**
- * Server prose, clamped to something that can only ever be a sentence.
- *
- * The unregistered-code path is the one place a description comes from the
- * payload rather than from this file, and the payload is not always ours: a
- * handled error relayed from a Go service is parsed out of an upstream
- * response body (`nlpgo/goHandledError.ts` forwards `message` and the whole of
- * `meta` verbatim), and that body comes from whatever model-provider endpoint
- * the customer configured. React escapes it, so this is not an injection —
- * but an upstream should not get to write a paragraph inside LangWatch's own
- * error chrome, and a driver diagnostic that lands here should be truncated
- * rather than recited.
- */
-function safeProse(value: string): string {
-  const collapsed = value.replace(/\s+/g, " ").trim();
-  if (collapsed.length === 0) return "";
-  if (collapsed.length <= MAX_PROSE_LENGTH) return collapsed;
-  // By code point, not code unit: slicing mid-surrogate leaves a lone half
-  // that renders as a replacement character right before the ellipsis.
-  const kept = [...collapsed].slice(0, MAX_PROSE_LENGTH - 1).join("");
-  return `${kept.trimEnd()}…`;
-}
-
-const MAX_PROSE_LENGTH = 200;
 
 /** Reads a string out of `meta` without trusting it. */
 const str = (
@@ -144,10 +120,22 @@ const presentations = {
     title: "The evaluator failed to run",
     // `meta.reason` is a machine sub-classifier ("auth_failed") for branching,
     // never prose — so branch on it and return authored copy, never the value.
-    describe: (error) =>
-      str(error, "reason", "") === "auth_failed"
+    //
+    // Both signals, because the two producers disagree: the experiments-v3
+    // mapper sets `reason: "auth_failed"`, while the langevals HTTP client
+    // (the other, busier producer) attaches only `meta.httpStatus`. Reading
+    // one of them meant half of the rejected-key failures read "try running it
+    // again" — advice that cannot work.
+    describe: (error) => {
+      const status = error.meta.httpStatus;
+      const isAuthFailure =
+        str(error, "reason", "") === "auth_failed" ||
+        status === 401 ||
+        status === 403;
+      return isAuthFailure
         ? "Check the API key for this evaluator's model provider."
-        : "Try running it again.",
+        : "Try running it again.";
+    },
   },
   evaluator_missing_field: {
     title: "The evaluator needs another field",
@@ -208,6 +196,23 @@ const presentations = {
     title: "Your account doesn't include this",
     describe: () => "Ask an admin on your team to upgrade your access.",
   },
+  cannot_impersonate_admin: {
+    // A deliberate denial, not a mistake to correct: admin-to-admin
+    // impersonation is refused so the audit trail stays attached to whoever
+    // actually acted. Saying "check your input" would invite a retry that is
+    // designed never to work.
+    title: "Admins can't be impersonated",
+    describe: () => "This is only available for accounts that aren't admins.",
+  },
+  cannot_impersonate_deactivated_user: {
+    title: "This account is deactivated",
+    describe: () =>
+      "Its sessions were revoked on purpose. Reactivate the account first.",
+  },
+  user_to_impersonate_not_found: {
+    title: "User not found",
+    describe: () => "They may have been removed since this page loaded.",
+  },
   resource_limit_exceeded: {
     title: "You've hit a plan limit",
     describe: () => "Upgrade your plan to raise it.",
@@ -217,8 +222,24 @@ const presentations = {
     describe: () => "Delete an existing set, or upgrade your plan.",
   },
   subscription_service_unavailable: {
-    title: "Billing is temporarily unavailable",
-    describe: () => "Try again in a moment.",
+    // Not a blip: this is raised only when a Stripe-dependent action runs on a
+    // self-hosted deployment, where there is no billing provider at all. The
+    // old "try again in a moment" invited the customer to keep retrying a
+    // permanent condition.
+    title: "Billing isn't available here",
+    describe: () =>
+      "This is a self-hosted deployment, so plans are managed outside the app.",
+  },
+
+  // ---- governance ----
+  anomaly_rule_not_found: {
+    title: "Anomaly rule not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  ingestion_source_not_found: {
+    title: "Ingestion source not found",
+    describe: () =>
+      "It may have been archived. Reload to see the current list.",
   },
 
   // ---- datasets ----
@@ -253,8 +274,12 @@ const presentations = {
   // ---- automations & notifications ----
   template_validation_error: {
     title: "This template isn't valid",
+    // The parser's position is the whole value of this error — the customer
+    // wrote the template — but it is still server-supplied prose, so it is
+    // clamped like every other sentence that isn't authored in this file.
     describe: (error) =>
-      str(error, "syntaxError", "Check the template and try again."),
+      safeProse(str(error, "syntaxError", "")) ||
+      "Check the template and try again.",
   },
   invalid_email_recipient: {
     title: "That email address isn't valid",
@@ -292,14 +317,41 @@ const presentations = {
   },
   test_fire_unavailable: {
     title: "Nothing to test yet",
-    describe: (error) =>
-      `Configure the ${str(error, "channel", "destination")} first.`,
+    // `meta.reason` is the sentence the service wrote for this exact case
+    // ("This automation has no email recipients to test-fire to.") — it names
+    // WHICH piece is missing, which the generic line cannot. It is also the
+    // error's own message, authored server-side, never relayed.
+    describe: (error) => {
+      const reason = safeProse(str(error, "reason", ""));
+      if (reason) return reason;
+      const channel = str(error, "channel", "");
+      return channel
+        ? `Configure the ${channel} destination first.`
+        : "Configure the destination first.";
+    },
   },
 
-  // ---- Langy ----
-  langy_conversation_not_found: { title: "Conversation not found" },
+  // ==========================================================================
+  // Langy.
+  //
+  // These entries are the authoring surface for Langy's error copy too:
+  // `features/langy/logic/langyErrorExplainer.ts` reads its title and
+  // description from here and keeps only the decisions it actually owns (card
+  // vs inline vs suppress, which action button, whether to show the reason
+  // chain). Two authorings had already contradicted each other —
+  // `langy_egress_misconfigured` read "we're on it, try again shortly" here
+  // and "a network policy an admin must fix" there, and only one of them was
+  // true. One code, one set of words.
+  // ==========================================================================
+  langy_conversation_not_found: {
+    title: "Conversation not found",
+    describe: () =>
+      "This conversation is no longer available. Start a new chat to keep going.",
+  },
   langy_conversation_not_owned: {
-    title: "You don't have access to this conversation",
+    title: "This conversation belongs to someone else",
+    describe: () =>
+      "You can view shared conversations but only the owner can continue them.",
   },
   langy_empty_message: {
     title: "Nothing to send",
@@ -314,68 +366,94 @@ const presentations = {
     describe: () => "Rephrase and try again.",
   },
   langy_turn_in_progress: {
-    title: "Still answering",
-    describe: () => "Wait for the current reply to finish.",
+    title: "Langy is still replying",
+    describe: () =>
+      "There's already a response in progress for this conversation. Wait for it to finish before sending another message.",
+  },
+  langy_turn_not_stoppable: {
+    title: "That reply already finished",
+    describe: () => "Refresh to see the conversation as it stands.",
   },
   langy_turn_timeout: {
     title: "That took too long",
-    describe: () => "Try asking again, or break it into smaller steps.",
+    describe: () =>
+      "Langy didn't finish in time. Try again, or ask for a narrower slice: a shorter time range, or a single trace.",
   },
   langy_agent_at_capacity: {
-    title: "Busy right now",
-    describe: () => "Try again in a moment.",
+    title: "Langy is busy right now",
+    describe: () =>
+      "Too many conversations are running at once. Give it a few seconds and try again.",
   },
   langy_agent_unavailable: {
-    title: "Temporarily unavailable",
-    describe: () => "Try again in a moment.",
+    title: "Langy is unavailable",
+    describe: () =>
+      "Langy can't be reached right now. Your message is safe, so send it again in a moment.",
   },
   langy_agent_errored: {
-    title: "Something went wrong mid-answer",
-    describe: () => "Try asking again.",
+    title: "Langy's reply failed",
+    describe: () =>
+      "Langy hit an error while writing this reply. Your message is safe, so try again.",
   },
   langy_agent_session_lost: {
-    title: "The session was lost",
-    describe: () => "Start a new message to continue.",
+    title: "Langy lost its place",
+    describe: () =>
+      "Langy dropped this conversation before the reply finished. Send your message again to pick it back up.",
   },
   langy_worker_restarting: {
-    title: "Restarting",
-    describe: () => "Try again in a moment.",
+    title: "Langy restarted",
+    describe: () =>
+      "An update interrupted this reply. Nothing was lost, so send your message again.",
   },
   langy_worker_stopped: {
-    title: "The session stopped",
-    describe: () => "Start a new message to continue.",
+    title: "Langy's worker stopped",
+    describe: () =>
+      "Langy's worker stopped before it could finish. Nothing you did is wrong and your message is safe, so try again.",
   },
   langy_worker_spawn_failed: {
-    title: "Couldn't start a session",
-    describe: () => "Try again in a moment.",
+    title: "Langy couldn't start up",
+    describe: () =>
+      "Langy failed to get going for this reply. Nothing was lost, so try again in a moment.",
   },
   langy_credential_resolution: {
     title: "Couldn't verify your access",
     describe: () => "Sign out and back in, then try again.",
   },
   langy_model_not_configured: {
-    title: "No model configured",
-    describe: () => "Add a model provider in settings to continue.",
+    title: "Choose a model for Langy",
+    describe: () =>
+      "Langy needs a model to run. Pick one in your project's model settings, then try again.",
   },
   langy_model_not_allowed: {
-    title: "That model isn't allowed",
-    describe: () => "Pick a different model, or ask an admin to allow it.",
+    title: "That model isn't available here",
+    describe: () =>
+      "The model you picked isn't enabled for this project. Choose one of the configured models and send again.",
+  },
+  langy_not_enabled: {
+    title: "Langy isn't available on this account",
+    describe: () => "Contact support if you'd like access.",
   },
   langy_insufficient_scope: {
-    title: "Missing permissions",
-    describe: () => "Reconnect and grant the requested access.",
+    title: "Langy doesn't have access here",
+    describe: () =>
+      "Langy doesn't have the permissions it needs in this project. Ask a workspace admin to grant them.",
   },
   langy_github_not_connected: {
-    title: "GitHub isn't connected",
-    describe: () => "Connect GitHub to continue.",
+    title: "Install the GitHub App to continue",
+    describe: () =>
+      "Langy needs the LangWatch GitHub App installed to open pull requests.",
   },
   langy_github_repo_not_accessible: {
-    title: "Can't reach that repository",
-    describe: () => "Check that the connection has access to it.",
+    title: "That repository isn't available to Langy",
+    describe: () =>
+      "The LangWatch GitHub App doesn't have access to that repository. Grant it access from Settings → Integrations → Configure, then try again.",
   },
   langy_egress_misconfigured: {
-    title: "Temporarily unavailable",
-    describe: () => "We're on it. Try again shortly.",
+    // Fail-closed network policy: Langy refuses to run rather than leak. Not a
+    // blip and not the customer's mistake — an admin has to fix the policy, so
+    // "try again shortly" was advice that could only ever fail.
+    title: "Langy is blocked by a network policy",
+    describe: () =>
+      "Langy's outbound network policy for this project is misconfigured, so it can't run safely. Ask a workspace admin to review it.",
   },
 
   // ---- validation ----
@@ -384,15 +462,16 @@ const presentations = {
     describe: (error) => {
       // Zod flattens to the INPUT SCHEMA's property names, which are wire
       // identifiers: every procedure takes a `projectId` the customer never
-      // sees. Name only fields that exist on screen; the per-field detail has
-      // a proper home anyway (applyHandledErrorToForm).
+      // sees. Name only fields that exist on screen, and name them the way the
+      // screen does; the per-field detail has a proper home anyway
+      // (applyHandledErrorToForm).
       const fieldErrors = error.meta.fieldErrors;
       if (fieldErrors && typeof fieldErrors === "object") {
-        const named = Object.keys(fieldErrors).filter((field) =>
-          USER_VISIBLE_FIELDS.has(field),
-        );
-        if (named.length > 0) {
-          return `There's a problem with ${listFields(named)}.`;
+        const labels = Object.keys(fieldErrors)
+          .map((field) => USER_VISIBLE_FIELDS[field])
+          .filter((label): label is string => !!label);
+        if (labels.length > 0) {
+          return `There's a problem with ${listLabels(labels)}.`;
         }
       }
       const formErrors = error.meta.formErrors;
@@ -400,10 +479,25 @@ const presentations = {
         const first = formErrors.find(
           (entry): entry is string => typeof entry === "string",
         );
-        if (first) return first;
+        if (first) return safeProse(first);
       }
       return "Some of the values aren't valid.";
     },
+  },
+  schema_failure: {
+    // One offending field, as a link in a `validation_error`'s reason chain —
+    // and, when a route raises it alone, an error in its own right.
+    title: "Check your input",
+    describe: (error) => {
+      const label = USER_VISIBLE_FIELDS[str(error, "field", "")];
+      return label
+        ? `There's a problem with ${label}.`
+        : "Some of the values aren't valid.";
+    },
+  },
+  malformed_request: {
+    title: "That request couldn't be read",
+    describe: () => "Check the format of what was sent, then try again.",
   },
   // ==========================================================================
   // Codes raised by the Go services (generated into `goErrorCodes` by
@@ -505,21 +599,12 @@ const presentations = {
   },
   upstream_http_error: {
     title: "A connected service returned an error",
-    // `meta.upstreamStatus` is attached by `nodeErrorDomain.ts` precisely so
-    // this entry can use it. A status is the one detail that changes what the
-    // customer should do: 401/403 is a key they can fix, 429 is a wait, 5xx is
-    // the other service's problem. Naming the number without the vocabulary
-    // around it keeps it useful without turning the toast into a stack trace.
-    describe: (error) => {
-      const status = error.meta.upstreamStatus;
-      if (typeof status !== "number") return "Try again in a moment.";
-      if (status === 401 || status === 403) {
-        return "Check the credentials for that service, then try again.";
-      }
-      if (status === 429) return "It's rate limiting us. Try again shortly.";
-      if (status >= 500) return "It's having trouble. Try again in a moment.";
-      return "Check its configuration, then try again.";
-    },
+    describe: (error) =>
+      describeUpstreamStatus({
+        error,
+        whenAbsent: "Try again in a moment.",
+        whenOther: "Check its configuration, then try again.",
+      }),
   },
   guardrail_attach_forbidden: {
     title: "You don't have permission to attach guardrails",
@@ -623,7 +708,18 @@ const presentations = {
   // ---- LLM node ----
   llm_error: {
     title: "The model call failed",
-    describe: () => "Try again, or check the node's model configuration.",
+    // The engine attaches the provider's status here whenever it got one, and
+    // without reading it an expired key, a rate limit and a provider outage
+    // all read "check the node's model configuration" — advice that is right
+    // once in three.
+    describe: (error) =>
+      describeUpstreamStatus({
+        error,
+        whenAbsent: "Try again, or check the node's model configuration.",
+        whenOther: "Check the node's model configuration, then run again.",
+        whenRejected:
+          "Check the API key for this model provider, then run again.",
+      }),
   },
   llm_executor_unavailable: {
     title: "The model runner is temporarily unavailable",
@@ -647,7 +743,14 @@ const presentations = {
   // ---- evaluator node ----
   evaluator_error: {
     title: "The evaluator failed to run",
-    describe: () => "Check its configuration, then run again.",
+    describe: (error) =>
+      describeUpstreamStatus({
+        error,
+        whenAbsent: "Check its configuration, then run again.",
+        whenOther: "Check its configuration, then run again.",
+        whenRejected:
+          "Check the API key for this evaluator's model provider, then run again.",
+      }),
   },
   evaluator_executor_unavailable: {
     title: "The evaluator runner is temporarily unavailable",
@@ -669,7 +772,12 @@ const presentations = {
   // ---- agent node ----
   agent_workflow_error: {
     title: "The agent step failed",
-    describe: () => "Check the agent's configuration, then run again.",
+    describe: (error) =>
+      describeUpstreamStatus({
+        error,
+        whenAbsent: "Check the agent's configuration, then run again.",
+        whenOther: "Check the agent's configuration, then run again.",
+      }),
   },
   agent_workflow_executor_unavailable: {
     title: "The agent runner is temporarily unavailable",
@@ -699,7 +807,12 @@ const presentations = {
   // ---- custom-workflow node ----
   custom_workflow_error: {
     title: "The referenced workflow failed",
-    describe: () => "Open it to see what went wrong, then run again.",
+    describe: (error) =>
+      describeUpstreamStatus({
+        error,
+        whenAbsent: "Open it to see what went wrong, then run again.",
+        whenOther: "Open it to see what went wrong, then run again.",
+      }),
   },
   custom_workflow_executor_unavailable: {
     title: "The workflow runner is temporarily unavailable",
@@ -757,40 +870,77 @@ const EVALUATOR_FIELD_LABELS: Record<string, string> = {
 };
 
 /**
- * Field names a customer can actually see and act on.
+ * Schema keys a customer can actually see, mapped to what the screen calls
+ * them.
  *
  * Anything not here is a wire identifier — `projectId`, `organizationId`,
  * `checkId` — and naming it in a toast is the same leak as showing a code
- * slug, just via `meta` instead of `message`.
+ * slug, just via `meta` instead of `message`. The keys that ARE visible still
+ * are not labels: quoting `slug` back at someone who is looking at a field
+ * marked "URL slug" reads as a different thing entirely, so this translates
+ * the same way `EVALUATOR_FIELD_LABELS` does.
  */
-const USER_VISIBLE_FIELDS = new Set([
-  "name",
-  "slug",
-  "email",
-  "description",
-  "url",
-  "prompt",
-  "model",
-  "value",
-  "label",
-  "title",
-]);
+const USER_VISIBLE_FIELDS: Record<string, string> = {
+  name: "the name",
+  slug: "the URL slug",
+  email: "the email address",
+  description: "the description",
+  url: "the URL",
+  prompt: "the prompt",
+  model: "the model",
+  value: "the value",
+  label: "the label",
+  title: "the title",
+};
 
-/** Joins field names into "a", "a and b", "a, b and c". */
-function listFields(fields: string[]): string {
-  if (fields.length === 1) return `"${fields[0]}"`;
-  const quoted = fields.map((field) => `"${field}"`);
-  const last = quoted.pop();
-  return `${quoted.join(", ")} and ${last}`;
+/** Joins labels into "a", "a and b", "a, b and c". */
+function listLabels(labels: string[]): string {
+  if (labels.length === 1) return labels[0]!;
+  const rest = [...labels];
+  const last = rest.pop();
+  return `${rest.join(", ")} and ${last}`;
 }
 
 /**
- * Fallback headline for a code with no registered copy.
+ * Body copy for a node failure that carries the upstream's HTTP status.
  *
- * A code can arrive here legitimately: a Go service or a rolling deploy can be
- * ahead of this client. Falling back on `fault` keeps the tone right — the
- * customer is told whether this is theirs to fix or ours, which is the only
- * thing we actually know.
+ * `meta.upstreamStatus` is attached by `nodeErrorDomain.ts` for every node
+ * code that can have one, precisely so these entries can use it. A status is
+ * the one detail that changes what the customer should do: 401/403 is a key
+ * they can fix, 429 is a wait, 5xx is the other service's problem. Naming the
+ * number without the vocabulary around it keeps it useful without turning the
+ * toast into a stack trace.
+ */
+function describeUpstreamStatus({
+  error,
+  whenAbsent,
+  whenOther,
+  whenRejected = "Check the credentials for that service, then try again.",
+}: {
+  error: HandledErrorShape;
+  /** No status on the error at all — we know nothing more than the code. */
+  whenAbsent: string;
+  /** A 4xx that isn't about credentials or rate limits. */
+  whenOther: string;
+  /** 401/403: something we sent was refused. */
+  whenRejected?: string;
+}): string {
+  const status = error.meta.upstreamStatus;
+  if (typeof status !== "number") return whenAbsent;
+  if (status === 401 || status === 403) return whenRejected;
+  if (status === 429) return "It's rate limiting us. Try again shortly.";
+  if (status >= 500) return "It's having trouble. Try again in a moment.";
+  return whenOther;
+}
+
+/**
+ * Fallback headline for a failure that arrives with NO code at all.
+ *
+ * Only for that case. `fault` is a coarse attribution with a server-side
+ * default of `customer`, so using it as a headline for an unrecognised code
+ * meant a platform failure whose payload predated the field read "Check your
+ * input", and a customer's own Python error read "A connected service didn't
+ * respond". Confidently wrong beats nothing only if it happens to be right.
  */
 const FAULT_TITLES: Record<HandledErrorFault, string> = {
   customer: "Check your input",
@@ -798,14 +948,31 @@ const FAULT_TITLES: Record<HandledErrorFault, string> = {
   provider: "A connected service didn't respond",
 };
 
+/**
+ * `dataset_import_stalled` → "Dataset import stalled".
+ *
+ * What an unrecognised code degrades to. It is a legitimate arrival — a Go
+ * service or the other half of a rolling deploy can be ahead of this client —
+ * and the code is the only true thing we have about it. Shown rather than
+ * hidden because the customer can quote it to support and get a real answer,
+ * where "Something went wrong" ends the conversation. Clamped, because the
+ * code came off the same wire as everything else here.
+ */
+function humanizeCode(code: string): string {
+  const words = safeProse(code.replace(/_/g, " "));
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export interface ErrorExplanation {
   title: string;
   /** Empty when there is nothing useful to add beyond the title. */
   description: string;
   /**
-   * Whether this copy was written for this specific code, or fell back to
-   * `fault`. Callers use it to decide whose headline wins: registered copy
-   * describes the actual failure, so it beats a caller's generic one.
+   * Whether this copy was written for this specific code, or is the degraded
+   * form (the humanised code, or the generic unknown state). Callers use it to
+   * decide whose headline wins: registered copy describes the actual failure,
+   * so it beats a caller's generic one — and the degraded form does not, since
+   * a caller's "Couldn't create project" at least names the action.
    */
   isRegistered: boolean;
 }
@@ -813,8 +980,9 @@ export interface ErrorExplanation {
 /**
  * Turns a handled error into the words a customer reads.
  *
- * Never returns a code slug or a server message — an unrecognised code
- * degrades to fault-based copy, which is calm and true rather than precise.
+ * Never returns a server message. An unrecognised code degrades to the code
+ * itself, humanised — specific and quotable to support — rather than to a
+ * fault-shaped guess at what went wrong.
  */
 export function explainHandledError(
   error: HandledErrorShape,
@@ -822,19 +990,28 @@ export function explainHandledError(
   // `hasOwn`, not a bare index: `code` is untrusted, and `"toString"` or
   // `"constructor"` would otherwise resolve to an inherited Object.prototype
   // member — truthy, so it would report itself registered and render a blank
-  // headline instead of degrading on fault.
+  // headline.
   const presentation = Object.hasOwn(presentations, error.code)
     ? (presentations as Record<string, ErrorPresentation>)[error.code]
     : undefined;
 
   if (!presentation) {
+    // Fault only when the code is missing or is nothing but whitespace — the
+    // one case where there is genuinely nothing specific to say.
+    const humanized = humanizeCode(error.code);
     return {
-      title: FAULT_TITLES[error.fault],
+      title:
+        humanized ||
+        FAULT_TITLES[error.fault] ||
+        UNKNOWN_ERROR_PRESENTATION.title,
       // `meta.message` is the deliberate opt-in channel for server-authored
       // prose (it mirrors Go's `Meta["message"]`). It is the only place the
       // server is allowed to put a sentence, so it is the only place we look
       // — and even here it is only a sentence's worth, because the payload
       // does not always originate with us. See `safeProse`.
+      //
+      // Left empty when there is none: the callers fall back to the server's
+      // first remediation tip, which was written for exactly this case.
       description: safeProse(str(error, "message", "")),
       isRegistered: false,
     };

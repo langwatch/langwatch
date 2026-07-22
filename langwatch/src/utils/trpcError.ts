@@ -65,13 +65,20 @@ export function isHandledByLiteMemberHandler(error: unknown): boolean {
 }
 
 /**
- * Check if an error was already handled by any global error handler
- * (license limit or lite member restriction), which surface it as a modal or a
- * bespoke toast — so reporting it again would duplicate it.
+ * Check if an error was already handled by any global error handler, which
+ * surface it as a modal or a bespoke toast — so reporting it again would
+ * duplicate it.
  *
- * You rarely need to call this: `showErrorToast` already does, which is why the
- * ~137 copies of this guard in `onError` callbacks are gone. Reach for it
- * directly only when reporting an error some other way.
+ * ALL FOUR interceptors in `utils/api.tsx` count. The first version listed
+ * only two, so a missing-model failure (which opens its own sticky toast
+ * naming the feature and linking to model settings) also drew a second,
+ * vaguer toast next to it — the exact duplication this guard exists to stop.
+ * Anything that calls `markAsHandledBy…` belongs here.
+ *
+ * You rarely need to call this: `showErrorToast` and `<HandledErrorAlert>`
+ * already do, which is why the ~137 copies of this guard in `onError`
+ * callbacks are gone. Reach for it directly only when reporting an error some
+ * other way.
  *
  * @example
  * ```tsx
@@ -83,7 +90,9 @@ export function isHandledByLiteMemberHandler(error: unknown): boolean {
 export function isHandledByGlobalHandler(error: unknown): boolean {
   return (
     isHandledByGlobalLicenseHandler(error) ||
-    isHandledByLiteMemberHandler(error)
+    isHandledByLiteMemberHandler(error) ||
+    isHandledByMissingModelHandler(error) ||
+    isHandledByProviderDisabledHandler(error)
   );
 }
 

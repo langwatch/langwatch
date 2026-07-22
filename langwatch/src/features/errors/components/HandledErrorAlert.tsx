@@ -1,6 +1,8 @@
 import { Box, HStack, List, Stack, Text } from "@chakra-ui/react";
 import { AlertCircle } from "lucide-react";
 
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
+
 import { explainAnyError } from "../logic/presentation";
 import { readErrorTraceId, readHandledError } from "../logic/readHandledError";
 
@@ -15,7 +17,10 @@ const HAIRLINE =
   "color-mix(in srgb, var(--chakra-colors-red-solid) 26%, var(--chakra-colors-border-muted))";
 
 export interface HandledErrorAlertProps {
-  /** Any error — handled or not. Renders nothing when null/undefined. */
+  /**
+   * Any error — handled or not. Renders nothing when null/undefined, or when a
+   * global interceptor has already reported it.
+   */
   error: unknown;
   /**
    * Headline for a failure we have no specific copy for — "Couldn't load
@@ -48,6 +53,13 @@ export function HandledErrorAlert({
   showAllTips = true,
 }: HandledErrorAlertProps) {
   if (!error) return null;
+
+  // Already surfaced by a global interceptor in `utils/api.tsx` — the upgrade
+  // modal, or one of its bespoke toasts. `showErrorToast` has always made this
+  // check; the alert did not, so a plan-limit refusal drew "Something went
+  // wrong / We've been notified" underneath the modal that was busy explaining
+  // it properly.
+  if (isHandledByGlobalHandler(error)) return null;
 
   const handled = readHandledError(error);
   const explanation = explainAnyError(error);

@@ -10,12 +10,24 @@ import { describe, expect, it, vi } from "vitest";
 import { applyHandledErrorToForm } from "../applyHandledErrorToForm";
 
 type FormStub = {
-  getValues: () => Record<string, unknown>;
+  control: { _fields: Record<string, unknown> };
   setError: ReturnType<typeof vi.fn>;
 };
 
+/**
+ * What react-hook-form records for a field an input registered AND mounted:
+ * a `_f` descriptor holding the live ref. That ref is the whole signal — it is
+ * the difference between a key the form knows about and a key the user can
+ * see.
+ */
+const registered = (name: string) => ({ _f: { name, ref: {} } });
+
 const formWithFields = (...fields: string[]): FormStub => ({
-  getValues: () => Object.fromEntries(fields.map((field) => [field, ""])),
+  control: {
+    _fields: Object.fromEntries(
+      fields.map((field) => [field, registered(field)]),
+    ),
+  },
   setError: vi.fn(),
 });
 
@@ -23,7 +35,7 @@ const validationError = (meta: Record<string, unknown>) => ({
   data: { error: { code: "validation_error", httpStatus: 422, meta } },
 });
 
-// The bridge only touches `getValues` and `setError`; the rest of
+// The bridge only touches `control._fields` and `setError`; the rest of
 // UseFormReturn is irrelevant to it.
 const apply = (error: unknown, form: FormStub, hasFormErrorSlot = false) =>
   applyHandledErrorToForm({ error, form: form as never, hasFormErrorSlot });
@@ -136,16 +148,93 @@ describe("applyHandledErrorToForm", () => {
   describe("given a nested field the form only owns as a container", () => {
     it("declines it — setting an error on a container shows the user nothing", () => {
       // zod's flatten() collapses ["version","configData","prompt"] to
-      // "version", which the form owns as an object. No input is registered
-      // against it, so marking it would leave a clean-looking form and a
-      // save that silently didn't happen.
+      // "version", which the form owns only as a branch: the input is
+      // registered three levels down. Marking the branch would leave a
+      // clean-looking form and a save that silently didn't happen.
       const form: FormStub = {
-        getValues: () => ({ version: { configData: { prompt: "" } } }),
+        control: {
+          _fields: {
+            version: {
+              configData: { prompt: registered("version.configData.prompt") },
+            },
+          },
+        },
         setError: vi.fn(),
       };
 
       const isConsumed = apply(
         validationError({ fieldErrors: { version: ["Required"] } }),
+        form,
+      );
+
+      expect(isConsumed).toBe(false);
+      expect(form.setError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a key the form holds a value for but paints no input for", () => {
+    /**
+     * The bug this replaced. `getValues()` answers "is there a value under
+     * this key", which is true for every hidden default a form carries —
+     * `projectId`, `organizationId`, an id threaded through for the mutation.
+     * The bridge would claim the error, set it on a key nothing renders, and
+     * return `true`, suppressing the caller's toast: the user pressed Save and
+     * absolutely nothing happened. One call site had already worked around it
+     * by hand.
+     */
+    it("declines it, so the failure still reaches the user as a toast", () => {
+      const form: FormStub = {
+        control: { _fields: { name: registered("name") } },
+        setError: vi.fn(),
+      };
+
+      const isConsumed = apply(
+        validationError({ fieldErrors: { projectId: ["Required"] } }),
+        form,
+      );
+
+      expect(isConsumed).toBe(false);
+      expect(form.setError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a field whose value is an array", () => {
+    /**
+     * Ownership follows registration, not the shape of the value. A
+     * multi-select is one input holding a list, and it renders its own error
+     * perfectly well — the previous check declined it purely for being an
+     * object, which sent a complaint the form could show to a toast instead.
+     */
+    it("claims a multi-select, which is one input holding a list", () => {
+      const form = formWithFields("channels");
+
+      const isConsumed = apply(
+        validationError({ fieldErrors: { channels: ["Pick at least one"] } }),
+        form,
+      );
+
+      expect(isConsumed).toBe(true);
+      expect(form.setError).toHaveBeenCalledWith(
+        "channels",
+        { type: "server", message: "Pick at least one" },
+        { shouldFocus: true },
+      );
+    });
+
+    it("declines a field array, whose inputs live on its items", () => {
+      // `useFieldArray("recipients")` registers `recipients.0.email`, so the
+      // array itself has no input of its own to hang the message on.
+      const form: FormStub = {
+        control: {
+          _fields: {
+            recipients: [{ email: registered("recipients.0.email") }],
+          },
+        },
+        setError: vi.fn(),
+      };
+
+      const isConsumed = apply(
+        validationError({ fieldErrors: { recipients: ["Required"] } }),
         form,
       );
 

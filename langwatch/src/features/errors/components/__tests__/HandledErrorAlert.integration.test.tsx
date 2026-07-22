@@ -12,6 +12,13 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+import {
+  markAsHandledByLicenseHandler,
+  markAsHandledByLiteMemberHandler,
+  markAsHandledByMissingModelHandler,
+  markAsHandledByProviderDisabledHandler,
+} from "~/utils/trpcError";
+
 import { HandledErrorAlert } from "../HandledErrorAlert";
 
 afterEach(() => {
@@ -161,6 +168,65 @@ describe("<HandledErrorAlert />", () => {
       expect(
         screen.queryByRole("link", { name: /read the docs/i }),
       ).not.toBeInTheDocument();
+    });
+
+    /**
+     * https was never the property that mattered. The relayed value comes from
+     * a customer-configured endpoint, so an off-origin https link would put
+     * someone else's page behind our own "Read the docs".
+     */
+    it("refuses an https one that isn't our docs site", () => {
+      renderAlert({
+        error: handledError({
+          code: "query_timeout",
+          docsUrl: "https://docs.evil.example/langwatch/query-timeout",
+        }),
+      });
+
+      expect(
+        screen.queryByRole("link", { name: /read the docs/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a global interceptor already reported the error", () => {
+    /**
+     * `utils/api.tsx` opens the upgrade modal for a plan limit and a bespoke,
+     * actionable toast for a missing model or a disabled provider.
+     * `showErrorToast` has always stood down for those; the alert did not, so
+     * a plan-limit refusal drew "Something went wrong / We've been notified"
+     * underneath the modal that was busy explaining it properly.
+     *
+     * All four markers, because the guard listed only two of them — the two
+     * that open modals — and the toast pair went on duplicating quietly.
+     */
+    it.each([
+      ["the license limit modal", markAsHandledByLicenseHandler],
+      ["the lite-member modal", markAsHandledByLiteMemberHandler],
+      ["the missing-model toast", markAsHandledByMissingModelHandler],
+      ["the provider-disabled toast", markAsHandledByProviderDisabledHandler],
+    ])("renders nothing next to %s", (_label, markAsHandled) => {
+      const error = Object.assign(new Error("resource_limit_exceeded"), {
+        data: { error: { code: "resource_limit_exceeded", httpStatus: 403 } },
+      });
+      markAsHandled(error);
+
+      const { container } = renderAlert({
+        error,
+        fallbackTitle: "Couldn't save",
+      });
+
+      expect(container).toBeEmptyDOMElement();
+    });
+
+    it("still renders one nothing has claimed", () => {
+      const error = Object.assign(new Error("resource_limit_exceeded"), {
+        data: { error: { code: "resource_limit_exceeded", httpStatus: 403 } },
+      });
+
+      renderAlert({ error, fallbackTitle: "Couldn't save" });
+
+      expect(screen.getByText("You've hit a plan limit")).toBeInTheDocument();
     });
   });
 
