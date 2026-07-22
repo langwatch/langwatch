@@ -2,6 +2,8 @@ import { Alert } from "@chakra-ui/react";
 import type { FieldValues, UseFormReturn } from "react-hook-form";
 import { useFormState } from "react-hook-form";
 
+import { FORM_SERVER_ERROR } from "../logic/applyHandledErrorToForm";
+
 export interface FormServerErrorProps<TFieldValues extends FieldValues> {
   form: UseFormReturn<TFieldValues>;
 }
@@ -23,7 +25,12 @@ export function FormServerError<TFieldValues extends FieldValues>({
   // memoise this component, or move it to a sibling that doesn't own the
   // form, and a rejected submit would silently render nothing.
   const { errors } = useFormState({ control: form.control });
-  const message = errors.root?.serverError?.message;
+  // Read through the same constant `applyHandledErrorToForm` writes to, so
+  // the two can never drift apart silently.
+  const [root, key] = FORM_SERVER_ERROR.split(".") as ["root", string];
+  const message = (
+    errors[root] as Record<string, { message?: string }> | undefined
+  )?.[key]?.message;
   if (!message) return null;
 
   return (

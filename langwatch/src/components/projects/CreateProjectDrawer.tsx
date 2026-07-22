@@ -1,6 +1,5 @@
 import { Heading, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
-import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -97,8 +96,10 @@ export function CreateProjectDrawer({
 
             handleClose();
           },
-          onError: (error) =>
-            showErrorToast({ error, fallbackTitle: "Couldn't create project" }),
+          // No toast: `ProjectForm` renders `<HandledErrorAlert>` for this
+          // same error. A failed create is a state that is still true, not a
+          // moment that just passed, so the inline alert is the right surface
+          // — and it already carries the tips, docs link and error id.
         },
       );
     });
