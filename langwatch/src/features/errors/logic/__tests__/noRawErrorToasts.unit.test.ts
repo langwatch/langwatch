@@ -26,27 +26,63 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
  */
 const ROOTS = ["src", "ee"].map((dir) => join(PACKAGE_ROOT, dir));
 
+/** The copy slots a customer reads. */
+const COPY_SLOT = /\b(?:title|description|fallbackTitle)\s*:\s*/g;
+
 /**
- * A toast copy slot and everything up to the end of its value.
+ * Reads one property value, starting just after its `:`.
  *
- * `title:` matters as much as `description:` — the wire message for a handled
- * error IS the code, so `title: error.message` puts `validation_error` in the
- * headline, which is worse than putting it in the body. The first version of
- * this guard only checked `description:` and eleven title-slug toasts sailed
- * through it.
+ * A regex cannot do this correctly and two earlier versions of this guard
+ * proved it. Bounding the value with `[^,;]` under-matched — it stopped at the
+ * first comma, so `description: fmt("Couldn't save", error.message)` was
+ * invisible — and over-matched, because with no comma or semicolon in the way
+ * it ran off the end of the call into the next statement, so
+ * `toast={{ title: "x" }}` followed by `onClick={() => log(error.message)}`
+ * read as one value and would have been flagged.
  *
- * The value deliberately spans newlines. The formatter wraps almost every real
- * call site onto a second line (`description:\n  err instanceof Error ? …`),
- * and an earlier version of this guard tested each physical line in isolation,
- * so every wrapped site was invisible to it — which is how the sites listed in
- * `ALLOWED`'s history got through a migration that was supposed to catch them.
- *
- * Bounded by `,` and `;` rather than by `}`: the value can legitimately
- * contain braces (`(err as { message: unknown }).message`), while a semicolon
- * always means the statement ended and we have run off into unrelated code.
+ * So: scan, tracking nesting and string state. The value ends at a `,` or `;`
+ * at depth zero, or at the `}` that closes the object literal it lives in.
+ * Strings and template literals are skipped whole, so a brace or comma inside
+ * copy can't end the value early.
  */
-const TOAST_COPY_VALUE =
-  /(?:title|description|fallbackTitle)\s*:\s*([^,;]{0,300}?)(?=[,;]|$)/g;
+function readValue(source: string, from: number): string {
+  let depth = 0;
+  let at = from;
+
+  for (; at < source.length; at++) {
+    const char = source[at]!;
+
+    if (char === '"' || char === "'" || char === "`") {
+      at = skipString(source, at);
+      continue;
+    }
+    if (char === "(" || char === "[" || char === "{") depth++;
+    else if (char === ")" || char === "]") {
+      if (depth === 0) break;
+      depth--;
+    } else if (char === "}") {
+      // Depth zero means this closes the object holding the property, so the
+      // value ended here — this is what stops the scan escaping the call.
+      if (depth === 0) break;
+      depth--;
+    } else if ((char === "," || char === ";") && depth === 0) break;
+  }
+
+  return source.slice(from, at);
+}
+
+/** Index of the closing quote of the string starting at `at`. */
+function skipString(source: string, at: number): number {
+  const quote = source[at];
+  for (let scan = at + 1; scan < source.length; scan++) {
+    if (source[scan] === "\\") {
+      scan++;
+      continue;
+    }
+    if (source[scan] === quote) return scan;
+  }
+  return source.length;
+}
 
 /** `.message` read off anything, however it is spelled. */
 const READS_MESSAGE = /\?\s*\.\s*message\b|\.\s*message\b/;
@@ -63,9 +99,17 @@ const READS_MESSAGE = /\?\s*\.\s*message\b|\.\s*message\b/;
  */
 const ERROR_IDENTIFIER = /\b(?:error|err|e|exception|cause|reason)\b/;
 
-/** `String(error)` — the other way to spell the same leak. */
+/**
+ * `String(error)` — the other way to spell the same leak.
+ *
+ * The template alternative requires `.message` or `String(`, unlike an earlier
+ * version which flagged any template opening `${e…}`. `e` is the near-universal
+ * name for a map or event parameter, so ``title: `${e.label}` `` inside a
+ * `.map((e) => …)` failed the guard with a message about leaking an error
+ * message it had never read.
+ */
 const STRINGIFIES_ERROR =
-  /String\(\s*(?:error|err|e|exception|cause)\s*\)|`[^`]*\$\{\s*(?:error|err|e)\b/;
+  /String\(\s*(?:error|err|e|exception|cause)\s*\)|`[^`]*\$\{[^}]*\b(?:error|err|e|exception|cause)\b[^}]*\.\s*message\b/;
 
 /**
  * Files allowed to reference an error message directly.
@@ -74,10 +118,13 @@ const STRINGIFIES_ERROR =
  * migration you didn't finish.
  */
 const ALLOWED = new Set<string>([
-  // Deliberately empty. `showErrorToast.ts` used to sit here, but its only
-  // `description: error.message` is inside a docblock, which `stripComments`
-  // now blanks — an allowlist entry that isn't holding anything back reads as
-  // permission to add more.
+  // This file. Its fixtures are deliberately written leaks — the detector's
+  // own tests above assert each one is caught — so scanning itself would
+  // always fail. Nothing else belongs here: `showErrorToast.ts` used to, but
+  // its only `description: error.message` is inside a docblock, which
+  // `stripComments` blanks, and an allowlist entry that isn't holding
+  // anything back reads as permission to add more.
+  "src/features/errors/logic/__tests__/noRawErrorToasts.unit.test.ts",
 ]);
 
 /**
@@ -89,6 +136,12 @@ const ALLOWED = new Set<string>([
  * trailing `//` is left alone deliberately — stripping it would also eat the
  * `//` in a `https://` inside a string literal, and blinding the guard is a
  * worse failure than reading one comment too many.
+ *
+ * A leading `*` is NOT treated as a comment. Block comments are already gone
+ * by then, so the only lines left starting with one are code — a JSX required
+ * marker (`ee/governance/dashboard/pages/ingestion-sources.tsx` has one), or a
+ * wrapped multiplication. Blanking those deletes real punctuation and moves
+ * the value boundaries the scanner depends on.
  */
 function stripComments(source: string): string {
   const withoutBlocks = source.replace(/\/\*[\s\S]*?\*\//g, (block) =>
@@ -97,12 +150,9 @@ function stripComments(source: string): string {
 
   return withoutBlocks
     .split("\n")
-    .map((line) => {
-      const trimmed = line.trimStart();
-      return trimmed.startsWith("//") || trimmed.startsWith("*")
-        ? " ".repeat(line.length)
-        : line;
-    })
+    .map((line) =>
+      line.trimStart().startsWith("//") ? " ".repeat(line.length) : line,
+    )
     .join("\n");
 }
 
@@ -125,6 +175,97 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+/** The detector, isolated from the filesystem walk so it can be tested. */
+function leaksIn(source: string): boolean {
+  const scanned = stripComments(source);
+  for (const match of scanned.matchAll(COPY_SLOT)) {
+    const value = readValue(scanned, match.index + match[0].length);
+    if (
+      (READS_MESSAGE.test(value) && ERROR_IDENTIFIER.test(value)) ||
+      STRINGIFIES_ERROR.test(value)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The detector's own tests.
+ *
+ * Without these, "no offenders" is indistinguishable from "detects nothing" —
+ * and this guard has twice shipped in the second state while reporting the
+ * first. Every LEAKS case is a shape that reached a customer, or would have.
+ */
+describe("the raw-message detector", () => {
+  describe("given a leak", () => {
+    it.each([
+      ["flat", `toaster.create({ description: error.message })`],
+      ["in the title", `toaster.create({ title: error.message })`],
+      ["as-cast", `toaster.create({ description: (error as Error).message })`],
+      [
+        "property-access cast",
+        `toaster.create({ description: String((err as { message: unknown }).message) })`,
+      ],
+      [
+        "wrapped onto the next line by the formatter",
+        `toaster.create({\n  description:\n    err instanceof Error ? err.message : "x",\n})`,
+      ],
+      [
+        "inside a template literal",
+        "toaster.create({ description: `Failed: ${error.message}` })",
+      ],
+      [
+        "behind a comma, inside a call",
+        `toaster.create({ description: fmt("Couldn't save", error.message) })`,
+      ],
+      [
+        "joined from an array",
+        `toaster.create({ description: [prefix, error.message].join(" ") })`,
+      ],
+      [
+        "in showErrorToast's own fallback",
+        `showErrorToast({ error, fallbackTitle: error.message })`,
+      ],
+      ["stringified", `toaster.create({ description: String(error) })`],
+    ])("catches it %s", (_shape, source) => {
+      expect(leaksIn(source)).toBe(true);
+    });
+  });
+
+  describe("given something that only looks like one", () => {
+    it.each([
+      [
+        "a real message that isn't an error's",
+        `toaster.create({ description: notification.message })`,
+      ],
+      ["plain copy", `toaster.create({ description: "Something went wrong" })`],
+      [
+        "a correct call",
+        `showErrorToast({ error, fallbackTitle: "Couldn't save" })`,
+      ],
+      [
+        "a map parameter named e",
+        "items.map((e) => toaster.create({ title: `${e.label}` }))",
+      ],
+      [
+        "an unrelated statement after the call",
+        `toaster.create({ title: "Failed" })\nconsole.error(error.message)`,
+      ],
+      [
+        "a JSX prop object followed by a handler",
+        `<Toast toast={{ title: "x" }} onClick={() => log(error.message)} />`,
+      ],
+      [
+        "the pattern described in a comment",
+        `// never write description: error.message\ntoaster.create({ description: "ok" })`,
+      ],
+    ])("stays quiet about %s", (_shape, source) => {
+      expect(leaksIn(source)).toBe(false);
+    });
+  });
+});
+
 describe("error toasts", () => {
   it("never render an error's raw message", () => {
     const offenders: string[] = [];
@@ -141,8 +282,8 @@ describe("error toasts", () => {
 
       const source = stripComments(raw);
 
-      for (const match of source.matchAll(TOAST_COPY_VALUE)) {
-        const value = match[1] ?? "";
+      for (const match of source.matchAll(COPY_SLOT)) {
+        const value = readValue(source, match.index + match[0].length);
         const leaks =
           (READS_MESSAGE.test(value) && ERROR_IDENTIFIER.test(value)) ||
           STRINGIFIES_ERROR.test(value);
