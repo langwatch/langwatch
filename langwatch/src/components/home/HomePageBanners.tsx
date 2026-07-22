@@ -662,7 +662,13 @@ export function HomePageBanners({
           insetInline={{ base: "-8%", md: "-14%" }}
           insetBlock={{ base: "-30%", md: "-45%" }}
           pointerEvents="none"
-          opacity={{ base: 0.42, _dark: 0.55 }}
+          opacity={{ base: 0.3, _dark: 0.55 }}
+          // Softer on light. On a pale ground the mesh's bands keep their
+          // edges and read as banding rather than as light; blurring takes the
+          // edges off without touching the colours. Dark needs none of it —
+          // the same blur there only muddies a field that already reads as
+          // depth.
+          filter={{ base: "blur(15px)", _dark: "none" }}
           css={{
             maskImage:
               "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
