@@ -62,6 +62,7 @@ const SidebarSectionToggle = ({
   <Box asChild width="full" cursor="pointer">
     <button
       type="button"
+      data-group
       aria-label={`${isExpanded ? "Collapse" : "Expand"} ${label}`}
       aria-expanded={isExpanded}
       onClick={onToggle}
@@ -89,10 +90,25 @@ const SidebarSectionToggle = ({
             {label}
           </Text>
         )}
-        {!isExpanded && (
-          <Box opacity={0.5} display="flex">
-            <ChevronRight size={13} aria-hidden="true" />
+        {/* Expanded rail: the chevron is a quiet affordance — visible when
+            the section is folded, revealed on hover when it's open, and it
+            rotates to show the state. Compact rail keeps the bare marker. */}
+        {showExpanded ? (
+          <Box
+            display="flex"
+            opacity={isExpanded ? 0 : 0.6}
+            transition="opacity 0.12s ease-in-out, transform 0.15s ease-in-out"
+            transform={isExpanded ? "rotate(90deg)" : "none"}
+            _groupHover={{ opacity: 0.8 }}
+          >
+            <ChevronRight size={12} aria-hidden="true" />
           </Box>
+        ) : (
+          !isExpanded && (
+            <Box opacity={0.5} display="flex">
+              <ChevronRight size={13} aria-hidden="true" />
+            </Box>
+          )
         )}
       </HStack>
     </button>

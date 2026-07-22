@@ -724,18 +724,18 @@ export const DashboardLayout = ({
         <HStack gap={2} justifyContent="flex-end" overflow="hidden">
           {publicEnv.data?.NODE_ENV === "development" && (
             <Text
-              fontSize="11px"
-              fontWeight="bold"
-              color="white"
-              backgroundColor="blackAlpha.600"
+              fontSize="10px"
+              fontWeight="600"
+              color="orange.fg"
+              backgroundColor="orange.solid/10"
               border="1px solid"
-              borderColor="whiteAlpha.300"
-              borderRadius="full"
-              height="32px"
-              paddingX={3}
+              borderColor="orange.solid/30"
+              borderRadius="md"
+              height="24px"
+              paddingX={2}
               display="flex"
               alignItems="center"
-              letterSpacing="wider"
+              letterSpacing="0.1em"
             >
               DEV
             </Text>
@@ -775,8 +775,11 @@ export const DashboardLayout = ({
           // While Langy is docked, this gray ground keeps the viewport edge and
           // the content card pulls in: the reserved strip is where the docked
           // panel sits as a second card, with a gap of page ground between the
-          // two. Spec: specs/langy/langy-panel-layout.feature
-          paddingRight={`${langyDockInset}px`}
+          // two. Without Langy, the card keeps a slim gutter of ground on its
+          // right so it reads as a floating card rather than a filled pane.
+          // Spec: specs/langy/langy-panel-layout.feature,
+          //       specs/navigation/shell-visual-language.feature
+          paddingRight={`${langyDockInset > 0 ? langyDockInset : 10}px`}
           transition={`padding-right ${LANGY_TRANSITION}`}
         >
           <Box
@@ -784,20 +787,22 @@ export const DashboardLayout = ({
             height="full"
             background="bg.surface"
             borderTopLeftRadius="xl"
-            // The Langy panel's edge, on the card that holds the whole app —
-            // one notch quieter than the panel's own: the muted hairline on
-            // the two edges that meet the page chrome, and (dark) a fainter
-            // cut of the panel's inset lit top rim, so the surface reads as
-            // a raised card catching light rather than a flat cut-out.
+            borderTopRightRadius="xl"
+            // The card that holds the whole app, one notch quieter than the
+            // Langy panel's own edge language: a muted hairline where it
+            // meets the page chrome, a soft ambient shadow in light, and
+            // (dark) a fainter cut of the panel's inset lit top rim, so the
+            // surface reads as a raised card catching light rather than a
+            // flat cut-out.
             borderTopWidth="1px"
             borderLeftWidth="1px"
+            borderRightWidth="1px"
             borderStyle="solid"
             borderColor="border.muted"
-            // With Langy docked the card no longer meets the viewport edge, so
-            // its right side joins the page-chrome language too: the same
-            // radius and muted hairline as its top-left corner.
-            borderTopRightRadius={langyDockInset > 0 ? "xl" : 0}
-            borderRightWidth={langyDockInset > 0 ? "1px" : 0}
+            _light={{
+              boxShadow:
+                "0 1px 2px rgba(16,24,40,0.04), 0 8px 24px -12px rgba(16,24,40,0.10)",
+            }}
             _dark={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" }}
             overflow="auto"
             display="flex"

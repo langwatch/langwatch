@@ -98,11 +98,12 @@ export const SideMenuItem = ({
 
   return (
     <HStack
+      position="relative"
       width={showLabel ? "full" : "auto"}
       height={MENU_ITEM_HEIGHT}
-      gap={3}
-      paddingX={3}
-      borderRadius="lg"
+      gap={2.5}
+      paddingX={2.5}
+      borderRadius="md"
       backgroundColor={isActive ? "nav.bgActive" : "transparent"}
       // In light mode the active row is a white card on the gray rail — a
       // whisper of shadow sells the lift; hover keeps the flat gray fill.
@@ -114,8 +115,24 @@ export const SideMenuItem = ({
       _hover={{
         backgroundColor: isActive ? "nav.bgActive" : "nav.bgHover",
       }}
-      transition="background-color 0.15s ease-in-out"
+      transition="background-color 0.12s ease-in-out"
     >
+      {/* The one place the chrome wears the brand: a small orange notch on
+          the active row. It survives the compact rail, where the label and
+          background can't carry the signal alone.
+          Spec: specs/navigation/shell-visual-language.feature */}
+      {isActive && (
+        <Box
+          position="absolute"
+          left="-1px"
+          top="20%"
+          bottom="20%"
+          width="2.5px"
+          borderRadius="full"
+          backgroundColor="orange.solid"
+          pointerEvents="none"
+        />
+      )}
       <Box
         position="relative"
         flexShrink={0}
@@ -135,7 +152,7 @@ export const SideMenuItem = ({
       {showLabel && (
         <>
           <Text
-            fontSize="14px"
+            fontSize="13.5px"
             fontWeight={isActive ? "500" : "normal"}
             color={isActive ? "nav.fgActive" : "nav.fg"}
             whiteSpace="nowrap"
