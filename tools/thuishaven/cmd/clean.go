@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procsupervisor"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/prunetui"
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -18,17 +19,22 @@ import (
 // footer and the agent report so the shared/non-shared split is always explicit.
 const sharedResourcesNote = "shared ClickHouse · Postgres · Redis · observability are machine-wide and never removed"
 
-// runPrune is `haven prune`. In a terminal it opens the interactive picker: it
-// scans every worktree concurrently (disk size, databases, idle time), pre-ticks
-// the ones idle past the stale threshold, and deletes exactly what the user
-// confirms — reusing DestroyWorktree, so the primary-checkout / running-from
-// guards and database-drop safety all apply. Agents (and any non-TTY) get the
-// same scan as a read-only report and nothing is deleted. `--artifacts` keeps the
-// original conservative reclaim: regenerable build caches only, no worktree
-// removed, dry-run without `--yes`.
-func runPrune(ctx context.Context, d deps, inv invocation) error {
-	if inv.has("--artifacts") {
-		return d.orch.Prune(ctx, d.worktree, inv.has("--yes"))
+// runClean is `haven clean` — the one cleanup command. In a terminal it opens
+// the interactive worktree picker (concurrent scan: disk size, databases, idle
+// time; stale ones pre-ticked; deletes exactly what the user confirms, with the
+// primary-checkout / running-from guards and database-drop safety of
+// DestroyWorktree), then reclaims the safe categories — regenerable build
+// artifacts of idle worktrees and orphaned dev processes — as part of the same
+// run. `--yes` skips the picker and applies ONLY the safe categories, never a
+// worktree deletion. Agents (and any non-TTY) get the read-only report and
+// delete nothing without `--yes`.
+func runClean(ctx context.Context, d deps, inv invocation) error {
+	if inv.has("--yes") {
+		if err := d.orch.Prune(ctx, d.worktree, true); err != nil {
+			return err
+		}
+		reapOrphanRuntimes(d)
+		return nil
 	}
 	threshold := pruneStaleThreshold(inv)
 	rows, err := d.orch.PlanPrune(d.worktree, d.worktree)
@@ -38,7 +44,19 @@ func runPrune(ctx context.Context, d deps, inv invocation) error {
 	if d.isAgent {
 		return printPruneReport(ctx, d, rows, threshold)
 	}
-	return prunetui.Run(ctx, d.pruneActions(rows, threshold))
+	if err := prunetui.Run(ctx, d.pruneActions(rows, threshold)); err != nil {
+		return err
+	}
+	reapOrphanRuntimes(d)
+	return nil
+}
+
+// reapOrphanRuntimes is the always-safe tail of a clean: kill dev runtimes
+// (tsgo, node, pnpm, uv, python, opencode) that have been orphaned to pid 1 but
+// still reference this worktree.
+func reapOrphanRuntimes(d deps) {
+	procsupervisor.ReapOrphans([]string{d.worktree})
+	fmt.Println("reaped orphaned dev runtimes")
 }
 
 // pruneStaleThreshold resolves the idle age at which a worktree is pre-selected:
