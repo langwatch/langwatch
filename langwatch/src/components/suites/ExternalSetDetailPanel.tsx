@@ -16,7 +16,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { FlaskConical, RefreshCw, TriangleAlert } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -30,6 +30,7 @@ import {
   computeGroupSummary,
   groupRunsByBatchId,
   groupRunsByScenarioId,
+  preserveUnchangedRunIdentity,
 } from "./run-history-transforms";
 import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import { useAutoExpansion } from "./useAutoExpansion";
@@ -109,7 +110,37 @@ export function ExternalSetDetailPanel({
     },
   );
 
-  const runData = runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
+  // Reconcile against the previously rendered runs so unchanged rows keep
+  // their object identity across polls instead of remounting/repainting on
+  // every refetch (see preserveUnchangedRunIdentity). Reset when the set or
+  // period changes so stale runs from a previous view never leak in.
+  const [runData, setRunData] = useState<ScenarioRunData[] | undefined>(
+    undefined,
+  );
+  const startDateMs = period.startDate.getTime();
+  const endDateMs = period.endDate.getTime();
+  useEffect(() => {
+    setRunData(undefined);
+  }, [scenarioSetId, startDateMs, endDateMs]);
+  useEffect(() => {
+    if (!runDataResult || !("runs" in runDataResult)) return;
+    setRunData((prev) =>
+      preserveUnchangedRunIdentity({
+        previous: prev ?? [],
+        next: runDataResult.runs,
+      }),
+    );
+  }, [runDataResult]);
+
+  // The reconciliation effect above runs one render after runDataResult
+  // lands, so treat that gap as still-loading — otherwise the empty state
+  // flashes for a frame before runData catches up.
+  const isReconcilingFirstResult =
+    !isLoading &&
+    runData === undefined &&
+    !!runDataResult &&
+    "runs" in runDataResult;
+  const isLoadingRunData = isLoading || isReconcilingFirstResult;
 
   useSuiteRunFreshness({
     scenarioSetId,
@@ -235,7 +266,7 @@ export function ExternalSetDetailPanel({
       </HStack>
 
       {/* Filter bar — fixed above the scrollable run list */}
-      {!isLoading && !error && runData && runData.length > 0 && (
+      {!isLoadingRunData && !error && runData && runData.length > 0 && (
         <Box
           paddingX={6}
           paddingY={4}
@@ -271,7 +302,7 @@ export function ExternalSetDetailPanel({
 
       {/* Content — scrollable */}
       <VStack ref={runListRef} align="stretch" gap={0} flex={1} overflow="auto">
-        {isLoading && <RunHistorySkeleton />}
+        {isLoadingRunData && <RunHistorySkeleton />}
 
         {error && (
           <EmptyState.Root paddingY={12}>
@@ -294,7 +325,7 @@ export function ExternalSetDetailPanel({
           </EmptyState.Root>
         )}
 
-        {!isLoading && !error && runData && runData.length > 0 && (
+        {!isLoadingRunData && !error && runData && runData.length > 0 && (
           <>
             {/* Run rows */}
             {!hasData && hasActiveFilters ? (
@@ -344,7 +375,7 @@ export function ExternalSetDetailPanel({
           </>
         )}
 
-        {!isLoading && !error && (!runData || runData.length === 0) && (
+        {!isLoadingRunData && !error && (!runData || runData.length === 0) && (
           <EmptyState.Root paddingY={12}>
             <EmptyState.Content>
               <EmptyState.Indicator>

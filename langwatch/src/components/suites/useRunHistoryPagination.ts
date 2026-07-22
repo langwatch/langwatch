@@ -11,6 +11,7 @@ import { STALL_THRESHOLD_MS } from "~/server/scenarios/stall-detection";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
+import { preserveUnchangedRunIdentity } from "./run-history-transforms";
 
 type PageData = {
   runs: ScenarioRunData[];
@@ -68,7 +69,18 @@ export function useRunHistoryPagination({
     if (!runDataResult?.changed) return;
 
     if (cursor === undefined) {
-      setPages([runDataResult]);
+      // Reuse unchanged runs' object identity from the previous page 0 so
+      // rows whose data didn't actually change can skip re-rendering (see
+      // preserveUnchangedRunIdentity) instead of remounting on every poll.
+      setPages((prev) => [
+        {
+          ...runDataResult,
+          runs: preserveUnchangedRunIdentity({
+            previous: prev[0]?.runs ?? [],
+            next: runDataResult.runs,
+          }),
+        },
+      ]);
     } else if (cursor !== prevCursorRef.current) {
       setPages((prev) => [...prev, runDataResult]);
     }

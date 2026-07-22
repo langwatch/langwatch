@@ -11,7 +11,7 @@
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { Dialog } from "~/components/ui/dialog";
 import { ChevronDown, ChevronRight, Square } from "lucide-react";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
@@ -47,12 +47,51 @@ type RunRowDataProps = {
 
 type RunRowProps = RunRowLoadingProps | RunRowDataProps;
 
-export function RunRow(props: RunRowProps) {
+/**
+ * Skips re-rendering a row whose own data hasn't changed. The freshness
+ * probe re-fetches the whole run history on every change anywhere in the
+ * set, handing every row a fresh `batchRun` wrapper object each time — this
+ * comparator looks past that wrapper to the actual scenario run references
+ * (kept stable by preserveUnchangedRunIdentity when unchanged) so unrelated
+ * rows don't repaint their sticky, blurred header every poll.
+ */
+function arePropsEqual(prev: RunRowProps, next: RunRowProps): boolean {
+  if (prev.loading || next.loading) {
+    return prev.loading === next.loading && prev.suiteName === next.suiteName;
+  }
+
+  if (
+    prev.isExpanded !== next.isExpanded ||
+    prev.expectedJobCount !== next.expectedJobCount ||
+    prev.suiteName !== next.suiteName ||
+    prev.viewMode !== next.viewMode ||
+    prev.isCancellingBatch !== next.isCancellingBatch ||
+    prev.cancellingJobId !== next.cancellingJobId ||
+    prev.isHighlighted !== next.isHighlighted ||
+    prev.batchRun.batchRunId !== next.batchRun.batchRunId ||
+    prev.batchRun.timestamp !== next.batchRun.timestamp ||
+    prev.batchRun.scenarioSetId !== next.batchRun.scenarioSetId
+  ) {
+    return false;
+  }
+
+  const prevRuns = prev.batchRun.scenarioRuns;
+  const nextRuns = next.batchRun.scenarioRuns;
+  if (prevRuns.length !== nextRuns.length) return false;
+  for (let i = 0; i < prevRuns.length; i++) {
+    if (prevRuns[i] !== nextRuns[i]) return false;
+  }
+  return true;
+}
+
+function RunRowComponent(props: RunRowProps) {
   if (props.loading) {
     return <RunRowLoading suiteName={props.suiteName} />;
   }
   return <RunRowData {...props} />;
 }
+
+export const RunRow = memo(RunRowComponent, arePropsEqual);
 
 function RunRowLoading({ suiteName }: { suiteName?: string }) {
   return (

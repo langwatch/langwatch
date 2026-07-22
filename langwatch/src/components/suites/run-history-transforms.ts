@@ -12,6 +12,37 @@ import { computeMetricStats, type MetricStats } from "~/components/shared/Metric
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
 
 
+/**
+ * Reconciles freshly-fetched runs against the previously rendered ones,
+ * reusing the old object reference for any run whose data is unchanged.
+ *
+ * The freshness probe re-fetches the full run list whenever anything in the
+ * scenario set changes, even though most polls only affect one or two runs.
+ * Without this, every poll hands the list brand-new object references for
+ * every run, which defeats row-level memoization and forces every card
+ * (including their sticky, blurred headers) to re-render and repaint in
+ * lockstep — the visible flicker while scrolling an active set.
+ */
+export function preserveUnchangedRunIdentity({
+  previous,
+  next,
+}: {
+  previous: ScenarioRunData[];
+  next: ScenarioRunData[];
+}): ScenarioRunData[] {
+  if (previous.length === 0) return next;
+
+  const previousById = new Map(previous.map((run) => [run.scenarioRunId, run]));
+
+  return next.map((run) => {
+    const prevRun = previousById.get(run.scenarioRunId);
+    if (prevRun && JSON.stringify(prevRun) === JSON.stringify(run)) {
+      return prevRun;
+    }
+    return run;
+  });
+}
+
 /** Valid values for the grouping dimension. */
 export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;
 
