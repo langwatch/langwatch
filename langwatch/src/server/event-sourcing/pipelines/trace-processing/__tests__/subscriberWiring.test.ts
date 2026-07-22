@@ -38,7 +38,6 @@ function buildTraceDeps(
     traceUpdateBroadcastReactor: reactorStub("traceUpdateBroadcast"),
     projectMetadataReactor: reactorStub("projectMetadata"),
     simulationMetricsSyncReactor: reactorStub("simulationMetricsSync"),
-    experimentMetricsSyncReactor: reactorStub("experimentMetricsSync"),
     automations: {
       triggerMatchHandler: vi.fn().mockResolvedValue(undefined),
       graphActivityHandler: vi.fn().mockResolvedValue(undefined),

@@ -221,10 +221,6 @@ describe("experiment run fold — event ordering invariants", () => {
     ).toBe(3);
     expect(state.Progress, `${label}: Progress must be 3`).toBe(3);
     expect(
-      state.TotalCost,
-      `${label}: TotalCost must be computed`,
-    ).toBeGreaterThan(0);
-    expect(
       state.ScoreCount,
       `${label}: ScoreCount must be 3`,
     ).toBe(3);

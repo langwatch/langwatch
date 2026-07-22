@@ -3,7 +3,6 @@ import type { FoldProjectionStore } from "../../projections/foldProjection.types
 import type { AppendStore } from "../../projections/mapProjection.types";
 import {
   CompleteExperimentRunCommand,
-  ComputeExperimentRunMetricsCommand,
   RecordEvaluatorResultCommand,
   RecordTargetResultCommand,
   StartExperimentRunCommand,
@@ -31,8 +30,11 @@ export interface ExperimentRunProcessingPipelineDeps {
  * - started -> target results received -> evaluator results received -> completed
  *
  * Fold Projection: experimentRunState
- * - Computes summary statistics (progress, costs, scores, pass rate)
+ * - Computes progress and score statistics
  * - Stored in experiment_runs ClickHouse table
+ * - Cost is NOT held here: it is summed from experiment_run_items at read
+ *   time, and priced from the item's trace where the item carries no cost of
+ *   its own. See ADR-061.
  *
  * Map Projection: experimentRunResultStorage
  * - Writes individual results to experiment_run_items for query-optimized access
@@ -67,10 +69,6 @@ export function createExperimentRunProcessingPipeline(
     .withCommand("startExperimentRun", StartExperimentRunCommand)
     .withCommand("recordTargetResult", RecordTargetResultCommand)
     .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand)
-    .withCommand(
-      "computeExperimentRunMetrics",
-      ComputeExperimentRunMetricsCommand,
-    )
     .withCommand("completeExperimentRun", CompleteExperimentRunCommand)
     .build();
 }

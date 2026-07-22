@@ -33,6 +33,7 @@ interface ClickHouseSimulationRunRecord {
   ScenarioId: string;
   BatchRunId: string;
   ScenarioSetId: string;
+  BatchTotal: number;
   Version: string;
   Status: string;
   Name: string | null;
@@ -86,6 +87,7 @@ export class SimulationRunStateRepositoryClickHouse<
       ScenarioId: record.ScenarioId,
       BatchRunId: record.BatchRunId,
       ScenarioSetId: record.ScenarioSetId,
+      BatchTotal: Number(record.BatchTotal ?? 0),
       Status: record.Status,
       Name: record.Name,
       Description: record.Description,
@@ -134,6 +136,7 @@ export class SimulationRunStateRepositoryClickHouse<
       ScenarioId: data.ScenarioId,
       BatchRunId: data.BatchRunId,
       ScenarioSetId: data.ScenarioSetId,
+      BatchTotal: data.BatchTotal ?? 0,
       Version: projectionVersion,
       Status: data.Status,
       Name: data.Name,
@@ -210,6 +213,7 @@ export class SimulationRunStateRepositoryClickHouse<
             t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
             t.ScenarioRunId AS ScenarioRunId, t.ScenarioId AS ScenarioId,
             t.BatchRunId AS BatchRunId, t.ScenarioSetId AS ScenarioSetId,
+            t.BatchTotal AS BatchTotal,
             t.Version AS Version, t.Status AS Status, t.Name AS Name,
             t.Description AS Description, t.Metadata AS Metadata,
             t.\`Messages.Id\` AS \`Messages.Id\`,

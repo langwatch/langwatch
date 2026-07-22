@@ -302,7 +302,6 @@ export class SuiteService {
           activeTargets: resolved.activeTargets,
           repeatCount: suite.repeatCount,
           skippedArchived: resolved.skippedArchived,
-          idempotencyKey: params.idempotencyKey,
           batchRunId: params.batchRunId,
         });
 

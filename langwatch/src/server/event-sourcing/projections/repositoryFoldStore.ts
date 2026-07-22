@@ -21,7 +21,7 @@ function sameRetention(
 /**
  * Generic adapter that wraps a ProjectionStore (repository) into a FoldProjectionStore.
  *
- * Replaces per-pipeline boilerplate store factories (e.g., createSuiteRunStateFoldStore,
+ * Replaces per-pipeline boilerplate store factories (e.g., createSimulationRunStateFoldStore,
  * createSimulationRunStateFoldStore) that all do the same thing: wrap data into a Projection
  * envelope on write, extract data on read.
  *
@@ -31,8 +31,8 @@ function sameRetention(
  *
  * @example
  * ```typescript
- * const store = new RepositoryFoldStore<SuiteRunStateData>(
- *   suiteRunStateRepo,
+ * const store = new RepositoryFoldStore<SimulationRunStateData>(
+ *   simulationRunStateRepo,
  *   SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
  * );
  * ```

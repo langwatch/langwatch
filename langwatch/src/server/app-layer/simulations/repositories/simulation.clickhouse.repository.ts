@@ -18,33 +18,14 @@ import {
   mapStatus,
 } from "~/server/simulations/simulation-run.mappers";
 import type { SimulationRepository } from "./simulation.repository";
+import {
+  SIMULATION_RUNS_TABLE,
+  simulationRunDedupPredicate,
+} from "./simulationRuns.sql";
 
-const TABLE_NAME = "simulation_runs" as const;
+const TABLE_NAME = SIMULATION_RUNS_TABLE;
 
 export const RUN_ID_CAP = 10000;
-
-/**
- * Returns an IN-tuple dedup predicate for simulation_runs.
- *
- * simulation_runs uses ReplacingMergeTree(UpdatedAt) with dedup key
- * (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId). This predicate
- * resolves dedup using only lightweight key columns in the inner GROUP BY,
- * avoiding the per-row dedup anti-pattern which materializes ALL columns
- * per granule (~8K rows).
- *
- * @param whereFilters - The same WHERE filters from the outer query,
- *   duplicated here for partition pruning in the inner subquery.
- *
- * @see dev/docs/best_practices/clickhouse-queries.md — "Safe Pattern: IN-Tuple Dedup"
- */
-function simulationRunDedupPredicate(whereFilters: string): string {
-  return `AND (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, UpdatedAt) IN (
-    SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-    FROM ${TABLE_NAME}
-    WHERE ${whereFilters}
-    GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-  )`;
-}
 
 /**
  * Builds date filter clauses from startDate/endDate:
@@ -365,6 +346,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const batchRowsPromise = this.queryRows<{
       BatchRunId: string;
       TotalCount: string;
+      ExpectedCount: string;
       PassCount: string;
       FailCount: string;
       RunningCount: string;
@@ -378,6 +360,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       `SELECT
         BatchRunId,
         toString(count())                                               AS TotalCount,
+        toString(max(BatchTotal))                                       AS ExpectedCount,
         toString(countIf(Status = 'SUCCESS'))                          AS PassCount,
         toString(countIf(Status IN ('FAILED','FAILURE','ERROR','CANCELLED'))) AS FailCount,
         toString(countIf(Status IN ('IN_PROGRESS','PENDING')))         AS RunningCount,
@@ -519,9 +502,19 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       const firstCompletedAt = Number(b.FirstCompletedAt);
       const allCompletedAt = Number(b.AllCompletedAt);
 
+      // Named apart from the outer `totalCount` (the distinct-batch count for
+      // pagination), which this callback would otherwise shadow.
+      const batchRunCount = Number(b.TotalCount);
+      // 0 means the batch predates the denominator; count the rows instead.
+      const expectedCount = Math.max(
+        Number(b.ExpectedCount) || 0,
+        batchRunCount,
+      );
+
       return {
         batchRunId: b.BatchRunId,
-        totalCount: Number(b.TotalCount),
+        totalCount: batchRunCount,
+        expectedCount,
         passCount: Number(b.PassCount),
         failCount: Number(b.FailCount),
         runningCount: Math.max(0, runningCount),

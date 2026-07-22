@@ -129,10 +129,6 @@ import {
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/simulation-processing/repositories";
-import {
-  SuiteRunStateRepositoryClickHouse,
-  SuiteRunStateRepositoryMemory,
-} from "../event-sourcing/pipelines/suite-run-processing/repositories";
 import { ExperimentService } from "../experiments/experiment.service";
 import { InviteService } from "../invites/invite.service";
 import { OrganizationRepository } from "../repositories/organization.repository";
@@ -454,7 +450,7 @@ export function initializeDefaultApp(options?: {
   const simulationReads = SimulationRunService.create(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
-  // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
+  // SuiteRunService is created after pipeline registration (needs queueRun command)
 
   const evaluations = {
     runs: evaluationRuns,
@@ -627,9 +623,6 @@ export function initializeDefaultApp(options?: {
 
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
-    suiteRunState: clickhouseEnabled
-      ? new SuiteRunStateRepositoryClickHouse(resolveClickHouseClient)
-      : new SuiteRunStateRepositoryMemory(),
     simulationRunState: clickhouseEnabled
       ? new SimulationRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new SimulationRunStateRepositoryMemory(),
@@ -1016,8 +1009,6 @@ export function initializeDefaultApp(options?: {
   });
 
   const suiteRunService = SuiteRunService.create({
-    resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
-    startSuiteRun: commands.suiteRuns.startSuiteRun,
     queueSimulationRun: commands.simulations.queueRun,
   });
 
@@ -1390,8 +1381,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: {
       runs: SuiteRunService.create({
-        resolveClickHouseClient: null,
-        startSuiteRun: noop,
         queueSimulationRun: noop,
       }),
     },
@@ -1514,7 +1503,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         startExperimentRun: noop,
         recordTargetResult: noop,
         recordEvaluatorResult: noop,
-        computeExperimentRunMetrics: noop,
         completeExperimentRun: noop,
       } as AppCommands["experimentRuns"],
       simulations: {
@@ -1528,11 +1516,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         deleteRun: noop,
         computeRunMetrics: noop,
       } as AppCommands["simulations"],
-      suiteRuns: {
-        startSuiteRun: noop,
-        recordSuiteRunItemStarted: noop,
-        completeSuiteRunItem: noop,
-      } as AppCommands["suiteRuns"],
       langy: {
         createConversation: noop,
         forkConversation: noop,

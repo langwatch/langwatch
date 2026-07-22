@@ -10,14 +10,12 @@ import type {
   ExperimentRunCompletedEvent,
   ExperimentRunStartedEvent,
   TargetResultEvent,
-  TraceMetricsComputedEvent,
 } from "../schemas/events";
 import {
   evaluatorResultEventSchema,
   experimentRunCompletedEventSchema,
   experimentRunStartedEventSchema,
   targetResultEventSchema,
-  traceMetricsComputedEventSchema,
 } from "../schemas/events";
 import { normalizeDurationMs } from "../utils/duration.utils";
 
@@ -37,7 +35,6 @@ export interface ExperimentRunStateData {
   Progress: number;
   CompletedCount: number;
   FailedCount: number;
-  TotalCost: number | null;
   TotalDurationMs: number | null;
   AvgScoreBps: number | null;
   PassRateBps: number | null;
@@ -54,9 +51,6 @@ export interface ExperimentRunStateData {
   ScoreCount: number;
   PassedCount: number;
   GradedCount: number;
-
-  // Per-trace cost breakdown from ECST (Event-Carried State Transfer)
-  TraceMetrics: Record<string, { totalCost: number }>;
 }
 
 export interface ExperimentRunState extends Projection<ExperimentRunStateData> {
@@ -89,7 +83,6 @@ const experimentRunEvents = [
   experimentRunStartedEventSchema,
   targetResultEventSchema,
   evaluatorResultEventSchema,
-  traceMetricsComputedEventSchema,
   experimentRunCompletedEventSchema,
 ] as const;
 
@@ -114,15 +107,20 @@ export class ExperimentRunStateFoldProjection
 
   /**
    * Order-insensitive fold: every handler is a counter (`CompletedCount++`),
-   * a running sum (`TotalCost`/`TotalDurationMs`/`TotalScoreSum` +=), a
-   * `Math.max` (`Total`), or a keyed map that last-write-wins per key
-   * (`TraceMetrics[traceId]` subtract-old/add-new, `Targets` merged by id) —
-   * so the state converges to the same value whichever order events are seen
-   * in. A run's aggregate is dataset-scale (one targetResult per row + one
-   * evaluatorResult per row×evaluator, thousands of events), so re-folding the
-   * whole history on every out-of-order event is the same O(n²) amplification
-   * that hit the trace folds — pure waste here since the result is identical.
+   * a running sum (`TotalDurationMs`/`TotalScoreSum` +=), a `Math.max`
+   * (`Total`), or a keyed map that last-write-wins per key (`Targets` merged
+   * by id) — so the state converges to the same value whichever order events
+   * are seen in. A run's aggregate is dataset-scale (one targetResult per row
+   * + one evaluatorResult per row×evaluator, thousands of events), so
+   * re-folding the whole history on every out-of-order event is the same O(n²)
+   * amplification that hit the trace folds — pure waste here since the result
+   * is identical.
    * See specs/event-sourcing/hot-trace-fold-amplification.feature.
+   *
+   * Cost is deliberately absent. It used to be a running sum fed partly by a
+   * per-trace map that was never persisted, which made the fold diverge on a
+   * cache miss and again on replay. It is now summed from
+   * `experiment_run_items` at read time — see ADR-061.
    */
   readonly options = { refoldOnOutOfOrder: false } as const;
 
@@ -142,7 +140,6 @@ export class ExperimentRunStateFoldProjection
       Progress: 0,
       CompletedCount: 0,
       FailedCount: 0,
-      TotalCost: null,
       TotalDurationMs: null,
       AvgScoreBps: null,
       PassRateBps: null,
@@ -154,7 +151,6 @@ export class ExperimentRunStateFoldProjection
       ScoreCount: 0,
       PassedCount: 0,
       GradedCount: 0,
-      TraceMetrics: {},
     };
   }
 
@@ -186,11 +182,6 @@ export class ExperimentRunStateFoldProjection
       completedCount += 1;
     }
 
-    let totalCost = state.TotalCost;
-    if (event.data.cost != null) {
-      totalCost = (totalCost ?? 0) + event.data.cost;
-    }
-
     let totalDurationMs = state.TotalDurationMs;
     const clampedDuration = normalizeDurationMs(event.data.duration);
     if (clampedDuration != null) {
@@ -204,7 +195,6 @@ export class ExperimentRunStateFoldProjection
       CompletedCount: completedCount,
       FailedCount: failedCount,
       Progress: progress,
-      TotalCost: totalCost,
       TotalDurationMs: totalDurationMs,
       Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
     };
@@ -219,7 +209,6 @@ export class ExperimentRunStateFoldProjection
       ScoreCount: scoreCount,
       PassedCount: passedCount,
       GradedCount: gradedCount,
-      TotalCost: totalCost,
     } = state;
 
     if (event.data.status === "processed") {
@@ -233,10 +222,6 @@ export class ExperimentRunStateFoldProjection
       }
     }
 
-    if (event.data.cost != null) {
-      totalCost = (totalCost ?? 0) + event.data.cost;
-    }
-
     const avgScoreBps =
       scoreCount > 0 ? Math.round(totalScoreSum / scoreCount) : null;
     const passRateBps =
@@ -248,36 +233,8 @@ export class ExperimentRunStateFoldProjection
       ScoreCount: scoreCount,
       PassedCount: passedCount,
       GradedCount: gradedCount,
-      TotalCost: totalCost,
       AvgScoreBps: avgScoreBps,
       PassRateBps: passRateBps,
-    };
-  }
-
-  handleExperimentRunTraceMetricsComputed(
-    event: TraceMetricsComputedEvent,
-    state: ExperimentRunStateData,
-  ): ExperimentRunStateData {
-    const traceMetrics = {
-      ...state.TraceMetrics,
-      [event.data.traceId]: {
-        totalCost: event.data.totalCost,
-      },
-    };
-
-    // Recompute TotalCost from all trace metrics
-    let totalCost = state.TotalCost ?? 0;
-    // If this trace was already counted, subtract the old value
-    const existingEntry = state.TraceMetrics[event.data.traceId];
-    if (existingEntry) {
-      totalCost -= existingEntry.totalCost;
-    }
-    totalCost += event.data.totalCost;
-
-    return {
-      ...state,
-      TraceMetrics: traceMetrics,
-      TotalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
     };
   }
 
