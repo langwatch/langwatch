@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
   CODEX_OAUTH_CLIENT_ID,
@@ -42,7 +43,13 @@ export type CodexPollResult =
   | { status: "pending" }
   | { status: "complete"; keys: CodexTokenKeys };
 
-export class CodexAuthError extends Error {
+/**
+ * A HandledError (not a bare Error) so the tRPC error formatter serializes
+ * it as an expected failure — the sign-in UI shows `message` verbatim and
+ * nothing logs as an unhandled 500. `kind` discriminates the poll loop's
+ * "keep waiting" cases from terminal ones.
+ */
+export class CodexAuthError extends HandledError {
   constructor(
     public readonly kind:
       | "http"
@@ -51,7 +58,11 @@ export class CodexAuthError extends Error {
       | "refresh_rejected",
     message: string,
   ) {
-    super(message);
+    super("codex_auth_failed", message, {
+      meta: { kind },
+      fault: "provider",
+      httpStatus: kind === "refresh_rejected" ? 401 : 502,
+    });
     this.name = "CodexAuthError";
   }
 }

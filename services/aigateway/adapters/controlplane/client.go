@@ -353,21 +353,29 @@ func (c *Client) RefreshCodexToken(ctx context.Context, providerRowID string) (s
 		return "", "", fmt.Errorf("codex refresh read: %w", err)
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
-		return "", "", fmt.Errorf("control plane: %w", domain.ErrCodexSessionDead)
+		// herr carries the typed code for surfacing; ErrCodexSessionDead rides
+		// as a reason so the dispatcher's errors.Is sentinel check still fires.
+		return "", "", herr.New(ctx, domain.ErrCodexSessionExpired, nil, domain.ErrCodexSessionDead)
 	}
 	if resp.StatusCode != http.StatusOK {
 		snippet := body
 		if len(snippet) > 200 {
 			snippet = snippet[:200]
 		}
-		return "", "", fmt.Errorf("codex refresh HTTP %d: %s", resp.StatusCode, snippet)
+		return "", "", herr.New(ctx, domain.ErrAuthUpstream, herr.M{
+			"reason":      "codex refresh failed",
+			"http_status": resp.StatusCode,
+			"body":        string(snippet),
+		})
 	}
 	var parsed struct {
 		AccessToken string `json:"access_token"`
 		AccountID   string `json:"account_id"`
 	}
 	if err := json.Unmarshal(body, &parsed); err != nil || parsed.AccessToken == "" {
-		return "", "", fmt.Errorf("codex refresh: malformed response")
+		return "", "", herr.New(ctx, domain.ErrAuthUpstream, herr.M{
+			"reason": "codex refresh: malformed response",
+		})
 	}
 	return parsed.AccessToken, parsed.AccountID, nil
 }

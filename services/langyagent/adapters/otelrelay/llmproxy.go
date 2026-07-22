@@ -8,8 +8,11 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strconv"
 	"strings"
 
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
@@ -34,8 +37,14 @@ const codexModelPrefix = "openai_codex/"
 
 // rewriteCodexModelBody swaps the outbound request body's "model" field for
 // the turn's full provider-prefixed id on codex turns. A no-op for every
-// other turn and for bodies that don't parse as a JSON object (the proxied
-// request stands untouched).
+// other turn (checked before any read) and for bodies without a model field
+// (the proxied request stands untouched).
+//
+// The body IS buffered once: rewriting a JSON field and re-stamping
+// Content-Length both need the complete document, and a request body is
+// bounded by the model's context window anyway. The swap itself is a
+// surgical gjson/sjson field set — the messages payload is never decoded —
+// and the SSE response path streams through untouched.
 func rewriteCodexModelBody(out *http.Request, turnModel string) {
 	if !strings.HasPrefix(turnModel, codexModelPrefix) || out.Body == nil {
 		return
@@ -47,33 +56,15 @@ func rewriteCodexModelBody(out *http.Request, turnModel string) {
 		out.ContentLength = 0
 		return
 	}
-	restore := func() {
-		out.Body = io.NopCloser(bytes.NewReader(raw))
-		out.ContentLength = int64(len(raw))
-	}
-	var body map[string]json.RawMessage
-	if json.Unmarshal(raw, &body) != nil {
-		restore()
-		return
-	}
-	if _, hasModel := body["model"]; !hasModel {
-		restore()
-		return
-	}
-	encodedModel, err := json.Marshal(turnModel)
-	if err != nil {
-		restore()
-		return
-	}
-	body["model"] = encodedModel
-	rewritten, err := json.Marshal(body)
-	if err != nil {
-		restore()
-		return
+	rewritten := raw
+	if gjson.GetBytes(raw, "model").Exists() {
+		if b, err := sjson.SetBytes(raw, "model", turnModel); err == nil {
+			rewritten = b
+		}
 	}
 	out.Body = io.NopCloser(bytes.NewReader(rewritten))
 	out.ContentLength = int64(len(rewritten))
-	out.Header.Set("Content-Length", fmt.Sprintf("%d", len(rewritten)))
+	out.Header.Set("Content-Length", strconv.Itoa(len(rewritten)))
 }
 
 // handleLLM mediates one worker LLM call (phase 2): the worker's

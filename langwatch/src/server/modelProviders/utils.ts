@@ -54,13 +54,6 @@ export const getVercelAIModel = async ({
     modelProviders,
   });
 
-  // Codex never goes through the nlpgo chat-completions proxy: the codex
-  // backend is Responses-only and its OAuth session lives at the AI
-  // gateway, so the handle comes from there instead.
-  if (isCodexModel(model_)) {
-    return getCodexVercelAIModel({ projectId, model: model_, featureKey });
-  }
-
   const providerKey = model_.split("/")[0] as keyof typeof modelProviders;
   const modelProvider = modelProviders[providerKey];
 
@@ -73,6 +66,15 @@ export const getVercelAIModel = async ({
     throw new Error(
       `Model provider "${providerKey}" is configured but disabled. Go to Settings → Model Providers to enable it.`,
     );
+  }
+
+  // Codex never goes through the nlpgo chat-completions proxy: the codex
+  // backend is Responses-only and its OAuth session lives at the AI
+  // gateway, so the handle comes from there instead. The branch sits AFTER
+  // the existence/enabled guards so an explicit "openai_codex/..." model
+  // cannot bypass a disconnected or disabled provider row.
+  if (isCodexModel(model_)) {
+    return getCodexVercelAIModel({ projectId, model: model_, featureKey });
   }
 
   const litellmParams = await prepareLitellmParams({

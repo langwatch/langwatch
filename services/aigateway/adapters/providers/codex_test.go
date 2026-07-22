@@ -165,6 +165,38 @@ func TestCodexStream_RefreshesOnceOn401(t *testing.T) {
 	}
 }
 
+// A refresh grant can succeed while the fresh token is itself rejected (the
+// account was revoked between grant and use). That retry-still-401 is a dead
+// session and must surface the typed code, not the provider's raw 401.
+func TestCodexStream_StillUnauthorizedAfterRefreshIsSessionExpired(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":{"message":"invalid token"}}`))
+	}))
+	defer backend.Close()
+
+	router := codexTestRouter(backend.URL, refresherFunc(func(context.Context, string) (string, string, error) {
+		return "fresh-token", "acct-1", nil
+	}))
+
+	_, err := router.dispatchCodexStream(
+		context.Background(),
+		codexRequest(`{}`),
+		"openai_codex/gpt-5.6-terra",
+		codexCredential(),
+	)
+	var upstream *domain.UpstreamError
+	if !errors.As(err, &upstream) {
+		t.Fatalf("expected UpstreamError, got %v", err)
+	}
+	if upstream.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", upstream.StatusCode)
+	}
+	if !strings.Contains(string(upstream.Body), "codex_session_expired") {
+		t.Errorf("retry-still-401 must carry the typed code, got: %s", upstream.Body)
+	}
+}
+
 func TestCodexStream_DeadSessionSurfacesTypedError(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)

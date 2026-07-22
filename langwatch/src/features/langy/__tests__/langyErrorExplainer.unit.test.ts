@@ -74,53 +74,59 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
 
 describe("explainLangyError", () => {
   describe("given an agent failure whose reason chain carries a dead codex session", () => {
-    it("promotes to the session-expired card with the sign-in action", () => {
-      const presentation = explainLangyError(
-        domain({
-          code: "langy_agent_errored",
-          reasons: [
-            {
-              kind: "provider_error",
-              reasons: [{ kind: "codex_session_expired" }],
-            },
-          ],
-        }),
-      );
-      expect(presentation.kind).toBe("langy_codex_session_expired");
-      expect(presentation.title).toBe("Your OpenAI session expired");
-      expect(presentation.action).toEqual({
-        label: "Sign in to Codex",
-        kind: "reconnect-codex",
+    describe("when the failure is explained", () => {
+      it("promotes to the session-expired card with the sign-in action", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "provider_error",
+                reasons: [{ kind: "codex_session_expired" }],
+              },
+            ],
+          }),
+        );
+        expect(presentation.kind).toBe("langy_codex_session_expired");
+        expect(presentation.title).toBe("Your OpenAI session expired");
+        expect(presentation.action).toEqual({
+          label: "Sign in to Codex",
+          kind: "reconnect-codex",
+        });
       });
     });
   });
 
   describe("given an agent failure whose reason chain carries the plan limit", () => {
-    it("promotes to the plan-limit card suggesting another model", () => {
-      const presentation = explainLangyError(
-        domain({
-          code: "langy_agent_errored",
-          reasons: [{ kind: "usage_limit_reached" }],
-        }),
-      );
-      expect(presentation.kind).toBe("langy_codex_plan_limit");
-      expect(presentation.description).toContain("another model");
-      expect(presentation.action).toEqual({
-        label: "Try again",
-        kind: "retry",
+    describe("when the failure is explained", () => {
+      it("promotes to the plan-limit card suggesting another model", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [{ kind: "usage_limit_reached" }],
+          }),
+        );
+        expect(presentation.kind).toBe("langy_codex_plan_limit");
+        expect(presentation.description).toContain("another model");
+        expect(presentation.action).toEqual({
+          label: "Try again",
+          kind: "retry",
+        });
       });
     });
   });
 
   describe("given an agent failure with unrelated reasons", () => {
-    it("keeps the generic reply-failed card", () => {
-      const presentation = explainLangyError(
-        domain({
-          code: "langy_agent_errored",
-          reasons: [{ kind: "rate_limited" }],
-        }),
-      );
-      expect(presentation.kind).toBe("langy_agent_errored");
+    describe("when the failure is explained", () => {
+      it("keeps the generic reply-failed card", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [{ kind: "rate_limited" }],
+          }),
+        );
+        expect(presentation.kind).toBe("langy_agent_errored");
+      });
     });
   });
 

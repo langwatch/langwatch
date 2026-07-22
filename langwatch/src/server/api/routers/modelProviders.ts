@@ -4,6 +4,7 @@ import {
   scopeAssignmentSchema,
 } from "~/server/scopes/scope.types";
 import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
+import { auditLog } from "../../auditLog";
 import { CodexAccountService } from "../../modelProviders/codexAccount.service";
 import {
   CODEX_ALLOWED_FEATURE_KEYS,
@@ -319,6 +320,22 @@ export const modelProviderRouter = createTRPCRouter({
           );
         }
       }
+
+      // The response hands the connector their own account email (PII), so
+      // the connect event is audit-logged: who, where, and which scopes. The
+      // email itself deliberately stays out of the log row.
+      void auditLog({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+        action: "modelProvider.codexConnect",
+        targetKind: "modelProvider",
+        targetId: saved?.id,
+        args: {
+          scopes: input.scopes,
+          setAsCodingDefaults: input.setAsCodingDefaults,
+          plan: poll.keys.CODEX_PLAN,
+        },
+      });
 
       return {
         status: "complete" as const,
