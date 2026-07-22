@@ -110,6 +110,23 @@ describe("showErrorToast", () => {
         expect.objectContaining({ title: "Couldn't create project" }),
       );
     });
+
+    /**
+     * With no caller headline there is nothing generic worth saying, so the
+     * code goes on screen: specific, and quotable to support. "Something went
+     * wrong" would be the same sentence for every unrecognised code there will
+     * ever be.
+     */
+    it("shows the code itself when the caller named no action", () => {
+      showErrorToast({
+        error: handledError({
+          code: "dataset_import_stalled",
+          httpStatus: 500,
+        }),
+      });
+
+      expect(create.mock.calls[0]![0].title).toBe("Dataset import stalled");
+    });
   });
 
   describe("given an unhandled failure", () => {

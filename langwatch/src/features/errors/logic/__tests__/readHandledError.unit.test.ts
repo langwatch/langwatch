@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  handledShapeFromSerialized,
   readAuthoredMessage,
   readErrorTraceId,
   readHandledError,
@@ -106,6 +107,121 @@ describe("readHandledError", () => {
 
       expect(result?.tips).toEqual(["keep this"]);
     });
+
+    /**
+     * Tips ride the same relay path `meta.message` is clamped for — a Go
+     * service parses them off an upstream response body — so an upstream that
+     * answers with an essay must not get to render an essay inside our own
+     * error chrome. The alert lists every one of them.
+     */
+    it("caps how many tips an upstream can put on screen", () => {
+      const result = readHandledError(
+        trpcError({
+          code: "trace_not_found",
+          httpStatus: 404,
+          tips: ["one", "two", "three", "four", "five", "six"],
+        }),
+      );
+
+      expect(result?.tips.length).toBeLessThanOrEqual(4);
+    });
+
+    it("clamps a tip that runs to a paragraph", () => {
+      const result = readHandledError(
+        trpcError({
+          code: "trace_not_found",
+          httpStatus: 404,
+          tips: ["x".repeat(5000)],
+        }),
+      );
+
+      expect(result?.tips[0]!.length).toBeLessThan(250);
+    });
+  });
+
+  describe("given a docs link", () => {
+    it("keeps one on our own docs origin", () => {
+      const result = readHandledError(
+        trpcError({
+          code: "trace_not_found",
+          httpStatus: 404,
+          docsUrl: "https://docs.langwatch.ai/platform/data-retention",
+        }),
+      );
+
+      expect(result?.docsUrl).toBe(
+        "https://docs.langwatch.ai/platform/data-retention",
+      );
+    });
+
+    /**
+     * https alone was not enough. `docs_url` is parsed off an upstream
+     * response body with a bare `z.string()` (`nlpgo/goHandledError.ts`,
+     * `langy/streaming/langyRelayFrame.ts`), and `ErrorActions` turns it into
+     * the href behind "Read the docs" — so any-https meant a customer-
+     * configured endpoint could put its own link inside LangWatch's chrome.
+     */
+    it.each([
+      ["another origin entirely", "https://docs.evil.example/langwatch"],
+      ["a lookalike host", "https://docs.langwatch.ai.evil.example/errors"],
+      ["a javascript: url", "javascript:alert(document.cookie)"],
+      ["plain http on the right host", "http://docs.langwatch.ai/errors"],
+      ["a relative path", "/errors/query-timeout"],
+    ])("refuses %s", (_label, docsUrl) => {
+      const result = readHandledError(
+        trpcError({ code: "trace_not_found", httpStatus: 404, docsUrl }),
+      );
+
+      expect(result?.docsUrl).toBeUndefined();
+    });
+  });
+
+  describe("given a handled error from a REST route", () => {
+    /**
+     * Hono routes send the handled error FLAT — the code in `error`, `meta`
+     * spread at the top level, the trace under `trace` (see
+     * `src/app/api/middleware/error-handler.ts`). Reading only the tRPC
+     * envelope meant every one of them reached the UI as an unhandled error:
+     * no registry copy, no docs link, no trace id, for a failure the server
+     * had named precisely.
+     */
+    it("lifts the code, meta and trace id off the flat body", () => {
+      const result = readHandledError({
+        error: "dataset_name_taken",
+        message: "A dataset named 'foo' already exists",
+        datasetName: "foo",
+        tips: ["Pick a different name"],
+        docsUrl: "https://docs.langwatch.ai/datasets",
+        fault: "customer",
+        trace: { traceId: "4bf92f", spanId: "00f067" },
+      });
+
+      expect(result).toMatchObject({
+        code: "dataset_name_taken",
+        fault: "customer",
+        tips: ["Pick a different name"],
+        docsUrl: "https://docs.langwatch.ai/datasets",
+        traceId: "4bf92f",
+      });
+      // The flat body spreads meta at the top level, and the sentence rides
+      // along as `meta.message` — the channel the registry reads for a code it
+      // has no copy for.
+      expect(result?.meta).toMatchObject({
+        datasetName: "foo",
+        message: "A dataset named 'foo' already exists",
+      });
+    });
+
+    it.each([
+      ["an unhandled 500", { error: "Internal server error" }],
+      [
+        "a Prisma conflict",
+        { error: "Conflict", message: "Unique constraint" },
+      ],
+      ["a bare not-found", { error: "Not found" }],
+    ])("declines %s, whose error field is prose not a code", (_label, body) => {
+      expect(readHandledError(body)).toBeNull();
+    });
   });
 });
 
@@ -129,9 +245,56 @@ describe("readErrorTraceId", () => {
     });
   });
 
+  describe("given a REST error body", () => {
+    it("finds the id under trace, where that boundary puts it", () => {
+      expect(
+        readErrorTraceId({
+          error: "Internal server error",
+          trace: { traceId: "from-rest", spanId: "s-1" },
+        }),
+      ).toBe("from-rest");
+    });
+  });
+
   it("returns undefined rather than guessing when there is no id", () => {
     expect(readErrorTraceId({})).toBeUndefined();
     expect(readErrorTraceId(new Error("boom"))).toBeUndefined();
+  });
+});
+
+describe("handledShapeFromSerialized", () => {
+  /**
+   * The type says these fields are present; the type is a promise about our
+   * own code, not about the bytes on the wire. This is the path a relayed Go
+   * error takes, and every field on it was parsed out of an upstream body.
+   */
+  describe("given a payload missing fields its type says are there", () => {
+    it("defaults the fault rather than rendering the word undefined", () => {
+      const shape = handledShapeFromSerialized({
+        code: "provider_error",
+        kind: "provider_error",
+        httpStatus: 502,
+        traceId: undefined,
+        spanId: undefined,
+        reasons: [],
+      } as never);
+
+      expect(shape.fault).toBe("customer");
+    });
+
+    it("defaults meta to an object every registry entry can read", () => {
+      const shape = handledShapeFromSerialized({
+        code: "provider_error",
+        kind: "provider_error",
+        httpStatus: 502,
+        fault: "provider",
+        traceId: undefined,
+        spanId: undefined,
+        reasons: [],
+      } as never);
+
+      expect(shape.meta).toEqual({});
+    });
   });
 });
 

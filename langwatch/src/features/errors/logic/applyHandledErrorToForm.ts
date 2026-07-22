@@ -29,8 +29,8 @@ export const FORM_SERVER_ERROR = "root.serverError";
  * ```
  *
  * Returns `false` for anything that isn't a field-level validation failure —
- * including a `validation_error` whose fields don't exist on this form, which
- * would otherwise be silently swallowed.
+ * including a `validation_error` naming fields this form doesn't paint an
+ * input for, which would otherwise be silently swallowed.
  */
 export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   error,
@@ -57,26 +57,12 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   const fieldErrors = asFieldErrors(handled.meta.fieldErrors);
   const formErrors = asStringArray(handled.meta.formErrors);
 
-  // Only claim fields this form actually renders. Two traps here, both of
-  // which end with the user staring at a clean form and a save that didn't
-  // happen:
-  //
-  //   - zod's flatten() collapses a nested path (["version","configData"]) to
-  //     its head, so a top-level key check says "yes, I own `version`" and
-  //     sets an error on a container no input is registered against. Nothing
-  //     renders it and shouldFocus finds no ref.
-  //   - a field that is in the schema but not currently mounted is absent
-  //     from getValues().
-  //
-  // So test against a leaf value, not just a key.
-  const values = form.getValues() as Record<string, unknown>;
-  const ownsLeaf = (field: string) =>
-    Object.hasOwn(values, field) && !isPlainContainer(values[field]);
-
   const nonEmpty = Object.entries(fieldErrors).filter(
     ([, messages]) => messages.length > 0,
   );
-  const applicable = nonEmpty.filter(([field]) => ownsLeaf(field));
+  const applicable = nonEmpty.filter((entry) =>
+    isPaintedField({ form, field: entry[0] }),
+  );
 
   // Only the errors this form can actually put on screen count towards
   // claiming it. See `hasFormErrorSlot`.
@@ -114,9 +100,46 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   return claimsEverything;
 }
 
-/** An object/array value — a container, not something an input binds to. */
-function isPlainContainer(value: unknown): boolean {
-  return typeof value === "object" && value !== null;
+/**
+ * Whether an input is actually on screen for this key.
+ *
+ * The question is "can this form SHOW the complaint", and only react-hook-form
+ * knows: it records a `_f` descriptor with a live `ref` for each field an
+ * input registered and mounted. Asking `getValues()` instead answered a
+ * different question — it returns every key in the form's values, including
+ * defaults for fields no input paints — so the bridge could claim an error,
+ * set it on a key with nothing rendering it, and return `true`, suppressing
+ * the caller's toast. The user pressed Save and nothing at all happened.
+ * (One call site had already worked around this by hand.)
+ *
+ * This also settles two cases the value-shape check got wrong by construction:
+ *
+ *   - zod's flatten() collapses a nested path (["version","configData"]) to
+ *     its head, and `_fields.version` is a plain branch with no `_f` — so a
+ *     container is declined, without inspecting any value.
+ *   - a multi-select registered as ONE input holds an array value and is
+ *     perfectly renderable; ownership follows registration, not the shape of
+ *     what happens to be in the field.
+ *
+ * Reading `control._fields` is reaching past the public API, deliberately:
+ * `getFieldState` reports validation state, not whether anything is mounted,
+ * and there is no public "is this registered" question. The failure mode if
+ * the internal moves is the safe one — nothing looks painted, so every error
+ * falls through to the toast.
+ */
+function isPaintedField<TFieldValues extends FieldValues>({
+  form,
+  field,
+}: {
+  form: UseFormReturn<TFieldValues>;
+  field: string;
+}): boolean {
+  let node: unknown = (form.control as { _fields?: unknown })._fields;
+  for (const segment of field.split(".")) {
+    if (!node || typeof node !== "object") return false;
+    node = (node as Record<string, unknown>)[segment];
+  }
+  return !!(node as { _f?: { ref?: unknown } } | undefined)?._f?.ref;
 }
 
 function asFieldErrors(value: unknown): Record<string, string[]> {

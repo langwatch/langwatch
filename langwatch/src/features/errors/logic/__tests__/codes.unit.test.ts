@@ -22,16 +22,33 @@ import { describe, expect, it } from "vitest";
 
 import { APP_ERROR_CODES } from "../codes";
 
-const SRC_ROOT = join(
-  fileURLToPath(new URL("../../../../", import.meta.url)),
-  ".",
-);
+const PACKAGE_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
 
 /**
- * Codes the shared package raises rather than an app-level subclass, so no
- * amount of scanning `src/` will find their declaration.
+ * Every tree that raises a handled error, the same three the raw-toast guard
+ * walks (`noRawErrorToasts.unit.test.ts`).
+ *
+ * `src` alone was a hole with no symptom: `ee/admin/impersonation.service.ts`
+ * declares three codes and `packages/api` another, so none of the four entered
+ * `APP_ERROR_CODES`, none was required to have copy, and the exhaustive
+ * `satisfies` in `presentation.ts` had nothing to complain about. A guard that
+ * only looks where the codes already are is a guard that passes forever.
+ */
+const ROOTS = ["src", "ee", "packages"].map((dir) => join(PACKAGE_ROOT, dir));
+
+/**
+ * Codes the ROOT workspace package raises rather than an app-level subclass, so
+ * no amount of scanning the trees above will find their declaration —
+ * `@langwatch/handled-error` lives outside `langwatch/`.
  */
 const PACKAGE_OWNED_CODES = new Set(["validation_error"]);
+
+/**
+ * A path typo turns this whole guard into a no-op, and it reports that as a
+ * pass. The exact number is noise, but "we read thousands of files" and "we
+ * read none" are worlds apart, and only one of them is a working guard.
+ */
+const MINIMUM_SCANNED_FILES = 500;
 
 /**
  * The four shapes a code is declared in:
@@ -68,9 +85,13 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+function scannedFiles(): string[] {
+  return ROOTS.flatMap((root) => walk(root));
+}
+
 function declaredCodes(): Set<string> {
   const found = new Set<string>();
-  for (const file of walk(SRC_ROOT)) {
+  for (const file of scannedFiles()) {
     const source = readFileSync(file, "utf8");
     // Only files that actually deal in handled errors — `super("...")` is far
     // too common a shape to scan blind.
@@ -85,6 +106,16 @@ function declaredCodes(): Set<string> {
 }
 
 describe("APP_ERROR_CODES", () => {
+  describe("given the trees the guard walks", () => {
+    it("reads a whole codebase, not an empty directory", () => {
+      expect(
+        scannedFiles().length,
+        `The walk found almost nothing, so every assertion below passes ` +
+          `vacuously. Check the roots resolve: ${ROOTS.join(", ")}.`,
+      ).toBeGreaterThan(MINIMUM_SCANNED_FILES);
+    });
+  });
+
   describe("given the codes the source actually declares", () => {
     it("lists every code a HandledError subclass raises", () => {
       const listed = new Set<string>(APP_ERROR_CODES);
