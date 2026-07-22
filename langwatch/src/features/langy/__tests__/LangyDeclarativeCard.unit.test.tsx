@@ -136,7 +136,7 @@ describe("LangyDeclarativeCard", () => {
 
         const row = screen.getByText("Faithfulness").closest("a");
         expect(row?.getAttribute("href")).toBe(
-          "/acme/evaluators?drawer.open=evaluatorViewer&drawer.evaluatorId=eval_1",
+          "/acme/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=eval_1",
         );
       });
     });

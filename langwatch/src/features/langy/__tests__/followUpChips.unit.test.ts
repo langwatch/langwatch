@@ -195,6 +195,31 @@ describe("deriveFollowUpChips", () => {
     });
   });
 
+  describe("given an evaluator result", () => {
+    const evaluatorCreate: SettledCall = {
+      name: "langwatch.evaluator.create",
+      state: "output-available",
+      input: { command: "langwatch evaluator create --name Faithfulness" },
+      output: JSON.stringify({ id: "eval_1", name: "Faithfulness" }),
+    };
+
+    describe("when its consumers cannot carry the evaluator across", () => {
+      it("withholds the plain Experiments / Online Evaluations chips — those pages cannot show the evaluator", () => {
+        const chips = deriveFollowUpChips({
+          call: evaluatorCreate,
+          projectSlug: "demo",
+        });
+
+        expect(chips.map((chip) => chip.label)).not.toContain(
+          "Open in Experiments",
+        );
+        expect(chips.map((chip) => chip.label)).not.toContain(
+          "Open in Online Evaluations",
+        );
+      });
+    });
+  });
+
   describe("given a result that is not a trace search", () => {
     /**
      * The regression this exists to prevent. `deriveFollowUpChips` used to bail

@@ -99,6 +99,17 @@ const DESTINATION_BY_FEATURE: Record<
 };
 
 /**
+ * Result kinds whose offers never resolve at the PLAIN grade. A plain chip is
+ * "go and look" — honest only when the destination shows the thing that earned
+ * the offer. An evaluator's consumers (Experiments, Online Evaluations) open
+ * on pages that neither show the evaluator nor pick it up, so "Open in
+ * Experiments" under a just-created evaluator was navigation noise pretending
+ * to be a next step. A CARRIED offer (a builder that takes the evaluator
+ * along) would still be welcome — none exists today.
+ */
+const PLAIN_INELIGIBLE_KINDS = new Set(["evaluators"]);
+
+/**
  * The follow-up chips a settled call earns: the offers `cliFollowUps` derives,
  * routed to a destination and kept only when one exists. Choosing a chip only
  * NAVIGATES — the href carries the search across, it never acts on the user's
@@ -139,7 +150,9 @@ export function deriveFollowUpChips({
     }
 
     // Nothing to carry. Offer the surface itself, worded so it cannot be
-    // mistaken for one that brought the result along.
+    // mistaken for one that brought the result along — unless the destination
+    // could not even SHOW the result's kind, in which case no chip at all.
+    if (PLAIN_INELIGIBLE_KINDS.has(suggestion.kind)) continue;
     const surface = SURFACE_BY_FEATURE[suggestion.featureId];
     if (!surface) continue;
     const href = buildSurfaceHref({ surface, projectSlug });

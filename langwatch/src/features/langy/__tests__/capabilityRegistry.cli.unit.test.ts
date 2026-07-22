@@ -237,7 +237,7 @@ describe("buildResourceHref, given a row-level deep link", () => {
           resourceId: "evaluator_1",
         }),
       ).toBe(
-        "/acme/evaluators?drawer.open=evaluatorViewer&drawer.evaluatorId=evaluator_1",
+        "/acme/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=evaluator_1",
       );
     });
   });

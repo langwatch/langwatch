@@ -1886,7 +1886,12 @@ function LangyPanel({
         // runs on the dock too.
         isolation="isolate"
         // A peeking panel is visible and clickable — it is the affordance.
-        pointerEvents={isOpen || peeking ? "auto" : "none"}
+        // But invisible must also mean untouchable: a peek faded to zero
+        // (dismissed) still covers its corner, and a click landing on nothing
+        // visible is worse than a peek that stayed.
+        pointerEvents={
+          (isOpen || peeking) && !peekDismissed ? "auto" : "none"
+        }
         // ...and therefore must NOT be hidden from assistive tech; its body is
         // made inert instead (see the content wrapper below), so the only
         // thing reachable behind the edge is the open control.
@@ -1909,10 +1914,6 @@ function LangyPanel({
         // edge its peek sliver rests on.
         transformOrigin={floating ? "bottom right" : "right center"}
         initial={false}
-        // Invisible must also mean untouchable: a peek faded to zero still
-        // covers its corner, and a click landing on nothing visible is worse
-        // than a peek that stayed.
-        pointerEvents={peekDismissed ? "none" : undefined}
         animate={
           isOpen
             ? "open"

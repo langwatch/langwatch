@@ -131,8 +131,10 @@ function parseDrawerEntity(
       }
     }
 
-    // Evaluator viewer drawer
-    if (drawerOpen === "evaluatorViewer") {
+    // Evaluator editor drawer — the id that actually exists in drawerRegistry.
+    // (`evaluatorViewer` was a phantom id: no drawer answered to it, so links
+    // carrying it opened nothing and this branch never matched a real visit.)
+    if (drawerOpen === "evaluatorEditor") {
       const evaluatorId = url.searchParams.get("drawer.evaluatorId");
       if (evaluatorId) {
         return {

@@ -149,8 +149,11 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
   },
   evaluators: {
     path: "evaluators",
+    // `evaluatorEditor` is the drawer that actually exists (drawerRegistry.ts);
+    // an earlier cut deep-linked `evaluatorViewer`, which no drawer answers to,
+    // so "open the evaluator" landed on the list with nothing open.
     resourceHref: (base, resourceId) =>
-      `${base}?drawer.open=evaluatorViewer&drawer.evaluatorId=${encodeURIComponent(
+      `${base}?drawer.open=evaluatorEditor&drawer.evaluatorId=${encodeURIComponent(
         resourceId,
       )}`,
   },

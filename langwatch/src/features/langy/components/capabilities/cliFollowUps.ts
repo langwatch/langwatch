@@ -75,6 +75,21 @@ export const SUGGESTION_LABEL: Record<string, string> = {
 };
 
 /**
+ * Result kinds that justify NO offers, even where the map names consumers.
+ *
+ * An offer is only worth making when its destination can honour it. The map
+ * says Experiments and Online Evaluations consume `evaluators`, which is true
+ * of the FEATURES — but neither destination page can receive a specific
+ * evaluator today (no builder carries one, and the index pages don't show it),
+ * so an evaluator card's offers resolved to bare "Open in Experiments" /
+ * "Open in Online Evaluations" chips: navigation noise pretending to be a
+ * next step. The card's own "Open in Evaluators" deep link already covers
+ * where the result actually lives. Delete a kind from this set the day a
+ * destination learns to carry it.
+ */
+const UNOFFERABLE_KINDS: ReadonlySet<string> = new Set(["evaluators"]);
+
+/**
  * The offers one settled tool result justifies: every feature that consumes a
  * resource kind this result produced, minus the feature that produced it (a
  * trace search does not offer to search traces).
@@ -95,6 +110,7 @@ export function followUpsForResult(
   const seen = new Set<string>();
 
   for (const kind of source.produces) {
+    if (UNOFFERABLE_KINDS.has(kind)) continue;
     for (const consumer of featuresConsuming(kind)) {
       if (consumer.id === source.id) continue;
 
