@@ -121,8 +121,16 @@ Feature: Langy's view of a conversation is the recorded conversation itself
   # "load snapshot, fold tail, reattach the token stream" — the same mechanism
   # as any other load, not a special recovery path.
 
-  @integration
+  @integration @unimplemented
   Scenario: Refreshing mid-reply carries on from where the turn was
+    # Tracked: awaits ADR-059's token-stream reattach (Phase 3's last step,
+    # not shipped). Nothing outside `langyChatTransport.sendMessages`
+    # subscribes to `langy.onTurnStream` and `reconnectToStream()` returns
+    # null, so a cold mount never rejoins the buffered tail; no durable event
+    # carries partial answer text either (`AnswerParts` lands only on
+    # `agent_responded`), so a refresh mid-reply has no written words to show.
+    # Same gap as langy-stop-and-resume.feature's "Refreshing mid-answer
+    # rejoins the same turn and keeps streaming".
     Given Langy is midway through replying
     When I refresh the page
     Then the words already written are shown, not a blank turn

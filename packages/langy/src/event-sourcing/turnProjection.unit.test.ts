@@ -112,6 +112,74 @@ describe("the local turn projection", () => {
     });
   });
 
+  describe("when two recorded steps reach the view out of recorded order", () => {
+    // Arrival order is not a fact about the conversation — a coalesced signal,
+    // a retried tail fetch and a slow response can all deliver a step the view
+    // is already past. The cursor is what encodes the RECORDED order, so a
+    // late-arriving earlier step must never overwrite what came after it.
+    /** @scenario Recorded steps apply in recorded order, not arrival order */
+    it("settles on the later recorded step, not the later arrival", () => {
+      const recordedFirst = accepted({ id: "e1", createdAt: 100 });
+      const recordedSecond = responded({ id: "e2", createdAt: 200 });
+
+      const inRecordedOrder = applyLangyTurnEvents(initialLangyTurnProjection, [
+        recordedFirst,
+        recordedSecond,
+      ]);
+      const reversedArrival = applyLangyTurnEvents(
+        applyLangyTurnEvents(initialLangyTurnProjection, [recordedSecond]),
+        [recordedFirst],
+      );
+
+      // Folding by arrival would re-open the turn: `accepted` sets running.
+      expect(inRecordedOrder.turn?.Status).toBe("completed");
+      expect(reversedArrival.turn?.Status).toBe("completed");
+      expect(reversedArrival.turn?.EndedAt).toBe(200);
+      expect(reversedArrival.cursor).toEqual(inRecordedOrder.cursor);
+    });
+
+    it("keeps the last-written plan of the recorded order, whichever lands first", () => {
+      const earlier: LangyConversationTurnWireEvent = {
+        id: "e1",
+        createdAt: 100,
+        occurredAt: 100,
+        type: LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED,
+        data: {
+          conversationId: "c1",
+          turnId: "t1",
+          items: [{ content: "read the trace", status: "in_progress" }],
+        },
+      };
+      const later: LangyConversationTurnWireEvent = {
+        id: "e2",
+        createdAt: 200,
+        occurredAt: 200,
+        type: LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED,
+        data: {
+          conversationId: "c1",
+          turnId: "t1",
+          items: [{ content: "read the trace", status: "completed" }],
+        },
+      };
+
+      const inRecordedOrder = applyLangyTurnEvents(initialLangyTurnProjection, [
+        earlier,
+        later,
+      ]);
+      const reversedArrival = applyLangyTurnEvents(
+        applyLangyTurnEvents(initialLangyTurnProjection, [later]),
+        [earlier],
+      );
+
+      // The plan is whole-list last-write-wins, so arrival order would show
+      // the checklist un-ticking itself.
+      expect(reversedArrival).toEqual(inRecordedOrder);
+      expect(reversedArrival.turn?.Plan).toEqual([
+        { content: "read the trace", status: "completed" },
+      ]);
+    });
+  });
+
   describe("when a new turn starts", () => {
     it("replaces the document — past turns live in message history", () => {
       const first = applyLangyTurnEvents(initialLangyTurnProjection, [
