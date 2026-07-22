@@ -348,59 +348,45 @@ tr.langy-target > td:last-of-type {
    in the composer, which is the one place the reader was not looking, having
    just clicked something else entirely. So the thing itself answers.
 
-   Half a second, and gone. The whole overlay rides an opacity envelope —
-   0 → 1 → 0 — so it arrives and clears without ever having a hard edge to
-   notice. What makes it read as FLUID rather than a tint is the gradient
-   underneath it: a blurred meniscus that rises from the bottom to past the top
-   across the same beat, so the colour appears to well UP THROUGH the thing
-   while the envelope takes it away. It only rises; there is no drain, because
-   at this speed a drain reads as a stutter.
+   It ENVELOPS. The wash covers the whole cell for the whole half second and
+   only its opacity moves — 0 → 1 → 0 — so the thing is wrapped and then let
+   go. An earlier cut had it rise from the bottom like a filling vessel; that
+   drew the eye DOWNWARD to a moving front and read as a progress bar running
+   through the row, when the point is the row itself being taken.
+
+   The gradient is still a gradient rather than a flat fill, because a single
+   opaque colour reads as a selection state; a soft one that gathers at the
+   edges reads as something closing around the thing.
 
    Drawn by the layer over the target's own box and corners (see AbsorbOoze),
    never by the target, so a <tbody> can have one too — a pseudo-element there
    would generate an anonymous table box and wreck the row's geometry. */
 .langy-absorb-ooze {
   overflow: hidden;
-  animation: langy-absorb-ooze-envelope 500ms ease-out forwards;
+  animation: langy-absorb-ooze-envelope 500ms ease-in-out forwards;
 }
 
 .langy-absorb-ooze::before {
   content: "";
   position: absolute;
-  /* Wider than the box: the blurred meniscus has to arrive from off the edges,
-     or its own softness reads as a gap down the sides. */
-  left: -12%;
-  right: -12%;
-  bottom: 0;
-  height: 0%;
-  background: linear-gradient(
-    180deg,
-    rgba(168, 85, 247, 0) 0%,
-    rgba(168, 85, 247, 0.45) 16%,
-    rgba(139, 92, 246, 0.6) 58%,
-    rgba(109, 40, 217, 0.65) 100%
-  );
-  filter: blur(6px);
-  /* Decelerating: the front moves fastest as it enters, which is what a liquid
-     filling a vessel does, and it keeps climbing until it has left the top. */
-  animation: langy-absorb-ooze-rise 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes langy-absorb-ooze-rise {
-  from {
-    height: 0%;
-  }
-  to {
-    /* Past the top, so the meniscus exits rather than parking at the ceiling. */
-    height: 118%;
-  }
+  /* The whole cell, for the whole beat. Nothing here moves. */
+  inset: 0;
+  background:
+    radial-gradient(
+      120% 100% at 50% 50%,
+      rgba(168, 85, 247, 0.34) 0%,
+      rgba(139, 92, 246, 0.5) 55%,
+      rgba(109, 40, 217, 0.62) 100%
+    );
 }
 
 @keyframes langy-absorb-ooze-envelope {
   0% {
     opacity: 0;
   }
-  22% {
+  /* Closes faster than it lets go: arriving is the confirmation, leaving is
+     just getting out of the way. */
+  35% {
     opacity: 1;
   }
   100% {
@@ -408,12 +394,10 @@ tr.langy-target > td:last-of-type {
   }
 }
 
-/* Confirmation must not depend on motion. Reduced motion gets the same message
-   as one still wash on the same envelope, with nothing rising. */
+/* Confirmation must not depend on motion — reduced motion keeps the same wash
+   on a plainer envelope. */
 @media (prefers-reduced-motion: reduce) {
-  .langy-absorb-ooze::before {
-    animation: none;
-    height: 100%;
-    filter: none;
+  .langy-absorb-ooze {
+    animation: langy-absorb-ooze-envelope 500ms steps(2, end) forwards;
   }
 }
