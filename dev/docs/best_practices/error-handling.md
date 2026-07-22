@@ -164,16 +164,33 @@ already used this invite", "That name is taken" — and replacing those with
 "we've been notified" tells the user to wait for something that will never
 change. That is a worse failure than the slug it would be avoiding.
 
-It is guarded, because plenty of routers also write
-`new TRPCError({ code: "BAD_REQUEST", message: error.message })` around a caught
-failure, which would drag a driver diagnostic through the same hole at 4xx that
-#5984 closed at 5xx. `readAuthoredMessage` drops anything 5xx, anything handled,
-anything slug-shaped, anything over 200 characters, and anything carrying the
-vocabulary of a machine rather than a person (a stack frame, a SQL fragment, a
-socket errno, a URL, an IP). None of that is a substitute for throwing a
-`HandledError` — **if you can name the failure, name it** and write its copy in
-the registry. The channel is there to stop the migration destroying copy that
-was already good, not to be a place to put new copy.
+**Whether a message is authored is decided at the boundary, not guessed at by
+the client.** `errorFormatter` in `src/server/api/trpc.ts` sets
+`data.authored`, and it is the only place that can: the test needs `cause`,
+which never crosses the wire. It marks a message authored only when the error
+is unhandled, non-5xx, has no `cause`, and its message is not simply the tRPC
+code name. That excludes the two accidents that otherwise reach a customer:
+
+```ts
+new TRPCError({ code: "NOT_FOUND" })                     // message IS "NOT_FOUND"
+new TRPCError({ code: "BAD_REQUEST", cause: err })       // message is err's
+```
+
+The first put a shouted code slug in front of a customer; the second dragged a
+driver diagnostic through the same hole at 4xx that #5984 closed at 5xx. An
+earlier version of this tried to tell them apart by sniffing the message for
+machine vocabulary, which is a guess — and a guess that silently ate real copy
+("Select a template from the list" looked like SQL).
+
+`readAuthoredMessage` still applies a second layer on top of the flag (length
+cap, SCREAMING_CASE, and a deliberately conservative machine-prose pattern),
+because the cost of being wrong is a Prisma string in a toast. Anything that
+pattern rejects must be something no product person would type.
+
+None of this is a substitute for throwing a `HandledError` — **if you can name
+the failure, name it** and write its copy in the registry. The channel exists
+to stop the migration destroying copy that was already good, not to be a place
+to put new copy.
 
 ### `applyHandledErrorToForm` and `<FormServerError>` ship together
 

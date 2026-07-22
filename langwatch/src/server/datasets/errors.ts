@@ -2,6 +2,7 @@
  * Custom error types for dataset domain.
  * These are framework-agnostic and can be mapped to tRPC/HTTP errors in the router layer.
  */
+import { HandledError } from "@langwatch/handled-error";
 
 export class DatasetNotFoundError extends Error {
   constructor(message = "Dataset not found") {
@@ -30,6 +31,27 @@ export class DatasetConflictError extends Error {
   constructor(message = "A dataset with this name already exists") {
     super(message);
     this.name = "DatasetConflictError";
+  }
+}
+
+/**
+ * The handled-error form of `DatasetConflictError` (ADR-045).
+ *
+ * A duplicate dataset name is a failure we can name and the caller can act on
+ * — rename and save again — so it crosses the boundary as a stable code the
+ * client keys its copy off, not as prose the client has to match on. The
+ * domain layer still throws `DatasetConflictError`; the tRPC boundary
+ * (`withDatasetErrorHandling`) promotes it to this.
+ */
+export class DatasetNameTakenError extends HandledError {
+  declare readonly code: "dataset_name_taken";
+
+  constructor() {
+    super("dataset_name_taken", "A dataset with this name already exists", {
+      httpStatus: 409,
+      fault: "customer",
+    });
+    this.name = "DatasetNameTakenError";
   }
 }
 

@@ -121,6 +121,19 @@ Feature: Handled errors — what the customer actually reads
     And the caller's own headline names the action that failed
 
   @bdd @handled-errors @presentation
+  Scenario Outline: Only the boundary decides what counts as authored copy
+    Given a procedure fails with <shape>
+      # the test needs the error's cause, which never crosses the wire, so the
+      # client cannot make this call for itself
+    When the client surfaces it
+    Then the customer reads the calm generic message instead
+
+    Examples:
+      | shape                                              |
+      | a client error carrying no message of its own      |
+      | a client error wrapping a caught failure           |
+
+  @bdd @handled-errors @presentation
   Scenario Outline: A machine's diagnostic is not mistaken for authored copy
     Given a procedure fails with a plain client error whose message is <shape>
       # routers that wrap a caught failure in a 4xx would otherwise reopen at

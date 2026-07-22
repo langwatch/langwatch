@@ -46,7 +46,7 @@ import {
   type ConfigFormCtx,
   isNotifyEntry,
 } from "~/features/automations/providers/types";
-import { describeError, showErrorToast } from "~/features/errors";
+import { explainAnyError, showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import type { FilterParam } from "~/hooks/useFilterParams";
@@ -775,15 +775,18 @@ export function AutomationDrawer({
         },
         onError: (err) => {
           // The attempt log is the persistent record of what the toast just
-          // said, so it has to say the same thing — including the case the
-          // toast covers and a hand-rolled registry read does not: a procedure
-          // that authored its own message for the user.
+          // said, so it has to say the same thing — same title selection as
+          // `showErrorToast`: registered copy names the actual failure and
+          // wins, anything else takes the generic headline for the action.
+          const explanation = explainAnyError(err);
           pushAttempt({
             at: Date.now(),
             channel,
             status: "failure",
-            errorTitle: "Test fire failed",
-            errorDetail: describeError({ error: err }),
+            errorTitle: explanation.isRegistered
+              ? explanation.title
+              : "Test fire failed",
+            errorDetail: explanation.description,
           });
           showErrorToast({ error: err, fallbackTitle: "Test fire failed" });
         },

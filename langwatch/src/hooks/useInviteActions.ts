@@ -158,7 +158,10 @@ export function useInviteActions({
           invalidateLimits();
         },
         onError: (error) =>
-          showErrorToast({ error, fallbackTitle: "Couldn't send the invitation for approval" }),
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't send the invitation for approval",
+          }),
       },
     );
   };
@@ -262,7 +265,10 @@ export function useInviteActions({
           invalidateLimits();
         },
         onError: (error) =>
-          showErrorToast({ error, fallbackTitle: "Couldn't approve the invitation" }),
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't approve the invitation",
+          }),
       },
     );
   };
@@ -283,7 +289,10 @@ export function useInviteActions({
           invalidateLimits();
         },
         onError: (error) =>
-          showErrorToast({ error, fallbackTitle: "Couldn't reject the invitation" }),
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't reject the invitation",
+          }),
       },
     );
   };
@@ -304,7 +313,10 @@ export function useInviteActions({
           invalidateLimits();
         },
         onError: (error) =>
-          showErrorToast({ error, fallbackTitle: "Couldn't delete the invite" }),
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't delete the invite",
+          }),
       },
     );
   };
