@@ -42,7 +42,7 @@ import type { BillingCheckpointService } from "../app-layer/billing/billingCheck
 import type { BroadcastPort } from "~/server/domain/broadcast/broadcast.port";
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostPort } from "~/server/domain/evaluations/evaluation-cost.port";
-import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
+import type { EvaluationExecutionPort } from "~/server/domain/evaluations/evaluation-execution.port";
 import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-inputs-offload";
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
@@ -343,8 +343,11 @@ export interface PipelineRegistryDeps {
     spans: SpanStorageService;
   };
   evaluations: {
+    // Concrete: the composition root reads `.repository` off it to build the
+    // eval fold store. The narrow `EvaluationRunPort` serves the dispatch path;
+    // this wiring struct is the root, which may name app-layer concretes.
     runs: EvaluationRunService;
-    execution: EvaluationExecutionService;
+    execution: EvaluationExecutionPort;
   };
   organizations: OrganizationService;
   costRecorder: EvaluationCostPort;

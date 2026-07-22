@@ -5,7 +5,7 @@ import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/s
 import { slackDeliveryMethodOf } from "@langwatch/automations/providers/slack";
 import { decryptWebhookHeaders } from "~/server/app-layer/automations/providers/webhook/server";
 import type { WebhookMethod } from "@langwatch/automations/providers/webhook";
-import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import type { EvaluationRunPort } from "~/server/domain/evaluations/evaluation-run.port";
 import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { TriggerPort } from "~/server/domain/automations/trigger.port";
@@ -101,7 +101,7 @@ export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
   /** Base host for deep links inside rendered customer templates (ADR-036). */
   baseHost: string;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
-  evaluationRuns: EvaluationRunService;
+  evaluationRuns: EvaluationRunPort;
   traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
   addToAnnotationQueue: (params: {
     traceIds: string[];

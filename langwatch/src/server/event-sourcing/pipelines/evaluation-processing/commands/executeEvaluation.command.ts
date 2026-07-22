@@ -7,7 +7,7 @@ import {
 import { getAzureSafetyEnvFromProject } from "../../../../app-layer/evaluations/azure-safety-env.server";
 import { HandledError } from "@langwatch/handled-error";
 import type { EvaluationCostPort } from "~/server/domain/evaluations/evaluation-cost.port";
-import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
+import type { EvaluationExecutionPort } from "~/server/domain/evaluations/evaluation-execution.port";
 import type { MonitorPort } from "~/server/domain/monitors/monitor.port";
 import {
   buildPreconditionTraceDataFromCommand,
@@ -73,7 +73,7 @@ export interface ExecuteEvaluationCommandDeps {
   monitors: MonitorPort;
   spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string; occurredAtMs?: number }): Promise<Span[]> };
   traceEvents: { getEventsByTraceId(params: { tenantId: string; traceId: string }): Promise<ElasticSearchEvent[]> };
-  evaluationExecution: EvaluationExecutionService;
+  evaluationExecution: EvaluationExecutionPort;
   costRecorder: EvaluationCostPort;
   /**
    * Resolves Azure Content Safety credentials from the per-project

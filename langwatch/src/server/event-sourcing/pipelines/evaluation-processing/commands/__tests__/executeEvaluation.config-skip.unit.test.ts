@@ -18,7 +18,7 @@ import {
   EvaluatorInputTooLargeError,
 } from "../../../../../app-layer/evaluations/errors";
 import type { EvaluationCostPort } from "~/server/domain/evaluations/evaluation-cost.port";
-import type { EvaluationExecutionService } from "../../../../../app-layer/evaluations/evaluation-execution.service";
+import type { EvaluationExecutionPort } from "~/server/domain/evaluations/evaluation-execution.port";
 import type { MonitorPort } from "~/server/domain/monitors/monitor.port";
 import { ExecuteEvaluationCommand } from "../executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
@@ -86,7 +86,7 @@ function buildCommandWithMocks({ thrown }: { thrown: Error }) {
 
   const evaluationExecution = {
     executeForTrace: vi.fn().mockRejectedValue(thrown),
-  } as unknown as EvaluationExecutionService;
+  } as unknown as EvaluationExecutionPort;
 
   const command = new ExecuteEvaluationCommand({
     monitors,

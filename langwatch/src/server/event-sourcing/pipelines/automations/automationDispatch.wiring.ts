@@ -5,7 +5,7 @@ import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { getAnalyticsService } from "~/server/app-layer/analytics";
-import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import type { EvaluationRunPort } from "~/server/domain/evaluations/evaluation-run.port";
 import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type { TraceSummaryRepository } from "~/server/event-sourcing/ports/trace-summary.repository";
 import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
@@ -80,7 +80,7 @@ export function buildAutomationDispatchPorts({
   triggers: TriggerPort;
   emailSuppressions: EmailSuppressionService;
   projects: ProjectServicePort;
-  evaluations: { runs: EvaluationRunService };
+  evaluations: { runs: EvaluationRunPort };
   traces: { spans: SpanStorageService };
   traceSummaryRepository: TraceSummaryRepository;
 }): AutomationDispatchPorts {

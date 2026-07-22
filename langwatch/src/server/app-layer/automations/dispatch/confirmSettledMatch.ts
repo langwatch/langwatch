@@ -1,4 +1,4 @@
-import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import type { EvaluationRunPort } from "~/server/domain/evaluations/evaluation-run.port";
 import {
   evaluateQueryInMemory,
   queryNeeds,
@@ -15,7 +15,7 @@ import {
 } from "~/server/filters/triggerFilter.matcher";
 
 export interface ConfirmSettledMatchDeps {
-  evaluationRuns: EvaluationRunService;
+  evaluationRuns: EvaluationRunPort;
   deriveEvents: (params: {
     tenantId: string;
     traceId: string;

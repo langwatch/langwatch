@@ -40,7 +40,7 @@ import {
   EvaluatorNotFoundError,
   TraceNotEvaluatableError,
 } from "./errors";
-import type { EvaluationExecutionResult } from "./evaluation-execution.types";
+import type { EvaluationExecutionResult } from "~/server/domain/evaluations/evaluation-execution.types";
 
 // Evaluations need full access to trace data — no user-facing redaction.
 const INTERNAL_PROTECTIONS: Protections = {

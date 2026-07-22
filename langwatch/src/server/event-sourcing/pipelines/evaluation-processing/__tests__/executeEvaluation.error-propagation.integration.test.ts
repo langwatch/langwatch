@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Command } from "../../..";
 import type { EvaluationCostPort } from "~/server/domain/evaluations/evaluation-cost.port";
-import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
+import type { EvaluationExecutionPort } from "~/server/domain/evaluations/evaluation-execution.port";
 import type { MonitorPort } from "~/server/domain/monitors/monitor.port";
 import { createTenantId } from "../../../domain/tenantId";
 import { ExecuteEvaluationCommand } from "../commands/executeEvaluation.command";
@@ -95,7 +95,7 @@ function buildCommandWithMocks({
 
   const evaluationExecution = {
     executeForTrace,
-  } as unknown as EvaluationExecutionService;
+  } as unknown as EvaluationExecutionPort;
 
   const costRecorder = {
     recordCost: vi.fn(),
