@@ -16,12 +16,7 @@ import { motion, useAnimationFrame, useMotionValue } from "motion/react";
 import posthog from "posthog-js";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { IconType } from "react-icons";
-import {
-  LuArrowLeft,
-  LuArrowRight,
-  LuMic,
-  LuZap,
-} from "react-icons/lu";
+import { LuArrowLeft, LuArrowRight, LuMic, LuZap } from "react-icons/lu";
 import { SERIF } from "~/features/asaplangy";
 import { LangyMark } from "~/features/langy/components/LangyMark";
 import { getIsMac } from "~/features/command-bar/utils/platform";
@@ -614,13 +609,13 @@ export function HomePageBanners({
           insetInline={{ base: "-8%", md: "-14%" }}
           insetBlock={{ base: "-30%", md: "-45%" }}
           pointerEvents="none"
-          opacity={{ base: 0.3, _dark: 0.55 }}
+          opacity={{ base: 0.3, _dark: 0.45 }}
           // Softer on light. On a pale ground the mesh's bands keep their
           // edges and read as banding rather than as light; blurring takes the
           // edges off without touching the colours. Dark needs none of it —
           // the same blur there only muddies a field that already reads as
           // depth.
-          filter={{ base: "blur(15px)", _dark: "none" }}
+          filter={{ base: "blur(15px)", _dark: "blur(5px)" }}
           css={{
             maskImage:
               "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
@@ -665,61 +660,171 @@ export function HomePageBanners({
         >
           {children}
 
-          {/* What is new, as a ticker rather than a bar.
-              It sits BELOW the field now. An announcement is the least
-              important thing on a page whose job is to take a question, and it
-              was previously the first line in the block with the only coloured
-              link in it — so the eye landed on this and not on the field. */}
-          {slide ? (
-            <HStack gap={2.5} align="center" minHeight="20px" maxWidth="full">
-              <Box flexShrink={0} color="orange.fg" display="grid">
-                {slide.iconNode ?? (slide.Icon ? <slide.Icon size={14} /> : null)}
-              </Box>
-              <Text
-                fontSize="12.5px"
-                color="fg.muted"
-                truncate
-                display={{ base: "none", sm: "block" }}
-              >
-                {slide.heading}
-              </Text>
-              <chakra.button
-                type="button"
-                onClick={() => handleCta(slide)}
-                fontFamily="mono"
-                fontSize="11px"
-                color="orange.fg"
-                background="transparent"
-                borderWidth={0}
-                cursor="pointer"
-                whiteSpace="nowrap"
-                flexShrink={0}
-                _hover={{ textDecoration: "underline" }}
-              >
-                {slide.ctaLabel}
-              </chakra.button>
-              {multi ? (
-                <HStack gap={1} flexShrink={0}>
-                  {eligible.map((_, i) => (
-                    <Box
-                      key={i}
-                      as="button"
-                      aria-label={`Show announcement ${i + 1} of ${eligible.length}`}
-                      aria-current={i === active ? "true" : undefined}
-                      onClick={() => selectSlide(i)}
-                      width={i === active ? "16px" : "6px"}
-                      height="6px"
-                      borderRadius="full"
-                      background={
-                        i === active ? "fg.muted" : "border.emphasized"
-                      }
-                      transition="width 200ms ease, background 200ms ease"
-                    />
-                  ))}
-                </HStack>
-              ) : null}
-            </HStack>
-          ) : null}
+          <VStack gap={1}>
+            {/* What is new, as a ticker rather than a bar.
+                It sits BELOW the field now. An announcement is the least
+                important thing on a page whose job is to take a question, and it
+                was previously the first line in the block with the only coloured
+                link in it — so the eye landed on this and not on the field. */}
+            {/* ONE measure, held for every slide.
+                Sized to its own content the block was honest per slide and
+                awful across them: each rotation re-measured the headline, so
+                the rule and the whole ticker jumped wider and narrower every
+                nine seconds — the announcement moving is the one thing more
+                distracting than the announcement. A constant is the only width
+                that cannot pop, so the headline truncates into it instead
+                (min and max are the same thing here on purpose). Narrower than
+                the field, because a rule the full width of the hero reads as a
+                divider closing the block rather than punctuation under a
+                line. */}
+            {slide ? (
+              <VStack gap="7px" width="min(520px, 100%)" align="stretch">
+                {/* The line. One target: the arrow is the affordance, so the
+                    announcement stops carrying a second small button beside a
+                    label that already says the same thing. The verb survives as
+                    the accessible name. */}
+                <chakra.button
+                  type="button"
+                  onClick={() => handleCta(slide)}
+                  aria-label={slide.ctaLabel}
+                  display="flex"
+                  alignItems="center"
+                  gap={2.5}
+                  width="full"
+                  minHeight="20px"
+                  background="transparent"
+                  borderWidth={0}
+                  padding={0}
+                  cursor="pointer"
+                  textAlign="left"
+                  css={{
+                    "&:hover .langy-ticker-arrow": {
+                      transform: "translateX(3px)",
+                      color: "var(--chakra-colors-orange-fg)",
+                    },
+                  }}
+                >
+                  <Box flexShrink={0} color="fg.muted" display="grid">
+                    {slide.iconNode ??
+                      (slide.Icon ? <slide.Icon size={14} /> : null)}
+                  </Box>
+                  {slide.badge ? (
+                    <chakra.span
+                      flexShrink={0}
+                      fontFamily="mono"
+                      fontSize="10px"
+                      letterSpacing="0.1em"
+                      textTransform="uppercase"
+                      color="orange.fg"
+                    >
+                      {slide.badge}
+                    </chakra.span>
+                  ) : null}
+                  <Text
+                    fontSize="12.5px"
+                    color="fg.muted"
+                    truncate
+                    /* A flex child's min-width is `auto`, so without this it
+                       refuses to shrink below its own text and pushes the row
+                       wide instead of ellipsing. */
+                    minWidth={0}
+                    flex="1"
+                  >
+                    {slide.heading}
+                  </Text>
+                  <chakra.span
+                    className="langy-ticker-arrow"
+                    aria-hidden
+                    flexShrink={0}
+                    color="fg.subtle"
+                    fontSize="12px"
+                    lineHeight="1"
+                    transition="transform 130ms ease, color 130ms ease"
+                  >
+                    &#8594;
+                  </chakra.span>
+                </chakra.button>
+
+                {/* The pagination is a span waterfall — the shape this product
+                    draws all day. Each announcement gets an equal segment
+                    because each gets an equal dwell; the ones already shown
+                    read complete, the live one fills across its own dwell (the
+                    same `progress` value the auto-advance runs on, so it eases
+                    to a stop under the pointer exactly like the rotation does),
+                    and the ones ahead are still empty track. Position and
+                    countdown are one object instead of dots plus a timer. */}
+                {/* The hit area is 16px tall; the mark inside it is 2px. Bled
+                    back out with a negative margin so buying a real click
+                    target costs the layout nothing — the rule sits exactly
+                    where it did, with more pointer either side of it. A 2px
+                    target is decoration you are invited to miss. */}
+                {multi ? (
+                  <HStack
+                    gap="5px"
+                    width="full"
+                    height="16px"
+                    marginTop="-7px"
+                    marginBottom="-7px"
+                  >
+                    {eligible.map((_, i) => (
+                      <Box
+                        key={i}
+                        as="button"
+                        aria-label={`Show announcement ${i + 1} of ${eligible.length}`}
+                        aria-current={i === active ? "true" : undefined}
+                        onClick={() => selectSlide(i)}
+                        flex="1"
+                        height="full"
+                        display="flex"
+                        alignItems="center"
+                        background="transparent"
+                        cursor="pointer"
+                        // The mark answers the pointer anywhere in the tall
+                        // box, so the target reads as the size it truly is.
+                        css={{
+                          "&:hover .langy-ticker-segment": {
+                            background: "var(--chakra-colors-fg-muted)",
+                          },
+                        }}
+                      >
+                        <Box
+                          className="langy-ticker-segment"
+                          width="full"
+                          height="2px"
+                          borderRadius="full"
+                          overflow="hidden"
+                          // Three bright chunks with gaps read as a progress
+                          // control — steps to get through — which is the wrong
+                          // promise for pagination. A hairline at low alpha
+                          // recedes to being punctuation: seen when you look at
+                          // it, never competing with the sentence above.
+                          background={
+                            i < active ? "fg.muted/40" : "fg.muted/15"
+                          }
+                          transition="background 200ms ease"
+                        >
+                          {i === active ? (
+                            <motion.div
+                              style={{
+                                height: "100%",
+                                // The same orange as NEW. The accent appearing
+                                // exactly twice — the word, and the segment it
+                                // belongs to — is what ties the two rows into
+                                // one object rather than a line and a widget.
+                                background: "var(--chakra-colors-orange-fg)",
+                                scaleX: progress,
+                                transformOrigin: "left",
+                              }}
+                            />
+                          ) : null}
+                        </Box>
+                      </Box>
+                    ))}
+                  </HStack>
+                ) : null}
+              </VStack>
+            ) : null}
+          </VStack>
         </VStack>
       </Box>
     );

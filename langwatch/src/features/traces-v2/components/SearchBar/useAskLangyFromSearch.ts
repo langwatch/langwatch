@@ -37,6 +37,13 @@ export function useAskLangyFromSearch(): {
         askLangy,
         openPanel,
         attachContext,
+        // Never over the top of something the reader already started writing:
+        // they may have opened the panel, begun a question, and come back for
+        // the filter. Read at call time for the same reason the query is.
+        seedDraft: (text) => {
+          if (useLangyStore.getState().draft.trim()) return;
+          useLangyStore.getState().setDraft(text);
+        },
       });
     },
     [askLangy, openPanel, attachContext],

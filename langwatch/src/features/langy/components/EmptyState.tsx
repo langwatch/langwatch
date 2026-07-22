@@ -190,6 +190,10 @@ export function EmptyState({
   );
   return (
     <VStack
+      // The invitation belongs to a genuinely new chat. Named so the restore
+      // path can pin that it is NOT what a loading conversation shows, without
+      // the assertion resting on which greeting was picked.
+      data-testid="langy-empty-state"
       align="stretch"
       gap={0}
       // `flex="1"` fills the docked sidebar's flex column so `justify="center"`

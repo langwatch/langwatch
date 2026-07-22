@@ -106,6 +106,7 @@ import {
   FLOATING_PANEL_CSS_WIDTH,
   FLOATING_PANEL_INSET,
   LANGY_TRANSITION,
+  langyRestingFloorPx,
   PANEL_LAYOUT_TRANSITION,
   resolveFloatingPanelWidth,
   SIDEBAR_PANEL_WIDTH,
@@ -131,6 +132,10 @@ import {
 } from "../stores/langyStore";
 import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
 import { Composer } from "./Composer";
+import {
+  ConversationSkeleton,
+  skeletonMessageCount,
+} from "./ConversationSkeleton";
 import { EmptyState } from "./EmptyState";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyCardGallery } from "./LangyCardGallery";
@@ -846,6 +851,7 @@ function LangyPanel({
     isTurnInFlight: isFoldTurnInFlight,
     inFlightTurnId: foldInFlightTurnId,
     shouldAskFeedback,
+    isLoading: isLoadingHistory,
     isFetching: isFetchingHistory,
     isError: hasHistoryError,
     error: historyError,
@@ -1115,6 +1121,34 @@ function LangyPanel({
 
   const isEmpty = messages.length === 0;
 
+  // RESTORING, not starting fresh. The panel remembered which conversation was
+  // open, so the moment it mounts it already knows there is one — before the
+  // history read lands. Without this the empty state's invitation painted over
+  // a conversation the reader had already had and was swapped out a beat
+  // later, which reads as Langy having forgotten them.
+  //
+  // A queued prompt or an in-flight turn is content of its own, and a
+  // conversation whose projection has not landed yet (`unconfirmed`) is one
+  // this tab JUST created — a new chat, so the invitation is right for it.
+  const isRestoringConversation =
+    !!activeConversationId &&
+    isEmpty &&
+    !pendingPrompt &&
+    !isBusy &&
+    isLoadingHistory &&
+    !isActiveConversationUnconfirmed;
+
+  // How big that conversation is going to be. The recents list already carries
+  // every conversation's message count, so this is a known quantity rather
+  // than a guess — the placeholder holds about the right amount of column and
+  // the card opens at the size the content will need. Null while the list
+  // itself is still loading; the skeleton then falls back to its own default.
+  const restoringMessageCount = useMemo(() => {
+    if (!isRestoringConversation) return null;
+    const restored = conversations.find((c) => c.id === activeConversationId);
+    return restored?.messageCount ?? null;
+  }, [isRestoringConversation, conversations, activeConversationId]);
+
   // The empty state's asks, picked from the project's reach — the same
   // selection the home page runs (see logic/langyHomeSuggestions.ts), so a
   // project with no traces is offered ways to get set up rather than four
@@ -1146,12 +1180,18 @@ function LangyPanel({
   // bouncing back as the answer arrives.
   // A queued question is content, so the card must not drop to its empty floor
   // underneath one and bounce back up the instant the turn starts.
-  const emptyAndSettled = isEmpty && !isBusy && !pendingPrompt;
-  const restingFloorPx = emptyAndSettled
-    ? 340
-    : messages.length <= 1
-      ? 410
-      : 520;
+  // A conversation that is merely still loading is NOT an empty one: resting on
+  // the empty floor underneath its placeholder only to step up as the messages
+  // land is the same bounce this floor exists to prevent.
+  const emptyAndSettled =
+    isEmpty && !isBusy && !pendingPrompt && !isRestoringConversation;
+  // What the card has to hold: the messages it has, or — while restoring — the
+  // count the recents list says are coming.
+  const expectedMessageCount = restoringMessageCount ?? messages.length;
+  const restingFloorPx = langyRestingFloorPx({
+    emptyAndSettled,
+    expectedMessageCount,
+  });
   // High-water mark: within a single conversation the floor only ever RISES, so
   // a mid-thread send can't collapse the card down and back up as the view
   // momentarily clears and refills — the jarring full → minimised → half
@@ -1171,7 +1211,10 @@ function LangyPanel({
   // is the LIVE stream OR the durable running-turn signal, so the wash stays lit
   // through a silent-worker gap just like the thinking line does — a settled
   // conversation is just a document, no wash under the text.
-  const showWash = isEmpty || isBusy || turnActive;
+  // A conversation still loading is a document arriving, not an empty surface:
+  // lighting the wash under the placeholder only to drop it as the messages
+  // land is one more thing changing on open.
+  const showWash = (isEmpty && !isRestoringConversation) || isBusy || turnActive;
 
   // The developer-mode card gallery takes over the message column entirely —
   // it is a lens onto the card kit, not something to interleave with a real
@@ -2347,6 +2390,19 @@ function LangyPanel({
                           onAction={onHistoryErrorAction}
                         />
                       </VStack>
+                    ) : isRestoringConversation ? (
+                      // Coming back to a conversation whose messages have not
+                      // arrived. Its shape, not an invitation to start one.
+                      <VStack
+                        align="stretch"
+                        paddingX={floating ? "19px" : "14px"}
+                        paddingTop={floating ? "19px" : "14px"}
+                      >
+                        <ConversationSkeleton
+                          count={skeletonMessageCount(restoringMessageCount)}
+                          dense={!floating}
+                        />
+                      </VStack>
                     ) : isEmpty && !pendingPrompt ? (
                       // A queued question counts as content: showing the empty
                       // state's "How can I help?" over a question the reader
@@ -2509,7 +2565,20 @@ function LangyPanel({
                       must never be quieter than a success. Suppressed while the
                       inspector scrubs the past: a live failure is not part of
                       the moment being replayed. */}
-                    {timeTravel ? null : failureSurface}
+                    {/* Padded to the message column's own measure. This block
+                        sits OUTSIDE the column (it has to — a failure renders
+                        whether or not the thread has messages), and outside it
+                        there is no padding at all, so the card ran edge to edge
+                        against the panel while every message beside it was
+                        inset. */}
+                    {!timeTravel && failureSurface ? (
+                      <Box
+                        paddingX={floating ? "19px" : "14px"}
+                        paddingBottom="12px"
+                      >
+                        {failureSurface}
+                      </Box>
+                    ) : null}
                     {/* The live edge. A smooth `scrollIntoView` on this sentinel is
                   what follows the stream — see useLangyStickToBottom. */}
                     <Box ref={endRef} height="1px" aria-hidden />

@@ -17,7 +17,14 @@ export interface ProjectReach {
   hasExperiments: boolean;
 }
 
-/** How many asks the home page's capability row shows. */
+/**
+ * How many asks the home page's capability row shows.
+ *
+ * Three fits, because the row is asks and nothing else: the onboarding control
+ * is an action rather than a prompt and sits on its own line beneath them (see
+ * LangyHomeHero). While the two shared a wrapping row this had to be two, or
+ * the control orphaned onto a line of its own whenever the labels ran long.
+ */
 export const HOME_SUGGESTION_COUNT = 3;
 
 /**

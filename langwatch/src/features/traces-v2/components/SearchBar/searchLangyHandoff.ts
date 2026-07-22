@@ -2,6 +2,16 @@ import { filterContextChip } from "~/features/langy/hooks/useLangyFilterContext"
 import type { LangyAttachedContext } from "~/features/langy/stores/langyStore";
 
 /**
+ * The half-written question the ask button leaves in the composer.
+ *
+ * Deliberately an unfinished sentence: it says what this is for, and the caret
+ * lands after it with the reader's half still to write. "Ask Langy about these
+ * traces" as a full sentence would be a label, and a label in a text box reads
+ * as something already asked.
+ */
+export const SEARCH_HANDOFF_DRAFT = "Find traces where ";
+
+/**
  * The search bar's handoff to Langy — what the Ask AI composer becomes for a
  * user who has Langy (spec: specs/traces-v2/search.feature, "The search bar's
  * ask affordance belongs to Langy when Langy is available").
@@ -24,6 +34,7 @@ export function handOffSearchToLangy({
   askLangy,
   openPanel,
   attachContext,
+  seedDraft,
 }: {
   /** What is in the editor right now — becomes the question when non-empty. */
   typedText?: string;
@@ -32,13 +43,25 @@ export function handOffSearchToLangy({
   askLangy: (prompt: string) => void;
   openPanel: () => void;
   attachContext: (item: LangyAttachedContext) => void;
+  /** Seed the composer, but never over something already half-written. */
+  seedDraft: (text: string) => void;
 }): void {
   const prompt = typedText?.trim() ?? "";
 
   if (prompt) {
     askLangy(prompt);
   } else {
+    // Nothing typed, so there is no question to ask yet — opening the panel
+    // ALONE is what made this button look broken: you clicked "Ask Langy" and
+    // the only thing that happened was a panel appearing somewhere else on
+    // screen, empty, with the search you were working on left behind.
+    //
+    // Open it with the sentence already started instead. The filter rides over
+    // as context (below), so what the reader completes here is answered against
+    // the traces they were actually looking at — and starting the line is what
+    // makes it obvious Langy will write the query, rather than expecting one.
     openPanel();
+    seedDraft(SEARCH_HANDOFF_DRAFT);
   }
 
   // Attach AFTER the ask: `askLangy` resets conversation-scoped state, and the

@@ -6,6 +6,7 @@ import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { selectLangySuggestions } from "~/features/langy/logic/langyHomeSuggestions";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useHomeDevState } from "./dev/homeDevState";
+import "./homeHeroScroll.css";
 import { OnboardAgentPill } from "./OnboardAgentPill";
 import { useProjectReach } from "./useProjectReach";
 import { WelcomeHeader } from "./WelcomeHeader";
@@ -125,8 +126,14 @@ export function LangyHomeHero() {
     <VStack align="center" gap={{ base: 5, md: 6 }} width="full">
       {/* The page's one big line, and it belongs here rather than in the
           corner: on a home whose subject is a question, the greeting is who
-          the question is addressed to. */}
-      <WelcomeHeader />
+          the question is addressed to.
+
+          It is also the first thing to go on the way down the page: the
+          wrapper carries the scroll-driven drift-and-dissolve (see
+          homeHeroScroll.css), which is why the line has a box of its own. */}
+      <Box className="langy-home-greeting">
+        <WelcomeHeader />
+      </Box>
 
       <VStack align="center" gap={3} width="full" maxWidth={ASK_MEASURE}>
         <Box
@@ -166,46 +173,53 @@ export function LangyHomeHero() {
           />
         </Box>
 
-        {/* The row under the field: asks worth borrowing, and the concrete way
-            to wire an agent up. Two honest routes into the product, and on a
-            centred column they belong on the centre line together rather than
-            at opposite ends of the page.
+        {/* TWO TIERS, not one wrapping row.
+            The chips are prompts — click one and it goes to Langy. The
+            onboarding control is an ACTION: it hands you something to take
+            away, or a link to follow. They were sharing a wrapping row, so
+            whether the action ended up beside a prompt or orphaned on a line
+            of its own was decided by how long the chip labels happened to be
+            that render. Given they are different kinds, the split is the
+            composition: a settled row of asks, and the action on its own
+            centre line under them.
 
-            It keeps its height while the project's reach is still being read,
-            because there are no honest asks to show until that lands. */}
-        <Box
-          width="full"
-          minHeight={ASK_ROW_MIN_HEIGHT}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <HStack gap={2} flexWrap="wrap" justify="center">
-            {/* On a project with nothing in it, this leads. Everything else on
-                the page describes data that does not exist yet, so the one
-                control that changes that is not the quiet outline at the end of
-                the row: it comes first and it fills in. */}
-            {leadWithOnboarding ? (
-              <OnboardAgentPill
-                prominent
-                onAskLangy={canAsk ? askLangy : undefined}
-              />
-            ) : null}
-            {canAsk
-              ? suggestions.map((suggestion) => (
-                  <AskChip
-                    key={suggestion.label}
-                    icon={<suggestion.icon size={12} />}
-                    label={suggestion.label}
-                    onClick={() => askLangy(suggestion.prompt)}
-                  />
-                ))
-              : null}
-            {!leadWithOnboarding ? (
-              <OnboardAgentPill onAskLangy={canAsk ? askLangy : undefined} />
-            ) : null}
-          </HStack>
-        </Box>
+            The row keeps its height while the project's reach is still being
+            read, because there are no honest asks to show until that lands. */}
+        <VStack width="full" gap={2.5} align="center">
+          {/* On a project with nothing in it, this LEADS. Everything else on
+              the page describes data that does not exist yet, so the one
+              control that changes that comes first — which in a stack means
+              above, not merely left. */}
+          {leadWithOnboarding ? (
+            <OnboardAgentPill
+              prominent
+              onAskLangy={canAsk ? askLangy : undefined}
+            />
+          ) : null}
+          <Box
+            width="full"
+            minHeight={ASK_ROW_MIN_HEIGHT}
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <HStack gap={2} flexWrap="wrap" justify="center">
+              {canAsk
+                ? suggestions.map((suggestion) => (
+                    <AskChip
+                      key={suggestion.label}
+                      icon={<suggestion.icon size={12} />}
+                      label={suggestion.label}
+                      onClick={() => askLangy(suggestion.prompt)}
+                    />
+                  ))
+                : null}
+            </HStack>
+          </Box>
+          {!leadWithOnboarding ? (
+            <OnboardAgentPill onAskLangy={canAsk ? askLangy : undefined} />
+          ) : null}
+        </VStack>
 
         {!canAsk ? (
           <Text fontSize="12px" color="fg.subtle" textAlign="center">

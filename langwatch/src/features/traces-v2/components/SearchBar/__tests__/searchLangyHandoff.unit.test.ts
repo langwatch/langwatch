@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { handOffSearchToLangy } from "../searchLangyHandoff";
+import {
+  handOffSearchToLangy,
+  SEARCH_HANDOFF_DRAFT,
+} from "../searchLangyHandoff";
 
 /**
  * The search bar's ask affordance handed to Langy — what a typed question and
@@ -10,11 +13,13 @@ describe("handOffSearchToLangy", () => {
   const askLangy = vi.fn();
   const openPanel = vi.fn();
   const attachContext = vi.fn();
+  const seedDraft = vi.fn();
 
   beforeEach(() => {
     askLangy.mockClear();
     openPanel.mockClear();
     attachContext.mockClear();
+    seedDraft.mockClear();
   });
 
   describe("given the user typed a question", () => {
@@ -25,6 +30,7 @@ describe("handOffSearchToLangy", () => {
         askLangy,
         openPanel,
         attachContext,
+        seedDraft,
       });
 
       expect(askLangy).toHaveBeenCalledWith("why are checkout traces failing");
@@ -40,6 +46,7 @@ describe("handOffSearchToLangy", () => {
           askLangy,
           openPanel,
           attachContext,
+          seedDraft,
         });
 
         expect(askLangy).toHaveBeenCalledWith("which of these are timeouts?");
@@ -52,7 +59,43 @@ describe("handOffSearchToLangy", () => {
     });
   });
 
+  describe("given the seed", () => {
+    it("is never planted over a question the user actually typed", () => {
+      handOffSearchToLangy({
+        typedText: "why are checkout traces failing",
+        appliedQueryText: "",
+        askLangy,
+        openPanel,
+        attachContext,
+        seedDraft,
+      });
+
+      expect(seedDraft).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given nothing was typed", () => {
+    // Opening an empty panel and nothing else is what made the button look
+    // broken: you clicked "Ask Langy" and the search you were working on was
+    // simply left behind.
+    it("starts the sentence for them rather than opening an empty panel", () => {
+      handOffSearchToLangy({
+        typedText: "   ",
+        appliedQueryText: "",
+        askLangy,
+        openPanel,
+        attachContext,
+        seedDraft,
+      });
+
+      expect(openPanel).toHaveBeenCalled();
+      expect(seedDraft).toHaveBeenCalledWith(SEARCH_HANDOFF_DRAFT);
+      // An unfinished line, so the reader completes it instead of reading it
+      // as a question that has already been asked.
+      expect(SEARCH_HANDOFF_DRAFT.endsWith(" ")).toBe(true);
+      expect(askLangy).not.toHaveBeenCalled();
+    });
+
     it("opens the panel without queuing a question", () => {
       handOffSearchToLangy({
         typedText: "   ",
@@ -60,6 +103,7 @@ describe("handOffSearchToLangy", () => {
         askLangy,
         openPanel,
         attachContext,
+        seedDraft,
       });
 
       expect(openPanel).toHaveBeenCalled();
@@ -74,6 +118,7 @@ describe("handOffSearchToLangy", () => {
           askLangy,
           openPanel,
           attachContext,
+          seedDraft,
         });
 
         expect(openPanel).toHaveBeenCalled();
@@ -94,6 +139,7 @@ describe("handOffSearchToLangy", () => {
         askLangy,
         openPanel,
         attachContext,
+        seedDraft,
       });
 
       expect(askLangy).toHaveBeenCalledWith("status:error");
@@ -109,6 +155,7 @@ describe("handOffSearchToLangy", () => {
         askLangy,
         openPanel,
         attachContext,
+        seedDraft,
       });
 
       expect(attachContext).not.toHaveBeenCalled();

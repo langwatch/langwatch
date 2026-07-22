@@ -170,3 +170,42 @@ export function resolveInspectorFrame({
     borderBottomLeftRadius: "0px",
   };
 }
+
+/**
+ * The floating card's resting floor, in px.
+ *
+ * The card is deliberately short at rest and GROWS with its conversation, so
+ * an empty thread is a compact card rather than a tall stub. The sizes are
+ * steps, not a curve: nothing (340), a card holding a turn (410), a card
+ * holding a thread (520).
+ *
+ * `expectedMessageCount` is what the card has to hold — the messages it has,
+ * or, while a remembered conversation's history is still loading, the count
+ * the recents list already knows is coming. Sizing from the loaded messages
+ * alone made a restored conversation open on the empty floor and step up as
+ * its history landed, which is the same bounce the high-water mark exists to
+ * prevent — just moved to the moment of opening.
+ */
+/**
+ * The steps were tuned against plain prose answers, where a short turn really
+ * is short. A turn that ends in a CARD — an error, a capability result — needs
+ * appreciably more room than one line of text, and at the old floors the card
+ * filled the card: composer hard against it, nothing breathing. Every step is
+ * a little taller so the panel always opens with somewhere to put an answer.
+ */
+export const LANGY_FLOATING_FLOOR_EMPTY_PX = 380;
+export const LANGY_FLOATING_FLOOR_TURN_PX = 480;
+export const LANGY_FLOATING_FLOOR_THREAD_PX = 560;
+
+export function langyRestingFloorPx({
+  emptyAndSettled,
+  expectedMessageCount,
+}: {
+  emptyAndSettled: boolean;
+  expectedMessageCount: number;
+}): number {
+  if (emptyAndSettled) return LANGY_FLOATING_FLOOR_EMPTY_PX;
+  return expectedMessageCount <= 1
+    ? LANGY_FLOATING_FLOOR_TURN_PX
+    : LANGY_FLOATING_FLOOR_THREAD_PX;
+}

@@ -96,6 +96,11 @@ export function LangyContextTargetLayer() {
           Outside the ARMED gate on purpose, though — reading the list you
           already have is not the picking mode. */}
       {isOpen ? <SpotlightLayer /> : null}
+      {/* Outside the armed gate: the flourish plays for the absorb that just
+          happened, and disarming is frequently the very next thing that
+          happens (a click can end the mode). Gating it on ARMED would cut the
+          confirmation off mid-play, which is precisely when it is wanted. */}
+      {isOpen ? <AbsorbFlashLayer /> : null}
     </>
   );
 }
@@ -115,6 +120,84 @@ function SpotlightLayer() {
   const spotlightId = useLangyContextTargetStore((s) => s.spotlightId);
   if (!spotlightId) return null;
   return <TargetSpotlight targetId={spotlightId} />;
+}
+
+/**
+ * The absorb flourish: purple wells up through the thing you just handed over
+ * and is gone in half a second.
+ *
+ * Drawn as an overlay rather than by the target, for the same reason the
+ * spotlight is: a `<tbody>` cannot carry a pseudo-element without generating an
+ * anonymous table box and wrecking the row's geometry, and half the things
+ * worth absorbing are table rows. An overlay works on every element there is,
+ * costs nothing when idle, and takes no clicks.
+ */
+function AbsorbFlashLayer() {
+  const absorbFlash = useLangyContextTargetStore((s) => s.absorbFlash);
+  if (!absorbFlash) return null;
+  return (
+    <AbsorbOoze
+      key={absorbFlash.nonce}
+      targetId={absorbFlash.id}
+      nonce={absorbFlash.nonce}
+    />
+  );
+}
+
+/** How long the ooze plays. Mirrors the CSS animation — keep the two equal. */
+const ABSORB_OOZE_MS = 500;
+
+function AbsorbOoze({
+  targetId,
+  nonce,
+}: {
+  targetId: string;
+  nonce: number;
+}) {
+  const clearAbsorbFlash = useLangyContextTargetStore(
+    (s) => s.clearAbsorbFlash,
+  );
+  const [box, setBox] = useState<{ rect: DOMRect; radius: string } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const element = document.querySelector<HTMLElement>(
+      `[data-langy-target="${CSS.escape(targetId)}"]`,
+    );
+    if (element) {
+      setBox({
+        rect: element.getBoundingClientRect(),
+        // Its own corners, read rather than guessed — a squared-off wash over a
+        // rounded card reads as something spilled on the page, not absorbed
+        // into it.
+        radius: getComputedStyle(element).borderRadius || "0px",
+      });
+    }
+    // Self-clearing: the store holds the flash only for as long as it plays, so
+    // nothing has to remember to put it away.
+    const done = window.setTimeout(() => clearAbsorbFlash(nonce), ABSORB_OOZE_MS);
+    return () => window.clearTimeout(done);
+  }, [targetId, nonce, clearAbsorbFlash]);
+
+  if (!box || typeof document === "undefined") return null;
+
+  return createPortal(
+    <chakra.div
+      className="langy-absorb-ooze"
+      data-testid="langy-absorb-ooze"
+      aria-hidden
+      position="fixed"
+      top={`${box.rect.top}px`}
+      left={`${box.rect.left}px`}
+      width={`${box.rect.width}px`}
+      height={`${box.rect.height}px`}
+      borderRadius={box.radius}
+      pointerEvents="none"
+      zIndex={1249}
+    />,
+    document.body,
+  );
 }
 
 /** Follows the element: its box, and its own corners. */
