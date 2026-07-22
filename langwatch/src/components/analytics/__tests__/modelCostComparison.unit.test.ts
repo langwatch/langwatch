@@ -139,13 +139,13 @@ describe("referenceModelOptions", () => {
       expect(options).not.toContain("custom/qwen3-14b");
     });
 
-    it("still excludes it when providers is not supplied (fail closed, not open)", () => {
+    it("cannot exclude custom models when providers is not supplied", () => {
       // Without `providers` there is no way to tell a genuinely-free
-      // catalog model apart from a custom-model placeholder, so this only
-      // matters for callers that always pass `providers` (the real
-      // ModelCostComparisonCard integration does). This case documents
-      // that omitting it does NOT accidentally re-admit custom models —
-      // it just can't exclude them without the provider list.
+      // catalog model apart from a custom-model placeholder, so the
+      // exclusion can only run for callers that pass `providers` (the real
+      // ModelCostComparisonCard integration always does). This case pins
+      // that fallback: omitting the provider list re-admits the custom
+      // model, so callers must supply `providers` for the guarantee to hold.
       const options = referenceModelOptions({
         modelMetadata: {
           "custom/qwen3-14b": customModelMetadata(),
