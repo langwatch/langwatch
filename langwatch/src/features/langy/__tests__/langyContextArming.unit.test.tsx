@@ -99,6 +99,21 @@ describe("useLangyContextArming", () => {
 
         expect(armSource()).toBeNull();
       });
+
+      it("arms even while a text field is focused — a bare Shift types nothing", () => {
+        // The composer is the field you reach for this from: mid-message, you
+        // hold Shift to point at the thing on the page you are about to ask
+        // about. The `#` latch yields to typing; the Shift hold must not.
+        render(<Host />);
+        const input = document.createElement("input");
+        document.body.appendChild(input);
+
+        press("Shift", input);
+        act(() => vi.advanceTimersByTime(400));
+
+        expect(armSource()).toBe("hold");
+        input.remove();
+      });
     });
 
     describe("when the user types a capital letter", () => {
