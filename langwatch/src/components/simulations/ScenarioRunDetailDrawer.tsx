@@ -16,11 +16,7 @@ import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { buildDisplayTitle } from "~/components/suites/run-history-transforms";
-import {
-  explainHandledError,
-  readHandledError,
-  UNKNOWN_ERROR_PRESENTATION,
-} from "~/features/errors";
+import { HandledErrorAlert } from "~/features/errors";
 import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
 import { ConversationExpandContext } from "~/features/traces-v2/components/TraceDrawer/conversationView/expandContext";
 import { useDejaViewLink } from "~/hooks/useDejaViewLink";
@@ -103,13 +99,6 @@ export function ScenarioRunDetailDrawer({
           getRunStatePollInterval({ status: data?.status, sseConnected }),
       },
     );
-
-  // The drawer body is the whole error surface here, so the copy is read
-  // straight out of the registry rather than wrapped in a second Alert.
-  const runStateHandled = readHandledError(runStateError);
-  const runStateExplanation = runStateHandled
-    ? explainHandledError(runStateHandled)
-    : UNKNOWN_ERROR_PRESENTATION;
 
   // Clear streaming messages once server data includes them
   useEffect(() => {
@@ -291,16 +280,18 @@ export function ScenarioRunDetailDrawer({
                     </Text>
                   </VStack>
                 ) : (
+                  // The alert is the whole error surface here: it reads the
+                  // handled payload, an authored non-5xx message, or the
+                  // generic unknown state, and carries the tips, docs link and
+                  // copyable error id with it.
                   <VStack gap={2} align="start" w="100%" pt={4}>
                     <Drawer.CloseTrigger />
-                    <Heading size="md" color="red.500">
-                      {runStateExplanation.isRegistered
-                        ? runStateExplanation.title
-                        : "Failed to load run"}
-                    </Heading>
-                    <Text color="fg.muted" fontSize="sm">
-                      {runStateExplanation.description}
-                    </Text>
+                    <Box width="100%">
+                      <HandledErrorAlert
+                        error={runStateError}
+                        fallbackTitle="Failed to load run"
+                      />
+                    </Box>
                   </VStack>
                 )
               ) : (

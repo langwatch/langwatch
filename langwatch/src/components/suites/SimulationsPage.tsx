@@ -14,7 +14,7 @@
 import { Box, EmptyState, HStack, VStack } from "@chakra-ui/react";
 import type { SimulationSuite } from "@prisma/client";
 import { subDays } from "date-fns";
-import { Plus, TriangleAlert } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import {
@@ -41,12 +41,7 @@ import {
 } from "~/components/suites/useSuiteRouting";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
-import {
-  explainHandledError,
-  readHandledError,
-  showErrorToast,
-  UNKNOWN_ERROR_PRESENTATION,
-} from "~/features/errors";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
@@ -468,27 +463,18 @@ function MainPanel({
   highlightBatchId: string | null;
 }) {
   if (error) {
-    // The EmptyState is the page's whole error surface, so the copy is read
-    // straight out of the registry rather than wrapped in a second Alert.
-    const handled = readHandledError(error);
-    const explanation = handled
-      ? explainHandledError(handled)
-      : UNKNOWN_ERROR_PRESENTATION;
-
+    // The alert is the page's whole error surface: one component that reads
+    // the handled payload, an authored non-5xx message, or the generic unknown
+    // state, and carries the tips, docs link and copyable error id with it.
     return (
       <EmptyState.Root paddingY={12}>
         <EmptyState.Content>
-          <EmptyState.Indicator color="red.fg">
-            <TriangleAlert size={28} />
-          </EmptyState.Indicator>
-          <EmptyState.Title>
-            {explanation.isRegistered
-              ? explanation.title
-              : "Couldn't load simulations"}
-          </EmptyState.Title>
-          <EmptyState.Description maxWidth="360px" textAlign="center">
-            {explanation.description}
-          </EmptyState.Description>
+          <Box maxWidth="420px" width="100%">
+            <HandledErrorAlert
+              error={error}
+              fallbackTitle="Couldn't load simulations"
+            />
+          </Box>
         </EmptyState.Content>
       </EmptyState.Root>
     );

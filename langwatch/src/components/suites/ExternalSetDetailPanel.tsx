@@ -15,15 +15,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { FlaskConical, RefreshCw, TriangleAlert } from "lucide-react";
+import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { ShadowDivider } from "~/components/ui/ShadowDivider";
-import {
-  explainHandledError,
-  readHandledError,
-  UNKNOWN_ERROR_PRESENTATION,
-} from "~/features/errors";
+import { HandledErrorAlert } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
@@ -115,13 +111,6 @@ export function ExternalSetDetailPanel({
 
   const runData =
     runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
-
-  // The EmptyState below is this panel's whole error surface, so the copy is
-  // read straight out of the registry rather than wrapped in a second Alert.
-  const errorHandled = readHandledError(error);
-  const errorExplanation = errorHandled
-    ? explainHandledError(errorHandled)
-    : UNKNOWN_ERROR_PRESENTATION;
 
   useSuiteRunFreshness({
     scenarioSetId,
@@ -282,20 +271,19 @@ export function ExternalSetDetailPanel({
       <VStack ref={runListRef} align="stretch" gap={0} flex={1} overflow="auto">
         {isLoading && <RunHistorySkeleton />}
 
+        {/* The alert is this panel's whole error surface: one component that
+            reads the handled payload, an authored non-5xx message, or the
+            generic unknown state, and carries the tips, docs link and
+            copyable error id with it. */}
         {error && (
           <EmptyState.Root paddingY={12}>
             <EmptyState.Content>
-              <EmptyState.Indicator color="red.fg">
-                <TriangleAlert size={28} />
-              </EmptyState.Indicator>
-              <EmptyState.Title>
-                {errorExplanation.isRegistered
-                  ? errorExplanation.title
-                  : "Couldn't load run data"}
-              </EmptyState.Title>
-              <EmptyState.Description maxWidth="360px" textAlign="center">
-                {errorExplanation.description}
-              </EmptyState.Description>
+              <Box maxWidth="420px" width="100%">
+                <HandledErrorAlert
+                  error={error}
+                  fallbackTitle="Couldn't load run data"
+                />
+              </Box>
               <Button
                 size="sm"
                 variant="outline"

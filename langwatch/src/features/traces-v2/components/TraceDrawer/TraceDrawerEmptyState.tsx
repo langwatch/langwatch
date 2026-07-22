@@ -18,11 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { Tooltip } from "~/components/ui/tooltip";
-import {
-  explainHandledError,
-  readHandledError,
-  UNKNOWN_ERROR_PRESENTATION,
-} from "~/features/errors";
+import { explainAnyError, UNKNOWN_ERROR_PRESENTATION } from "~/features/errors";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 
 interface TraceDrawerEmptyStateProps {
@@ -101,10 +97,15 @@ export function TraceDrawerEmptyState({
   const kind = classifyError(error, traceId);
   const { Icon, title, description, palette } = KIND_CONFIG[kind];
   // The headline above is deliberately generic; this is the one line that says
-  // what actually failed. Only a handled error has anything to add — an
-  // unhandled one has no copy beyond what KIND_CONFIG already said.
-  const handled = readHandledError(error);
-  const detail = handled ? explainHandledError(handled) : null;
+  // what actually failed. `explainAnyError` covers all three cases — a handled
+  // code, a message the procedure authored for the user, or nothing at all —
+  // and the last of those is the one we suppress, because repeating the
+  // generic line under a generic headline is noise.
+  const explanation = explainAnyError(error);
+  const detail = explanation.description;
+  // Identity, not string comparison: `explainAnyError` returns the shared
+  // UNKNOWN constant itself when it had nothing of its own to say.
+  const hasDetail = !!error && explanation !== UNKNOWN_ERROR_PRESENTATION;
   const { copied, copy } = useCopyToClipboard();
 
   const handleCopy = () => {
@@ -220,11 +221,9 @@ export function TraceDrawerEmptyState({
         </Button>
       </HStack>
 
-      {kind === "load-failed" && detail && (
+      {kind === "load-failed" && hasDetail && (
         <Text textStyle="2xs" color="fg.subtle" maxWidth="360px" paddingTop={1}>
-          {detail.description
-            ? `${detail.title}. ${detail.description}`
-            : detail.title}
+          {detail}
         </Text>
       )}
     </VStack>

@@ -39,10 +39,7 @@ describe("buildTargetMetadata", () => {
   describe("given a target with a localPromptConfig model", () => {
     it("attributes the model from localPromptConfig even when a loaded prompt exists", () => {
       const loadedPrompts = new Map([
-        [
-          "prompt-1",
-          { name: "Saved Prompt", model: "openai/saved-model" },
-        ],
+        ["prompt-1", { name: "Saved Prompt", model: "openai/saved-model" }],
       ]) as unknown as Map<string, VersionedPrompt>;
 
       const [target] = buildTargetMetadata({

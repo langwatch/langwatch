@@ -53,8 +53,8 @@ import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
 import { nodeErrorToDomainError } from "./nodeErrorDomain";
 import {
   extractTargetOutput,
-  mapErrorEvent,
   mapNlpEvent,
+  mapThrownErrorEvent,
   mapWorkflowEvaluatorResult,
   type ResultMapperConfig,
 } from "./resultMapper";
@@ -1284,7 +1284,11 @@ export async function* executeCell(
       { error, rowIndex: cell.rowIndex, targetId: cell.targetId },
       "Cell execution failed",
     );
-    yield mapErrorEvent((error as Error).message, cell.rowIndex, cell.targetId);
+    yield mapThrownErrorEvent({
+      error,
+      rowIndex: cell.rowIndex,
+      targetId: cell.targetId,
+    });
   }
 }
 
@@ -1422,6 +1426,11 @@ export async function* executeWorkflowCell(
               outputs: execution_state.outputs,
               cost: execution_state.cost,
               error: execution_state.error,
+              // The coded half of the failure — without it the evaluator cell
+              // renders the engine's raw message verbatim.
+              error_type: execution_state.error_type,
+              upstream_status: execution_state.upstream_status,
+              trace_id: execution_state.trace_id ?? finalTraceId,
             },
           ),
         );
@@ -1460,7 +1469,11 @@ export async function* executeWorkflowCell(
       { error, rowIndex: cell.rowIndex, targetId: cell.targetId },
       "Workflow cell execution failed",
     );
-    yield mapErrorEvent((error as Error).message, cell.rowIndex, cell.targetId);
+    yield mapThrownErrorEvent({
+      error,
+      rowIndex: cell.rowIndex,
+      targetId: cell.targetId,
+    });
   }
 }
 

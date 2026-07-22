@@ -15,17 +15,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { FlaskConical, RefreshCw, TriangleAlert } from "lucide-react";
+import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import { toaster } from "~/components/ui/toaster";
-import {
-  explainHandledError,
-  readHandledError,
-  showErrorToast,
-  UNKNOWN_ERROR_PRESENTATION,
-} from "~/features/errors";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
@@ -331,27 +326,18 @@ export function RunHistoryPanel({
   // --- Render ---
 
   if (error) {
-    // The EmptyState is this panel's whole error surface, so the copy is read
-    // straight out of the registry rather than wrapped in a second Alert.
-    const handled = readHandledError(error);
-    const explanation = handled
-      ? explainHandledError(handled)
-      : UNKNOWN_ERROR_PRESENTATION;
-
+    // The alert is this panel's whole error surface: one component that reads
+    // the handled payload, an authored non-5xx message, or the generic unknown
+    // state, and carries the tips, docs link and copyable error id with it.
     return (
       <EmptyState.Root paddingY={12}>
         <EmptyState.Content>
-          <EmptyState.Indicator color="red.fg">
-            <TriangleAlert size={28} />
-          </EmptyState.Indicator>
-          <EmptyState.Title>
-            {explanation.isRegistered
-              ? explanation.title
-              : "Couldn't load runs"}
-          </EmptyState.Title>
-          <EmptyState.Description maxWidth="360px" textAlign="center">
-            {explanation.description}
-          </EmptyState.Description>
+          <Box maxWidth="420px" width="100%">
+            <HandledErrorAlert
+              error={error}
+              fallbackTitle="Couldn't load runs"
+            />
+          </Box>
           <Button size="sm" variant="outline" onClick={() => void refetch()}>
             <RefreshCw size={14} /> Try again
           </Button>

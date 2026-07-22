@@ -77,8 +77,9 @@ export interface ExecutionState {
   /**
    * The raw engineer-facing failure message. Kept for the studio's debug
    * panel and logs, but it can name a URL or a Go net error, so it is NOT
-   * rendered to a customer — the control plane presents from `error_type`
-   * (see ADR-045, `src/features/errors`).
+   * rendered to a customer — both the control plane and the studio present
+   * from `error_type` (see ADR-045, `src/features/errors`, and the studio's
+   * `utils/executionStateError`).
    */
   error?: string;
   /**
@@ -387,6 +388,10 @@ export type Workflow = {
       run_id?: string;
       status?: ExecutionStatus;
       error?: string;
+      /** Stable failure code — mirrors `ExecutionState.error_type`. */
+      error_type?: string;
+      /** Upstream HTTP status, when an HTTP node got a non-2xx. */
+      upstream_status?: number;
       progress?: number;
       total?: number;
       timestamps?: {

@@ -1,7 +1,11 @@
 import { useCallback, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { toaster } from "~/components/ui/toaster";
-import { explainSerializedError, showErrorToast } from "~/features/errors";
+import {
+  describeError,
+  explainSerializedError,
+  showErrorToast,
+} from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import type {
@@ -307,7 +311,20 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           });
           break;
 
-        case "error":
+        case "error": {
+          // A coded frame reads from the registry; an uncoded one carries the
+          // engine's own diagnostic (missing column, evaluator crash), which
+          // the server already vetted as safe to show and which is the only
+          // thing that tells the user what to change.
+          const coded = event.domainError
+            ? explainSerializedError(event.domainError)
+            : null;
+          const detail = coded
+            ? coded.description
+              ? `${coded.title}. ${coded.description}`
+              : coded.title
+            : event.message;
+
           if (event.rowIndex !== undefined && event.targetId) {
             if (event.evaluatorId) {
               // Evaluator error
@@ -318,31 +335,32 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
                 {
                   status: "error",
                   error_type: "EvaluatorError",
-                  details: event.message,
+                  details: detail,
                   traceback: [],
+                  ...(event.domainError
+                    ? { domainError: event.domainError }
+                    : {}),
                 },
               );
             } else {
               // Target error
-              updateTargetError(event.rowIndex, event.targetId, event.message);
+              updateTargetError(event.rowIndex, event.targetId, detail);
             }
           } else {
             // Fatal error
-            setError(event.message);
+            setError(detail);
             setResults({ status: "error" });
-            // `event` is a stream frame, not an error — it has no handled
-            // payload, so showErrorToast would replace the engine's own
-            // diagnostic (missing column, evaluator crash) with "we've been
-            // notified". That message is the only thing that tells the user
-            // what to change.
             toaster.create({
-              title: "Couldn't finish the evaluation",
-              description: event.message,
+              title: coded?.title ?? "Couldn't finish the evaluation",
+              description: coded
+                ? coded.description || undefined
+                : event.message,
               type: "error",
               meta: { closable: true },
             });
           }
           break;
+        }
 
         case "stopped":
           setStatus("stopped");
@@ -726,7 +744,15 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           chunkTimeout: 300_000, // 5min between events
           onError: (err) => {
             setStatus("error");
-            setError(err.message);
+            // `error` is exported hook state that ends up on screen, so it gets
+            // the same treatment as the toast: registry copy, never the wire
+            // message (which is the code slug for a handled failure).
+            setError(
+              describeError({
+                error: err,
+                fallbackTitle: "Couldn't run the evaluation",
+              }),
+            );
             setIsAborting(false); // Clear aborting state on error
             cleanupThisExecution();
             showErrorToast({
@@ -739,9 +765,13 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         // Clean up this execution's cells when SSE completes
         cleanupThisExecution();
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
         setStatus("error");
-        setError(message);
+        setError(
+          describeError({
+            error: err,
+            fallbackTitle: "Couldn't run the evaluation",
+          }),
+        );
         setIsAborting(false); // Clear aborting state on error
         cleanupThisExecution();
       }
