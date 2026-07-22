@@ -248,7 +248,10 @@ describe(
       });
       recordProgress = async (conversationId: string) => {
         const progress = recordedSteps(conversationId).at(-1)!;
-        await subscriber.handle(progress);
+        await subscriber.handle(progress, {
+          tenantId: progress.tenantId,
+          aggregateId: String(progress.aggregateId),
+        });
       };
     });
 
