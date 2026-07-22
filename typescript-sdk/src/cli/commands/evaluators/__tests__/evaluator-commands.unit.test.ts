@@ -277,7 +277,7 @@ describe("createEvaluatorCommand() catalog-miss shape under machine formats", ()
     };
     expect(doc.ok).toBe(false);
     expect(doc.error.code).toBe("validation_error");
-    const [reason] = doc.error.reasons;
+    const reason = doc.error.reasons[0]!;
     expect(reason.kind).toBe("schema_failure");
     expect(reason.meta.field).toBe("type");
     expect(reason.meta.expected).toContain("ragas/response_relevancy");
@@ -295,7 +295,7 @@ describe("listEvaluatorTypesCommand()", () => {
 
   describe("when listing the embedded catalog", () => {
     it("returns every type with slug, name, and category without any API call", async () => {
-      const { listEvaluatorTypesCommand } = await import("../types");
+      const { listEvaluatorTypesCommand } = await import("../types.js");
 
       const result = listEvaluatorTypesCommand();
 
