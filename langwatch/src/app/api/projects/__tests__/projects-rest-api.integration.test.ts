@@ -250,6 +250,7 @@ describe("Feature: Projects REST API", () => {
       expect(body.pagination.page).toBe(1);
     });
 
+    /** @scenario Listing projects never discloses base keys */
     it("does not include apiKey in list response", async () => {
       await api.post("/api/projects", {
         name: `List Test ${nanoid(6)}`,
@@ -275,6 +276,7 @@ describe("Feature: Projects REST API", () => {
   });
 
   describe("GET /api/projects/:id", () => {
+    /** @scenario Reading a project never discloses its base key */
     it("returns a project without apiKey", async () => {
       const createRes = await api.post("/api/projects", {
         name: `Get Test ${nanoid(6)}`,
@@ -531,12 +533,20 @@ describe("Feature: Projects REST API", () => {
       projectId = await createProject();
     });
 
+    /** @scenario A caller who can change the project reads the base key */
     it("returns the base key to a caller who can update the project", async () => {
+      const stored = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { apiKey: true },
+      });
+
       const res = await api.get(`/api/projects/${projectId}/api-key`);
+
       expect(res.status).toBe(200);
-      expect((await res.json()).apiKey).toBeTruthy();
+      expect((await res.json()).apiKey).toBe(stored!.apiKey);
     });
 
+    /** @scenario A read-only credential cannot read the base key */
     it("refuses a caller who can only view the project", async () => {
       const token = await mintKey(["project:view"], testOrganization.id);
 
@@ -550,6 +560,7 @@ describe("Feature: Projects REST API", () => {
       expect(await res.text()).not.toContain(stored!.apiKey);
     });
 
+    /** @scenario Permission is checked against the requested project */
     it("refuses a project-scoped caller asking about a sibling project", async () => {
       const sibling = await createProject();
       const token = await mintKey(["project:update"], projectId);
@@ -567,6 +578,7 @@ describe("Feature: Projects REST API", () => {
       expect(await other.text()).not.toContain(stored!.apiKey);
     });
 
+    /** @scenario A project in another organization is not disclosed */
     it("reports a project in another organization as not found", async () => {
       const otherOrg = await prisma.organization.create({
         data: { name: "Other Org", slug: `--test-other-${nanoid(8)}` },
