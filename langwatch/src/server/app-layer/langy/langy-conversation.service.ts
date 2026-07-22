@@ -13,6 +13,7 @@ import {
   type TenantId,
 } from "~/server/event-sourcing/domain/tenantId";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
 import {
   langyAgentErrorFromErrorFrame,
   serializeLangyTurnError,
@@ -64,14 +65,17 @@ export type { LangyConversationRepository as LangyConversationReadRepository } f
 
 /**
  * Narrow read port over the canonical event log, for the tail read (ADR-059).
- * Structurally satisfied by `EventStore.getEvents` — the service never sees
- * appends, pagination internals, or other aggregates.
+ * Structurally satisfied by `EventStore.getEventsOccurredSince` — the service
+ * never sees appends, pagination internals, or other aggregates. The explicit
+ * lower bound is what lets ClickHouse prune weekly partitions instead of
+ * cold-scanning a long conversation's whole history on every tail fetch.
  */
 export interface LangyConversationEventsReader {
-  getEvents(
+  getEventsOccurredSince(
     aggregateId: string,
     context: { tenantId: TenantId },
     aggregateType: "langy_conversation",
+    occurredAtFromMs: number,
   ): Promise<readonly LangyConversationProcessingEvent[]>;
 }
 
@@ -273,10 +277,13 @@ export class LangyConversationService {
    * server-only fields, so the wire schema is secure by construction — spine
    * events (which carry `runToken` / handoff tokens) never enter this read.
    *
-   * Served from the same per-conversation event read the folds use (bounded,
-   * deduplicated, `(acceptedAt, eventId)`-ordered) and filtered by the shared
-   * cursor comparator; a strict-after storage read is a drop-in optimization
-   * behind this contract if conversations ever outgrow it.
+   * Served from a partition-pruned storage read: the cursor's `acceptedAt` is
+   * the event's ACCEPT time, storage's lower bound is on OCCURRED time, and an
+   * event accepted after the cursor may have occurred earlier (delayed relays,
+   * replays) — so the floor sits a full rehydration window below the cursor.
+   * Still strictly filtered by the shared cursor comparator in memory; the
+   * bound only exists so ClickHouse skips the weekly partitions a long
+   * conversation left behind.
    */
   async getEventsAfter({
     projectId,
@@ -306,10 +313,11 @@ export class LangyConversationService {
     // durable events at all — an empty tail is the honest answer.
     if (!this.events) return { events: [], cursor: after, truncated: false };
 
-    const all = await this.events.getEvents(
+    const all = await this.events.getEventsOccurredSince(
       conversationId,
       { tenantId: createTenantId(projectId) },
       "langy_conversation",
+      Math.max(0, after.acceptedAt - REHYDRATION_WINDOW_MS),
     );
 
     const turnTypes: readonly string[] = LANGY_CONVERSATION_TURN_EVENT_TYPES;

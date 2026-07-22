@@ -63,12 +63,16 @@ export class EventRepositoryMemory implements EventRepository {
       return false;
     });
 
-    // Sort by timestamp then eventId to ensure consistent ordering
+    // Sort by timestamp then eventId to ensure consistent ordering. The id
+    // tie-break is plain relational (byte-wise), never localeCompare: it must
+    // order exactly like ClickHouse's `ORDER BY EventTimestamp, EventId` and
+    // the shared cursor comparator, or a same-millisecond tie folds in a
+    // different order in tests than in prod.
     const sortedRecords = [...filteredRecords].sort((a, b) => {
       if (a.EventTimestamp !== b.EventTimestamp) {
         return a.EventTimestamp - b.EventTimestamp;
       }
-      return a.EventId.localeCompare(b.EventId);
+      return a.EventId < b.EventId ? -1 : a.EventId > b.EventId ? 1 : 0;
     });
 
     // Return a copy to prevent mutation

@@ -810,11 +810,16 @@ export const useLangyStore = create<LangyState>()(
           );
           // Refresh-resume: the durable record names a turn in flight and this
           // tab tracks none — adopt it so Stop targets it and live signals
-          // route to it. Guarded so a mid-send tab never gets clobbered.
+          // route to it. `activeTurnId === null` keeps a mid-send tab from
+          // being clobbered; requiring the seed to have ADVANCED the fold
+          // (the reducer returns the same reference for a stale snapshot)
+          // keeps a lagging refetch from resurrecting a finished turn. Never
+          // guard on the phase: the observeBackendTurn effect flips it to
+          // `active` in this same commit, before this reducer runs.
           const adoptTurnId =
             snapshot.currentTurnId &&
             s.activeTurnId === null &&
-            s.turnPhase === "idle"
+            turnProjection !== s.turnProjection
               ? snapshot.currentTurnId
               : null;
           // The phase reducers return the WHOLE state (`{...state, ...}`), so

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
 import {
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
@@ -547,7 +548,7 @@ describe("LangyConversationService", () => {
   describe("getEventsAfter — the tail the browser folds (ADR-059)", () => {
     // Fixtures only need to satisfy the reader port structurally.
     const makeEvents = (events: unknown[]) => ({
-      getEvents: vi.fn(async () => events as never),
+      getEventsOccurredSince: vi.fn(async () => events as never),
     });
 
     const visibleRepo = () =>
@@ -594,7 +595,7 @@ describe("LangyConversationService", () => {
             after: { acceptedAt: 0, eventId: "" },
           }),
         ).rejects.toThrow(LangyConversationNotFoundError);
-        expect(events.getEvents).not.toHaveBeenCalled();
+        expect(events.getEventsOccurredSince).not.toHaveBeenCalled();
       });
     });
 
@@ -634,6 +635,45 @@ describe("LangyConversationService", () => {
         expect(result.events.map((e) => e.id)).toEqual(["e3"]);
         expect(result.cursor).toEqual({ acceptedAt: 300, eventId: "e3" });
         expect(result.truncated).toBe(false);
+      });
+
+      it("floors the storage read a rehydration window below the cursor, never negative", async () => {
+        // The bound is on OCCURRED time while the cursor is on ACCEPT time,
+        // so it must sit a full safety window below the cursor — pruning old
+        // partitions without ever excluding a delayed event's occurred-at.
+        const events = makeEvents([]);
+        const svc = new LangyConversationService(
+          visibleRepo(),
+          makeCommands(),
+          undefined,
+          events,
+        );
+        const acceptedAt = REHYDRATION_WINDOW_MS + 5_000;
+        await svc.getEventsAfter({
+          projectId: "p1",
+          conversationId: "c1",
+          userId: "alice",
+          after: { acceptedAt, eventId: "e1" },
+        });
+        expect(events.getEventsOccurredSince).toHaveBeenCalledWith(
+          "c1",
+          expect.anything(),
+          "langy_conversation",
+          5_000,
+        );
+
+        await svc.getEventsAfter({
+          projectId: "p1",
+          conversationId: "c1",
+          userId: "alice",
+          after: { acceptedAt: 10, eventId: "e1" },
+        });
+        expect(events.getEventsOccurredSince).toHaveBeenLastCalledWith(
+          "c1",
+          expect.anything(),
+          "langy_conversation",
+          0,
+        );
       });
 
       it("tie-breaks same-millisecond events by event id, byte-wise", async () => {
