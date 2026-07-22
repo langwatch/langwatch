@@ -21,6 +21,7 @@
  *
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  */
+import { HandledError } from "@langwatch/handled-error";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -30,12 +31,12 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "../../../db";
-import { appRouter } from "../../root";
-import { createInnerTRPCContext } from "../../trpc";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 
 describe("virtualKeys.update — guardrail attach", () => {
   const ns = `vkgr-${nanoid(8)}`;
@@ -146,7 +147,9 @@ describe("virtualKeys.update — guardrail attach", () => {
         displayPrefix: "vk-lw-01HZX9N",
         createdById: USER_ID,
         config: {},
-        scopes: { create: [{ scopeType: "PROJECT", scopeId: DEMO_PROJECT_ID }] },
+        scopes: {
+          create: [{ scopeType: "PROJECT", scopeId: DEMO_PROJECT_ID }],
+        },
       },
     });
 
@@ -224,10 +227,14 @@ describe("virtualKeys.update — guardrail attach", () => {
     });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.teamUser.deleteMany({ where: { team: { organizationId: ORG_ID } } });
+    await prisma.teamUser.deleteMany({
+      where: { team: { organizationId: ORG_ID } },
+    });
     await prisma.project.deleteMany({ where: { teamId: TEAM_ID } });
     await prisma.team.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.user.deleteMany({
       where: { id: { in: [USER_ID, NOATTACH_USER_ID] } },
     });
@@ -254,8 +261,8 @@ describe("virtualKeys.update — guardrail attach", () => {
         where: { id: VK_ID },
       });
       expect(
-        (vk.config as { guardrailAttachments?: unknown[] }).guardrailAttachments ??
-          [],
+        (vk.config as { guardrailAttachments?: unknown[] })
+          .guardrailAttachments ?? [],
       ).toEqual([]);
     });
   });
@@ -277,7 +284,9 @@ describe("virtualKeys.update — guardrail attach", () => {
               { direction: "pre", guardrailIds: [DEMO_GUARDRAIL_ID] },
             ],
           },
-          scopes: { create: [{ scopeType: "PROJECT", scopeId: DEMO_PROJECT_ID }] },
+          scopes: {
+            create: [{ scopeType: "PROJECT", scopeId: DEMO_PROJECT_ID }],
+          },
         },
       });
 
@@ -337,8 +346,11 @@ describe("virtualKeys.update — guardrail attach", () => {
   describe("when the caller lacks gatewayGuardrails:attach on the project", () => {
     /** @scenario gatewayGuardrails:attach is required on the VK side to wire a guardrail to a VK */
     it("rejects with a handled guardrail_attach_forbidden", async () => {
-      await expect(
-        noAttachCaller.virtualKeys.update({
+      // On `code`, not the message: `createCaller` bypasses the HTTP
+      // errorFormatter, so what surfaces here is the HandledError itself and
+      // its message is server copy — which is free to change.
+      const rejection = await noAttachCaller.virtualKeys
+        .update({
           organizationId: ORG_ID,
           id: VK_ID,
           config: {
@@ -346,8 +358,19 @@ describe("virtualKeys.update — guardrail attach", () => {
               { direction: "pre", guardrailIds: [DEMO_GUARDRAIL_ID] },
             ],
           },
-        }),
-      ).rejects.toThrow(/guardrail_attach_forbidden/);
+        })
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+
+      // tRPC wraps a thrown error and hangs the original off `cause` — which
+      // is exactly where `trpc.ts`'s errorFormatter reads it from to build the
+      // wire payload, so this asserts the same thing the client will see.
+      const cause = (rejection as { cause?: unknown })?.cause;
+      expect(HandledError.isHandled(cause)).toBe(true);
+      expect((cause as HandledError).code).toBe("guardrail_attach_forbidden");
+      expect((cause as HandledError).httpStatus).toBe(403);
     });
 
     // Guards against a false-green: the denial must come from the
