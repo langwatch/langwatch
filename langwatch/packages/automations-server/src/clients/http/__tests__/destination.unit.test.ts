@@ -1,13 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DispatchError } from "@langwatch/dispatch-error";
-import { ssrfSafeFetch } from "~/utils/ssrfProtection";
-import { sendHttpDestination } from "../httpDestination";
+import {
+  sendHttpDestination,
+  type EgressFetchInit,
+  type EgressResponse,
+  type HttpEgress,
+} from "../destination";
 
-vi.mock("~/utils/ssrfProtection", () => ({ ssrfSafeFetch: vi.fn() }));
+const mockedFetch =
+  vi.fn<(url: string, init?: EgressFetchInit) => Promise<EgressResponse>>();
+const fakeEgress: HttpEgress = {
+  safeFetch: mockedFetch,
+  fetchWithResolvedIp: vi.fn(),
+};
 
-const mockedFetch = vi.mocked(ssrfSafeFetch);
-
-type MockedResponse = Awaited<ReturnType<typeof ssrfSafeFetch>>;
+type MockedResponse = EgressResponse;
 
 /**
  * A REAL Response, so `body` is a real ReadableStream — the primitive reads the
@@ -36,6 +43,7 @@ function endlessBody(): { stream: ReadableStream<Uint8Array>; wasCancelled: () =
 
 const send = (overrides?: { maxResponseBytes?: number }) =>
   sendHttpDestination({
+    egress: fakeEgress,
     url: "https://example.com/hook",
     body: "{}",
     contextLabel: "test",

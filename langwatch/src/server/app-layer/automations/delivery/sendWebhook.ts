@@ -12,7 +12,8 @@ import {
   createSSRFValidator,
   isPrivateOrLocalhostIP,
 } from "~/utils/ssrfProtection";
-import { sendHttpDestination } from "./httpDestination";
+import { sendHttpDestination } from "@langwatch/automations-server/clients/http/destination";
+import { appHttpEgress } from "./appHttpEgress";
 
 /**
  * The webhook channel's SSRF policy (ADR-040 §4): private-IP / localhost
@@ -156,6 +157,7 @@ export async function sendWebhook({
   // for a test fire, which has no retries to dedupe.
   const resolvedEventId = eventId ?? randomUUID();
   const response = await sendHttpDestination({
+    egress: appHttpEgress,
     url,
     method,
     headers: {

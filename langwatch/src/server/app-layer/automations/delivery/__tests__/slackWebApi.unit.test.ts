@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DispatchError } from "@langwatch/dispatch-error";
-import { sendHttpDestination } from "../httpDestination";
+import { sendHttpDestination } from "@langwatch/automations-server/clients/http/destination";
 import { listSlackChannels, postSlackChatMessage } from "../slackWebApi";
 
-vi.mock("../httpDestination", () => ({ sendHttpDestination: vi.fn() }));
+vi.mock("@langwatch/automations-server/clients/http/destination", () => ({
+  sendHttpDestination: vi.fn(),
+}));
 
 const mockedSend = vi.mocked(sendHttpDestination);
 

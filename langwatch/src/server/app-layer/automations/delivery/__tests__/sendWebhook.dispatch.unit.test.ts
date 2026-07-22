@@ -5,11 +5,13 @@ import { DispatchError } from "@langwatch/dispatch-error";
 // sendWebhook's ORCHESTRATION (event-id header, dispatch cap, Retry-After
 // threading) without a network call. The executed SSRF blocks live in
 // sendWebhook.unit.test.ts, which uses the real transport.
-vi.mock("../httpDestination", () => ({ sendHttpDestination: vi.fn() }));
+vi.mock("@langwatch/automations-server/clients/http/destination", () => ({
+  sendHttpDestination: vi.fn(),
+}));
 vi.mock("~/server/rateLimit", () => ({ rateLimit: vi.fn() }));
 
 import { rateLimit } from "~/server/rateLimit";
-import { sendHttpDestination } from "../httpDestination";
+import { sendHttpDestination } from "@langwatch/automations-server/clients/http/destination";
 import {
   assertWebhookDelivered,
   sendWebhook,

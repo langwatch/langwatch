@@ -1,12 +1,4 @@
-import {
-  DispatchError,
-  parseRetryAfterMs,
-} from "@langwatch/dispatch-error";
-import {
-  fetchWithResolvedIp,
-  ssrfSafeFetch,
-  type SSRFValidationResult,
-} from "~/utils/ssrfProtection";
+import { DispatchError, parseRetryAfterMs } from "@langwatch/dispatch-error";
 
 /** Total-request timeout — a slowloris endpoint can't pin a worker slot. */
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -14,7 +6,42 @@ const DEFAULT_TIMEOUT_MS = 10_000;
  *  so a hostile endpoint can't stream gigabytes into memory. */
 const DEFAULT_MAX_RESPONSE_BYTES = 64 * 1024;
 
-export interface HttpDestinationRequest {
+export interface EgressResponseHeaders {
+  entries(): IterableIterator<[string, string]>;
+  get(name: string): string | null;
+}
+
+export interface EgressResponse {
+  status: number;
+  body: ReadableStream<Uint8Array> | null;
+  headers: EgressResponseHeaders | undefined;
+}
+
+export interface EgressFetchInit {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  signal?: AbortSignal;
+  headersTimeoutMs?: number;
+  bodyTimeoutMs?: number;
+  followRedirects?: boolean;
+}
+
+/**
+ * The SSRF-fenced outbound-HTTP pair the app injects (ADR-063 §1: the
+ * package owns no egress policy). `Validated` is the app validator's result
+ * type — this module never inspects it; it flows opaquely from
+ * `validateUrl` into `fetchWithResolvedIp`.
+ */
+export interface HttpEgress<Validated = unknown> {
+  safeFetch(url: string, init?: EgressFetchInit): Promise<EgressResponse>;
+  fetchWithResolvedIp(
+    validated: Validated,
+    init?: EgressFetchInit,
+  ): Promise<EgressResponse>;
+}
+
+export interface HttpDestinationRequest<Validated = unknown> {
   url: string;
   method?: "POST" | "PUT" | "PATCH";
   /** Static headers. Content-Type et al. are the caller's to set. */
@@ -32,6 +59,8 @@ export interface HttpDestinationRequest {
   maxResponseBytes?: number;
   /** Short label woven into DispatchError messages (e.g. the trigger name). */
   contextLabel: string;
+  /** The app's SSRF-fenced fetch pair — see {@link HttpEgress}. */
+  egress: HttpEgress<Validated>;
   /**
    * Override the SSRF validator — e.g. a `createSSRFValidator({ blockLocal:
    * true, allowedHosts: [] })` instance that blocks private IPs regardless of
@@ -41,7 +70,7 @@ export interface HttpDestinationRequest {
    * back to the weaker policy. A 3xx with a Location throws terminally; a
    * bare 3xx is returned to the caller to classify.
    */
-  validateUrl?: (url: string) => Promise<SSRFValidationResult>;
+  validateUrl?: (url: string) => Promise<Validated>;
 }
 
 export interface HttpDestinationResponse {
@@ -61,12 +90,8 @@ export interface HttpDestinationResponse {
 const RESPONSE_HEADER_VALUE_CHARS = 200;
 const RESPONSE_HEADER_MAX_COUNT = 32;
 
-type SsrfResponseHeaders = Awaited<
-  ReturnType<typeof ssrfSafeFetch>
->["headers"];
-
 function captureResponseHeaders(
-  headers: SsrfResponseHeaders | undefined,
+  headers: EgressResponseHeaders | undefined,
 ): Record<string, string> {
   const out: Record<string, string> = {};
   if (!headers) return out;
@@ -78,8 +103,6 @@ function captureResponseHeaders(
   }
   return out;
 }
-
-type ResponseBodyStream = Awaited<ReturnType<typeof ssrfSafeFetch>>["body"];
 
 /**
  * Reads at most `maxBytes` off the response stream, then cancels it.
@@ -93,7 +116,7 @@ async function readCappedBody({
   body,
   maxBytes,
 }: {
-  body: ResponseBodyStream;
+  body: EgressResponse["body"];
   maxBytes: number;
 }): Promise<string> {
   if (!body) return "";
@@ -128,11 +151,11 @@ async function readCappedBody({
 /**
  * The one SSRF-fenced outbound HTTP utility every customer-endpoint dispatch
  * shares (ADR-030 Consequences / ADR-040 §4). All outbound goes through the
- * audited {@link ssrfSafeFetch} — cloud-metadata denylist, private-IP blocking,
- * DNS-rebinding defeat via IP pinning, and redirect re-validation — never a
- * hand-rolled `fetch`. A total-request timeout bounds slow endpoints (enforced
- * both by an AbortSignal and, as a backstop, by socket-level bounds on the
- * dispatching agent) and the response is read with a size cap.
+ * injected, audited {@link HttpEgress} — cloud-metadata denylist, private-IP
+ * blocking, DNS-rebinding defeat via IP pinning, and redirect re-validation —
+ * never a hand-rolled `fetch`. A total-request timeout bounds slow endpoints
+ * (enforced both by an AbortSignal and, as a backstop, by socket-level bounds
+ * on the dispatching agent) and the response is read with a size cap.
  *
  * Transport-level failure (DNS, connection reset, timeout) throws a **retryable**
  * DispatchError; an SSRF block throws a **terminal** one (a fenced URL never
@@ -140,7 +163,7 @@ async function readCappedBody({
  * classifies 2xx/4xx/5xx per its own contract (a webhook and Slack disagree on
  * what a 4xx means), then rides the outbox retry machinery.
  */
-export async function sendHttpDestination({
+export async function sendHttpDestination<Validated>({
   url,
   method = "POST",
   headers,
@@ -148,9 +171,10 @@ export async function sendHttpDestination({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES,
   contextLabel,
+  egress,
   validateUrl,
-}: HttpDestinationRequest): Promise<HttpDestinationResponse> {
-  let response: Awaited<ReturnType<typeof ssrfSafeFetch>>;
+}: HttpDestinationRequest<Validated>): Promise<HttpDestinationResponse> {
+  let response: EgressResponse;
   try {
     const init = {
       method,
@@ -167,12 +191,12 @@ export async function sendHttpDestination({
       const validated = await validateUrl(url);
       // Redirects are refused outright: a hop would re-validate through the
       // weaker default policy (see `validateUrl` on the request type).
-      response = await fetchWithResolvedIp(validated, {
+      response = await egress.fetchWithResolvedIp(validated, {
         ...init,
         followRedirects: false,
       });
     } else {
-      response = await ssrfSafeFetch(url, init);
+      response = await egress.safeFetch(url, init);
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

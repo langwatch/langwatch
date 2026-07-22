@@ -1,7 +1,8 @@
 import { DispatchError } from "@langwatch/dispatch-error";
 import type { SlackPayload } from "@langwatch/automations/templating/renderSlack";
 import { createLogger } from "@langwatch/observability";
-import { sendHttpDestination } from "./httpDestination";
+import { sendHttpDestination } from "@langwatch/automations-server/clients/http/destination";
+import { appHttpEgress } from "./appHttpEgress";
 
 const logger = createLogger("langwatch:triggers:slackWebApi");
 
@@ -85,6 +86,7 @@ export async function postSlackChatMessage({
 }): Promise<void> {
   const label = `Slack Web API dispatch for trigger "${triggerName}"`;
   const response = await sendHttpDestination({
+    egress: appHttpEgress,
     url: CHAT_POST_MESSAGE_URL,
     method: "POST",
     headers: {
@@ -183,6 +185,7 @@ async function listChannelsForTypes(
     let response: { status: number; body: string };
     try {
       response = await sendHttpDestination({
+    egress: appHttpEgress,
         url: CONVERSATIONS_LIST_URL,
         method: "POST",
         headers: {

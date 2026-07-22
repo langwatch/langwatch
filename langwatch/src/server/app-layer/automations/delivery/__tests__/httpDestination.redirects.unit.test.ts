@@ -2,7 +2,8 @@ import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DispatchError } from "@langwatch/dispatch-error";
 import { createSSRFValidator } from "~/utils/ssrfProtection";
-import { sendHttpDestination } from "../httpDestination";
+import { sendHttpDestination } from "@langwatch/automations-server/clients/http/destination";
+import { appHttpEgress } from "../appHttpEgress";
 
 /**
  * Executed redirect-refusal regression (ADR-040 §4): the strict-validator
@@ -58,6 +59,7 @@ afterAll(async () => {
 
 const send = (path: string) =>
   sendHttpDestination({
+    egress: appHttpEgress,
     url: `${baseUrl}${path}`,
     body: "{}",
     contextLabel: "redirect test",
