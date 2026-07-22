@@ -33,10 +33,18 @@ export type LangyPeekPhase = "rest" | "near";
  * the sliver is paint nobody sees.
  */
 export const FLOATING_PEEK_CARD_HEIGHT = 76;
-/** Sliver above the bottom edge at rest — the card's rounded top lip. */
-export const FLOATING_PEEK_REST_PX = 10;
+/**
+ * Sliver above the bottom edge at rest.
+ *
+ * A lip you have to already know about is a lip nobody finds, which is what
+ * the first cut's 10px turned out to be: enough to say "something is there"
+ * only to someone told to look. It now stands proud enough to read as a
+ * docked thing you can grab, while still sitting under the page rather than
+ * over it.
+ */
+export const FLOATING_PEEK_REST_PX = 28;
 /** Risen height on proximity/focus — the full header line reads. */
-export const FLOATING_PEEK_NEAR_PX = 36;
+export const FLOATING_PEEK_NEAR_PX = 48;
 
 // ── Sidebar mode: the dock's spine peeks from the right edge ───────────────
 /** The sliver card's full width (mostly offscreen right). */
