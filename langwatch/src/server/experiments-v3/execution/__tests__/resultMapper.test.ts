@@ -17,7 +17,7 @@ import {
 
 class DatasetColumnMissingError extends HandledError {
   constructor() {
-    super("invalid_dataset", "Column \"expected_output\" is not mapped", {
+    super("invalid_dataset", 'Column "expected_output" is not mapped', {
       httpStatus: 422,
     });
   }

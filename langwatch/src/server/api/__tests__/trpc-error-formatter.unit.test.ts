@@ -1,9 +1,9 @@
 /** @vitest-environment node */
+
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { errorFormatterForTesting } from "../trpc";
 
 function format(error: TRPCError) {
@@ -153,7 +153,8 @@ describe("authored-message verdict", () => {
     it("marks a message with no cause as authored", () => {
       const error = new TRPCError({
         code: "BAD_REQUEST",
-        message: "Changing column types is not yet supported for large datasets",
+        message:
+          "Changing column types is not yet supported for large datasets",
       });
 
       expect(format(error).data.authored).toBe(true);
@@ -215,7 +216,11 @@ describe("authored-message verdict", () => {
       const error = new TRPCError({
         code: "NOT_FOUND",
         message: "Conversation not found: c-1",
-        cause: new NotFoundError("langy_conversation_not_found", "Conversation", "c-1"),
+        cause: new NotFoundError(
+          "langy_conversation_not_found",
+          "Conversation",
+          "c-1",
+        ),
       });
 
       expect(format(error).data.authored).toBe(false);

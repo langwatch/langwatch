@@ -442,7 +442,8 @@ export const mapThrownErrorEvent = ({
 
   return {
     type: "error",
-    message: rowIndex === undefined ? UNNAMED_RUN_FAILURE : UNNAMED_CELL_FAILURE,
+    message:
+      rowIndex === undefined ? UNNAMED_RUN_FAILURE : UNNAMED_CELL_FAILURE,
     ...(serverMessage ? { serverMessage } : {}),
     traceId: activeTraceId,
     rowIndex,

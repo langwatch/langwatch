@@ -1,8 +1,12 @@
 import { useCallback, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
-import type { ExportMode, ExportFormat, ExportProgress } from "~/server/export/types";
 import type { ExportProgressEvent } from "~/server/api/routers/export";
+import type {
+  ExportFormat,
+  ExportMode,
+  ExportProgress,
+} from "~/server/export/types";
 import { api } from "~/utils/api";
 
 interface ExportConfig {
@@ -76,7 +80,7 @@ function extractFilename({
   if (!contentDisposition) return fallbackName;
 
   const filenameMatch = contentDisposition.match(
-    /filename\*?=(?:UTF-8''|")?([^";]+)"?/i
+    /filename\*?=(?:UTF-8''|")?([^";]+)"?/i,
   );
   if (filenameMatch?.[1]) {
     return decodeURIComponent(filenameMatch[1]);
@@ -118,7 +122,7 @@ export function useExportTraces({
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
+    null,
   );
 
   // tRPC subscription for export progress via BroadcastService (Redis pub/sub)
@@ -140,7 +144,7 @@ export function useExportTraces({
           }));
         }
       },
-    }
+    },
   );
 
   const openExportDialog = useCallback(
@@ -148,7 +152,7 @@ export function useExportTraces({
       setSelectedTraceIds(options?.selectedTraceIds);
       setIsDialogOpen(true);
     },
-    []
+    [],
   );
 
   const closeExportDialog = useCallback(() => {
@@ -228,14 +232,14 @@ export function useExportTraces({
         .then(async (response) => {
           if (!response.ok) {
             throw new Error(
-              `Export failed: ${response.status} ${response.statusText}`
+              `Export failed: ${response.status} ${response.statusText}`,
             );
           }
 
           // Read total from header immediately
           const totalTraces = parseInt(
             response.headers.get("X-Total-Traces") ?? "0",
-            10
+            10,
           );
           setProgress((prev) => ({ ...prev, total: totalTraces }));
 
@@ -250,9 +254,7 @@ export function useExportTraces({
           if (blob.size === 0) {
             const isNoMatches = totalTraces === 0;
             toaster.create({
-              title: isNoMatches
-                ? "Export produced no data"
-                : "Export failed",
+              title: isNoMatches ? "Export produced no data" : "Export failed",
               description: isNoMatches
                 ? "No traces matched the current filters. Try adjusting the time range or search query."
                 : "The server returned an empty response. Please try again.",
@@ -302,7 +304,7 @@ export function useExportTraces({
         }, 1500);
       });
     },
-    [projectId, filters, startDate, endDate, query, selectedTraceIds]
+    [projectId, filters, startDate, endDate, query, selectedTraceIds],
   );
 
   return {
