@@ -16,6 +16,7 @@ import {
   mockCreateSubscription,
   mockDetectCurrency,
   mockGetActivePlan,
+  mockGetBillingCurrency,
   mockGetOrganizationWithMembers,
   mockGetPendingInvites,
   mockAddTeamMemberOrEvents,
@@ -116,6 +117,9 @@ vi.mock("~/utils/api", async () => {
         },
         getLastSubscription: {
           useQuery: () => setup.mockGetLastSubscription(),
+        },
+        getBillingCurrency: {
+          useQuery: () => setup.mockGetBillingCurrency(),
         },
       },
       useContext: vi.fn(() => ({
@@ -326,6 +330,57 @@ describe("<SubscriptionPage/>", () => {
             expect.objectContaining({
               organizationId: "test-org-id",
               plan: "GROWTH_SEAT_EUR_MONTHLY",
+            }),
+          );
+        });
+      });
+    });
+
+    describe("when billing currency is fixed to EUR but geoip detects USD", () => {
+      beforeEach(() => {
+        mockDetectCurrency.mockReturnValue({
+          data: { currency: "USD" },
+          isLoading: false,
+        });
+        mockGetBillingCurrency.mockReturnValue({
+          data: { fixedCurrency: "EUR" },
+          isLoading: false,
+        });
+      });
+
+      it("hides the currency selector", async () => {
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
+        });
+
+        expect(screen.queryByTestId("currency-selector")).not.toBeInTheDocument();
+      });
+
+      it("upgrades in the fixed EUR currency, not the detected USD one", async () => {
+        const user = userEvent.setup();
+        const mockMutateAsync = vi.fn().mockResolvedValue({ url: null });
+        mockCreateSubscription.mockReturnValue({
+          mutate: vi.fn(),
+          mutateAsync: mockMutateAsync,
+          isLoading: false,
+          isPending: false,
+        });
+
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
+        });
+
+        await user.click(screen.getByRole("button", { name: /Upgrade now/i }));
+
+        await waitFor(() => {
+          expect(mockMutateAsync).toHaveBeenCalledWith(
+            expect.objectContaining({
+              plan: "GROWTH_SEAT_EUR_MONTHLY",
+              currency: "EUR",
             }),
           );
         });

@@ -113,6 +113,18 @@ export const createSubscriptionRouterFactory = ({
         });
       }),
 
+    getBillingCurrency: protectedProcedure
+      .input(z.object({ organizationId: z.string() }))
+      .use(checkOrganizationPermission("organization:view"))
+      .use(billingErrorHandler)
+      .query(async ({ input }) => {
+        return {
+          fixedCurrency: await customerService.getFixedBillingCurrency({
+            organizationId: input.organizationId,
+          }),
+        };
+      }),
+
     getLastSubscription: protectedProcedure
       .input(z.object({ organizationId: z.string() }))
       .use(checkOrganizationPermission("organization:view"))
