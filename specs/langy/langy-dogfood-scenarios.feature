@@ -36,6 +36,16 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     Then on the follow-up Langy drills into a trace it already surfaced
     And Langy uses the concrete id from the prior turn rather than re-listing
 
+  @integration
+  Scenario: An ambiguous "make me an eval" is asked about before anything is created
+    Given a Langy dogfood scenario where the user says only "make me an eval"
+    When the scenario runs against Langy
+    Then Langy asks one short question distinguishing a batch experiment from an online evaluator
+    And Langy creates nothing before the user answers
+    And after the answer, Langy creates the matching resource and the create succeeds
+    And the judge confirms that a create rejected over a type slug is corrected from the
+      error's accepted values and retried once, never turned into a question
+
   # ---------------------------------------------------------------------------
   # The judge rubric is Langy's own rules
   # ---------------------------------------------------------------------------
