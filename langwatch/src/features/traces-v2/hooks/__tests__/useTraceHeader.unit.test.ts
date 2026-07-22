@@ -6,12 +6,16 @@ import { useDrawerStore } from "../../stores/drawerStore";
 import { useTraceHeader } from "../useTraceHeader";
 
 const headerData: { traceId?: string; timestamp?: number } = {};
+const capturedHeaderInputs: Array<{ full?: boolean }> = [];
 
 vi.mock("~/utils/api", () => ({
   api: {
     tracesV2: {
       header: {
-        useQuery: () => ({ data: headerData, isLoading: false }),
+        useQuery: (input: { full?: boolean }) => {
+          capturedHeaderInputs.push(input);
+          return { data: headerData, isLoading: false };
+        },
       },
     },
   },
@@ -33,7 +37,20 @@ describe("useTraceHeader", () => {
   beforeEach(() => {
     headerData.traceId = undefined;
     headerData.timestamp = undefined;
+    capturedHeaderInputs.length = 0;
     useDrawerStore.setState({ traceId: null, occurredAtMs: null });
+  });
+
+  describe("given the drawer's own detail read", () => {
+    describe("when the drawer opens", () => {
+      it("resolves offloaded input/output in full", () => {
+        useDrawerStore.getState().openTrace("trace-1");
+
+        renderHook(() => useTraceHeader());
+
+        expect(capturedHeaderInputs.at(-1)).toMatchObject({ full: true });
+      });
+    });
   });
 
   describe("given the drawer opened without a partition hint", () => {

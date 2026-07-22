@@ -68,10 +68,13 @@ export function useOpenTraceDrawer() {
         // Seed both keyed-with-timestamp and keyed-without — the drawer
         // hook always sends `occurredAtMs` when present in the URL, but
         // other entry points (back-stack, conversation jumps) don't, so
-        // we keep the bare key seeded as a fallback.
+        // we keep the bare key seeded as a fallback. full: true matches
+        // useTraceHeader's own query key — the drawer is the one caller
+        // that reads full: true, so the seed must land under the same key
+        // or the drawer's mount just sees a cache miss and reloads anyway.
         const seed = (prev?: TraceHeader) => prev ?? listItemToHeader(trace);
         utils.tracesV2.header.setData(
-          { projectId: project.id, traceId: trace.traceId },
+          { projectId: project.id, traceId: trace.traceId, full: true },
           seed,
         );
         utils.tracesV2.header.setData(
@@ -79,6 +82,7 @@ export function useOpenTraceDrawer() {
             projectId: project.id,
             traceId: trace.traceId,
             occurredAtMs: trace.timestamp,
+            full: true,
           },
           seed,
         );
@@ -102,7 +106,7 @@ export function useOpenTraceDrawer() {
               : buildPreviewTraceDetail(trace);
 
           utils.tracesV2.header.setData(
-            { projectId: project.id, traceId: trace.traceId },
+            { projectId: project.id, traceId: trace.traceId, full: true },
             detail.header,
           );
           utils.tracesV2.header.setData(
@@ -110,6 +114,7 @@ export function useOpenTraceDrawer() {
               projectId: project.id,
               traceId: trace.traceId,
               occurredAtMs: trace.timestamp,
+              full: true,
             },
             detail.header,
           );
@@ -226,7 +231,13 @@ export function useOpenTraceDrawer() {
         // marks that seed fresh for the 5-min staleTime, so without forcing a
         // fetch the cache tokens never appear until a hard refresh. staleTime:0
         // pulls the full header (with attributes) immediately, behind the seed.
-        void utils.tracesV2.header.prefetch(input, { staleTime: 0 });
+        // full: true matches useTraceHeader's own query key — `input` itself
+        // stays bare (no `full`) since it's shared below as the spanTree
+        // query key too.
+        void utils.tracesV2.header.prefetch(
+          { ...input, full: true },
+          { staleTime: 0 },
+        );
         // Same key + queryFn as `useSpanTree`, so the drawer's mount joins
         // this in-flight paged fetch instead of firing a second one.
         void queryClient.prefetchQuery({
