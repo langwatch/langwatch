@@ -17,7 +17,6 @@ import {
 } from "~/components/me/IngestionTemplateInstallDrawer";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { Link } from "~/components/ui/link";
-import { showErrorToast } from "~/features/errors";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 
@@ -76,22 +75,18 @@ export function TraceIngestSection() {
   );
 
   const utils = api.useUtils();
+  // Neither mutation toasts: both are driven from inside the install drawer,
+  // which is open whenever they can fail and renders this same error inline
+  // via `<HandledErrorAlert>`. A toast would report it a second time.
   const installMutation = api.ingestionKey.install.useMutation({
     onSuccess: () => {
       void utils.ingestionKey.list.invalidate();
     },
-    onError: (error) =>
-      showErrorToast({
-        error,
-        fallbackTitle: "Couldn't install this integration",
-      }),
   });
   const rotateMutation = api.ingestionKey.rotate.useMutation({
     onSuccess: () => {
       void utils.ingestionKey.list.invalidate();
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't rotate this key" }),
   });
 
   const publicEnv = usePublicEnv();
@@ -130,7 +125,7 @@ export function TraceIngestSection() {
         [slug]: { token: result.token, endpoint: otlpEndpoint },
       }));
     } catch {
-      // surfaced via toaster + drawer error state
+      // surfaced inline by the drawer, off `installMutation.error`
     }
   };
 
@@ -150,7 +145,7 @@ export function TraceIngestSection() {
         [slug]: { token: result.token, endpoint: otlpEndpoint },
       }));
     } catch {
-      // surfaced via toaster + drawer error state
+      // surfaced inline by the drawer, off `rotateMutation.error`
     }
   };
 

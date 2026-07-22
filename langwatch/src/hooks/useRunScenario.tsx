@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { showErrorToast } from "~/features/errors";
 import type { TargetValue } from "../components/scenarios/TargetSelector";
 import { toaster } from "../components/ui/toaster";
 import { api } from "../utils/api";
@@ -114,14 +115,7 @@ export function useRunScenario({
           });
         }
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "An unexpected error occurred";
-        toaster.create({
-          title: "Failed to start scenario",
-          description: message,
-          type: "error",
-          meta: { closable: true },
-        });
+        showErrorToast({ error, fallbackTitle: "Couldn't start the scenario" });
       } finally {
         setIsPolling(false);
       }

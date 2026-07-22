@@ -161,6 +161,8 @@ function RoutingPoliciesPage() {
       setDrawerError(null);
       toaster.create({ title: "Routing policy created", type: "success" });
     },
+    // No toast: the composer that failed is still open and shows this same
+    // sentence inline, so a toast would only say it twice at once.
     onError: (e) => {
       setDrawerError(
         describeError({
@@ -168,10 +170,6 @@ function RoutingPoliciesPage() {
           fallbackTitle: "Couldn't create routing policy",
         }),
       );
-      showErrorToast({
-        error: e,
-        fallbackTitle: "Couldn't create routing policy",
-      });
     },
   });
 
@@ -183,6 +181,7 @@ function RoutingPoliciesPage() {
       setDrawerError(null);
       toaster.create({ title: "Routing policy updated", type: "success" });
     },
+    // No toast, for the same reason as `createMutation` above.
     onError: (e) => {
       setDrawerError(
         describeError({
@@ -190,10 +189,6 @@ function RoutingPoliciesPage() {
           fallbackTitle: "Couldn't update routing policy",
         }),
       );
-      showErrorToast({
-        error: e,
-        fallbackTitle: "Couldn't update routing policy",
-      });
     },
   });
 

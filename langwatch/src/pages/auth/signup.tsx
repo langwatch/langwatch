@@ -81,17 +81,25 @@ function SignUpForm() {
   const onSubmit = async (values: z.infer<typeof schema>) => {
     try {
       await register.mutateAsync(values);
+    } catch {
+      // `register.error` renders in the alert below, carrying the reason the
+      // server actually gave ("User already exists", "Too many signup
+      // attempts"). A toast here would only cover that with a vaguer line.
+      return;
+    }
 
-      setSignInLoading(true);
+    // The account exists from here on, so this leg fails on its own terms —
+    // and it has no alert of its own, which is why it toasts.
+    setSignInLoading(true);
+    try {
       const response = await signIn("credentials", {
         email: values.email,
         password: values.password,
         callbackUrl: callbackUrl,
       });
-      setSignInLoading(false);
 
       if (response?.error) {
-        throw new Error("Sign up failed");
+        throw new Error("Sign in failed");
       }
 
       if (response?.status && response.status >= 400) {
@@ -99,13 +107,16 @@ function SignUpForm() {
       }
     } catch {
       toaster.create({
-        title: "Error",
-        description: "Failed to sign up",
+        title: "Couldn't sign you in",
+        description:
+          "Your account was created — sign in with your new details.",
         type: "error",
         meta: {
           closable: true,
         },
       });
+    } finally {
+      setSignInLoading(false);
     }
   };
 

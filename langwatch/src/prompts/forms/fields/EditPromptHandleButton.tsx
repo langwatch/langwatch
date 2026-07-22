@@ -66,11 +66,15 @@ export function EditPromptHandleButton() {
       });
     };
 
-    const onError = (error: Error) =>
+    const onError = (error: Error) => {
+      // The toast shows the registry's copy for the code, so the raw error
+      // reaches no surface — this is its only local diagnostic.
+      logger.error({ error }, "Failed to change prompt handle");
       showErrorToast({
         error,
         fallbackTitle: "Couldn't change the prompt handle",
       });
+    };
 
     triggerChangeHandle({ id, onSuccess, onError });
   };

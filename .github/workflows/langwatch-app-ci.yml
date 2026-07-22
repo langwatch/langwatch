@@ -337,14 +337,51 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Installs the Biome version the lockfile pins and puts it on PATH. The
+      # reviewdog action below does this internally too; doing it explicitly is
+      # what lets the gate step call `biome` directly instead of depending on a
+      # third party's step ordering.
+      - name: Setup Biome
+        uses: biomejs/setup-biome@4c91541eaada48f67d7dbd7833600ce162b68f51 # v2.7.1
+        with:
+          working-dir: langwatch
+
+      # Inline PR annotations, and nothing else — this step cannot gate.
+      # `github-pr-review` has no PR to annotate on `merge_group` or `push`, so
+      # it no-ops there, and `detect-changes` forces this job relevant on those
+      # events, which meant the job reported green with nothing checked. Its
+      # `filter_mode` also defaults to `added`, so a diagnostic on a line the PR
+      # didn't touch is never reported at all. Neither is a reviewdog bug:
+      # reviewdog is a reviewer. The gate is the step after it.
       - uses: mongolyy/reviewdog-action-biome@c49bee54c1f87e4be32446ae3deca3a186b88a3a # v2
         with:
           reporter: github-pr-review
           fail_level: error
           # The action resolves the Biome version (from the lockfile) and runs
           # Biome inside workdir, so biome_flags paths are relative to it.
+          #
+          # `--max-diagnostics` is load-bearing: Biome caps output at 20
+          # diagnostics by default and `src` + `ee` carry thousands of
+          # pre-existing format and lint diagnostics. reviewdog parses Biome's
+          # stdout, so a suppressed diagnostic never reaches the PR — which made
+          # the raw-error-toast plugin's diagnostic a coin flip on whether it
+          # was inside the cap at all.
           workdir: langwatch
-          biome_flags: "./src ./ee"
+          biome_flags: "./src ./ee --max-diagnostics=1000"
+
+      # The gate: every event, every line, nothing suppressed.
+      #
+      # Scoped to the analyzer plugins rather than the whole ruleset on purpose.
+      # `src` + `ee` currently emit thousands of pre-existing format and lint
+      # diagnostics, so a blanket `biome ci` here would fail every PR from day
+      # one and be switched off within the week. The plugins are the rules we
+      # have decided are non-negotiable — today that is
+      # `langwatch/biome-plugins/no-raw-error-toast.grit`, whose companion
+      # source-scanning guard lives in
+      # `src/features/errors/logic/__tests__/noRawErrorToasts.unit.test.ts`.
+      - name: Enforce analyzer plugins
+        working-directory: langwatch
+        run: biome lint --only=plugin --max-diagnostics=none --colors=off ./src ./ee
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'

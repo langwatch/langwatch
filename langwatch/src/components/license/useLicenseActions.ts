@@ -33,7 +33,11 @@ export function useLicenseActions({
       if (friendly !== error.message) {
         toaster.create({
           title: "Couldn't activate license",
-          description: friendly,
+          // `friendly` only reaches here when `getUserFriendlyLicenseError`
+          // RECOGNISED the message and returned its own curated copy; the
+          // guard sees a message-derived value and cannot see the lookup in
+          // between.
+          description: friendly, // no-raw-error-toast-ok
           type: "error",
         });
         return;

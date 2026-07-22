@@ -15,7 +15,11 @@ import { useEffect, useState } from "react";
 import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
 import type { InMemoryDataset } from "~/components/datasets/editor/DatasetEditorTable";
-import { showErrorToast } from "~/features/errors";
+import {
+  describeError,
+  readHandledError,
+  showErrorToast,
+} from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { Drawer } from "../components/ui/drawer";
@@ -104,6 +108,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
     watch,
     formState: { errors },
     reset,
+    setError,
     control,
   } = useForm<FormValues>({
     defaultValues: {
@@ -226,6 +231,18 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
           void trpc.dataset.getAll.invalidate();
         },
         onError: (error) => {
+          // A taken name is a complaint about the field the user is looking
+          // at, so it belongs under that field rather than in a toast they
+          // have to translate back into an edit. `applyHandledErrorToForm`
+          // only claims `validation_error`, so this code is placed by hand.
+          if (readHandledError(error)?.code === "dataset_name_taken") {
+            setError(
+              "name",
+              { type: "server", message: describeError({ error }) },
+              { shouldFocus: true },
+            );
+            return;
+          }
           showErrorToast({
             error,
             fallbackTitle: props.datasetToSave?.datasetId

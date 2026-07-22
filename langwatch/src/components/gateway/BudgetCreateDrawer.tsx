@@ -12,6 +12,7 @@ import { useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
+import { describeError, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
@@ -130,14 +131,14 @@ export function BudgetCreateDrawer({
       reset();
       onOpenChange(false);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to create budget";
       // Cross-org guard + missing-member errors are inline-actionable; other
       // failures get a toast so the user knows something happened.
       if (scopeKind === "PRINCIPAL") {
-        setSubmitError(message);
+        setSubmitError(
+          describeError({ error, fallbackTitle: "Couldn't create the budget" }),
+        );
       } else {
-        toaster.create({ title: message, type: "error" });
+        showErrorToast({ error, fallbackTitle: "Couldn't create the budget" });
       }
     }
   };
