@@ -9,10 +9,13 @@
  *   - Two gestures, one mode: a Shift keyup must not cancel a `#` latch.
  *   - A tab switch mid-hold must not leave the page armed forever.
  */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useLangyContextArming } from "../hooks/useLangyContextArming";
 import { useLangyContextTargetStore } from "../stores/langyContextTargetStore";
+import { useLangyStore } from "../stores/langyStore";
+import { LangyContextTargetLayer } from "../components/LangyContextTargetLayer";
 
 function Host() {
   useLangyContextArming();
@@ -190,6 +193,64 @@ describe("useLangyContextArming", () => {
         });
 
         expect(event.defaultPrevented).toBe(false);
+      });
+    });
+  });
+});
+
+/**
+ * The gesture has to work from where the user actually is.
+ *
+ * The arming listener lived inside a subtree the layer only rendered while the
+ * Langy panel was OPEN, so holding Shift anywhere else did nothing whatsoever —
+ * no highlight, no hint, no error. The peek made that the common case rather
+ * than the edge one: a minimised panel reads as closed, which is how Langy sits
+ * most of the time.
+ *
+ * Mounted through the REAL layer, not the hook: mounting the hook directly is
+ * exactly what let the bug through, because the hook was never the broken part.
+ */
+/** The layer paints real chrome once armed, so it needs the design system. */
+function renderLayer() {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <LangyContextTargetLayer />
+    </ChakraProvider>,
+  );
+}
+
+describe("LangyContextTargetLayer", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useLangyContextTargetStore.getState().reset();
+    useLangyStore.setState({ isOpen: false });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    useLangyStore.setState({ isOpen: false });
+  });
+
+  describe("given the Langy panel is closed", () => {
+    describe("when the user holds Shift", () => {
+      it("still arms the page", () => {
+        renderLayer();
+
+        press("Shift");
+        act(() => {
+          vi.advanceTimersByTime(400);
+        });
+
+        expect(armSource()).toBe("hold");
+      });
+    });
+
+    describe("when the user presses #", () => {
+      it("still latches the mode on", () => {
+        renderLayer();
+
+        press("#");
+
+        expect(armSource()).toBe("key");
       });
     });
   });
