@@ -5,6 +5,10 @@ import type { TriggerSummary } from "@langwatch/automations/repositories/trigger
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { Trace } from "~/server/tracer/types";
 import {
+  appDatasetMapping,
+  appSettledMatchKit,
+} from "~/server/app-layer/automations/dispatch/appDispatchPorts";
+import {
   createLogOverflowHandler,
   createNotifyDigestHandler,
   createPersistMatchHandler,
@@ -140,6 +144,8 @@ function makeDeps(activeTrigger: TriggerSummary) {
     updateLastRunAt: vi.fn().mockResolvedValue(undefined),
   };
   const deps = {
+    filters: appSettledMatchKit,
+    datasetMapping: appDatasetMapping,
     triggers,
     projects: {
       getById: vi.fn().mockResolvedValue({

@@ -53,7 +53,7 @@ import {
   type DraftProject,
   validateTemplateDraft,
 } from "~/server/app-layer/automations/trigger-template.service";
-import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
+import { NOTIFY_TRIGGER_ACTIONS } from "@langwatch/automations-server/dispatch/trigger-action-dispatch";
 import { WebhookDeliveryService } from "@langwatch/automations-server/services/webhook-delivery.service";
 import { featureFlagService } from "~/server/featureFlag";
 import { KSUID_RESOURCES } from "~/utils/constants";

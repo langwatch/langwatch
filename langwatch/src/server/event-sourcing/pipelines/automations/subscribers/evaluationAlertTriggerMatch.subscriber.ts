@@ -7,10 +7,8 @@ import type { EvaluationProcessingEvent } from "~/server/event-sourcing/pipeline
 import type { TriggerMatchRecordedEventData } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 
-import {
-  NOTIFY_TRIGGER_ACTIONS,
-  triggerReadsEvaluations,
-} from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
+import { NOTIFY_TRIGGER_ACTIONS } from "@langwatch/automations-server/dispatch/trigger-action-dispatch";
+import { triggerReadsEvaluations } from "~/server/app-layer/automations/dispatch/appDispatchPorts";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 
 const logger = createLogger(

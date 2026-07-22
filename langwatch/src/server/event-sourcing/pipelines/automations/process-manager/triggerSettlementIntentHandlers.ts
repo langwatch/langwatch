@@ -44,8 +44,15 @@ import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   type ConfirmSettledMatchDeps,
   confirmSettledMatch,
-} from "../../../../app-layer/automations/dispatch/confirmSettledMatch";
-import { dispatchTriggerAction } from "../../../../app-layer/automations/dispatch/triggerActionDispatch";
+} from "@langwatch/automations-server/dispatch/confirm-settled-match";
+import {
+  dispatchTriggerAction,
+  type DatasetRecordEntryLike,
+} from "@langwatch/automations-server/dispatch/trigger-action-dispatch";
+import {
+  appDatasetMapping,
+  appSettledMatchKit,
+} from "../../../../app-layer/automations/dispatch/appDispatchPorts";
 import {
   type LogOverflowIntent,
   type NotifyDigestIntent,
@@ -103,6 +110,16 @@ export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
   baseHost: string;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   evaluationRuns: EvaluationRunService;
+  deriveEvents: (params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    foldVersion?: number;
+  }) => Promise<DerivedTraceEvent[]>;
+  /** The app's settle-recheck machinery (ADR-063 §1). */
+  filters: typeof appSettledMatchKit;
+  /** The app's trace→dataset mapping machinery (ADR-063 §1). */
+  datasetMapping: typeof appDatasetMapping;
   traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
   addToAnnotationQueue: (params: {
     traceIds: string[];
@@ -113,7 +130,7 @@ export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
   addToDataset: (params: {
     datasetId: string;
     projectId: string;
-    datasetRecords: DatasetRecordEntry[];
+    datasetRecords: DatasetRecordEntryLike[];
   }) => Promise<void>;
   /** ADR-040 §6 delivery-log writer. Optional: absent in tests. */
   recordWebhookDelivery?: WebhookDeliveryRecorder;

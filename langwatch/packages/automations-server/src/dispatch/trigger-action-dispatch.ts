@@ -1,23 +1,35 @@
 import { createLogger } from "@langwatch/observability";
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction } from "@langwatch/automations/enums";
 import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
-import type { ProjectService } from "~/server/app-layer/projects/project.service";
-import { queryNeeds } from "~/server/app-layer/traces/filter-to-clickhouse";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TriggerFilters } from "@langwatch/automations/domain/filters";
 import type { TriggerSummary } from "@langwatch/automations/repositories/trigger.repository";
-import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
-import type { DatasetRecordEntry } from "~/server/datasets/types";
 import { DispatchError } from "@langwatch/dispatch-error";
-import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
-import {
-  mapTraceToDatasetEntry,
-  TRACE_EXPANSIONS,
-  type TraceMapping,
-} from "~/server/tracer/tracesMapping";
-import type { Trace } from "~/server/tracer/types";
+
+/** The filter-analysis pair `triggerReadsEvaluations` consumes — the app
+ *  supplies its liqe `queryNeeds` and structured-filter classifier. */
+export interface TriggerFilterQueryKit {
+  queryNeeds(filterQuery: string): ReadonlySet<string>;
+  classifyTriggerFilters(filters: TriggerFilters): {
+    hasEvaluationFilters: boolean;
+  };
+}
+
+/** The slice of a trace this dispatcher touches: identity, the span presence
+ *  gate, and whatever else rides along opaquely to the injected mapper. */
+export interface TraceLike {
+  trace_id: string;
+  spans?: readonly unknown[] | null;
+}
+
+/** One dataset row as this module writes it. The app's DatasetRecordEntry
+ *  is structurally satisfied by these objects. */
+export type DatasetRecordEntryLike = {
+  id: string;
+  selected: boolean;
+} & Record<string, unknown>;
 
 const logger = createLogger("langwatch:trigger-action-dispatch");
 
@@ -55,14 +67,17 @@ export const PERSIST_TRIGGER_ACTIONS = new Set<TriggerAction>([
  * at-most-once `TriggerSent(triggerId, traceId)` gate dedupes the two enqueues,
  * so whichever pipeline confirms the match first wins and the other no-ops.
  */
-export function triggerReadsEvaluations(trigger: {
-  filters: TriggerSummary["filters"];
-  filterQuery: TriggerSummary["filterQuery"];
-}): boolean {
+export function triggerReadsEvaluations(
+  trigger: {
+    filters: TriggerSummary["filters"];
+    filterQuery: TriggerSummary["filterQuery"];
+  },
+  kit: TriggerFilterQueryKit,
+): boolean {
   if (trigger.filterQuery != null) {
-    return queryNeeds(trigger.filterQuery).has("evaluations");
+    return kit.queryNeeds(trigger.filterQuery).has("evaluations");
   }
-  return classifyTriggerFilters(trigger.filters).hasEvaluationFilters;
+  return kit.classifyTriggerFilters(trigger.filters).hasEvaluationFilters;
 }
 
 /**
@@ -101,10 +116,16 @@ export function computeScheduledFor({
   return new Date(nextBoundaryMs);
 }
 
-export interface TriggerActionDispatchDeps {
-  triggers: TriggerService;
-  projects: ProjectService;
-  traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
+export interface TriggerActionDispatchDeps<TTrace extends TraceLike = TraceLike> {
+  triggers: {
+    updateLastRunAt(triggerId: string, projectId: string): Promise<void>;
+  };
+  /** Existence gate only — a dispatch against a deleted project is dropped. */
+  projects: { getById(projectId: string): Promise<object | null> };
+  traceById: (
+    projectId: string,
+    traceId: string,
+  ) => Promise<TTrace | undefined>;
   addToAnnotationQueue: (params: {
     traceIds: string[];
     projectId: string;
@@ -114,8 +135,18 @@ export interface TriggerActionDispatchDeps {
   addToDataset: (params: {
     datasetId: string;
     projectId: string;
-    datasetRecords: DatasetRecordEntry[];
+    datasetRecords: DatasetRecordEntryLike[];
   }) => Promise<void>;
+  /** The app's trace→dataset mapping machinery, injected whole: expansion
+   *  vocabulary membership plus the row mapper itself. */
+  datasetMapping: {
+    isTraceExpansion(key: string): boolean;
+    mapTraceToDatasetEntry(
+      trace: TTrace,
+      mapping: Record<string, { source: string; key: string; subkey: string }>,
+      expansions: ReadonlySet<string>,
+    ): Record<string, unknown>[];
+  };
 }
 
 interface ActionParams {
@@ -130,20 +161,20 @@ interface ActionParams {
   createdByUserId?: string;
 }
 
-export async function dispatchTriggerAction({
+export async function dispatchTriggerAction<TTrace extends TraceLike>({
   deps,
   trigger,
   traceId,
   tenantId,
 }: {
-  deps: TriggerActionDispatchDeps;
+  deps: TriggerActionDispatchDeps<TTrace>;
   trigger: TriggerSummary;
   traceId: string;
   tenantId: string;
   // Part of the dispatch envelope (the settled fold), accepted so callers can
   // pass it uniformly, but not read here: the persist actions (annotation
   // queue, dataset) work off the full trace, not the fold projection.
-  foldState: TraceSummaryData;
+  foldState: unknown;
 }): Promise<void> {
   const project = await deps.projects.getById(tenantId);
 
@@ -156,7 +187,7 @@ export async function dispatchTriggerAction({
   // Best-effort: if trace not found, actions that only need input/output still work with a stub.
   const fullTrace =
     (await deps.traceById(tenantId, traceId)) ??
-    ({ trace_id: traceId } as Trace);
+    ({ trace_id: traceId } as TTrace);
 
   const params = (trigger.actionParams ?? {}) as ActionParams;
 
@@ -225,7 +256,7 @@ export async function dispatchTriggerAction({
   );
 }
 
-async function addTraceToDataset({
+async function addTraceToDataset<TTrace extends TraceLike>({
   deps,
   trigger,
   traceId,
@@ -233,12 +264,12 @@ async function addTraceToDataset({
   params,
   fullTrace,
 }: {
-  deps: TriggerActionDispatchDeps;
+  deps: TriggerActionDispatchDeps<TTrace>;
   trigger: TriggerSummary;
   traceId: string;
   tenantId: string;
   params: ActionParams;
-  fullTrace: Trace;
+  fullTrace: TTrace;
 }): Promise<boolean> {
   if (!params.datasetId || !params.datasetMapping) {
     logger.warn(
@@ -261,19 +292,15 @@ async function addTraceToDataset({
 
   const { mapping, expansions: expansionsArray } = params.datasetMapping;
   const expansions = new Set(
-    expansionsArray.filter(
-      (e): e is keyof typeof TRACE_EXPANSIONS => e in TRACE_EXPANSIONS,
-    ),
+    expansionsArray.filter((e) => deps.datasetMapping.isTraceExpansion(e)),
   );
 
-  const entries: DatasetRecordEntry[] = [];
+  const entries: DatasetRecordEntryLike[] = [];
 
-  const mappedEntries = mapTraceToDatasetEntry(
+  const mappedEntries = deps.datasetMapping.mapTraceToDatasetEntry(
     trace,
-    mapping as TraceMapping,
+    mapping,
     expansions,
-    undefined,
-    undefined,
   );
 
   for (let i = 0; i < mappedEntries.length; i++) {

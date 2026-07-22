@@ -41,6 +41,10 @@ import type { TriggerService } from "~/server/app-layer/automations/trigger.serv
 import { dispatchGraphAlertAction } from "@langwatch/automations-server/dispatch/graph-alert-dispatch";
 import { decryptWebhookHeaders } from "~/server/app-layer/automations/providers/webhook/server";
 import {
+  appDatasetMapping,
+  appSettledMatchKit,
+} from "~/server/app-layer/automations/dispatch/appDispatchPorts";
+import {
   consumeEmailCapSlot,
   consumeTenantEmailCapSlot,
 } from "~/server/app-layer/automations/dispatch/appEmailCaps";
@@ -235,6 +239,8 @@ export function buildAutomationDispatchPorts({
     traceSummaryStore,
     evaluationRuns: evaluations.runs,
     deriveEvents: (params) => traceReadDerivation.deriveEvents(params),
+    filters: appSettledMatchKit,
+    datasetMapping: appDatasetMapping,
     emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
     consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
       consumeEmailCapSlot({
