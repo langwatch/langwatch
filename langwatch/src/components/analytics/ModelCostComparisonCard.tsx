@@ -49,13 +49,13 @@ const DEFAULT_REFERENCE = "anthropic/claude-sonnet-4-6";
 export function ModelCostComparisonCard() {
   const { project } = useOrganizationTeamProject();
   const { filterParams, queryOpts } = useFilterParams();
-  const { modelMetadata } = useModelProvidersSettings({
+  const { modelMetadata, providers } = useModelProvidersSettings({
     projectId: project?.id,
   });
 
   const options = useMemo(
-    () => referenceModelOptions(modelMetadata),
-    [modelMetadata],
+    () => referenceModelOptions({ modelMetadata, providers }),
+    [modelMetadata, providers],
   );
   const [referenceModel, setReferenceModel] = useState<string | undefined>(
     undefined,

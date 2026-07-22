@@ -1,9 +1,34 @@
 import { describe, expect, it } from "vitest";
 import type { ModelMetadataForFrontend } from "../../../hooks/useModelProvidersSettings";
+import type { MaybeStoredModelProvider } from "../../../server/modelProviders/registry";
 import {
   estimateReferenceCost,
   referenceModelOptions,
 } from "../modelCostComparison";
+
+// A custom/self-hosted model's real cost is unknown, but
+// `mergeCustomModelMetadata` backfills its pricing with {0,0} so other
+// consumers (e.g. LLMConfigPopover) don't choke on missing fields. This
+// fixture reproduces that shape to prove referenceModelOptions doesn't
+// trust it.
+const customModelMetadata = (): ModelMetadataForFrontend =>
+  ({
+    id: "custom/qwen3-14b",
+    name: "qwen3-14b",
+    provider: "custom",
+    pricing: { inputCostPerToken: 0, outputCostPerToken: 0 },
+  }) as never;
+
+const providerWithCustomModel = (
+  modelId: string,
+): Record<string, MaybeStoredModelProvider> =>
+  ({
+    custom: {
+      provider: "custom",
+      enabled: true,
+      customModels: [{ modelId, displayName: modelId }],
+    },
+  }) as never;
 
 // Spec: specs/analytics/model-cost-comparison.feature
 
@@ -69,18 +94,20 @@ describe("referenceModelOptions", () => {
   describe("when some models lack catalog pricing", () => {
     it("offers only models with complete pricing, sorted", () => {
       const options = referenceModelOptions({
-        "openai/gpt-5-mini": metadataWith({
-          inputCostPerToken: 0.00000025,
-          outputCostPerToken: 0.000002,
-        }),
-        "custom/qwen3-14b": metadataWith(undefined as never),
-        "anthropic/claude-sonnet-4-6": metadataWith({
-          inputCostPerToken: 0.000003,
-          outputCostPerToken: 0.000015,
-        }),
-        "custom/half-priced": metadataWith({
-          inputCostPerToken: 0.000001,
-        } as never),
+        modelMetadata: {
+          "openai/gpt-5-mini": metadataWith({
+            inputCostPerToken: 0.00000025,
+            outputCostPerToken: 0.000002,
+          }),
+          "custom/qwen3-14b": metadataWith(undefined as never),
+          "anthropic/claude-sonnet-4-6": metadataWith({
+            inputCostPerToken: 0.000003,
+            outputCostPerToken: 0.000015,
+          }),
+          "custom/half-priced": metadataWith({
+            inputCostPerToken: 0.000001,
+          } as never),
+        },
       });
       expect(options).toEqual([
         "anthropic/claude-sonnet-4-6",
@@ -91,7 +118,41 @@ describe("referenceModelOptions", () => {
 
   describe("when metadata has not loaded yet", () => {
     it("returns an empty list", () => {
-      expect(referenceModelOptions(undefined)).toEqual([]);
+      expect(referenceModelOptions({ modelMetadata: undefined })).toEqual([]);
+    });
+  });
+
+  describe("when a custom/self-hosted model carries placeholder {0,0} pricing", () => {
+    it("excludes it even though the pricing fields are both numbers", () => {
+      const options = referenceModelOptions({
+        modelMetadata: {
+          "anthropic/claude-sonnet-4-6": metadataWith({
+            inputCostPerToken: 0.000003,
+            outputCostPerToken: 0.000015,
+          }),
+          "custom/qwen3-14b": customModelMetadata(),
+        },
+        providers: providerWithCustomModel("qwen3-14b"),
+      });
+
+      expect(options).toEqual(["anthropic/claude-sonnet-4-6"]);
+      expect(options).not.toContain("custom/qwen3-14b");
+    });
+
+    it("still excludes it when providers is not supplied (fail closed, not open)", () => {
+      // Without `providers` there is no way to tell a genuinely-free
+      // catalog model apart from a custom-model placeholder, so this only
+      // matters for callers that always pass `providers` (the real
+      // ModelCostComparisonCard integration does). This case documents
+      // that omitting it does NOT accidentally re-admit custom models —
+      // it just can't exclude them without the provider list.
+      const options = referenceModelOptions({
+        modelMetadata: {
+          "custom/qwen3-14b": customModelMetadata(),
+        },
+      });
+
+      expect(options).toEqual(["custom/qwen3-14b"]);
     });
   });
 });

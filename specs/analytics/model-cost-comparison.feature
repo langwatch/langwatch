@@ -28,6 +28,12 @@ Feature: Model cost comparison — estimated savings against a reference model
     When the user opens the reference model selector
     Then models without pricing in the catalog are not listed
 
+  Scenario: Custom and self-hosted models are never offered as reference
+    Given a custom or self-hosted model has been added to a provider
+    When the user opens the reference model selector
+    Then the custom model is not listed, even though it has placeholder pricing
+    And it cannot be selected to produce a fabricated savings estimate
+
   Scenario: Traffic that already costs more than the reference shows negative savings
     Given the actual recorded cost is higher than the reference estimate
     Then the card presents the difference as additional cost, not savings
