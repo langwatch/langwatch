@@ -203,9 +203,15 @@ describe("<AuthenticationSettings/>", () => {
 
       /** @scenario Wrong current password keeps the dialog open and shows an error */
       it("keeps the dialog open and shows the error toast when the server rejects the current password", async () => {
-        mockChangePassword.mockRejectedValue(
-          new Error("Current password is incorrect"),
-        );
+        // Shaped like the real rejection, not a bare Error: `user.changePassword`
+        // throws a 401 `TRPCError` whose message it wrote for the user, and the
+        // boundary stamps `data.authored` to say so (see `readAuthoredMessage`).
+        // That flag is what keeps the specific reason on screen now that #5984
+        // stopped the client rendering `error.message` on its own say-so.
+        mockChangePassword.mockRejectedValue({
+          message: "Current password is incorrect",
+          data: { httpStatus: 401, authored: true },
+        });
         renderPage();
 
         await act(async () => {
@@ -232,10 +238,13 @@ describe("<AuthenticationSettings/>", () => {
           fireEvent.click(submitBtns[0]!);
         });
 
+        // The headline is the call site's `fallbackTitle`; the body is the
+        // sentence the procedure authored, which is the whole point of this
+        // case — the user has to be told WHICH password was wrong.
         await waitFor(() => {
           expect(mockToasterCreate).toHaveBeenCalledWith(
             expect.objectContaining({
-              title: "Failed to change password",
+              title: "Couldn't change your password",
               description: "Current password is incorrect",
               type: "error",
             }),
@@ -276,10 +285,19 @@ describe("<AuthenticationSettings/>", () => {
           fireEvent.click(submitBtns[0]!);
         });
 
+        // The mirror of the case above: this rejection carries no
+        // `data.authored`, and neither does a real one — the procedure raises
+        // this as a 500, and the boundary never marks a 5xx authored (its
+        // message names Auth0 scopes and env vars, which is an operator's
+        // detail, not a customer's). So it degrades to the call site's
+        // headline plus the generic body, never the server's own words. Don't
+        // restore an `error.message` assertion here; relaying it was the
+        // #5984 bug.
         await waitFor(() => {
           expect(mockToasterCreate).toHaveBeenCalledWith(
             expect.objectContaining({
-              title: "Failed to change password",
+              title: "Couldn't change your password",
+              description: "We've been notified. Try again in a moment.",
               type: "error",
             }),
           );
