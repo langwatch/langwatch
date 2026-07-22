@@ -4,9 +4,9 @@ package herrgen
 //
 // Registrations are read syntactically, so `http.StatusConflict` arrives as two
 // identifiers rather than the 409 the compiler would fold it into. Mirrors
-// net/http's own list; a constant missing here means its registration resolves
-// to no status at all, which the generated file shows as an entry with no
-// httpStatus.
+// net/http's own list; a constant missing here fails the run, because the
+// alternative — emitting the code with no httpStatus — is indistinguishable
+// from a code nobody registered.
 var httpStatuses = map[string]int{
 	"StatusContinue":           100,
 	"StatusSwitchingProtocols": 101,

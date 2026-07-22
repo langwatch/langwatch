@@ -27,7 +27,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	entries, nodeCodes, err := Parse(*root)
+	entries, nodeCodes, err := Parse(*root, stderr)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2

@@ -18,8 +18,12 @@ func fileRegistrations(
 	herrName, pkgDir string,
 	imports map[string]string,
 	modulePath string,
-) []Registration {
-	var found []Registration
+) ([]Registration, error) {
+	var (
+		found  []Registration
+		errs   []string
+		hasErr bool
+	)
 	ast.Inspect(file, func(node ast.Node) bool {
 		call, ok := node.(*ast.CallExpr)
 		if !ok || len(call.Args) != 2 || !isSelector(call.Fun, herrName, "RegisterStatus") {
@@ -29,11 +33,16 @@ func fileRegistrations(
 		if !ok {
 			return true
 		}
-		status, ok := statusValue(call.Args[1], imports)
+		position := fset.Position(call.Pos())
+		status, ok, err := statusValue(call.Args[1], imports)
+		if err != nil {
+			hasErr = true
+			errs = append(errs, fmt.Sprintf("%s:%d: %v", filepath.ToSlash(position.Filename), position.Line, err))
+			return true
+		}
 		if !ok {
 			return true
 		}
-		position := fset.Position(call.Pos())
 		found = append(found, Registration{
 			Code:   key,
 			Status: status,
@@ -41,7 +50,11 @@ func fileRegistrations(
 		})
 		return true
 	})
-	return found
+	if hasErr {
+		slices.Sort(errs)
+		return nil, fmt.Errorf("unresolvable HTTP status:\n  %s", strings.Join(errs, "\n  "))
+	}
+	return found, nil
 }
 
 // constKey renders the const a RegisterStatus call names as "pkgDir.ConstName",
@@ -66,26 +79,40 @@ func constKey(expr ast.Expr, pkgDir string, imports map[string]string, modulePat
 
 // statusValue resolves the status argument, either a net/http constant or a
 // plain integer literal.
-func statusValue(expr ast.Expr, imports map[string]string) (int, bool) {
+//
+// The three outcomes are deliberately distinct. A shape we do not read at all
+// (a variable, a helper call, a selector into some other package) returns
+// (0, false, nil) and the caller moves on. A `net/http` constant we cannot map
+// returns an error: the registration is unmistakably a status registration, so
+// skipping it would emit a status-less entry that looks exactly like a code
+// nobody registered. That is a gap in httpStatuses, and it should stop the run
+// rather than quietly change the generated file.
+func statusValue(expr ast.Expr, imports map[string]string) (int, bool, error) {
 	switch arg := expr.(type) {
 	case *ast.BasicLit:
 		if arg.Kind != token.INT {
-			return 0, false
+			return 0, false, nil
 		}
 		status, err := strconv.Atoi(arg.Value)
 		if err != nil {
-			return 0, false
+			return 0, false, nil
 		}
-		return status, true
+		return status, true, nil
 	case *ast.SelectorExpr:
 		qualifier, ok := arg.X.(*ast.Ident)
 		if !ok || imports[qualifier.Name] != "net/http" {
-			return 0, false
+			return 0, false, nil
 		}
 		status, ok := httpStatuses[arg.Sel.Name]
-		return status, ok
+		if !ok {
+			return 0, false, fmt.Errorf(
+				"http.%s is not in herrgen's status map; add it to httpStatuses in tools/herrgen/status.go",
+				arg.Sel.Name,
+			)
+		}
+		return status, true, nil
 	}
-	return 0, false
+	return 0, false, nil
 }
 
 // resolveStatuses maps each code string to its registered status, failing when

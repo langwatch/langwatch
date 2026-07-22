@@ -1,6 +1,7 @@
 package herrgen_test
 
 import (
+	"io"
 	"slices"
 	"strings"
 	"testing"
@@ -86,7 +87,7 @@ var _ = NodeError{Type: "engine_error"}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, got, err := herrgen.Parse(tree(t, test.files))
+			_, got, err := herrgen.Parse(tree(t, test.files), io.Discard)
 			if err != nil {
 				t.Fatalf("Parse() error = %v", err)
 			}

@@ -13,6 +13,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -78,7 +79,12 @@ func (e Entry) Primary() Declaration { return e.Declarations[0] }
 // It fails when two consts holding the same code string register different HTTP
 // statuses: herr's registry is keyed by the string, so one of the two would
 // silently win at runtime depending on init order.
-func Parse(root string) ([]Entry, []NodeCode, error) {
+//
+// A file that does not parse is skipped with a warning on warn rather than
+// failing the run: the tree contains hand-written Go that is never compiled
+// (documentation snippets rendered into the product UI), and one of those
+// failing to parse must not take the drift check down with it.
+func Parse(root string, warn io.Writer) ([]Entry, []NodeCode, error) {
 	modulePath, err := readModulePath(root)
 	if err != nil {
 		return nil, nil, err
@@ -108,7 +114,8 @@ func Parse(root string) ([]Entry, []NodeCode, error) {
 		// later reads as a path someone can open.
 		file, err := parser.ParseFile(fset, rel, source, parser.ParseComments)
 		if err != nil {
-			return nil, nil, fmt.Errorf("parse %s: %w", rel, err)
+			fmt.Fprintf(warn, "herrgen: skipping %s, it does not parse as Go: %v\n", rel, err)
+			continue
 		}
 
 		// NodeError literals need no import — they are plain composite literals
@@ -117,7 +124,10 @@ func Parse(root string) ([]Entry, []NodeCode, error) {
 		nodeSites = append(nodeSites, fileNodeErrorSites(file, rel)...)
 
 		imports := importsOf(file)
-		herrName := localNameFor(imports, modulePath+"/"+herrImportSuffix)
+		herrName, err := localNameFor(imports, modulePath+"/"+herrImportSuffix)
+		if err != nil {
+			return nil, nil, fmt.Errorf("%s: %w", rel, err)
+		}
 		if herrName == "" {
 			// Neither a declaration nor a registration can appear without the
 			// import, so there is nothing else here to read.
@@ -131,7 +141,11 @@ func Parse(root string) ([]Entry, []NodeCode, error) {
 			declarations = append(declarations, decl)
 			byConst[pkgDir+"."+decl.Name] = decl.Code
 		}
-		registrations = append(registrations, fileRegistrations(fset, file, herrName, pkgDir, imports, modulePath)...)
+		fileRegs, err := fileRegistrations(fset, file, herrName, pkgDir, imports, modulePath)
+		if err != nil {
+			return nil, nil, err
+		}
+		registrations = append(registrations, fileRegs...)
 	}
 
 	statuses, err := resolveStatuses(registrations, byConst)
@@ -144,9 +158,14 @@ func Parse(root string) ([]Entry, []NodeCode, error) {
 // goFiles lists the repository-relative non-test Go files under root.
 //
 // testdata is skipped for the same reason the go tool skips it: the Go inside is
-// a fixture, and its codes are not the product's.
+// a fixture, and its codes are not the product's. A directory with no go.mod at
+// or above it belongs to no module, so nothing there can compile and nothing
+// there can declare a code the services actually throw.
 func goFiles(root string) ([]string, error) {
 	var files []string
+	// inModule[dir] answers "does a go.mod sit at or above this directory".
+	// The walk is top-down, so a directory's parent is always already answered.
+	inModule := map[string]bool{}
 	err := filepath.WalkDir(root, func(abs string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -155,12 +174,17 @@ func goFiles(root string) ([]string, error) {
 		if relErr != nil {
 			return relErr
 		}
+		rel = filepath.ToSlash(rel)
 		if entry.IsDir() {
 			name := entry.Name()
-			if rel == "." {
-				return nil
+			if rel != "." && (strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" || name == "testdata") {
+				return filepath.SkipDir
 			}
-			if strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" || name == "testdata" {
+			// path.Dir(".") is "." and inModule has no entry for it yet, so the
+			// root falls through to its own go.mod check.
+			hasModule := inModule[path.Dir(rel)] || fileExists(filepath.Join(abs, "go.mod"))
+			inModule[rel] = hasModule
+			if !hasModule {
 				return filepath.SkipDir
 			}
 			return nil
@@ -218,13 +242,31 @@ func importsOf(file *ast.File) map[string]string {
 	return imports
 }
 
-func localNameFor(imports map[string]string, importPath string) string {
+// localNameFor returns the local name a file imports importPath under, or "" if
+// it does not import it at all.
+//
+// A dot import is rejected rather than reported as ".": every read below matches
+// a `herr.X` selector, which a dot import erases, so the file's codes would
+// vanish from the generated output without a word.
+func localNameFor(imports map[string]string, importPath string) (string, error) {
 	for name, candidate := range imports {
-		if candidate == importPath {
-			return name
+		if candidate != importPath {
+			continue
 		}
+		if name == "." {
+			return "", fmt.Errorf(
+				"dot-imports %s; herrgen reads codes as `herr.Code(...)` selectors and cannot see them without the qualifier",
+				importPath,
+			)
+		}
+		return name, nil
 	}
-	return ""
+	return "", nil
+}
+
+func fileExists(name string) bool {
+	info, err := os.Stat(name)
+	return err == nil && !info.IsDir()
 }
 
 var modulePattern = regexp.MustCompile(`(?m)^module\s+(\S+)\s*$`)
