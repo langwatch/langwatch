@@ -107,6 +107,8 @@ import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
 } from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
+import { ScenarioFailureHandler } from "../scenarios/scenario-failure-handler";
+import { ScenarioService } from "../scenarios/scenario.service";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
 import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
 import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
@@ -1103,6 +1105,19 @@ export class PipelineRegistry {
         scenarioExecutionReactor: scenarioExecutionHandle.reactor,
         traceMetricsSyncReactor,
         computeRunMetricsCommand,
+        // ADR-062: the `scenarioExecution` process writes the terminal state
+        // for a run whose worker died. The failure handler resolves the app
+        // lazily because it dispatches a command on the very pipeline being
+        // registered here.
+        scenarioExecutionDispatch: {
+          emitFailure: (params) =>
+            ScenarioFailureHandler.create().ensureFailureEventsEmitted(params),
+          lookupScenario: ({ projectId, scenarioId }) =>
+            ScenarioService.create(this.deps.prisma).getById({
+              projectId,
+              id: scenarioId,
+            }),
+        },
       }),
     );
 

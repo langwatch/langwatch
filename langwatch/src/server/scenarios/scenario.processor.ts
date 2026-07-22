@@ -16,7 +16,6 @@ import { createLogger } from "@langwatch/observability";
 import { type ChildProcess, spawn } from "child_process";
 import path from "path";
 import { env } from "~/env.mjs";
-import { getSharedClickHouseClient } from "../clickhouse/clickhouseClient";
 import {
   createContextFromJobData,
   getJobContextMetadata,
@@ -51,19 +50,12 @@ import type {
   ChildProcessJobData,
   ScenarioExecutionResult,
 } from "./execution/types";
-import { reconcileOrphanedRunsOnBoot } from "./orphaned-run-reconciliation.clickhouse";
 import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
 import { ScenarioService } from "./scenario.service";
 import {
   type FailureEventParams,
   ScenarioFailureHandler,
 } from "./scenario-failure-handler";
-import {
-  findQueuedRunCandidates,
-  LOOKBACK_MS,
-  ORPHAN_QUEUED_THRESHOLD_MS,
-  reconcileOrphanedQueuedRuns,
-} from "./scenario-orphan-reconciler";
 
 // ============================================================================
 // Dependency Interfaces (Dependency Inversion Principle)
@@ -674,49 +666,16 @@ export async function startScenarioProcessor(
     "Scenario processor started (event-driven)",
   );
 
-  // Belt-and-braces for hard kills (OOM/SIGKILL) where the graceful drain
-  // above never ran: reconcile runs left orphaned at QUEUED by a previous
-  // worker. Fire-and-forget — a slow or failing cross-tenant ClickHouse scan
-  // must never wedge worker startup. Uses the shared (non-tenant) client
-  // because the scan is intentionally cross-tenant.
-  const sharedClickHouseClient = getSharedClickHouseClient();
-  if (sharedClickHouseClient) {
-    const reconcilerNow = Date.now();
-    void reconcileOrphanedQueuedRuns({
-      findCandidates: () =>
-        findQueuedRunCandidates({
-          client: sharedClickHouseClient,
-          lookbackMs: LOOKBACK_MS,
-          now: reconcilerNow,
-          orphanThresholdMs: ORPHAN_QUEUED_THRESHOLD_MS,
-        }),
-      emitFailure: (candidate) =>
-        deps.failureEmitter.ensureFailureEventsEmitted({
-          projectId: candidate.projectId,
-          scenarioId: candidate.scenarioId,
-          setId: candidate.setId,
-          batchRunId: candidate.batchRunId,
-          scenarioRunId: candidate.scenarioRunId,
-          error:
-            "Reconciled: orphaned QUEUED run with no live worker (worker restart/crash)",
-        }),
-      now: reconcilerNow,
-      thresholdMs: ORPHAN_QUEUED_THRESHOLD_MS,
-    }).catch((err) => logger.warn({ err }, "orphan reconciler failed"));
-  }
-
-  // The sweep above only takes QUEUED runs terminal — a run nobody ever picked
-  // up. A run a dead worker had already STARTED is invisible to it and spins in
-  // the UI forever (#3195), so this second sweep takes the IN_PROGRESS orphans
-  // terminal. The two are disjoint by status and never touch the same run:
-  // queue wait cannot be read as worker death (nothing bounds it), while an
-  // idle IN_PROGRESS run past 2× the child timeout provably has no live worker.
-  // Fire-and-forget so a large/slow sweep never blocks worker startup.
-  void reconcileOrphanedRunsOnBoot({
-    failureEmitter: deps.failureEmitter,
-  }).catch((err: unknown) =>
-    logger.error({ err }, "Orphaned-run reconciliation failed on boot"),
-  );
+  // Stuck-run recovery is NOT here any more. Two cross-tenant ClickHouse
+  // sweeps used to run at this point — one for runs orphaned at QUEUED, one
+  // for runs orphaned at IN_PROGRESS — and because they ran only at boot, the
+  // recovery bound was the deploy cadence: a run abandoned an hour after the
+  // last restart waited for the next one.
+  //
+  // The `scenarioExecution` process manager on the simulation pipeline now
+  // holds that guarantee continuously. Every progress event re-arms its
+  // durable deadline; when one fires, it writes the terminal state itself.
+  // See ADR-062.
 
   return {
     close: async () => {
