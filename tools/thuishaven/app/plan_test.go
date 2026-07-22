@@ -46,3 +46,4 @@ func (stubProxy) Installed() bool                    { return false }
 func (stubProxy) EnsureReady() error                 { return nil }
 func (stubProxy) Endpoint() (string, int)            { return "https", 443 }
 func (stubProxy) CACertPath() string                 { return "" }
+func (stubProxy) Shutdown() error                    { return nil }

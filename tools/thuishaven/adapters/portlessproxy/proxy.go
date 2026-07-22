@@ -149,6 +149,14 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
+// Shutdown stops the proxy daemon (`haven down --all`). Not running is fine.
+func (p *Proxy) Shutdown() error {
+	if !p.Running() {
+		return nil
+	}
+	return p.runVerbose("proxy", "stop")
+}
+
 // Register points a hostname at a loopback port (idempotent via --force).
 func (p *Proxy) Register(service, slug string, port int) error {
 	return p.run("alias", p.naming.RouteName(service, slug), strconv.Itoa(port), "--force")

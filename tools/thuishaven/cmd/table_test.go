@@ -90,35 +90,35 @@ func TestParseRejectsUndeclaredFlags(t *testing.T) {
 }
 
 func TestParseRejectsUnexpectedPositionals(t *testing.T) {
-	// The old CLI silently ignored `haven seed demo` (running the default seed);
-	// the parser makes the footgun impossible for every command at once.
-	if _, err := parse(specByName(t, "seed"), []string{"demo"}); err == nil {
+	// The old CLI silently ignored unexpected positionals (`haven seed demo` ran
+	// the default seed); the parser makes the footgun impossible everywhere.
+	if _, err := parse(specByName(t, "down"), []string{"everything"}); err == nil {
 		t.Error("parse accepted a positional on a command that declares none")
 	}
 }
 
 func TestParseValueFlags(t *testing.T) {
 	t.Run("space-separated value", func(t *testing.T) {
-		inv, err := parse(specByName(t, "seed"), []string{"--preset", "demo"})
+		inv, err := parse(specByName(t, "hmr"), []string{"--ttl", "45s"})
 		if err != nil {
 			t.Fatalf("parse: %v", err)
 		}
-		if got := inv.value("--preset"); got != "demo" {
-			t.Errorf("value = %q, want demo", got)
+		if got := inv.value("--ttl"); got != "45s" {
+			t.Errorf("value = %q, want 45s", got)
 		}
 	})
 	t.Run("equals-embedded value", func(t *testing.T) {
-		inv, err := parse(specByName(t, "seed"), []string{"--preset=demo"})
+		inv, err := parse(specByName(t, "hmr"), []string{"--ttl=45s"})
 		if err != nil {
 			t.Fatalf("parse: %v", err)
 		}
-		if got := inv.value("--preset"); got != "demo" {
-			t.Errorf("value = %q, want demo", got)
+		if got := inv.value("--ttl"); got != "45s" {
+			t.Errorf("value = %q, want 45s", got)
 		}
 	})
 	t.Run("trailing value flag errors instead of silently defaulting", func(t *testing.T) {
-		if _, err := parse(specByName(t, "seed"), []string{"--preset"}); err == nil {
-			t.Error("parse accepted a trailing --preset with no value")
+		if _, err := parse(specByName(t, "hmr"), []string{"--ttl"}); err == nil {
+			t.Error("parse accepted a trailing --ttl with no value")
 		}
 	})
 }

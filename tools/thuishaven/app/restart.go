@@ -32,6 +32,11 @@ func (o *Orchestrator) Restart(ctx context.Context, p UpParams, name string) err
 // RestartStack is Restart addressed by slug — what the hub (which acts on any
 // registered stack, not just the current worktree's) calls.
 func (o *Orchestrator) RestartStack(ctx context.Context, slug, name string) error {
+	// The observability stack is shared, not a stack child — bounce it directly.
+	// It keeps no volume, so a restart is also how collected telemetry is reset.
+	if name == "obs" {
+		return o.restartObservability(ctx)
+	}
 	st, ok := o.stackBySlug(slug)
 	if !ok {
 		return fmt.Errorf("no registered stack %q — is it up? (haven up)", slug)
@@ -107,3 +112,19 @@ func restartableNames(st domain.Stack) []string {
 // ResolveSlug exposes slug resolution to the composition root (for log paths,
 // detached up).
 func (o *Orchestrator) ResolveSlug(p UpParams) (string, error) { return o.resolveSlug(p) }
+
+// restartObservability stops and re-ensures the shared LGTM stack, re-routing
+// its hostname. Telemetry starts fresh — the stack keeps no volume by design.
+func (o *Orchestrator) restartObservability(ctx context.Context) error {
+	if o.obs == nil {
+		return fmt.Errorf("observability is not managed here")
+	}
+	_ = o.obs.Stop(ctx)
+	endpoints, err := o.obs.Ensure(ctx)
+	if err != nil {
+		return err
+	}
+	o.routeObservability()
+	fmt.Printf("observability restarted — grafana %s (telemetry starts fresh; it keeps no volume)\n", endpoints.GrafanaURL())
+	return nil
+}

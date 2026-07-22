@@ -118,12 +118,13 @@ EXAMPLES
     haven pr 4913                # try PR #4913 locally in a fresh worktree
     haven                        # the hub: every stack + actions (git/down/destroy)
     haven git                    # git TUI for this worktree (haven git <slug> for another)
-    haven seed --preset demo     # reseed past onboarding, with sample traces
+    haven db reset --demo        # fresh databases, seeded past onboarding with sample data
     haven status                 # every stack + shared-server health, one shot
     haven status --json          # the same, machine-readable
     haven up --watch             # air hot-reload for gateway + nlp
     haven up --detach            # background the stack; haven logs -f to follow
     haven restart nlp            # bounce one Go service without hot reload
     haven down                   # stop the stack, keep the databases
+    haven down --all             # stop everything haven runs on this machine
     haven switch otel            # print the otel-* worktree's dir (cd via shell-init)
 `

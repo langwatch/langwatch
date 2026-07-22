@@ -496,26 +496,6 @@ func stripFlag(args []string, flag string) ([]string, bool) {
 	return out, found
 }
 
-// seedExtraEnv maps `haven seed`'s extra flags to the HAVEN_SEED_* switches
-// the seed script reads. Only explicit flags are emitted — env vars the user
-// already exported flow through the child's inherited environment untouched.
-func seedExtraEnv(inv invocation) []string {
-	var env []string
-	if inv.has("--first-message") {
-		env = append(env, "HAVEN_SEED_FIRST_MESSAGE=1")
-	}
-	if inv.has("--no-first-message") {
-		env = append(env, "HAVEN_SEED_FIRST_MESSAGE=0")
-	}
-	if inv.has("--skip-model-providers") {
-		env = append(env, "HAVEN_SEED_MODEL_PROVIDERS=0")
-	}
-	if inv.has("--skip-feature-flags") {
-		env = append(env, "HAVEN_SEED_FEATURE_FLAGS=0")
-	}
-	return env
-}
-
 // runUpgrade reinstalls the haven binary from this checkout via go install.
 func runUpgrade(ctx context.Context, d deps, _ invocation) error {
 	cmd := exec.CommandContext(ctx, "go", "install", "./cmd/haven")
