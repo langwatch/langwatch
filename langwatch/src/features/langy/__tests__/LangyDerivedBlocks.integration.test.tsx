@@ -55,6 +55,7 @@ vi.mock("recharts", async (importOriginal) => {
 });
 
 import { MessageContent } from "../components/MessageContent";
+import { LangyChoicesCard } from "../components/blocks/LangyChoicesCard";
 
 afterEach(cleanup);
 
@@ -317,6 +318,85 @@ describe("given a derived timeseries with hints", () => {
     );
     expect(screen.queryByText("Open in Traces")).toBeNull();
     expect(screen.getByText("Cost per day")).toBeDefined();
+  });
+});
+
+describe("given an option whose entity no longer exists", () => {
+  it("renders it disabled and says the thing is gone — unselectable", () => {
+    const onSelect = vi.fn();
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <LangyChoicesCard
+          card={{
+            kind: "choices",
+            blockId: "q-refs",
+            question: "Which agent?",
+            options: [
+              {
+                id: "live",
+                label: "checkout-agent",
+                ref: { type: "agent", id: "agent_live" },
+              },
+              {
+                id: "dead",
+                label: "retired-agent",
+                ref: { type: "agent", id: "agent_gone" },
+              },
+            ],
+          }}
+          lockState={{ status: "open" }}
+          onSelect={onSelect}
+          refRowsOverride={
+            new Map([
+              ["live", { state: "live", primary: "checkout-agent" }],
+              ["dead", { state: "dead" }],
+            ])
+          }
+        />
+      </ChakraProvider>,
+    );
+
+    expect(screen.getByText("No longer exists")).toBeDefined();
+    fireEvent.click(screen.getByText("retired-agent"));
+    expect(onSelect).not.toHaveBeenCalled();
+    // The live sibling stays selectable.
+    fireEvent.click(screen.getByText("checkout-agent"));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("given a question that allows Other", () => {
+  it("answers with the typed free text like any option would", () => {
+    const onSelect = vi.fn();
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <LangyChoicesCard
+          card={{
+            kind: "choices",
+            blockId: "q-other",
+            question: "Which agent?",
+            options: [{ id: "a", label: "Agent A" }],
+            allowOther: true,
+          }}
+          lockState={{ status: "open" }}
+          onSelect={onSelect}
+        />
+      </ChakraProvider>,
+    );
+
+    fireEvent.click(screen.getByText("Other…"));
+    fireEvent.change(screen.getByPlaceholderText("Your own answer…"), {
+      target: { value: "my local agent" },
+    });
+    fireEvent.click(screen.getByText("Send"));
+    expect(onSelect).toHaveBeenCalledWith({
+      selection: {
+        blockId: "q-other",
+        optionIds: [],
+        otherText: "my local agent",
+      },
+      card: expect.objectContaining({ blockId: "q-other" }) as unknown,
+    });
   });
 });
 
