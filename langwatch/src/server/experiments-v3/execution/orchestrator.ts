@@ -34,6 +34,7 @@ import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
@@ -50,7 +51,6 @@ import { generateOtelTraceId } from "~/utils/trace";
 import { abortManager } from "./abortManager";
 import { type LoadedWorkflow, workflowLoadKey } from "./dataLoader";
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
-import { nodeErrorToDomainError } from "./nodeErrorDomain";
 import {
   extractTargetOutput,
   mapNlpEvent,
@@ -1729,6 +1729,13 @@ export const buildTargetMetadata = ({
  * falsy target outputs (`false`, `0`, `""`) must persist as
  * `{ output: value }` (only null/undefined become a null `predicted`), and
  * error events must land as predicted-null rows carrying the error message.
+ *
+ * The stored message is the failure's OWN (`serverMessage`), not the wire
+ * line. This row is the run history that support and the customer's own run
+ * views read back; recording "This row couldn't be run" for a Prisma failure,
+ * an OOM and a bad mapping alike leaves nothing to read back. ADR-045 is about
+ * what the customer is shown live, not about erasing our own record — and
+ * `toClientEvent` is what keeps the two apart.
  */
 export const buildTargetResultDispatch = ({
   tenantId,
@@ -1780,8 +1787,8 @@ export const buildTargetResultDispatch = ({
       predicted: null,
       cost: null,
       duration: null,
-      error: event.message,
-      traceId: null,
+      error: event.serverMessage ?? event.message,
+      traceId: event.traceId ?? null,
       occurredAt,
     };
   }

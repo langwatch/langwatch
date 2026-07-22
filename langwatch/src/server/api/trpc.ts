@@ -122,6 +122,39 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
  */
 
 /**
+ * How deep to walk a `cause` chain looking for the message tRPC copied.
+ *
+ * `new TRPCError({ cause })` takes `cause.message` verbatim, and a wrapper
+ * (`new Error("…", { cause: driverErr })`) can re-donate the same string one
+ * level further down. Three links covers every wrapping we do; a bound also
+ * means a self-referential `cause` can't spin here.
+ */
+const MAX_CAUSE_DEPTH = 3;
+
+/**
+ * True when `message` is not our words but the caught error's own.
+ *
+ * tRPC's constructor defaults `message` to `cause.message`, so an inherited
+ * message and an authored one are indistinguishable by the time they reach
+ * this formatter — except by comparison with the cause that donated it. A
+ * procedure that writes its own sentence and passes `cause` for the log line
+ * produces a message that matches nothing in the chain, and is authored.
+ *
+ * Deliberately conservative: a procedure that writes `message: err.message`
+ * reads as inherited and degrades to the generic copy. Showing a driver
+ * string is the worse of the two mistakes.
+ */
+function isInheritedFromCause(message: string, cause: unknown): boolean {
+  let current = cause;
+  for (let depth = 0; depth < MAX_CAUSE_DEPTH; depth++) {
+    if (!(current instanceof Error)) return false;
+    if (current.message === message) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+/**
  * Extracted for testing — see
  * langwatch/src/server/api/__tests__/modelNotConfigured.trpc.integration.test.ts.
  * Keep `errorFormatter` in `t.create` calling this so production and
@@ -233,27 +266,34 @@ export function errorFormatterForTesting({
   //
   //   - `new TRPCError({ code: "NOT_FOUND" })` — tRPC defaults `message` to
   //     the code NAME, so the customer would read "NOT_FOUND".
-  //   - `new TRPCError({ code: "BAD_REQUEST", cause: err })` — the message is
-  //     inherited from whatever was caught, so a driver string ("fetch
-  //     failed", "Invalid time value") would be presented as our own copy.
-  //     That is the leak #5984 closed at 5xx, reopened one status class down.
+  //   - `new TRPCError({ code: "BAD_REQUEST", cause: err })` — tRPC defaults
+  //     `message` to the CAUSE's message, so a driver string ("fetch failed",
+  //     "Invalid time value") would be presented as our own copy. That is the
+  //     leak #5984 closed at 5xx, reopened one status class down.
+  //
+  // What is NOT an accident is `new TRPCError({ code, message: <copy>, cause:
+  // err })` — passing `cause` for the log line while writing the sentence
+  // yourself. That is the majority shape in this codebase, and an earlier
+  // version of this gate rejected it wholesale on `cause === undefined`,
+  // which told an admin who mistyped a rule field to "try again in a moment".
+  // So the test is authored-vs-INHERITED, not caused-vs-uncaused.
   //
   // Deciding this here rather than by sniffing the message client-side is the
   // difference between a fact and a guess.
   const isAuthoredMessage =
     !handled &&
     !isInternalServerError &&
-    error.cause === undefined &&
     typeof shape.message === "string" &&
     shape.message.length > 0 &&
-    shape.message !== error.code;
+    shape.message !== error.code &&
+    !isInheritedFromCause(shape.message, error.cause);
 
+  // tRPC includes stacks in development error shapes. Local callers should
+  // exercise the same safe wire contract as production callers — including on
+  // a plain 4xx, which used to keep its stack because this ran only for 5xx
+  // and handled errors.
   const shapeData = { ...shape.data };
-  if (isInternalServerError || handled) {
-    // tRPC includes stacks in development error shapes. Local callers should
-    // exercise the same safe wire contract as production callers.
-    delete shapeData.stack;
-  }
+  delete shapeData.stack;
 
   return {
     ...shape,

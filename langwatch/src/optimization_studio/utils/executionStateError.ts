@@ -3,7 +3,7 @@ import {
   explainSerializedError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "~/features/errors";
-import { nodeErrorToDomainError } from "~/server/experiments-v3/execution/nodeErrorDomain";
+import { nodeErrorToDomainError } from "./nodeErrorDomain";
 
 /**
  * An errored execution state, as the studio reads it.
@@ -47,23 +47,37 @@ const MAX_RAW_LENGTH = 160;
  * the message we have beats a comforting sentence that isn't accurate — this
  * is a builder surface, and the person reading it is debugging a workflow they
  * wrote. It is capped so a Go stack can't fill the toast.
+ *
+ * An UNRECOGNISED code takes the same fallback, for the same reason. The engine
+ * normalises what it emits — a Python `ValueError` in a code node arrives as
+ * `code_runner_error` with the class leading the message — so the registry
+ * should have copy for every code it mints. "Should" is the operative word: a
+ * browser tab open across a deploy holds a client older than the service that
+ * minted the code, and the registry it was built with has nothing for it.
+ * Presenting the fault-based headline there ("Something went wrong on our end")
+ * while discarding the exception the customer's own function raised is strictly
+ * worse than showing them the exception.
  */
 export function explainExecutionStateError(
   state: CodedExecutionFailure | undefined | null,
 ): ErrorExplanation {
-  if (state?.error_type) {
-    return explainSerializedError(
-      nodeErrorToDomainError({
-        errorType: state.error_type,
-        upstreamStatus: state.upstream_status,
-        traceId: state.trace_id,
-        spanId: state.span_id,
-      }),
-    );
-  }
+  const coded = state?.error_type
+    ? explainSerializedError(
+        nodeErrorToDomainError({
+          errorType: state.error_type,
+          upstreamStatus: state.upstream_status,
+          traceId: state.trace_id,
+          spanId: state.span_id,
+        }),
+      )
+    : null;
+
+  if (coded?.isRegistered) return coded;
 
   const raw = state?.error?.trim();
-  if (!raw) return UNKNOWN_ERROR_PRESENTATION;
+  // Nothing left to say in our own words: the fault-based headline beats
+  // "we've been notified" (which nobody was), and beats nothing at all.
+  if (!raw) return coded ?? UNKNOWN_ERROR_PRESENTATION;
 
   return {
     title: "That step didn't run",

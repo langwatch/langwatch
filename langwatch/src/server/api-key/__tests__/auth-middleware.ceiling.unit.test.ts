@@ -167,7 +167,12 @@ describe("requireApiKeyPermission()", () => {
         const res = await app.request("/");
 
         expect(res.status).toBe(403);
-        await expect(res.json()).resolves.toMatchObject({ error: "Forbidden" });
+        // The `error` field is the CODE, not the status text: the middleware
+        // answers with the same body `onError` would have built (ADR-045), so
+        // a caller keeps the code, the permission in `meta`, and the tips.
+        await expect(res.json()).resolves.toMatchObject({
+          error: "api_key_permission_denied",
+        });
         expect(handler).not.toHaveBeenCalled();
       });
     });

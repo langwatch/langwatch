@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StudioServerEvent } from "../../types/events";
 import type { WorkflowStore } from "../useWorkflowStore";
 
@@ -21,7 +21,40 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
+import { toaster } from "../../../components/ui/toaster";
 import { useHandleServerMessage } from "../usePostEvent";
+
+const toastCreate = vi.mocked(toaster.create);
+
+/** The toast `alertOnError` raised, or undefined if it never fired. */
+function lastToast() {
+  return toastCreate.mock.calls.at(-1)?.[0] as
+    | {
+        id?: string;
+        title?: string;
+        description?: string;
+        type?: string;
+      }
+    | undefined;
+}
+
+function handleErroredExecution(
+  executionState: Record<string, unknown>,
+): ReturnType<typeof lastToast> {
+  const { result } = renderHook(() =>
+    useHandleServerMessage({
+      workflowStore: createMockStore(),
+      alertOnComponent: vi.fn(),
+    }),
+  );
+
+  result.current({
+    type: "execution_state_change",
+    payload: { execution_state: { status: "error", ...executionState } },
+  } as StudioServerEvent);
+
+  return lastToast();
+}
 
 function createMockStore(
   overrides: Partial<WorkflowStore> = {},
@@ -47,6 +80,10 @@ function createMockStore(
 }
 
 describe("useHandleServerMessage", () => {
+  beforeEach(() => {
+    toastCreate.mockClear();
+  });
+
   describe("when component_state_change completes", () => {
     it("does not auto-select the node (avoids jumping during multi-node workflows)", () => {
       const store = createMockStore();
@@ -199,6 +236,118 @@ describe("useHandleServerMessage", () => {
 
         expect(store.setSelectedNode).toHaveBeenCalledWith("end-node");
       });
+    });
+  });
+});
+
+/**
+ * `alertOnError` decides what a failed run SAYS. Every branch of it — the
+ * words, where they come from, whether the toast is red, and whether a second
+ * failure replaces the first — is only observable through the toaster.
+ */
+describe("alertOnError", () => {
+  beforeEach(() => {
+    toastCreate.mockClear();
+  });
+
+  describe("given a coded failure", () => {
+    it("uses the registry's copy, not the engine's message", () => {
+      const toast = handleErroredExecution({
+        error_type: "invalid_dataset",
+        error:
+          'dataset: column "expected_output" missing at /tmp/lw-run-9/rows.jsonl',
+      });
+
+      expect(toast?.type).toBe("error");
+      expect(toast?.title).not.toContain("expected_output");
+      expect(toast?.title).not.toContain("/tmp/");
+      expect(toast?.description ?? "").not.toContain("/tmp/");
+    });
+  });
+
+  describe("given an uncoded failure", () => {
+    it("shows the message we do have rather than claiming we were notified", () => {
+      const toast = handleErroredExecution({
+        error: "Timeout",
+      });
+
+      expect(toast?.type).toBe("error");
+      expect(toast?.description).toBe("Timeout");
+    });
+
+    it("caps a wall of Go so it cannot fill the toast", () => {
+      const wall = "goroutine stack ".repeat(40);
+      const toast = handleErroredExecution({ error: wall });
+
+      expect(toast?.description).toBeDefined();
+      expect(toast!.description!.length).toBeLessThan(wall.length);
+      expect(toast!.description!.length).toBeLessThanOrEqual(160);
+    });
+  });
+
+  describe("when two different uncoded failures arrive", () => {
+    /**
+     * The dedupe id is keyed on what the toast SAYS. Keying it on
+     * `error_type` alone collapsed every uncoded failure onto one id, so the
+     * second one silently replaced the first instead of stacking beside it.
+     */
+    it("gives them two toast ids", () => {
+      handleErroredExecution({ error: "Timeout" });
+      const first = lastToast()?.id;
+      handleErroredExecution({ error: "Connection reset" });
+      const second = lastToast()?.id;
+
+      expect(first).toBeDefined();
+      expect(second).toBeDefined();
+      expect(first).not.toBe(second);
+    });
+  });
+
+  describe("when two failures share a code the registry has no copy for", () => {
+    /**
+     * `engine.go` forwards the code runner's own error type, so two unrelated
+     * Python failures can arrive under the same unregistered code. They
+     * present from their raw messages, so they must not share a toast id.
+     */
+    it("gives them two toast ids", () => {
+      handleErroredExecution({
+        error_type: "ValueError",
+        error: "invalid literal for int() with base 10: 'abc'",
+      });
+      const first = lastToast()?.id;
+      handleErroredExecution({
+        error_type: "ValueError",
+        error: "could not convert string to float: 'x'",
+      });
+      const second = lastToast()?.id;
+
+      expect(first).not.toBe(second);
+    });
+  });
+
+  describe("when the run was deliberately cancelled", () => {
+    /**
+     * The engine emits `context_canceled`, which matches neither of the words
+     * the prose fallback looks for — so pressing Stop used to raise a red
+     * "something went wrong".
+     */
+    it("does not toast the cancel as an error", () => {
+      const toast = handleErroredExecution({
+        error_type: "context_canceled",
+        error: "context canceled",
+      });
+
+      expect(toast?.type).toBe("info");
+      expect(toast?.title).toBe("Stopped");
+    });
+
+    it("still recognises a stop announced only in prose", () => {
+      const toast = handleErroredExecution({
+        error: "Execution was stopped by the user",
+      });
+
+      expect(toast?.type).toBe("info");
+      expect(toast?.title).toBe("Stopped");
     });
   });
 });

@@ -17,6 +17,26 @@ import { useWorkflowStore, type WorkflowStore } from "./useWorkflowStore";
 const logger = createLogger("langwatch:wizard:usePostEvent");
 let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;
 
+/** The engine's code for "somebody pressed stop", not a failure. */
+const STOP_ERROR_TYPE = "context_canceled";
+
+/**
+ * Whether a failed state is really a cancellation.
+ *
+ * The code is asked first because it is the fact: the engine emits
+ * `context_canceled` for a deliberate stop, and it matches neither of the
+ * words the prose check looks for — so a user who pressed Stop got a red
+ * "something went wrong" toast for doing exactly what they meant to.
+ *
+ * The prose check stays as the fallback for the frames that carry no code at
+ * all (the stream's top-level `error`, the optimization runner).
+ */
+function isDeliberateStop(failure: CodedExecutionFailure | undefined): boolean {
+  if (failure?.error_type === STOP_ERROR_TYPE) return true;
+  const raw = failure?.error?.toLowerCase() ?? "";
+  return raw.includes("stopped") || raw.includes("interrupted");
+}
+
 export const PostEventProvider = ({
   children,
 }: {
@@ -203,25 +223,27 @@ export const useHandleServerMessage = ({
    * Toasts a failed run.
    *
    * The words come from the state's `error_type` via the code-keyed registry
-   * (ADR-045). A state with no code falls back to its raw message — see
+   * (ADR-045). A state with no code — or one whose code the registry has no
+   * copy for — falls back to its raw message. See
    * `explainExecutionStateError`, which explains why saying "we've been
    * notified" there would be untrue.
    */
   const alertOnError = useCallback(
     (failure: CodedExecutionFailure | undefined) => {
       const explanation = explainExecutionStateError(failure);
-      const rawMessage = failure?.error?.toLowerCase() ?? "";
-      const wasStopped =
-        rawMessage.includes("stopped") || rawMessage.includes("interrupted");
+      const wasStopped = isDeliberateStop(failure);
 
       // Keyed by what the toast actually SAYS, so a repeating failure (the
       // engine down while the studio retries) updates one toast instead of
       // stacking a wall of them — while two different failures stay two
       // toasts. Keying on `error_type` alone collapsed every uncoded failure
       // onto one id, so a second, different one would silently replace the
-      // first.
+      // first — and that includes a code the registry doesn't know, which
+      // presents from its raw message just like an uncoded one does.
       const dedupeId = `studio-${wasStopped ? "stopped" : "error"}-${
-        failure?.error_type ?? explanation.title + explanation.description
+        explanation.isRegistered
+          ? failure?.error_type
+          : explanation.title + explanation.description
       }`;
 
       if (wasStopped) {
