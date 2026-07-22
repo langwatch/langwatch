@@ -2,11 +2,30 @@ package app
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
+
+// ObservabilityLogs streams the shared LGTM container's docker logs — the
+// `haven logs obs` target, so the observability stack is a log target like
+// any service.
+func (o *Orchestrator) ObservabilityLogs(ctx context.Context, follow bool) error {
+	if o.container == nil {
+		return fmt.Errorf("no container runtime configured")
+	}
+	dockerHost, err := o.container.Ensure(ctx)
+	if err != nil {
+		return err
+	}
+	shell := "docker logs --tail 200 " + domain.ObservabilityContainer
+	if follow {
+		shell = "docker logs --tail 200 -f " + domain.ObservabilityContainer
+	}
+	return o.sup.RunOnce(ctx, "obs", o.cfg.RepoRoot, shell, []string{"DOCKER_HOST=" + dockerHost})
+}
 
 // linkObservability records the collector's port on the stack — which is what
 // makes OverlayEnv emit the OTel vars — and routes the shared hostname. It is

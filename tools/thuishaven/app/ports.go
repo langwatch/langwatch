@@ -100,6 +100,10 @@ type Child struct {
 	// gets a non-5xx response — so a lane that depends on another (the web/app on
 	// the API) never starts before what it needs is serving. Empty = start now.
 	ReadyProbeURL string
+	// LogPath, if set, captures every output line (timestamped) to this file —
+	// size-capped with one rotated generation — whether the stack runs attached
+	// or detached. It is what `haven logs` reads (ADR-064: logs are a tap).
+	LogPath string
 }
 
 // System is the set of OS facts the app needs, behind a port so it can be faked.
