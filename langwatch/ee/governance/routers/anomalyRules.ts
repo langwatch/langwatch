@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import {
+  AnomalyRuleService,
+  SUPPORTED_SCOPES,
+  SUPPORTED_SEVERITIES,
+} from "@ee/governance/services/activity-monitor/anomalyRule.service";
 /**
  * tRPC router for AnomalyRule admin CRUD.
  *
@@ -18,12 +23,6 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
-import {
-  AnomalyRuleService,
-  SUPPORTED_SCOPES,
-  SUPPORTED_SEVERITIES,
-} from "@ee/governance/services/activity-monitor/anomalyRule.service";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,
@@ -47,7 +46,10 @@ const enterpriseGate = requireEnterprisePlan(
  * Anything else re-throws unchanged so genuine internal errors stay
  * visible.
  */
-function translateConfigValidationError(err: unknown, ruleType?: string): never {
+function translateConfigValidationError(
+  err: unknown,
+  ruleType?: string,
+): never {
   if (err instanceof z.ZodError) {
     // Detect which config the issues belong to so the error message
     // points the admin at the right field. Both threshold-config and
@@ -68,10 +70,7 @@ function translateConfigValidationError(err: unknown, ruleType?: string): never 
       cause: err,
     });
   }
-  if (
-    err instanceof Error &&
-    /Unsupported ruleType/i.test(err.message)
-  ) {
+  if (err instanceof Error && /Unsupported ruleType/i.test(err.message)) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: err.message,
@@ -84,9 +83,7 @@ function translateConfigValidationError(err: unknown, ruleType?: string): never 
 const severitySchema = z.enum(
   SUPPORTED_SEVERITIES as readonly [string, ...string[]],
 );
-const scopeSchema = z.enum(
-  SUPPORTED_SCOPES as readonly [string, ...string[]],
-);
+const scopeSchema = z.enum(SUPPORTED_SCOPES as readonly [string, ...string[]]);
 const statusSchema = z.enum(["active", "disabled"]);
 
 function toDto(row: {
@@ -212,7 +209,9 @@ export const anomalyRulesRouter = createTRPCRouter({
           organizationId: input.organizationId,
           name: input.name,
           description: input.description,
-          severity: input.severity as (typeof SUPPORTED_SEVERITIES)[number] | undefined,
+          severity: input.severity as
+            | (typeof SUPPORTED_SEVERITIES)[number]
+            | undefined,
           ruleType: input.ruleType,
           scope: input.scope as (typeof SUPPORTED_SCOPES)[number] | undefined,
           scopeId: input.scopeId,
@@ -232,10 +231,7 @@ export const anomalyRulesRouter = createTRPCRouter({
     .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
-      const archived = await service.archive(
-        input.id,
-        input.organizationId,
-      );
+      const archived = await service.archive(input.id, input.organizationId);
       return toDto(archived);
     }),
 });

@@ -4,8 +4,8 @@ import {
   describe,
   expect,
   it,
-  vi,
   type Mock,
+  vi,
 } from "vitest";
 import { adminClient, impersonateUser } from "../adminClient";
 
@@ -21,11 +21,12 @@ describe("adminClient", () => {
   let fetchMock: Mock;
 
   beforeEach(() => {
-    fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ data: [], total: 0 }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
+    fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ data: [], total: 0 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
     );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
   });
@@ -60,9 +61,7 @@ describe("adminClient", () => {
 
     it("defaults pagination, sort, and filter when params are partial", async () => {
       await adminClient.getList("organization", {});
-      const body = JSON.parse(
-        fetchMock.mock.calls[0]![1].body as string,
-      );
+      const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
       expect(body.params.pagination).toEqual({ page: 1, perPage: 25 });
       expect(body.params.sort).toEqual({ field: "id", order: "ASC" });
       expect(body.params.filter).toEqual({});
@@ -104,9 +103,9 @@ describe("adminClient", () => {
       fetchMock.mockResolvedValueOnce(
         new Response("boom", { status: 500, statusText: "Server Error" }),
       );
-      await expect(
-        adminClient.getList("user", {}),
-      ).rejects.toThrow(/user\/getList failed \(500\): boom/);
+      await expect(adminClient.getList("user", {})).rejects.toThrow(
+        /user\/getList failed \(500\): boom/,
+      );
     });
   });
 });
@@ -116,8 +115,9 @@ describe("impersonateUser", () => {
   let fetchMock: Mock;
 
   beforeEach(() => {
-    fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ message: "ok" }), { status: 200 }),
+    fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ message: "ok" }), { status: 200 }),
     );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
   });

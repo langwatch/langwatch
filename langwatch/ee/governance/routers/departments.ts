@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import {
+  DepartmentAssignmentTargetNotFoundError,
+  DepartmentNotFoundError,
+  DepartmentService,
+} from "@ee/governance/services/department/department.service";
 /**
  * tRPC router for departments: org-scoped CRUD plus assignment of users,
  * teams, and projects. Reads gate on `governance:view`, writes on
@@ -9,12 +14,6 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
-import {
-  DepartmentAssignmentTargetNotFoundError,
-  DepartmentNotFoundError,
-  DepartmentService,
-} from "@ee/governance/services/department/department.service";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";

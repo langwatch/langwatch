@@ -9,9 +9,7 @@ import {
   observeIngestionPullDuration,
 } from "~/server/metrics";
 
-import {
-  type IngestionPullRunIntent,
-} from "./ingestionPullProcess.types";
+import type { IngestionPullRunIntent } from "./ingestionPullProcess.types";
 
 const logger = createLogger("langwatch:governance:ingestion-pull-effects");
 

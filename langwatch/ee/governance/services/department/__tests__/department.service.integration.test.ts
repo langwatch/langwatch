@@ -7,17 +7,15 @@
 import { OrganizationUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import {
-  DepartmentAssignmentTargetNotFoundError,
-  DepartmentService,
-} from "../department.service";
-
 import { prisma } from "../../../../../src/server/db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../../src/server/event-sourcing/__tests__/integration/testContainers";
+import {
+  DepartmentAssignmentTargetNotFoundError,
+  DepartmentService,
+} from "../department.service";
 
 describe("DepartmentService", () => {
   const ns = `dept-${nanoid(8)}`;
@@ -48,7 +46,12 @@ describe("DepartmentService", () => {
       },
     });
     await prisma.team.create({
-      data: { id: TEAM_ID, name: TEAM_ID, slug: `team-${ns}`, organizationId: ORG_ID },
+      data: {
+        id: TEAM_ID,
+        name: TEAM_ID,
+        slug: `team-${ns}`,
+        organizationId: ORG_ID,
+      },
     });
     await prisma.project.create({
       data: {
@@ -67,9 +70,13 @@ describe("DepartmentService", () => {
     await prisma.department.deleteMany({
       where: { organizationId: { in: [ORG_ID, OTHER_ORG_ID] } },
     });
-    await prisma.project.deleteMany({ where: { team: { organizationId: ORG_ID } } });
+    await prisma.project.deleteMany({
+      where: { team: { organizationId: ORG_ID } },
+    });
     await prisma.team.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.user.deleteMany({ where: { email: { contains: ns } } });
     await prisma.organization.deleteMany({
       where: { id: { in: [ORG_ID, OTHER_ORG_ID] } },
@@ -115,7 +122,9 @@ describe("DepartmentService", () => {
         departmentId: marketing.id,
       });
       let membership = await prisma.organizationUser.findUniqueOrThrow({
-        where: { userId_organizationId: { userId: ROBIN, organizationId: ORG_ID } },
+        where: {
+          userId_organizationId: { userId: ROBIN, organizationId: ORG_ID },
+        },
       });
       expect(membership.departmentId).toBe(marketing.id);
 
@@ -125,7 +134,9 @@ describe("DepartmentService", () => {
         departmentId: sales.id,
       });
       membership = await prisma.organizationUser.findUniqueOrThrow({
-        where: { userId_organizationId: { userId: ROBIN, organizationId: ORG_ID } },
+        where: {
+          userId_organizationId: { userId: ROBIN, organizationId: ORG_ID },
+        },
       });
       expect(membership.departmentId).toBe(sales.id);
     });
@@ -149,7 +160,9 @@ describe("DepartmentService", () => {
         departmentId: engineering.id,
       });
 
-      const team = await prisma.team.findUniqueOrThrow({ where: { id: TEAM_ID } });
+      const team = await prisma.team.findUniqueOrThrow({
+        where: { id: TEAM_ID },
+      });
       const project = await prisma.project.findUniqueOrThrow({
         where: { id: PROJECT_ID },
       });
@@ -180,7 +193,9 @@ describe("DepartmentService", () => {
       // Unassigned because the archived department is absent from the active
       // name map.
       const membership = await prisma.organizationUser.findUniqueOrThrow({
-        where: { userId_organizationId: { userId: ROBIN, organizationId: ORG_ID } },
+        where: {
+          userId_organizationId: { userId: ROBIN, organizationId: ORG_ID },
+        },
       });
       expect(membership.departmentId).toBe(legacy.id);
       const activeIds = listed.map((c) => c.id);

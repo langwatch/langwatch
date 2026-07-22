@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
-import type {
-  GatewayBudgetLedgerStatus,
-  PrismaClient,
-} from "@prisma/client";
+import type { GatewayBudgetLedgerStatus, PrismaClient } from "@prisma/client";
 import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type { ReactorContext, ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
-import {
-  type BudgetDebitRow,
+import type {
+  ReactorContext,
+  ReactorDefinition,
+} from "~/server/event-sourcing/reactors/reactor.types";
+import type {
+  BudgetDebitRow,
   GatewayBudgetClickHouseRepository,
 } from "~/server/gateway/budget.clickhouse.repository";
 import type {
@@ -112,8 +112,7 @@ export function createGatewayBudgetSyncReactor(
         // row on every request.
         const now = new Date();
         const shouldTouch =
-          !vk.lastUsedAt ||
-          now.getTime() - vk.lastUsedAt.getTime() > 60 * 1000;
+          !vk.lastUsedAt || now.getTime() - vk.lastUsedAt.getTime() > 60 * 1000;
         logger.info(
           {
             projectId,
@@ -179,7 +178,8 @@ export function createGatewayBudgetSyncReactor(
           virtualKeyId: vk.id,
           principalUserId: vk.principalUserId,
         };
-        const budgets = await deps.budgetRepository.applicableForRequest(scopes);
+        const budgets =
+          await deps.budgetRepository.applicableForRequest(scopes);
         if (budgets.length === 0) return;
 
         const amountUsd = formatDecimal(foldState.totalCost ?? 0);

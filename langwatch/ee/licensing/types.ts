@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { PlanInfo } from "./planInfo";
 import type { LicenseError } from "./constants";
+import type { PlanInfo } from "./planInfo";
 
 /** Plan limits embedded within a license */
 export const LicensePlanLimitsSchema = z.object({
@@ -136,7 +136,11 @@ type ValidLicenseStatus = {
   organizationName: string;
 } & LicenseResourceLimits;
 
-export type LicenseStatus = NoLicenseStatus | UnreadableLicenseStatus | InvalidLicenseStatus | ValidLicenseStatus;
+export type LicenseStatus =
+  | NoLicenseStatus
+  | UnreadableLicenseStatus
+  | InvalidLicenseStatus
+  | ValidLicenseStatus;
 
 /** Result of storing a license */
 export type StoreLicenseResult =

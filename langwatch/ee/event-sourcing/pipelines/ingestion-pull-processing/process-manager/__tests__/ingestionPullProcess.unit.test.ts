@@ -1,15 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { ingestionPullPM } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/pipeline";
 
 import { INGESTION_PULL_EVENT_TYPES } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/constants";
 import type { IngestionPullProcessingEvent } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
-import { ingestionPullPM } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/pipeline";
+import { describe, expect, it } from "vitest";
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
 import type {
   ProcessDefinition,
   ProcessEventEnvelope,
   ProcessInput,
 } from "~/server/event-sourcing/process-manager";
+import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
 
 import {
   INGESTION_PULL_PROCESS_NAME,

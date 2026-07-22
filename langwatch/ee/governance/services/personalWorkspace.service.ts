@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { generate } from "@langwatch/ksuid";
 /**
  * PersonalWorkspaceService — owns the lifecycle of a user's "Personal
  * Workspace" inside an organization.
@@ -28,7 +29,6 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
@@ -125,9 +125,7 @@ export class PersonalWorkspaceService {
       // email part (jane@acme.com → "jane"), otherwise a fallback. Slug
       // gets a nanoid suffix to avoid global slug collisions across orgs.
       const displayLabel =
-        displayName?.trim() ||
-        displayEmail?.split("@")[0] ||
-        "user";
+        displayName?.trim() || displayEmail?.split("@")[0] || "user";
       const teamName = `${displayLabel}'s Workspace`;
       const teamSlug = `personal-${userId.toLowerCase().slice(0, 12)}-${nanoid(6).toLowerCase()}`;
       const projectSlug = `personal-${userId.toLowerCase().slice(0, 12)}-${nanoid(6).toLowerCase()}`;

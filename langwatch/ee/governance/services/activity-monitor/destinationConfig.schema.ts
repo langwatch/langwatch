@@ -80,7 +80,10 @@ export function safeParseDestinationConfig(
   | { ok: false; error: z.ZodError } {
   // Common case: empty/missing config means "no destinations" — that's
   // explicit log-only behavior, not a validation failure.
-  if (!config || (typeof config === "object" && Object.keys(config).length === 0)) {
+  if (
+    !config ||
+    (typeof config === "object" && Object.keys(config).length === 0)
+  ) {
     return { ok: true, data: { destinations: [] } };
   }
   const result = destinationConfigSchema.safeParse(config);

@@ -27,10 +27,9 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { prisma } from "~/server/db";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { TokenResolver } from "~/server/api-key/token-resolver";
+import { prisma } from "~/server/db";
 
 import { IngestionKeyService } from "../ingestionKey.service";
 
@@ -68,7 +67,12 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
       },
     });
     await prisma.team.create({
-      data: { id: TEAM_ID, organizationId: ORG_ID, name: `team ${suffix}`, slug: `team-${suffix}` },
+      data: {
+        id: TEAM_ID,
+        organizationId: ORG_ID,
+        name: `team ${suffix}`,
+        slug: `team-${suffix}`,
+      },
     });
     await prisma.project.create({
       data: {
@@ -82,7 +86,12 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
       },
     });
     await prisma.team.create({
-      data: { id: OTHER_TEAM_ID, organizationId: ORG_ID, name: `team2 ${suffix}`, slug: `team2-${suffix}` },
+      data: {
+        id: OTHER_TEAM_ID,
+        organizationId: ORG_ID,
+        name: `team2 ${suffix}`,
+        slug: `team2-${suffix}`,
+      },
     });
     await prisma.project.create({
       data: {
@@ -98,16 +107,30 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
   });
 
   afterAll(async () => {
-    await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } }).catch(() => undefined);
-    await prisma.apiKey.deleteMany({ where: { organizationId: ORG_ID } }).catch(() => undefined);
-    await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } }).catch(() => undefined);
+    await prisma.roleBinding
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
+    await prisma.apiKey
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
+    await prisma.customRole
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
     await prisma.project
       .deleteMany({ where: { teamId: { in: [TEAM_ID, OTHER_TEAM_ID] } } })
       .catch(() => undefined);
-    await prisma.team.deleteMany({ where: { organizationId: ORG_ID } }).catch(() => undefined);
-    await prisma.organizationUser.deleteMany({ where: { organizationId: ORG_ID } }).catch(() => undefined);
-    await prisma.user.deleteMany({ where: { id: USER_ID } }).catch(() => undefined);
-    await prisma.organization.deleteMany({ where: { id: ORG_ID } }).catch(() => undefined);
+    await prisma.team
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
+    await prisma.organizationUser
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
+    await prisma.user
+      .deleteMany({ where: { id: USER_ID } })
+      .catch(() => undefined);
+    await prisma.organization
+      .deleteMany({ where: { id: ORG_ID } })
+      .catch(() => undefined);
   });
 
   describe("when an ingest key is issued for a project", () => {
@@ -123,7 +146,10 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
 
       // The OTLP exporter inside the wrapped tool sends the bearer token
       // alone — no projectId. The key must resolve to its bound project.
-      const resolved = await resolver.resolve({ token: issued.token, projectId: null });
+      const resolved = await resolver.resolve({
+        token: issued.token,
+        projectId: null,
+      });
       expect(resolved).not.toBeNull();
       expect(resolved?.type).toBe("apiKey");
       if (resolved?.type === "apiKey") {
@@ -159,7 +185,9 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
         organizationId: ORG_ID,
         permissionMode: "restricted",
         permissions: ["traces:create"],
-        bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        bindings: [
+          { role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID },
+        ],
       });
 
       // A single PROJECT-scoped binding is unambiguous, so the key resolves to
@@ -219,13 +247,17 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
       });
       expect(second.token).not.toBe(first.token);
 
-      expect(await resolver.resolve({ token: first.token, projectId: null })).toBeNull();
-      const live = await resolver.resolve({ token: second.token, projectId: null });
+      expect(
+        await resolver.resolve({ token: first.token, projectId: null }),
+      ).toBeNull();
+      const live = await resolver.resolve({
+        token: second.token,
+        projectId: null,
+      });
       expect(live?.type).toBe("apiKey");
       if (live?.type === "apiKey") {
         expect(live.project.id).toBe(OTHER_PROJECT_ID);
       }
     });
   });
-
 });

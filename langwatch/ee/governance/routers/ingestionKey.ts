@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 /**
  * tRPC router for ingestion keys — the user-side mint/rotate/list flow for
  * personal-project trace ingest. An "ingestion key" is one row of the single
@@ -17,8 +18,6 @@
  * before issuing the new one), so a tool never accumulates keys.
  */
 import { z } from "zod";
-
-import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";

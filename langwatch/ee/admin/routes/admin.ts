@@ -9,35 +9,35 @@
  *   - POST|DELETE /api/admin/impersonate
  *   - POST        /api/admin/:resource   (ra-data-simple-prisma)
  */
+
+import { HandledError } from "@langwatch/handled-error";
+import { PlanTypes, type Prisma, SubscriptionStatus } from "@prisma/client";
 import {
   defaultHandler,
-  getListHandler,
-  getOneHandler,
   type GetListRequest,
   type GetOneRequest,
+  getListHandler,
+  getOneHandler,
 } from "ra-data-simple-prisma";
-import { PlanTypes, Prisma, SubscriptionStatus } from "@prisma/client";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { auth as betterAuth } from "~/server/better-auth";
-import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 import { auditLog } from "~/server/auditLog";
+import { getServerAuthSession } from "~/server/auth";
+import { auth as betterAuth } from "~/server/better-auth";
+import { prisma } from "~/server/db";
 import { UserService } from "~/server/users/user.service";
-import { HandledError } from "@langwatch/handled-error";
-import { isAdmin } from "../isAdmin";
 import {
-  ORGANIZATION_SAFE_SELECT,
-  PROJECT_SAFE_SELECT,
-} from "../safeSelects";
-import {
-  USER_BACKOFFICE_INCLUDE,
   mapUserToBackofficeRow,
+  USER_BACKOFFICE_INCLUDE,
   type UserWithBackofficeIncludes,
 } from "../backoffice/userVisibility";
 import { ImpersonationService } from "../impersonation.service";
+import { isAdmin } from "../isAdmin";
+import { ORGANIZATION_SAFE_SELECT, PROJECT_SAFE_SELECT } from "../safeSelects";
 
 const secured = createServiceApp({ basePath: "/api" });
-const adminAuth = handlerManagedAuth("super-admin session validated in-handler via isAdmin");
+const adminAuth = handlerManagedAuth(
+  "super-admin session validated in-handler via isAdmin",
+);
 
 const ALLOWED_RESOURCES = new Set([
   "user",
@@ -58,8 +58,12 @@ const ALLOWED_RESOURCES = new Set([
 // the helper below maps those to HTTP status codes, keeping the route
 // thin and leaving the rules in one testable place.
 
-secured.access(adminAuth).post("/admin/impersonate", async (c) => handleImpersonate(c, "POST"));
-secured.access(adminAuth).delete("/admin/impersonate", async (c) => handleImpersonate(c, "DELETE"));
+secured
+  .access(adminAuth)
+  .post("/admin/impersonate", async (c) => handleImpersonate(c, "POST"));
+secured
+  .access(adminAuth)
+  .delete("/admin/impersonate", async (c) => handleImpersonate(c, "DELETE"));
 
 async function handleImpersonate(c: any, method: "POST" | "DELETE") {
   const session = await getServerAuthSession({ req: c.req.raw as any });

@@ -1,5 +1,8 @@
 import { createLogger } from "@langwatch/observability";
-import { getClickHouseClientForOrganization, getClickHouseClientForProject } from "../../../src/server/clickhouse/clickhouseClient";
+import {
+  getClickHouseClientForOrganization,
+  getClickHouseClientForProject,
+} from "../../../src/server/clickhouse/clickhouseClient";
 
 const logger = createLogger("langwatch:billing:billableEventsQuery");
 
@@ -17,7 +20,7 @@ export function getBillingMonth(now: Date = new Date()): string {
  */
 export function getPreviousBillingMonth(now: Date = new Date()): string {
   const prev = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1),
   );
   return getBillingMonth(prev);
 }
@@ -52,7 +55,7 @@ export async function queryBillableEventsTotal({
   if (!client) {
     logger.warn(
       { organizationId },
-      "ClickHouse not available, skipping billable events query"
+      "ClickHouse not available, skipping billable events query",
     );
     return null;
   }
@@ -92,7 +95,7 @@ export async function queryBillableEventsTotalUniq({
   if (!client) {
     logger.warn(
       { organizationId },
-      "ClickHouse not available, skipping billable events query"
+      "ClickHouse not available, skipping billable events query",
     );
     return null;
   }
@@ -136,7 +139,7 @@ export async function queryTraceSummariesTotalUniq({
   if (!client) {
     logger.warn(
       { projectIds },
-      "ClickHouse not available, skipping trace summaries query"
+      "ClickHouse not available, skipping trace summaries query",
     );
     return null;
   }
@@ -176,7 +179,7 @@ export async function queryBillableEventsByProjectApprox({
   if (!client) {
     logger.warn(
       { organizationId },
-      "ClickHouse not available, skipping billable events by project query"
+      "ClickHouse not available, skipping billable events by project query",
     );
     return [];
   }
@@ -219,7 +222,7 @@ export async function queryBillableEventsByProject({
   if (!client) {
     logger.warn(
       { organizationId },
-      "ClickHouse not available, skipping billable events by project query"
+      "ClickHouse not available, skipping billable events by project query",
     );
     return [];
   }

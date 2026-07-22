@@ -10,7 +10,12 @@ import { FREE_PLAN, PUBLIC_KEY } from "./constants";
 import { resolvePlanDefaults } from "./defaults";
 import { OrganizationNotFoundError } from "./errors";
 import type { PlanInfo } from "./planInfo";
-import type { LicensePlanLimits, LicenseStatus, RemoveLicenseResult, StoreLicenseResult } from "./types";
+import type {
+  LicensePlanLimits,
+  LicenseStatus,
+  RemoveLicenseResult,
+  StoreLicenseResult,
+} from "./types";
 import { parseLicenseKey, validateLicense } from "./validation";
 
 const logger = createLogger("langwatch:licensing:licenseHandler");
@@ -20,7 +25,9 @@ const logger = createLogger("langwatch:licensing:licenseHandler");
  * Follows Interface Segregation Principle - only what we need.
  */
 export interface ITraceUsageService {
-  getCurrentMonthCount(params: { organizationId: string }): Promise<number | "unlimited">;
+  getCurrentMonthCount(params: {
+    organizationId: string;
+  }): Promise<number | "unlimited">;
 }
 
 interface LicenseHandlerConfig {
@@ -61,7 +68,6 @@ export class LicenseHandler {
     this.repository = config.repository;
     this.traceUsageService = config.traceUsageService ?? null;
   }
-
 
   /**
    * Gets the active plan for an organization based on its stored license.
@@ -105,7 +111,7 @@ export class LicenseHandler {
    */
   async validateAndStoreLicense(
     organizationId: string,
-    licenseKey: string
+    licenseKey: string,
   ): Promise<StoreLicenseResult> {
     // Validate the license before storing
     const result = validateLicense({ licenseKey, publicKey: this.publicKey });
@@ -221,7 +227,10 @@ export class LicenseHandler {
     // For valid licenses, use data from validationResult (avoids second parse)
     if (validationResult.valid) {
       const { licenseData } = validationResult;
-      const resourceCounts = await this.getResourceCounts(organizationId, licenseData.plan);
+      const resourceCounts = await this.getResourceCounts(
+        organizationId,
+        licenseData.plan,
+      );
       return {
         hasLicense: true,
         valid: true,
@@ -240,7 +249,10 @@ export class LicenseHandler {
     }
 
     const { data: licenseData } = signedLicense;
-    const resourceCounts = await this.getResourceCounts(organizationId, licenseData.plan);
+    const resourceCounts = await this.getResourceCounts(
+      organizationId,
+      licenseData.plan,
+    );
     return {
       hasLicense: true,
       valid: false,
@@ -255,7 +267,10 @@ export class LicenseHandler {
   /**
    * Fetches all resource counts for an organization and combines with plan limits.
    */
-  private async getResourceCounts(organizationId: string, plan: LicensePlanLimits) {
+  private async getResourceCounts(
+    organizationId: string,
+    plan: LicensePlanLimits,
+  ) {
     // Resolve defaults for optional plan fields
     const resolved = resolvePlanDefaults(plan);
 
@@ -264,7 +279,8 @@ export class LicenseHandler {
     // Returns 0 if service not provided (e.g., in tests).
     // "unlimited" is resolved to 0 since license display needs a numeric value.
     const messagesCountPromise = this.traceUsageService
-      ? this.traceUsageService.getCurrentMonthCount({ organizationId })
+      ? this.traceUsageService
+          .getCurrentMonthCount({ organizationId })
           .then((count) => (count === "unlimited" ? 0 : count))
       : Promise.resolve(0);
 

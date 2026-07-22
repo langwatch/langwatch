@@ -4,8 +4,8 @@ import {
   GOVERNANCE_ATTR,
   GOVERNANCE_ORIGIN_KIND_VALUE,
 } from "@ee/governance/services/governanceAttributeKeys";
-import {
-  type GovernanceKpiContribution,
+import type {
+  GovernanceKpiContribution,
   GovernanceKpisClickHouseRepository,
 } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";

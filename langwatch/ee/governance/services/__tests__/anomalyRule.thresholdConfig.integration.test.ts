@@ -22,6 +22,9 @@
  *
  * Spec: specs/ai-gateway/governance/anomaly-rule-threshold-schema.feature
  */
+
+import { FREE_PLAN } from "@ee/licensing/constants";
+import type { PlanInfo } from "@ee/licensing/planInfo";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -29,17 +32,12 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { FREE_PLAN } from "@ee/licensing/constants";
-import type { PlanInfo } from "@ee/licensing/planInfo";
-
-import { prisma } from "~/server/db";
+import { appRouter } from "~/server/api/root";
+import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
-
-import { appRouter } from "~/server/api/root";
-import { createInnerTRPCContext } from "~/server/api/trpc";
+import { prisma } from "~/server/db";
 import { safeParseSpendSpikeThresholdConfig } from "../activity-monitor/thresholdConfig.schema";
 
 const ns = `tcfg-${nanoid(8)}`;
@@ -49,7 +47,7 @@ let organizationId: string;
 let adminUserId: string;
 
 beforeAll(async () => {
-  resetApp();
+  await resetApp();
   globalForApp.__langwatch_app = createTestApp({
     planProvider: PlanProviderService.create({
       getActivePlan: async () => enterprisePlan,
@@ -74,7 +72,11 @@ beforeAll(async () => {
   });
   adminUserId = admin.id;
   await prisma.organizationUser.create({
-    data: { userId: admin.id, organizationId, role: OrganizationUserRole.ADMIN },
+    data: {
+      userId: admin.id,
+      organizationId,
+      role: OrganizationUserRole.ADMIN,
+    },
   });
   await prisma.teamUser.create({
     data: { userId: admin.id, teamId: team.id, role: TeamUserRole.ADMIN },
@@ -91,15 +93,27 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.anomalyRule.deleteMany({ where: { organizationId } }).catch(() => {});
-  await prisma.roleBinding.deleteMany({ where: { organizationId } }).catch(() => {});
+  await prisma.anomalyRule
+    .deleteMany({ where: { organizationId } })
+    .catch(() => {});
+  await prisma.roleBinding
+    .deleteMany({ where: { organizationId } })
+    .catch(() => {});
   await prisma.teamUser
     .deleteMany({ where: { team: { slug: { startsWith: `--tcfg-team-` } } } })
     .catch(() => {});
-  await prisma.organizationUser.deleteMany({ where: { organizationId } }).catch(() => {});
-  await prisma.team.deleteMany({ where: { slug: { startsWith: `--tcfg-team-` } } }).catch(() => {});
-  await prisma.organization.deleteMany({ where: { slug: `--tcfg-${ns}` } }).catch(() => {});
-  await prisma.user.deleteMany({ where: { email: `tcfg-admin-${ns}@example.com` } }).catch(() => {});
+  await prisma.organizationUser
+    .deleteMany({ where: { organizationId } })
+    .catch(() => {});
+  await prisma.team
+    .deleteMany({ where: { slug: { startsWith: `--tcfg-team-` } } })
+    .catch(() => {});
+  await prisma.organization
+    .deleteMany({ where: { slug: `--tcfg-${ns}` } })
+    .catch(() => {});
+  await prisma.user
+    .deleteMany({ where: { email: `tcfg-admin-${ns}@example.com` } })
+    .catch(() => {});
 });
 
 function callerFor(userId: string) {

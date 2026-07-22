@@ -13,10 +13,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 type Client = Prisma.TransactionClient | PrismaClient;
 
 export class GovernanceAuditRepository {
-  emit(
-    client: Client,
-    data: Prisma.AuditLogUncheckedCreateInput,
-  ) {
+  emit(client: Client, data: Prisma.AuditLogUncheckedCreateInput) {
     return client.auditLog.create({ data });
   }
 }

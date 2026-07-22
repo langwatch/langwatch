@@ -1,5 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { AdminWorkspaceViewAuditService } from "@ee/governance/services/adminWorkspaceViewAudit.service";
+import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import { GovernanceOcsfExportService } from "@ee/governance/services/governanceOcsfExport.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import {
+  type PersonaResolution,
+  resolvePersonaHomeSafe,
+} from "@ee/governance/services/personaResolver.service";
+import {
+  QUARANTINE_DEFAULT_THRESHOLD,
+  QUARANTINE_DEFAULT_WINDOW_SECONDS,
+  QuarantineFillEvaluator,
+} from "@ee/governance/services/quarantineFillEvaluator.service";
+import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 /**
  * tRPC router for cross-cutting governance read-side queries that
  * don't fit neatly under the more focused governance routers
@@ -16,26 +30,6 @@
  *       specs/ai-gateway/governance/siem-export.feature
  */
 import { z } from "zod";
-
-import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
-import {
-  resolvePersonaHomeSafe,
-  type PersonaResolution,
-} from "@ee/governance/services/personaResolver.service";
-import { getApp } from "~/server/app-layer/app";
-import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
-import { featureFlagService } from "~/server/featureFlag";
-import { GovernanceOcsfExportService } from "@ee/governance/services/governanceOcsfExport.service";
-import {
-  QUARANTINE_DEFAULT_THRESHOLD,
-  QUARANTINE_DEFAULT_WINDOW_SECONDS,
-  QuarantineFillEvaluator,
-} from "@ee/governance/services/quarantineFillEvaluator.service";
-import { AdminWorkspaceViewAuditService } from "@ee/governance/services/adminWorkspaceViewAudit.service";
-import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-
 import {
   ENTERPRISE_FEATURE_ERRORS,
   requireEnterprisePlan,
@@ -45,6 +39,10 @@ import {
   hasOrganizationPermission,
 } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { featureFlagService } from "~/server/featureFlag";
+import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 
 export const governanceRouter = createTRPCRouter({
   /**
@@ -289,9 +287,7 @@ export const governanceRouter = createTRPCRouter({
         async (tenantId) => {
           const client = await getClickHouseClientForProject(tenantId);
           if (!client) {
-            throw new Error(
-              `ClickHouse not available for tenant ${tenantId}`,
-            );
+            throw new Error(`ClickHouse not available for tenant ${tenantId}`);
           }
           return client;
         },

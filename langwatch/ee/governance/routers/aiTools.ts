@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import {
+  AiToolEntryService,
+  SUPPORTED_TILE_TYPES,
+} from "@ee/governance/services/aiToolEntry.service";
 /**
  * tRPC router for the AI Tools Portal catalog (Phase 7).
  *
@@ -22,11 +26,6 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
-import {
-  AiToolEntryService,
-  SUPPORTED_TILE_TYPES,
-} from "@ee/governance/services/aiToolEntry.service";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -224,9 +223,7 @@ export const aiToolsRouter = createTRPCRouter({
           departmentIds: input.departmentIds,
           order: input.order,
           enabled: input.enabled,
-          type: input.type as
-            | (typeof SUPPORTED_TILE_TYPES)[number]
-            | undefined,
+          type: input.type as (typeof SUPPORTED_TILE_TYPES)[number] | undefined,
           config: input.config,
           actorUserId: ctx.session.user.id,
         });

@@ -8,7 +8,9 @@ const KNOWN_USAGE_UNITS = ["traces", "events"] as const;
  * This provides compile-time safety that all limits have defined values.
  */
 // TODO: remove the Omit when evaluationsCredit is dropped from LicensePlanLimitsSchema
-export type ResolvedPlanLimits = Required<Omit<LicensePlanLimits, "evaluationsCredit">>;
+export type ResolvedPlanLimits = Required<
+  Omit<LicensePlanLimits, "evaluationsCredit">
+>;
 
 /**
  * Applies default values to optional fields in LicensePlanLimits.
@@ -24,7 +26,9 @@ export type ResolvedPlanLimits = Required<Omit<LicensePlanLimits, "evaluationsCr
  * @param plan - License plan limits with optional fields
  * @returns Plan limits with all fields guaranteed to have values
  */
-export function resolvePlanDefaults(plan: LicensePlanLimits): ResolvedPlanLimits {
+export function resolvePlanDefaults(
+  plan: LicensePlanLimits,
+): ResolvedPlanLimits {
   return {
     // Pass through required fields unchanged
     type: plan.type,

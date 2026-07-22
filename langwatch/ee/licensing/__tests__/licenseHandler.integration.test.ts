@@ -1,26 +1,19 @@
-import {
-  beforeAll,
-  afterAll,
-  afterEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "../../../src/server/db";
-import { LicenseHandler, type ITraceUsageService } from "../licenseHandler";
+import { LicenseEnforcementRepository } from "../../../src/server/license-enforcement/license-enforcement.repository";
+import { FREE_PLAN } from "../constants";
 import { OrganizationNotFoundError } from "../errors";
+import { type ITraceUsageService, LicenseHandler } from "../licenseHandler";
+import { TEST_PUBLIC_KEY } from "./fixtures/testKeys";
 import {
   BASE_LICENSE,
   ENTERPRISE_LICENSE,
-  VALID_LICENSE_KEY,
-  EXPIRED_LICENSE_KEY,
-  TAMPERED_LICENSE_KEY,
   ENTERPRISE_LICENSE_KEY,
+  EXPIRED_LICENSE_KEY,
   GARBAGE_DATA,
+  TAMPERED_LICENSE_KEY,
+  VALID_LICENSE_KEY,
 } from "./fixtures/testLicenses";
-import { TEST_PUBLIC_KEY } from "./fixtures/testKeys";
-import { FREE_PLAN } from "../constants";
-import { LicenseEnforcementRepository } from "../../../src/server/license-enforcement/license-enforcement.repository";
 
 // Mock TraceUsageService for testing - returns 0 for all counts
 const mockTraceUsageService: ITraceUsageService = {
@@ -214,14 +207,14 @@ describe("LicenseHandler Integration", () => {
     it("stores valid license and returns success with planInfo", async () => {
       const result = await handler.validateAndStoreLicense(
         organizationId,
-        ENTERPRISE_LICENSE_KEY
+        ENTERPRISE_LICENSE_KEY,
       );
 
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.planInfo.type).toBe(ENTERPRISE_LICENSE.plan.type);
         expect(result.planInfo.maxMembers).toBe(
-          ENTERPRISE_LICENSE.plan.maxMembers
+          ENTERPRISE_LICENSE.plan.maxMembers,
         );
       }
 
@@ -243,7 +236,7 @@ describe("LicenseHandler Integration", () => {
     it("returns error for invalid license format", async () => {
       const result = await handler.validateAndStoreLicense(
         organizationId,
-        GARBAGE_DATA
+        GARBAGE_DATA,
       );
 
       expect(result.success).toBe(false);
@@ -262,7 +255,7 @@ describe("LicenseHandler Integration", () => {
     it("returns error for invalid signature", async () => {
       const result = await handler.validateAndStoreLicense(
         organizationId,
-        TAMPERED_LICENSE_KEY
+        TAMPERED_LICENSE_KEY,
       );
 
       expect(result.success).toBe(false);
@@ -275,7 +268,7 @@ describe("LicenseHandler Integration", () => {
     it("returns error for expired license", async () => {
       const result = await handler.validateAndStoreLicense(
         organizationId,
-        EXPIRED_LICENSE_KEY
+        EXPIRED_LICENSE_KEY,
       );
 
       expect(result.success).toBe(false);
@@ -286,7 +279,10 @@ describe("LicenseHandler Integration", () => {
 
     it("throws OrganizationNotFoundError for non-existent org", async () => {
       await expect(
-        handler.validateAndStoreLicense("non-existent-org-id", VALID_LICENSE_KEY)
+        handler.validateAndStoreLicense(
+          "non-existent-org-id",
+          VALID_LICENSE_KEY,
+        ),
       ).rejects.toThrow(OrganizationNotFoundError);
     });
 
@@ -297,14 +293,14 @@ describe("LicenseHandler Integration", () => {
       // Then store ENTERPRISE license
       const result = await handler.validateAndStoreLicense(
         organizationId,
-        ENTERPRISE_LICENSE_KEY
+        ENTERPRISE_LICENSE_KEY,
       );
 
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.planInfo.type).toBe(ENTERPRISE_LICENSE.plan.type);
         expect(result.planInfo.maxMembers).toBe(
-          ENTERPRISE_LICENSE.plan.maxMembers
+          ENTERPRISE_LICENSE.plan.maxMembers,
         );
       }
 
@@ -366,7 +362,7 @@ describe("LicenseHandler Integration", () => {
 
     it("throws OrganizationNotFoundError for non-existent org", async () => {
       await expect(
-        handler.removeLicense("non-existent-org-id")
+        handler.removeLicense("non-existent-org-id"),
       ).rejects.toThrow(OrganizationNotFoundError);
     });
   });

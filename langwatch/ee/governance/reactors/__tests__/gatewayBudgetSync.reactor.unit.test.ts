@@ -19,7 +19,7 @@ vi.mock("@langwatch/observability", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 function createFoldState(
@@ -91,12 +91,16 @@ const event: TraceProcessingEvent = {
 } as unknown as TraceProcessingEvent;
 
 function mockDeps(
-  vk:
-    | { id: string; organizationId: string; principalUserId: string | null }
-    | null,
-  project:
-    | { id: string; teamId: string; team: { organizationId: string } }
-    | null,
+  vk: {
+    id: string;
+    organizationId: string;
+    principalUserId: string | null;
+  } | null,
+  project: {
+    id: string;
+    teamId: string;
+    team: { organizationId: string };
+  } | null,
   budgets: GatewayBudget[] = [],
 ): {
   deps: GatewayBudgetSyncReactorDeps;

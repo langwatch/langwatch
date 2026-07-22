@@ -31,7 +31,10 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 
-import { PersonalVirtualKeyService, PersonalVirtualKeyNotFoundError } from "../personalVirtualKey.service";
+import {
+  PersonalVirtualKeyNotFoundError,
+  PersonalVirtualKeyService,
+} from "../personalVirtualKey.service";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-pvk-${suffix}`;

@@ -24,6 +24,8 @@
  * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  *       (@bdd @governance-api @audit-uniform)
  */
+
+import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
 import {
   type Organization,
   OrganizationUserRole,
@@ -36,18 +38,16 @@ import {
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
-
 import { app as governanceApp } from "~/app/api/governance/[[...route]]/app";
 import { projectFactory } from "~/factories/project.factory";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
-  PlanProviderService,
   type PlanProvider,
+  PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
 
 import { FREE_PLAN } from "../../../licensing/constants";
 
@@ -79,11 +79,14 @@ describe("Audit uniformity: identical payload shape across all governance surfac
   });
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
-        getActivePlan: vi.fn().mockResolvedValue(FREE_PLAN) as unknown as
-          PlanProvider["getActivePlan"],
+        getActivePlan: vi
+          .fn()
+          .mockResolvedValue(
+            FREE_PLAN,
+          ) as unknown as PlanProvider["getActivePlan"],
       }),
       usageLimits: {
         notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
@@ -105,9 +108,9 @@ describe("Audit uniformity: identical payload shape across all governance surfac
       },
     });
 
-    const projectInput = (projectFactory.build as unknown as (
-      override: Partial<Project>,
-    ) => Project)({ slug: nanoid() });
+    const projectInput = (
+      projectFactory.build as unknown as (override: Partial<Project>) => Project
+    )({ slug: nanoid() });
     testProject = await prisma.project.create({
       data: { ...projectInput, teamId: testTeam.id } as unknown as Parameters<
         typeof prisma.project.create
@@ -188,7 +191,9 @@ describe("Audit uniformity: identical payload shape across all governance surfac
     }
     userIds.length = 0;
     for (const id of orgIds) {
-      await prisma.organization.delete({ where: { id } }).catch(() => undefined);
+      await prisma.organization
+        .delete({ where: { id } })
+        .catch(() => undefined);
     }
     orgIds.length = 0;
   });

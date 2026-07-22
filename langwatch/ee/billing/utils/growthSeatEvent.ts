@@ -1,8 +1,8 @@
 import type { Currency } from "@prisma/client";
 import { InvalidSeatCountError } from "../errors";
+import { type PlanTypes as PlanType, PlanTypes } from "../planTypes";
 import { prices } from "../stripe/stripePriceCatalog";
 import type { StripePriceName } from "../stripe/stripePrices.types";
-import { PlanTypes, type PlanTypes as PlanType } from "../planTypes";
 
 /** Set of all GROWTH_SEAT price IDs resolved from the Stripe catalog. */
 const GROWTH_SEAT_PRICE_IDS = new Set([
