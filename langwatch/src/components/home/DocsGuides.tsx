@@ -3,16 +3,19 @@ import type { IconType } from "react-icons";
 import {
   LuArrowUpRight,
   LuBookOpen,
-  LuBot,
   LuCirclePlay,
   LuEye,
   LuRocket,
   LuScroll,
-  LuSparkles,
   LuSquareCode,
-  LuTerminal,
 } from "react-icons/lu";
 import { HomeCard } from "./HomeCard";
+import {
+  HOME_SECTION_GAP,
+  HOME_SECTION_PADDING,
+  HomeSectionHeader,
+} from "./HomeSectionHeader";
+import { OnboardAgentPill } from "./OnboardAgentPill";
 
 /**
  * Docs & guides, said out loud: a card of four first-class guide links (not
@@ -78,80 +81,29 @@ const GUIDES: Guide[] = [
   },
 ];
 
-export function DocsGuides() {
+export function DocsGuides({
+  showOnboardPill = true,
+}: {
+  /**
+   * The Langy home moves the onboarding pill up into its lit block, so it
+   * turns this one off rather than showing the same route twice on one page.
+   */
+  showOnboardPill?: boolean;
+} = {}) {
   return (
-    <HomeCard cursor="default" padding={4} height="full" width="full">
-      <VStack align="stretch" gap={3} width="full">
-        <HStack justify="space-between" align="center" gap={3} wrap="wrap">
-          <HStack gap={2} align="baseline">
-            <Text
-              fontFamily="mono"
-              fontSize="10.5px"
-              letterSpacing="0.1em"
-              textTransform="uppercase"
-              color="fg.subtle"
-            >
-              The Odyssey
-            </Text>
-            <Text
-              fontFamily="mono"
-              fontSize="10.5px"
-              color="fg.subtle"
-              opacity={0.7}
-            >
-              · docs & guides
-            </Text>
-          </HStack>
-          {/* Agent onboarding, Cloudflare-style: friendly copy, tool glyphs
-              in their own small tiles. Lives here with the rest of the
-              docs — the page header stays uncrowded. */}
-          <chakra.a
-            href="https://docs.langwatch.ai/integration/overview"
-            target="_blank"
-            rel="noreferrer"
-            display="inline-flex"
-            alignItems="center"
-            gap={2}
-            whiteSpace="nowrap"
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="full"
-            background="bg.surface"
-            paddingLeft={3}
-            paddingRight="4px"
-            paddingY="3px"
-            transition="border-color 130ms ease, background 130ms ease"
-            _hover={{
-              borderColor: "border.emphasized",
-              background: "bg.muted",
-            }}
-          >
-            <chakra.span fontSize="12px" color="fg">
-              Onboard your agent
-            </chakra.span>
-            <HStack gap="3px">
-              {[
-                { Glyph: LuBot, color: "fg.muted" },
-                { Glyph: LuTerminal, color: "fg.muted" },
-                { Glyph: LuSparkles, color: "orange.fg" },
-              ].map(({ Glyph, color }, i) => (
-                <Box
-                  key={i}
-                  boxSize="18px"
-                  borderRadius="5px"
-                  background="bg.muted"
-                  borderWidth="1px"
-                  borderColor="border.muted"
-                  display="grid"
-                  placeItems="center"
-                  color={color}
-                >
-                  <Glyph size={10} />
-                </Box>
-              ))}
-            </HStack>
-          </chakra.a>
-        </HStack>
+    <HomeCard
+      cursor="default"
+      padding={HOME_SECTION_PADDING}
+      height="full"
+      width="full"
+    >
+      <VStack align="stretch" gap={HOME_SECTION_GAP} width="full">
+        {/* "The Odyssey" was an internal name for this card, and a reader
+            meeting it on their first day learns nothing from it. The title now
+            says what the section is (copywriting.md: no internal codenames). */}
+        <HomeSectionHeader title="Docs and guides">
+          {showOnboardPill ? <OnboardAgentPill /> : null}
+        </HomeSectionHeader>
         <Grid templateColumns={{ base: "1fr", sm: "1fr 1fr" }} gap={1}>
           {GUIDES.map((guide) => (
             <GuideTile key={guide.title} guide={guide} />

@@ -9,6 +9,9 @@ Recipes are domain-specific, use-case-specific skills that solve particular prob
 | `test-cli-usability` | Write scenario tests to ensure your CLI is usable by AI agents |
 | `debug-instrumentation` | Debug and improve your LangWatch traces |
 | `agent-best-practices` | Expert AI engineering consultant for your agent development practices |
+| `debug-with-langwatch` | Root-cause production errors: errored traces → spans → monitor/evaluator scores |
+| `eval-triage` | Investigate failing experiments and evaluation regressions |
+| `setup-lw` | Set up and troubleshoot the LangWatch CLI (login, endpoint, project) |
 | `evaluate-multimodal` | Evaluate multimodal agents (images, audio, PDFs) |
 | `generate-rag-dataset` | Generate synthetic evaluation dataset from your RAG knowledge base |
 | `test-compliance` | Test that your agent stays observational in regulated domains |

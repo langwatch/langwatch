@@ -90,6 +90,7 @@ import {
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import { LangyFeedbackPromptService } from "~/server/app-layer/langy/langy-feedback-prompt.service";
 import { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
 import {
   LangyGithubAppTokenService,
@@ -992,6 +993,9 @@ export function initializeDefaultApp(options?: {
     credentials: LangyCredentialService.create(prisma),
     resolveModel: getVercelAIModel,
     worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,
+    // The durable buffer backs a user Stop: reconstruct the partial answer and
+    // end the live stream (ADR-058). Null without Redis, like the stores below.
+    tokenBuffer: redis ? langyTokenBuffer : null,
     reservePermit: reserveLangyGithubPrPermit,
     releasePermit: releaseLangyGithubPrPermit,
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
@@ -1004,6 +1008,10 @@ export function initializeDefaultApp(options?: {
     admission: langyTurnAdmission,
     accessStore: redis ? createLangyTurnAccessStore({ redis }) : null,
     handoffStore: redis ? langyHandoffStore : null,
+    // A follow-up turn is told what earlier turns of the same conversation
+    // created — the agent's own worker forgets it whenever it is reaped or
+    // respawned (see `langyConversationMemory`).
+    messages: langyMessageRepository,
   });
 
   const suiteRunService = SuiteRunService.create({
@@ -1202,6 +1210,10 @@ export function initializeDefaultApp(options?: {
       credentials: traced(
         LangyCredentialService.create(prisma),
         "LangyCredentialService",
+      ),
+      feedbackPrompt: traced(
+        new LangyFeedbackPromptService({ redis }),
+        "LangyFeedbackPromptService",
       ),
     },
     organizations,
@@ -1406,6 +1418,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           throw new Error("no model provider in test app");
         },
         worker: null,
+        tokenBuffer: null,
         reservePermit: async () => ({
           reserved: false,
           allowed: false,
@@ -1420,6 +1433,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         admission: new NullLangyTurnAdmissionRepository(),
         accessStore: null,
         handoffStore: null,
+        messages: new NullLangyMessageRepository(),
       }),
       messages: new LangyMessageService(
         new NullLangyMessageRepository(),
@@ -1430,6 +1444,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         new LangyGithubAppTokenService("", "", null),
       ),
       credentials: LangyCredentialService.create(testPrisma),
+      feedbackPrompt: new LangyFeedbackPromptService({ redis: null }),
     },
     organizations: nullOrganizations,
     projects: nullProjects,

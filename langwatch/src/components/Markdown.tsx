@@ -10,9 +10,11 @@ import {
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
+import { useRouter } from "~/utils/compat/next-router";
 import { ConfirmDialog } from "./gateway/ConfirmDialog";
 import { RenderCode } from "./code/RenderCode";
 import { getProxiedImageUrl } from "./ExternalImage";
+import { Link as UiLink } from "./ui/link";
 import { Prose } from "./ui/prose";
 
 const logger = createLogger("langwatch:components:Markdown");
@@ -31,6 +33,7 @@ function MarkdownWithPluginsAndProxy({
   className,
   fontSize = "14px",
   linkVariant = "default",
+  color,
   children,
 }: {
   className?: string;
@@ -42,6 +45,11 @@ function MarkdownWithPluginsAndProxy({
   fontSize?: string;
   /** Langy spends its one accent on useful navigation. */
   linkVariant?: "default" | "langy";
+  /**
+   * Base text colour, overriding Prose's full-brightness `fg`. Langy dims its
+   * answers a step below the user's words so the hierarchy reads at a glance.
+   */
+  color?: string;
   children: string;
 }) {
   if (typeof children !== "string") {
@@ -55,7 +63,12 @@ function MarkdownWithPluginsAndProxy({
     url.startsWith("data:") ? url : defaultUrlTransform(url);
 
   return (
-    <Prose className={className} fontSize={fontSize} maxWidth="none">
+    <Prose
+      className={className}
+      fontSize={fontSize}
+      maxWidth="none"
+      {...(color ? { color } : {})}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         urlTransform={urlTransform}
@@ -110,6 +123,16 @@ function textOf(node: ReactNode): string {
     .trim();
 }
 
+/**
+ * A same-app destination we can hand to the SPA router — an absolute path like
+ * `/my-project/messages/abc123`. Protocol-relative (`//host`) and absolute
+ * (`https://…`) URLs are external and must get a real navigation, so a trace
+ * link inside the app stays SPA while a GitHub PR link opens for real.
+ */
+export function isInternalHref(href: string): boolean {
+  return href.startsWith("/") && !href.startsWith("//");
+}
+
 function normaliseDisplayedUrl(value: string): string | null {
   const clean = value.trim().replace(/[.,;:!?]+$/, "");
   if (!/^https?:\/\//i.test(clean)) return null;
@@ -138,32 +161,72 @@ function MarkdownLink({
   href?: string;
   variant: "default" | "langy";
 } & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "color">) {
+  const router = useRouter();
   const [warningOpen, setWarningOpen] = useState(false);
   const label = textOf(children);
   const mismatched = isMismatchedUrlLabel(label, href);
   const langy = variant === "langy";
+  // An absolute http(s) destination leaves the app: it gets Chakra's external
+  // link treatment (new tab, `rel="noopener noreferrer"`) instead of
+  // navigating the SPA away mid-read. In-app paths SPA-navigate through the
+  // router so the surrounding page (and an open Langy panel) stays mounted.
+  const isExternal = /^https?:\/\//i.test(href);
+
+  /** SPA-navigate an in-app path; anything else gets a real navigation. */
+  const navigate = () => {
+    if (isInternalHref(href)) {
+      void router.push(href);
+    } else {
+      window.location.assign(href);
+    }
+  };
+
+  const styleProps = {
+    color: langy ? "orange.fg" : undefined,
+    textDecorationColor: langy ? "orange.muted" : undefined,
+    background: mismatched ? "orange.subtle" : undefined,
+    borderRadius: mismatched ? "sm" : undefined,
+    paddingX: mismatched ? "2px" : undefined,
+    // Keep a markdown-authored title (`[text](url "title")`) unless the
+    // mismatch warning needs the slot.
+    title: mismatched ? `Displayed URL differs from ${href}` : rest.title,
+    "data-mismatched-url": mismatched ? "true" : undefined,
+    onClick: (event: React.MouseEvent<HTMLAnchorElement>) => {
+      rest.onClick?.(event);
+      if (event.defaultPrevented) return;
+      if (mismatched) {
+        event.preventDefault();
+        setWarningOpen(true);
+        return;
+      }
+      // Plain left click on an in-app link: SPA-navigate. Modified clicks
+      // (cmd/ctrl/shift/middle) keep the real anchor behaviour — new tab,
+      // "open in new tab", etc.
+      if (
+        isInternalHref(href) &&
+        event.button === 0 &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.shiftKey &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        void router.push(href);
+      }
+    },
+  };
 
   return (
     <>
-      <chakra.a
-        {...rest}
-        href={href}
-        color={langy ? "orange.fg" : undefined}
-        textDecorationColor={langy ? "orange.muted" : undefined}
-        background={mismatched ? "orange.subtle" : undefined}
-        borderRadius={mismatched ? "sm" : undefined}
-        paddingX={mismatched ? "2px" : undefined}
-        title={mismatched ? `Displayed URL differs from ${href}` : undefined}
-        data-mismatched-url={mismatched ? "true" : undefined}
-        onClick={(event) => {
-          rest.onClick?.(event);
-          if (event.defaultPrevented || !mismatched) return;
-          event.preventDefault();
-          setWarningOpen(true);
-        }}
-      >
-        {children}
-      </chakra.a>
+      {isExternal ? (
+        <UiLink {...rest} {...styleProps} href={href} isExternal>
+          {children}
+        </UiLink>
+      ) : (
+        <chakra.a {...rest} {...styleProps} href={href}>
+          {children}
+        </chakra.a>
+      )}
       {mismatched ? (
         <ConfirmDialog
           open={warningOpen}
@@ -174,7 +237,11 @@ function MarkdownLink({
           tone="warning"
           onConfirm={() => {
             setWarningOpen(false);
-            window.location.assign(href);
+            if (isExternal) {
+              window.open(href, "_blank", "noopener,noreferrer");
+            } else {
+              navigate();
+            }
           }}
         />
       ) : null}
@@ -188,5 +255,6 @@ export const Markdown = memo(
     prevProps.className === nextProps.className &&
     prevProps.fontSize === nextProps.fontSize &&
     prevProps.linkVariant === nextProps.linkVariant &&
+    prevProps.color === nextProps.color &&
     prevProps.children === nextProps.children,
 );

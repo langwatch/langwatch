@@ -16,17 +16,17 @@ export { LangWatch, FetchPolicy, type GetPromptOptions } from "./client-sdk";
 /**
  * Typed API failures.
  *
- * When the platform DECLINES a request it says why, in a structure: a `kind`
+ * When the platform DECLINES a request it says why, in a structure: a `code`
  * you can switch on, the `meta` that makes it actionable, and the trace id to
- * quote at support. Narrow with `isLangWatchDomainError` and match the `kind`
+ * quote at support. Narrow with `isLangWatchHandledError` and match the `code`
  * rather than the message — the message is written for humans and may change;
- * the kind is the contract.
+ * the code is the contract.
  *
  * ```ts
  * try {
  *   await langwatch.prompts.get("nope");
  * } catch (error) {
- *   if (isLangWatchDomainError(error) && error.kind === "prompt_not_found") {
+ *   if (isLangWatchHandledError(error) && error.code === "prompt_not_found") {
  *     // ...
  *   }
  *   throw error;
@@ -39,14 +39,14 @@ export { LangWatch, FetchPolicy, type GetPromptOptions } from "./client-sdk";
  * the two must not look alike.
  */
 export {
-  LangWatchDomainError,
-  isLangWatchDomainError,
+  LangWatchHandledError,
+  isLangWatchHandledError,
   LangWatchApiError,
 } from "./internal/api/errors";
 export type {
-  CliDomainError as LangWatchDomainErrorShape,
-  CliDomainErrorReason as LangWatchDomainErrorReason,
-} from "@langwatch/cli-cards/domain-error";
+  CliHandledError as LangWatchHandledErrorShape,
+  CliHandledErrorReason as LangWatchHandledErrorReason,
+} from "@langwatch/cli-cards/handled-error";
 
 // Experiments API exports
 export {

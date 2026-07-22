@@ -37,11 +37,13 @@ export {
 export { parseCliJson } from "./cliJson.js";
 
 export {
+  CLI_CARD_OUTCOMES,
   cliToolResultSchema,
   cliToolResultPayload,
   parseCliToolResult,
   toCliTextResult,
   toCliToolResult,
+  type CliCardOutcome,
   type CliToolResult,
 } from "./tool-result.js";
 
@@ -57,9 +59,12 @@ export {
 export {
   CARD_KINDS,
   SCHEMA_BY_CARD_KIND,
+  createdResourceCardSchema,
   datasetCardSchema,
   evalRunCardSchema,
   metricsCardSchema,
+  namesCreatedResource,
+  timeseriesCardSchema,
   promptDiffCardSchema,
   resourceCardSchema,
   scenarioCardSchema,
@@ -76,9 +81,14 @@ export {
   CLI_COLLECTION_VERBS,
   CLI_SUBRESOURCE_VERBS,
   asJsonDocument,
+  assertTotalOrder,
+  CARD_PROBES,
   cardKindFor,
+  promoteCard,
+  type CardProbe,
   cardSchemaFor,
   cliVerbTone,
+  parseCardResult,
   parseCliResult,
   type CliVerbTone,
   type ParsedCliResult,
@@ -86,18 +96,19 @@ export {
 } from "./registry.js";
 
 /**
- * The domain-error reading is zod-free and also importable on its own
- * (`@langwatch/cli-cards/domain-error`) — the CLI's hot path takes that subpath so
+ * The handled-error reading is zod-free and also importable on its own
+ * (`@langwatch/cli-cards/handled-error`) — the CLI's hot path takes that subpath so
  * that an instrumented command does not drag zod (~28ms) into every invocation.
  * Importing it from here, alongside the schemas, is the right call for the app,
  * which has zod loaded already.
  */
 export {
-  domainErrorFromThrown,
-  parseDomainError,
+  handledErrorFromThrown,
+  isTerminalFailure,
+  parseHandledError,
   readCliErrorDocument,
   toCliErrorDocument,
-  type CliDomainError,
-  type CliDomainErrorReason,
+  type CliHandledError,
+  type CliHandledErrorReason,
   type CliErrorDocument,
-} from "./domain-error.js";
+} from "./handled-error.js";

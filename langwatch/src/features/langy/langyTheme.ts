@@ -171,6 +171,28 @@ export const langyThemeConfig = defineConfig({
 
           // The signal grid's line colour (dark only — see langyTheme.css).
           grid: langy("transparent", white(0.035)),
+
+          // Langy's answer text: a step dimmer than `fg`, so a glance separates
+          // "what I said" (bright, bubbled) from "what it said" (the quiet
+          // page). Light is ink-800 eased toward paper; dark is the site's
+          // paper-at-alpha move, one notch under full white.
+          answerFg: langy("#363530", white(0.87)),
+
+          // The user's message bubble. It has its OWN tokens because the
+          // generic ones do not survive the light ground: `bg.muted` and
+          // `border.muted` BOTH resolve to gray.100 (#f1f5f9) there, so the
+          // bubble was a 3%-off-white fill outlined in exactly its own colour —
+          // no edge at all — floating on a white panel that is itself
+          // translucent over a gray.100 page. It was invisible.
+          //
+          // Light therefore steps the fill down to gray.200 and gives it a real
+          // gray.300 hairline: still quiet, still neutral (the panel keeps the
+          // app's own palette — a warm bubble read as a beige island), but
+          // unmistakably a bubble. Dark already worked and keeps its values:
+          // elevation as white-alpha over the ink ground, the site's one
+          // hairline.
+          userBubbleBg: langy("#e2e8f0", white(0.06)),
+          userBubbleBorder: langy("#cbd5e1", white(0.1)),
         },
       },
 
@@ -193,6 +215,16 @@ export const langyThemeConfig = defineConfig({
         xs: { value: { _langy: "0.71875rem", _langyDark: "0.71875rem" } },
         sm: { value: { _langy: "0.8125rem", _langyDark: "0.8125rem" } },
         md: { value: { _langy: "0.9375rem", _langyDark: "0.9375rem" } },
+        // The answer body: half a step under `sm`, so Langy's prose sits
+        // visibly below the user's words without dropping to `xs` caption
+        // territory. Base value matches `sm` for any use outside `.langy-root`.
+        langyAnswer: {
+          value: {
+            base: "0.8125rem",
+            _langy: "0.78125rem",
+            _langyDark: "0.78125rem",
+          },
+        },
       },
     },
 

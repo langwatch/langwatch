@@ -27,9 +27,45 @@ export interface LangyMessagesResult {
    * hold a working state through that gap instead of going blank.
    */
   isTurnInFlight: boolean;
+  /**
+   * WHICH turn is in flight, straight off the durable record — null when none
+   * is, and null in the brief window between a send and the turn being accepted.
+   *
+   * This is what makes Stop work in a tab that did not start the turn. A tab
+   * only learns a turn id from its own send, so a turn adopted from
+   * `isTurnInFlight` alone had a Stop button with nothing behind it (see
+   * `logic/langyStopTarget.ts`).
+   */
+  inFlightTurnId: string | null;
+  /**
+   * The backend-driven feedback cadence: should the panel ask "How did Langy
+   * do?" under the latest answer? Computed server-side (conversation depth +
+   * per-user quiet period) so it holds across tabs and devices.
+   */
+  shouldAskFeedback: boolean;
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
+  /** Re-run the history fetch — what the failure card's "Try again" does. */
+  refetch: () => void;
+  /** The failure itself, so the panel can classify and explain it. */
+  error: unknown;
+}
+
+/** How often the durable turn state is re-checked while a turn is in flight. */
+const TURN_IN_FLIGHT_POLL_MS = 3_000;
+
+/**
+ * Self-stopping poll (see dev/docs/best_practices/async-processing-ui.md):
+ * while the fold says a turn is in flight, re-check on a short interval so the
+ * settled state lands even when the freshness signal is delayed or lost —
+ * without it a stale `isTurnInFlight: true` sits in the cache and the working
+ * indicator outlives the answer. Stops itself the moment the turn settles.
+ */
+export function langyMessagesPollInterval(
+  data: { isTurnInFlight: boolean } | undefined,
+): number | false {
+  return data?.isTurnInFlight ? TURN_IN_FLIGHT_POLL_MS : false;
 }
 
 /**
@@ -53,6 +89,11 @@ export function useLangyMessages(
       staleTime: 30_000,
       refetchOnWindowFocus: false,
       keepPreviousData: true,
+      // Wrapped, not passed by reference: handing the helper straight to
+      // react-query lets its narrow `{ isTurnInFlight }` param type win the
+      // inference for the query's TData, collapsing `query.data` to that shape
+      // (CI typecheck caught it). The arrow keeps `data` contextually typed.
+      refetchInterval: (data) => langyMessagesPollInterval(data),
     },
   );
 
@@ -60,8 +101,12 @@ export function useLangyMessages(
     messages: (query.data?.messages ?? []) as LangyMessageDto[],
     lastError: query.data?.lastError ?? null,
     isTurnInFlight: query.data?.isTurnInFlight ?? false,
+    inFlightTurnId: query.data?.inFlightTurnId ?? null,
+    shouldAskFeedback: query.data?.shouldAskFeedback ?? false,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,
+    error: query.error,
+    refetch: () => void query.refetch(),
   };
 }

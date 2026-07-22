@@ -140,6 +140,26 @@ export interface LangyTurnRelayDeps {
     turnId: string;
     frameNonce: string;
   }): Promise<boolean>;
+  /**
+   * Read the runToken the worker was handed at dispatch, straight from the
+   * synchronous per-turn Redis handoff. This is the EXACT token the manager
+   * signs its frames with, written before dispatch — so a first frame that
+   * outruns the async `RunToken` projection is authenticated instead of dropped
+   * as `no-run-token`. Returns null when no handoff exists (aged out past its
+   * TTL, or a legacy conversation with no token).
+   *
+   * `projectId` is REQUIRED, not decorative: the handoff key is
+   * conversation+turn scoped, but conversation identity is project-scoped
+   * (`@@unique([projectId, ConversationId])`), so the implementation must refuse
+   * a handoff stashed under a different project rather than hand this stream
+   * another tenant's runToken. Optional dep so unit tests can exercise the
+   * projection fallback in isolation.
+   */
+  readHandoffRunToken?(a: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  }): Promise<string | null>;
   logger?: { warn(o: unknown, m: string): void; debug?(o: unknown, m: string): void };
 }
 
@@ -202,7 +222,11 @@ export class LangyTurnRelay {
     // Authenticity FIRST — no field is trusted until the MAC checks out. The
     // runToken is looked up by the (as-yet-unverified) conversationId; a wrong
     // conversationId simply yields a token the MAC won't match against.
-    const runToken = await this.loadRunToken(envelope.conversationId, envelope.projectId);
+    const runToken = await this.loadRunToken({
+      conversationId: envelope.conversationId,
+      projectId: envelope.projectId,
+      turnId: envelope.turnId,
+    });
     if (runToken === null) {
       return this.reject({ reason: "no-run-token", envelope });
     }
@@ -233,17 +257,61 @@ export class LangyTurnRelay {
     return this.apply(envelope, frameParse.data);
   }
 
-  private async loadRunToken(
-    conversationId: string,
-    projectId: string,
-  ): Promise<string | null> {
-    if (this.runToken === undefined) {
-      this.runToken = await this.deps.conversations.getRunToken({
+  private async loadRunToken({
+    conversationId,
+    projectId,
+    turnId,
+  }: {
+    conversationId: string;
+    projectId: string;
+    turnId: string;
+  }): Promise<string | null> {
+    // Cache only a REAL token. A null from a transient projection lag must NOT
+    // be cached: the old `=== undefined` guard cached the null and dropped every
+    // subsequent frame on the connection as no-run-token (prod: a first turn lost
+    // its whole first ~5 minutes of progress frames).
+    if (this.runToken != null) return this.runToken;
+
+    // Synchronous source first: the per-turn handoff carries the EXACT token the
+    // worker signed with, written before dispatch — so the first frames of a
+    // brand-new conversation (whose RunToken projection is still queued) are
+    // authenticated instead of dropped.
+    let fromHandoff: string | null | undefined;
+    try {
+      fromHandoff = await this.deps.readHandoffRunToken?.({
         projectId,
         conversationId,
+        turnId,
       });
+    } catch (error) {
+      // Falling THROUGH to the projection is the entire point of the two-stage
+      // lookup, so a transient Redis blip on this hot path must not propagate
+      // out of handle() and tear down the whole relay stream.
+      this.deps.logger?.warn(
+        {
+          projectId,
+          conversationId,
+          turnId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "langy relay handoff runToken read failed; falling back to the projection",
+      );
+      fromHandoff = null;
     }
-    return this.runToken ?? null;
+    if (fromHandoff) {
+      this.runToken = fromHandoff;
+      return fromHandoff;
+    }
+
+    // Fallback: the durable RunToken projection. Covers a handoff that aged out
+    // past its TTL on a very long turn, and keeps working when no handoff dep is
+    // wired (unit tests).
+    const fromProjection = await this.deps.conversations.getRunToken({
+      projectId,
+      conversationId,
+    });
+    if (fromProjection) this.runToken = fromProjection;
+    return fromProjection;
   }
 
   private checkTurn(envelope: LangyFrameEnvelope): boolean {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveFollowUpChips,
+  MAX_FOLLOW_UP_CHIPS,
   type SettledCall,
 } from "../components/capabilities/followUpChips";
 
@@ -16,8 +17,6 @@ const traceSearch = (over: Partial<SettledCall> = {}): SettledCall => ({
   ...over,
 });
 
-const labelsOf = (chips: { label: string }[]) => chips.map((c) => c.label);
-
 describe("deriveFollowUpChips", () => {
   describe("given a trace search that found traces", () => {
     describe("when the search filtered on errors", () => {
@@ -31,6 +30,7 @@ describe("deriveFollowUpChips", () => {
           id: "traces:observability.analytics",
           label: "Graph these",
           href: "/demo/analytics/custom?has_error=true",
+          carried: true,
         });
       });
 
@@ -44,27 +44,46 @@ describe("deriveFollowUpChips", () => {
           id: "traces:triggers",
           label: "Alert me on this",
           href: "/demo/messages?has_error=true&drawer.open=automation",
+          carried: true,
         });
       });
 
-      it("drops the offers no destination can carry (dataset, annotation)", () => {
+      it("puts the chips that carry the filter before the ones that only navigate", () => {
         const chips = deriveFollowUpChips({
           call: traceSearch(),
           projectSlug: "demo",
         });
 
-        expect(labelsOf(chips)).toEqual(["Graph these", "Alert me on this"]);
+        const firstPlain = chips.findIndex((chip) => !chip.carried);
+        const lastCarried = chips.map((c) => c.carried).lastIndexOf(true);
+        if (firstPlain !== -1) expect(lastCarried).toBeLessThan(firstPlain);
+      });
+
+      it("keeps the row a next step, not a menu", () => {
+        const chips = deriveFollowUpChips({
+          call: traceSearch(),
+          projectSlug: "demo",
+        });
+
+        expect(chips.length).toBeLessThanOrEqual(MAX_FOLLOW_UP_CHIPS);
       });
     });
 
     describe("when the search had only free text, nothing a field filter", () => {
-      it("offers nothing — a graph and an alert need fields, not free text", () => {
+      it("cannot carry the filter, so it offers the surfaces instead", () => {
+        // A graph and an alert need FIELDS, so nothing can be recompiled here.
+        // That used to mean silence; now the offers still resolve, worded so
+        // they never claim the search came along.
         const chips = deriveFollowUpChips({
           call: traceSearch({ input: { query: "refund policy" } }),
           projectSlug: "demo",
         });
 
-        expect(chips).toEqual([]);
+        expect(chips.length).toBeGreaterThan(0);
+        expect(chips.every((chip) => !chip.carried)).toBe(true);
+        expect(
+          chips.every((chip) => chip.label.startsWith("Open in ")),
+        ).toBe(true);
       });
     });
 
@@ -113,19 +132,31 @@ describe("deriveFollowUpChips", () => {
     });
   });
 
-  describe("given an analytics result whose only offer has no destination", () => {
-    it("drops 'Pin to a dashboard' — no dashboard preload link exists yet", () => {
+  describe("given a result that is not a trace search", () => {
+    /**
+     * The regression this exists to prevent. `deriveFollowUpChips` used to bail
+     * unless the input parsed as a TRACE query, so an analytics answer — the
+     * single most likely thing a user asks a follow-up about — earned no
+     * guidance whatsoever, even though the feature map had already derived the
+     * offer.
+     */
+    it("still guides the user somewhere, rather than offering nothing at all", () => {
       const chips = deriveFollowUpChips({
         call: {
           name: "langwatch.analytics.query",
           state: "output-available",
           input: {},
-          output: JSON.stringify({ data: [{ metric: "trace_count", value: 9 }] }),
+          output: JSON.stringify({
+            data: [{ metric: "trace_count", value: 9 }],
+          }),
         },
         projectSlug: "demo",
       });
 
-      expect(chips).toEqual([]);
+      expect(chips.length).toBeGreaterThan(0);
+      // Nothing was recompiled, so nothing may claim to have been.
+      expect(chips.every((chip) => !chip.carried)).toBe(true);
+      expect(chips.every((chip) => chip.href.startsWith("/demo/"))).toBe(true);
     });
   });
 });

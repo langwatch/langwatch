@@ -89,6 +89,17 @@ export interface GovernanceConfig {
   tool_policies?: PlatformToolPolicyMap;
 
   /**
+   * Persistent opt-out from the background command daemon, written by
+   * `langwatch config set daemon off`. Absent = on. `LANGWATCH_NO_DAEMON`
+   * (per-invocation) takes precedence when both are set.
+   *
+   * Also read DIRECTLY from this file by cli/daemon/eligibility.ts
+   * (`isDaemonDisabledByConfig`), which must stay dependency-free — keep the
+   * field name in sync.
+   */
+  daemon?: "on" | "off";
+
+  /**
    * Most-recent signed `request_increase_url` returned by the
    * gateway in a 402 budget_exceeded payload — cached so
    * `langwatch request-increase` opens the exact URL the gateway
@@ -151,7 +162,14 @@ export function configPath(): string {
   return path.join(os.homedir(), ".langwatch", "config.json");
 }
 
-/** Read the config from disk, merging in defaults for missing keys. */
+/**
+ * Read the config from disk, merging in defaults for missing keys.
+ *
+ * Deliberately re-read on EVERY call, with no in-process cache: the daemon's
+ * logged-in single-identity boundary depends on it (see "THE LOGGED-IN
+ * SINGLE-IDENTITY BOUNDARY" in cli/daemon/identity.ts). A cached credential
+ * here would outlive a logout inside a long-lived daemon.
+ */
 export function loadConfig(): GovernanceConfig {
   const p = configPath();
   if (!fs.existsSync(p)) return defaults();

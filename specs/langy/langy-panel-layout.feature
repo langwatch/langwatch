@@ -63,6 +63,19 @@ Feature: Langy panel layout modes
     Then page content reclaims the full viewport width
     And the content card extends back to the viewport edge without right rounding
 
+  # The morph idiom is not only panel-to-panel. The home page's lit block is
+  # an ORIGIN for it: its composer is the same object as the panel's, so
+  # sending from home seats that object into whichever layout is in use rather
+  # than opening the panel beside a box that just vanished. The travel itself
+  # is specified in specs/home/langy-home-morph.feature.
+
+  Scenario: The home page's composer is an origin for the panel's morph
+    Given the Langy home renders and the panel is closed
+    When I send a question from the home page's composer
+    Then the panel opens in whichever layout I use
+    And the composer seats itself on that panel's floor as one continuous object
+    And the panel is not remounted, so nothing in flight is torn down
+
   # Opening a drawer does something DIFFERENT per layout, so docked and
   # floating stay visibly distinct.
 

@@ -2,12 +2,17 @@
  * @vitest-environment jsdom
  *
  * The claims this feature stands or falls on:
- *   1. ZERO cost when Langy is closed — no class, no data attribute, no inline
- *      style, and the page's own behaviour untouched.
- *   2. Langy NEVER steals the click. A trace row still opens its drawer with the
- *      panel open.
- *   3. Registered targets remain visually inert unless the user explicitly
- *      requests a reveal from the context palette.
+ *   1. ZERO cost while disarmed — with the panel closed AND with it open. No
+ *      class, no visual state, no inline style, not draggable, and the page's
+ *      own click behaviour untouched. The one thing a registered target does
+ *      carry is its locating id, which paints nothing and listens to nothing:
+ *      the panel → page spotlight has to be able to find the card a chip names
+ *      without the user first arming anything.
+ *   2. Offered — armed, or briefly revealed — a target lights up and a click
+ *      means "give this to Langy" instead of whatever the surface's click meant.
+ *   3. A `#trace` reveal makes the same offer the armed page does. It used to
+ *      light rows up and answer to nothing, which made the palette's own promise
+ *      ("anything that lights up can be added as context") untrue.
  */
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -33,6 +38,7 @@ function HostRow({ onOpen }: { onOpen: () => void }) {
 
 const targets = () => useLangyContextTargetStore.getState();
 const langy = () => useLangyStore.getState();
+const row = () => screen.getByTestId("row");
 
 const traceTarget = {
   id: "trace:abc123",
@@ -41,22 +47,23 @@ const traceTarget = {
   ref: "abc123",
 } as const;
 
+function reset() {
+  targets().reset();
+  langy().closePanel();
+  langy().resetChosenChips();
+}
+
 describe("useLangyContextTarget", () => {
-  beforeEach(() => {
-    targets().reset();
-    langy().closePanel();
-    langy().resetDismissedChips();
-  });
+  beforeEach(reset);
 
   describe("given the Langy panel is closed", () => {
     describe("when a target renders", () => {
       it("puts nothing on the element — no class, no data attribute, no style", () => {
         render(<HostRow onOpen={() => undefined} />);
 
-        const row = screen.getByTestId("row");
-        expect(row.className).toBe("");
-        expect(row.getAttribute("data-langy-target")).toBeNull();
-        expect(row.getAttribute("style")).toBeNull();
+        expect(row().className).toBe("");
+        expect(row().getAttribute("data-langy-target")).toBeNull();
+        expect(row().getAttribute("style")).toBeNull();
       });
 
       it("registers nothing, so the store stays empty", () => {
@@ -69,14 +76,14 @@ describe("useLangyContextTarget", () => {
         let opened = 0;
         render(<HostRow onOpen={() => opened++} />);
 
-        fireEvent.click(screen.getByTestId("row"));
+        fireEvent.click(row());
 
         expect(opened).toBe(1);
       });
     });
   });
 
-  describe("given the Langy panel is open", () => {
+  describe("given the Langy panel is open but the page is not armed", () => {
     beforeEach(() => {
       langy().openPanel();
     });
@@ -88,33 +95,23 @@ describe("useLangyContextTarget", () => {
         expect(targets().targets["trace:abc123"]).toEqual(traceTarget);
       });
 
-      it("marks the element up so the layer can find it without a ref", () => {
-        // Deliberately not a React ref: the trace table's row ref already
-        // belongs to the virtualizer, and a target must never have to fight the
-        // component it's decorating for it.
+      it("still shows nothing — asking a question does not arm the page", () => {
         render(<HostRow onOpen={() => undefined} />);
 
-        expect(
-          screen.getByTestId("row").getAttribute("data-langy-target"),
-        ).toBe("trace:abc123");
+        expect(row().className).toBe("");
+        expect(row().getAttribute("data-langy-target-state")).toBeNull();
+        expect(row().getAttribute("draggable")).toBeNull();
+        expect(row().getAttribute("style")).toBeNull();
       });
 
-      it("stays invisible until the pointer comes near it", () => {
+      it("carries its locating id, so the panel can point back at it", () => {
+        // Hovering a chip in the composer shines a light on the card it names,
+        // and that is not the picking mode — it is reading the list you already
+        // have. The layer finds the element by this attribute, so gating it on
+        // arming meant the spotlight could never find anything.
         render(<HostRow onOpen={() => undefined} />);
 
-        expect(
-          screen.getByTestId("row").getAttribute("data-langy-target-state"),
-        ).toBeNull();
-      });
-
-      it("desyncs its shimmer from its neighbours with a stable phase offset", () => {
-        render(<HostRow onOpen={() => undefined} />);
-
-        expect(
-          screen
-            .getByTestId("row")
-            .style.getPropertyValue("--langy-target-delay"),
-        ).toMatch(/^-\d+ms$/);
+        expect(row().getAttribute("data-langy-target")).toBe("trace:abc123");
       });
     });
 
@@ -137,22 +134,10 @@ describe("useLangyContextTarget", () => {
         let opened = 0;
         render(<HostRow onOpen={() => opened++} />);
 
-        fireEvent.click(screen.getByTestId("row"));
+        fireEvent.click(row());
 
         expect(opened).toBe(1);
         expect(targets().picked).toEqual([]);
-      });
-    });
-
-    describe("when the composer asks to see traces (#trace → reveal)", () => {
-      it("lights the target up like the pointer had come near", () => {
-        render(<HostRow onOpen={() => undefined} />);
-
-        act(() => targets().requestReveal({ kind: "trace" }));
-
-        expect(
-          screen.getByTestId("row").getAttribute("data-langy-target-state"),
-        ).toBe("near");
       });
     });
 
@@ -164,17 +149,138 @@ describe("useLangyContextTarget", () => {
           targets().setActiveChipIds(["trace:abc123"]);
         });
 
-        expect(
-          screen.getByTestId("row").getAttribute("data-langy-target-state"),
-        ).toBeNull();
+        expect(row().getAttribute("data-langy-target-state")).toBeNull();
+      });
+    });
+
+    describe("when the composer asks to see traces (#trace → reveal)", () => {
+      it("lights the target up without arming the rest of the page", () => {
+        render(<HostRow onOpen={() => undefined} />);
+
+        act(() => targets().requestReveal({ kind: "trace" }));
+
+        expect(row().getAttribute("data-langy-target-state")).toBe("near");
+      });
+
+      it("lets the lit row be clicked straight into context", () => {
+        // The palette's own words: "anything that lights up can be added as
+        // context". Revealed rows used to light up and do nothing but open
+        // their own drawer, which made that copy a lie for as long as it showed.
+        let opened = 0;
+        render(<HostRow onOpen={() => opened++} />);
+        act(() => targets().requestReveal({ kind: "trace" }));
+
+        fireEvent.click(row());
+
+        expect(targets().picked.map((t) => t.id)).toEqual(["trace:abc123"]);
+        expect(langy().chosenChipIds.has("trace:abc123")).toBe(true);
+        expect(opened).toBe(0);
+      });
+
+      it("lets the lit row be dragged onto the panel", () => {
+        render(<HostRow onOpen={() => undefined} />);
+
+        act(() => targets().requestReveal({ kind: "trace" }));
+
+        expect(row().getAttribute("draggable")).toBe("true");
+      });
+
+      it("hands the row straight back when the reveal fades", () => {
+        let opened = 0;
+        render(<HostRow onOpen={() => opened++} />);
+        act(() => targets().requestReveal({ kind: "trace" }));
+
+        act(() => targets().clearReveal());
+
+        expect(row().getAttribute("data-langy-target-state")).toBeNull();
+        expect(row().getAttribute("draggable")).toBeNull();
+        fireEvent.click(row());
+        expect(opened).toBe(1);
+      });
+
+      it("ignores a reveal of some other kind", () => {
+        render(<HostRow onOpen={() => undefined} />);
+
+        act(() => targets().requestReveal({ kind: "dataset" }));
+
+        expect(row().getAttribute("data-langy-target-state")).toBeNull();
+        expect(row().getAttribute("draggable")).toBeNull();
+      });
+    });
+  });
+
+  describe("given the page is armed", () => {
+    beforeEach(() => {
+      langy().openPanel();
+      act(() => targets().arm("key"));
+    });
+
+    describe("when a target mounts", () => {
+      it("marks the element up so the layer can find it without a ref", () => {
+        // Deliberately not a React ref: the trace table's row ref already
+        // belongs to the virtualizer, and a target must never have to fight the
+        // component it's decorating for it.
+        render(<HostRow onOpen={() => undefined} />);
+
+        expect(row().getAttribute("data-langy-target")).toBe("trace:abc123");
+      });
+
+      it("lights up, because the point of the mode is showing what can be given", () => {
+        render(<HostRow onOpen={() => undefined} />);
+
+        expect(row().getAttribute("data-langy-target-state")).toBe("near");
+      });
+
+      it("desyncs its shimmer from its neighbours with a stable phase offset", () => {
+        render(<HostRow onOpen={() => undefined} />);
+
+        expect(row().style.getPropertyValue("--langy-target-delay")).toMatch(
+          /^-\d+ms$/,
+        );
+      });
+
+      it("can be dragged onto the panel", () => {
+        render(<HostRow onOpen={() => undefined} />);
+
+        expect(row().getAttribute("draggable")).toBe("true");
+      });
+    });
+
+    describe("when the user clicks the target", () => {
+      it("gives it to Langy instead of running the surface's own click", () => {
+        let opened = 0;
+        render(<HostRow onOpen={() => opened++} />);
+
+        fireEvent.click(row());
+
+        expect(targets().picked.map((t) => t.id)).toEqual(["trace:abc123"]);
+        expect(langy().chosenChipIds.has("trace:abc123")).toBe(true);
+        expect(opened).toBe(0);
+      });
+    });
+
+    describe("when the page is disarmed again", () => {
+      it("hands the element straight back", () => {
+        let opened = 0;
+        render(<HostRow onOpen={() => opened++} />);
+        expect(row().getAttribute("draggable")).toBe("true");
+
+        act(() => targets().disarm());
+
+        expect(row().className).toBe("");
+        expect(row().getAttribute("data-langy-target-state")).toBeNull();
+        expect(row().getAttribute("draggable")).toBeNull();
+        fireEvent.click(row());
+        expect(opened).toBe(1);
       });
     });
   });
 
   describe("given a surface with nothing to offer", () => {
     describe("when it passes a null target", () => {
-      it("stays inert even with the panel open", () => {
+      it("stays inert even armed", () => {
         langy().openPanel();
+        act(() => targets().arm("key"));
 
         function EmptyHost() {
           const target = useLangyContextTarget(null);
@@ -191,9 +297,7 @@ describe("useLangyContextTarget", () => {
 
 describe("the target's toggle", () => {
   beforeEach(() => {
-    targets().reset();
-    langy().closePanel();
-    langy().resetDismissedChips();
+    reset();
     langy().openPanel();
   });
 
@@ -217,20 +321,19 @@ describe("the target's toggle", () => {
         expect(targets().picked.map((t) => t.id)).toEqual(["trace:abc123"]);
       });
 
-      it("lifts any earlier dismissal, so a chip you removed can be re-added", () => {
-        langy().dismissChip("trace:abc123");
+      it("chooses the chip, so a page-derived offer becomes real context", () => {
         render(<ToggleHost />);
 
         fireEvent.click(screen.getByTestId("affordance"));
 
-        expect(langy().dismissedChipIds.has("trace:abc123")).toBe(false);
+        expect(langy().chosenChipIds.has("trace:abc123")).toBe(true);
       });
     });
   });
 
   describe("given the target's chip is already in the composer", () => {
     // Covers BOTH routes to "added": a chip the user picked, and one Langy
-    // auto-derived from the route / open drawer. Both land in activeChipIds.
+    // derived from the route / open drawer. Both land in activeChipIds.
     beforeEach(() => {
       targets().setActiveChipIds(["trace:abc123"]);
     });
@@ -238,14 +341,15 @@ describe("the target's toggle", () => {
     describe("when the affordance is clicked again", () => {
       it("takes it back out of context", () => {
         targets().pick(traceTarget);
+        langy().chooseChip("trace:abc123");
         render(<ToggleHost />);
 
         fireEvent.click(screen.getByTestId("affordance"));
 
         expect(targets().picked).toEqual([]);
-        // Dismissed too — the chip showing might have been auto-derived rather
-        // than picked, and unpicking alone would leave it in the composer.
-        expect(langy().dismissedChipIds.has("trace:abc123")).toBe(true);
+        // Dropped too — the chip showing might have been derived rather than
+        // picked, and unpicking alone would leave it in the composer.
+        expect(langy().chosenChipIds.has("trace:abc123")).toBe(false);
       });
     });
   });

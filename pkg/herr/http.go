@@ -36,8 +36,15 @@ type ErrorResponse struct {
 }
 
 // ErrorBody is the error detail within the envelope.
+//
+// Type and Code always carry the same value. Type is the OpenAI-compatible
+// discriminant (see docs/ai-gateway/api/errors.mdx — provider SDKs parse it and
+// must keep raising their usual typed exceptions), and Code is the name the
+// TypeScript side uses everywhere. Emitting both means a consumer can read
+// whichever its transport taught it and always get the same answer.
 type ErrorBody struct {
 	Type    string      `json:"type"`
+	Code    string      `json:"code"`
 	Message string      `json:"message"`
 	Meta    M           `json:"meta,omitempty"`
 	TraceID string      `json:"trace_id,omitempty"`
@@ -112,11 +119,19 @@ func Body(err error) ErrorBody {
 // (message rides Meta["message"], exactly where toErrorBody promotes it from).
 // Stacks don't cross the wire; TraceID/SpanID survive when parseable.
 func FromBody(body ErrorBody) E {
+	// Code and Type always agree when we produced the envelope; prefer Code and
+	// fall back to Type so a body from an older writer (Type only) still
+	// resolves to the same error.
+	code := body.Code
+	if code == "" {
+		code = body.Type
+	}
+
 	meta := M{}
 	for k, v := range body.Meta {
 		meta[k] = v
 	}
-	if body.Message != "" && body.Message != body.Type {
+	if body.Message != "" && body.Message != code {
 		meta["message"] = body.Message
 	}
 	if len(body.Tips) > 0 {
@@ -128,7 +143,7 @@ func FromBody(body ErrorBody) E {
 	if body.Fault != "" {
 		meta["fault"] = body.Fault
 	}
-	e := E{Code: Code(body.Type), Meta: meta}
+	e := E{Code: Code(code), Meta: meta}
 	if tid, err := trace.TraceIDFromHex(body.TraceID); err == nil {
 		e.TraceID = tid
 	}
@@ -175,6 +190,7 @@ func metaStrings(m M, key string) []string {
 func toErrorBody(e E) ErrorBody {
 	body := ErrorBody{
 		Type:    string(e.Code),
+		Code:    string(e.Code),
 		Message: string(e.Code),
 	}
 

@@ -36,7 +36,30 @@ const tracer = getLangWatchTracer("langwatch.langy.api-key");
 // stopping short of delete/manage/share. The per-session key never grants more
 // than the caller holds; this list only bounds the maximum surface Langy tools
 // can ever touch.
+//
+// `project:view` is the ONE exception to the nine-families shape, and it is a
+// read. It is the platform's base project read — every built-in role holds it,
+// down to VIEWER and the EXTERNAL lite member — and it is what gates the
+// project-shaped reads that have no resource family of their own: listing the
+// project's agents, its configured model providers (returned masked), and its
+// model defaults. Langy is meant to read the project on the user's behalf, so
+// without it `langwatch agent list` was refused a permission every human in the
+// project already holds. No project WRITE is a candidate: `project:update` is
+// what stores model-provider credentials and `project:manage` regenerates the
+// project's API key, so the assistant gets the read and nothing else.
+//
+// THE OTHER HALF OF THIS CONTRACT IS THE ROUTE. A permission listed here is
+// worthless unless the endpoint asks for that grain: `POST /api/scenarios`
+// used to require `scenarios:manage`, so a key holding exactly
+// `scenarios:create` — issued by this list, to a user who genuinely could
+// create scenarios — was refused at the door. The fix belongs on the route
+// (a create asks for `:create`; `:manage` still implies it, so nobody loses
+// access), NOT here: widening this list to `:manage` would hand Langy delete
+// rights it must not have, to buy a create it should already have had. When a
+// Langy write is refused for a permission this list already contains, look at
+// the route's `requires(...)` first.
 const LANGY_CANDIDATE_PERMISSIONS: Permission[] = [
+  "project:view",
   "traces:view",
   "traces:create",
   "traces:update",
@@ -58,9 +81,18 @@ const LANGY_CANDIDATE_PERMISSIONS: Permission[] = [
   "prompts:view",
   "prompts:create",
   "prompts:update",
+  // Read only, deliberately, and the odd one out in this list.
+  //
+  // Everything else here creates DATA: a row Langy wrote, which does nothing
+  // until someone reads it. A trigger is a standing instruction — it keeps
+  // acting, on its own schedule, on rows Langy never saw. And it is durable, so
+  // it outlives the session key's short TTL by an unbounded margin: the thing
+  // that authorised it is long gone while it is still running.
+  //
+  // A person setting one up chooses its destination and owns what it does
+  // afterwards. Delegating that authorship is a different decision from
+  // delegating a write, and this list is not the place to make it.
   "triggers:view",
-  "triggers:create",
-  "triggers:update",
   "workflows:view",
   "workflows:create",
   "workflows:update",

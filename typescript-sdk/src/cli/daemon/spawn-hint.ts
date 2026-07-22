@@ -44,9 +44,18 @@ export function recordMissAndDecideToSpawn(identity: DaemonIdentity): boolean {
   const file = hintPath(identity);
   const now = Date.now();
 
+  // Deliberately OUTSIDE the swallow-everything block below. A socket
+  // directory we cannot own (identity.ts UntrustedSocketDirError) is not a
+  // bookkeeping hiccup to shrug off and retry — it means the socket can never
+  // be made private, so there must be no daemon at all. Fail closed: no hint,
+  // no spawn, every command runs in-process exactly as it does today.
   try {
     ensureSocketDir(identity.socketDir);
+  } catch {
+    return false;
+  }
 
+  try {
     let recent: number[] = [];
     try {
       const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf8"));

@@ -15,7 +15,11 @@ import {
   type LangyTurnContext,
   langyTurnContextSchema,
 } from "~/server/app-layer/langy/langyTurnContext.schema";
-import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import {
+  createLangyTokenBuffer,
+  type LangyStreamEntry,
+} from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 
 import type { Session } from "~/server/auth";
@@ -136,7 +140,14 @@ const langyModelOverrideSchema = z
 
 /** Inputs shared by create + continue (the SAME turn-start operation). */
 const langyTurnInputShape = {
-  requestId: z.string().uuid(),
+  /**
+   * Client-minted identity for ONE logical send: transport retries replay the
+   * same key + content; a genuinely new send (the composer re-arming) mints a
+   * fresh key. Reusing a key with different content is a 409.
+   */
+  idempotencyKey: z.string().min(8).max(128).optional(),
+  /** @deprecated wire alias for pre-rename client bundles — same semantics. */
+  requestId: z.string().uuid().optional(),
   messages: z.array(langyTurnMessageSchema).min(1),
   modelOverride: langyModelOverrideSchema.optional(),
   /**
@@ -208,11 +219,95 @@ async function canWatchTurn({
 }
 
 /**
+ * Sleep for `ms`, resolving early to `false` when the signal aborts — so a
+ * watcher loop unblocks promptly the moment its follow() ends — otherwise `true`.
+ */
+function abortableDelay(ms: number, signal: AbortSignal): Promise<boolean> {
+  if (signal.aborted) return Promise.resolve(false);
+  return new Promise<boolean>((resolve) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve(true);
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/** How often the settlement watcher consults the durable fold + heartbeat. */
+const SETTLEMENT_POLL_MS = 5_000;
+/**
+ * Consecutive settled reads required before synthesizing a terminal, so a single
+ * projection blip can never end a live stream.
+ */
+const SETTLEMENT_CONFIRM_POLLS = 2;
+
+/**
+ * Poll a turn's durable fold + per-turn heartbeat while its live edge is being
+ * tailed, and resolve to the terminal entry the buffer never received — or null
+ * if the stream ended first (aborted) or the turn never settled.
+ *
+ * Split out of `onTurnStream` so the subscription body stays at the orchestration
+ * level and this confirmation loop is independently testable. The safety gate
+ * itself lives in {@link decideSyntheticTerminal}.
+ */
+async function watchForMissedTerminal({
+  projectId,
+  conversationId,
+  turnId,
+  userId,
+  buffer,
+  signal,
+}: {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  userId: string;
+  buffer: {
+    liveness(a: {
+      conversationId: string;
+      turnId: string;
+    }): Promise<{ stale: boolean }>;
+  };
+  signal: AbortSignal;
+}): Promise<LangyStreamEntry | null> {
+  let settledStreak = 0;
+  while (!signal.aborted) {
+    if (!(await abortableDelay(SETTLEMENT_POLL_MS, signal))) return null;
+    const [conversation, liveness] = await Promise.all([
+      getApp()
+        .langy.conversations.getById({ id: conversationId, projectId, userId })
+        .catch(() => null),
+      buffer.liveness({ conversationId, turnId }).catch(() => null),
+    ]);
+    if (!conversation || !liveness) {
+      settledStreak = 0;
+      continue;
+    }
+    const decision = decideSyntheticTerminal({
+      status: conversation.status,
+      lastError: conversation.lastError,
+      heartbeatStale: liveness.stale,
+    });
+    if (!decision) {
+      settledStreak = 0;
+      continue;
+    }
+    settledStreak += 1;
+    if (settledStreak >= SETTLEMENT_CONFIRM_POLLS) return decision;
+  }
+  return null;
+}
+
+/**
  * Dispatch a turn through the app-layer turn service. Create and Continue are
  * the SAME operation — `isNewConversation` is the only difference (it emits the
  * semantically-first `conversation_started`). The service throws DomainErrors,
  * which the shared `domainErrorMiddleware` maps to coded TRPCErrors carrying
- * `data.domainError` (read by the client's `readLangyTrpcError`).
+ * `data.error` (read by the client's `readLangyTrpcError`).
  */
 async function acceptTurn({
   input,
@@ -220,7 +315,8 @@ async function acceptTurn({
 }: {
   input: {
     projectId: string;
-    requestId: string;
+    idempotencyKey?: string | undefined;
+    requestId?: string | undefined;
     conversationId?: string | null;
     messages: LangyChatMessageInput[];
     modelOverride?: string;
@@ -230,9 +326,21 @@ async function acceptTurn({
   };
   session: Session;
 }): Promise<{ conversationId: string; turnId: string }> {
+  // Alias resolution for pre-rename client bundles; new clients send
+  // idempotencyKey. Neither present is a malformed request. Imperative
+  // rather than a schema .refine: the procedure base already carries a
+  // projectId input, and tRPC merges .input() calls — which requires plain
+  // object schemas, not the ZodEffects a refine produces.
+  const idempotencyKey = input.idempotencyKey ?? input.requestId;
+  if (!idempotencyKey) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "idempotencyKey is required.",
+    });
+  }
   return getApp().langy.turns.startConversationTurn({
     projectId: input.projectId,
-    requestId: input.requestId,
+    idempotencyKey,
     session,
     requestedConversationId: input.conversationId ?? null,
     messages: input.messages,
@@ -345,6 +453,28 @@ export const langyRouter = createTRPCRouter({
          * never leave the user staring at just their own message.
          */
         isTurnInFlight: boolean;
+        /**
+         * WHICH turn is in flight — null when none is, and null in the brief
+         * window between a message being sent and its turn being accepted on
+         * the record (`CurrentTurnId` lands at `agent_turn_accepted`).
+         *
+         * The durable answer to "what would Stop stop?". A browser tab only
+         * learns a turn id from its OWN send, so a turn it merely adopted from
+         * this read — started in another tab, or rejoined after a refresh —
+         * used to offer a Stop button with no id behind it: the click moved the
+         * control to "Stopping" and dispatched nothing, while the agent kept
+         * running. A tab-to-tab message could not fix that, because the worst
+         * case is that no other tab exists; the record can, because it always
+         * knew.
+         */
+        inFlightTurnId: string | null;
+        /**
+         * Whether the panel should ask "How did Langy do?" under the latest
+         * answer — the backend-driven cadence (never a client heuristic; see
+         * specs/langy/langy-feedback.feature). False while a turn is in
+         * flight: the answer being rated must exist first.
+         */
+        shouldAskFeedback: boolean;
       }> => {
         // Both reads go through user-scoped application services. The message
         // service performs its own visibility check; this detail read is also
@@ -367,15 +497,29 @@ export const langyRouter = createTRPCRouter({
             : [],
           createdAtMs: row.createdAt.getTime(),
         }));
+        const isTurnInFlight =
+          conversation.status === LANGY_CONVERSATION_STATUS.ACTIVE ||
+          conversation.status === LANGY_CONVERSATION_STATUS.RUNNING;
+        const shouldAskFeedback = isTurnInFlight
+          ? false
+          : await getApp().langy.feedbackPrompt.shouldAsk({
+              userId: ctx.session.user.id,
+              conversationId: input.conversationId,
+              assistantAnswerCount: messages.filter(
+                (message) => message.role === "assistant",
+              ).length,
+            });
         return {
           messages,
           lastError:
             conversation.status === LANGY_CONVERSATION_STATUS.FAILED
               ? conversation.lastError
               : null,
-          isTurnInFlight:
-            conversation.status === LANGY_CONVERSATION_STATUS.ACTIVE ||
-            conversation.status === LANGY_CONVERSATION_STATUS.RUNNING,
+          isTurnInFlight,
+          // Only ever the id of a turn that IS in flight: a cleared/stale id
+          // must never become a Stop target.
+          inFlightTurnId: isTurnInFlight ? conversation.currentTurnId : null,
+          shouldAskFeedback,
         };
       },
     ),
@@ -467,8 +611,7 @@ export const langyRouter = createTRPCRouter({
    * `LangyConversationNotOwnedError` for someone else's conversation.
    */
   continueConversation: langyTurnProcedure
-    .input(
-      z.object({
+    .input(z.object({
         conversationId: z.string().min(1),
         ...langyTurnInputShape,
       }),
@@ -487,6 +630,35 @@ export const langyRouter = createTRPCRouter({
         });
       },
     ),
+
+  /**
+   * Stop an in-flight turn FOR REAL (ADR-058). The browser's `useChat` stop only
+   * aborts its own subscription and lets the worker keep burning tokens; this
+   * records the durable stopped terminal (the confirmation the client waits on),
+   * ends the live stream, and best-effort asks the worker to abandon the run.
+   *
+   * `langy:create` — the same permission as sending — but deliberately NOT the
+   * rate-limited `langyTurnProcedure`: a Stop must never be throttled. The
+   * per-turn control gate (actor-or-owner, never a shared viewer) and its handled
+   * `LangyConversationNotOwnedError` live in the service; idempotent — stopping an
+   * already-finished turn is a harmless no-op.
+   */
+  stopTurn: langyCreateProcedure
+    .input(
+      z.object({
+        conversationId: z.string().min(1),
+        turnId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ stopped: boolean }> => {
+      await getApp().langy.turns.stopTurn({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        turnId: input.turnId,
+        userId: ctx.session.user.id,
+      });
+      return { stopped: true };
+    }),
 
   /**
    * The model allowlist the composer's picker narrows to, or null when the
@@ -608,6 +780,43 @@ export const langyRouter = createTRPCRouter({
     }),
 
   /**
+   * The feedback card was SHOWN — start the quiet period (the backend-driven
+   * cadence, specs/langy/langy-feedback.feature). Showing counts as asking:
+   * without this, an ignored card would re-appear under every answer, which is
+   * exactly the nagging the cadence exists to prevent. A write, so it wants
+   * `langy:create`, same as recordFeedback.
+   */
+  feedbackPromptShown: langyCreateProcedure
+    .input(z.object({ conversationId: z.string().min(1) }))
+    .mutation(async ({ input, ctx }): Promise<void> => {
+      // Same doctrine as recordFeedback: never act on a conversation id the
+      // caller cannot actually see in this project. The visible-check runs the
+      // project + ownership/shared rules, so a forged or foreign id is a
+      // silent no-op instead of stamping the caller's cadence record with
+      // attribution they don't own.
+      const conversation = await getApp().langy.conversations.findByIdVisible({
+        id: input.conversationId,
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+      });
+      if (!conversation) {
+        logger.warn(
+          {
+            projectId: input.projectId,
+            conversationId: input.conversationId,
+            userId: ctx.session.user.id,
+          },
+          "dropping langy feedback-shown mark for a conversation the caller cannot see",
+        );
+        return;
+      }
+      await getApp().langy.feedbackPrompt.markShown({
+        userId: ctx.session.user.id,
+        conversationId: input.conversationId,
+      });
+    }),
+
+  /**
    * SSE subscription pushing `langy_conversation_updated` signals to active
    * browsers when a conversation's fold projection advances. The client
    * listens, cancels + invalidates its TanStack cache, and refetches the slim
@@ -710,15 +919,59 @@ export const langyRouter = createTRPCRouter({
           if (entry.type === "end" || entry.type === "error") terminal = true;
         }
         if (!terminal) {
-          for await (const { entry } of buffer.follow({
+          // A refresh mid-turn can miss the worker's terminal frame (its relay
+          // connection dropped before it). follow() would then block until the
+          // hard per-turn deadline, leaving the UI on "Starting up…" for minutes
+          // though the turn already finished. While we tail the live edge, watch
+          // the durable fold + per-turn heartbeat; if the turn has settled with
+          // no terminal in the buffer, synthesize one so the client resolves.
+          const settle = new AbortController();
+          const followSignal = AbortSignal.any([signal, settle.signal]);
+          let synthesized: LangyStreamEntry | null = null;
+
+          const watcher = watchForMissedTerminal({
+            projectId,
             conversationId,
             turnId,
-            fromId: lastId,
-            signal,
-          })) {
-            yield entry;
-            if (entry.type === "end" || entry.type === "error") break;
+            userId,
+            buffer,
+            signal: followSignal,
+          })
+            .then((entry) => {
+              if (!entry) return;
+              synthesized = entry;
+              settle.abort(); // unblock the follow() below
+            })
+            // Attached HERE, not in the finally below: follow() can block for
+            // minutes, so a rejection would sit unhandled until then — and Node's
+            // default --unhandled-rejections=throw would take the process down
+            // first. A failed watcher just means no synthesized terminal.
+            .catch(() => {});
+
+          try {
+            for await (const { entry } of buffer.follow({
+              conversationId,
+              turnId,
+              fromId: lastId,
+              signal: followSignal,
+            })) {
+              yield entry;
+              if (entry.type === "end" || entry.type === "error") {
+                // A real terminal reached the buffer — never override it.
+                synthesized = null;
+                return;
+              }
+            }
+          } finally {
+            settle.abort();
+            await watcher; // already has its own .catch()
           }
+
+          // follow() ended with no buffered terminal. If the watcher proved the
+          // turn settled, deliver the synthesized terminal so the UI resolves
+          // instead of hanging; the client reconciles the transcript via
+          // langy.messages.
+          if (synthesized) yield synthesized;
         }
       } finally {
         blocking.disconnect();

@@ -129,3 +129,31 @@ func TestLangyImageEnsureShell(t *testing.T) {
 		})
 	})
 }
+
+// The local idle timeout is a RAM decision, and overriding it is what makes the
+// warm path testable locally at all — so the override, and its fallbacks, are
+// worth pinning. A bad value must never take the stack down with it.
+func TestLangyWorkerIdleMS(t *testing.T) {
+	t.Run("defaults to the constrained local value", func(t *testing.T) {
+		t.Setenv(langyWorkerIdleEnv, "")
+		if got := langyWorkerIdleMS(); got != localLangyWorkerIdleMS {
+			t.Fatalf("want %d, got %d", localLangyWorkerIdleMS, got)
+		}
+	})
+
+	t.Run("honours a developer override", func(t *testing.T) {
+		t.Setenv(langyWorkerIdleEnv, "300000")
+		if got := langyWorkerIdleMS(); got != 300_000 {
+			t.Fatalf("want 300000, got %d", got)
+		}
+	})
+
+	t.Run("falls back rather than failing on a bad value", func(t *testing.T) {
+		for _, bad := range []string{"soon", "-1", "0"} {
+			t.Setenv(langyWorkerIdleEnv, bad)
+			if got := langyWorkerIdleMS(); got != localLangyWorkerIdleMS {
+				t.Fatalf("%q: want fallback %d, got %d", bad, localLangyWorkerIdleMS, got)
+			}
+		}
+	})
+}

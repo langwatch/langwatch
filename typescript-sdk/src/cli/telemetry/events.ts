@@ -31,7 +31,7 @@
 // The zod-free subpath, deliberately: this module is on the hot path of every
 // instrumented command, and the package root pulls in the (zod-based) card
 // schemas, which cost ~28ms an invocation to load and which nothing here needs.
-import { domainErrorFromThrown } from "@langwatch/cli-cards/domain-error";
+import { handledErrorFromThrown } from "@langwatch/cli-cards/handled-error";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import {
   LANGWATCH_EVENT_ATTRIBUTES as ATTR,
@@ -376,18 +376,18 @@ export const createCommandEvents = ({
     failed: ({ error, message }) => {
       // Read the failure back into the structure the platform gave it, so the
       // panel gets a kind it can act on rather than a sentence it can only print.
-      const domain = domainErrorFromThrown(error);
-      const reason = redactSecrets(domain.message, env);
+      const handled = handledErrorFromThrown(error);
+      const reason = redactSecrets(handled.message, env);
       const line = message ? redactSecrets(message, env) : reason;
 
       emit(
         LANGWATCH_EVENTS.error,
         {
           [ATTR.error]: reason,
-          [ATTR.errorKind]: domain.kind,
-          [ATTR.errorIsDomain]: domain.isDomain,
-          ...(domain.httpStatus > 0
-            ? { [ATTR.errorStatus]: domain.httpStatus }
+          [ATTR.errorKind]: handled.kind,
+          [ATTR.errorIsHandled]: handled.isHandled,
+          ...(handled.httpStatus > 0
+            ? { [ATTR.errorStatus]: handled.httpStatus }
             : {}),
           [ATTR.message]: line,
           [ATTR.durationMs]: Date.now() - startedAt,

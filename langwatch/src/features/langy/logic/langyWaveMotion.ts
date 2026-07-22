@@ -85,14 +85,22 @@ export const WAVE_MOTION_TARGETS: Record<LangyWaveActivity, LangyWaveMotion> = {
   // are multipliers; the renderer's absolute pixel amplitudes are deliberately
   // tiny (see `sampleRope`), so even "streaming" only whispers.
   idle: { energy: 0.22, drift: 0.45, flutter: 0.25, pulse: 0 },
-  // Working states bloom a touch more above the idle whisper than they used to,
-  // so the work in the thread reads a little more clearly on the fold — without
-  // lifting idle (a settled panel looks unchanged) and staying well inside the
-  // "still a whisper" ceiling the renderer's tiny absolute amplitudes enforce.
-  waiting: { energy: 0.35, drift: 0.6, flutter: 0.25, pulse: 0 },
-  thinking: { energy: 0.55, drift: 0.38, flutter: 0.1, pulse: 0 },
-  streaming: { energy: 0.8, drift: 1.0, flutter: 0.76, pulse: 0 },
-  tool: { energy: 0.47, drift: 0.42, flutter: 0.16, pulse: 1 },
+  // WAITING IS THE ONE PEOPLE WATCH. It is the cold-start window — the longest
+  // stretch anyone stares at this panel — and it used to sit at 0.35 energy with
+  // idle's own flutter, which is to say it looked switched off at exactly the
+  // moment the user most wants to know something is happening. The wake ripple
+  // marked the send and then the rope went back to almost-still.
+  //
+  // It now blows: high flutter and near-streaming drift, so the rope wiggles in
+  // the wind rather than merely drifting. It stays UNDER streaming (that
+  // ordering is load-bearing and pinned by test) — the difference is character
+  // rather than volume, a gusty wait against a purposeful travelling wind.
+  waiting: { energy: 0.58, drift: 0.8, flutter: 0.55, pulse: 0 },
+  // Thinking stays the deep slow swell: MORE amplitude than waiting, much less
+  // flutter and much less drift. Reasoning reads as considered, not agitated.
+  thinking: { energy: 0.62, drift: 0.5, flutter: 0.14, pulse: 0 },
+  streaming: { energy: 0.9, drift: 1.15, flutter: 0.8, pulse: 0 },
+  tool: { energy: 0.6, drift: 0.55, flutter: 0.16, pulse: 1 },
   settling: { energy: 0.08, drift: 0.32, flutter: 0.18, pulse: 0 },
 };
 
@@ -104,12 +112,14 @@ export function restingWaveMotion(): LangyWaveMotion {
 /**
  * Rising energy answers within ~half a second (a state change should be
  * legible promptly); falling energy takes ~2s to visually settle (a turn's end
- * eases out, never snaps). Character params (drift/flutter/pulse) share one
+ * eases out, never snaps). The fall is a little quicker than it was, because the
+ * working states now sit higher — from a louder peak the same time constant left
+ * the rope perceptibly moving after the answer had landed. Character params (drift/flutter/pulse) share one
  * medium time constant so waveform shape morphs smoothly through rapid
  * tool→stream→tool flips.
  */
 export const WAVE_ENERGY_RISE_TAU_S = 0.45;
-export const WAVE_ENERGY_FALL_TAU_S = 0.8;
+export const WAVE_ENERGY_FALL_TAU_S = 0.7;
 export const WAVE_CHARACTER_TAU_S = 0.6;
 
 /** The wake ripple's top-to-bottom travel time. */

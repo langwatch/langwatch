@@ -1,9 +1,11 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -15,12 +17,15 @@ type gitTestHygiene struct {
 	worktreesErr error
 }
 
-func (f *gitTestHygiene) Worktrees(string) ([]Worktree, error) { return f.worktrees, f.worktreesErr }
-func (f *gitTestHygiene) Dirty(string) bool                    { return false }
-func (f *gitTestHygiene) DirSize(string) (int64, bool)         { return 0, false }
-func (f *gitTestHygiene) Remove(string) error                  { return nil }
-func (f *gitTestHygiene) PruneGitWorktrees(string)             {}
-func (f *gitTestHygiene) RemoveWorktree(string, string) error  { return nil }
+func (f *gitTestHygiene) Worktrees(string) ([]Worktree, error)            { return f.worktrees, f.worktreesErr }
+func (f *gitTestHygiene) Dirty(string) bool                               { return false }
+func (f *gitTestHygiene) DirSize(string) (int64, bool)                    { return 0, false }
+func (f *gitTestHygiene) DiskUsage(context.Context, string) (int64, bool) { return 0, false }
+func (f *gitTestHygiene) Remove(string) error                             { return nil }
+func (f *gitTestHygiene) PruneGitWorktrees(string)                        {}
+func (f *gitTestHygiene) RemoveWorktree(string, string) error             { return nil }
+func (f *gitTestHygiene) LastActivity(string) (time.Time, bool)           { return time.Time{}, false }
+func (f *gitTestHygiene) UpstreamGone(string, string) bool                { return false }
 
 // @scenario "Opening the git UI for another stack by slug"
 // @scenario "Unknown target is rejected with the available choices"

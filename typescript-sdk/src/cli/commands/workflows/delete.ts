@@ -3,8 +3,9 @@ import { createSpinner } from "../../utils/spinner";
 import { WorkflowsApiService } from "@/client-sdk/services/workflows/workflows-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
-export const deleteWorkflowCommand = async (id: string, options?: { format?: string }): Promise<void> => {
+export const deleteWorkflowCommand = async (id: string): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new WorkflowsApiService();
@@ -29,9 +30,12 @@ export const deleteWorkflowCommand = async (id: string, options?: { format?: str
     await service.delete(id);
     deleteSpinner.succeed(`Archived workflow "${chalk.cyan(workflowName)}"`);
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify({ id, name: workflowName, archived: true }, null, 2));
-    }
+    return {
+      data: { id, name: workflowName, archived: true },
+      table: () => {
+        // The spinner's success line above is the whole human output.
+      },
+    };
   } catch (error) {
     failSpinner({
       spinner: deleteSpinner,
