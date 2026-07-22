@@ -8,7 +8,7 @@ import type { WebhookMethod } from "@langwatch/automations/providers/webhook";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
-import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import type { TriggerPort } from "~/server/domain/automations/trigger.port";
 import type { DatasetRecordEntry } from "@langwatch/contracts/datasets";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { IntentExecutor } from "~/server/event-sourcing/pipeline/processManagerDefinition";
@@ -96,7 +96,7 @@ interface ActionParams {
  * queue transport — the ProcessManagerOutbox owns retry now.
  */
 export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
-  triggers: TriggerService;
+  triggers: TriggerPort;
   projects: ProjectServicePort;
   /** Base host for deep links inside rendered customer templates (ADR-036). */
   baseHost: string;

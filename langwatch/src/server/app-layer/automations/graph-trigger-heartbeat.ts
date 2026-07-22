@@ -36,7 +36,7 @@ import { prisma as defaultPrisma } from "~/server/db";
 import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";
 import type { GraphTriggerEvaluationReason } from "./graph-trigger-evaluation.service";
 import { parseSeriesIndex } from "./seriesName";
-import type { TriggerService } from "./trigger.service";
+import type { TriggerPort } from "~/server/domain/automations/trigger.port";
 
 const logger = createLogger(
   "langwatch:app-layer:triggers:graph-trigger-heartbeat",
@@ -62,7 +62,7 @@ interface CandidateTrigger {
 }
 
 export interface GraphTriggerHeartbeatDeps {
-  triggers: TriggerService;
+  triggers: TriggerPort;
   prisma: PrismaClient;
   /** Resolver matching the slim repository's contract — same signature so
    *  tests can stub a single client and the prod path uses the default
@@ -496,7 +496,7 @@ export function defaultGraphTriggerHeartbeatDeps({
   triggers,
   prisma = defaultPrisma,
 }: {
-  triggers: TriggerService;
+  triggers: TriggerPort;
   prisma?: PrismaClient;
 }): GraphTriggerHeartbeatDeps {
   return {

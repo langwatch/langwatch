@@ -63,7 +63,7 @@ import type { SpanStorageService } from "../app-layer/traces/span-storage.servic
 import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../domain/traces/types";
-import type { TriggerService } from "../app-layer/automations/trigger.service";
+import type { TriggerPort } from "~/server/domain/automations/trigger.port";
 import type { AutomationAuditRepository } from "../app-layer/automations/repositories/automation-audit.repository";
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
@@ -335,7 +335,7 @@ export interface PipelineRegistryDeps {
   enterprisePipelines: EnterprisePipelineSetConfig;
   projects: ProjectServicePort;
   monitors: MonitorPort;
-  triggers: TriggerService;
+  triggers: TriggerPort;
   automations: { ports: AutomationDispatchPorts };
   prisma: PrismaClient;
   traces: {

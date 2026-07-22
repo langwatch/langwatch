@@ -35,7 +35,7 @@ import {
 } from "~/server/app-layer/automations/graph-trigger-heartbeat";
 import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
-import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import type { TriggerPort } from "~/server/domain/automations/trigger.port";
 import { dispatchGraphAlertAction } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
 import {
   consumeEmailCapSlot,
@@ -77,7 +77,7 @@ export function buildAutomationDispatchPorts({
 }: {
   prisma: PrismaClient;
   redis: Redis | Cluster | null;
-  triggers: TriggerService;
+  triggers: TriggerPort;
   emailSuppressions: EmailSuppressionService;
   projects: ProjectServicePort;
   evaluations: { runs: EvaluationRunService };

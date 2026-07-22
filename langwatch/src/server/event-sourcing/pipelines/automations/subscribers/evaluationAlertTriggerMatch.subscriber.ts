@@ -11,7 +11,7 @@ import {
   NOTIFY_TRIGGER_ACTIONS,
   triggerReadsEvaluations,
 } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
-import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import type { TriggerPort } from "~/server/domain/automations/trigger.port";
 
 const logger = createLogger(
   "langwatch:triggers:evaluation-alert-trigger-match-subscriber",
@@ -33,7 +33,7 @@ export interface RecordTriggerMatchPort {
 }
 
 export function createEvaluationAlertTriggerMatchHandler(deps: {
-  triggers: TriggerService;
+  triggers: TriggerPort;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   recordTriggerMatch: RecordTriggerMatchPort;
 }) {

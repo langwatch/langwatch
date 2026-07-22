@@ -8,39 +8,10 @@ import type {
 import type { NotificationCadence } from "@langwatch/automations/cadences";
 import type { TriggerFilters } from "@langwatch/contracts/filters";
 
-export interface TriggerSummary {
-  id: string;
-  projectId: string;
-  name: string;
-  action: TriggerAction;
-  /** ADR-044 automation kind. Load-bearing at dispatch: a REPORT fires on its
-   *  calendar schedule only, so it must never be treated as a trace automation.
-   *  A report persists `filters: {}` and no `customGraphId`, which is exactly
-   *  the shape of a match-everything trace trigger — the kind is the ONLY thing
-   *  that tells them apart. */
-  triggerKind: TriggerKind;
-  actionParams: unknown;
-  filters: TriggerFilters;
-  /** ADR-043 Subject facet: the Traces-V2 liqe query the automation is about.
-   *  NULL = legacy `filters`-driven trigger; when set, the dispatcher evaluates
-   *  it in-memory against fold state and ignores `filters`. */
-  filterQuery: string | null;
-  alertType: AlertType | null;
-  message: string | null;
-  customGraphId: string | null;
-  notificationCadence: NotificationCadence;
-  /** Per-trigger trace-readiness debounce in ms (ADR-026). Always populated by
-   *  the repository — the column is `NOT NULL DEFAULT 30000`. */
-  traceDebounceMs: number;
-  /** Customer-authored notification templates (ADR-036). NULL means "this
-   *  channel uses the legacy framework renderer". */
-  templates: {
-    slackTemplateType: string | null;
-    slackTemplate: string | null;
-    emailSubjectTemplate: string | null;
-    emailBodyTemplate: string | null;
-  };
-}
+// Defined in the domain layer so event-sourcing can name it without importing
+// app-layer (ADR-063). One definition, re-exported here for repo consumers.
+export type { TriggerSummary } from "~/server/domain/automations/trigger.port";
+import type { TriggerSummary } from "~/server/domain/automations/trigger.port";
 
 /**
  * The minimum a report needs to (re)build its calendar schedule: the trigger

@@ -8,7 +8,7 @@ import type { ProjectServicePort } from "~/server/domain/projects/project-servic
 import { queryNeeds } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
-import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import type { TriggerPort } from "~/server/domain/automations/trigger.port";
 import type { DatasetRecordEntry } from "@langwatch/contracts/datasets";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
@@ -102,7 +102,7 @@ export function computeScheduledFor({
 }
 
 export interface TriggerActionDispatchDeps {
-  triggers: TriggerService;
+  triggers: TriggerPort;
   projects: ProjectServicePort;
   traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
   addToAnnotationQueue: (params: {

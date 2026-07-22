@@ -2,7 +2,7 @@
 
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
-import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import type { TriggerPort } from "~/server/domain/automations/trigger.port";
 import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { RecordTriggerMatchPort } from "~/server/event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedReactor";
@@ -11,7 +11,7 @@ import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 
 /** Post-traceSummary, origin-guarded handoff into the automations pipeline. */
 export function createTraceAlertTriggerMatchHandler(deps: {
-  triggers: TriggerService;
+  triggers: TriggerPort;
   recordTriggerMatch: RecordTriggerMatchPort;
 }) {
   return async (

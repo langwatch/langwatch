@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Event } from "~/server/event-sourcing/domain/types";
 
 import type { GraphTriggerEvaluationReason } from "~/server/app-layer/automations/graph-trigger-evaluation.service";
-import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import type { TriggerPort } from "~/server/domain/automations/trigger.port";
 
 const logger = createLogger(
   "langwatch:triggers:graph-trigger-activity-subscriber",
@@ -12,7 +12,7 @@ const logger = createLogger(
 export const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
 
 export interface GraphTriggerActivityDeps {
-  triggers: TriggerService;
+  triggers: TriggerPort;
   evaluateGraphTrigger: (params: {
     triggerId: string;
     projectId: string;
