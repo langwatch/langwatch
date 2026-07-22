@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import {
   ColumnTypeChangeNotSupportedError,
   DatasetConflictError,
+  DatasetNameTakenError,
   DatasetNotFoundError,
   DatasetNotReadyError,
 } from "./errors";
@@ -23,11 +24,12 @@ export async function withDatasetErrorHandling<T>(
       });
     }
 
+    // A name clash is knowable and the caller can act on it, so it crosses the
+    // boundary as a handled code rather than prose the client has to match on
+    // (ADR-045). `message` here is server copy; the customer-facing words live
+    // in the client's presentation registry under `dataset_name_taken`.
     if (error instanceof DatasetConflictError) {
-      throw new TRPCError({
-        code: "CONFLICT",
-        message: error.message,
-      });
+      throw new DatasetNameTakenError();
     }
 
     // A column-type change on an s3_jsonl dataset is a user-actionable

@@ -6,7 +6,7 @@ describe("datasetErrorHandler", () => {
   });
 
   describe("when DatasetConflictError thrown", () => {
-    it.todo("maps to CONFLICT tRPC error");
+    it.todo("maps to a dataset_name_taken handled error");
   });
 
   describe("when unknown error thrown", () => {

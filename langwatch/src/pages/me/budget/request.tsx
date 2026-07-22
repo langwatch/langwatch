@@ -4,6 +4,7 @@ import {
   Button,
   Heading,
   HStack,
+  Link,
   Spacer,
   Text,
   Textarea,
@@ -72,6 +73,7 @@ function RequestBudgetIncreasePage() {
   const [submitState, setSubmitState] = useState<
     "idle" | "submitting" | "sent"
   >("idle");
+  const [sendFailed, setSendFailed] = useState(false);
 
   const requestMutation = api.user.requestBudgetIncrease.useMutation({
     onSuccess: () => {
@@ -94,6 +96,10 @@ function RequestBudgetIncreasePage() {
         error: err,
         fallbackTitle: "Couldn't send your request",
       });
+      // The toast reports the failure and then leaves; the way out of a
+      // request that won't send is the admin's address, so it stays on the
+      // page until the next attempt.
+      setSendFailed(true);
     },
   });
 
@@ -101,6 +107,7 @@ function RequestBudgetIncreasePage() {
 
   const submit = () => {
     if (!organization) return;
+    setSendFailed(false);
     setSubmitState("submitting");
     requestMutation.mutate({
       organizationId: organization.id,
@@ -157,6 +164,29 @@ function RequestBudgetIncreasePage() {
                 We emailed {adminEmail ?? "your organization admin"} with the
                 spend context. They'll review and update the budget in Settings
                 → AI Governance → Budgets.
+              </Alert.Description>
+            </Box>
+          </Alert.Root>
+        )}
+
+        {!noOrg && submitState !== "sent" && sendFailed && (
+          <Alert.Root status="error" borderRadius="md">
+            <Alert.Indicator>
+              <AlertTriangle size={18} />
+            </Alert.Indicator>
+            <Box>
+              <Alert.Title>We couldn't send your request</Alert.Title>
+              <Alert.Description fontSize="sm">
+                Try again, or{" "}
+                {adminEmail ? (
+                  <>
+                    email{" "}
+                    <Link href={`mailto:${adminEmail}`}>{adminEmail}</Link>{" "}
+                    directly.
+                  </>
+                ) : (
+                  "contact your organization admin directly."
+                )}
               </Alert.Description>
             </Box>
           </Alert.Root>

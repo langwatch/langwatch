@@ -105,11 +105,10 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
       void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
       onSave?.(agent);
     },
-    onError: (error) => {
-      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
-        return;
-      showErrorToast({ error, fallbackTitle: "Couldn't create agent" });
-    },
+    // No `onError` here on purpose: the only caller awaits `mutateAsync`
+    // inside `onSubmit`, and react-query runs both, so reporting in each
+    // stacks two identical toasts for one failure. The catch owns it — it
+    // has the headline that names the whole action.
   });
 
   const isSaving =

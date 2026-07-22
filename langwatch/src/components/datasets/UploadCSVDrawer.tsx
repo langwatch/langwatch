@@ -630,7 +630,7 @@ export function UploadCSVForm({
         return;
       }
       // A same-origin local-FS failure (e.g. StorageNotWritable) is a real,
-      // actionable server error — surface it verbatim, no fallback parse.
+      // actionable server error — report it to the user, no fallback parse.
       logger.error({ error }, "Direct dataset upload failed");
       // System error → top alert; clear any file-level error so the two never
       // render the shared `upload-error` testid at once.
