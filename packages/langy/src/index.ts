@@ -8,3 +8,8 @@ export * from "./event-sourcing/turnProjection";
 export * from "./event-sourcing/folds/turnFold";
 export * from "./event-sourcing/folds/conversationFold";
 export * from "./event-sourcing/folds/messageMap";
+export * from "./blocks/schemas";
+export * from "./blocks/salvage";
+export * from "./blocks/fence";
+export * from "./blocks/preview";
+export * from "./blocks/choices";
