@@ -32,8 +32,12 @@ interface BackofficeTableProps {
   isFetching?: boolean;
   /**
    * The list query's failure, if any. Deliberately `unknown` — it is handed
-   * straight to `HandledErrorAlert`, which reads the handled-error payload off
-   * a tRPC error rather than its `message` (which is the code slug since #5984).
+   * straight to `HandledErrorAlert`, which lifts the handled-error payload off
+   * whichever transport carried it rather than rendering `message`.
+   *
+   * These views fetch over plain `fetch` against the Hono `/api/admin/*`
+   * routes, so the payload arrives in the flat REST shape and `adminClient`
+   * copies it onto the thrown error for the reader to find.
    */
   error?: unknown;
   onCreate?: () => void;

@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import {
-  DepartmentAssignmentTargetNotFoundError,
-  DepartmentNotFoundError,
-  DepartmentService,
-} from "@ee/governance/services/department/department.service";
 /**
  * tRPC router for departments: org-scoped CRUD plus assignment of users,
  * teams, and projects. Reads gate on `governance:view`, writes on
@@ -12,6 +7,12 @@ import {
  *
  * Spec: specs/ai-gateway/governance/departments.feature
  */
+
+import {
+  DepartmentAssignmentTargetNotFoundError,
+  DepartmentNotFoundError,
+  DepartmentService,
+} from "@ee/governance/services/department/department.service";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 

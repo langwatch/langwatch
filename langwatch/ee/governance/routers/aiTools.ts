@@ -1,9 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import {
-  AiToolEntryService,
-  SUPPORTED_TILE_TYPES,
-} from "@ee/governance/services/aiToolEntry.service";
 /**
  * tRPC router for the AI Tools Portal catalog (Phase 7).
  *
@@ -24,6 +20,11 @@ import {
  * So this router OWNS the catalog entity only - the per-tile behaviors
  * are wired client-side against existing endpoints.
  */
+
+import {
+  AiToolEntryService,
+  SUPPORTED_TILE_TYPES,
+} from "@ee/governance/services/aiToolEntry.service";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 

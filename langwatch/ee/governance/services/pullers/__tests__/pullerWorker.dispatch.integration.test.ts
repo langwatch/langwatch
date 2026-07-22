@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { ClickHouseClient } from "@clickhouse/client";
 /**
  * @vitest-environment node
  *
@@ -22,6 +21,8 @@ import type { ClickHouseClient } from "@clickhouse/client";
  *
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
+
+import type { ClickHouseClient } from "@clickhouse/client";
 import http from "http";
 import { nanoid } from "nanoid";
 import type { AddressInfo } from "net";

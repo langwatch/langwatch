@@ -42,7 +42,11 @@ import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { showErrorToast } from "~/features/errors";
+import {
+  HandledErrorAlert,
+  readHandledError,
+  showErrorToast,
+} from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -73,6 +77,21 @@ const STATUS_META: Record<
   },
   disabled: { icon: CircleX, label: "Disabled", color: "fg.muted" },
 };
+
+/**
+ * Whether a failed load actually means "no such source".
+ *
+ * Reads the handled payload first — a `NotFoundError` carries `httpStatus`
+ * 404 regardless of which tRPC code wrapped it — and falls back to the tRPC
+ * envelope code for the plain `new TRPCError({ code: "NOT_FOUND" })` the
+ * router throws today. Anything else is a load failure, not a deletion.
+ */
+function isNotFoundError(error: unknown): boolean {
+  if (!error) return false;
+  if (readHandledError(error)?.httpStatus === 404) return true;
+  const code = (error as { data?: { code?: unknown } })?.data?.code;
+  return code === "NOT_FOUND";
+}
 
 const fmtUsd = (n: number) =>
   n === 0 ? "$0.00" : numeral(n).format("$0,0.0000");
@@ -145,9 +164,6 @@ function IngestionSourceDetailPage() {
   if (!sourceId) {
     return <NotFoundScene />;
   }
-  if (sourceQuery.isError) {
-    return <NotFoundScene />;
-  }
 
   const source = sourceQuery.data;
   const health = healthQuery.data;
@@ -155,6 +171,29 @@ function IngestionSourceDetailPage() {
   const pageTitle = source?.name
     ? `${source.name} · Ingestion Source · LangWatch`
     : "Ingestion Source · LangWatch";
+
+  // "This source doesn't exist" is a claim, and only a genuine 404 earns it.
+  // Every other failure — a permission denial, a 500, a dropped connection —
+  // used to land here too, so an admin whose source was very much alive was
+  // told it had been deleted and went looking for who removed it.
+  if (isNotFoundError(sourceQuery.error)) {
+    return <NotFoundScene />;
+  }
+  if (sourceQuery.error) {
+    return (
+      <GovernanceLayout pageTitle={pageTitle}>
+        <EnterpriseLockedSurface
+          featureName="Ingestion Source detail"
+          description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
+        >
+          <HandledErrorAlert
+            error={sourceQuery.error}
+            fallbackTitle="Couldn't load this ingestion source"
+          />
+        </EnterpriseLockedSurface>
+      </GovernanceLayout>
+    );
+  }
 
   if (!source) {
     return (
@@ -248,28 +287,39 @@ function IngestionSourceDetailPage() {
             </Button>
           </HStack>
 
-          <SimpleGrid columns={{ base: 2, md: 4 }} gap={4}>
-            <MetricCard
-              title="Events 24h"
-              value={numeral(health?.events24h ?? 0).format("0,0")}
-              isLoading={healthQuery.isLoading}
+          {/* The metric cards read `health?.eventsNd ?? 0`, so a failed
+              health query renders "0 events" — indistinguishable from a
+              silent source, and the first thing an admin does about a silent
+              source is go rebuild an integration that was never broken. */}
+          {healthQuery.error ? (
+            <HandledErrorAlert
+              error={healthQuery.error}
+              fallbackTitle="Couldn't load health metrics for this source"
             />
-            <MetricCard
-              title="Events 7d"
-              value={numeral(health?.events7d ?? 0).format("0,0")}
-              isLoading={healthQuery.isLoading}
-            />
-            <MetricCard
-              title="Events 30d"
-              value={numeral(health?.events30d ?? 0).format("0,0")}
-              isLoading={healthQuery.isLoading}
-            />
-            <MetricCard
-              title="Last event"
-              value={fmtRelative(health?.lastSuccessIso ?? null)}
-              isLoading={healthQuery.isLoading}
-            />
-          </SimpleGrid>
+          ) : (
+            <SimpleGrid columns={{ base: 2, md: 4 }} gap={4}>
+              <MetricCard
+                title="Events 24h"
+                value={numeral(health?.events24h ?? 0).format("0,0")}
+                isLoading={healthQuery.isLoading}
+              />
+              <MetricCard
+                title="Events 7d"
+                value={numeral(health?.events7d ?? 0).format("0,0")}
+                isLoading={healthQuery.isLoading}
+              />
+              <MetricCard
+                title="Events 30d"
+                value={numeral(health?.events30d ?? 0).format("0,0")}
+                isLoading={healthQuery.isLoading}
+              />
+              <MetricCard
+                title="Last event"
+                value={fmtRelative(health?.lastSuccessIso ?? null)}
+                isLoading={healthQuery.isLoading}
+              />
+            </SimpleGrid>
+          )}
 
           <StaleTimestampCallout
             health={health ?? null}
@@ -286,18 +336,29 @@ function IngestionSourceDetailPage() {
               <Heading as="h3" size="sm">
                 Recent events
               </Heading>
-              <Text fontSize="sm" color="fg.muted">
-                Last {events.length} OCSF-normalised events from this source.
-                Raw payload + normalised fields shown side-by-side. Newest
-                first.
-              </Text>
+              {!eventsQuery.error && (
+                <Text fontSize="sm" color="fg.muted">
+                  Last {events.length} OCSF-normalised events from this source.
+                  Raw payload + normalised fields shown side-by-side. Newest
+                  first.
+                </Text>
+              )}
             </VStack>
 
             {eventsQuery.isLoading && <Spinner size="sm" />}
 
-            {!eventsQuery.isLoading && events.length === 0 && (
-              <EmptyEventsHint source={source} />
-            )}
+            {/* `EmptyEventsHint` walks an admin through setting up an
+                integration. Showing it because the events query failed sends
+                someone debugging a live source off to re-install something
+                that is already working. */}
+            <HandledErrorAlert
+              error={eventsQuery.error}
+              fallbackTitle="Couldn't load recent events"
+            />
+
+            {!eventsQuery.isLoading &&
+              !eventsQuery.error &&
+              events.length === 0 && <EmptyEventsHint source={source} />}
 
             {events.length > 0 && (
               <VStack align="stretch" gap={2}>

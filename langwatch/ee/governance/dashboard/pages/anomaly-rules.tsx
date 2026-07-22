@@ -22,7 +22,7 @@ import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { showErrorToast } from "~/features/errors";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { docsUrl } from "~/utils/docsUrl";
@@ -275,7 +275,7 @@ function AnomalyRulesPage() {
       // nothing here crossed the wire, so it is safe to show verbatim.
       toaster.create({
         title: "Invalid JSON in config field",
-        description:
+        description: // no-raw-error-toast-ok
           parseFailure instanceof SyntaxError ? parseFailure.message : "",
         type: "error",
       });
@@ -354,70 +354,81 @@ function AnomalyRulesPage() {
 
           {rulesQuery.isLoading && <Spinner size="sm" />}
 
-          {(["critical", "warning", "info"] as const).map((sev) => {
-            const meta = SEVERITY_OPTIONS.find((o) => o.value === sev)!;
-            return (
-              <Box
-                key={sev}
-                as="section"
-                borderWidth="1px"
-                borderColor="border.muted"
-                borderRadius="md"
-                padding={4}
-              >
-                <HStack alignItems="start" marginBottom={3}>
-                  <VStack align="start" gap={0}>
-                    <HStack gap={2}>
-                      <Text fontSize="sm" fontWeight="semibold">
-                        {meta.label}
-                      </Text>
-                      <Badge size="sm" variant="surface">
-                        {grouped[sev].length}
-                      </Badge>
-                    </HStack>
-                  </VStack>
-                  <Spacer />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const fresh = blankComposer();
-                      fresh.severity = sev;
-                      setComposer(fresh);
-                    }}
-                    disabled={!!composer}
-                  >
-                    <Plus size={14} /> New rule
-                  </Button>
-                </HStack>
+          {/* The severity sections below count off `rulesQuery.data ?? []`, so
+              a failed load renders "Critical 0 / Warning 0 / Info 0". On an
+              alerting-configuration surface that reads as "you have no
+              critical rules" — a claim we cannot make when we never got the
+              list. Say what went wrong and show nothing instead. */}
+          <HandledErrorAlert
+            error={rulesQuery.error}
+            fallbackTitle="Couldn't load anomaly rules"
+          />
 
-                <VStack align="stretch" gap={2}>
-                  {grouped[sev].length === 0 && (
-                    <Text fontSize="sm" color="fg.muted">
-                      No {meta.label.toLowerCase()} rules.
-                    </Text>
-                  )}
-                  {grouped[sev].map((rule) => (
-                    <RuleRow
-                      key={rule.id}
-                      rule={rule}
-                      onEdit={() => startEdit(rule)}
-                      onArchive={() =>
-                        archiveMutation.mutate({
-                          id: rule.id,
-                          organizationId: orgId,
-                        })
-                      }
-                      isArchiving={
-                        archiveMutation.isPending &&
-                        archiveMutation.variables?.id === rule.id
-                      }
-                    />
-                  ))}
-                </VStack>
-              </Box>
-            );
-          })}
+          {!rulesQuery.error &&
+            (["critical", "warning", "info"] as const).map((sev) => {
+              const meta = SEVERITY_OPTIONS.find((o) => o.value === sev)!;
+              return (
+                <Box
+                  key={sev}
+                  as="section"
+                  borderWidth="1px"
+                  borderColor="border.muted"
+                  borderRadius="md"
+                  padding={4}
+                >
+                  <HStack alignItems="start" marginBottom={3}>
+                    <VStack align="start" gap={0}>
+                      <HStack gap={2}>
+                        <Text fontSize="sm" fontWeight="semibold">
+                          {meta.label}
+                        </Text>
+                        <Badge size="sm" variant="surface">
+                          {grouped[sev].length}
+                        </Badge>
+                      </HStack>
+                    </VStack>
+                    <Spacer />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const fresh = blankComposer();
+                        fresh.severity = sev;
+                        setComposer(fresh);
+                      }}
+                      disabled={!!composer}
+                    >
+                      <Plus size={14} /> New rule
+                    </Button>
+                  </HStack>
+
+                  <VStack align="stretch" gap={2}>
+                    {grouped[sev].length === 0 && (
+                      <Text fontSize="sm" color="fg.muted">
+                        No {meta.label.toLowerCase()} rules.
+                      </Text>
+                    )}
+                    {grouped[sev].map((rule) => (
+                      <RuleRow
+                        key={rule.id}
+                        rule={rule}
+                        onEdit={() => startEdit(rule)}
+                        onArchive={() =>
+                          archiveMutation.mutate({
+                            id: rule.id,
+                            organizationId: orgId,
+                          })
+                        }
+                        isArchiving={
+                          archiveMutation.isPending &&
+                          archiveMutation.variables?.id === rule.id
+                        }
+                      />
+                    ))}
+                  </VStack>
+                </Box>
+              );
+            })}
         </VStack>
       </EnterpriseLockedSurface>
     </GovernanceLayout>

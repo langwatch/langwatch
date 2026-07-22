@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { PullResult, PullRunOptions } from "./pullerAdapter";
 /**
  * OpenAI Enterprise Compliance reference puller — built on top of
  * the S3PollingPullerAdapter with the bucket-shape locked to
@@ -24,6 +23,8 @@ import type { PullResult, PullRunOptions } from "./pullerAdapter";
  * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
  *       (same lock-the-shape pattern; openai/claude follow as ⏳ rows)
  */
+
+import type { PullResult, PullRunOptions } from "./pullerAdapter";
 import {
   type S3PollingConfig,
   S3PollingPullerAdapter,

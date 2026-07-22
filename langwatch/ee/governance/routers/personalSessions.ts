@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { CliSessionInventoryService } from "@ee/governance/services/cliSessionInventory.service";
-import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
 /**
  * tRPC router for /me/sessions — Phase 8 Sessions/Devices dashboard.
  *
@@ -18,6 +16,9 @@ import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevoc
  *
  * Spec: specs/ai-governance/sessions/sessions-inventory.feature
  */
+
+import { CliSessionInventoryService } from "@ee/governance/services/cliSessionInventory.service";
+import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
 import { z } from "zod";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
