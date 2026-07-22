@@ -69,7 +69,7 @@ type AITraceParams struct {
 	UpstreamErrorType string
 
 	// MirrorTier is the ADR-061 mirror fidelity resolved for this VK's
-	// organization ("content" | "structural" | "skip" | ""), materialised into
+	// organization ("content" | "structural" | "skip" | ""), materialized into
 	// the bundle by the control plane. Non-skip only for Langy virtual keys, so
 	// ordinary customer traffic is never mirrored. content ⇒ the gateway emits a
 	// SECOND gen_ai span (with prompt/completion) into the mirror project;

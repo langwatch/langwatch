@@ -32,7 +32,7 @@ const (
 	// attrDrop marks a span the gateway started but does not want exported
 	// (zero-cost, no-output probe calls). dropFilterExporter omits these.
 	attrDrop = attribute.Key("langwatch.reserved.drop")
-	// attrMirrorTier / attrMirrorSourceOrg are internal signalling set by
+	// attrMirrorTier / attrMirrorSourceOrg are internal signaling set by
 	// EndSpan and consumed by mirrorExporter (ADR-061). They are stripped from
 	// BOTH the customer copy and the mirror copy before export — a reserved
 	// marker must never reach either project.
@@ -317,7 +317,7 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		span.SetAttributes(attrOutputMessages.String(output))
 	}
 
-	// ADR-061 mirror markers: internal signalling for mirrorExporter, stripped
+	// ADR-061 mirror markers: internal signaling for mirrorExporter, stripped
 	// from every exported copy. Only stamped for a non-skip tier (Langy VKs),
 	// so ordinary customer traffic never grows a mirror copy.
 	if tier := params.MirrorTier; tier == mirrorTierContent || tier == mirrorTierStructural {

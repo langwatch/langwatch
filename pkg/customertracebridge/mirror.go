@@ -11,7 +11,7 @@ import (
 // mirrorExporter is the gateway half of the ADR-061 mirror lane. The gateway
 // emits one gen_ai span per LLM call into the customer's project; that span is
 // the one piece of a Langy turn's trace the manager's relay never sees (the
-// gen_ai spans are synthesised here, not exported by the worker). So the mirror
+// gen_ai spans are synthesized here, not exported by the worker). So the mirror
 // is completed HERE: a span EndSpan marked with a non-skip tier is DUPLICATED
 // into the mirror project, at the fidelity the tier allows.
 //
@@ -20,7 +20,7 @@ import (
 //     usage, cost, status and model survive.
 //
 // The reserved marker attributes are stripped from BOTH copies: they are
-// internal signalling and must reach neither project. The customer's own copy
+// internal signaling and must reach neither project. The customer's own copy
 // is otherwise untouched — the mirror leg can only ADD a copy, never alter or
 // withhold the customer's.
 //
@@ -87,7 +87,7 @@ func (m mirrorExporter) mirrorCopy(s sdktrace.ReadOnlySpan, tier string) sdktrac
 }
 
 // stripMarkers returns the span with only the reserved mirror markers removed,
-// so the customer's own copy never carries internal signalling.
+// so the customer's own copy never carries internal signaling.
 func stripMarkers(s sdktrace.ReadOnlySpan) sdktrace.ReadOnlySpan {
 	// Fast path: nothing to strip.
 	if spanAttr(s, attrMirrorTier) == "" && spanAttr(s, attrMirrorSourceOrg) == "" {
