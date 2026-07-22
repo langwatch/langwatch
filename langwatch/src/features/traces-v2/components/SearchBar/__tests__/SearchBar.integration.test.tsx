@@ -30,6 +30,7 @@ const langyMock = {
   ask: vi.fn(),
   open: vi.fn(),
   attach: vi.fn(),
+  draft: "",
 };
 vi.mock("~/features/langy/hooks/useShowLangy", () => ({
   useShowLangy: () => langyMock.enabled,
@@ -43,6 +44,13 @@ vi.mock("~/features/langy/stores/langyStore", () => {
     askLangy: langyMock.ask,
     openPanel: langyMock.open,
     attachContext: langyMock.attach,
+    // The handoff seeds the composer through the store, so the mock has to
+    // carry a real draft: `seedDraft` reads it to decide whether the reader
+    // already started writing.
+    draft: langyMock.draft,
+    setDraft: (text: string) => {
+      langyMock.draft = text;
+    },
   });
   const useLangyStore = (
     selector: (s: ReturnType<typeof state>) => unknown,
@@ -105,6 +113,7 @@ beforeEach(() => {
   langyMock.ask.mockClear();
   langyMock.open.mockClear();
   langyMock.attach.mockClear();
+  langyMock.draft = "";
 });
 
 function renderSearchBar() {
@@ -293,6 +302,25 @@ describe("<SearchBar /> ask affordance", () => {
         expect(
           document.querySelector("[data-placeholder]"),
         ).toBeInTheDocument();
+      });
+
+      it("seeds the composer with an opening for the question", () => {
+        useFilterStore.getState().applyQueryText("@status:error");
+        renderSearchBar();
+
+        fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
+
+        expect(langyMock.draft).not.toBe("");
+      });
+
+      it("leaves a question the reader already started alone", () => {
+        langyMock.draft = "why are these slow";
+        useFilterStore.getState().applyQueryText("@status:error");
+        renderSearchBar();
+
+        fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
+
+        expect(langyMock.draft).toBe("why are these slow");
       });
     });
   });
