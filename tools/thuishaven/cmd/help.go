@@ -126,6 +126,9 @@ EXAMPLES
     haven up --watch             # air hot-reload for gateway + nlp
     haven up --detach            # background the stack; haven logs -f to follow
     haven restart nlp            # bounce one Go service without hot reload
+    haven logs                   # recent output from every service, interleaved
+    haven logs nlp -f            # follow one service live
+    haven logs --level warn --since 10m   # only recent warnings and errors
     haven down                   # stop the stack, keep the databases
     haven down --all             # stop everything haven runs on this machine
     haven switch otel            # print the otel-* worktree's dir (cd via shell-init)

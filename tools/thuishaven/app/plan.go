@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -24,6 +25,9 @@ func goServiceShell(repoRoot, svc string, shouldWatch bool) string {
 // service its SERVER_ADDR.
 func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, langyDockerHost string) []Child {
 	base := st.OverlayEnv()
+	logPath := func(name string) string {
+		return filepath.Join(o.cfg.Home, "logs", st.Slug, name+".log")
+	}
 	// Bun and Node use their own bundled CA roots, NOT the macOS system store, so
 	// the app process and the langy worker's opencode (Bun) subprocess otherwise
 	// reject the portless HTTPS certs on every gateway/control-plane call ("self
@@ -53,7 +57,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 			"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true")
 	}
 	out = append(out, Child{
-		Name: "app", Dir: lwDir, Color: palette[1],
+		Name: "app", Dir: lwDir, Color: palette[1], LogPath: logPath("app"),
 		Shell: "pnpm -s run dev:vite",
 		Env:   nodeEnv(),
 		// Hold the web (vite) until the API answers /api/health. The app proxies
@@ -72,26 +76,28 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 		apiEnv = append(apiEnv, "WORKERS_IN_PROCESS=1")
 	}
 	out = append(out, Child{
-		Name: "api", Dir: lwDir, Color: palette[3],
+		Name: "api", Dir: lwDir, Color: palette[3], LogPath: logPath("api"),
 		Shell: "pnpm -s run start:app",
 		Env:   apiEnv,
 	})
 	if opts.Selection.Gateway {
 		out = append(out, Child{
-			Name: "gateway", Dir: opts.RepoRoot, Color: palette[2],
+			Name: "gateway", Dir: opts.RepoRoot, Color: palette[2], LogPath: logPath("gateway"),
 			Shell: goServiceShell(opts.RepoRoot, "aigateway", opts.ShouldGoWatch),
 			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("gateway"))),
 		})
 	}
 	if opts.Selection.NLP {
 		out = append(out, Child{
-			Name: "nlp", Dir: opts.RepoRoot, Color: palette[4],
+			Name: "nlp", Dir: opts.RepoRoot, Color: palette[4], LogPath: logPath("nlp"),
 			Shell: goServiceShell(opts.RepoRoot, "nlpgo", opts.ShouldGoWatch),
 			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("nlp"))),
 		})
 	}
 	if opts.Selection.Langy {
-		out = append(out, o.langyChild(st, opts, base, port("langyagent"), langyDockerHost))
+		langy := o.langyChild(st, opts, base, port("langyagent"), langyDockerHost)
+		langy.LogPath = logPath("langyagent")
+		out = append(out, langy)
 	}
 	if opts.ShouldStartWorkers && opts.Selection.Workers {
 		out = append(out, Child{
@@ -99,7 +105,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 			// prefix reads as an error even on ordinary info logs. Red (palette[5])
 			// is reserved for genuine failures, so no lane label uses it —
 			// TestNoLaneIsRed pins that.
-			Name: "workers", Dir: lwDir, Color: palette[0],
+			Name: "workers", Dir: lwDir, Color: palette[0], LogPath: logPath("workers"),
 			Shell: "pnpm -s run start:workers",
 			Env:   append(nodeEnv(), "START_WORKERS=true"),
 		})

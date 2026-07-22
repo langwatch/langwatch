@@ -243,13 +243,16 @@ var table = []commandSpec{
 	},
 	{
 		name:    "logs",
-		summary: "print a detached stack's log file",
+		summary: "captured service logs from any terminal: all interleaved, or the named ones",
+		args:    "[service…]",
+		maxArgs: -1,
 		flags: []flagSpec{
 			{long: "--follow", short: "-f", summary: "stream live"},
+			{long: "--since", takesValue: true, value: "<dur>", summary: "only lines from the last e.g. 10m"},
+			{long: "--level", takesValue: true, value: "<lvl>", summary: "only warn-or-worse (warn) / errors (error)"},
+			{long: "--stack", takesValue: true, value: "<slug>", summary: "another worktree's stack by slug"},
 		},
-		run: func(ctx context.Context, d deps, inv invocation) error {
-			return runLogs(ctx, d, inv.has("--follow"))
-		},
+		run: runLogsCmd,
 	},
 	{
 		name:    "status",

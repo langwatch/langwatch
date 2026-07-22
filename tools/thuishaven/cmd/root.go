@@ -458,25 +458,6 @@ func runUpDetached(d deps, rest []string) error {
 	return nil
 }
 
-// runLogs prints (or follows, with -f) the detached stack's log file via tail.
-func runLogs(ctx context.Context, d deps, shouldFollow bool) error {
-	slug, err := d.orch.ResolveSlug(d.params)
-	if err != nil {
-		return err
-	}
-	logPath := stackLogPath(slug)
-	if _, err := os.Stat(logPath); err != nil {
-		return fmt.Errorf("no log file for stack %q (%s) — logs are captured when the stack is started with `haven up -d`", slug, logPath)
-	}
-	args := []string{"-n", "200"}
-	if shouldFollow {
-		args = append(args, "-f")
-	}
-	cmd := exec.CommandContext(ctx, "tail", append(args, logPath)...)
-	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-	return cmd.Run()
-}
-
 // prWorktreeBase is where `haven pr` puts new PR worktrees: HAVEN_WORKTREE_DIR if
 // set, else the sibling `worktrees/` dir next to the main checkout (matching the
 // existing layout, e.g. .../langwatch/worktrees).
