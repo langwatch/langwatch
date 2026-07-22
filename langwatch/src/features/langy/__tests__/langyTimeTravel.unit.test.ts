@@ -97,6 +97,7 @@ describe("buildTimeTravelView", () => {
   });
 
   describe("scrubbed to mid-turn", () => {
+    /** @scenario Scrubbing to mid-answer shows the prose as far as it had streamed */
     it("shows the sent question and the answer exactly as far as it had streamed", () => {
       seq = 0;
       const records = [
@@ -211,6 +212,7 @@ describe("buildTimeTravelView", () => {
     // reaches the tape a catch-up round-trip later. Positions inside that gap
     // used to double-render the answer (settled row + its own partial) under
     // a thinking line that never ended.
+    /** @scenario A settled answer never shows beside its own partial */
     it("shows the settled answer once, with nothing claiming Langy still works", () => {
       seq = 0;
       const records = [

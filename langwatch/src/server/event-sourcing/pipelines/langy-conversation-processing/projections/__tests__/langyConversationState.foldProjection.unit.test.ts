@@ -6,12 +6,10 @@ import {
   LANGY_CONVERSATION_EVENT_VERSIONS,
   LANGY_CONVERSATION_STATUS,
   LANGY_TITLE_SOURCE,
+  type LangyConversationStateData,
 } from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "../../schemas/events";
-import {
-  LangyConversationStateFoldProjection,
-  type LangyConversationStateData,
-} from "../langyConversationState.foldProjection";
+import { LangyConversationStateFoldProjection } from "../langyConversationState.foldProjection";
 
 const noopStore: StateProjectionStore<LangyConversationStateData> = {
   store: async () => {},

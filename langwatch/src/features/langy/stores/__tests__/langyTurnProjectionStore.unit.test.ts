@@ -46,7 +46,7 @@ describe("the turn projection in the store", () => {
     // persisted, and without clearing it a repeated same-scope reset is a
     // deliberate heartbeat no-op, leaking projection state between tests.
     useLangyStore.setState({ scopeAnnounced: false });
-    useLangyStore.getState().resetForProject();
+    useLangyStore.getState().resetForProject("project-test");
   });
 
   describe("when a snapshot names a turn in flight and this tab tracks none", () => {

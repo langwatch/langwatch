@@ -86,6 +86,7 @@ describe("the local turn projection", () => {
       expect(isLangyTurnProjectionTerminal(state)).toBe(true);
     });
 
+    /** @scenario Applying a recorded step the view has already seen changes nothing */
     it("re-applying the same tail changes nothing — replay is safe", () => {
       const tail = [
         accepted({ id: "e1", createdAt: 100 }),

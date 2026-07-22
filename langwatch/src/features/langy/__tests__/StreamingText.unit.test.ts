@@ -21,6 +21,7 @@ describe("partitionStreamingText", () => {
     expect(result.animatedWords).toEqual(["one ", "two ", "three"]);
   });
 
+  /** @scenario Multi-line prose keeps its reading order while streaming */
   it("keeps newlines out of the word tokens so multi-line prose reads in order", () => {
     // The regression: "traces.\n\n" as ONE inline-block token parked the word
     // a line above its sentence (an inline-block's baseline is its last line
