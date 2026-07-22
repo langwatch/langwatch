@@ -23,7 +23,7 @@ type NodeError struct {
 `
 
 // engineTree writes the engine package's type declaration alongside the files
-// under test, so the fixture stands for the tree it is modelling.
+// under test, so the fixture stands for the tree it is modeling.
 func engineTree(t *testing.T, files map[string]string) string {
 	t.Helper()
 	all := map[string]string{"services/nlpgo/app/engine/nodeerror.go": nodeErrorDeclaration}
@@ -176,10 +176,10 @@ var _ = NodeError{Type: "engine_error"}
 	if err == nil {
 		t.Fatal("Parse() error = nil, want the forwarded Type to fail the run")
 	}
-	for _, want := range []string{"services/nlpgo/app/engine/forward.go:4", "Normalise"} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("Parse() error = %q, want it to mention %q", err, want)
-		}
+	// The file:line is the part that has to survive rewording — it is how the
+	// engineer finds the forwarded Type. The rest of the sentence is copy.
+	if !strings.Contains(err.Error(), "services/nlpgo/app/engine/forward.go:4") {
+		t.Errorf("Parse() error = %q, want it to name the offending site", err)
 	}
 }
 

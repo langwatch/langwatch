@@ -9,7 +9,7 @@ import (
 )
 
 // The code runner's error type is an OPEN set — whatever Python exception class
-// the customer's own function raised, plus the two the runner synthesises. The
+// the customer's own function raised, plus the two the runner synthesizes. The
 // engine used to forward it verbatim, so a `ValueError` reached the client as if
 // it were one of our codes, with no copy written for it and nothing failing to
 // compile. Every path now lands on a code the client knows.
@@ -21,7 +21,7 @@ func TestNodeErrorFromCodeBlock(t *testing.T) {
 		wantMessage string
 	}{
 		{
-			name:        "a timeout the runner synthesised gets the timeout code",
+			name:        "a timeout the runner synthesized gets the timeout code",
 			err:         codeblock.Error{Type: "Timeout", Message: "code_block_timeout"},
 			wantType:    "code_block_timeout",
 			wantMessage: "the code block ran past its time limit and was stopped",
@@ -78,7 +78,7 @@ func TestNodeErrorFromCodeBlockKeepsTheTraceback(t *testing.T) {
 
 func TestNodeErrorFromCodeBlockOnlyProducesKnownCodes(t *testing.T) {
 	// classifyNodeFault is the closest thing the engine has to the client's
-	// registry: a code it does not recognise falls through to faultPlatform,
+	// registry: a code it does not recognize falls through to faultPlatform,
 	// which pages us for a customer's own Python bug.
 	for _, raw := range []string{"Timeout", "RunnerError", "ValueError", "KeyError", ""} {
 		ne := nodeErrorFromCodeBlock(&codeblock.Error{Type: raw, Message: "boom"})

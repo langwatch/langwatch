@@ -34,6 +34,11 @@ func tree(t *testing.T, files map[string]string) string {
 // herrPackage is the stub the fixtures import; only the shape matters, the
 // parser never type-checks. Code is a defined string type here exactly as it is
 // in pkg/herr, which is what lets a bare literal stand in for it at a call site.
+// The struct below declares a field named Code of type Code, which is what
+// pkg/herr declares and so what the fixture has to match — and which reads as a
+// duplicated word to the linter.
+//
+//nolint:dupword // fixture mirrors pkg/herr's E struct
 const herrPackage = `package herr
 
 import "context"

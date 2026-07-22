@@ -170,9 +170,9 @@ func resolveNodeErrorSites(sites []nodeErrorSite) ([]nodeErrorSite, error) {
 	if len(unreadable) > 0 {
 		slices.Sort(unreadable)
 		return nil, fmt.Errorf(
-			"NodeError literals whose Type is not a string literal (the code still reaches the client, "+
-				"so it cannot be generated and would ship with no customer copy):\n  %s\n"+
-				"Normalise the upstream error onto a NodeError code written as a literal.",
+			"normalise the upstream error onto a NodeError code written as a literal — "+
+				"these Type values are not string literals, so they cannot be generated "+
+				"and would reach the client with no customer copy:\n  %s",
 			strings.Join(unreadable, "\n  "),
 		)
 	}
