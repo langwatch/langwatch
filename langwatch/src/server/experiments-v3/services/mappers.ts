@@ -34,7 +34,6 @@ export interface ClickHouseExperimentRunRow {
   Progress: number;
   CompletedCount: number;
   FailedCount: number;
-  TotalCost: number | null;
   TotalDurationMs: number | null;
   AvgScoreBps: number | null;
   PassRateBps: number | null;

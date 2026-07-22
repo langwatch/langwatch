@@ -80,7 +80,6 @@ import type { SpanStorageService } from "../app-layer/traces/span-storage.servic
 import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../app-layer/traces/types";
-import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
@@ -127,7 +126,6 @@ import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-p
 import type { ExperimentRunStateData } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
-import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import { createLangyMaintenancePipeline } from "./pipelines/langy-maintenance/pipeline";
@@ -172,7 +170,6 @@ import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/pr
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
-import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
 import {
   createDeferredOriginHandler,
   createOriginGateReactor,
@@ -466,7 +463,6 @@ export class PipelineRegistry {
     const {
       pipeline: tracePipeline,
       simComputeRunMetrics,
-      wireExperimentDeps,
     } = this.registerTracePipeline({
       evalPipeline,
       traceSummaryStore,
@@ -493,9 +489,7 @@ export class PipelineRegistry {
         simComputeRunMetrics,
       });
 
-    const experimentRunPipeline = this.registerExperimentRunPipeline({
-      wireExperimentDeps,
-    });
+    const experimentRunPipeline = this.registerExperimentRunPipeline();
     const { pipeline: langyConversationPipeline } =
       this.registerLangyConversationPipeline();
     const { pipeline: topicClusteringPipeline } =
@@ -928,37 +922,6 @@ export class PipelineRegistry {
       computeRunMetrics: simComputeRunMetrics.fn,
     });
 
-    // Late-bound reference for experiment metrics sync reactor.
-    // The experiment pipeline is registered after the trace pipeline,
-    // so computeExperimentRunMetrics is wired after experiment pipeline registration.
-    let expComputeRunMetrics:
-      | ((data: ComputeExperimentRunMetricsCommandData) => Promise<void>)
-      | null = null;
-    let expLookupExperimentId:
-      | ((tenantId: string, runId: string) => Promise<string | null>)
-      | null = null;
-
-    const experimentMetricsSyncReactor = createExperimentMetricsSyncReactor({
-      computeExperimentRunMetrics: async (data) => {
-        if (!expComputeRunMetrics) {
-          logger.warn(
-            "experiment computeExperimentRunMetrics not yet initialized, skipping",
-          );
-          return;
-        }
-        return expComputeRunMetrics(data);
-      },
-      lookupExperimentId: async (tenantId, runId) => {
-        if (!expLookupExperimentId) {
-          logger.warn(
-            "experiment lookupExperimentId not yet initialized, skipping",
-          );
-          return null;
-        }
-        return expLookupExperimentId(tenantId, runId);
-      },
-    });
-
     const gatewayBudgetSyncReactor = this.deps.gatewayBudgetSync
       ? createGatewayBudgetSyncReactor(this.deps.gatewayBudgetSync)
       : undefined;
@@ -995,7 +958,6 @@ export class PipelineRegistry {
         traceUpdateBroadcastReactor,
         projectMetadataReactor,
         simulationMetricsSyncReactor,
-        experimentMetricsSyncReactor,
         spanStorageBroadcastReactor,
         gatewayBudgetSyncReactor,
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
@@ -1086,23 +1048,6 @@ export class PipelineRegistry {
       traceSummaryStore,
       /** Cross-pipeline deferred — resolved by registerSimulationPipeline. */
       simComputeRunMetrics,
-      /**
-       * Wires late-bound experiment computeExperimentRunMetrics and
-       * lookupExperimentId into the trace-side experimentMetricsSync reactor.
-       * Called after the experiment pipeline is registered.
-       */
-      wireExperimentDeps: (deps: {
-        computeExperimentRunMetrics: (
-          data: ComputeExperimentRunMetricsCommandData,
-        ) => Promise<void>;
-        lookupExperimentId: (
-          tenantId: string,
-          runId: string,
-        ) => Promise<string | null>;
-      }) => {
-        expComputeRunMetrics = deps.computeExperimentRunMetrics;
-        expLookupExperimentId = deps.lookupExperimentId;
-      },
     };
   }
 
@@ -1241,13 +1186,7 @@ export class PipelineRegistry {
     );
   }
 
-  private registerExperimentRunPipeline({
-    wireExperimentDeps,
-  }: {
-    wireExperimentDeps: ReturnType<
-      PipelineRegistry["registerTracePipeline"]
-    >["wireExperimentDeps"];
-  }) {
+  private registerExperimentRunPipeline() {
     const experimentRunStore = this.cached<ExperimentRunStateData>(
       createExperimentRunStateFoldStore(
         this.deps.repositories.experimentRunState,
@@ -1262,47 +1201,6 @@ export class PipelineRegistry {
           this.deps.repositories.experimentRunItemStorage,
       }),
     );
-
-    // Wire the trace-side experimentMetricsSync reactor's late-bound deps
-    const expCommands = mapCommands(experimentRunPipeline.commands);
-
-    // Create the experimentId lookup function using the experiment run ClickHouse repository
-    const lookupExperimentId = async (
-      tenantId: string,
-      runId: string,
-    ): Promise<string | null> => {
-      try {
-        const client = await getClickHouseClientForProject(tenantId);
-        if (!client) return null;
-
-        const result = await client.query({
-          query: `
-            SELECT ExperimentId
-            FROM experiment_runs
-            WHERE TenantId = {tenantId:String}
-              AND RunId = {runId:String}
-            ORDER BY UpdatedAt DESC
-            LIMIT 1
-          `,
-          query_params: { tenantId, runId },
-          format: "JSONEachRow",
-        });
-
-        const rows = await result.json<{ ExperimentId: string }>();
-        return rows[0]?.ExperimentId ?? null;
-      } catch (error) {
-        logger.warn(
-          { tenantId, runId, error },
-          "Failed to lookup experimentId for trace metrics sync",
-        );
-        return null;
-      }
-    };
-
-    wireExperimentDeps({
-      computeExperimentRunMetrics: expCommands.computeExperimentRunMetrics,
-      lookupExperimentId,
-    });
 
     return experimentRunPipeline;
   }
