@@ -82,14 +82,23 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   // claiming it. See `hasFormErrorSlot`.
   const showableFormErrors = hasFormErrorSlot ? formErrors : [];
 
+  // Whether the form can show the WHOLE rejection. When it can't, the caller
+  // still toasts, so the parts this form can't display aren't lost.
+  const claimsEverything =
+    applicable.length === nonEmpty.length &&
+    showableFormErrors.length === formErrors.length;
+
   if (applicable.length === 0 && showableFormErrors.length === 0) return false;
 
   applicable.forEach(([field, messages], index) => {
     form.setError(
       field as Path<TFieldValues>,
       { type: "server", message: messages[0] },
-      // Focus the first one so a rejection below the fold still lands.
-      { shouldFocus: index === 0 },
+      // Focus the first one so a rejection below the fold still lands — but
+      // only when the form is the sole report. On a partial match a toast is
+      // coming too, and yanking focus into a field while a toast explains a
+      // different problem reads as two things fighting for attention.
+      { shouldFocus: claimsEverything && index === 0 },
     );
   });
 
@@ -100,14 +109,9 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
     });
   }
 
-  // Claim the error only if the form showed ALL of it. On a partial match the
-  // unclaimed complaints would be shown nowhere, so the caller still toasts —
-  // and an unshowable form-level complaint is never a partial match, it is a
-  // total one, so it fails this check too.
-  return (
-    applicable.length === nonEmpty.length &&
-    showableFormErrors.length === formErrors.length
-  );
+  // Mark what it owns either way: a `projectId` complaint the user can't act
+  // on shouldn't stop them seeing that `name` is the field that's wrong.
+  return claimsEverything;
 }
 
 /** An object/array value — a container, not something an input binds to. */

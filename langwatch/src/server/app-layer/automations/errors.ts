@@ -120,16 +120,24 @@ export class MissingSlackWebhookError extends HandledError {
  * A test-fire reached the provider but delivery was rejected — a Slack
  * `not_in_channel` / `channel_not_found`, a dead webhook, a bad bot token. The
  * underlying `DispatchError` already carries an actionable, provider-specific
- * message (see `explainSlackPostError`); this lifts it onto the typed
- * `HandledError` channel so the drawer renders it as a clear 4xx instead of a
- * generic 500. `field` targets the channel input, the most common fix.
+ * message (see `explainSlackPostError`: "the bot isn't in that channel. Invite
+ * it with `/invite @LangWatch`…"), which is the entire value of this error —
+ * a generic "check the destination" tells the user nothing they didn't know.
+ *
+ * It travels in `meta.message`, not in the error's `message`. Since #5984 the
+ * latter never crosses the wire, so passing it there — as this class did —
+ * meant the one useful sentence was dropped at the boundary and the customer
+ * read the registry's generic fallback instead. `meta.message` is the
+ * sanctioned opt-in channel for server-authored prose (ADR-045).
+ *
+ * `field` targets the channel input, the most common fix.
  */
 export class NotificationDeliveryError extends HandledError {
   declare readonly code: "notification_delivery_error";
 
   constructor(message: string) {
     super("notification_delivery_error", message, {
-      meta: { field: "slackChannelId" },
+      meta: { field: "slackChannelId", message },
       httpStatus: 422,
     });
     this.name = "NotificationDeliveryError";

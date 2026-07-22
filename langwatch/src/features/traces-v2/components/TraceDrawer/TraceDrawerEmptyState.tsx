@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { Tooltip } from "~/components/ui/tooltip";
-import { explainAnyError, UNKNOWN_ERROR_PRESENTATION } from "~/features/errors";
+import { explainAnyError } from "~/features/errors";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 
 interface TraceDrawerEmptyStateProps {
@@ -103,9 +103,11 @@ export function TraceDrawerEmptyState({
   // generic line under a generic headline is noise.
   const explanation = explainAnyError(error);
   const detail = explanation.description;
-  // Identity, not string comparison: `explainAnyError` returns the shared
-  // UNKNOWN constant itself when it had nothing of its own to say.
-  const hasDetail = !!error && explanation !== UNKNOWN_ERROR_PRESENTATION;
+  // Emptiness, not identity. A registered code with a title and no `describe`
+  // (`not_found`, `dspy_step_not_found`, …) returns a fresh object with an
+  // empty description, so an identity check called it "has detail" and
+  // rendered a padded blank line where the old code named the failure.
+  const hasDetail = !!error && detail.length > 0;
   const { copied, copy } = useCopyToClipboard();
 
   const handleCopy = () => {

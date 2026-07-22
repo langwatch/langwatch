@@ -65,7 +65,10 @@ function safeProse(value: string): string {
   const collapsed = value.replace(/\s+/g, " ").trim();
   if (collapsed.length === 0) return "";
   if (collapsed.length <= MAX_PROSE_LENGTH) return collapsed;
-  return `${collapsed.slice(0, MAX_PROSE_LENGTH - 1).trimEnd()}…`;
+  // By code point, not code unit: slicing mid-surrogate leaves a lone half
+  // that renders as a replacement character right before the ellipsis.
+  const kept = [...collapsed].slice(0, MAX_PROSE_LENGTH - 1).join("");
+  return `${kept.trimEnd()}…`;
 }
 
 const MAX_PROSE_LENGTH = 200;
@@ -218,6 +221,12 @@ const presentations = {
     describe: () => "Try again in a moment.",
   },
 
+  // ---- datasets ----
+  dataset_name_taken: {
+    title: "That name is taken",
+    describe: () => "Pick a different name for this dataset.",
+  },
+
   // ---- suites (run plans) ----
   suite_not_found: { title: "Run plan not found" },
   suite_name_taken: {
@@ -272,7 +281,14 @@ const presentations = {
   },
   notification_delivery_error: {
     title: "We couldn't deliver that notification",
-    describe: () => "Check the destination and try again.",
+    // The one registry entry that prefers the server's words to its own. The
+    // provider knows why it rejected the message and `explainSlackPostError`
+    // turns that into real remediation ("invite the bot with /invite
+    // @LangWatch"); "check the destination and try again" is what is left when
+    // that sentence is thrown away.
+    describe: (error) =>
+      safeProse(str(error, "message", "")) ||
+      "Check the destination and try again.",
   },
   test_fire_unavailable: {
     title: "Nothing to test yet",

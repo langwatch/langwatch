@@ -25,6 +25,7 @@ export const APP_ERROR_CODES = [
   "api_key_scope_violation",
   "broadcaster_not_active",
   "clickhouse_unavailable",
+  "dataset_name_taken",
   "dspy_step_not_found",
   "evaluation_not_found",
   "evaluator_config_error",
