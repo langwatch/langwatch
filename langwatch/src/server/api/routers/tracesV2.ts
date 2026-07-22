@@ -1068,10 +1068,19 @@ export const tracesV2Router = createTRPCRouter({
          * before returning. Costs one extra spans read per call — only the
          * drawer's own detail read needs it; every other caller (hover
          * peek, name lookups, bulk hydrators, sibling prefetch) reads a
-         * truncated preview or discards the content immediately, so they
-         * must pass false to stay a cheap read.
+         * truncated preview or discards the content immediately, so every
+         * caller in this codebase passes it explicitly, true or false.
+         *
+         * Defaults to `true` (the pre-existing, unconditional behavior)
+         * purely for rollout safety: a browser tab still running the
+         * previous frontend bundle sends no `full` field at all, and this
+         * default keeps that in-flight request working exactly as before
+         * instead of a Zod validation error, until the tab refreshes onto
+         * the bundle that sends it. Every call site added by this change
+         * passes the field explicitly — this default only ever backstops
+         * a stale client, never a caller in the current code.
          */
-        full: z.boolean(),
+        full: z.boolean().default(true),
       }),
     )
     .use(checkProjectPermission("traces:view"))
