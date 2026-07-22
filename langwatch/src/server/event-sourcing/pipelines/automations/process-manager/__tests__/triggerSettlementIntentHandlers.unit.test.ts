@@ -18,8 +18,11 @@ const { deliverWebhookMock, loggerWarnMock, sendRenderedTriggerEmailMock } =
     sendRenderedTriggerEmailMock: vi.fn().mockResolvedValue(undefined),
   }));
 
-vi.mock("~/server/app-layer/automations/delivery/deliverWebhook", () => ({
+vi.mock("@langwatch/automations-server/clients/http/deliver-webhook", () => ({
   deliverWebhook: deliverWebhookMock,
+}));
+vi.mock("~/server/app-layer/automations/delivery/appWebhookSender", () => ({
+  sendWebhook: vi.fn(),
 }));
 
 vi.mock("~/server/mailer/triggerEmail", () => ({
