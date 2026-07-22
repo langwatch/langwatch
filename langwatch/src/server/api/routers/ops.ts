@@ -5,8 +5,10 @@ import { checkOpsPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { DASHBOARD_EVENT } from "~/server/app-layer/ops/metrics-collector";
-import { OPS_BLOB_SORTS } from "~/server/app-layer/ops/repositories/blob-store.repository";
-import type { DashboardData } from "~/server/app-layer/ops/types";
+import {
+  type DashboardData,
+  OPS_BLOB_SORTS,
+} from "~/server/app-layer/ops/types";
 import {
   resolveHotDays,
   TABLE_TTL_CONFIG,

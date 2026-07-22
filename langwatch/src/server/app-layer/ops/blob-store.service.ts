@@ -2,13 +2,13 @@ import { createLogger } from "@langwatch/observability";
 
 import type { BlobSweepReport } from "~/server/event-sourcing/queues/groupQueue/blobSweeper";
 
+import type { BlobStoreRepository } from "./repositories/blob-store.repository";
 import type {
-  BlobStoreRepository,
   OpsBlobPage,
   OpsBlobSort,
   OpsBlobStoreStats,
   OpsBlobSummary,
-} from "./repositories/blob-store.repository";
+} from "./types";
 
 const logger = createLogger("langwatch:ops:blob-store");
 
@@ -57,7 +57,7 @@ export class BlobStoreService {
   }
 
   async getStats(): Promise<OpsBlobStoreStats> {
-    return this.repo.getStats({ sampleLimit: STATS_SAMPLE_LIMIT });
+    return this.repo.findStats({ sampleLimit: STATS_SAMPLE_LIMIT });
   }
 
   async deleteBlob(params: {

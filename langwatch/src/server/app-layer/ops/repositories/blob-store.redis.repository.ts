@@ -19,12 +19,12 @@ import { CachedLuaScript } from "~/server/event-sourcing/queues/groupQueue/cache
 import { GROUP_QUEUE_REGISTRY_KEY } from "~/server/event-sourcing/queues/groupQueue/scripts";
 
 import type {
-  BlobStoreRepository,
   OpsBlobPage,
   OpsBlobSort,
   OpsBlobStoreStats,
   OpsBlobSummary,
-} from "./blob-store.repository";
+} from "../types";
+import type { BlobStoreRepository } from "./blob-store.repository";
 
 /** Dry-run eval, so the browser reports the same verdict the runner would act on. */
 const previewScript = new CachedLuaScript(BLOB_SWEEP_LUA);
@@ -345,7 +345,7 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
     }
   }
 
-  async getStats({
+  async findStats({
     sampleLimit,
   }: {
     sampleLimit: number;
