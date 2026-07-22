@@ -4,6 +4,7 @@ import {
   Activity,
   Anvil,
   CalendarClock,
+  Database,
   Film,
   Flag,
   History,
@@ -396,6 +397,13 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         label="Scheduler"
         href="/ops/scheduler"
         isActive={router.pathname.startsWith("/ops/scheduler")}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={Database}
+        label="Payload store"
+        href="/ops/blobs"
+        isActive={router.pathname.startsWith("/ops/blobs")}
         showLabel={showExpanded}
       />
       <SideMenuLink

@@ -241,6 +241,9 @@ export default function SettingsLayout({
               <MenuLink href="/ops/foundry" includePath="/ops/foundry">
                 The Foundry
               </MenuLink>
+              <MenuLink href="/ops/blobs" includePath="/ops/blobs">
+                Payload store
+              </MenuLink>
               <MenuLink href="/ops/dejaview" includePath="/ops/dejaview">
                 Deja View
               </MenuLink>

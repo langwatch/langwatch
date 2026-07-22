@@ -8,6 +8,8 @@ export function ConfirmDialog({
   title,
   description,
   isLoading,
+  children,
+  confirmDisabled = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -15,6 +17,14 @@ export function ConfirmDialog({
   title: string;
   description: string;
   isLoading: boolean;
+  /**
+   * Optional extra input rendered under the description. Used where confirming
+   * should take deliberate effort rather than one click, e.g. typing the name
+   * of what is about to be destroyed.
+   */
+  children?: React.ReactNode;
+  /** Holds the confirm button closed until {@link children} is satisfied. */
+  confirmDisabled?: boolean;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
@@ -24,6 +34,7 @@ export function ConfirmDialog({
         </Dialog.Header>
         <Dialog.Body>
           <Text textStyle="sm">{description}</Text>
+          {children}
         </Dialog.Body>
         <Dialog.Footer>
           <Button variant="outline" size="sm" onClick={onClose}>
@@ -34,6 +45,7 @@ export function ConfirmDialog({
             size="sm"
             onClick={onConfirm}
             loading={isLoading}
+            disabled={confirmDisabled}
           >
             Confirm
           </Button>
