@@ -11,11 +11,9 @@ import {
   langyTurnToolCallSchema,
   parseConversationTurnKey,
   type LangyConversationTurnData,
-} from "@langwatch/langy";
-import {
   LANGY_CONVERSATION_TURN_STATUS,
   type LangyConversationTurnStatus,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+} from "@langwatch/langy";
 
 /**
  * The status values this column accepts, derived from the ONE definition rather
