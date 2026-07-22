@@ -13,17 +13,20 @@ import (
 // runGitUI is `haven git [target]`: the embedded moron git TUI opened for the
 // current worktree, a stack slug, a worktree name, or a directory — inspection
 // across worktrees without cd-ing or checking anything out. Agents (and
-// --json) get the plain per-worktree overview instead; a TUI is useless to
-// them.
-func runGitUI(_ context.Context, d deps, rest []string) error {
-	if d.isAgent || hasFlag(rest, "--json") || hasFlag(rest, "--list") {
-		if firstNonFlag(rest) != "" {
-			return fmt.Errorf("targets are not supported with --list/--json")
+// --json) get the machine-readable per-worktree overview instead; a TUI is
+// useless to them.
+func runGitUI(_ context.Context, d deps, inv invocation) error {
+	if d.isAgent || inv.has("--json") {
+		if len(inv.args) > 0 {
+			return fmt.Errorf("targets are not supported with --json")
 		}
-		return d.orch.GitOverview(d.worktree, d.isAgent || hasFlag(rest, "--json"))
+		return d.orch.GitOverview(d.worktree, true)
 	}
 
-	target := firstNonFlag(rest)
+	target := ""
+	if len(inv.args) > 0 {
+		target = inv.args[0]
+	}
 	dir := d.worktree
 	if target != "" {
 		// A registered slug always wins over a same-named local directory: only

@@ -12,11 +12,11 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/hubtui"
 )
 
-// runHub is `haven hub` (and bare `haven` in a terminal): the interactive hub.
-// Opening a stack's git view quits the hub, runs the moron TUI, and re-enters
-// the hub when it closes — two full-screen programs take turns rather than
-// nesting. Agents get the plain list; a TUI is useless to them.
-func runHub(ctx context.Context, d deps, _ []string) error {
+// runHub is bare `haven` in a terminal: the interactive hub. Opening a stack's
+// git view quits the hub, runs the moron TUI, and re-enters the hub when it
+// closes — two full-screen programs take turns rather than nesting. Agents get
+// the plain list; a TUI is useless to them.
+func runHub(ctx context.Context, d deps) error {
 	if d.isAgent {
 		return d.orch.List(false)
 	}
