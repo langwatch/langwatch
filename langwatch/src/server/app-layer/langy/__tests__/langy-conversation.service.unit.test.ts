@@ -113,17 +113,66 @@ describe("LangyConversationService", () => {
       }
     });
 
-    it("a miss with no pending handoff stays an immediate not-found", async () => {
-      const findVisibleById = vi.fn().mockResolvedValue(null);
-      const repo = makeRepo({
-        findVisibleById,
-        findPendingHandoff: vi.fn().mockResolvedValue(null),
-      });
-      const svc = new LangyConversationService(repo, makeCommands());
-      await expect(
-        svc.getById({ id: "c-unknown", projectId: "p1", userId: "alice" }),
-      ).rejects.toThrow(LangyConversationNotFoundError);
-      expect(findVisibleById).toHaveBeenCalledTimes(1);
+    it("an unknown id still gives up quickly, without waiting out the window", async () => {
+      vi.useFakeTimers();
+      try {
+        const findVisibleById = vi.fn().mockResolvedValue(null);
+        const repo = makeRepo({
+          findVisibleById,
+          findPendingHandoff: vi.fn().mockResolvedValue(null),
+        });
+        const svc = new LangyConversationService(repo, makeCommands());
+        const pending = svc.getById({
+          id: "c-unknown",
+          projectId: "p1",
+          userId: "alice",
+        });
+        const outcome = expect(pending).rejects.toThrow(
+          LangyConversationNotFoundError,
+        );
+        await vi.advanceTimersByTimeAsync(10_000);
+        await outcome;
+        // A short grace, not the whole window: an id nobody is creating must
+        // not pay the cost of one that is.
+        expect(findVisibleById.mock.calls.length).toBeLessThanOrEqual(5);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    // The other half of the same race, and the one that kept reaching people:
+    // the handoff row is written by the very dispatch being waited on, so a
+    // read that arrived before IT landed found no evidence, took the fast
+    // path, and reported "not found" without ever retrying.
+    it("waits when the handoff itself has not landed yet either", async () => {
+      vi.useFakeTimers();
+      try {
+        const findVisibleById = vi
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(null)
+          .mockResolvedValue(row());
+        const repo = makeRepo({
+          findVisibleById,
+          // Nothing to see on the first probe — the create is younger than
+          // this read by a few milliseconds.
+          findPendingHandoff: vi
+            .fn()
+            .mockResolvedValueOnce(null)
+            .mockResolvedValue({ token: "t", turnId: "turn-1" }),
+        });
+        const svc = new LangyConversationService(repo, makeCommands());
+        const pending = svc.getById({
+          id: "c1",
+          projectId: "p1",
+          userId: "alice",
+        });
+        await vi.advanceTimersByTimeAsync(5_000);
+        const detail = await pending;
+        expect(detail.id).toBe("c1");
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("gives up honestly when the projection never lands inside the window", async () => {
@@ -144,7 +193,7 @@ describe("LangyConversationService", () => {
         const outcome = expect(pending).rejects.toThrow(
           LangyConversationNotFoundError,
         );
-        await vi.advanceTimersByTimeAsync(5_000);
+        await vi.advanceTimersByTimeAsync(20_000);
         await outcome;
       } finally {
         vi.useRealTimers();

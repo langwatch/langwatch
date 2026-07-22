@@ -90,13 +90,27 @@ const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
 
 /**
  * How long a read will wait out the dispatch window — the gap between a
- * create command being ACCEPTED and its projection row landing. The projector
- * is typically hundreds of milliseconds behind; six beats of 250ms covers the
- * real distribution with room, while keeping the worst added latency for a
- * conversation that truly died mid-dispatch at 1.5s.
+ * create command being ACCEPTED and its projection row landing.
+ *
+ * 1.5s was not enough. A turn that has to wake a cold worker takes far longer
+ * than the projector's usual few hundred milliseconds, and the read landed a
+ * beat before the row did — so the reader was told their conversation did not
+ * exist, and then it did.
  */
-const DISPATCH_LAG_RETRIES = 6;
-const DISPATCH_LAG_RETRY_MS = 250;
+const DISPATCH_LAG_ATTEMPTS = 12;
+const DISPATCH_LAG_RETRY_MS = 400;
+/**
+ * How many attempts may pass with NO pending handoff before we conclude the id
+ * is simply unknown.
+ *
+ * It cannot be zero, which is the second half of the same bug: the handoff row
+ * is written by the very dispatch we are waiting on, so a read that arrives
+ * before IT lands found no evidence, took the fast path, and returned "not
+ * found" without ever retrying. A couple of beats of grace is the difference
+ * between "no create is in flight" and "the create is a few milliseconds
+ * younger than this read".
+ */
+const DISPATCH_HANDOFF_GRACE_ATTEMPTS = 3;
 
 const conversationServiceLogger = createLogger(
   "langwatch:langy:conversation-service",
@@ -254,28 +268,26 @@ export class LangyConversationService {
     projectId: string;
     userId: string;
   }) {
-    const row = await this.repository.findVisibleById({
-      id,
-      projectId,
-      userId,
-    });
-    if (row) return row;
-
-    const handoff = await this.repository
-      .findPendingHandoff({ projectId, conversationId: id })
-      .catch(() => null);
-    if (!handoff) return null;
-
-    for (let attempt = 0; attempt < DISPATCH_LAG_RETRIES; attempt++) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, DISPATCH_LAG_RETRY_MS),
-      );
-      const retried = await this.repository.findVisibleById({
+    for (let attempt = 0; attempt <= DISPATCH_LAG_ATTEMPTS; attempt++) {
+      const row = await this.repository.findVisibleById({
         id,
         projectId,
         userId,
       });
-      if (retried) return retried;
+      if (row) return row;
+
+      // Re-asked every beat, not once up front: the handoff row lands on the
+      // same dispatch we are waiting for, so "no handoff yet" early on means
+      // "too soon to tell", not "no such conversation".
+      const handoff = await this.repository
+        .findPendingHandoff({ projectId, conversationId: id })
+        .catch(() => null);
+      if (!handoff && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) return null;
+
+      if (attempt === DISPATCH_LAG_ATTEMPTS) return null;
+      await new Promise((resolve) =>
+        setTimeout(resolve, DISPATCH_LAG_RETRY_MS),
+      );
     }
     return null;
   }
