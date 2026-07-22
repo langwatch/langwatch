@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -222,87 +221,34 @@ func TestUpAlreadyRunningGuard(t *testing.T) {
 
 // @scenario "Down keeps the databases by default"
 // @scenario "Down drops the databases only when explicitly asked"
-func TestDownDatabaseSemantics(t *testing.T) {
+// @scenario "Down keeps the databases, always"
+func TestDownKeepsDatabases(t *testing.T) {
 	ctx := context.Background()
 	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
-
-	newFixture := func() (*fakeSystem, *fakeDBServer, *fakeDBServer, *Orchestrator) {
-		store := &fakeStore{
-			stacks:    []domain.Stack{restartStack()},
-			slugCache: map[string]string{"/wt/feat-x": "feat-x"},
-		}
-		sys := &fakeSystem{alive: map[int]bool{42: true}}
-		ch := &fakeDBServer{databases: []string{"lw_feat_x"}}
-		pg := &fakeDBServer{databases: []string{"lw_feat_x"}}
-		o := &Orchestrator{
-			cfg:   Config{ShouldManageClickHouse: true, ShouldManagePostgres: true, Naming: domain.DefaultNaming("")},
-			store: store, sys: sys, proxy: &fakeProxy{}, ch: ch, pg: pg, log: zap.NewNop(),
-		}
-		return sys, ch, pg, o
+	store := &fakeStore{
+		stacks:    []domain.Stack{restartStack()},
+		slugCache: map[string]string{"/wt/feat-x": "feat-x"},
+	}
+	sys := &fakeSystem{alive: map[int]bool{42: true}}
+	ch := &fakeDBServer{databases: []string{"lw_feat_x"}}
+	pg := &fakeDBServer{databases: []string{"lw_feat_x"}}
+	o := &Orchestrator{
+		cfg:   Config{ShouldManageClickHouse: true, ShouldManagePostgres: true, Naming: domain.DefaultNaming("")},
+		store: store, sys: sys, proxy: &fakeProxy{}, ch: ch, pg: pg, log: zap.NewNop(),
 	}
 
-	t.Run("when downing without flags, databases are kept and the launcher is stopped", func(t *testing.T) {
-		sys, ch, pg, o := newFixture()
-		if err := o.Down(ctx, params, false); err != nil {
+	t.Run("when downing, databases are kept and the launcher is stopped", func(t *testing.T) {
+		if err := o.Down(ctx, params); err != nil {
 			t.Fatalf("Down: %v", err)
 		}
 		if len(ch.dropped) != 0 || len(pg.dropped) != 0 {
-			t.Errorf("down must keep databases by default, got ch=%v pg=%v", ch.dropped, pg.dropped)
+			t.Errorf("down must never drop databases, got ch=%v pg=%v", ch.dropped, pg.dropped)
 		}
 		if len(sys.terminated) != 1 || sys.terminated[0] != 42 {
 			t.Errorf("down should stop the live launcher, got %v", sys.terminated)
 		}
-	})
-
-	t.Run("when downing with --drop-db, both databases are dropped", func(t *testing.T) {
-		_, ch, pg, o := newFixture()
-		if err := o.Down(ctx, params, true); err != nil {
-			t.Fatalf("Down: %v", err)
-		}
-		if len(ch.dropped) != 1 || ch.dropped[0] != "lw_feat_x" {
-			t.Errorf("--drop-db should drop the clickhouse db, got %v", ch.dropped)
-		}
-		if len(pg.dropped) != 1 || pg.dropped[0] != "lw_feat_x" {
-			t.Errorf("--drop-db should drop the postgres db, got %v", pg.dropped)
-		}
-	})
-
-	t.Run("when --drop-db and the clickhouse drop fails, Down attempts both and returns an error", func(t *testing.T) {
-		store, ch, pg := &fakeStore{
-			stacks:    []domain.Stack{restartStack()},
-			slugCache: map[string]string{"/wt/feat-x": "feat-x"},
-		}, &fakeDBServer{databases: []string{"lw_feat_x"}, dropErr: errors.New("ch boom")}, &fakeDBServer{databases: []string{"lw_feat_x"}}
-		o := &Orchestrator{
-			cfg:   Config{ShouldManageClickHouse: true, ShouldManagePostgres: true, Naming: domain.DefaultNaming("")},
-			store: store, sys: &fakeSystem{alive: map[int]bool{42: true}}, proxy: &fakeProxy{}, ch: ch, pg: pg, log: zap.NewNop(),
-		}
-		err := o.Down(ctx, params, true)
-		if err == nil {
-			t.Fatal("Down should return an error when a database drop fails")
-		}
-		// Cleanup still completes: the postgres drop is attempted and the stack is removed.
-		if len(pg.dropped) != 1 {
-			t.Errorf("postgres drop must still be attempted after a clickhouse drop failure, got %v", pg.dropped)
-		}
 		if len(store.stacks) != 0 {
-			t.Errorf("the stack entry must still be removed, got %v", store.stacks)
-		}
-	})
-
-	t.Run("when --drop-db and the postgres drop fails, Down returns an error", func(t *testing.T) {
-		store, ch, pg := &fakeStore{
-			stacks:    []domain.Stack{restartStack()},
-			slugCache: map[string]string{"/wt/feat-x": "feat-x"},
-		}, &fakeDBServer{databases: []string{"lw_feat_x"}}, &fakeDBServer{databases: []string{"lw_feat_x"}, dropErr: errors.New("pg boom")}
-		o := &Orchestrator{
-			cfg:   Config{ShouldManageClickHouse: true, ShouldManagePostgres: true, Naming: domain.DefaultNaming("")},
-			store: store, sys: &fakeSystem{alive: map[int]bool{42: true}}, proxy: &fakeProxy{}, ch: ch, pg: pg, log: zap.NewNop(),
-		}
-		if err := o.Down(ctx, params, true); err == nil {
-			t.Fatal("Down should return an error when the postgres drop fails")
-		}
-		if len(ch.dropped) != 1 {
-			t.Errorf("clickhouse drop must still be attempted, got %v", ch.dropped)
+			t.Errorf("the registry entry must be removed, got %v", store.stacks)
 		}
 	})
 }

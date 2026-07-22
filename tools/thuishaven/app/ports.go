@@ -27,6 +27,9 @@ type Proxy interface {
 	// Endpoint reports how the proxy is reachable (scheme, port) so URLs are
 	// correct on the default 443 or an unprivileged port.
 	Endpoint() (scheme string, port int)
+	// Shutdown stops the proxy daemon — the tail of `haven down --all`. A proxy
+	// that is not running is not an error.
+	Shutdown() error
 	// CACertPath returns the portless Local CA PEM path (or "" if absent) so the
 	// orchestrator can point Bun/Node children at it via NODE_EXTRA_CA_CERTS —
 	// those runtimes ignore the macOS system trust store the CA is installed into.

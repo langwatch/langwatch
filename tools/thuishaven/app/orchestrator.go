@@ -2,10 +2,8 @@ package app
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 	"time"
 
@@ -370,12 +368,11 @@ func (o *Orchestrator) replaceRunningStack(p UpParams, shouldForce bool) error {
 
 // Down tears the current worktree's stack down from anywhere: it stops a live
 // launcher (the supervised children die with their process group), removes the
-// routes, and drops the registry entry. Databases are KEPT by default — tearing
-// a stack down must not silently discard data; pass shouldDropDB (--drop-db) for
-// the "give me a fresh DB" affordance, so the next `up` re-runs migrations into
-// a clean, correctly-counted schema. Long-unused databases are pruned in the
-// background by the daemon (DBIdleTTL) or explicitly via `haven prune`.
-func (o *Orchestrator) Down(ctx context.Context, p UpParams, shouldDropDB bool) error {
+// routes, and drops the registry entry. Databases are KEPT, always — no flag
+// on down can discard data; fresh data is `haven db reset`, and long-unused
+// databases are pruned in the background by the daemon (DBIdleTTL) or via
+// `haven clean`.
+func (o *Orchestrator) Down(ctx context.Context, p UpParams) error {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return err
@@ -390,34 +387,8 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, shouldDropDB bool) 
 	}
 	o.proxy.Remove(domain.ClickHouseService, slug)
 	o.proxy.Remove(domain.PostgresService, slug)
-	// Attempt every drop even if one fails, so route/registry cleanup always
-	// completes, but AGGREGATE the failures and return them. A dropped-DB request
-	// that silently retained the old database would let `haven down --drop-db &&
-	// haven up` reuse stale state while reporting a clean reset.
-	var dropErrs []error
-	if o.ch != nil && o.cfg.ShouldManageClickHouse && shouldDropDB {
-		db := domain.DatabaseForSlug(slug)
-		if err := o.ch.DropDatabase(ctx, db); err != nil {
-			o.log.Warn("could not drop clickhouse database", zap.String("db", db), zap.Error(err))
-			dropErrs = append(dropErrs, fmt.Errorf("dropping clickhouse database %q: %w", db, err))
-		} else {
-			fmt.Printf("dropped clickhouse database %q\n", db)
-		}
-	}
-	if o.pg != nil && o.cfg.ShouldManagePostgres && shouldDropDB {
-		db := domain.DatabaseForSlug(slug)
-		if err := o.pg.DropDatabase(ctx, db); err != nil {
-			o.log.Warn("could not drop postgres database", zap.String("db", db), zap.Error(err))
-			dropErrs = append(dropErrs, fmt.Errorf("dropping postgres database %q: %w", db, err))
-		} else {
-			fmt.Printf("dropped postgres database %q\n", db)
-		}
-	}
 	o.store.RemoveStack(slug)
-	if len(dropErrs) > 0 {
-		return fmt.Errorf("stack %q stopped but database drop failed — state may be stale: %w", slug, errors.Join(dropErrs...))
-	}
-	fmt.Printf("stack %q torn down\n", slug)
+	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)
 	return nil
 }
 
@@ -510,84 +481,6 @@ func (o *Orchestrator) ensureRedis(ctx context.Context, st *domain.Stack) {
 		Hostname: o.cfg.Naming.Hostname(domain.RedisService, st.Slug),
 		URL:      fmt.Sprintf("%s:%d", o.cfg.Naming.Hostname(domain.RedisService, st.Slug), port),
 	})
-}
-
-// SeedPresets are the seed variants beyond the plain static identity. "demo"
-// seeds the project as already past onboarding and ingests sample traces
-// through the running stack's collector, so the UI opens on real-looking data.
-var SeedPresets = []string{"demo"}
-
-// SeedOptions tune what `haven seed` layers on top of the stable identity.
-// Every extra is individually controllable: the flags map to HAVEN_SEED_*
-// env vars the seed script reads, so env-driven setups work identically.
-type SeedOptions struct {
-	Preset string
-	// ShouldIngestTraces ingests the deterministic sample traces through the
-	// running stack's collector after the seed (--traces / HAVEN_SEED_TRACES=1;
-	// always on for the demo preset).
-	ShouldIngestTraces bool
-	// ExtraEnv is appended to the seed child's environment — the HAVEN_SEED_*
-	// switches resolved from CLI flags (--first-message, --skip-model-providers).
-	ExtraEnv []string
-}
-
-// Seed reseeds the current stack's database — the "give me a fresh DB"
-// affordance. A preset layers a variant on top of the stable identity; the
-// empty preset is the unchanged default.
-func (o *Orchestrator) Seed(ctx context.Context, p UpParams, opts SeedOptions) error {
-	preset := opts.Preset
-	if preset != "" && !slices.Contains(SeedPresets, preset) {
-		return fmt.Errorf("unknown seed preset %q — available: %s", preset, strings.Join(SeedPresets, ", "))
-	}
-	// Seed the database this worktree's stack actually uses — not whatever
-	// DATABASE_URL happens to be inherited. seedEnv resolves the running stack and
-	// passes its overlay (per-slug loopback DATABASE_URL/CLICKHOUSE_URL, the local
-	// API key) into the child, mirroring the `up` path, so the env cmd.guardSeedEnv
-	// validated and the env the seed connects to are the same provably-local target.
-	env := o.seedEnv(p)
-	if preset != "" {
-		env = append(env, "HAVEN_SEED_PRESET="+preset)
-	}
-	env = append(env, opts.ExtraEnv...)
-	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm run prisma:seed", env), env); err != nil {
-		return err
-	}
-	if preset != "demo" && !opts.ShouldIngestTraces {
-		return nil
-	}
-	// The retry hint must repeat what the user actually ran: `--preset demo`
-	// would also flip the onboarding state for a plain `--traces` run.
-	retryCmd := "haven seed --traces"
-	if preset == "demo" {
-		retryCmd = "haven seed --preset demo"
-	}
-	if err := o.seedSampleTraces(ctx, p, retryCmd); err != nil {
-		return err
-	}
-	if preset != "demo" {
-		return nil
-	}
-	return o.seedRealisticPlatformData(ctx, p, retryCmd)
-}
-
-// seedEnv builds the base environment for the prisma:seed child: the running
-// stack's resolved overlay when one is registered (so the seed writes into this
-// worktree's per-slug database rather than whatever DATABASE_URL is inherited),
-// always carrying HAVEN_SEED_LANGWATCH_API_KEY so the seeded project key matches
-// the local ingestion key — otherwise a re-seed rotates it back to the default
-// and the subsequent sample-trace ingestion 401s. With no stack registered the
-// child inherits the (guardSeedEnv-validated) process/.env environment.
-func (o *Orchestrator) seedEnv(p UpParams) []string {
-	var env []string
-	if slug, err := o.resolveSlug(p); err == nil {
-		if st, ok := o.stackBySlug(slug); ok {
-			env = st.OverlayEnv()
-		}
-	}
-	if o.cfg.LocalAPIKey != "" && !hasEnvKey(env, "HAVEN_SEED_LANGWATCH_API_KEY") {
-		env = append(env, "HAVEN_SEED_LANGWATCH_API_KEY="+o.cfg.LocalAPIKey)
-	}
-	return env
 }
 
 // seedShell wraps a prisma:seed command with a best-effort feature-flag upsert:

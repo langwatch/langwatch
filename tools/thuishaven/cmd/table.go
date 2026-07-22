@@ -158,22 +158,26 @@ func flagHint(spec commandSpec) string {
 // fails with a one-line pointer; it never keeps working silently (ADR-064:
 // clean break, no compatibility layer).
 var removed = map[string]string{
-	"ls":     "haven status",
-	"list":   "haven status",
-	"doctor": "haven status",
-	"watch":  "haven status (or bare `haven` for the live hub)",
-	"hub":    "haven (bare)",
-	"ps":     "haven",
-	"active": "haven",
-	"rs":     "haven restart",
-	"sw":     "haven switch",
-	"cd":     "haven switch",
-	"ch":     "haven clickhouse",
-	"pg":     "haven postgres",
-	"obs":    "haven observability",
-	"tc":     "haven typecheck",
-	"oc":     "haven cleanup",
-	"moron":  "haven git",
+	"ls":            "haven status",
+	"list":          "haven status",
+	"doctor":        "haven status",
+	"watch":         "haven status (or bare `haven` for the live hub)",
+	"hub":           "haven (bare)",
+	"ps":            "haven",
+	"active":        "haven",
+	"rs":            "haven restart",
+	"sw":            "haven switch",
+	"cd":            "haven switch",
+	"ch":            "haven db url clickhouse (the server is managed automatically)",
+	"clickhouse":    "haven db url clickhouse (the server is managed automatically)",
+	"pg":            "haven db url postgres (the server is managed automatically)",
+	"postgres":      "haven db url postgres (the server is managed automatically)",
+	"obs":           "haven status — the observability stack is managed automatically (haven restart obs bounces it)",
+	"observability": "haven status — the observability stack is managed automatically (haven restart obs bounces it)",
+	"seed":          "haven db reset [--demo]",
+	"tc":            "haven typecheck",
+	"oc":            "haven cleanup",
+	"moron":         "haven git",
 }
 
 // table is the whole CLI surface, in help order.
@@ -202,12 +206,15 @@ var table = []commandSpec{
 	},
 	{
 		name:    "down",
-		summary: "stop this worktree's stack; databases are kept",
+		summary: "stop this worktree's stack; data is always kept",
 		flags: []flagSpec{
-			{long: "--drop-db", summary: "also drop this stack's databases (fresh DB next up)"},
+			{long: "--all", summary: "stop every stack, the shared servers, the daemon, and the proxy"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
-			return d.orch.Down(ctx, d.params, inv.has("--drop-db"))
+			if inv.has("--all") {
+				return d.orch.DownAll(ctx)
+			}
+			return d.orch.Down(ctx, d.params)
 		},
 	},
 	{
@@ -244,32 +251,15 @@ var table = []commandSpec{
 		},
 	},
 	{
-		name:    "seed",
-		summary: "reseed this stack's database (refuses non-local database URLs)",
+		name:    "db",
+		summary: "this stack's data: reset [--demo] (drop + migrate + seed) | url [engine]",
+		args:    "<reset|url> [engine]",
+		maxArgs: 2,
 		flags: []flagSpec{
-			{long: "--preset", takesValue: true, value: "<name>", summary: "seed variant (demo)"},
-			{long: "--traces", summary: "ingest the sample traces"},
-			{long: "--first-message", summary: "mark the project as past its first trace"},
-			{long: "--no-first-message", summary: "clear the first-trace flag"},
-			{long: "--skip-model-providers", summary: "do not seed env-derived model providers"},
-			{long: "--skip-feature-flags", summary: "do not enable the dev feature set"},
+			{long: "--demo", summary: "seed the demo preset after the reset (sample traces need the stack up)"},
+			{long: "--yes", summary: "confirm without prompting (required in agent mode)"},
 		},
-		run: func(ctx context.Context, d deps, inv invocation) error {
-			if err := guardSeedEnv(d.lwDir); err != nil {
-				return err
-			}
-			if inv.has("--first-message") && inv.has("--no-first-message") {
-				return fmt.Errorf("--first-message and --no-first-message are mutually exclusive — pass one or the other")
-			}
-			if inv.has("--preset") && inv.value("--preset") == "" {
-				return fmt.Errorf("--preset needs a value — available: %s", strings.Join(app.SeedPresets, ", "))
-			}
-			return d.orch.Seed(ctx, d.params, app.SeedOptions{
-				Preset:             inv.value("--preset"),
-				ShouldIngestTraces: inv.has("--traces") || os.Getenv("HAVEN_SEED_TRACES") == "1",
-				ExtraEnv:           seedExtraEnv(inv),
-			})
-		},
+		run: runDB,
 	},
 	{
 		name:    "pr",
@@ -332,39 +322,6 @@ var table = []commandSpec{
 		name:    "setup",
 		summary: "one-time machine bootstrap: portless proxy + trusted CA",
 		run:     func(ctx context.Context, d deps, _ invocation) error { return d.orch.Setup(ctx) },
-	},
-	{
-		name:    "clickhouse",
-		summary: "the shared managed ClickHouse: status | up | url | stop | drop [--all]",
-		args:    "[subcommand]",
-		maxArgs: 1,
-		flags: []flagSpec{
-			{long: "--all", summary: "drop every lw_* database (lw_main is kept)"},
-		},
-		run: func(ctx context.Context, d deps, inv invocation) error {
-			return d.orch.RunClickHouse(ctx, d.params, inv.raw)
-		},
-	},
-	{
-		name:    "postgres",
-		summary: "the shared managed Postgres: status | up | url | drop [--all]",
-		args:    "[subcommand]",
-		maxArgs: 1,
-		flags: []flagSpec{
-			{long: "--all", summary: "drop every lw_* database (lw_main is kept)"},
-		},
-		run: func(ctx context.Context, d deps, inv invocation) error {
-			return d.orch.RunPostgres(ctx, d.params, inv.raw)
-		},
-	},
-	{
-		name:    "observability",
-		summary: "the shared LGTM stack: status | up | down",
-		args:    "[subcommand]",
-		maxArgs: 1,
-		run: func(ctx context.Context, d deps, inv invocation) error {
-			return d.orch.RunObservability(ctx, inv.raw)
-		},
 	},
 	{
 		name:    "hmr",
