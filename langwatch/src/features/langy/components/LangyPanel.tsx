@@ -1570,7 +1570,9 @@ function LangyPanel({
   // re-drives the last TURN, and nothing about a failed history read means a
   // turn should run. Re-reading is the whole remedy.
   const onHistoryErrorAction = useCallback(
-    (kind: "connect-github" | "configure-model" | "retry") => {
+    (
+      kind: "connect-github" | "configure-model" | "reconnect-codex" | "retry",
+    ) => {
       if (kind !== "retry") return;
       void refetchHistory();
     },
