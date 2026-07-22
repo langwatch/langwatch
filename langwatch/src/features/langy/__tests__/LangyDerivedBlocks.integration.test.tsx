@@ -320,6 +320,81 @@ describe("given a derived timeseries with hints", () => {
   });
 });
 
+describe("given a turn streaming a block (ADR-060 §7)", () => {
+  const statsFenceOpen =
+    'Plotting this now:\n```langy-card\n{"kind": "stats", "blockId": "live1", "title": "Forming", "items": [';
+
+  it("shows no card preview until a validating prefix exists", () => {
+    renderMessage(
+      assistantMessage([{ type: "text", text: statsFenceOpen }]),
+      { isStreaming: true },
+    );
+    expect(screen.getByText(/Plotting/)).toBeDefined();
+    expect(screen.queryByText(/Derived by Langy/)).toBeNull();
+  });
+
+  it("renders the forming card once the prefix validates, marked forming", () => {
+    renderMessage(
+      assistantMessage([
+        {
+          type: "text",
+          text: `${statsFenceOpen}{"label": "traces", "value": 12}`,
+        },
+      ]),
+      { isStreaming: true },
+    );
+    expect(screen.getByText("Derived by Langy · forming")).toBeDefined();
+    expect(screen.getByText("Forming")).toBeDefined();
+    expect(screen.getByText("traces")).toBeDefined();
+  });
+
+  it("replaces the preview with the settled card — exactly one card renders", () => {
+    const { rerender } = renderMessage(
+      assistantMessage([
+        {
+          type: "text",
+          text: `${statsFenceOpen}{"label": "traces", "value": 12}`,
+        },
+      ]),
+      { isStreaming: true },
+    );
+    expect(screen.getByText("Derived by Langy · forming")).toBeDefined();
+
+    // The turn settles: the durable parts replace the streamed text — the
+    // stamped part is the truth, the preview is gone with the stream.
+    rerender(
+      <ChakraProvider value={defaultSystem}>
+        <MessageContent
+          message={assistantMessage([
+            { type: "text", text: "Plotting this now:" },
+            {
+              type: "langy-card",
+              blockId: "live1",
+              kind: "stats",
+              provenance: "derived",
+              card: {
+                kind: "stats",
+                blockId: "live1",
+                title: "Forming",
+                items: [{ label: "traces", value: 12 }],
+              },
+            },
+          ])}
+          appliedOutcomes={{}}
+          discardedProposals={new Set()}
+          applyingProposals={new Set()}
+          onApply={async () => {}}
+          onDiscard={() => {}}
+        />
+      </ChakraProvider>,
+    );
+
+    expect(screen.queryByText("Derived by Langy · forming")).toBeNull();
+    expect(screen.getAllByText("Derived by Langy")).toHaveLength(1);
+    expect(screen.getByText("Forming")).toBeDefined();
+  });
+});
+
 describe("given a card renderer that throws", () => {
   it("costs one card, never the answer around it", () => {
     // A stamped part whose card will explode the stats body: value is an

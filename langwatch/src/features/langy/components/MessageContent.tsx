@@ -28,6 +28,7 @@ import {
   type LangyAnswerSegment,
 } from "../logic/langyAnswerSegments";
 import { LangyDerivedBlockCard } from "./blocks/LangyDerivedBlockCard";
+import { StreamingAnswerWithBlocks } from "./blocks/StreamingAnswerWithBlocks";
 import { LangyFailedBlockCard } from "./blocks/LangyFailedBlockCard";
 import { LangyCardBoundary } from "./LangyCardBoundary";
 import { LangyFeedback } from "./LangyFeedback";
@@ -324,9 +325,14 @@ function MessageContentImpl({
         ) : (
           displayText &&
           (isStreaming ? (
-            <Box fontSize="langyAnswer" color="langy.answerFg" lineHeight="1.6">
-              <StreamingText text={displayText} />
-            </Box>
+            // The live turn: prose streams as ever, and any forming
+            // ```langy-card fence previews through the SAME validation the
+            // relay stamps with at settle (ADR-060 §7). Fence-less streams
+            // take the plain path inside, unchanged.
+            <StreamingAnswerWithBlocks
+              text={displayText}
+              projectSlug={project?.slug ?? null}
+            />
           ) : (
             <Box
               css={{
