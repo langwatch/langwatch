@@ -54,7 +54,7 @@ const makeEvaluator = (overrides: Partial<EvaluatorResponse> = {}): EvaluatorRes
   name: "Test Evaluator",
   slug: "test-evaluator",
   type: "evaluator",
-  config: { evaluatorType: "langevals/llm_judge" },
+  config: { evaluatorType: "langevals/llm_boolean" },
   workflowId: null,
   copiedFromEvaluatorId: null,
   createdAt: "2026-01-01T00:00:00Z",
@@ -173,12 +173,55 @@ describe("createEvaluatorCommand()", () => {
     it("calls create with name and evaluatorType config", async () => {
       mockCreate.mockResolvedValue(makeEvaluator({ name: "My Eval" }));
 
-      await createEvaluatorCommand("My Eval", { type: "langevals/llm_judge" });
+      await createEvaluatorCommand("My Eval", { type: "langevals/llm_boolean" });
 
       expect(mockCreate).toHaveBeenCalledWith({
         name: "My Eval",
-        config: { evaluatorType: "langevals/llm_judge" },
+        config: { evaluatorType: "langevals/llm_boolean" },
       });
+    });
+
+    it("accepts the platform's native evaluator types, not only the langevals catalog", async () => {
+      mockCreate.mockResolvedValue(makeEvaluator({ name: "Secrets" }));
+
+      await createEvaluatorCommand("Secrets", {
+        type: "langwatch/api_keys_and_secrets_detection",
+      });
+
+      expect(mockCreate).toHaveBeenCalledWith({
+        name: "Secrets",
+        config: { evaluatorType: "langwatch/api_keys_and_secrets_detection" },
+      });
+    });
+  });
+
+  describe("when the evaluator type is not in the catalog", () => {
+    // The live failure this pins: an agent sent a stale slug
+    // ("ragas/answer_relevancy") and only learned it was wrong after a
+    // network round-trip, from a 422 that named no valid alternatives.
+    it("fails before any API call is made", async () => {
+      await expect(
+        createEvaluatorCommand("quick-relevancy", {
+          type: "ragas/answer_relevancy",
+        }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it("names the closest valid slugs and the command that lists them all", async () => {
+      await expect(
+        createEvaluatorCommand("quick-relevancy", {
+          type: "ragas/answer_relevancy",
+        }),
+      ).rejects.toThrow(ProcessExitError);
+
+      const printed = vi
+        .mocked(console.error)
+        .mock.calls.map((call) => String(call[0]))
+        .join("\n");
+      expect(printed).toContain("ragas/response_relevancy");
+      expect(printed).toContain("langwatch evaluator types");
     });
   });
 
@@ -189,8 +232,88 @@ describe("createEvaluatorCommand()", () => {
       );
 
       await expect(
-        createEvaluatorCommand("My Eval", { type: "langevals/llm_judge" }),
+        createEvaluatorCommand("My Eval", { type: "langevals/llm_boolean" }),
       ).rejects.toThrow(ProcessExitError);
+    });
+  });
+});
+
+describe("createEvaluatorCommand() catalog-miss shape under machine formats", () => {
+  let savedChalkLevel: typeof chalk.level;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    savedChalkLevel = chalk.level;
+    vi.mocked(EvaluatorsApiService).mockImplementation(function () { return ({
+      getAll: vi.fn(),
+      get: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
+    }) as unknown as EvaluatorsApiService; });
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+  });
+
+  afterEach(async () => {
+    chalk.level = savedChalkLevel;
+    await applyOutputContext(resolveOutputOptions({}, {}));
+  });
+
+  it("emits validation_error with the reason's expected/received, the shape rule 16 reads", async () => {
+    await applyOutputContext(resolveOutputOptions({ output: "json", format: "table" }, {}));
+
+    await expect(
+      createEvaluatorCommand("quick-relevancy", { type: "ragas/answer_relevancy" }),
+    ).rejects.toThrow(ProcessExitError);
+
+    const printed = vi.mocked(console.log).mock.calls.map((call) => String(call[0])).join("\n");
+    const doc = JSON.parse(printed) as {
+      ok: boolean;
+      error: {
+        code: string;
+        reasons: { kind: string; meta: { field: string; expected: string[]; received: string } }[];
+      };
+    };
+    expect(doc.ok).toBe(false);
+    expect(doc.error.code).toBe("validation_error");
+    const [reason] = doc.error.reasons;
+    expect(reason.kind).toBe("schema_failure");
+    expect(reason.meta.field).toBe("type");
+    expect(reason.meta.expected).toContain("ragas/response_relevancy");
+    expect(reason.meta.received).toBe("ragas/answer_relevancy");
+  });
+});
+
+describe("listEvaluatorTypesCommand()", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+  });
+
+  describe("when listing the embedded catalog", () => {
+    it("returns every type with slug, name, and category without any API call", async () => {
+      const { listEvaluatorTypesCommand } = await import("../types");
+
+      const result = listEvaluatorTypesCommand();
+
+      const entries = result.data as {
+        slug: string;
+        name: string;
+        category: string;
+      }[];
+      expect(entries.length).toBeGreaterThan(30);
+      const slugs = entries.map((entry) => entry.slug);
+      expect(slugs).toContain("ragas/response_relevancy");
+      expect(slugs).toContain("langwatch/api_keys_and_secrets_detection");
+      for (const entry of entries) {
+        expect(entry.name.length).toBeGreaterThan(0);
+        expect(entry.category.length).toBeGreaterThan(0);
+      }
+      // The catalog is embedded at build: no service constructed, no fetch.
+      expect(EvaluatorsApiService).not.toHaveBeenCalled();
     });
   });
 });
