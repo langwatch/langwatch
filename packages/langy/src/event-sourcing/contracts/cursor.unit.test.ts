@@ -4,7 +4,7 @@ import {
   compareLangyEventCursors,
   cursorHasReachedEvent,
   type LangyEventCursor,
-} from "../cursor";
+} from "./cursor";
 
 const at = (acceptedAt: number, eventId: string): LangyEventCursor => ({
   acceptedAt,
