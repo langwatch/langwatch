@@ -91,20 +91,123 @@ packages/automations/src/
 Depends on `@langwatch/automations`, `@langwatch/api`,
 `@langwatch/handled-error`, `@langwatch/observability`, `@langwatch/ssrf`.
 Still no Prisma and no React: it consumes the repository interfaces and
-receives implementations by injection.
+receives implementations by injection. The full structure — every current
+`app-layer/automations` module has a named destination here:
 
 ```
-packages/automations-server/src/
-  services/        # AutomationService, SilenceService, SuggestionService,
-                   #   TemplateService, FireHistoryService, SlackIntegrationService
-  clients/         # slack (incoming webhook + Web API), http webhook
-                   #   (SSRF-guarded), email sender port
-  event-sourcing/  # event/command/intent Zod schemas + pure evolve/wake
-                   #   functions for the ADR-052 process managers
-  api/             # the versioned customer API: a dependency-injected
-                   #   factory built with @langwatch/api's createService
-  errors.ts        # HandledError subclasses for the domain (ADR-045)
+packages/automations-server/
+  package.json          # exports: "." (build + deps contract), "./api",
+                        #   "./services", "./clients", "./dispatch",
+                        #   "./event-sourcing", "./testing"
+  tsconfig.json         # incremental + its own tsBuildInfoFile (repo rule)
+  vitest.config.ts
+  src/
+    index.ts            # buildAutomationsServices(deps) — the one composition
+                        #   entry; app + tests construct everything through it
+    deps.ts             # the injected-dependency contract (see below)
+    errors.ts           # HandledError subclasses: stable code, httpStatus,
+                        #   fault, tips/docsUrl (ADR-045)
+
+    services/           # transport-independent use cases; depend on ports +
+                        #   domain contracts only, never on clients directly
+      automation.service.ts        # rule CRUD, kind/facet validation,
+                                   #   enable/disable (today: trigger.service.ts)
+      silence.service.ts           # silence/unsilence, expiry semantics (§4)
+      suggestion.service.ts        # the deterministic detectors (§5)
+      fire-history.service.ts      # (today: trigger-fire-history.service.ts)
+      template.service.ts          # render, preview, test-fire
+                                   #   (today: trigger-template.service.ts)
+      webhook-delivery.service.ts  # delivery-log reads + prune policy
+      email-suppression.service.ts
+      graph-evaluation.service.ts  # threshold eval over the analytics port
+                                   #   (today: graph-trigger-evaluation +
+                                   #   evaluate-custom-graph-threshold)
+      slack-integration.service.ts # OAuth exchange, sealed token storage,
+                                   #   channel listing (§6)
+      report-schedule.service.ts   # ScheduledJob sync for REPORT rules
+                                   #   (today: TriggerService.syncReportSchedule)
+
+    dispatch/           # effect orchestration between the process managers
+                        #   and the clients; owns notify-vs-persist classing
+      action-dispatch.ts           # (today: triggerActionDispatch.ts)
+      graph-alert-dispatch.ts      # (today: graphAlertActionDispatch.ts)
+      email-caps.ts                # ADR-031 caps + suppression
+      confirm-settled-match.ts     # settled-fold reconfirmation
+      notifier.ts                  # (today: triggerNotifier.ts)
+
+    clients/            # outbound edges; import ports + platform packages,
+                        #   never services (no cycles back up the stack)
+      slack/
+        incoming-webhook.client.ts # (today: sendSlackWebhook.ts)
+        web-api.client.ts          # chat.postMessage, conversations.list
+                                   #   (today: slackWebApi.ts)
+        webhook-guard.ts           # hooks.slack.com host lock
+      http/
+        webhook.client.ts          # ADR-040 delivery (today: sendWebhook +
+                                   #   deliverWebhook)
+        destination.ts             # SSRF / redirect / timeout guards over
+                                   #   @langwatch/ssrf (today: httpDestination)
+
+    providers/          # server halves of the provider registry, one module
+                        #   per channel (today: app-layer providers/<name>/server.ts)
+      registry.ts
+      slack.ts  webhook.ts  email.ts  dataset.ts  annotation-queue.ts
+
+    event-sourcing/     # everything the ADR-052 pipeline mounts, minus the
+                        #   mounting itself; evolve/wake stay pure (no IO,
+                        #   no clocks — ctx.at only)
+      events.ts                    # event type constants + Zod schemas
+      commands/
+        record-trigger-match.ts
+      settle-window.ts             # deterministic settle-window buckets
+      processes/
+        trigger-settlement.ts      # state, evolve, onWake, intent schemas
+        graph-alert-sweep.ts
+        webhook-delivery-prune.ts
+      intents/
+        handlers.ts                # intent executors over dispatch/ + services/
+
+    api/                # the customer API (§2); depends on services only
+      service.ts                   # buildAutomationsApi(deps)
+      versions/
+        2026-08-01.ts              # registers the version's operations
+      operations/                  # one module per operation: input schema,
+        create-rule.ts             #   output schema, handler — the unit an
+        list-rules.ts              #   agent tool binds to
+        …                          #   (one file per §2 operation)
+
+    testing/            # exported fakes so every consumer tests against the
+      fakes.ts          #   same in-memory repository + port implementations
 ```
+
+**The injected-dependency contract (`deps.ts`).** Everything the package
+cannot own arrives as a port, typed here and constructed at the app's
+composition root:
+
+- The repository interfaces from `@langwatch/automations` (trigger,
+  fire-history, webhook-delivery, custom-graph, email-suppression,
+  scheduled-job, slack-integration, suggestion-dismissal, audit).
+- `AnalyticsPort` — `getTimeseries` for graph evaluation, reports, and the
+  suggestion detectors (the app adapts its analytics service).
+- `DatasetPort` and `AnnotationQueuePort` — the persist-class actions write
+  through these, not through app imports.
+- `MailerPort` — outbound email delivery.
+- `SecretSealPort` — encrypt/decrypt for stored Slack tokens and webhook
+  secrets.
+- `Clock` — services and dispatch never read wall time directly, which is
+  what keeps silence expiry and settle windows testable (evolve/wake
+  functions already get `ctx.at` from the substrate).
+
+**Dependency rules, enforced.** `api → services → (ports, dispatch)`;
+`dispatch → clients`; `clients` import nothing above themselves;
+`event-sourcing/processes` import only domain contracts and stay pure. The
+package's `package.json` must never grow `@prisma/client`, `next`, or
+`react` — pinned by a unit test on the dependency list, the same way enum
+parity is pinned today.
+
+**Builders move to the domain package.** `report.builder.ts` and
+`graph-alert.builder.ts` are pure row→shape translations and land in
+`@langwatch/automations/domain`, not here.
 
 **What stays in the app** (`langwatch/src/`):
 
