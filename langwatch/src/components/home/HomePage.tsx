@@ -4,6 +4,7 @@ import {
   Container,
   Grid,
   HStack,
+  Skeleton,
   Spacer,
   VStack,
 } from "@chakra-ui/react";
@@ -89,7 +90,9 @@ export function HomePage() {
               <ConsideringLangWatch />
             </HStack>
 
-            {composition === "signal-focused" ? (
+            {composition === "undecided" ? (
+              <HomeCompositionSkeleton />
+            ) : composition === "signal-focused" ? (
               <>
                 <HomeBriefingSection />
                 {/* The chrome grid: two equal-height columns whose interior
@@ -219,6 +222,40 @@ function ConsideringLangWatch() {
         Request a demo
       </chakra.a>
     </HStack>
+  );
+}
+
+/**
+ * What the page shows before it knows which home it is.
+ *
+ * The three compositions hang off feature flags, and every gate reports
+ * "off" while its flag is in the air — so the page used to resolve to the
+ * classic home, paint it, and swap to the real one a beat later. The reader
+ * watched their home page change shape under them on every cold load, which
+ * reads as a bug in the product rather than as loading.
+ *
+ * So it commits to nothing. This is deliberately NOT a mock of any one
+ * composition — the three lead with different things and guessing wrong just
+ * moves the flicker into the skeleton. It is the shape they share: a lead
+ * block, then a wide row, then the spine. Neutral, unlabelled, and gone by
+ * the time the answer lands.
+ */
+function HomeCompositionSkeleton() {
+  return (
+    <VStack
+      gap={4}
+      width="full"
+      align="stretch"
+      aria-busy="true"
+      aria-label="Loading your home"
+    >
+      <Skeleton height="180px" borderRadius="xl" />
+      <Skeleton height="96px" borderRadius="lg" />
+      <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={4}>
+        <Skeleton height="120px" borderRadius="lg" />
+        <Skeleton height="120px" borderRadius="lg" />
+      </Grid>
+    </VStack>
   );
 }
 

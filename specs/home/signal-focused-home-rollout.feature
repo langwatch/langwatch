@@ -62,3 +62,36 @@ Feature: Signal-focused home rollout
     When the briefing sheet renders its invitation
     Then the typed first step opens the feature surface that teaches it
     And no action offers to do it with Langy
+
+  # Which home a reader gets is decided by feature flags, and a flag that has
+  # not answered yet is not the same as a flag that is off. Rendering a home on
+  # the assumption of "off" means rendering the wrong one and replacing it a
+  # beat later — the reader watches their home change shape on every cold load.
+  Scenario: The page waits rather than guessing which home it is
+    Given I am loading the home page
+    And the rollout flags that decide the composition have not answered yet
+    When the page renders
+    Then a single neutral placeholder renders in place of the home
+    And no composition is rendered
+    And the placeholder is announced as loading
+
+  Scenario: The decided home replaces the placeholder once, and never swaps again
+    Given I am loading the home page
+    And the placeholder is showing
+    When every flag the composition depends on has answered
+    Then the home it resolved to renders
+    And no other composition was rendered first
+
+  # Waiting on a question whose answer cannot change the outcome is just a
+  # slower page.
+  Scenario: The page only waits on flags that could change the answer
+    Given I am loading the home page
+    And the signal-focused rollout is enabled for me
+    When the signal-focused home wins the precedence
+    Then the page does not wait on the Langy rollout to render
+
+  Scenario: A reader with no project never waits on a flag that cannot answer
+    Given I am loading the home page
+    But I have no project
+    When the page renders
+    Then the classic home renders without waiting

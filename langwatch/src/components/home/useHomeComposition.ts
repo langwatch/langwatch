@@ -1,7 +1,7 @@
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
-import { useShowSignalFocusedHome } from "./useShowSignalFocusedHome";
+import { useLangyVisibility } from "~/features/langy/hooks/useShowLangy";
+import { useSignalFocusedHomeVisibility } from "./useShowSignalFocusedHome";
 
 /**
  * The rollout flag the Langy home hangs off. Registered with
@@ -18,7 +18,18 @@ export const LANGY_HOME_FLAG = "release_ui_home_langy_lantern_enabled" as const;
  * block with a real composer in it, `classic` is banners + traces overview +
  * recent work + onboarding.
  */
-export type HomeComposition = "signal-focused" | "langy" | "classic";
+export type HomeComposition =
+  | "signal-focused"
+  | "langy"
+  | "classic"
+  /**
+   * Not known yet. Every gate below reports `false` while it loads, so the
+   * page would otherwise resolve to `classic`, paint it, and then swap to the
+   * real composition a beat later — the reader watches their home page change
+   * shape under them on every cold load. The page renders one skeleton for
+   * this and commits to nothing.
+   */
+  | "undecided";
 
 /**
  * The precedence rule itself, as a pure function.
@@ -44,11 +55,17 @@ export function resolveHomeComposition({
   showSignalFocusedHome,
   showLangy,
   langyHomeEnabled,
+  isResolving = false,
 }: {
   showSignalFocusedHome: boolean;
   showLangy: boolean;
   langyHomeEnabled: boolean;
+  /** Any gate this answer depends on is still in flight. */
+  isResolving?: boolean;
 }): HomeComposition {
+  // Before precedence, because an unknown gate makes every branch below a
+  // guess — and a guess here is a page the reader watches get replaced.
+  if (isResolving) return "undecided";
   if (showSignalFocusedHome) return "signal-focused";
   if (showLangy && langyHomeEnabled) return "langy";
   return "classic";
@@ -56,8 +73,8 @@ export function resolveHomeComposition({
 
 /** The resolver, wired to the three real gates. */
 export function useHomeComposition(): HomeComposition {
-  const showSignalFocusedHome = useShowSignalFocusedHome();
-  const showLangy = useShowLangy();
+  const signalFocused = useSignalFocusedHomeVisibility();
+  const langy = useLangyVisibility();
   const { project, organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
@@ -65,15 +82,27 @@ export function useHomeComposition(): HomeComposition {
 
   // Only asked when it could matter: a reader without Langy can never get the
   // Langy home, so evaluating its rollout for them is a wasted round trip.
-  const { enabled: langyHomeEnabled } = useFeatureFlag(LANGY_HOME_FLAG, {
-    projectId: project?.id,
-    organizationId: organization?.id,
-    enabled: showLangy && !showSignalFocusedHome,
-  });
+  const { enabled: langyHomeEnabled, isLoading: langyHomeLoading } =
+    useFeatureFlag(LANGY_HOME_FLAG, {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      enabled: langy.show && !signalFocused.show,
+    });
+
+  // Follows the precedence exactly, so the page never waits on a gate whose
+  // answer could not change the outcome: once signal-focused has won, nothing
+  // below it is asked, and a reader without Langy never waits on the Langy
+  // home's rollout.
+  const langyHomeAsked = langy.show && !signalFocused.show;
+  const isResolving =
+    signalFocused.isResolving ||
+    (!signalFocused.show &&
+      (langy.isResolving || (langyHomeAsked && langyHomeLoading)));
 
   return resolveHomeComposition({
-    showSignalFocusedHome,
-    showLangy,
+    showSignalFocusedHome: signalFocused.show,
+    showLangy: langy.show,
     langyHomeEnabled,
+    isResolving,
   });
 }

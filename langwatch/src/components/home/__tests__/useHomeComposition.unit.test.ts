@@ -70,3 +70,38 @@ describe("resolveHomeComposition", () => {
     });
   });
 });
+
+describe("when a gate the answer depends on has not answered yet", () => {
+  /** @scenario The page waits rather than guessing which home it is */
+  it("commits to nothing, whatever the gates currently read as", () => {
+    // Every gate reports `false` while loading, so without this the resolver
+    // would confidently answer "classic" and the page would paint the wrong
+    // home before swapping it out.
+    for (const showSignalFocusedHome of [false, true]) {
+      for (const showLangy of [false, true]) {
+        for (const langyHomeEnabled of [false, true]) {
+          expect(
+            resolveHomeComposition({
+              showSignalFocusedHome,
+              showLangy,
+              langyHomeEnabled,
+              isResolving: true,
+            }),
+          ).toBe("undecided");
+        }
+      }
+    }
+  });
+
+  /** @scenario The decided home replaces the placeholder once */
+  it("answers normally the moment nothing is in flight", () => {
+    expect(
+      resolveHomeComposition({
+        showSignalFocusedHome: false,
+        showLangy: true,
+        langyHomeEnabled: true,
+        isResolving: false,
+      }),
+    ).toBe("langy");
+  });
+});

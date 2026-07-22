@@ -21,13 +21,35 @@ export const SIGNAL_FOCUSED_HOME_FLAG =
  * without either implying the other.
  */
 export function useShowSignalFocusedHome(): boolean {
-  const { project } = useOrganizationTeamProject({
+  return useSignalFocusedHomeVisibility().show;
+}
+
+/**
+ * The same gate, with its uncertainty exposed.
+ *
+ * `enabled` reads `false` while the flag is in flight, which is right for
+ * hiding a control and wrong for picking a page: this composition wins
+ * outright, so nothing else can be decided until it has answered.
+ */
+export function useSignalFocusedHomeVisibility(): {
+  show: boolean;
+  isResolving: boolean;
+} {
+  const { project, isLoading: contextLoading } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const { enabled } = useFeatureFlag(SIGNAL_FOCUSED_HOME_FLAG, {
-    projectId: project?.id,
-    enabled: !!project,
-  });
-  return enabled;
+  const { enabled, isLoading: flagLoading } = useFeatureFlag(
+    SIGNAL_FOCUSED_HOME_FLAG,
+    {
+      projectId: project?.id,
+      enabled: !!project,
+    },
+  );
+  return {
+    show: enabled,
+    // A reader with no project is decided, not pending — the flag query is
+    // disabled for them and will never answer.
+    isResolving: contextLoading || (!!project && flagLoading),
+  };
 }
