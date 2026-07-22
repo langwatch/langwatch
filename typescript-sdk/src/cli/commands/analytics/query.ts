@@ -4,6 +4,7 @@ import { AnalyticsApiService } from "@/client-sdk/services/analytics/analytics-a
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { toTimeseriesShape } from "./timeseriesShape";
 
 const METRIC_PRESETS: Record<string, { metric: string; aggregation: string }> = {
   "trace-count": { metric: "metadata.trace_id", aggregation: "cardinality" },
@@ -96,7 +97,20 @@ export const queryAnalyticsCommand = async (options: {
     spinner.succeed("Analytics query complete");
 
     return {
-      data: { ...result, metric, aggregation },
+      // The raw result, plus the card-shaped view of it. The raw arrays stay
+      // exactly as they were for anything already reading them; `series` is
+      // what makes this a chart instead of a table of numbers (see
+      // `timeseriesShape.ts`, and `CARD_PROBES` for how it is picked up).
+      data: {
+        ...result,
+        metric,
+        aggregation,
+        ...(toTimeseriesShape({
+          currentPeriod: result.currentPeriod,
+          previousPeriod: result.previousPeriod,
+          metric,
+        }) ?? {}),
+      },
       table: () => {
         console.log();
         console.log(chalk.bold("Current Period:"));

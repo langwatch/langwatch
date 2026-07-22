@@ -19,7 +19,7 @@ const traceItem: LangyAttachedContext = {
 
 describe("attachContext", () => {
   beforeEach(() => {
-    useLangyStore.getState().resetForProject();
+    useLangyStore.getState().resetForProject("project-test");
   });
 
   describe("given a surface attaches a piece of context", () => {
@@ -60,7 +60,7 @@ describe("attachContext", () => {
   describe("when the store resets for a new project", () => {
     it("clears attached context so it cannot bleed across projects", () => {
       useLangyStore.getState().attachContext(traceItem);
-      useLangyStore.getState().resetForProject();
+      useLangyStore.getState().resetForProject("project-test");
       expect(useLangyStore.getState().attachedContext).toEqual([]);
     });
   });

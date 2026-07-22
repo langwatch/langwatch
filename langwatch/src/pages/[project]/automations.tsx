@@ -47,6 +47,8 @@ import {
   TableShell,
 } from "~/features/automations/components/page/AutomationTableCells";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { automationContextChip } from "~/features/langy/logic/langyContextChips";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -422,8 +424,9 @@ function AutomationsPage() {
     </Menu.Root>
   );
 
+  // No `key` here: the row is wrapped by <LangyContextTarget>, and the key
+  // belongs on the outermost element of the iteration, not on the row inside it.
   const sharedRowProps = (trigger: EnhancedTrigger) => ({
-    key: trigger.id,
     "data-trigger-id": trigger.id,
     cursor: "pointer",
     _hover: { bg: "bg.muted" },
@@ -565,6 +568,17 @@ function AutomationsPage() {
                               trigger.actionParams as TriggerActionParams;
                             const stats = statsByTriggerId.get(trigger.id);
                             return (
+                              // Armed, the row can be handed to Langy; its own click (open the
+                              // automation) is untouched. The chip id matches the one the
+                              // `/automations/<id>` route derives, so the row and the open
+                              // automation are one chip.
+                              <LangyContextTarget
+                                key={trigger.id}
+                                target={automationContextChip({
+                                  automationId: trigger.id,
+                                  name: trigger.name,
+                                })}
+                              >
                               <Table.Row {...sharedRowProps(trigger)}>
                                 <Table.Cell fontWeight="medium">
                                   {trigger.name}
@@ -602,6 +616,7 @@ function AutomationsPage() {
                                   {rowActionsMenu(trigger)}
                                 </Table.Cell>
                               </Table.Row>
+                              </LangyContextTarget>
                             );
                           })}
                         </Table.Body>
@@ -753,8 +768,18 @@ function AutomationsPage() {
                               }
                             ).schedule;
                             return (
-                              <Table.Row
+                              // Armed, the row can be handed to Langy; its own click (open the
+                              // automation) is untouched. The chip id matches the one the
+                              // `/automations/<id>` route derives, so the row and the open
+                              // automation are one chip.
+                              <LangyContextTarget
                                 key={trigger.id}
+                                target={automationContextChip({
+                                  automationId: trigger.id,
+                                  name: trigger.name,
+                                })}
+                              >
+                              <Table.Row
                                 data-trigger-id={trigger.id}
                                 cursor="pointer"
                                 _hover={{ bg: "bg.muted" }}
@@ -797,6 +822,7 @@ function AutomationsPage() {
                                   {rowActionsMenu(trigger)}
                                 </Table.Cell>
                               </Table.Row>
+                              </LangyContextTarget>
                             );
                           })}
                         </Table.Body>
@@ -853,6 +879,17 @@ function AutomationsPage() {
                               trigger.actionParams as TriggerActionParams;
                             const stats = statsByTriggerId.get(trigger.id);
                             return (
+                              // Armed, the row can be handed to Langy; its own click (open the
+                              // automation) is untouched. The chip id matches the one the
+                              // `/automations/<id>` route derives, so the row and the open
+                              // automation are one chip.
+                              <LangyContextTarget
+                                key={trigger.id}
+                                target={automationContextChip({
+                                  automationId: trigger.id,
+                                  name: trigger.name,
+                                })}
+                              >
                               <Table.Row {...sharedRowProps(trigger)}>
                                 <Table.Cell fontWeight="medium">
                                   {trigger.name}
@@ -915,6 +952,7 @@ function AutomationsPage() {
                                   {rowActionsMenu(trigger)}
                                 </Table.Cell>
                               </Table.Row>
+                              </LangyContextTarget>
                             );
                           })}
                         </Table.Body>

@@ -14,6 +14,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { CliResultDigest } from "@langwatch/cli-cards";
 import { render, screen } from "@testing-library/react";
+import { cloneElement, type ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveCapability } from "../components/capabilities/capabilityRegistry";
 import { LangyDeclarativeCard } from "../components/capabilities/LangyDeclarativeCard";
@@ -32,6 +33,18 @@ const useCapabilityDataMock = vi.fn((): CapabilityData => idleData);
 vi.mock("../hooks/useCapabilityData", () => ({
   useCapabilityData: () => useCapabilityDataMock(),
 }));
+
+// jsdom measures every element as 0x0, at which recharts' ResponsiveContainer
+// draws nothing at all — so the chart body would be invisible to the test for
+// a reason that has nothing to do with the card.
+vi.mock("recharts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("recharts")>();
+  return {
+    ...actual,
+    ResponsiveContainer: ({ children }: { children: ReactElement }) =>
+      cloneElement(children, { width: 640, height: 200 }),
+  };
+});
 
 beforeEach(() => {
   useCapabilityDataMock.mockReturnValue(idleData);
@@ -218,6 +231,22 @@ describe("LangyDeclarativeCard", () => {
       });
     });
 
+    // A create that never happened returns nothing at all. Whether such a call
+    // reaches a card at all is `hasCapabilityCard`'s decision, and the answer is
+    // no — see capabilityCardSelection.unit.test.ts.
+
+    describe("when a create returned the resource it created", () => {
+      it("renders the created card", () => {
+        renderCard({
+          name: "langwatch.scenario.create",
+          input: { name: "Customer support agent" },
+          output: { id: "scenario_1", name: "Customer support agent" },
+        });
+
+        expect(screen.getByText("Created and ready to use.")).toBeTruthy();
+      });
+    });
+
     describe("when a resource was removed", () => {
       it("renders the removed card", () => {
         renderCard({
@@ -351,6 +380,79 @@ describe("LangyDeclarativeCard", () => {
         ).toBeTruthy();
         expect(screen.queryByText("No prompts yet.")).toBeNull();
       });
+    });
+  });
+});
+
+/**
+ * The body widget the catalog names, when that widget is not one this card had
+ * a branch for. `chart` was registered in the catalog's vocabulary and had no
+ * case and no default, so the switch fell off the end and the card rendered
+ * `undefined` — a shell with nothing in it.
+ */
+describe("given a body widget the catalog names", () => {
+  /** The same descriptor the call resolves to, re-seated on one widget. */
+  function renderWithBody({ body, output }: { body: string; output: unknown }) {
+    const descriptor = resolveCapability("langwatch.analytics.query");
+    if (!descriptor) throw new Error("no descriptor for analytics query");
+    return render(
+      <ChakraProvider value={defaultSystem}>
+        <LangyDeclarativeCard
+          descriptor={
+            { ...descriptor, body } as unknown as typeof descriptor
+          }
+          input={{}}
+          output={output}
+          projectSlug="acme"
+        />
+      </ChakraProvider>,
+    );
+  }
+
+  const trend = {
+    series: [
+      {
+        name: "Total cost",
+        points: [
+          { t: "2026-07-13", v: 0.11 },
+          { t: "2026-07-14", v: 0.28 },
+        ],
+      },
+    ],
+    title: "Total cost",
+    unit: "usd",
+    currentPeriod: [],
+  };
+
+  describe("when the widget is a chart and the result is plottable", () => {
+    it("draws the plot", () => {
+      renderWithBody({ body: "chart", output: trend });
+
+      expect(document.querySelector(".recharts-surface")).not.toBeNull();
+    });
+  });
+
+  describe("when the widget is a chart and the result has nothing to plot", () => {
+    it("reads the figures instead of drawing an empty axis", () => {
+      renderWithBody({
+        body: "chart",
+        output: { currentPeriod: [], total: 4, failures: 1 },
+      });
+
+      expect(document.querySelector(".recharts-surface")).toBeNull();
+      expect(screen.getByText("total")).toBeTruthy();
+    });
+  });
+
+  describe("when the widget is one this card has never heard of", () => {
+    it("still draws a body rather than an empty card", () => {
+      renderWithBody({
+        body: "constellation",
+        output: { currentPeriod: [], name: "Total cost", status: "ready" },
+      });
+
+      expect(screen.getByText("status")).toBeTruthy();
+      expect(screen.getByText("ready")).toBeTruthy();
     });
   });
 });

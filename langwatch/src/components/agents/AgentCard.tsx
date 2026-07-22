@@ -12,6 +12,8 @@ import {
   Workflow,
 } from "lucide-react";
 import { LuClock, LuPencil, LuTrash2 } from "react-icons/lu";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { agentContextChip } from "~/features/langy/logic/langyContextChips";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Menu } from "../ui/menu";
@@ -68,6 +70,11 @@ export function AgentCard({
   };
 
   return (
+    // Armed, the card can be handed to Langy; its own click (edit the agent) is
+    // untouched, and with Langy closed this renders the card exactly as before.
+    <LangyContextTarget
+      target={agentContextChip({ agentId: agent.id, name: agent.name })}
+    >
     <Card.Root
       variant="elevated"
       onClick={handleCardClick}
@@ -195,5 +202,6 @@ export function AgentCard({
         </VStack>
       </Card.Body>
     </Card.Root>
+    </LangyContextTarget>
   );
 }

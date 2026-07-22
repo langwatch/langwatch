@@ -1,5 +1,6 @@
-import { Box, chakra, HStack, Text, Textarea } from "@chakra-ui/react";
+import { Box, chakra, HStack, Spinner, Text, Textarea } from "@chakra-ui/react";
 import {
+  Bot,
   Check,
   ChevronDown,
   ClipboardCheck,
@@ -12,27 +13,56 @@ import {
   LayoutDashboard,
   ListChecks,
   type LucideIcon,
+  MessageSquareQuote,
   MessagesSquare,
-  Paperclip,
   Plus,
   Send,
+  Sparkles,
   Square,
   Waypoints,
+  Workflow,
+  X,
+  Zap,
 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { memo, useRef, useState } from "react";
 import type React from "react";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import type { LangyRevealableKind } from "../stores/langyContextTargetStore";
+import type { LangySkill } from "~/shared/langy/langySkills";
+import {
+  type LangyRevealableKind,
+  useLangyContextTargetStore,
+} from "../stores/langyContextTargetStore";
 import { describeChipContext } from "../logic/langyChipContext";
 import { type LangyContextChip, useLangyStore } from "../stores/langyStore";
 import { LangyComposerPalette, type PaletteMode } from "./LangyComposerPalette";
 import { LangyModelPill } from "./LangyModelPill";
 
 // The composer's corner. Lives here (not in the theme) because the sheen ring
-// inherits it — one value, two places that must agree.
+// inherits it — one value, two places that must agree. It is also what sells
+// the home page's send as one object moving: the travelling copy holds this
+// exact radius from the home page to the panel's floor, so DO NOT vary it per
+// variant.
 const COMPOSER_RADIUS = "18px";
+
+/**
+ * Marks the composer's outer card in the DOM so a surface OUTSIDE the panel can
+ * measure where it is going to land.
+ *
+ * The home page's send animates a copy of its own composer to the panel's, and
+ * the panel is mounted in a different tree behind a `position: fixed` boundary,
+ * so there is no ref to pass. An attribute is the seam: one selector, no
+ * plumbing through three components, and nothing breaks if the reader is not on
+ * the home page. The value distinguishes the panel's composer (the destination)
+ * from the home page's own (the origin).
+ */
+export const COMPOSER_ANCHOR_ATTR = "data-langy-composer";
+
+// The send/stop control crossfades between phases (send ⇄ stop ⇄ stopping)
+// rather than hard-swapping — a small scale+fade keyed on the phase.
+const MotionSwap = motion.create(Box);
 
 // Icon per context kind, so a chip reads as its resource at a glance.
 const CONTEXT_ICON: Record<LangyContextChip["kind"], LucideIcon> = {
@@ -46,6 +76,10 @@ const CONTEXT_ICON: Record<LangyContextChip["kind"], LucideIcon> = {
   evaluation: ClipboardCheck,
   selection: ListChecks,
   filter: Filter,
+  workflow: Workflow,
+  agent: Bot,
+  automation: Zap,
+  annotation: MessageSquareQuote,
 };
 
 // A single, static placeholder. A cycling typewriter here read as gimmicky and
@@ -56,15 +90,19 @@ const COMPOSER_PLACEHOLDER = "Ask Langy or describe what you want…";
 /**
  * The composer rail — affordances that sit beside the model picker.
  *
- * Every entry here is a PLACEHOLDER: reasoning effort and attachments have no
- * backend behind them, so they render disabled rather than faked. This array is
- * the seam: when one gets wiring it grows an `onClick` and drops out of the
- * placeholder path, and the layout does not change to accommodate it.
+ * The one entry left here is a PLACEHOLDER: reasoning effort has no backend
+ * behind it, so it renders disabled rather than faked. This is the seam: when it
+ * gets wiring it grows an `onClick` and drops out of the placeholder path, and
+ * the layout does not change to accommodate it.
  *
- * "Skills" USED to sit here as a third greyed-out button. It is gone because
- * skills are now real — they have a catalogue, a chip, and a `/` to summon them
- * — and leaving a dead button next to a live feature is how a UI teaches people
- * that its buttons are decoration.
+ * Two buttons used to sit here and are gone, for the same reason in two
+ * directions. "Skills" went because they became REAL — a catalogue, a chip, and
+ * a `/` to summon them — and a dead button beside a live feature teaches people
+ * that the buttons are decoration. "Attach a file" went because it is NOT
+ * coming: there is no upload path at any layer (no write endpoint, no field on
+ * the turn, no way to get bytes to the worker), so a greyed paperclip was
+ * advertising a feature with nothing behind it and no plan to build it. A
+ * placeholder is a promise; an indefinite one is a lie.
  */
 function ComposerImpl({
   model,
@@ -72,11 +110,8 @@ function ComposerImpl({
   langyDefaultModel,
   onModelChange,
   onSend,
-  onQueue,
   onStop,
   variant = "floating",
-  isBusy,
-  queuedCount = 0,
   disabled,
   contextChips = [],
   onRemoveChip,
@@ -84,6 +119,7 @@ function ComposerImpl({
   onAddChip,
   onKindIntent,
   placeholder = COMPOSER_PLACEHOLDER,
+  cardRef,
 }: {
   /** The model Langy will use for the next send. "" = let the server pick. */
   model: string;
@@ -93,14 +129,20 @@ function ComposerImpl({
   langyDefaultModel?: string | null;
   onModelChange: (model: string) => void;
   onSend: (input: string) => void;
-  /** Accept the next message while the current turn is still running. */
-  onQueue?: (input: string) => void;
+  /** Stop the in-flight turn (the panel owns the real backend stop, ADR-058). */
   onStop: () => void;
-  /** Floating is a card; sidebar is already bounded and stays deliberately flat. */
-  variant?: "floating" | "sidebar";
-  isBusy: boolean;
-  queuedCount?: number;
+  /**
+   * Floating is a card; sidebar is already bounded and stays deliberately
+   * flat; hero is the home page's, sitting on glass over a moving canvas.
+   */
+  variant?: "floating" | "sidebar" | "hero";
   disabled: boolean;
+  /**
+   * Hero only. A ref onto the composer's outer card, so the home page can
+   * measure where its send starts from. The panel's own composer is found by
+   * `COMPOSER_ANCHOR_ATTR` instead — it lives in another tree.
+   */
+  cardRef?: React.RefObject<HTMLDivElement | null>;
   /** Page context (experiment/trace) that rides as removable chips in-composer. */
   contextChips?: LangyContextChip[];
   onRemoveChip?: (id: string) => void;
@@ -115,7 +157,13 @@ function ComposerImpl({
   placeholder?: string;
 }) {
   const floating = variant === "floating";
+  const hero = variant === "hero";
   const [focused, setFocused] = useState(false);
+  // Only the hero cares: it centres its single line, and has to stop doing so
+  // the moment the field grows, or the send button ends up halfway down a
+  // paragraph. Measured from the field itself rather than guessed from the
+  // text's length, which would be wrong at every width.
+  const [multiline, setMultiline] = useState(false);
   const reduceMotion = useReducedMotion();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Keep the hot keystroke subscription at the leaf. When LangyPanel itself
@@ -124,22 +172,37 @@ function ComposerImpl({
   // was enough main-thread work to look like a page reload.
   const input = useLangyStore((s) => s.draft);
   const onInputChange = useLangyStore((s) => s.setDraft);
-  const canSend = !!input.trim() && !isBusy && !disabled;
+  // The turn phase is the SINGLE source for the send/stop affordance (ADR-058):
+  // `idle` lets the composer send; `active`/`stopping` disable sending and show
+  // Stop. Gating on the durable phase — not the client stream's flaky isBusy —
+  // is what stops a second send slipping through the instant the first token
+  // arrives and 409-ing the in-flight turn. You can still TYPE the next message.
+  const turnPhase = useLangyStore((s) => s.turnPhase);
+  const turnActive = turnPhase !== "idle";
 
-  // The rainbow sheen is an INVITATION on a blank composer — it belongs to the
-  // empty, idle state, where it reads as "start here". The moment the
-  // conversation has anything in it — a turn in flight, or a conversation with
-  // history/messages already adopted — the sheen would only compete with the
-  // answer, so it drops. `activeConversationId` is non-null once the server
-  // adopts a fresh turn or the user loads a conversation; `isBusy` covers the
-  // instant between the first send and that adoption. Either means the
-  // conversation has started, so the sheen goes.
-  const activeConversationId = useLangyStore((s) => s.activeConversationId);
-  const conversationStarted = activeConversationId !== null || isBusy;
+  // The one-time gesture hint. Both selectors return booleans, so the target
+  // registry's churn (rows mounting as a table scrolls) re-renders the composer
+  // only on the single transition from "nothing to point at" to "something".
+  const contextHintDismissed = useLangyStore((s) => s.contextHintDismissed);
+  const dismissContextHint = useLangyStore((s) => s.dismissContextHint);
+  const pageHasTargets = useLangyContextTargetStore(
+    (s) => Object.keys(s.targets).length > 0,
+  );
+  const showGestureHint = !contextHintDismissed && pageHasTargets;
+  const canSend = turnPhase === "idle" && !!input.trim() && !disabled;
+
+  // The rainbow sheen is an ACTIVITY signal, not an invitation. It used to ride
+  // the border only while the composer was blank and idle ("start here") and
+  // drop the instant you sent — which meant the one moment the composer had
+  // something to say about itself was the one moment it said nothing. Now it is
+  // lit for exactly as long as a turn is in flight (including the `stopping`
+  // window), so the ring travelling round the composer means "Langy is working".
+  // It pairs with the 3px sink below: same trigger, same phase, one posture.
 
   /**
-   * `#` summons context. Skills are ambient agent capabilities and do not need
-   * a second, user-managed representation in the composer.
+   * Two keys, two palettes, and the split is the whole point: `#` summons
+   * CONTEXT (the things on this page Langy could be given), `/` summons SKILLS
+   * (the things Langy knows how to do). One is nouns, the other verbs.
    *
    * The trigger key is NEVER inserted into the draft — we intercept it on
    * keydown and open the palette instead. That is why there is no "strip the
@@ -151,6 +214,30 @@ function ComposerImpl({
    */
   const [palette, setPalette] = useState<PaletteMode | null>(null);
   const [paletteQuery, setPaletteQuery] = useState("");
+
+  const openPalette = (mode: PaletteMode) => {
+    setPaletteQuery("");
+    setPalette(mode);
+  };
+
+  /**
+   * A picked skill becomes a real, editable message rather than a token.
+   *
+   * A skill declares the question it answers (`userPrompt` in its own
+   * SKILL.md); dropping that into the draft leaves the user with something they
+   * can read, edit and send. The alternative — inserting `/tracing` and hoping
+   * — asks them to finish a sentence in a syntax nobody documented. Client
+   * commands are the exception: `/feedback` IS the message the composer
+   * intercepts, so it goes in verbatim.
+   */
+  const pickSkill = (skill: LangySkill) => {
+    const text =
+      skill.source === "client-command"
+        ? `/${skill.id}`
+        : (skill.prompt ?? `Use the ${skill.label} skill: `);
+    const existing = input.trim();
+    onInputChange(existing ? `${existing}\n\n${text}` : text);
+  };
 
   const closePalette = () => {
     setPalette(null);
@@ -172,14 +259,19 @@ function ComposerImpl({
   ) => {
     if (event.key === "#" && atWordBoundary()) {
       event.preventDefault();
-      setPaletteQuery("");
-      setPalette("context");
+      openPalette("context");
+      return;
+    }
+    if (event.key === "/" && atWordBoundary()) {
+      event.preventDefault();
+      openPalette("skills");
       return;
     }
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      if (isBusy && input.trim()) onQueue?.(input);
-      else if (canSend) onSend(input);
+      // No queue: Enter is a no-op mid-turn (canSend is false while a turn is in
+      // flight), so nothing is sent until the turn finishes.
+      if (canSend) onSend(input);
     }
   };
 
@@ -191,9 +283,9 @@ function ComposerImpl({
       // Both layouts wear the rounded, shadowed card — sidebar included — and
       // BOTH inset it by the same generous gutter, so the docked card doesn't
       // read as tighter or more squashed than the floating one.
-      paddingX={3.5}
-      paddingTop={3}
-      paddingBottom={floating ? 2 : 3.5}
+      paddingX={hero ? 0 : 3.5}
+      paddingTop={hero ? 0 : 3}
+      paddingBottom={hero ? 0 : floating ? 2 : 3.5}
       // Transparent in BOTH layouts: the footer is a sibling BELOW the scroller
       // (its content can't bleed past it), so a solid backing bought nothing and
       // only painted a grey box around the card. Transparent lets the panel
@@ -213,19 +305,20 @@ function ComposerImpl({
           overshoot). The wrapper owns the transform, and the radius the sheen
           ring inherits.
 
-          The travelling rainbow sheen is a SEPARATE signal: it rides the border
-          only while the conversation is still empty and idle — the inviting
-          "start a chat" state — and drops the moment the first message or
-          streamed element arrives. See `conversationStarted` above. */}
+          The travelling rainbow sheen rides the same trigger: lit while a turn
+          is in flight, dark at rest. See the note on `turnActive` above. */}
+      {showGestureHint ? (
+        <ContextGestureHint onDismiss={dismissContextHint} />
+      ) : null}
       <Box
         position="relative"
         borderRadius={COMPOSER_RADIUS}
         transform={
-          isBusy && !reduceMotion ? "translateY(3px)" : "translateY(0)"
+          turnActive && !reduceMotion ? "translateY(3px)" : "translateY(0)"
         }
         transition="transform 380ms cubic-bezier(0.32, 0.72, 0, 1)"
       >
-        {!conversationStarted ? (
+        {turnActive ? (
           <Box className="langy-composer-sheen" aria-hidden />
         ) : null}
         {/* One integrated surface. The field, the page-context chips, the
@@ -233,11 +326,22 @@ function ComposerImpl({
             lights up in the brand orange on focus — the composer reads as one
             object you are composing in, not three stacked controls. */}
         <Box
+          ref={hero ? cardRef : undefined}
+          // The seam the home page's send measures against. Present on every
+          // variant so the panel's composer (`panel`) is findable from outside
+          // the panel's tree, and the home page's own (`hero`) is never
+          // mistaken for it.
+          {...{ [COMPOSER_ANCHOR_ATTR]: hero ? "hero" : "panel" }}
           borderWidth="1px"
           borderStyle="solid"
           borderColor={focused ? "orange.emphasized" : "border.emphasized"}
           borderRadius={COMPOSER_RADIUS}
-          background="bg.subtle"
+          // Hero sits on GLASS. It is the only variant with a moving canvas
+          // behind it, so an opaque fill would punch a hole in the block it is
+          // set into; a blurred, mostly-opaque surface keeps the text crisp
+          // while the light still reads through the edges.
+          background={hero ? "bg.panel/88" : "bg.subtle"}
+          backdropFilter={hero ? "blur(8px)" : undefined}
           // Focus swaps in the brand-orange ring in both layouts. At rest the
           // floating card leans on the panel it overlays (no shadow, as before),
           // while the sidebar card grows its own drop shadow so it lifts off the
@@ -268,67 +372,180 @@ function ComposerImpl({
                 onAddChip?.(id);
                 closePalette();
               }}
+              onPickSkill={pickSkill}
               onKindIntent={onKindIntent}
               onClose={closePalette}
             />
           ) : null}
 
-          <ContextSummaryMenu
-            contextChips={contextChips}
-            addableChips={addableChips}
-            onRemoveChip={onRemoveChip}
-            onAddChip={onAddChip}
-            compact={!floating}
-          />
+          {/* The hero is deliberately barer than the panel's two. It is the
+              first thing a reader meets on their home page, sitting over a
+              moving canvas, and a context summary plus a model picker plus a
+              sigil rail is a great deal of chrome to meet before you have
+              typed anything. Everything it drops is one click away the moment
+              the panel opens, on the same conversation. */}
+          {hero ? null : (
+            <ContextSummaryMenu
+              contextChips={contextChips}
+              addableChips={addableChips}
+              onRemoveChip={onRemoveChip}
+              onAddChip={onAddChip}
+              compact={!floating}
+            />
+          )}
 
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => onInputChange(e.target.value)}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            onKeyDown={onTextareaKeyDown}
-            placeholder={isBusy ? "Write your next message…" : placeholder}
-            disabled={disabled}
-            rows={1}
-            autoresize
-            maxHeight="120px"
-            minHeight="20px"
-            paddingX={3}
-            paddingTop={2.5}
-            paddingBottom={0.5}
-            border="none"
-            background="transparent"
-            // Denser than the panel's body scale: the composer is a control, not
-            // reading matter, and a wider panel made 14px input read shouty.
-            fontSize="sm"
-            lineHeight="1.5"
-            color="fg"
-            resize="none"
-            // Block (not the default inline-block) so the textarea has no
-            // baseline descender gap under it — that phantom ~5px was the
-            // "dead band" between the placeholder and the model/send rail.
-            display="block"
-            _focus={{ outline: "none", boxShadow: "none" }}
-            _focusVisible={{ outline: "none", boxShadow: "none" }}
-          />
+          {/* The input row: the field, and send / stop DIRECTLY BESIDE IT.
+              The control used to live on the bottom rail with the model picker,
+              which put two unrelated things — "what model runs this" and "run
+              it" — on one line and left the input floating above them both.
+              Beside the field it reads as the field's own action.
 
-          {/* Bottom rail: the per-send model picker and a row of composer
-              affordances on the left, send / stop on the right.
+              `align="flex-end"` so the button stays pinned to the bottom of a
+              growing textarea (autoresize climbs to 120px) rather than drifting
+              down with the vertical centre.
+
+              The HERO is the exception, and it has to be. In the panel this row
+              sits between a context summary above and the model rail below,
+              which is what gives the field its vertical bearings; the hero
+              shows neither, so the row IS the bar. Bottom-aligned against
+              nothing, the text rode high and the send button hung off the
+              floor. Centred, with symmetric padding, the placeholder and the
+              button share one optical centre line. It still flips to bottom
+              alignment once the field has grown past a single line, so a long
+              question does not drag the button down the middle of it. */}
+          <HStack
+            gap={1.5}
+            align={hero && !multiline ? "center" : "flex-end"}
+            paddingRight={hero ? "7px" : 2}
+            paddingLeft={hero ? "5px" : 0}
+            paddingY={hero ? "7px" : 0}
+            paddingBottom={hero ? "7px" : 1}
+          >
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => {
+                onInputChange(e.target.value);
+                if (hero) setMultiline(e.target.scrollHeight > 30);
+              }}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              onKeyDown={onTextareaKeyDown}
+              placeholder={
+                turnActive ? "Write your next message…" : placeholder
+              }
+              disabled={disabled}
+              rows={1}
+              autoresize
+              maxHeight="120px"
+              minHeight="20px"
+              flex={1}
+              minWidth={0}
+              paddingX={3}
+              // Symmetric in the hero so the single line sits on the row's
+              // centre; the panel keeps its asymmetric pair, which is tuned to
+              // the rail sitting directly underneath it.
+              paddingTop={hero ? 0 : 2.5}
+              paddingBottom={hero ? 0 : 0.5}
+              border="none"
+              background="transparent"
+              // Denser than the panel's body scale: the composer is a control, not
+              // reading matter, and a wider panel made 14px input read shouty.
+              fontSize="sm"
+              lineHeight="1.5"
+              color="fg"
+              resize="none"
+              // Block (not the default inline-block) so the textarea has no
+              // baseline descender gap under it — that phantom ~5px was the
+              // "dead band" between the placeholder and the model rail.
+              display="block"
+              _focus={{ outline: "none", boxShadow: "none" }}
+              _focusVisible={{ outline: "none", boxShadow: "none" }}
+            />
+            {/* A turn in flight disables sending — Stop takes the button (no
+                queue). It persists through the "stopping" window (after the
+                client abort) until the backend confirms the terminal, then flips
+                back to Send. */}
+            <AnimatePresence mode="wait" initial={false}>
+              <MotionSwap
+                key={turnPhase}
+                display="flex"
+                flexShrink={0}
+                initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={
+                  reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7 }
+                }
+                transition={{ duration: 0.13, ease: "easeOut" }}
+              >
+                {turnActive ? (
+                  <SendButton
+                    aria-label={turnPhase === "stopping" ? "Stopping" : "Stop"}
+                    onClick={onStop}
+                    disabled={turnPhase === "stopping"}
+                    background={
+                      turnPhase === "stopping" ? "bg.muted" : "red.solid"
+                    }
+                    color={turnPhase === "stopping" ? "fg.muted" : "white"}
+                    cursor={turnPhase === "stopping" ? "default" : "pointer"}
+                  >
+                    {turnPhase === "stopping" ? (
+                      <Spinner size="xs" borderWidth="1.5px" />
+                    ) : (
+                      // The square is symmetric, so it needs no optical
+                      // correction — unlike the plane below.
+                      <Square size={12} />
+                    )}
+                  </SendButton>
+                ) : (
+                  <SendButton
+                    aria-label="Send"
+                    onClick={() => onSend(input)}
+                    disabled={!canSend}
+                    background={canSend ? "orange.solid" : "bg.muted"}
+                    color={canSend ? "white" : "fg.muted"}
+                    cursor={canSend ? "pointer" : "default"}
+                  >
+                    {/* OPTICAL centring, not geometric. Lucide's paper plane is
+                        very nearly centred in its own box (ink centre is within
+                        0.15 of the 24-grid centre), so `place-items: center`
+                        already puts it dead centre — and it still reads low and
+                        left, because the glyph's visual mass is the wide tail
+                        while the tip runs off to the top right. Nudging it a
+                        pixel along its own axis is what makes it LOOK centred in
+                        a circle. Sub-pixel values don't survive rasterisation,
+                        hence a whole pixel each way. */}
+                    <Box
+                      display="grid"
+                      placeItems="center"
+                      transform="translate(1px, -1px)"
+                    >
+                      <Send size={14} />
+                    </Box>
+                  </SendButton>
+                )}
+              </MotionSwap>
+            </AnimatePresence>
+          </HStack>
+
+          {/* Bottom rail: the per-send model picker and the composer
+              affordances. Send is NOT here any more — it sits beside the input
+              above, where the thing it acts on is.
 
               The rail is built to GROW — one primitive, one array — but it only
-              ever shows what is real. Effort, skills and attachments have no
-              wiring behind them today, so they render as explicitly disabled
-              placeholders rather than buttons that lie: a greyed glyph with a
-              "Coming soon" tooltip, quiet enough that they never compete with
-              Send. Page context is NOT here — it already has a better home as
-              the chips above the input, where you can see what's attached. */}
+              ever shows what is real. Reasoning effort has no wiring behind it
+              today, so it renders as an explicitly disabled placeholder rather
+              than a button that lies: a greyed glyph with a "Coming soon"
+              tooltip. Page context is NOT here — it already has a better home
+              as the chips above the input, where you can see what's attached. */}
           <HStack
             gap={1}
             paddingLeft={2.5}
             paddingRight={2}
             paddingBottom={2}
-            paddingTop={1}
+            paddingTop={0}
+            // See the note on the context summary above: the hero stays bare.
+            display={hero ? "none" : undefined}
           >
             <LangyModelPill
               model={model}
@@ -339,41 +556,27 @@ function ComposerImpl({
               // the send and can't change mid-flight — so the picker greys out
               // until the turn settles rather than offering a choice that
               // wouldn't take.
-              disabled={disabled || isBusy}
+              disabled={disabled || turnActive}
             />
             <RailButton icon={Gauge} label="Reasoning effort" />
-            <RailButton icon={Paperclip} label="Attach a file" />
-            {/* The only discoverability the palette gets, and all it needs. It
-                fades out the moment the composer is in use, so it is a hint on
-                an empty field rather than a permanent label. */}
-            {isBusy ? (
-              <>
-                {queuedCount > 0 ? (
-                  <Text marginLeft="auto" textStyle="2xs" color="fg.muted">
-                    {queuedCount} queued
-                  </Text>
-                ) : null}
-                <SendButton
-                  aria-label="Stop"
-                  onClick={onStop}
-                  background="red.solid"
-                  color="white"
-                >
-                  <Square size={12} />
-                </SendButton>
-              </>
-            ) : (
-              <SendButton
-                aria-label="Send"
-                onClick={() => onSend(input)}
-                disabled={!canSend}
-                background={canSend ? "orange.solid" : "bg.muted"}
-                color={canSend ? "white" : "fg.muted"}
-                cursor={canSend ? "pointer" : "default"}
-              >
-                <Send size={14} />
-              </SendButton>
-            )}
+            <Box flex={1} />
+            {/* The two keys, said out loud. A palette you can only reach by
+                guessing a keystroke is a palette most people never see, so the
+                sigils sit on the rail as real buttons: they name what each key
+                opens AND open it, which means the shortcut teaches itself the
+                first time someone clicks one. */}
+            <SigilButton
+              sigil="#"
+              label="Context"
+              hint="Add something from this page. Press #"
+              onClick={() => openPalette("context")}
+            />
+            <SigilButton
+              sigil="/"
+              label="Skills"
+              hint="Pick what Langy should do. Press /"
+              onClick={() => openPalette("skills")}
+            />
           </HStack>
         </Box>
       </Box>
@@ -389,7 +592,9 @@ function ComposerImpl({
             "@media (max-height: 520px)": { display: "none" },
           }}
         >
-          Langy proposes — you review and apply.
+          {/* House style rules out the em dash anywhere in user-facing copy
+              (dev/docs/best_practices/copywriting.md). */}
+          Langy proposes, you review and apply.
         </Text>
       ) : null}
     </Box>
@@ -398,6 +603,113 @@ function ComposerImpl({
 
 export const Composer = memo(ComposerImpl);
 Composer.displayName = "Composer";
+
+/**
+ * A key, named. Deliberately shows the glyph rather than an icon: the point of
+ * the control is to teach the keystroke, and an icon teaches nothing about
+ * which key to press.
+ */
+function SigilButton({
+  sigil,
+  label,
+  hint,
+  onClick,
+}: {
+  sigil: string;
+  label: string;
+  hint: string;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip content={hint} openDelay={300} showArrow>
+      <chakra.button
+        type="button"
+        aria-label={hint}
+        onClick={onClick}
+        display="inline-flex"
+        alignItems="center"
+        gap={1}
+        height="22px"
+        paddingLeft={1}
+        paddingRight={1.5}
+        borderRadius="md"
+        borderWidth={0}
+        background="transparent"
+        color="fg.subtle"
+        cursor="pointer"
+        flexShrink={0}
+        _hover={{ background: "bg.muted", color: "fg" }}
+      >
+        <chakra.span
+          display="grid"
+          placeItems="center"
+          minWidth="15px"
+          height="15px"
+          borderRadius="sm"
+          borderWidth="1px"
+          borderStyle="solid"
+          borderColor="border.emphasized"
+          fontFamily="mono"
+          fontSize="10px"
+          lineHeight="1"
+        >
+          {sigil}
+        </chakra.span>
+        <Text textStyle="2xs">{label}</Text>
+      </chakra.button>
+    </Tooltip>
+  );
+}
+
+/**
+ * The one-time teaching line for "you can hand me things off the page".
+ *
+ * It appears the first time there is actually something on the page to hand
+ * over — a hint on a page with nothing to point at would be teaching a gesture
+ * that does nothing — and it goes away for good the moment the user dismisses
+ * it OR does the thing (see `absorbContextTarget`). One showing, then silence.
+ */
+function ContextGestureHint({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <HStack
+      gap={2}
+      align="start"
+      marginBottom={2}
+      paddingX={2.5}
+      paddingY={1.5}
+      borderRadius="lg"
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="orange.subtle"
+      background="orange.subtle/40"
+      data-testid="langy-context-gesture-hint"
+    >
+      <Box color="orange.fg" display="grid" paddingTop="2px" flexShrink={0}>
+        <Sparkles size={12} />
+      </Box>
+      <Text textStyle="2xs" color="fg.muted" flex={1} minWidth={0}>
+        Anything on this page can come along. Press{" "}
+        <chakra.kbd fontFamily="mono">#</chakra.kbd> to light it up, then click
+        it. Dragging it onto Langy works too.
+      </Text>
+      <chakra.button
+        type="button"
+        aria-label="Dismiss hint"
+        onClick={onDismiss}
+        display="grid"
+        placeItems="center"
+        borderWidth={0}
+        background="transparent"
+        color="fg.subtle"
+        cursor="pointer"
+        flexShrink={0}
+        _hover={{ color: "fg" }}
+      >
+        <X size={12} />
+      </chakra.button>
+    </HStack>
+  );
+}
 
 /**
  * One rail affordance. Disabled on purpose — see COMPOSER_RAIL. It keeps the
@@ -453,9 +765,26 @@ function ContextSummaryMenu({
 }) {
   const primary = contextChips[0];
   const extra = Math.max(0, contextChips.length - 1);
+  // Panel -> page. Running the pointer down this list lights each chip's real
+  // card up where it sits, so "workflow: checkout" stops being a word the user
+  // has to take on trust and becomes the card they can see.
+  const setSpotlight = useLangyContextTargetStore((s) => s.setSpotlight);
+  const spotlight = (chip: LangyContextChip) => ({
+    onMouseEnter: () => setSpotlight(chip.id),
+    onMouseLeave: () => setSpotlight(null),
+    onFocus: () => setSpotlight(chip.id),
+    onBlur: () => setSpotlight(null),
+  });
 
   return (
-    <Menu.Root positioning={{ placement: "top-start", gutter: 6 }}>
+    <Menu.Root
+      positioning={{ placement: "top-start", gutter: 6 }}
+      // A closing menu must take its spotlight with it, or the page keeps
+      // glowing at a chip nobody is pointing at any more.
+      onOpenChange={(details) => {
+        if (!details.open) setSpotlight(null);
+      }}
+    >
       <Menu.Trigger asChild>
         <chakra.button
           type="button"
@@ -514,6 +843,7 @@ function ContextSummaryMenu({
                   onClick={() => onRemoveChip?.(chip.id)}
                   aria-label={`Remove ${chip.label} from context`}
                   paddingY={2}
+                  {...spotlight(chip)}
                 >
                   <HStack gap={2.5} width="full" align="start">
                     <Box color="orange.fg" display="grid" paddingTop="2px">
@@ -544,6 +874,7 @@ function ContextSummaryMenu({
               key={chip.id}
               value={chip.id}
               onClick={() => onAddChip?.(chip.id)}
+              {...spotlight(chip)}
             >
               <HStack gap={2}>
                 <Box color="orange.fg" display="grid" placeItems="center">
@@ -577,7 +908,6 @@ function SendButton({
   return (
     <chakra.button
       type="button"
-      marginLeft="auto"
       width="34px"
       height="34px"
       borderRadius="full"

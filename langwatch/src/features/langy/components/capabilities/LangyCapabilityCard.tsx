@@ -11,7 +11,7 @@
  * Every bespoke card (Traces, Metrics, EvalRun, Dataset, Scenario, resource
  * results) composes THIS shell so the whole kit stays one visual system.
  */
-import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import {
   ArrowUpRight,
   BarChart3,
@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
+import { LangySpaAnchor } from "../LangySpaAnchor";
 import { langyThinkingShimmerStyles } from "../langyShimmer";
 import type {
   CapabilityIconName,
@@ -63,6 +64,7 @@ const SURFACE_ICON: Record<CapabilitySurface, LucideIcon> = {
   prompts: FileText,
   dashboards: LayoutDashboard,
   simulations: MessagesSquare,
+  scenarios: MessagesSquare,
   agents: Bot,
   automations: Zap,
   workflows: Workflow,
@@ -224,7 +226,7 @@ export function CapabilityDeepLinkChip({
   const href = buildSurfaceHref({ surface, projectSlug, resourceId });
   if (!href) return null;
   return (
-    <chakra.a
+    <LangySpaAnchor
       href={href}
       display="inline-flex"
       alignItems="center"
@@ -237,7 +239,7 @@ export function CapabilityDeepLinkChip({
     >
       {label ?? `Open in ${SURFACE_LABEL[surface]}`}
       <ArrowUpRight size={12} />
-    </chakra.a>
+    </LangySpaAnchor>
   );
 }
 
@@ -294,7 +296,7 @@ export function CapabilityRow({
 
   if (href) {
     return (
-      <chakra.a
+      <LangySpaAnchor
         href={href}
         display="flex"
         alignItems="center"
@@ -306,7 +308,7 @@ export function CapabilityRow({
       >
         {body}
         <ArrowUpRight size={12} color="var(--chakra-colors-fg-subtle)" />
-      </chakra.a>
+      </LangySpaAnchor>
     );
   }
   return (

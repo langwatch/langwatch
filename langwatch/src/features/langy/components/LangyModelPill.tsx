@@ -16,6 +16,7 @@ import {
   Image,
   Layers3,
   LoaderCircle,
+  Sparkles,
   Zap,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -30,6 +31,7 @@ import {
   type LangyModelGroup,
   profileLangyModel,
 } from "../logic/langyModelProfile";
+import { splitLangyModels } from "../logic/langyModelSuggestions";
 import { LangyComboboxSearch } from "./LangyComboboxSearch";
 
 type ProviderKey = keyof typeof modelProviderIcons;
@@ -166,16 +168,36 @@ export function LangyModelPill({
     });
   }, [allItems, query]);
 
+  // The catalogue is the right list and the wrong front door — see
+  // logic/langyModelSuggestions.ts. A short derived shortlist leads; everything
+  // else waits behind "More models".
+  const searching = query.trim().length > 0;
+  const { suggested, more } = useMemo(
+    () =>
+      splitLangyModels({
+        items: collection.items,
+        langyDefaultModel,
+        selectedModel: model,
+        searching,
+      }),
+    [collection.items, langyDefaultModel, model, searching],
+  );
+
   const groupedItems = useMemo(
     () =>
       MODEL_GROUPS.map((group) => ({
         ...group,
-        items: collection.items.filter(
-          (item) => item.profile.group === group.id,
-        ),
+        items: more.filter((item) => item.profile.group === group.id),
       })).filter((group) => group.items.length > 0),
-    [collection.items],
+    [more],
   );
+
+  // Collapsed by default — the point of the shortlist is that the catalogue is
+  // out of the way. A search forces it open, because a search that hides its own
+  // matches is a search that lies; and with no shortlist there is nothing to
+  // disclose, so the catalogue simply IS the list.
+  const [showMore, setShowMore] = useState(false);
+  const moreOpen = showMore || searching || suggested.length === 0;
 
   return (
     <Combobox.Root
@@ -353,37 +375,106 @@ export function LangyModelPill({
               </>
             )}
             <Box padding={1}>
-              {groupedItems.map(
-                ({ id, label, hint, icon: GroupIcon, items }) => (
-                  <Combobox.ItemGroup key={id}>
-                    <Combobox.ItemGroupLabel
-                      display="flex"
-                      alignItems="center"
-                      gap={1.5}
-                      paddingX={2}
-                      paddingTop={2}
-                      paddingBottom={1}
-                      color="fg.subtle"
+              {suggested.length > 0 ? (
+                <Combobox.ItemGroup>
+                  <Combobox.ItemGroupLabel
+                    display="flex"
+                    alignItems="center"
+                    gap={1.5}
+                    paddingX={2}
+                    paddingTop={2}
+                    paddingBottom={1}
+                    color="fg.subtle"
+                  >
+                    <Sparkles size={11} />
+                    <Text
+                      textStyle="2xs"
+                      fontWeight="600"
+                      textTransform="uppercase"
+                      letterSpacing="0.07em"
                     >
-                      <GroupIcon size={11} />
-                      <Text
-                        textStyle="2xs"
-                        fontWeight="600"
-                        textTransform="uppercase"
-                        letterSpacing="0.07em"
-                      >
-                        {label}
-                      </Text>
-                      <Text textStyle="2xs" fontWeight="400" opacity={0.72}>
-                        · {hint}
-                      </Text>
-                    </Combobox.ItemGroupLabel>
-                    {items.map((item) => (
-                      <ModelRow key={item.value} item={item} />
-                    ))}
-                  </Combobox.ItemGroup>
-                ),
-              )}
+                      Suggested
+                    </Text>
+                  </Combobox.ItemGroupLabel>
+                  {suggested.map((item) => (
+                    <ModelRow key={item.value} item={item} />
+                  ))}
+                </Combobox.ItemGroup>
+              ) : null}
+
+              {/* The disclosure only exists when there is a shortlist to hide
+                  the rest behind. It is a real button, not a header that
+                  happens to be clickable, so it is reachable by keyboard from
+                  inside the listbox. */}
+              {suggested.length > 0 && groupedItems.length > 0 && !searching ? (
+                <chakra.button
+                  type="button"
+                  onClick={() => setShowMore((open) => !open)}
+                  aria-expanded={moreOpen}
+                  display="flex"
+                  alignItems="center"
+                  gap={1.5}
+                  width="full"
+                  marginTop={1}
+                  paddingX={2}
+                  paddingY={1.5}
+                  borderRadius="md"
+                  borderWidth={0}
+                  background="transparent"
+                  color="fg.muted"
+                  cursor="pointer"
+                  _hover={{ background: "bg.subtle", color: "fg" }}
+                >
+                  <Box
+                    display="grid"
+                    placeItems="center"
+                    transition="transform 160ms ease"
+                    transform={moreOpen ? "rotate(180deg)" : undefined}
+                  >
+                    <ChevronDown size={12} />
+                  </Box>
+                  <Text textStyle="2xs" fontWeight="500">
+                    {moreOpen ? "Fewer models" : "More models"}
+                  </Text>
+                  <Text textStyle="2xs" color="fg.subtle">
+                    {more.length}
+                  </Text>
+                </chakra.button>
+              ) : null}
+
+              {moreOpen
+                ? groupedItems.map(
+                    ({ id, label, hint, icon: GroupIcon, items }) => (
+                      <Combobox.ItemGroup key={id}>
+                        <Combobox.ItemGroupLabel
+                          display="flex"
+                          alignItems="center"
+                          gap={1.5}
+                          paddingX={2}
+                          paddingTop={2}
+                          paddingBottom={1}
+                          color="fg.subtle"
+                        >
+                          <GroupIcon size={11} />
+                          <Text
+                            textStyle="2xs"
+                            fontWeight="600"
+                            textTransform="uppercase"
+                            letterSpacing="0.07em"
+                          >
+                            {label}
+                          </Text>
+                          <Text textStyle="2xs" fontWeight="400" opacity={0.72}>
+                            · {hint}
+                          </Text>
+                        </Combobox.ItemGroupLabel>
+                        {items.map((item) => (
+                          <ModelRow key={item.value} item={item} />
+                        ))}
+                      </Combobox.ItemGroup>
+                    ),
+                  )
+                : null}
             </Box>
           </Combobox.Content>
         </Combobox.Positioner>
@@ -419,14 +510,21 @@ function ModelRow({ item }: { item: ModelItem }) {
             <Layers3 size={15} />
           )}
         </Box>
+        {/* The NAME is the thing being chosen, so it gets a floor. With
+            `minWidth: 0` and every sibling `flexShrink={0}`, a row carrying
+            four trait icons plus the "Langy default" badge squeezed the label
+            to "g…" — the one row a user most needs to read was the one row
+            they could not. */}
         <Combobox.ItemText
-          css={{ flex: 1, minWidth: 0 }}
+          css={{ flex: 1, minWidth: "8ch" }}
           fontSize="13px"
           truncate
         >
           {item.label}
         </Combobox.ItemText>
-        <HStack gap={1} color="fg.subtle" flexShrink={0}>
+        {/* Traits yield first: they are a glanceable extra, and losing one to
+            a narrow row costs less than losing the name. */}
+        <HStack gap={1} color="fg.subtle" flexShrink={1} overflow="hidden">
           {item.profile.isQuick ? <ModelTrait label="Fast" icon={Zap} /> : null}
           {item.profile.isLongRunning ? (
             <ModelTrait label="Long-running" icon={Clock3} />
@@ -439,8 +537,13 @@ function ModelRow({ item }: { item: ModelItem }) {
           ) : null}
         </HStack>
         {item.isLangyDefault ? (
-          <Text textStyle="2xs" color="orange.fg" whiteSpace="nowrap">
-            Langy default
+          <Text
+            textStyle="2xs"
+            color="orange.fg"
+            whiteSpace="nowrap"
+            flexShrink={0}
+          >
+            Default
           </Text>
         ) : null}
         <Combobox.ItemIndicator>
