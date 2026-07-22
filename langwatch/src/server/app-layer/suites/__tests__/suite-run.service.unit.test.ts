@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NullSuiteRunReadRepository } from "../repositories/suite-run.repository";
 import { SuiteRunService } from "../suite-run.service";
 
 vi.mock("@langwatch/observability", () => ({
@@ -30,18 +29,13 @@ vi.mock("@langwatch/ksuid", () => ({
 
 describe("SuiteRunService", () => {
   describe("startRun()", () => {
-    const startSuiteRunCommand = vi.fn().mockResolvedValue(undefined);
     const queueSimulationRunCommand = vi.fn().mockResolvedValue(undefined);
 
     let service: SuiteRunService;
 
     beforeEach(() => {
       vi.clearAllMocks();
-      service = new SuiteRunService(
-        new NullSuiteRunReadRepository(),
-        startSuiteRunCommand,
-        queueSimulationRunCommand,
-      );
+      service = new SuiteRunService(queueSimulationRunCommand);
     });
 
     describe("when a run is started with one scenario and one target", () => {
@@ -54,7 +48,6 @@ describe("SuiteRunService", () => {
           activeTargets: [{ type: "http", referenceId: "target-1" }],
           repeatCount: 1,
           skippedArchived: { scenarios: [], targets: [] },
-          idempotencyKey: "idem-1",
         });
 
         expect(result.items).toHaveLength(1);
@@ -75,7 +68,6 @@ describe("SuiteRunService", () => {
           activeTargets: [{ type: "http", referenceId: "target-1" }],
           repeatCount: 1,
           skippedArchived: { scenarios: [], targets: [] },
-          idempotencyKey: "idem-1",
         });
 
         expect(result.batchRunId).toBe("batch-run-123");
@@ -99,7 +91,6 @@ describe("SuiteRunService", () => {
           ],
           repeatCount: 3,
           skippedArchived: { scenarios: [], targets: [] },
-          idempotencyKey: "idem-2",
         });
 
         // 2 scenarios * 2 targets * 3 repeats = 12

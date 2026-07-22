@@ -60,6 +60,16 @@ export type BatchHistoryItemRun = {
 export type BatchHistoryItem = {
   batchRunId: string;
   totalCount: number;
+  /**
+   * How many runs the batch set out to queue (ADR-061), carried on each child
+   * row. Equal to `totalCount` for a fully dispatched batch, and larger when
+   * some of the fan-out never reached the queue — which is the difference
+   * between "this batch is five runs" and "this batch lost one".
+   *
+   * Falls back to `totalCount` for batches queued before the denominator was
+   * recorded, so history never shows a zero total.
+   */
+  expectedCount: number;
   passCount: number;    // SUCCESS
   failCount: number;    // FAILED | FAILURE | ERROR | CANCELLED
   runningCount: number; // IN_PROGRESS | PENDING

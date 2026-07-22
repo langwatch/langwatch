@@ -15,6 +15,8 @@ export const queueRunCommandDataSchema = z.object({
     type: z.enum(["prompt", "http", "code", "workflow"]),
     referenceId: z.string(),
   }).optional(),
+  /** Size of the batch this run belongs to (ADR-061). 1 for an ad-hoc run. */
+  batchTotal: z.number().int().nonnegative().optional(),
   occurredAt: z.number(),
 });
 export type QueueRunCommandData = z.infer<typeof queueRunCommandDataSchema>;

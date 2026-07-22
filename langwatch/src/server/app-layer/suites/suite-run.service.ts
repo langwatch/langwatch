@@ -1,18 +1,10 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
-import type { SuiteRunStateData } from "~/server/event-sourcing/pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
-import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { traced } from "../tracing";
-import { SuiteRunClickHouseRepository } from "./repositories/suite-run.clickhouse.repository";
-import {
-  NullSuiteRunReadRepository,
-  type SuiteRunReadRepository,
-} from "./repositories/suite-run.repository";
 
 const logger = createLogger("langwatch:suite-run:service");
 
@@ -45,24 +37,20 @@ export type SuiteRunTarget = {
 
 export class SuiteRunService {
   constructor(
-    readonly repository: SuiteRunReadRepository,
-    private readonly startSuiteRunCommand: (data: StartSuiteRunCommandData) => Promise<void>,
     private readonly queueSimulationRunCommand: (data: QueueRunCommandData) => Promise<void>,
   ) {}
 
   static create(params: {
-    resolveClickHouseClient: ClickHouseClientResolver | null;
-    startSuiteRun: (data: StartSuiteRunCommandData) => Promise<void>;
     queueSimulationRun: (data: QueueRunCommandData) => Promise<void>;
   }): SuiteRunService {
-    const repo = params.resolveClickHouseClient
-      ? new SuiteRunClickHouseRepository(params.resolveClickHouseClient)
-      : new NullSuiteRunReadRepository();
-    return traced(new SuiteRunService(repo, params.startSuiteRun, params.queueSimulationRun), "SuiteRunService");
+    return traced(
+      new SuiteRunService(params.queueSimulationRun),
+      "SuiteRunService",
+    );
   }
 
   /**
-   * Start a suite run: dispatch the startSuiteRun command and schedule BullMQ jobs.
+   * Start a suite run: queue one simulation run per scenario/target/repeat.
    *
    * Generates the batchRunId upfront and returns it synchronously (before jobs
    * finish scheduling), so the frontend can navigate to the run page immediately.
@@ -75,7 +63,6 @@ export class SuiteRunService {
     activeTargets: SuiteRunTarget[];
     repeatCount: number;
     skippedArchived: SuiteRunResult["skippedArchived"];
-    idempotencyKey: string;
     batchRunId?: string;
   }): Promise<SuiteRunResult> {
     const {
@@ -86,7 +73,6 @@ export class SuiteRunService {
       activeTargets,
       repeatCount,
       skippedArchived,
-      idempotencyKey,
     } = params;
 
     const batchRunId = params.batchRunId ?? generateBatchRunId();
@@ -105,18 +91,6 @@ export class SuiteRunService {
       },
       "Starting suite run",
     );
-
-    await this.startSuiteRunCommand({
-      tenantId: projectId,
-      batchRunId,
-      scenarioSetId: setId,
-      suiteId,
-      total,
-      scenarioIds: activeScenarioIds,
-      targetIds: activeTargets.map((t) => t.referenceId),
-      idempotencyKey,
-      occurredAt: Date.now(),
-    });
 
     // Pre-generate scenarioRunIds and dispatch queueRun for each so QUEUED
     // entries appear in ClickHouse immediately. The same IDs are passed to the
@@ -150,6 +124,9 @@ export class SuiteRunService {
             langwatch: { targetReferenceId: item.target.referenceId },
           },
           target: { type: item.target.type, referenceId: item.target.referenceId },
+          // The batch denominator travels with every child (ADR-061), so the
+          // suite's progress is readable from the first row that lands.
+          batchTotal: total,
           occurredAt: now,
         }),
       ),
@@ -175,21 +152,6 @@ export class SuiteRunService {
         name: scenarioNameMap.get(item.scenarioId),
       })),
     };
-  }
-
-  async getSuiteRunState(params: {
-    projectId: string;
-    batchRunId: string;
-  }): Promise<SuiteRunStateData | null> {
-    return this.repository.getSuiteRunState(params);
-  }
-
-  async getBatchHistory(params: {
-    projectId: string;
-    scenarioSetId: string;
-    limit?: number;
-  }): Promise<SuiteRunStateData[]> {
-    return this.repository.getBatchHistory(params);
   }
 
 }
