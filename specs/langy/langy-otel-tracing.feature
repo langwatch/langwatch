@@ -82,15 +82,20 @@ Feature: Langy agent activity is traced into the user's project
   # LangWatch's own copy of the turn — the mirror lane (ADR-061)
   #
   # The customer's project gets the turn verbatim — their agent, their prompts.
-  # A SECOND copy of the turn goes to LangWatch's own production Langy project,
-  # so LangWatch can watch Langy work with the same tools customers use. The
-  # copy is TIERED per customer policy, every tier a fail-closed allowlist:
-  #   content    — the structural fields plus the explicitly listed content
-  #                keys (prompts, completions, tool payloads). The default.
-  #   structural — timings, token usage, cost, status; no content. The prior
-  #                "LangWatch cannot see content" promise lives on as THIS
-  #                tier's guarantee.
+  # A SECOND copy of the turn goes to LangWatch's own mirror project, so
+  # LangWatch can watch Langy work with the same tools customers use. Where the
+  # customer's own forward keeps their content and scrubs the platform detail
+  # around it, the mirror is the inverse: it scrubs nothing operational — span
+  # names, hierarchy, timings, worker identity all survive — and gates only the
+  # CONTENT on the customer's tier:
+  #   content    — the whole turn including prompts, completions and tool
+  #                payloads. The default.
+  #   structural — the same operational shape with the content removed. The
+  #                prior "LangWatch cannot see content" promise lives on as
+  #                THIS tier's guarantee.
   #   skip       — no copy at all.
+  # (The separate content-stripped OPS copy that feeds LangWatch's own
+  # collector is unchanged, and keeps its fail-closed allowlist.)
   # The tier rides the turn's credentials envelope, resolved per organization
   # by the control plane. A mirror failure is never the customer's problem,
   # and a turn run inside the prod Langy project itself never mirrors.
@@ -105,8 +110,9 @@ Feature: Langy agent activity is traced into the user's project
   Scenario: The mirror receives the turn at the customer's tier
     Given a customer organization at the default content tier
     When the worker reports its activity
-    Then the prod Langy project receives the turn with its content
-    And every mirrored attribute was explicitly allowlisted
+    Then the mirror project receives the turn with its content
+    And the mirrored turn keeps the shape the customer sees
+    And the mirrored turn names the customer it came from
 
   Scenario: A restricted customer's mirror carries structure and never content
     Given a customer organization restricted to the structural tier
