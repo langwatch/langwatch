@@ -98,6 +98,44 @@ Feature: Handled errors — what the customer actually reads
     And a copyable error id is still offered, so support can correlate it
       # the one thing an unhandled error is allowed to tell the client
 
+  @bdd @handled-errors @presentation
+  Scenario: An error id stays readable where it cannot be copied
+    Given a failure carrying an error id
+    And the browser offers no clipboard, as on an insecure origin
+    When the client surfaces it
+    Then the error id is shown as selectable text instead
+      # withholding the copy button must not withhold the id itself —
+      # otherwise the customer has nothing to quote to support
+
+  # ==========================================================================
+  # Prose a procedure wrote for a person survives the migration
+  # ==========================================================================
+
+  @bdd @handled-errors @presentation
+  Scenario: A plain 4xx keeps the sentence its procedure authored
+    Given a procedure fails with a plain client error carrying authored copy
+      # e.g. "You've already used this invite" — several hundred such
+      # throw sites predate handled errors, and #5984 left them alone
+    When the client surfaces it
+    Then the customer reads that sentence
+    And the caller's own headline names the action that failed
+
+  @bdd @handled-errors @presentation
+  Scenario Outline: A machine's diagnostic is not mistaken for authored copy
+    Given a procedure fails with a plain client error whose message is <shape>
+      # routers that wrap a caught failure in a 4xx would otherwise reopen at
+      # 4xx the leak that #5984 closed at 5xx
+    When the client surfaces it
+    Then the customer reads the calm generic message instead
+
+    Examples:
+      | shape                          |
+      | a database driver's diagnostic |
+      | a socket error code            |
+      | a stack frame                  |
+      | a host name or address         |
+      | longer than a sentence or two  |
+
   # ==========================================================================
   # Workflow node failures cross the language boundary as codes
   # ==========================================================================
@@ -140,6 +178,27 @@ Feature: Handled errors — what the customer actually reads
     When the bridge is offered that error
     Then it declines it
     And the failure falls through to a toast rather than disappearing
+
+  @bdd @handled-errors @presentation
+  Scenario: A form-level complaint is only claimed by a form that can show it
+    Given a form submit fails with a validation error about the submission as
+      a whole, rather than about any one field
+    And the form renders the form-level error slot
+    When the bridge is offered that error
+    Then the complaint is shown at the top of the form
+    And no toast is shown, because the rejection is already visible
+
+  @bdd @handled-errors @presentation
+  Scenario: A form with no error slot never swallows the rejection
+    Given a form submit fails with a validation error about the submission as
+      a whole
+    And the form does not render the form-level error slot
+    When the bridge is offered that error
+    Then it declines it
+    And the failure falls through to a toast
+      # silence is the worst outcome available here: claiming the error would
+      # suppress the toast and display nothing, so pressing Save would appear
+      # to do nothing at all
 
   # ==========================================================================
   # Keeping it that way
