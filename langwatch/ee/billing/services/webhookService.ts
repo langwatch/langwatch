@@ -627,6 +627,7 @@ export class EEWebhookService implements WebhookService {
     fireSubscriptionSyncNurturing({
       organizationId: existingSubscription.organizationId,
       hasSubscription: !!remainingActive,
+      plan: remainingActive?.plan,
     });
 
     // Cancellation deliberately leaves the org's retention policies in place
@@ -666,6 +667,7 @@ export class EEWebhookService implements WebhookService {
       fireSubscriptionSyncNurturing({
         organizationId: existingSubForUpdate.organizationId,
         hasSubscription: !!remainingActive,
+        plan: remainingActive?.plan,
       });
 
       // Cancellation deliberately leaves the org's retention policies in place
@@ -857,6 +859,7 @@ export class EEWebhookService implements WebhookService {
       fireSubscriptionSyncNurturing({
         organizationId: updatedSubscription.organizationId,
         hasSubscription: true,
+        plan: updatedSubscription.plan,
       });
     }
   }

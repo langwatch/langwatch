@@ -1,6 +1,7 @@
 import { getApp } from "../../../../src/server/app-layer/app";
 import { prisma } from "../../../../src/server/db";
 import { captureException } from "../../../../src/utils/posthogErrorCapture";
+import { resolveCioPlanLabel } from "../planLabel";
 import type { CioPersonTraits, CioOrgTraits } from "../types";
 
 /**
@@ -87,7 +88,7 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
         organizationId: orgUser.organizationId,
         status: "ACTIVE",
       },
-      select: { id: true },
+      select: { plan: true },
     }),
   ]);
 
@@ -95,6 +96,7 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
 
   const signupData = (org.signupData ?? {}) as Record<string, unknown>;
   const hasTraces = projects.some((p) => p.firstMessage);
+  const planLabel = resolveCioPlanLabel(activeSubscription?.plan);
 
   const traits: Partial<CioPersonTraits> = {
     ...(user.email ? { email: user.email } : {}),
@@ -105,12 +107,14 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
       : {}),
     has_traces: hasTraces,
     has_subscription: !!activeSubscription,
+    plan: planLabel,
     createdAt: user.createdAt.toISOString(),
     last_active_at: new Date().toISOString(),
   };
 
   const orgTraits: Partial<CioOrgTraits> = {
     name: org.name,
+    plan: planLabel,
     ...(signupData.companySize
       ? { company_size: signupData.companySize as string }
       : {}),
