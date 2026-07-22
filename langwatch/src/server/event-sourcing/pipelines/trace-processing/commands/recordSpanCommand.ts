@@ -3,7 +3,7 @@ import { SpanKind } from "@opentelemetry/api";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
-import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import type { BlobStorePort } from "~/server/domain/traces/blob-store.port";
 import {
   createCostEnrichmentDeps,
   OtlpSpanCostEnrichmentService,
@@ -91,10 +91,10 @@ export interface RecordSpanCommandDependencies {
     }) => Promise<SpanContentDropResult>;
   };
   /**
-   * ADR-022: Optional BlobStore for spool fetch (when command carries spoolRef)
+   * ADR-022: Optional BlobStorePort for spool fetch (when command carries spoolRef)
    * and post-store spool deletion. When absent, spoolRef commands are rejected.
    */
-  blobStore?: BlobStore;
+  blobStore?: BlobStorePort;
 }
 
 function createDefaultDependencies(): RecordSpanCommandDependencies {
@@ -133,7 +133,7 @@ export class RecordSpanCommand
     "langwatch:trace-processing:record-span",
   );
   private readonly deps: RecordSpanCommandDependencies;
-  private readonly blobStore?: BlobStore;
+  private readonly blobStore?: BlobStorePort;
 
   /**
    * @param deps - Optional partial of injectable dependencies. Any omitted

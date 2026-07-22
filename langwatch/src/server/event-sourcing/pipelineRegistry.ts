@@ -21,7 +21,7 @@ import type { Cluster, Redis } from "ioredis";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
-import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import type { BlobStorePort } from "~/server/domain/traces/blob-store.port";
 import {
   resolveClaudeLogVisibilityDeadlineMs,
   resolveClaudeTurnLogCap,
@@ -41,7 +41,7 @@ import type { UsageReportingService } from "../../../ee/billing/services/usageRe
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastPort } from "~/server/domain/broadcast/broadcast.port";
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
-import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
+import type { EvaluationCostPort } from "~/server/domain/evaluations/evaluation-cost.port";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
 import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-inputs-offload";
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
@@ -347,17 +347,17 @@ export interface PipelineRegistryDeps {
     execution: EvaluationExecutionService;
   };
   organizations: OrganizationService;
-  costRecorder: EvaluationCostRecorder;
+  costRecorder: EvaluationCostPort;
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
   gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
   /**
-   * ADR-022: BlobStore for RecordSpanCommand spool reconstitution.
+   * ADR-022: BlobStorePort for RecordSpanCommand spool reconstitution.
    * When provided, the trace-processing pipeline wires it into RecordSpanCommand
    * so oversized commands (> 256 KB) are fetched from S3 and the spool is
    * best-effort DELETEd after event_log INSERT succeeds.
    */
-  blobStore?: BlobStore;
+  blobStore?: BlobStorePort;
   governanceKpisSync?: GovernanceKpisSyncReactorDeps;
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
   retentionPolicyResolver?: RetentionPolicyResolver;
@@ -994,7 +994,7 @@ export class PipelineRegistry {
         spanStorageBroadcastReactor,
         claudeCodeSpanSyncReactor,
         gatewayBudgetSyncReactor,
-        // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
+        // ADR-022: Wire BlobStorePort so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
         blobStore: this.deps.blobStore,
         // Span-command sharding fan-out (env TRACE_SPAN_PROCESSING_SHARDS,

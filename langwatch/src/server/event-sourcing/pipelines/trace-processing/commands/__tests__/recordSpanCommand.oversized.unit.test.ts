@@ -2,7 +2,7 @@
  * Unit tests for the oversized command path in RecordSpanCommand.
  *
  * ADR-022: When a command carries `spoolRef`, the worker must:
- *   1. Fetch the full span from S3 via BlobStore (one call).
+ *   1. Fetch the full span from S3 via BlobStorePort (one call).
  *   2. Reconstitute the full span and process it normally.
  *   3. After event_log INSERT succeeds, best-effort delete the spool.
  *
@@ -24,7 +24,7 @@ import {
   RecordSpanCommand,
   type RecordSpanCommandDependencies,
 } from "../recordSpanCommand";
-import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import type { BlobStorePort } from "~/server/domain/traces/blob-store.port";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -154,12 +154,12 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
   });
 
   describe("when the command worker handles the oversized command", () => {
-    it("calls BlobStore.get exactly once with the spool key and the reconstituted span flows through", async () => {
-      // Stub BlobStore with a getSpool that returns the full serialized span
+    it("calls BlobStorePort.get exactly once with the spool key and the reconstituted span flows through", async () => {
+      // Stub BlobStorePort with a getSpool that returns the full serialized span
       const blobStore = {
         getSpool: vi.fn().mockResolvedValue(Buffer.from(spoolBody, "utf-8")),
         deleteSpool: vi.fn().mockResolvedValue(undefined),
-      } as unknown as BlobStore;
+      } as unknown as BlobStorePort;
 
       const deps = makeDeps();
       const handler = new RecordSpanCommand({ ...deps, blobStore });
@@ -177,11 +177,11 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       expect(spanData?.attributes?.length).toBeGreaterThan(0);
     });
 
-    it("does NOT call BlobStore.getSpool when the command has no spoolRef (regular path)", async () => {
+    it("does NOT call BlobStorePort.getSpool when the command has no spoolRef (regular path)", async () => {
       const blobStore = {
         getSpool: vi.fn(),
         deleteSpool: vi.fn(),
-      } as unknown as BlobStore;
+      } as unknown as BlobStorePort;
 
       const deps = makeDeps();
       const handler = new RecordSpanCommand({ ...deps, blobStore });
@@ -192,12 +192,12 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       expect((blobStore as unknown as { getSpool: ReturnType<typeof vi.fn> }).getSpool).not.toHaveBeenCalled();
     });
 
-    it("does NOT call BlobStore.deleteSpool inside handle() — deletion is deferred to cleanupAfterStore()", async () => {
+    it("does NOT call BlobStorePort.deleteSpool inside handle() — deletion is deferred to cleanupAfterStore()", async () => {
       const deleteSpoolMock = vi.fn().mockResolvedValue(undefined);
       const blobStore = {
         getSpool: vi.fn().mockResolvedValue(Buffer.from(spoolBody, "utf-8")),
         deleteSpool: deleteSpoolMock,
-      } as unknown as BlobStore;
+      } as unknown as BlobStorePort;
 
       const deps = makeDeps();
       const handler = new RecordSpanCommand({ ...deps, blobStore });
@@ -209,12 +209,12 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       expect(deleteSpoolMock).not.toHaveBeenCalled();
     });
 
-    it("calls BlobStore.deleteSpool via cleanupAfterStore() after successful event_log INSERT", async () => {
+    it("calls BlobStorePort.deleteSpool via cleanupAfterStore() after successful event_log INSERT", async () => {
       const deleteSpoolMock = vi.fn().mockResolvedValue(undefined);
       const blobStore = {
         getSpool: vi.fn().mockResolvedValue(Buffer.from(spoolBody, "utf-8")),
         deleteSpool: deleteSpoolMock,
-      } as unknown as BlobStore;
+      } as unknown as BlobStorePort;
 
       const deps = makeDeps();
       const handler = new RecordSpanCommand({ ...deps, blobStore });
@@ -229,12 +229,12 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       expect(deleteSpoolMock).toHaveBeenCalledWith(SPOOL_REF);
     });
 
-    it("does NOT call BlobStore.deleteSpool when storeEvents throws (handle() succeeded but INSERT failed)", async () => {
+    it("does NOT call BlobStorePort.deleteSpool when storeEvents throws (handle() succeeded but INSERT failed)", async () => {
       const deleteSpoolMock = vi.fn();
       const blobStore = {
         getSpool: vi.fn().mockResolvedValue(Buffer.from(spoolBody, "utf-8")),
         deleteSpool: deleteSpoolMock,
-      } as unknown as BlobStore;
+      } as unknown as BlobStorePort;
 
       const deps = makeDeps();
       const handler = new RecordSpanCommand({ ...deps, blobStore });
@@ -249,13 +249,13 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       expect(deleteSpoolMock).not.toHaveBeenCalled();
     });
 
-    it("does NOT call BlobStore.deleteSpool when the command handling fails (event_log INSERT would not have succeeded)", async () => {
+    it("does NOT call BlobStorePort.deleteSpool when the command handling fails (event_log INSERT would not have succeeded)", async () => {
       const deleteSpoolMock = vi.fn();
       const blobStore = {
         // getSpool succeeds but deps will throw
         getSpool: vi.fn().mockResolvedValue(Buffer.from(spoolBody, "utf-8")),
         deleteSpool: deleteSpoolMock,
-      } as unknown as BlobStore;
+      } as unknown as BlobStorePort;
 
       const deps = makeDeps();
       // Make PII redaction throw to simulate a processing failure before event construction
@@ -272,11 +272,11 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       expect(deleteSpoolMock).not.toHaveBeenCalled();
     });
 
-    it("propagates the error when BlobStore.getSpool throws", async () => {
+    it("propagates the error when BlobStorePort.getSpool throws", async () => {
       const blobStore = {
         getSpool: vi.fn().mockRejectedValue(new Error("S3 GET failed: NoSuchKey")),
         deleteSpool: vi.fn(),
-      } as unknown as BlobStore;
+      } as unknown as BlobStorePort;
 
       const deps = makeDeps();
       const handler = new RecordSpanCommand({ ...deps, blobStore });
@@ -289,7 +289,7 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       const blobStore = {
         getSpool: vi.fn().mockResolvedValue(Buffer.from(spoolBody, "utf-8")),
         deleteSpool: vi.fn().mockResolvedValue(undefined),
-      } as unknown as BlobStore;
+      } as unknown as BlobStorePort;
 
       const deps = makeDeps();
       const handler = new RecordSpanCommand({ ...deps, blobStore });
@@ -402,7 +402,7 @@ describe("given a shared RecordSpanCommand instance processing two concurrent tr
             return Buffer.from(makeSpoolBody(TRACE_ID_B, SPAN_ID_B), "utf-8");
           }),
         deleteSpool: deleteSpoolMock,
-      } as unknown as BlobStore;
+      } as unknown as BlobStorePort;
 
       const deps = makeDeps();
       // ONE shared handler instance — mirrors withCommandInstance in pipeline.ts

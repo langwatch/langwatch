@@ -11,7 +11,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Command } from "../../..";
-import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
+import type { EvaluationCostPort } from "~/server/domain/evaluations/evaluation-cost.port";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
 import { createTenantId } from "../../../domain/tenantId";
@@ -99,7 +99,7 @@ function buildCommandWithMocks({
 
   const costRecorder = {
     recordCost: vi.fn(),
-  } as unknown as EvaluationCostRecorder;
+  } as unknown as EvaluationCostPort;
 
   const azureSafetyEnvResolver = vi.fn().mockResolvedValue({
     AZURE_CONTENT_SAFETY_ENDPOINT: "https://byok.cognitiveservices.azure.com/",

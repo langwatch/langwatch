@@ -17,7 +17,7 @@ import {
   EvaluatorExecutionError,
   EvaluatorInputTooLargeError,
 } from "../../../../../app-layer/evaluations/errors";
-import type { EvaluationCostRecorder } from "../../../../../app-layer/evaluations/evaluation-cost.recorder";
+import type { EvaluationCostPort } from "~/server/domain/evaluations/evaluation-cost.port";
 import type { EvaluationExecutionService } from "../../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../../app-layer/monitors/monitor.service";
 import { ExecuteEvaluationCommand } from "../executeEvaluation.command";
@@ -93,7 +93,7 @@ function buildCommandWithMocks({ thrown }: { thrown: Error }) {
     spanStorage: { getSpansByTraceId: vi.fn().mockResolvedValue([]) },
     traceEvents: { getEventsByTraceId: vi.fn().mockResolvedValue([]) },
     evaluationExecution,
-    costRecorder: { recordCost: vi.fn() } as unknown as EvaluationCostRecorder,
+    costRecorder: { recordCost: vi.fn() } as unknown as EvaluationCostPort,
     azureSafetyEnvResolver: vi.fn().mockResolvedValue(null),
   });
 

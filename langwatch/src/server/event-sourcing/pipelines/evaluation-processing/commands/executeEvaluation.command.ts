@@ -6,7 +6,7 @@ import {
 } from "../../../../app-layer/evaluations/azure-safety-env";
 import { getAzureSafetyEnvFromProject } from "../../../../app-layer/evaluations/azure-safety-env.server";
 import { HandledError } from "@langwatch/handled-error";
-import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
+import type { EvaluationCostPort } from "~/server/domain/evaluations/evaluation-cost.port";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
 import {
@@ -74,7 +74,7 @@ export interface ExecuteEvaluationCommandDeps {
   spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string; occurredAtMs?: number }): Promise<Span[]> };
   traceEvents: { getEventsByTraceId(params: { tenantId: string; traceId: string }): Promise<ElasticSearchEvent[]> };
   evaluationExecution: EvaluationExecutionService;
-  costRecorder: EvaluationCostRecorder;
+  costRecorder: EvaluationCostPort;
   /**
    * Resolves Azure Content Safety credentials from the per-project
    * `azure_safety` model provider. Returns null when no credentials are

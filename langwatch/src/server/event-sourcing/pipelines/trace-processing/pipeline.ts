@@ -1,4 +1,4 @@
-import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import type { BlobStorePort } from "~/server/domain/traces/blob-store.port";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { definePipeline } from "../../";
@@ -117,11 +117,11 @@ export interface TraceProcessingPipelineDeps {
     TraceSummaryData
   >;
   /**
-   * ADR-022: BlobStore injected so RecordSpanCommand can reconstitute oversized
+   * ADR-022: BlobStorePort injected so RecordSpanCommand can reconstitute oversized
    * commands (fetch from S3 spool) and best-effort delete the spool after
    * event_log INSERT succeeds. Optional — without it, the spool path is disabled.
    */
-  blobStore?: BlobStore;
+  blobStore?: BlobStorePort;
   /**
    * Number of GroupQueue shards for `recordSpan` commands. `1` (default) keeps
    * the historic per-trace group key; `> 1` spreads a trace's spans across
