@@ -159,7 +159,7 @@
     "fast-deep-equal": "^3.1.3",
     "fastq": "^1.20.1",
     "geoip-country": "^5.0.202607010001",
-    "hono": "^4.12.27",
+    "hono": "^4.12.31",
     "hono-openapi": "^0.4.8",
     "immer": "^11.1.8",
     "import-in-the-middle": "3.2.0",
