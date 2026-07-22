@@ -181,9 +181,23 @@ describe("explainHandledError", () => {
       };
 
       /**
-       * Values a registry entry is allowed to echo, each with its reason.
+       * Codes allowed to echo one specific meta field, with the reason.
        *
-       * An exemption is a decision, so it is written down here rather than
+       * Narrower than {@link ALLOWED_ECHOES}: an exemption that applies to
+       * every code is a hole, and `meta.message` is the field a relayed Go
+       * service can write, so exactly one code may render it.
+       */
+      const ALLOWED_PER_CODE: Record<string, Set<string>> = {
+        // The provider's own reason for rejecting delivery is the entire
+        // value of this error — "invite the bot with /invite @LangWatch".
+        // Authored server-side by `explainSlackPostError`, never relayed.
+        notification_delivery_error: new Set(["message"]),
+      };
+
+      /**
+       * Values ANY registry entry may echo, each with its reason.
+       *
+       * An exemption is a decision, so it is written down rather than
        * expressed as an absence from the poison list — the previous version of
        * this test asserted against four hand-picked strings, which meant the
        * three entries that DO render meta verbatim (`syntaxError`,
@@ -212,6 +226,7 @@ describe("explainHandledError", () => {
         for (const [key, value] of Object.entries(poison)) {
           if (typeof value !== "string") continue;
           if (key in ALLOWED_ECHOES) continue;
+          if (ALLOWED_PER_CODE[code]?.has(key)) continue;
 
           expect(
             rendered,

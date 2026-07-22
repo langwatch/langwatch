@@ -122,7 +122,10 @@ describe("applyHandledErrorToForm", () => {
       expect(form.setError).toHaveBeenCalledWith(
         "name",
         { type: "server", message: "Required" },
-        { shouldFocus: true },
+        // No focus grab: a toast is coming for the part this form can't show,
+        // and pulling focus into a field while it explains something else
+        // reads as two things competing.
+        { shouldFocus: false },
       );
       // Partial: the form-level complaint has nowhere to go, so the toast
       // must still fire.
