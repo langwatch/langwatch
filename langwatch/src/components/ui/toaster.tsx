@@ -44,7 +44,10 @@ const statusHairline = (color: string) =>
 
 const STATUS = {
   error: { hairline: statusHairline("red-solid"), fg: "red.fg" },
-  warning: { hairline: statusHairline("yellow-solid"), fg: "#c98a2f" },
+  // Semantic tokens throughout: a literal hex is the one value that can't
+  // resolve differently per theme, and this icon sits on a near-black surface
+  // in dark mode where a fixed mid-amber loses most of its contrast.
+  warning: { hairline: statusHairline("yellow-solid"), fg: "yellow.fg" },
   success: { hairline: statusHairline("green-solid"), fg: "green.fg" },
   info: { hairline: "border.muted", fg: "fg.muted" },
   loading: { hairline: "border.muted", fg: "fg.muted" },
@@ -98,6 +101,13 @@ export const Toaster = () => {
           return (
             <Toast.Root
               width={{ md: "sm" }}
+              // zag hard-codes `role="status"` on every toast, which is a
+              // polite live region: a screen reader finishes whatever it is
+              // saying first, and an error can auto-dismiss before it is ever
+              // announced. A failure is assertive by definition — and the copy
+              // IS the payload here, so losing it loses the whole toast. The
+              // prop spreads onto the element and wins over zag's default.
+              role={status === "error" ? "alert" : undefined}
               // Material, radius, padding and type come from the `toast`
               // slot recipe in `pages/_app.tsx` — Chakra's defaults are
               // attribute selectors that a style prop can't outrank. Only the
@@ -107,24 +117,9 @@ export const Toaster = () => {
               <StatusIcon status={status} />
 
               <Stack gap="0.5" flex="1" maxWidth="100%">
-                {toast.title && (
-                  <Toast.Title
-                    fontSize="13.5px"
-                    fontWeight="640"
-                    lineHeight="1.35"
-                    letterSpacing="-0.005em"
-                  >
-                    {toast.title}
-                  </Toast.Title>
-                )}
+                {toast.title && <Toast.Title>{toast.title}</Toast.Title>}
                 {toast.description && (
-                  <Toast.Description
-                    fontSize="13px"
-                    lineHeight="1.5"
-                    color="fg.muted"
-                  >
-                    {toast.description}
-                  </Toast.Description>
+                  <Toast.Description>{toast.description}</Toast.Description>
                 )}
                 {/* Set by `showErrorToast` — the docs link and copyable error id
                     that every handled error offers. Plain `toaster.create` calls

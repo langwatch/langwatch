@@ -1,6 +1,7 @@
 import {
   goErrorCodes,
   type HandledErrorFault,
+  nodeErrorCodes,
   type SerializedHandledError,
   type SerializedReason,
 } from "@langwatch/handled-error";
@@ -74,7 +75,7 @@ export function readHandledError(err: unknown): HandledErrorShape | null {
     tips: Array.isArray(value.tips)
       ? value.tips.filter((tip): tip is string => typeof tip === "string")
       : [],
-    docsUrl: typeof value.docsUrl === "string" ? value.docsUrl : undefined,
+    docsUrl: safeDocsUrl(value.docsUrl),
     traceId: typeof value.traceId === "string" ? value.traceId : undefined,
     reasons: Array.isArray(value.reasons)
       ? (value.reasons.filter(isRecord) as unknown as SerializedReason[])
@@ -102,6 +103,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * A docs link, or nothing.
+ *
+ * `docsUrl` ends up in an `href` (see `components/ErrorActions.tsx`), and
+ * neither React nor Chakra sanitises one — so `javascript:…` here would run in
+ * the app's own origin the moment a customer clicked "Read the docs". A
+ * `typeof === "string"` check is not enough for a field that becomes a link.
+ *
+ * The value is server-authored today (`app-layer/error-remediation.ts` builds
+ * it from a static registry), but it does not stay that way: a handled error
+ * relayed from a Go service arrives via `nlpgo/goHandledError.ts`, which parses
+ * `docs_url` out of an upstream response body with a plain `z.string()`. That
+ * body comes from whatever model-provider endpoint the customer configured.
+ * This module's own docblock says it trusts nothing; this is the field that
+ * didn't.
+ */
+function safeDocsUrl(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length === 0) return undefined;
+
+  try {
+    // Absolute-only, deliberately: a relative link would resolve against
+    // whatever page the error happened on and go somewhere arbitrary.
+    return new URL(value).protocol === "https:" ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Narrows a `SerializedHandledError` — the shape carried on an event payload
  * (e.g. a `target_result.domainError`) rather than under `data.error` — to the
  * client-side `HandledErrorShape` the presentation layer reads.
@@ -119,7 +148,10 @@ export function handledShapeFromSerialized(
     httpStatus: serialized.httpStatus,
     fault: serialized.fault,
     tips: serialized.tips ?? [],
-    docsUrl: serialized.docsUrl,
+    // Validated here as well as in `readHandledError`: this is the path a Go
+    // service's error takes, and `nlpgo/goHandledError.ts` parses `docs_url`
+    // off an upstream body with a bare `z.string()`.
+    docsUrl: safeDocsUrl(serialized.docsUrl),
     traceId: serialized.traceId,
     reasons: serialized.reasons,
   };
@@ -136,6 +168,11 @@ export function handledShapeFromSerialized(
 const KNOWN_CODES = new Set<string>([
   ...APP_ERROR_CODES,
   ...Object.keys(goErrorCodes),
+  // Node failures reach the browser on workflow execution state, and the
+  // registry is exhaustive over them too. Leaving them out worked only by
+  // accident — they happen to be slug-shaped, so the heuristic below caught
+  // them — which is not a reason to rely on the heuristic.
+  ...Object.keys(nodeErrorCodes),
 ]);
 
 /** Belt and braces for a code newer than this client: still slug-shaped. */
@@ -154,7 +191,8 @@ const SLUG_SHAPED = /^[a-z0-9]+(_[a-z0-9]+)*$/;
  * tells a user to wait for something that will never change.
  *
  * Returns `undefined` for anything 5xx, anything handled (the registry owns
- * that copy), and anything that looks like a code slug.
+ * that copy), anything that looks like a code slug, and anything that looks
+ * like it came from a driver rather than a person — see {@link MACHINE_PROSE}.
  */
 export function readAuthoredMessage(err: unknown): string | undefined {
   if (readHandledError(err)) return undefined;
@@ -166,5 +204,50 @@ export function readAuthoredMessage(err: unknown): string | undefined {
   if (typeof message !== "string" || message.length === 0) return undefined;
 
   if (KNOWN_CODES.has(message) || SLUG_SHAPED.test(message)) return undefined;
+  if (message.length > MAX_AUTHORED_LENGTH) return undefined;
+  if (MACHINE_PROSE.test(message)) return undefined;
+
   return message;
 }
+
+/**
+ * Longer than this and nobody wrote it for a customer.
+ *
+ * Authored copy is a sentence or two ("That project name is already taken").
+ * A stack frame, a serialised query, or a driver's diagnostic block runs to
+ * hundreds of characters, and length alone separates them reliably.
+ */
+const MAX_AUTHORED_LENGTH = 200;
+
+/**
+ * Shapes that mean a machine wrote this string, not a person.
+ *
+ * The 4xx channel exists because several hundred procedures throw a plain
+ * `TRPCError` whose message is real copy, and #5984 deliberately left those
+ * alone. But plenty of routers also do
+ * `new TRPCError({ code: "BAD_REQUEST", message: error.message })` around a
+ * caught failure — `routers/apiKey.ts`, `dataPrivacy.ts`, `routingPolicies.ts`,
+ * `personalVirtualKeys.ts`, `datasetRecord.ts` all do — which drags a Prisma
+ * or socket diagnostic through the same hole at 4xx that #5984 closed at 5xx.
+ *
+ * Provenance would be the right discriminator, but the throw sites don't
+ * record it, and inventing a flag they'd have to remember to set trades a
+ * silent leak for a silently-forgotten annotation. Recognising the machine's
+ * own vocabulary is narrower than it looks: none of these read as English a
+ * product person would have written.
+ */
+const MACHINE_PROSE = new RegExp(
+  [
+    "\\bprisma\\.", // Invalid `prisma.user.create()` invocation
+    "\\bPrismaClient", //
+    "\\b(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE)\\b.*\\b(?:FROM|WHERE|VALUES|SET)\\b",
+    "\\b(?:ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EPIPE|EAI_AGAIN)\\b",
+    "\\bat\\s+\\w+[\\w.]*\\s+\\(", // a stack frame
+    "\\b\\w+Error:\\s", // "TypeError: ...", "SyntaxError: ..."
+    "://[^\\s]*", // a URL, which means a hostname
+    "\\b\\d{1,3}(?:\\.\\d{1,3}){3}\\b", // an IP address
+    "\\bnode_modules\\b",
+    "\\b(?:invocation|constraint failed|deadlock detected)\\b",
+  ].join("|"),
+  "i",
+);

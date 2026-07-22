@@ -34,15 +34,21 @@ const SRC_ROOT = join(
 const PACKAGE_OWNED_CODES = new Set(["validation_error"]);
 
 /**
- * The three shapes a code is declared in:
+ * The four shapes a code is declared in:
  *   `super("some_code", …)`                    — the common case
  *   `declare readonly code: "some_code"`        — subclass narrowing
  *   `const { code = "some_code" } = options`    — a base class's default
+ *   `new HandledError("some_code", …)`          — a one-off with no subclass
+ *
+ * The last is worth scanning even though subclasses are the norm: a single
+ * permission denial doesn't earn a class, and a shape the scanner can't see is
+ * a code that reaches a customer with no copy written for it.
  */
 const CODE_PATTERNS = [
   /super\(\s*"([a-z][a-z0-9_]*)"/g,
   /declare\s+(?:readonly\s+)?code:\s*"([a-z][a-z0-9_]*)"/g,
   /\bcode\s*=\s*"([a-z][a-z0-9_]*)"/g,
+  /new\s+HandledError\(\s*"([a-z][a-z0-9_]*)"/g,
 ];
 
 function isTestFile(path: string): boolean {
@@ -109,5 +115,13 @@ describe("APP_ERROR_CODES", () => {
 
   it("holds no duplicates", () => {
     expect(APP_ERROR_CODES.length).toBe(new Set(APP_ERROR_CODES).size);
+  });
+
+  it("stays sorted, so a hand edit lands where the reader looks for it", () => {
+    // Not a value echo — this asserts an invariant of the list's arrangement,
+    // not its contents. The list is hand-maintained and every new code is an
+    // insertion into it; once the order breaks, the next person inserts by
+    // eye near the wrong neighbour and duplicates become easy to miss.
+    expect([...APP_ERROR_CODES]).toEqual([...APP_ERROR_CODES].sort());
   });
 });

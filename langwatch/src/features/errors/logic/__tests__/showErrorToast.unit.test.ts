@@ -141,11 +141,87 @@ describe("showErrorToast", () => {
     });
   });
 
-  it("never renders the code slug as the title", () => {
+  it("renders the registry's copy as the title, not the code slug", () => {
     showErrorToast({
       error: handledError({ code: "validation_error", httpStatus: 422 }),
     });
 
-    expect(create.mock.calls[0]![0].title).not.toBe("validation_error");
+    // Asserting the positive: `not.toBe("validation_error")` also passes for
+    // `""`, `"validation_error "` and `"Error: validation_error"`, so it was
+    // an assertion that could barely fail.
+    expect(create.mock.calls[0]![0].title).toBe("Check your input");
+  });
+
+  describe("given a plain 4xx the procedure wrote copy for", () => {
+    /**
+     * #5984 collapsed the wire message to the code for handled errors, but
+     * deliberately left a non-5xx `TRPCError`'s message alone — several hundred
+     * throw sites write real copy there ("That name is taken"), and replacing
+     * it with "we've been notified" tells the user to wait for something that
+     * will never change. This is the branch that keeps that promise.
+     */
+    it("shows the authored sentence", () => {
+      showErrorToast({
+        error: {
+          message: "You've already used this invite.",
+          data: { httpStatus: 400 },
+        },
+        fallbackTitle: "Couldn't accept the invite",
+      });
+
+      const toast = create.mock.calls[0]![0];
+      expect(toast.title).toBe("Couldn't accept the invite");
+      expect(toast.description).toBe("You've already used this invite.");
+    });
+
+    it("refuses a message a driver wrote rather than a person", () => {
+      showErrorToast({
+        error: {
+          message:
+            "Invalid `prisma.project.create()` invocation: connect ECONNREFUSED 10.0.0.4:5432",
+          data: { httpStatus: 400 },
+        },
+        fallbackTitle: "Couldn't create the project",
+      });
+
+      const toast = create.mock.calls[0]![0];
+      expect(toast.description).not.toMatch(/prisma|ECONNREFUSED|10\.0\.0\.4/i);
+    });
+
+    it("refuses one at 5xx, where the message is never customer copy", () => {
+      showErrorToast({
+        error: {
+          message: "Unexpected token in JSON",
+          data: { httpStatus: 500 },
+        },
+        fallbackTitle: "Couldn't save",
+      });
+
+      expect(create.mock.calls[0]![0].description).not.toContain(
+        "Unexpected token",
+      );
+    });
+  });
+
+  describe("on every error toast", () => {
+    /**
+     * Both are deliberate and neither was asserted: the shared 5s default is
+     * not long enough to read the copy and click through to the docs or the
+     * error id, and dropping `closable` leaves an error toast with no close
+     * button, because the Toaster only renders `Toast.CloseTrigger` when
+     * `meta.closable` is set.
+     */
+    it("stays long enough to read and dismissable by hand", () => {
+      showErrorToast({
+        error: handledError(null),
+        fallbackTitle: "Couldn't save",
+      });
+
+      const toast = create.mock.calls[0]![0] as ToastArgs & {
+        duration?: number;
+      };
+      expect(toast.duration).toBe(12000);
+      expect(toast.meta.closable).toBe(true);
+    });
   });
 });
