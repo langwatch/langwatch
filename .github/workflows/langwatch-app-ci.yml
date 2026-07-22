@@ -344,7 +344,7 @@ jobs:
           # The action resolves the Biome version (from the lockfile) and runs
           # Biome inside workdir, so biome_flags paths are relative to it.
           workdir: langwatch
-          biome_flags: "./src"
+          biome_flags: "./src ./ee"
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'

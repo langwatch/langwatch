@@ -27,7 +27,7 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
 const ROOTS = ["src", "ee"].map((dir) => join(PACKAGE_ROOT, dir));
 
 /**
- * An error's `.message` fed into either toast field.
+ * A toast copy slot and everything up to the end of its value.
  *
  * `title:` matters as much as `description:` — the wire message for a handled
  * error IS the code, so `title: error.message` puts `validation_error` in the
@@ -35,12 +35,37 @@ const ROOTS = ["src", "ee"].map((dir) => join(PACKAGE_ROOT, dir));
  * this guard only checked `description:` and eleven title-slug toasts sailed
  * through it.
  *
- * Covers `error.message`, `err?.message`, `e.message || "…"` and
- * `String(error)`. Scanned against the whole file rather than line-by-line so
- * a wrapped `description:\n  error.message` can't hide.
+ * The value deliberately spans newlines. The formatter wraps almost every real
+ * call site onto a second line (`description:\n  err instanceof Error ? …`),
+ * and an earlier version of this guard tested each physical line in isolation,
+ * so every wrapped site was invisible to it — which is how the sites listed in
+ * `ALLOWED`'s history got through a migration that was supposed to catch them.
+ *
+ * Bounded by `,` and `;` rather than by `}`: the value can legitimately
+ * contain braces (`(err as { message: unknown }).message`), while a semicolon
+ * always means the statement ended and we have run off into unrelated code.
  */
-const RAW_MESSAGE_TOAST =
-  /(?:title|description|fallbackTitle)\s*:\s*[^,\n}]*(?:\b(?:error|err|e)\s*\??\.\s*message\b|String\(\s*(?:error|err|e)\s*\))/;
+const TOAST_COPY_VALUE =
+  /(?:title|description|fallbackTitle)\s*:\s*([^,;]{0,300}?)(?=[,;]|$)/g;
+
+/** `.message` read off anything, however it is spelled. */
+const READS_MESSAGE = /\?\s*\.\s*message\b|\.\s*message\b/;
+
+/**
+ * An error-shaped identifier anywhere in the value.
+ *
+ * Paired with {@link READS_MESSAGE} rather than glued to it, because the two
+ * are routinely separated by a cast or a guard — `(error as Error).message`,
+ * `(err as { message: unknown }).message`, `err instanceof Error ? err.message
+ * : "…"`. Requiring them to be adjacent is what let those three shapes through;
+ * requiring only that both appear keeps `description: notification.message`
+ * (a real message, not an error's) out of the net.
+ */
+const ERROR_IDENTIFIER = /\b(?:error|err|e|exception|cause|reason)\b/;
+
+/** `String(error)` — the other way to spell the same leak. */
+const STRINGIFIES_ERROR =
+  /String\(\s*(?:error|err|e|exception|cause)\s*\)|`[^`]*\$\{\s*(?:error|err|e)\b/;
 
 /**
  * Files allowed to reference an error message directly.
@@ -49,9 +74,43 @@ const RAW_MESSAGE_TOAST =
  * migration you didn't finish.
  */
 const ALLOWED = new Set<string>([
-  // The helper whose entire job is to read errors correctly.
-  "src/features/errors/logic/showErrorToast.ts",
+  // Deliberately empty. `showErrorToast.ts` used to sit here, but its only
+  // `description: error.message` is inside a docblock, which `stripComments`
+  // now blanks — an allowlist entry that isn't holding anything back reads as
+  // permission to add more.
 ]);
+
+/**
+ * Blanks out comments so prose about the pattern isn't mistaken for a call
+ * site, without moving anything: every stripped character becomes a space and
+ * every newline survives, so match offsets still map to real line numbers.
+ *
+ * Line comments are only stripped when the line is *entirely* a comment. A
+ * trailing `//` is left alone deliberately — stripping it would also eat the
+ * `//` in a `https://` inside a string literal, and blinding the guard is a
+ * worse failure than reading one comment too many.
+ */
+function stripComments(source: string): string {
+  const withoutBlocks = source.replace(/\/\*[\s\S]*?\*\//g, (block) =>
+    block.replace(/[^\n]/g, " "),
+  );
+
+  return withoutBlocks
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trimStart();
+      return trimmed.startsWith("//") || trimmed.startsWith("*")
+        ? " ".repeat(line.length)
+        : line;
+    })
+    .join("\n");
+}
+
+function lineOf(source: string, index: number): number {
+  let line = 1;
+  for (let at = 0; at < index; at++) if (source[at] === "\n") line++;
+  return line;
+}
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -74,19 +133,23 @@ describe("error toasts", () => {
       const rel = relative(PACKAGE_ROOT, file);
       if (ALLOWED.has(rel)) continue;
 
-      const source = readFileSync(file, "utf8");
-      if (!source.includes("toaster")) continue;
+      const raw = readFileSync(file, "utf8");
+      // `showErrorToast` does not contain the substring "toaster", so testing
+      // for "toaster" alone skipped every file that had already migrated —
+      // exactly the files where `fallbackTitle: error.message` can appear.
+      if (!/toaster|showErrorToast|HandledErrorAlert/.test(raw)) continue;
 
-      source.split("\n").forEach((line, index) => {
-        // Comments describing the pattern (this file's own docblock, the
-        // best-practices examples) are not call sites.
-        const trimmed = line.trim();
-        if (trimmed.startsWith("*") || trimmed.startsWith("//")) return;
+      const source = stripComments(raw);
 
-        if (RAW_MESSAGE_TOAST.test(line)) {
-          offenders.push(`${rel}:${index + 1}`);
-        }
-      });
+      for (const match of source.matchAll(TOAST_COPY_VALUE)) {
+        const value = match[1] ?? "";
+        const leaks =
+          (READS_MESSAGE.test(value) && ERROR_IDENTIFIER.test(value)) ||
+          STRINGIFIES_ERROR.test(value);
+        if (!leaks) continue;
+
+        offenders.push(`${rel}:${lineOf(source, match.index)}`);
+      }
     }
 
     expect(
