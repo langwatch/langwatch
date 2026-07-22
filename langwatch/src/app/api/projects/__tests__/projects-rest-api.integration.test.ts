@@ -27,8 +27,7 @@ describe("Feature: Projects REST API", () => {
   });
 
   const api = {
-    get: (path: string) =>
-      app.request(path, { headers: authHeaders() }),
+    get: (path: string) => app.request(path, { headers: authHeaders() }),
     post: (path: string, body: unknown) =>
       app.request(path, {
         method: "POST",
@@ -115,27 +114,41 @@ describe("Feature: Projects REST API", () => {
   });
 
   afterAll(async () => {
-    await prisma.project.deleteMany({
-      where: { team: { organizationId: testOrganization.id } },
-    }).catch(() => {});
-    await prisma.roleBinding.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.apiKey.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.teamUser.deleteMany({
-      where: { userId },
-    }).catch(() => {});
-    await prisma.organizationUser.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.team.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.organization.delete({
-      where: { id: testOrganization.id },
-    }).catch(() => {});
+    await prisma.project
+      .deleteMany({
+        where: { team: { organizationId: testOrganization.id } },
+      })
+      .catch(() => {});
+    await prisma.roleBinding
+      .deleteMany({
+        where: { organizationId: testOrganization.id },
+      })
+      .catch(() => {});
+    await prisma.apiKey
+      .deleteMany({
+        where: { organizationId: testOrganization.id },
+      })
+      .catch(() => {});
+    await prisma.teamUser
+      .deleteMany({
+        where: { userId },
+      })
+      .catch(() => {});
+    await prisma.organizationUser
+      .deleteMany({
+        where: { organizationId: testOrganization.id },
+      })
+      .catch(() => {});
+    await prisma.team
+      .deleteMany({
+        where: { organizationId: testOrganization.id },
+      })
+      .catch(() => {});
+    await prisma.organization
+      .delete({
+        where: { id: testOrganization.id },
+      })
+      .catch(() => {});
   });
 
   describe("Authentication", () => {
@@ -224,8 +237,7 @@ describe("Feature: Projects REST API", () => {
       });
       expect(res.status).toBe(400);
     });
-
-});
+  });
 
   describe("GET /api/projects", () => {
     it("lists non-archived projects for the organization", async () => {
@@ -406,8 +418,12 @@ describe("Feature: Projects REST API", () => {
         });
         expect(res.status).toBe(400);
 
-        await prisma.team.delete({ where: { id: otherTeam.id } }).catch(() => {});
-        await prisma.organization.delete({ where: { id: otherOrg.id } }).catch(() => {});
+        await prisma.team
+          .delete({ where: { id: otherTeam.id } })
+          .catch(() => {});
+        await prisma.organization
+          .delete({ where: { id: otherOrg.id } })
+          .catch(() => {});
       });
 
       /** @scenario PATCH with teamId and name is atomic */
@@ -465,6 +481,125 @@ describe("Feature: Projects REST API", () => {
     it("returns 404 for non-existent project", async () => {
       const res = await api.delete("/api/projects/project_nope");
       expect(res.status).toBe(404);
+    });
+  });
+
+  /**
+   * @see specs/api-keys/project-key-read-access.feature
+   *
+   * The base key is a project-level write credential, so reading it needs
+   * `project:update` on the project being asked for.
+   */
+  describe("GET /api/projects/:id/api-key", () => {
+    const getAs = (path: string, token: string) =>
+      app.request(path, { headers: { Authorization: `Bearer ${token}` } });
+
+    const mintKey = async (permissions: string[], scopeId: string) =>
+      (
+        await ApiKeyService.create(prisma).create({
+          name: `scoped-${nanoid(6)}`,
+          userId,
+          createdByUserId: userId,
+          organizationId: testOrganization.id,
+          permissionMode: "restricted",
+          permissions,
+          bindings: [
+            {
+              role: TeamUserRole.CUSTOM,
+              scopeType:
+                scopeId === testOrganization.id
+                  ? RoleBindingScopeType.ORGANIZATION
+                  : RoleBindingScopeType.PROJECT,
+              scopeId,
+            },
+          ],
+        })
+      ).token;
+
+    const createProject = async () => {
+      const res = await api.post("/api/projects", {
+        name: `Key Test ${nanoid(6)}`,
+        teamId: testTeam.id,
+        language: "python",
+        framework: "langchain",
+      });
+      return (await res.json()).id as string;
+    };
+
+    let projectId: string;
+    beforeAll(async () => {
+      projectId = await createProject();
+    });
+
+    it("returns the base key to a caller who can update the project", async () => {
+      const res = await api.get(`/api/projects/${projectId}/api-key`);
+      expect(res.status).toBe(200);
+      expect((await res.json()).apiKey).toBeTruthy();
+    });
+
+    it("refuses a caller who can only view the project", async () => {
+      const token = await mintKey(["project:view"], testOrganization.id);
+
+      const res = await getAs(`/api/projects/${projectId}/api-key`, token);
+
+      expect(res.status).toBe(403);
+      const stored = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { apiKey: true },
+      });
+      expect(await res.text()).not.toContain(stored!.apiKey);
+    });
+
+    it("refuses a project-scoped caller asking about a sibling project", async () => {
+      const sibling = await createProject();
+      const token = await mintKey(["project:update"], projectId);
+
+      const own = await getAs(`/api/projects/${projectId}/api-key`, token);
+      expect(own.status).toBe(200);
+
+      const other = await getAs(`/api/projects/${sibling}/api-key`, token);
+      expect(other.status).toBe(403);
+
+      const stored = await prisma.project.findUnique({
+        where: { id: sibling },
+        select: { apiKey: true },
+      });
+      expect(await other.text()).not.toContain(stored!.apiKey);
+    });
+
+    it("reports a project in another organization as not found", async () => {
+      const otherOrg = await prisma.organization.create({
+        data: { name: "Other Org", slug: `--test-other-${nanoid(8)}` },
+      });
+      const otherTeam = await prisma.team.create({
+        data: {
+          name: "Other Team",
+          slug: `--test-other-team-${nanoid(8)}`,
+          organizationId: otherOrg.id,
+        },
+      });
+      const foreign = await prisma.project.create({
+        data: {
+          name: "Foreign",
+          slug: `--test-foreign-${nanoid(8)}`,
+          apiKey: `test-foreign-${nanoid(16)}`,
+          teamId: otherTeam.id,
+          language: "python",
+          framework: "langchain",
+        },
+      });
+
+      const res = await api.get(`/api/projects/${foreign.id}/api-key`);
+      expect(res.status).toBe(404);
+      expect(await res.text()).not.toContain(foreign.apiKey);
+
+      await prisma.project
+        .delete({ where: { id: foreign.id } })
+        .catch(() => {});
+      await prisma.team.delete({ where: { id: otherTeam.id } }).catch(() => {});
+      await prisma.organization
+        .delete({ where: { id: otherOrg.id } })
+        .catch(() => {});
     });
   });
 });
