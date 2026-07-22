@@ -33,6 +33,10 @@ function renderLangyMarkdown(text: string) {
   );
 }
 
+// Same-origin stub for the guard's origin comparison — restored after each
+// test so the shared jsdom window never leaks a bare-object location.
+const realLocation = window.location;
+
 beforeEach(() => {
   Object.defineProperty(window, "location", {
     value: { origin: "https://app.langwatch.ai" },
@@ -42,6 +46,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  Object.defineProperty(window, "location", {
+    value: realLocation,
+    writable: true,
+    configurable: true,
+  });
   cleanup();
   pushMock.mockClear();
 });
@@ -89,6 +98,18 @@ describe("Feature: a resource in the agent's prose reads as a named link, never 
 
       fireEvent.click(screen.getByText("the docs"));
       // Never hijacked into the SPA router — the app must not navigate away.
+      expect(pushMock).not.toHaveBeenCalled();
+    });
+
+    it("never treats a backslash-disguised protocol-relative href as internal", () => {
+      // Browsers normalise `\\` to `/`, so `/\\evil.com` resolves as the
+      // protocol-relative `//evil.com` — an off-site jump wearing a leading
+      // slash. Markdown's urlTransform percent-encodes the backslash to
+      // `%5C` before the guard ever sees it, so the ENCODED disguise must be
+      // rejected exactly like the raw byte: never SPA-pushed.
+      renderLangyMarkdown("Click [here](/\\evil.com).");
+
+      fireEvent.click(screen.getByText("here"));
       expect(pushMock).not.toHaveBeenCalled();
     });
   });

@@ -48,6 +48,11 @@ function renderCard(output: unknown) {
   );
 }
 
+// The jsdom window is shared across files in a worker: stub location for the
+// origin comparison, and RESTORE it so later suites that navigate for real
+// (LangyExternalLinkGuard) aren't poisoned by a leaked bare-object stub.
+const realLocation = window.location;
+
 beforeEach(() => {
   // `CapabilityDeepLinkChip` compares a CLI result's `platformUrl` against
   // `window.location.origin` (BASE_HOST isn't exposed to the client bundle)
@@ -60,6 +65,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  Object.defineProperty(window, "location", {
+    value: realLocation,
+    writable: true,
+    configurable: true,
+  });
   cleanup();
   pushMock.mockClear();
 });

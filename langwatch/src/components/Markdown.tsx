@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { chakra } from "@chakra-ui/react";
+import { ArrowUpRight } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   Children,
@@ -128,9 +129,58 @@ function textOf(node: ReactNode): string {
  * `/my-project/messages/abc123`. Protocol-relative (`//host`) and absolute
  * (`https://…`) URLs are external and must get a real navigation, so a trace
  * link inside the app stays SPA while a GitHub PR link opens for real.
+ *
+ * A backslash disqualifies the href too: browsers recover from `/\evil.com`
+ * (or `\/evil.com`) by normalising `\` to `/`, so it resolves as the
+ * protocol-relative `//evil.com` — an off-site jump wearing a leading slash.
+ * The WHATWG URL spec doesn't sanction that, but real browsers do it, so the
+ * guard rejects any backslash rather than trust a `startsWith("//")` check
+ * that the browser is about to sidestep.
+ *
+ * Tab / newline / carriage-return are rejected for the same reason: the URL
+ * parser STRIPS them before resolving, so `/\t/evil.com` collapses to
+ * `//evil.com` and escapes the `startsWith("//")` check the same way. Reject
+ * any C0 control character rather than enumerate the three the spec strips.
+ *
+ * This is THE internal-href guard — `useSpaLinkClick` (features/langy) and
+ * the panel's navigate handler use this same function; do not fork it.
  */
+// eslint-disable-next-line no-control-regex -- intentionally matching C0 controls
+const CONTROL_CHARS = /[\u0000-\u001f]/;
+
+// The PERCENT-ENCODED forms of the same rejected bytes: markdown's
+// `defaultUrlTransform` encodes a literal `\\` to `%5C` (and C0 controls to
+// `%0x`/`%1x`) before the href ever reaches this guard, so the raw-byte
+// checks alone would wave the disguised form through to the router.
+const ENCODED_REJECTS = /%5c|%0[0-9a-f]|%1[0-9a-f]/i;
+
 export function isInternalHref(href: string): boolean {
-  return href.startsWith("/") && !href.startsWith("//");
+  return (
+    href.startsWith("/") &&
+    !href.startsWith("//") &&
+    !href.includes("\\") &&
+    !CONTROL_CHARS.test(href) &&
+    !ENCODED_REJECTS.test(href)
+  );
+}
+
+/**
+ * The SPA path of an ABSOLUTE url that stays on this app instance, null for
+ * anything else. Langy references resources by their absolute platform link
+ * (`BASE_HOST + path`); when that origin is the page's own, the link must
+ * ride the SPA router — a new tab or full load would tear down the
+ * persistent panel mid-conversation.
+ */
+function sameOriginSpaPath(href: string): string | null {
+  if (!/^https?:\/\//i.test(href)) return null;
+  try {
+    const url = new URL(href);
+    if (url.origin !== window.location.origin) return null;
+    const path = url.pathname + url.search + url.hash;
+    return isInternalHref(path) ? path : null;
+  } catch {
+    return null;
+  }
 }
 
 function normaliseDisplayedUrl(value: string): string | null {
@@ -163,20 +213,22 @@ function MarkdownLink({
 } & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "color">) {
   const router = useRouter();
   const [warningOpen, setWarningOpen] = useState(false);
-  const router = useRouter();
   const label = textOf(children);
   const mismatched = isMismatchedUrlLabel(label, href);
   const langy = variant === "langy";
-  // An absolute http(s) destination leaves the app: it gets Chakra's external
-  // link treatment (new tab, `rel="noopener noreferrer"`) instead of
-  // navigating the SPA away mid-read. In-app paths SPA-navigate through the
-  // router so the surrounding page (and an open Langy panel) stays mounted.
-  const isExternal = /^https?:\/\//i.test(href);
+  // An absolute http(s) destination normally leaves the app: it gets Chakra's
+  // external link treatment (new tab, `rel="noopener noreferrer"`) instead of
+  // navigating the SPA away mid-read — UNLESS its origin is this instance's
+  // own (Langy's platform links are absolute), in which case its path rides
+  // the SPA router like any in-app link. Relative in-app paths SPA-navigate
+  // so the surrounding page (and an open Langy panel) stays mounted.
+  const spaPath = isInternalHref(href) ? href : sameOriginSpaPath(href);
+  const isExternal = /^https?:\/\//i.test(href) && !spaPath;
 
-  /** SPA-navigate an in-app path; anything else gets a real navigation. */
+  /** SPA-navigate an in-app destination; anything else gets a real navigation. */
   const navigate = () => {
-    if (isInternalHref(href)) {
-      void router.push(href);
+    if (spaPath) {
+      void router.push(spaPath);
     } else {
       window.location.assign(href);
     }
@@ -204,7 +256,7 @@ function MarkdownLink({
       // (cmd/ctrl/shift/middle) keep the real anchor behaviour — new tab,
       // "open in new tab", etc.
       if (
-        isInternalHref(href) &&
+        spaPath &&
         event.button === 0 &&
         !event.metaKey &&
         !event.ctrlKey &&
@@ -212,7 +264,7 @@ function MarkdownLink({
         !event.altKey
       ) {
         event.preventDefault();
-        void router.push(href);
+        void router.push(spaPath);
       }
     },
   };
@@ -222,6 +274,18 @@ function MarkdownLink({
       {isExternal ? (
         <UiLink {...rest} {...styleProps} href={href} isExternal>
           {children}
+          {langy ? (
+            // Langy spends its one accent on navigation, so a link that
+            // LEAVES the app must say so before it is clicked.
+            <chakra.span
+              aria-label="opens outside LangWatch"
+              display="inline-flex"
+              verticalAlign="baseline"
+              marginLeft="2px"
+            >
+              <ArrowUpRight size={11} aria-hidden="true" />
+            </chakra.span>
+          ) : null}
         </UiLink>
       ) : (
         <chakra.a {...rest} {...styleProps} href={href}>

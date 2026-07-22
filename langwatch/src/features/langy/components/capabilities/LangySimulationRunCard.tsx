@@ -51,6 +51,14 @@ export function LangySimulationRunCard(props: CapabilityCardInput) {
   return <LiveSimulationRunCard {...props} runId={runId} />;
 }
 
+/** Terminal per the drawer's own polling policy — the single source of "done". */
+function statusIsTerminal(status?: ScenarioRunStatus): boolean {
+  return (
+    status !== undefined &&
+    getRunStatePollInterval({ status, sseConnected: false }) === false
+  );
+}
+
 function LiveSimulationRunCard({
   runId,
   ...props
@@ -62,18 +70,18 @@ function LiveSimulationRunCard({
     useSimulationStreamingState(runId);
 
   // A terminal run never changes; don't hold an SSE subscription per settled
-  // card in a long conversation. Set from the query below one render later —
-  // an unknown status (still loading) stays subscribed so an in-progress run
-  // streams from its first frame.
-  const [isTerminal, setIsTerminal] = useState(false);
-
-  const { isConnected: sseConnected } = useSimulationUpdateListener({
-    projectId: project?.id ?? "",
-    enabled: !!project?.id && !isTerminal,
-    debounceMs: 300,
-    filter: { scenarioRunId: runId },
-    onStreamingEvent: handleStreamingEvent,
-  });
+  // card in a long conversation. SEEDED from the envelope's own status — the
+  // typed payload already says "SUCCESS", so a settled card never opens a
+  // subscription even for its first render. An unknown/absent status (a run
+  // surfaced mid-flight) stays subscribed so it streams from the first frame;
+  // the live query below flips the flag once the platform reports terminal.
+  const [isTerminal, setIsTerminal] = useState(() =>
+    statusIsTerminal(
+      typeof (props.output as { status?: unknown }).status === "string"
+        ? ((props.output as { status: string }).status as ScenarioRunStatus)
+        : undefined,
+    ),
+  );
 
   const { data, error } = api.scenarios.getRunState.useQuery(
     { projectId: project?.id ?? "", scenarioRunId: runId },
@@ -88,14 +96,20 @@ function LiveSimulationRunCard({
     },
   );
 
+  const { isConnected: sseConnected } = useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    // `!error`: a run the platform can't answer for renders the fallback —
+    // isTerminal never flips for it (only a terminal STATUS does), so without
+    // this the dead card would hold its subscription open indefinitely.
+    enabled: !!project?.id && !isTerminal && !error,
+    debounceMs: 300,
+    filter: { scenarioRunId: runId },
+    onStreamingEvent: handleStreamingEvent,
+  });
+
   const status = data?.status;
   useEffect(() => {
-    if (
-      status !== undefined &&
-      getRunStatePollInterval({ status, sseConnected: false }) === false
-    ) {
-      setIsTerminal(true);
-    }
+    if (statusIsTerminal(status)) setIsTerminal(true);
   }, [status]);
 
   // Drop optimistic streamed messages once the server state includes them.

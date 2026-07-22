@@ -13,8 +13,6 @@ import type React from "react";
 import { isInternalHref, Markdown } from "~/components/Markdown";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRouter } from "~/utils/compat/next-router";
-// The HARDENED internal-href guard (backslash + control-char rejection) —
-// Markdown.tsx exports a weaker copy; consolidation tracked on the stacked PR.
 import { useSpaLinkClick } from "../logic/spaLink";
 import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "./LangyMark";
 import { githubPrsFromToolParts } from "~/shared/langy/githubPrCard";
