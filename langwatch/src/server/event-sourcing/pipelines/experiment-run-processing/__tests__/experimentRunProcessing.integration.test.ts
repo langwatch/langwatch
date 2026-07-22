@@ -337,7 +337,6 @@ describe.skip(
         expect(data.CompletedCount).toBe(2);
         expect(data.FailedCount).toBe(0);
         expect(data.Progress).toBe(2);
-        expect(data.TotalCost).toBeCloseTo(0.005, 4);
         expect(data.AvgScoreBps).toBe(10000); // 1.0 → 10000 bps
         expect(data.PassRateBps).toBe(10000); // 1.0 → 10000 bps
         expect(data.FinishedAt).not.toBeNull();

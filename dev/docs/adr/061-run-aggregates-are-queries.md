@@ -131,30 +131,71 @@ the compatible change.
 and computed by grouping `experiment_run_items` on `(TenantId, RunId)` — a
 primary-key range scan, not a bloom-filtered scan.
 
-`TotalCost` does not move with them, and neither does `TraceMetrics`. Both
-need care that the rest of this section does not:
+### The trace-cost path is deleted, not repaired
 
-`TraceMetrics` is an unbounded `Record<traceId, { totalCost }>` held in the
-fold state, and `experiment_runs` **has no column for it** — the ClickHouse
-read mapper hardcodes `TraceMetrics: {}`. It is in-memory state that never
-survives a reload. Its only job is to subtract a trace's previous cost before
-adding the new one, so `TotalCost` is not double-counted when
-`traceMetricsComputed` is redelivered for the same trace. Because the map is
-empty after any reload, that guard only holds within a single fold session:
-across a reload a redelivered event inflates `TotalCost` silently. Deleting
-the map without replacing the guard would widen that hole rather than close
-it.
+`TotalCost` is the one field where the pipeline duplicates a *correct* derived
+path rather than a merely redundant one, and the duplicate is the broken copy.
 
-The fix is to give per-trace cost rows instead of a map. `traceMetricsComputed`
-writes an `experiment_run_items` row (the table already carries `TraceId`, and
-is already keyed for the group), and `TotalCost` becomes a sum over target
-cost, evaluator cost, and the latest per-trace row — deduplicated by the same
-`ReplacingMergeTree` merge that already dedups every other item. The unbounded
-map disappears and the double-count guard starts working across reloads, which
-it does not today.
+The written path: `experimentMetricsSync.reactor.ts` sits on the
+**trace-processing** pipeline, debounces 60s per trace, and dispatches
+`computeExperimentRunMetrics` carrying the trace's cost. The fold folds it into
+`TotalCost`, keeping an unbounded `Record<traceId, { totalCost }>` —
+`TraceMetrics` — so it can subtract a trace's previous figure before adding the
+new one.
 
-That makes the cost path a behaviour change rather than a pure derivation, so
-it ships separately from the counter derivation above.
+That path yields three different answers for the same event log:
+
+- **Live fold, warm cache.** `TraceMetrics` rides along inside the serialised
+  fold state in `RedisCachedFoldStore` (300s TTL), so the subtraction works and
+  the answer is right.
+- **Live fold, cold cache.** `experiment_runs` **has no `TraceMetrics` column**
+  — the read mapper hardcodes `{}`. On any fall-through to ClickHouse the map
+  is empty, nothing is subtracted, and a reprice adds the trace's full cost on
+  top of its own earlier figure.
+- **Any re-fold or replay.** The command's idempotency key is
+  `${tenantId}:${runId}:trace-metrics:${traceId}` — identical for every
+  reprice — and `deduplicateEvents` runs on every event-store read keeping the
+  *first* occurrence. Every reprice is discarded, so the run is stuck at the
+  earliest and lowest figure.
+
+Repricing is the normal case, not an edge: the reactor re-fires whenever spans
+land after its window, each time with a higher running total. So the projection
+is not merely non-idempotent, it is non-convergent — which the fold's own
+doc comment denies, claiming the state "converges to the same value whichever
+order events are seen in".
+
+None of this is worth repairing, because **nothing reads `TotalCost`**.
+`mapClickHouseRunToExperimentRun` pulls the column into its row type and then
+drops it; the returned `ExperimentRun` carries cost only in `summary`, which is
+built from `sumIf(TargetCost, …)` / `sumIf(EvaluationCost, …)` grouped over
+`experiment_run_items`. Where an item has no cost of its own — SDK experiments
+report none — `enrichItemsWithTraceCosts` reads `trace_summaries` at read time,
+resolving the latest version through the IN-tuple dedup and splitting a shared
+trace evenly across the targets under it.
+
+That read-time path is already correct on every count the written one fails:
+it reads the current price rather than a debounced snapshot, it cannot drift
+because it accumulates nothing, and it needs no guard against redelivery
+because there is no delivery.
+
+The two also disagree on what a trace's cost *means*. The read path fills in
+a trace's price only where the item reports no cost of its own
+(`TargetCost IS NULL`), treating the two as alternative sources for the same
+figure. The fold added them, so a target that reported its cost inline *and*
+produced a trace was counted twice — a test named "combines trace costs with
+inline target/evaluator costs" pinned exactly that.
+
+So the decision is deletion, end to end: the `experimentMetricsSync` reactor,
+the `computeExperimentRunMetrics` command, the `traceMetricsComputed` event,
+the `TraceMetrics` map, and the `TotalCost` field. The late-bound
+`wireExperimentDeps` dance in `pipelineRegistry.ts` — which exists only to
+hand the reactor a `lookupExperimentId` that queries `experiment_runs` on every
+experiment trace — goes with them.
+
+This also takes work off the busiest pipeline in the system: every trace fold
+currently evaluates the reactor's `shouldReact`, and every experiment trace
+enqueues a delayed job and a ClickHouse lookup, to maintain a column no reader
+consumes.
 
 ### Migration
 
@@ -163,8 +204,11 @@ old replicas are still reading:
 
 1. Add `BatchTotal` to `simulation_runs` and stop writing `suite_runs`. Old
    replicas still writing it are harmless, because nothing reads it.
-2. One release later, drop the `suite_runs` table and the `experiment_runs`
-   counter columns.
+2. Delete the trace-cost path and stop writing `experiment_runs.TotalCost`.
+   The column stays; omitted from the insert it reads NULL, which is what a
+   run with no priced trace already reads today.
+3. One release later, drop the `suite_runs` table and the `experiment_runs`
+   counter and cost columns.
 
 `suite_runs` is not backfilled or migrated. Nothing reads it, and the path
 that does serve users already reads the source those rows were derived from.
@@ -197,11 +241,21 @@ that does serve users already reads the source those rows were derived from.
   here.
 - The `suite_runs` retention and TTL entries stay until the drop migration, so
   existing rows keep ageing out of a table nothing writes.
-- Deriving the experiment-run counters is safe in isolation, but the cost path
-  is not: `TotalCost` currently depends on an in-memory map that never
-  persists, so it already double-counts a redelivered `traceMetricsComputed`
-  across a reload. Moving per-trace cost to rows fixes that, and is the reason
-  the experiment half splits into two changes rather than one.
+- Deleting the trace-cost path removes a cross-pipeline reactor, a delayed job
+  and a per-trace `experiment_runs` lookup from the trace-processing hot path,
+  and removes an unbounded per-run map from fold state that was being
+  serialised into Redis on every event.
+- The user-visible cost does not change, because it was never coming from the
+  deleted path. The residual risk is a consumer of `experiment_runs.TotalCost`
+  outside this repository: nothing in `langwatch/src` reads it, but a
+  dashboard or an ad-hoc query could. Such a consumer is today reading a figure
+  that is wrong in one of three ways depending on cache residency, so the
+  column is not a value anything should have been trusting.
+- Two earlier revisions of this ADR were wrong about this path — first
+  claiming `TraceMetrics` was persisted and costly to write, then claiming the
+  fix was to move per-trace cost into `experiment_run_items` rows. Both
+  assumed `TotalCost` had a reader. It does not, and the correct cost path
+  already exists on the read side.
 - Aggregates become self-healing: a corrected or late child row changes the
   answer on the next read, with no projection to rebuild.
 - Suite runs no longer have an event stream of their own, so anything that

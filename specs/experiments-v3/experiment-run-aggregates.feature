@@ -29,13 +29,43 @@ Feature: Experiment run totals are derived from its items
     Then the run still reports one completed item
     And its cost is counted once
 
-  # --- Per-trace cost ---
+  # --- Cost ---
+  #
+  # Costs reach a run by two routes. An experiment that reports its own costs
+  # carries them on the item. An SDK experiment reports none, and the cost is
+  # only known once the trace it produced has been priced from its spans.
 
-  Scenario: A trace's cost is recorded once however often it is reported
-    Given an experiment run whose cost has been computed for a trace
-    When that trace's cost is reported again with a new figure
-    Then the run's total cost counts the trace once, at the newer figure
-    And this holds even if the run was reloaded in between
+  Scenario: An item that reports its own cost keeps that figure
+    Given an experiment run whose items were recorded with costs
+    When the user opens the run
+    Then each item reports the cost it was recorded with
+
+  Scenario: An item with no cost of its own is priced from its trace
+    Given an experiment run whose items were recorded without costs
+    And each item recorded the trace it produced
+    When the user opens the run
+    Then each item reports the cost of its trace
+
+  Scenario: Several targets sharing one trace split its cost
+    Given an experiment run with two targets whose executions share a trace
+    When the user opens the run
+    Then the trace's cost is divided evenly between them
+    And the run's total counts that trace's cost once
+
+  Scenario: A trace priced after the run finished is still counted
+    Given an experiment run reported as finished
+    And one of its traces is priced afterwards
+    When the user opens the run
+    Then the run's total includes that trace's cost
+
+  Scenario: A trace repriced upwards reports the newer figure
+    Given an experiment run whose trace has been priced
+    When further spans arrive and the trace is repriced higher
+    When the user opens the run
+    Then the run reports the newer figure
+    And it reports the same figure however many times the run is read
+
+  # --- Lateness ---
 
   Scenario: A late item changes the run immediately
     Given an experiment run reported as finished

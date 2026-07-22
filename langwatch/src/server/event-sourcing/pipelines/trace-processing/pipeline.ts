@@ -92,10 +92,6 @@ export interface TraceProcessingPipelineDeps {
     TraceProcessingEvent,
     TraceSummaryData
   >;
-  experimentMetricsSyncReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
   automations: {
     triggerMatchHandler: (
       event: TraceProcessingEvent,
@@ -219,11 +215,6 @@ export function createTraceProcessingPipeline(
       "traceSummary",
       "simulationMetricsSync",
       deps.simulationMetricsSyncReactor,
-    )
-    .withReactor(
-      "traceSummary",
-      "experimentMetricsSync",
-      deps.experimentMetricsSyncReactor,
     )
     .withSubscriber("triggerMatch", {
       fold: "traceSummary",

@@ -22,7 +22,8 @@ export class App {
   readonly dspySteps: AppDependencies["dspySteps"];
   readonly simulations: AppDependencies["simulations"] &
     AppCommands["simulations"];
-  readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
+  /** Service only — suite runs have no pipeline of their own (ADR-061). */
+  readonly suiteRuns: AppDependencies["suiteRuns"];
   readonly topicClustering: AppDependencies["topicClustering"] &
     AppCommands["topicClustering"];
   readonly commands: AppCommands;
@@ -82,7 +83,7 @@ export class App {
     this.experimentRuns = deps.commands.experimentRuns;
     this.dspySteps = deps.dspySteps;
     this.simulations = { ...deps.simulations, ...deps.commands.simulations };
-    this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
+    this.suiteRuns = deps.suiteRuns;
     this.topicClustering = {
       ...deps.topicClustering,
       ...deps.commands.topicClustering,
