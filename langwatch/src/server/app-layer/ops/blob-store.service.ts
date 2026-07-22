@@ -5,6 +5,7 @@ import type { BlobSweepReport } from "~/server/event-sourcing/queues/groupQueue/
 import type {
   BlobStoreRepository,
   OpsBlobPage,
+  OpsBlobSort,
   OpsBlobStoreStats,
   OpsBlobSummary,
 } from "./repositories/blob-store.repository";
@@ -34,12 +35,16 @@ export class BlobStoreService {
     cursor?: string | null;
     limit?: number;
     projectId?: string | null;
+    sort?: OpsBlobSort;
   }): Promise<OpsBlobPage> {
     return this.repo.findAll({
       queueName: params.queueName,
       cursor: params.cursor ?? null,
       limit: params.limit ?? DEFAULT_PAGE_SIZE,
       projectId: params.projectId ?? null,
+      // Ranked by default: an operator opening this page is looking for what is
+      // occupying the instance, and raw cursor order is hash-bucket order.
+      sort: params.sort ?? "largest",
     });
   }
 

@@ -21,6 +21,7 @@ import { GROUP_QUEUE_REGISTRY_KEY } from "~/server/event-sourcing/queues/groupQu
 import type {
   BlobStoreRepository,
   OpsBlobPage,
+  OpsBlobSort,
   OpsBlobStoreStats,
   OpsBlobSummary,
 } from "./blob-store.repository";
@@ -38,6 +39,17 @@ const MAX_PAGE = 200;
  * requested limit and a fixed number of SCAN calls.
  */
 const MAX_SCAN_CALLS_PER_PAGE = 20;
+
+/**
+ * How many blobs a ranked listing may examine before it ranks what it has.
+ *
+ * There is no index over size / TTL / lease state, so ranking means describing
+ * blobs one page at a time. This bounds that work at a few thousand pipelined
+ * reads — enough that "largest" and "unreferenced" surface the real offenders
+ * on a healthy instance, and bounded enough that it cannot become a scan of a
+ * multi-million-key keyspace on a sick one.
+ */
+const RANK_SAMPLE_CAP = 5_000;
 
 function isCluster(client: IORedis | Cluster): client is Cluster {
   return typeof (client as Cluster).nodes === "function";
@@ -69,12 +81,17 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
     cursor,
     limit,
     projectId,
+    sort = "scan",
   }: {
     queueName: string;
     cursor?: string | null;
     limit: number;
     projectId?: string | null;
+    sort?: OpsBlobSort;
   }): Promise<OpsBlobPage> {
+    if (sort !== "scan") {
+      return this.findRanked({ queueName, limit, projectId, sort });
+    }
     const pageSize = Math.min(Math.max(limit, 1), MAX_PAGE);
     const prefix = redisBlobKeyPrefix(queueName);
     // Filtering by project narrows in Redis rather than in Node, so a tenant
@@ -124,6 +141,94 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
       blobs,
       nextCursor:
         Object.keys(nextCursors).length > 0 ? JSON.stringify(nextCursors) : null,
+      sampled: blobs.length,
+      rankedFromSample: false,
+    };
+  }
+
+  /**
+   * Ranked listing: read a bounded sample, order it, return the head.
+   *
+   * There is no index to sort by — size, TTL and lease state all live on
+   * separate keys — so a true global top-N would mean describing every blob in
+   * the keyspace on every request. The sample cap is the deliberate ceiling on
+   * that, and `rankedFromSample` tells the caller when the answer is
+   * "largest of what we looked at" rather than "largest that exists". Silently
+   * presenting the former as the latter is how an operator chases the wrong
+   * blob.
+   */
+  private async findRanked({
+    queueName,
+    limit,
+    projectId,
+    sort,
+  }: {
+    queueName: string;
+    limit: number;
+    projectId?: string | null;
+    sort: OpsBlobSort;
+  }): Promise<OpsBlobPage> {
+    const pageSize = Math.min(Math.max(limit, 1), MAX_PAGE);
+    const sample: OpsBlobSummary[] = [];
+    let cursor: string | null = null;
+    let exhausted = false;
+
+    while (sample.length < RANK_SAMPLE_CAP) {
+      const page: OpsBlobPage = await this.findAll({
+        queueName,
+        cursor,
+        limit: MAX_PAGE,
+        projectId,
+        sort: "scan",
+      });
+      sample.push(...page.blobs);
+      cursor = page.nextCursor;
+      if (!cursor) {
+        exhausted = true;
+        break;
+      }
+    }
+
+    const now = Date.now();
+    const byLapsedLease = (blob: OpsBlobSummary): number =>
+      // Future deadlines are live leases, not lapses; sort them last.
+      blob.earliestLeaseDeadlineMs === null ||
+      blob.earliestLeaseDeadlineMs > now
+        ? Number.POSITIVE_INFINITY
+        : blob.earliestLeaseDeadlineMs;
+
+    const ranked = [...sample];
+    switch (sort) {
+      case "largest":
+        ranked.sort((a, b) => b.sizeBytes - a.sizeBytes);
+        break;
+      case "stalest":
+        // A null TTL means no expiry at all, which outlives every finite one.
+        ranked.sort(
+          (a, b) =>
+            (a.ttlSeconds ?? Number.POSITIVE_INFINITY) -
+            (b.ttlSeconds ?? Number.POSITIVE_INFINITY),
+        );
+        break;
+      case "unreferenced":
+        ranked.sort(
+          (a, b) => a.liveLeases - b.liveLeases || b.sizeBytes - a.sizeBytes,
+        );
+        break;
+      case "oldest_lapsed_lease":
+        ranked.sort((a, b) => byLapsedLease(a) - byLapsedLease(b));
+        break;
+      default:
+        break;
+    }
+
+    return {
+      blobs: ranked.slice(0, pageSize),
+      // Ranking consumes its own sample, so there is no resumable cursor: a
+      // "next page" of a best-of-sample would not mean anything.
+      nextCursor: null,
+      sampled: sample.length,
+      rankedFromSample: !exhausted,
     };
   }
 
@@ -176,18 +281,25 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
       pipeline.ttl(entry.key);
       pipeline.zcard(blobLeaseSetKey(keyArgs));
       pipeline.scard(blobHolderSetKey(keyArgs));
+      // Lowest score in the lease set: the earliest deadline, which dates the
+      // oldest lapse once it is in the past.
+      pipeline.zrange(blobLeaseSetKey(keyArgs), 0, 0, "WITHSCORES");
     }
     const results = (await pipeline.exec()) ?? [];
 
     const summaries: OpsBlobSummary[] = [];
     for (const [index, entry] of parsed.entries()) {
-      const base = index * 4;
+      const base = index * 5;
       const num = (offset: number): number => {
         const value = results[base + offset]?.[1];
         return typeof value === "number" ? value : Number(value ?? 0);
       };
       const ttl = num(1);
       const holders = num(3);
+      const earliest = results[base + 4]?.[1];
+      const earliestScore = Array.isArray(earliest)
+        ? Number((earliest as string[])[1])
+        : Number.NaN;
       summaries.push({
         queueName,
         projectId: entry.projectId,
@@ -198,6 +310,9 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
         // The sentinel is bookkeeping, not a holder, so showing it would make
         // every blob look referenced by one phantom.
         holderTokens: Math.max(holders - 1, 0),
+        earliestLeaseDeadlineMs: Number.isFinite(earliestScore)
+          ? earliestScore
+          : null,
         sweepOutcome: await this.previewOutcome(queueName, entry),
       });
     }

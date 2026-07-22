@@ -5,6 +5,7 @@ import { checkOpsPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { DASHBOARD_EVENT } from "~/server/app-layer/ops/metrics-collector";
+import { OPS_BLOB_SORTS } from "~/server/app-layer/ops/repositories/blob-store.repository";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import {
   resolveHotDays,
@@ -925,6 +926,7 @@ export const opsRouter = createTRPCRouter({
         cursor: z.string().max(4000).nullish(),
         limit: z.number().int().min(1).max(200).default(50),
         projectId: z.string().max(200).nullish(),
+        sort: z.enum(OPS_BLOB_SORTS).default("largest"),
       }),
     )
     .query(async ({ input }) => {
