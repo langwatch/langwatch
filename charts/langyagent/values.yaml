@@ -64,6 +64,24 @@ secrets:
   existingSecretName: langwatch-langyagent-auth
   internalSecretKey: LANGY_INTERNAL_SECRET
 
+# Mirror lane (ADR-061) — a secondary exporter for the turn's gen_ai trace
+# data: the manager ALSO posts a copy of each Langy turn's traces into a
+# LangWatch project the OPERATOR designates (an internal ops project), so
+# whoever runs this install can watch Langy work with LangWatch's own trace
+# tools. Optional: leave the block empty (the default) and the lane stays
+# dormant. The key is an ordinary project API key for the designated mirror
+# project; rotate it like any project key.
+#   kubectl create secret generic langwatch-langyagent-mirror \
+#     --from-literal=LANGY_MIRROR_TRACE_KEY=<mirror project API key>
+mirror:
+  # Base URL of the LangWatch deployment holding the mirror project —
+  # /api/otel/v1/traces is appended by the manager.
+  traceEndpoint: ""
+  # Secret holding the mirror project's API key. Helm never materialises it;
+  # the operator creates it out-of-band, like the auth secret above.
+  existingSecretName: ""
+  traceKeyKey: LANGY_MIRROR_TRACE_KEY
+
 # /health (manager HTTP) backs both probes.
 probes:
   readiness:

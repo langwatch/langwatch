@@ -416,7 +416,7 @@ func capabilitiesFor(creds domain.Credentials) []app.Capability {
 }
 
 func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
-	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)))
+	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier)
 
 	p.mu.Lock()
 	if w, ok := p.workers[conversationID]; ok {
@@ -671,6 +671,12 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 			Model:             creds.Model,
 			GatewayBaseURL:    creds.GatewayBaseURL,
 			LLMVirtualKey:     creds.LLMVirtualKey,
+			// ADR-061 mirror lane: the tier + source tenant ride the envelope.
+			// The tier is in the credential signature, so this worker's registered
+			// tier is never stale (a change respawned it).
+			MirrorTier:           creds.MirrorTier,
+			SourceOrganizationID: creds.OrganizationID,
+			SourceProjectID:      creds.ProjectID,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("register worker telemetry relay: %w", err)
