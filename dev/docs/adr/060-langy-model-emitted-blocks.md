@@ -36,7 +36,7 @@ Two needs have since become pressing:
 1. **Model-shaped views of data the platform holds but does not compute.**
    "Plot this dataset's two columns against each other" has no answering
    command: the dataset card is a table, `analytics query` charts only
-   platform metrics, and AGENTS.md rule 20 currently — honestly — instructs
+   platform metrics, and AGENTS.md rule 25 currently — honestly — instructs
    the agent to say the view can't be drawn. The data is right there; the
    product refuses the picture.
 2. **A real UI for the one question the agent is allowed to ask.** AGENTS.md
@@ -122,7 +122,7 @@ affordances (§5). Two hardenings are named and deferred, not rejected:
 stripping fences from tool output before the model reads it, and a per-turn
 nonce in the fence tag.
 
-The rule 20 division of labor stands: if a command can compute it, the
+The rule 25 division of labor stands: if a command can compute it, the
 command must ("cost per day" is `analytics query`, never a hand-summed
 block). The blocks carry data the platform holds but does not compute —
 dataset columns, model-derived groupings — and the prompt rule that draws
@@ -229,7 +229,7 @@ validator is what keeps it from adding a second truth.
   these are new entries, not new conditional paths.
 - Time travel inherits fidelity for free: stamped parts and selection events
   replay through the same fold as everything else.
-- AGENTS.md changes (rule 20 gains the block instruction; rule 3's exception
+- AGENTS.md changes (rule 25 gains the block instruction; rule 3's exception
   points at the choices block) ship WITH the implementation and carry a
   dogfood eval each.
 - `specs/langy/langy-capability-cards.feature` remains the panel-rendering
