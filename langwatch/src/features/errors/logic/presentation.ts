@@ -217,6 +217,27 @@ const presentations = {
     title: "You've hit a plan limit",
     describe: () => "Upgrade your plan to raise it.",
   },
+  // Browser-telemetry ingest (ADR-058). These answer the RUM endpoint rather
+  // than a screen, so the reader is usually an engineer with the network tab
+  // open — the copy names what the endpoint refused and what changes it.
+  rum_ingest_disabled: {
+    title: "Browser telemetry isn't enabled",
+    describe: () =>
+      "Turn on browser monitoring for this project to collect it.",
+  },
+  rum_payload_invalid: {
+    title: "That telemetry report couldn't be read",
+    describe: () => "The browser sent a body this endpoint doesn't recognise.",
+  },
+  rum_payload_too_large: {
+    title: "That telemetry report is too big",
+    describe: () => "Send smaller batches of browser spans.",
+  },
+  rum_rate_limited: {
+    title: "Too many telemetry reports",
+    describe: () =>
+      "Browser monitoring is sending faster than we accept. It will resume on its own.",
+  },
   scenario_set_limit_exceeded: {
     title: "You've hit the simulation set limit",
     describe: () => "Delete an existing set, or upgrade your plan.",
