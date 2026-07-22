@@ -1,6 +1,7 @@
 package herrgen_test
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -301,7 +302,7 @@ const (
 				files[path] = source
 			}
 
-			got, _, err := herrgen.Parse(tree(t, files))
+			got, _, err := herrgen.Parse(tree(t, files), io.Discard)
 			if err != nil {
 				t.Fatalf("Parse() error = %v", err)
 			}
@@ -366,7 +367,7 @@ func registerErrorStatuses() {
 `,
 	})
 
-	_, _, err := herrgen.Parse(root)
+	_, _, err := herrgen.Parse(root, io.Discard)
 	if err == nil {
 		t.Fatal("Parse() error = nil, want a conflict")
 	}
@@ -418,7 +419,7 @@ func RegisterStatuses() {
 `,
 	})
 
-	entries, _, err := herrgen.Parse(root)
+	entries, _, err := herrgen.Parse(root, io.Discard)
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
 	}
@@ -428,5 +429,171 @@ func RegisterStatuses() {
 	}
 	if len(entry.Declarations) != 2 {
 		t.Errorf("unauthorized has %d declarations, want 2", len(entry.Declarations))
+	}
+}
+
+func TestParseReadsTypedConstDeclarations(t *testing.T) {
+	// `const X herr.Code = "x"` puts the conversion in the declared type rather
+	// than around the literal. It is the same declaration to the compiler, and
+	// missing it means the code ships with no customer-facing copy.
+	root := tree(t, map[string]string{
+		"pkg/herr/herr.go": herrPackage,
+		"pkg/config/validate.go": `package config
+
+import (
+	"net/http"
+
+	"example.com/repo/pkg/herr"
+)
+
+// ConfigInvalid is the herr code for configuration validation failures.
+const ConfigInvalid herr.Code = "config_invalid"
+
+func RegisterStatuses() {
+	herr.RegisterStatus(ConfigInvalid, http.StatusBadRequest)
+}
+`,
+	})
+
+	entries, _, err := herrgen.Parse(root, io.Discard)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	entry := entryFor(t, entries, "config_invalid")
+	want := herrgen.Declaration{
+		Name:    "ConfigInvalid",
+		Code:    "config_invalid",
+		Doc:     "ConfigInvalid is the herr code for configuration validation failures.\n",
+		Source:  "pkg/config/validate.go",
+		Service: "config",
+	}
+	if len(entry.Declarations) != 1 || entry.Declarations[0] != want {
+		t.Errorf("config_invalid declarations = %+v, want [%+v]", entry.Declarations, want)
+	}
+	if !entry.HasStatus || entry.Status != 400 {
+		t.Errorf("config_invalid status = %d (registered %t), want 400 (registered true)", entry.Status, entry.HasStatus)
+	}
+}
+
+func TestParseReadsTypedConstsInsideABlock(t *testing.T) {
+	// Only the specs that carry the type are codes; a plain string const in the
+	// same block is not one.
+	root := tree(t, map[string]string{
+		"pkg/herr/herr.go": herrPackage,
+		"services/nlpgo/domain/errors.go": `package domain
+
+import "example.com/repo/pkg/herr"
+
+const (
+	// ErrBusy is thrown while another run holds the workflow.
+	ErrBusy herr.Code = "busy"
+	DefaultQueue        = "runs"
+)
+`,
+	})
+
+	entries, _, err := herrgen.Parse(root, io.Discard)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if len(entries) != 1 || entries[0].Code != "busy" {
+		t.Fatalf("Parse() = %+v, want exactly the busy entry", entries)
+	}
+	if entries[0].Declarations[0].Doc != "ErrBusy is thrown while another run holds the workflow.\n" {
+		t.Errorf("busy doc = %q, want the const's own doc", entries[0].Declarations[0].Doc)
+	}
+}
+
+func TestParseRejectsAnUnmappedHTTPStatusConstant(t *testing.T) {
+	// Skipping it would emit a status-less entry, which reads exactly like a
+	// code nobody registered — a silent lie in the generated file.
+	root := tree(t, map[string]string{
+		"pkg/herr/herr.go": herrPackage,
+		"services/nlpgo/domain/errors.go": `package domain
+
+import (
+	"net/http"
+
+	"example.com/repo/pkg/herr"
+)
+
+const ErrTeapot = herr.Code("teapot")
+
+func RegisterStatuses() {
+	herr.RegisterStatus(ErrTeapot, http.StatusInventedByNobody)
+}
+`,
+	})
+
+	_, _, err := herrgen.Parse(root, io.Discard)
+	if err == nil {
+		t.Fatal("Parse() error = nil, want the unmapped status constant to fail the run")
+	}
+	for _, want := range []string{"StatusInventedByNobody", "services/nlpgo/domain/errors.go:12"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("Parse() error = %q, want it to mention %q", err, want)
+		}
+	}
+}
+
+func TestParseRejectsADotImportOfHerr(t *testing.T) {
+	// A dot import erases the `herr.` qualifier every read below matches on, so
+	// the file's codes would vanish from the generated output without a word.
+	root := tree(t, map[string]string{
+		"pkg/herr/herr.go": herrPackage,
+		"services/nlpgo/domain/errors.go": `package domain
+
+import . "example.com/repo/pkg/herr"
+
+const ErrHidden = Code("hidden")
+`,
+	})
+
+	_, _, err := herrgen.Parse(root, io.Discard)
+	if err == nil {
+		t.Fatal("Parse() error = nil, want the dot import to fail the run")
+	}
+	for _, want := range []string{"services/nlpgo/domain/errors.go", "dot-import"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("Parse() error = %q, want it to mention %q", err, want)
+		}
+	}
+}
+
+func TestParseSkipsUnparseableFilesWithAWarning(t *testing.T) {
+	// The tree carries hand-written Go that is never compiled (documentation
+	// snippets rendered into the product UI). One of those failing to parse must
+	// not take the drift check down with it.
+	root := tree(t, map[string]string{
+		"pkg/herr/herr.go": herrPackage,
+		"langwatch/src/features/onboarding/snippets/go/openai.snippet.go": `package main
+
+func main() { this is not Go
+`,
+		"services/nlpgo/domain/errors.go": `package domain
+
+import "example.com/repo/pkg/herr"
+
+const ErrBusy = herr.Code("busy")
+`,
+	})
+
+	var warnings strings.Builder
+	entries, _, err := herrgen.Parse(root, &warnings)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	entryFor(t, entries, "busy")
+	if !strings.Contains(warnings.String(), "openai.snippet.go") {
+		t.Errorf("warnings = %q, want the skipped file named", warnings.String())
+	}
+}
+
+func TestParseSkipsDirectoriesOutsideAnyModule(t *testing.T) {
+	root := t.TempDir()
+	// No go.mod at the root: nothing under it belongs to a module, so the walk
+	// has nothing to read and Parse says so rather than inventing codes.
+	if _, _, err := herrgen.Parse(root, io.Discard); err == nil {
+		t.Fatal("Parse() error = nil, want a missing-go.mod failure")
 	}
 }

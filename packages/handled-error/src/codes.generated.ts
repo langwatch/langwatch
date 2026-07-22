@@ -75,6 +75,12 @@ export const goErrorCodes = {
    */
   code_block_timeout: { service: "nlpgo", httpStatus: 504 },
   /**
+   * ConfigInvalid — is the herr code for configuration validation failures.
+   *
+   * @source pkg/config/validate.go
+   */
+  config_invalid: { service: "config" },
+  /**
    * ErrConversationBusy — signals a second concurrent turn for a conversation
    * whose single-stream opencode session is already answering. The control
    * plane shows a "still answering — wait" notice. Maps to 409.
