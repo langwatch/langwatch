@@ -56,6 +56,7 @@ Feature: haven CLI surface
 
   Scenario: Cleanup is one interactive command
     When the developer runs "haven clean"
-    Then one picker offers worktrees, build artifacts, idle databases, and orphaned processes as categories
+    Then the interactive picker offers every worktree with its databases, disk size, and idle time
+    And the safe categories — build artifacts and orphaned dev processes — are reclaimed in the same run
     And in agent mode it prints the report and deletes nothing
-    And "--yes" applies only the safe categories, never worktree deletion
+    And "haven clean --yes" applies only the safe categories, never worktree deletion

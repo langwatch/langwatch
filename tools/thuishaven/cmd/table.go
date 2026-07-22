@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
-	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procsupervisor"
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
 
@@ -336,29 +335,13 @@ var table = []commandSpec{
 		},
 	},
 	{
-		name:    "prune",
-		summary: "interactive worktree cleanup; --artifacts is the conservative reclaim",
+		name:    "clean",
+		summary: "one cleanup: worktree picker, then safe reclaim (artifacts, orphan processes)",
 		flags: []flagSpec{
-			{long: "--artifacts", summary: "reclaim regenerable disk only, delete no worktree"},
-			{long: "--yes", summary: "apply without prompting (with --artifacts; else dry-run)"},
+			{long: "--yes", summary: "no picker: apply only the safe categories, never worktree deletion"},
 			{long: "--stale-days", takesValue: true, value: "<n>", summary: "idle age pre-ticked for deletion"},
 		},
-		run: runPrune,
-	},
-	{
-		name:    "cleanup",
-		summary: "reap orphaned dev runtimes (tsgo, node, pnpm, …) of this worktree",
-		flags: []flagSpec{
-			{long: "--yes", summary: "confirm — cleanup refuses without it"},
-		},
-		run: func(_ context.Context, d deps, inv invocation) error {
-			if !inv.has("--yes") {
-				return fmt.Errorf("refusing cleanup without --yes")
-			}
-			procsupervisor.ReapOrphans([]string{d.worktree})
-			fmt.Printf("haven cleaned orphaned dev runtimes under %s\n", d.worktree)
-			return nil
-		},
+		run: runClean,
 	},
 	{
 		name:    "typecheck",
