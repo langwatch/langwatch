@@ -124,6 +124,7 @@ describe("CLI_COLLECTION_VERBS", () => {
     expect(CLI_COLLECTION_VERBS.has("get")).toBe(false);
   });
 
+  /** @scenario The type catalog renders as a collection */
   it("counts the evaluator type catalog as a collection", () => {
     expect(CLI_COLLECTION_VERBS.has("types")).toBe(true);
   });
@@ -133,6 +134,7 @@ describe("CLI_SUBRESOURCE_VERBS", () => {
   // `evaluator types` answers with the catalog, whose rows carry a `slug` the
   // id convention would read as an evaluator. Hydrated as saved evaluators, a
   // complete catalog resolves to nothing and draws as "no evaluators".
+  /** @scenario Catalog types are never looked up as the project's saved evaluators */
   it("keeps the type catalog out of parent-resource id lookup", () => {
     expect(CLI_SUBRESOURCE_VERBS.has("types")).toBe(true);
   });

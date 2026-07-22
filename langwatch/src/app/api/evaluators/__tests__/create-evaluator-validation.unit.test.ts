@@ -41,6 +41,7 @@ describe("creating an evaluator with an unknown type", () => {
       config: { evaluatorType: "ragas/answer_relevancy" },
     };
 
+    /** @scenario Unknown evaluator type is rejected naming the exact field */
     it("answers 422 validation_error naming config.evaluatorType, not the whole config", async () => {
       const res = await post(staleSlug);
 
@@ -50,6 +51,7 @@ describe("creating an evaluator with an unknown type", () => {
       expect(body.fields).toEqual(["config.evaluatorType"]);
     });
 
+    /** @scenario The rejection lists every type that would have been accepted */
     it("carries every accepted evaluator type as the reason's meta.expected", async () => {
       const res = await post(staleSlug);
 
@@ -63,6 +65,7 @@ describe("creating an evaluator with an unknown type", () => {
       expect(reason.meta.received).toBe("ragas/answer_relevancy");
     });
 
+    /** @scenario The rejection lists every type that would have been accepted */
     it("lists the slugs a stale ragas name should be corrected to", async () => {
       const res = await post(staleSlug);
 
@@ -72,6 +75,7 @@ describe("creating an evaluator with an unknown type", () => {
       expect(expected).toContain("legacy/ragas_answer_relevancy");
     });
 
+    /** @scenario The accepted types stay out of the prose message */
     it("keeps the accepted types out of the prose message", async () => {
       const res = await post(staleSlug);
 

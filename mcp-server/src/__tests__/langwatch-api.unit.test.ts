@@ -524,6 +524,7 @@ describe("langwatch-api", () => {
         ],
       };
 
+      /** @scenario A rejection over MCP carries the accepted types */
       it("keeps the reasons on the error", async () => {
         const { createEvaluator } = await import(
           "../langwatch-api-evaluators.js"

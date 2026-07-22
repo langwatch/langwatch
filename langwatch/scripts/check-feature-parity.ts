@@ -43,6 +43,10 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "mcp-server/src",
   "typescript-sdk/src",
   "python-sdk/src",
+  // What we SHIP as instructions is behavior too: the skill sources and the
+  // assistant's rules are tested here (and nowhere else), so scenarios about
+  // what an instruction teaches can only bind from this root.
+  "skills/_tests",
 ];
 
 /**

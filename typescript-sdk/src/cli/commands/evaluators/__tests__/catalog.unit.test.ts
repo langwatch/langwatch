@@ -7,6 +7,7 @@ import {
 
 describe("the CLI's evaluator-type catalog", () => {
   describe("when checking a slug against the catalog", () => {
+    /** @scenario The CLI accepts every type the platform's catalog accepts */
     it("accepts langevals catalog types and the platform's native types alike", () => {
       expect(isValidEvaluatorType("ragas/response_relevancy")).toBe(true);
       expect(

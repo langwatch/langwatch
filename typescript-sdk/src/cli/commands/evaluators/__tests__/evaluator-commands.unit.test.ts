@@ -181,6 +181,7 @@ describe("createEvaluatorCommand()", () => {
       });
     });
 
+    /** @scenario The CLI accepts every type the platform's catalog accepts */
     it("accepts the platform's native evaluator types, not only the langevals catalog", async () => {
       mockCreate.mockResolvedValue(makeEvaluator({ name: "Secrets" }));
 
@@ -199,6 +200,7 @@ describe("createEvaluatorCommand()", () => {
     // The live failure this pins: an agent sent a stale slug
     // ("ragas/answer_relevancy") and only learned it was wrong after a
     // network round-trip, from a 422 that named no valid alternatives.
+    /** @scenario The CLI rejects an unknown evaluator type before calling the API */
     it("fails before any API call is made", async () => {
       await expect(
         createEvaluatorCommand("quick-relevancy", {
@@ -209,6 +211,7 @@ describe("createEvaluatorCommand()", () => {
       expect(mockCreate).not.toHaveBeenCalled();
     });
 
+    /** @scenario The CLI rejects an unknown evaluator type before calling the API */
     it("names the closest valid slugs and the command that lists them all", async () => {
       await expect(
         createEvaluatorCommand("quick-relevancy", {
@@ -294,6 +297,7 @@ describe("listEvaluatorTypesCommand()", () => {
   });
 
   describe("when listing the embedded catalog", () => {
+    /** @scenario Valid evaluator types can be listed without touching the API */
     it("returns every type with slug, name, and category without any API call", async () => {
       const { listEvaluatorTypesCommand } = await import("../types.js");
 

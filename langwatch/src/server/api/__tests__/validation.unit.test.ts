@@ -131,6 +131,7 @@ describe("the REST boundary's request validator", () => {
       return app;
     };
 
+    /** @scenario A schema can hand its accepted set to any validation failure */
     it("carries the refinement's accepted set as meta.expected, like an enum's", async () => {
       const res = await post({ kind: "catalog/nope" }, appWithCatalog());
 

@@ -93,6 +93,7 @@ describe("the evaluator types our shipped instructions teach", () => {
   const taught = shippedInstructionFiles().flatMap(evaluatorTypesTaughtIn);
 
   describe("when an instruction puts a slug in an evaluator-type position", () => {
+    /** @scenario No shipped instruction teaches an evaluator type the platform rejects */
     it("only ever names a type the platform accepts", () => {
       const invalid = taught.filter(
         ({ slug }) => !(slug in AVAILABLE_EVALUATORS),
