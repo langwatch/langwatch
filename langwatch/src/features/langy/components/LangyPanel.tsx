@@ -711,6 +711,7 @@ function LangyPanel({
     isFetching: isFetchingHistory,
     isError: hasHistoryError,
     error: historyError,
+    refetch: refetchHistory,
   } = useLangyMessages(activeConversationId);
 
   /**
@@ -1307,6 +1308,17 @@ function LangyPanel({
     void regenerate();
   }, [regenerate, messages.length]);
 
+  // The history card's own retry. Deliberately NOT `onErrorAction`: that one
+  // re-drives the last TURN, and nothing about a failed history read means a
+  // turn should run. Re-reading is the whole remedy.
+  const onHistoryErrorAction = useCallback(
+    (kind: "connect-github" | "configure-model" | "retry") => {
+      if (kind !== "retry") return;
+      void refetchHistory();
+    },
+    [refetchHistory],
+  );
+
   const onErrorAction = useCallback(
     (kind: "connect-github" | "configure-model" | "retry") => {
       if (kind !== "retry") return;
@@ -1890,6 +1902,21 @@ function LangyPanel({
                         <ModelProviderScreen
                           variant="langy"
                           onComplete={() => void resolvedDefaultQuery.refetch()}
+                        />
+                      </VStack>
+                    ) : historyErrorPresentation ? (
+                      // Ahead of the empty state deliberately: a conversation we
+                      // could not READ is not a conversation with nothing in it,
+                      // and "How can I help?" over a failed load tells the reader
+                      // their messages are gone.
+                      <VStack
+                        align="stretch"
+                        paddingX={floating ? "19px" : "14px"}
+                        paddingTop={floating ? "19px" : "14px"}
+                      >
+                        <LangyError
+                          presentation={historyErrorPresentation}
+                          onAction={onHistoryErrorAction}
                         />
                       </VStack>
                     ) : isEmpty && !pendingPrompt ? (

@@ -105,5 +105,7 @@ export function useLangyMessages(
     isFetching: query.isFetching,
     isError: query.isError,
     error: query.error,
+    /** Re-run the history fetch — what the failure card's "Try again" does. */
+    refetch: query.refetch,
   };
 }
