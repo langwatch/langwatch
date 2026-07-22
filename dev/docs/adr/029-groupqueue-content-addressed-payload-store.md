@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-20
 
-**Status:** Proposed
+**Status:** Accepted (WP4 lease lifecycle shipped in #5947; retention amendment below in #6028)
 
 > **Lifecycle amendment (2026-07-18):** WP4 replaced the holder-set eager-reclaim design below with per-holder renewable leases and lazy reclaim. The content-addressed tiers, tenant namespacing, and GQ2 envelope remain unchanged. See the current [GroupQueue architecture](../../../langwatch/src/server/event-sourcing/queues/groupQueue/ARCHITECTURE.md#per-holder-renewable-leases); the holder-set sections in this ADR are retained as the historical decision being superseded.
 >
@@ -20,7 +20,7 @@
 >
 > Retiring a blob's LAST lease now shortens its expiry to `BLOB_RELEASE_GRACE_TTL_SECONDS` (1 hour) instead of leaving the full backstop. This is deliberately not a return to eager reclaim: the bytes are not deleted, and any subsequent take re-arms the 4-day backstop. The race WP4 closed was a release *destroying* bytes a concurrent producer had already written and was about to stage; shortening a deadline cannot destroy them, and the producer's stage restores the backstop. The gap being covered is one Redis round trip, so an hour over-covers it by orders of magnitude. Withheld — full backstop retained — whenever any lease is live, or the rolling-deploy holder set carries a member beyond the migration sentinel (a pod from a pre-lease release, whose holder this blob's lease set cannot see).
 >
-> `gq_blob_release_grace_total` counts blobs entering the window. It exists because the failure mode this amendment fixes was *silence*: nothing reported that reclaim had stopped, and the only evidence was memory the rollout notes had already told operators to expect. Read it beside `gq_jobs_completed_total` — a rate near zero while jobs complete means reclaim is not happening again. `gq_jobs_dropped_total{reason="missing_blob"}` stays the rollback signal.
+> `gq_blob_release_grace_total` counts blobs entering the window. It exists because the failure mode this amendment fixes was *silence*: nothing reported that reclaim had stopped, and the only evidence was memory the rollout notes had already told operators to expect. Read it beside `gq_jobs_completed_total` — a rate near zero while jobs complete means reclaim is not happening again. `gq_jobs_dropped_total{reason="missing_blob"}` stays the rollback signal. Scope is terminal retirement only; the dedup-squash release applies the same window but is not counted, because that would mean widening the stage scripts' return contract on the hot path. Treat the count as a floor and don't derive a reclaim ratio from it.
 >
 > Note for anyone reading a prod graph after deploying this: it bounds *future* accumulation only. Blobs released before the fix keep the backstop their last take gave them and still age out on their own 4-day schedule.
 

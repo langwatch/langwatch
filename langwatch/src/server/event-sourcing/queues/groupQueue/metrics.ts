@@ -292,11 +292,18 @@ export const gqJobsDroppedTotal = new Counter({
  * evidence was Redis memory climbing for four days, which the lease rollout had
  * already told operators to expect. A rate near zero while jobs complete means
  * reclaim is not happening — read it beside `gq_jobs_completed_total`, not
- * alone. It counts only the TS release/transfer paths, so the Lua dedup-squash
- * release does not appear here.
+ * alone.
+ *
+ * ⚠️ Scope: terminal retirement only — the TS release and transfer paths. The
+ * dedup-squash release inside `STAGE_LUA` applies the same grace window but is
+ * NOT counted, because reporting it would mean widening the stage scripts'
+ * return contract on the hot path. So this is a liveness signal ("is reclaim
+ * happening at all"), not a complete ledger of graced blobs: treat the count as
+ * a floor, and do not compute a reclaim ratio from it. The squash path's own
+ * coverage is the integration tests plus Redis memory itself.
  */
 export const gqBlobReleaseGraceTotal = new Counter({
   name: "gq_blob_release_grace_total",
-  help: "Blobs whose last lease was retired, moving them from the 4-day backstop onto the release grace window",
+  help: "Blobs whose last lease was retired via terminal retirement, moving them from the 4-day backstop onto the release grace window (excludes the dedup-squash release path — a floor, not a total)",
   labelNames: ["queue_name", "tier"] as const,
 });

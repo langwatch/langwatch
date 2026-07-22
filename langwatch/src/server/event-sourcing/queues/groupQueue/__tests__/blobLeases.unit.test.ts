@@ -1,10 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import { BlobLeases } from "../blobLeases";
 import { CachedLuaScript } from "../cachedLuaScript";
 
 const PROJECT = createTenantId("project-1");
+
+// Every test here spies on the shared CachedLuaScript prototype. Without this,
+// call history accumulates across tests and an exact-argument assertion can
+// silently match a previous test's invocation.
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("BlobLeases", () => {
   describe("given a queue-scoped lease primitive", () => {
@@ -65,8 +72,6 @@ describe("BlobLeases", () => {
           "{queue}:gq:blobholders:project-1/hash-1",
           "holder-1",
         );
-        // lastCall, not calls[0]: the spy is on the shared prototype and is not
-        // reset between tests in this file.
         expect(run.mock.lastCall).not.toContain(
           "{queue}:gq:blob:project-1/hash-1",
         );
