@@ -163,7 +163,6 @@ describe("sendSlackWebhook", () => {
             input: "user question",
             output: "assistant answer",
             fullTrace: {
-              trace_id: "trace-1",
               events: [
                 {
                   event_type: "thumbs_up",
@@ -171,7 +170,7 @@ describe("sendSlackWebhook", () => {
                   event_details: { feedback: "great" },
                 },
               ],
-            } as unknown as Trace,
+            },
           },
         ],
         triggerName: "Quality Alert",

@@ -58,7 +58,7 @@ vi.mock("@langwatch/automations-server/services/webhook-delivery.service", () =>
   }),
 }));
 
-vi.mock("~/server/app-layer/automations/dispatch/emailCaps", () => ({
+vi.mock("~/server/app-layer/automations/dispatch/appEmailCaps", () => ({
   consumeEmailCapSlot: vi.fn().mockResolvedValue({ allowed: true, count: 1 }),
   consumeTenantEmailCapSlot: vi
     .fn()

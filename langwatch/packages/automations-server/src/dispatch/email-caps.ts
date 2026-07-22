@@ -1,5 +1,19 @@
 import { createLogger } from "@langwatch/observability";
-import { connection } from "~/server/redis";
+
+/** The Redis command surface the caps need — satisfied by ioredis. */
+export interface EmailCapRedis {
+  set(
+    key: string,
+    value: string | number,
+    ex: "EX",
+    seconds: number,
+    nx: "NX",
+  ): Promise<unknown>;
+  get(key: string): Promise<string | null>;
+  incr(key: string): Promise<number>;
+  incrby(key: string, increment: number): Promise<number>;
+  expire(key: string, seconds: number, nx: "NX"): Promise<unknown>;
+}
 
 const logger = createLogger("langwatch:outbox:emailHourlyCap");
 
@@ -105,7 +119,19 @@ function sweepExpiredMemoryEntries(now: number): void {
   }
 }
 
-export async function consumeEmailCapSlot({
+export interface EmailCaps {
+  consumeEmailCapSlot: typeof consumeEmailCapSlotShape;
+  consumeTenantEmailCapSlot: typeof consumeTenantEmailCapSlotShape;
+}
+
+export function createEmailCaps({
+  redis,
+}: {
+  /** ioredis connection, or undefined for the in-memory fallback. */
+  redis: EmailCapRedis | undefined;
+}) {
+  const connection = redis;
+  async function consumeEmailCapSlot({
   projectId,
   triggerId,
   now,
@@ -225,7 +251,7 @@ export async function consumeEmailCapSlot({
  * (the hourly cap is the primary throttle and logs at ERROR; this backstop's
  * degradation is a warning, not a page).
  */
-export async function consumeTenantEmailCapSlot({
+async function consumeTenantEmailCapSlot({
   projectId,
   now,
   cap,
@@ -322,6 +348,13 @@ export async function consumeTenantEmailCapSlot({
 }
 
 /** Test-only: clear in-memory state (hourly + tenant). No-op for Redis. */
+  return { consumeEmailCapSlot, consumeTenantEmailCapSlot };
+}
+
+type ConsumeEmailCaps = ReturnType<typeof createEmailCaps>;
+declare const consumeEmailCapSlotShape: ConsumeEmailCaps["consumeEmailCapSlot"];
+declare const consumeTenantEmailCapSlotShape: ConsumeEmailCaps["consumeTenantEmailCapSlot"];
+
 export function _resetMemoryEmailCapStore(): void {
   memoryStore.clear();
   claimStore.clear();

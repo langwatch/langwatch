@@ -1,16 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   _resetMemoryEmailCapStore,
-  consumeEmailCapSlot,
-  consumeTenantEmailCapSlot,
-} from "../emailCaps";
+  createEmailCaps,
+  type EmailCapRedis,
+} from "../email-caps";
 
-// `connection` is a mutable module-level binding; the mock lets each test
-// drive it (undefined = in-memory path, an object = Redis path).
-const redisMock = vi.hoisted(() => ({
-  connection: undefined as unknown,
-}));
-vi.mock("~/server/redis", () => redisMock);
+// Mutable per-test connection (undefined = in-memory path, an object = Redis
+// path); the factory is constructed per call so each test's value applies.
+const redisMock = { connection: undefined as unknown };
+const caps = () =>
+  createEmailCaps({ redis: redisMock.connection as EmailCapRedis | undefined });
+const consumeEmailCapSlot: ReturnType<
+  typeof createEmailCaps
+>["consumeEmailCapSlot"] = (args) => caps().consumeEmailCapSlot(args);
+const consumeTenantEmailCapSlot: ReturnType<
+  typeof createEmailCaps
+>["consumeTenantEmailCapSlot"] = (args) =>
+  caps().consumeTenantEmailCapSlot(args);
 
 // Stable singleton logger so a test can spy the SAME `error` fn the module
 // captured at import time (`const logger = createLogger(...)` runs once).

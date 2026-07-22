@@ -42,7 +42,7 @@ import { dispatchGraphAlertAction } from "~/server/app-layer/automations/dispatc
 import {
   consumeEmailCapSlot,
   consumeTenantEmailCapSlot,
-} from "~/server/app-layer/automations/dispatch/emailCaps";
+} from "~/server/app-layer/automations/dispatch/appEmailCaps";
 import type { TriggerSettlementDispatchDeps } from "../../../event-sourcing/pipelines/automations/process-manager/triggerSettlementIntentHandlers";
 
 /**
