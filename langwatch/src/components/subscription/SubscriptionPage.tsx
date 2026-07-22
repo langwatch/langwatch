@@ -294,7 +294,12 @@ export function SubscriptionPage() {
     activePlanType: plan?.type,
   });
 
-  if (!organization || activePlan.isLoading || detectedCurrency.isLoading) {
+  if (
+    !organization ||
+    activePlan.isLoading ||
+    detectedCurrency.isLoading ||
+    billingCurrency.isLoading
+  ) {
     return (
       <SettingsLayout>
         <Flex justifyContent="center" padding={8}>
