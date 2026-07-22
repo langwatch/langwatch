@@ -29,11 +29,13 @@ Feature: Experiment run totals are derived from its items
     Then the run still reports one completed item
     And its cost is counted once
 
-  Scenario: Per-trace cost is computed from the items
-    Given an experiment run whose items span several traces
-    When the user opens the run
-    Then the cost attributed to each trace is summed from that trace's items
-    And no per-trace record is carried on the run itself
+  # --- Per-trace cost ---
+
+  Scenario: A trace's cost is recorded once however often it is reported
+    Given an experiment run whose cost has been computed for a trace
+    When that trace's cost is reported again with a new figure
+    Then the run's total cost counts the trace once, at the newer figure
+    And this holds even if the run was reloaded in between
 
   Scenario: A late item changes the run immediately
     Given an experiment run reported as finished
