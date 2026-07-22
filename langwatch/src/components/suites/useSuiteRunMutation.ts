@@ -4,7 +4,11 @@
  * Used by both SuiteFormDrawer (Save & Run) and suites/index.tsx (sidebar Run).
  */
 
-import { readHandledError, showErrorToast } from "~/features/errors";
+import {
+  explainHandledError,
+  readHandledError,
+  showErrorToast,
+} from "~/features/errors";
 import { api } from "~/utils/api";
 import { toaster } from "../ui/toaster";
 
@@ -58,20 +62,22 @@ export function useSuiteRunMutation({
     },
     onError: (err, variables) => {
       // A run plan with nothing runnable left is a curated rejection with its
-      // own way out — the toast carries the "Edit Run Plan" action, which is
-      // the fix. Keyed off the stable code, not the prose.
-      const code = readHandledError(err)?.code;
-      const archivedKind =
-        code === "suite_all_scenarios_archived"
-          ? "scenario"
-          : code === "suite_all_targets_archived"
-            ? "target"
-            : null;
+      // own way out — this toast adds the "Edit Run Plan" action, which is the
+      // fix. Keyed off the stable code; the words stay in the registry, which
+      // already owns copy for both of these.
+      const handled = readHandledError(err);
+      const allArchived =
+        handled &&
+        (handled.code === "suite_all_scenarios_archived" ||
+          handled.code === "suite_all_targets_archived")
+          ? handled
+          : null;
 
-      if (archivedKind) {
+      if (allArchived) {
+        const { title, description } = explainHandledError(allArchived);
         toaster.create({
-          title: "Cannot execute run plan",
-          description: `Every ${archivedKind} in this run plan is archived. Edit the plan to include active ones.`,
+          title,
+          description: description || undefined,
           type: "error",
           meta: { closable: true },
           action: {

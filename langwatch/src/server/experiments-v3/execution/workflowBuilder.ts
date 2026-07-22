@@ -6,7 +6,17 @@ import type {
   LocalPromptConfig,
   TargetConfig,
 } from "~/experiments-v3/types";
-import { LATEST_SPEC_VERSION, type Code, type Entry, type Evaluator, type Field, type HttpComponentConfig, type LlmPromptConfigComponent, type Signature, type Workflow } from "~/optimization_studio/types/dsl";
+import {
+  type Code,
+  type Entry,
+  type Evaluator,
+  type Field,
+  type HttpComponentConfig,
+  LATEST_SPEC_VERSION,
+  type LlmPromptConfigComponent,
+  type Signature,
+  type Workflow,
+} from "~/optimization_studio/types/dsl";
 
 /**
  * HTTP node data structure - uses parameters like other nodes.
@@ -18,11 +28,12 @@ type HttpNodeData = {
   outputs: Field[];
   parameters: Field[];
 };
+
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { ChatMessage } from "~/server/tracer/types";
 import type {
   ExecutionCell,
@@ -193,9 +204,7 @@ const buildTargetNode = (
     if (targetConfig.localPromptConfig) {
       // Get name from loaded prompt if available, fall back to target ID
       const name =
-        loadedData.prompt?.handle ??
-        loadedData.prompt?.name ??
-        targetConfig.id;
+        loadedData.prompt?.handle ?? loadedData.prompt?.name ?? targetConfig.id;
       return {
         targetNode: buildSignatureNodeFromLocalConfig({
           nodeId: targetNodeId,
@@ -305,7 +314,8 @@ export const buildEvaluatorTargetNode = (
     ? loadedEvaluators?.get(targetConfig.targetEvaluatorId)
     : undefined;
   const dbConfig = dbEvaluator?.config as EvaluatorDbConfig | undefined;
-  const settings = targetConfig.localEvaluatorConfig?.settings ?? dbConfig?.settings ?? {};
+  const settings =
+    targetConfig.localEvaluatorConfig?.settings ?? dbConfig?.settings ?? {};
 
   // Build inputs with value mappings applied
   const inputs: Field[] = (targetConfig.inputs ?? []).map((input) => ({
@@ -925,7 +935,8 @@ const buildEvaluatorNodes = (
       ? loadedEvaluators?.get(evaluator.dbEvaluatorId)
       : undefined;
     const dbConfig = dbEvaluator?.config as EvaluatorDbConfig | undefined;
-    const settings = evaluator.localEvaluatorConfig?.settings ?? dbConfig?.settings ?? {};
+    const settings =
+      evaluator.localEvaluatorConfig?.settings ?? dbConfig?.settings ?? {};
 
     // Get name from loaded evaluator, fall back to evaluator ID
     const evaluatorName = dbEvaluator?.name ?? evaluator.id;

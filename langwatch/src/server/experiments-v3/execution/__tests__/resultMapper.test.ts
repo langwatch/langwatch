@@ -5,7 +5,6 @@ import {
   coerceScore,
   extractTargetOutput,
   isEvaluatorNode,
-  mapErrorEvent,
   mapEvaluatorResult,
   mapNlpEvent,
   mapTargetResult,
@@ -922,37 +921,6 @@ describe("resultMapper", () => {
           score: 0.0, // Score should be preserved
         });
       }
-    });
-  });
-
-  describe("mapErrorEvent", () => {
-    it("creates generic error event", () => {
-      const result = mapErrorEvent("Something went wrong");
-
-      expect(result).toEqual({
-        type: "error",
-        message: "Something went wrong",
-        rowIndex: undefined,
-        targetId: undefined,
-        evaluatorId: undefined,
-      });
-    });
-
-    it("creates error event with context", () => {
-      const result = mapErrorEvent(
-        "Failed to execute",
-        2,
-        "target-1",
-        "eval-1",
-      );
-
-      expect(result).toEqual({
-        type: "error",
-        message: "Failed to execute",
-        rowIndex: 2,
-        targetId: "target-1",
-        evaluatorId: "eval-1",
-      });
     });
   });
 });

@@ -46,12 +46,7 @@ import {
   type ConfigFormCtx,
   isNotifyEntry,
 } from "~/features/automations/providers/types";
-import {
-  explainHandledError,
-  readHandledError,
-  showErrorToast,
-  UNKNOWN_ERROR_PRESENTATION,
-} from "~/features/errors";
+import { describeError, showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import type { FilterParam } from "~/hooks/useFilterParams";
@@ -779,16 +774,16 @@ export function AutomationDrawer({
           });
         },
         onError: (err) => {
-          const domain = readHandledError(err);
-          const { title, description, isRegistered } = domain
-            ? explainHandledError(domain)
-            : UNKNOWN_ERROR_PRESENTATION;
+          // The attempt log is the persistent record of what the toast just
+          // said, so it has to say the same thing — including the case the
+          // toast covers and a hand-rolled registry read does not: a procedure
+          // that authored its own message for the user.
           pushAttempt({
             at: Date.now(),
             channel,
             status: "failure",
-            errorTitle: isRegistered ? title : "Test fire failed",
-            errorDetail: description,
+            errorTitle: "Test fire failed",
+            errorDetail: describeError({ error: err }),
           });
           showErrorToast({ error: err, fallbackTitle: "Test fire failed" });
         },

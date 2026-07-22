@@ -246,7 +246,17 @@ export type EvaluationV3Event =
   | { type: "progress"; completed: number; total: number }
   | {
       type: "error";
+      /**
+       * Wire message. For a coded failure this is the code itself (#5984); for
+       * an unhandled one it is a fixed generic line — never a thrown error's
+       * own `message`, which is server copy naming internal services.
+       */
       message: string;
+      /**
+       * The coded failure, when we knew what went wrong. The client presents
+       * from this via the registry, exactly as it does for `target_result`.
+       */
+      domainError?: SerializedHandledError;
       rowIndex?: number;
       targetId?: string;
       evaluatorId?: string;

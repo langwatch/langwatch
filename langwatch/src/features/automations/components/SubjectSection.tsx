@@ -16,11 +16,7 @@ import type { NotificationCadence } from "@langwatch/automations/cadences";
 import { useEffect, useMemo, useState } from "react";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
 import { Tooltip } from "~/components/ui/tooltip";
-import {
-  explainHandledError,
-  readHandledError,
-  UNKNOWN_ERROR_PRESENTATION,
-} from "~/features/errors";
+import { describeError } from "~/features/errors";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
@@ -645,17 +641,13 @@ function TracePreview({
   }
   if (error && !hasData) {
     // A single xs line under the query editor — too tight for an alert, so it
-    // takes the registry's words directly.
-    const handled = readHandledError(error);
-    const explanation = handled
-      ? explainHandledError(handled)
-      : UNKNOWN_ERROR_PRESENTATION;
-
+    // takes the one-string form of the same copy.
     return (
       <Text textStyle="xs" color="fg.error">
-        {explanation.description
-          ? `${explanation.title}. ${explanation.description}`
-          : explanation.title}
+        {describeError({
+          error,
+          fallbackTitle: "Couldn't check matching traces",
+        })}
       </Text>
     );
   }

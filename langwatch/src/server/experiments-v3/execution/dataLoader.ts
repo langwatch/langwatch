@@ -472,7 +472,10 @@ export const loadExecutionData = async (
       where: { id: versionId, projectId, workflowId },
     });
     if (!version) {
-      return { error: `Workflow version "${versionId}" not found`, status: 404 };
+      return {
+        error: `Workflow version "${versionId}" not found`,
+        status: 404,
+      };
     }
 
     return {
@@ -514,7 +517,9 @@ export const loadExecutionData = async (
     const key = workflowLoadKey({ workflowId: linkedWorkflowId });
     if (loadedWorkflows.has(key)) continue;
 
-    const result = await loadPublishedWorkflow({ workflowId: linkedWorkflowId });
+    const result = await loadPublishedWorkflow({
+      workflowId: linkedWorkflowId,
+    });
     if ("error" in result) return result;
     loadedWorkflows.set(key, result);
   }

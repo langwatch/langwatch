@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State } from "~/experiments-v3/types";
 import {
-  resolveScopedRowIndices,
   buildEvaluatorInputs,
   generateCells,
   generateComparisonCells,
+  resolveScopedRowIndices,
 } from "../orchestrator";
 import type { ExecutionScope } from "../types";
 
@@ -616,11 +616,11 @@ describe("orchestrator", () => {
       it("resolves the synthetic evaluator's type from the DB row instead of forcing select_best_compare", () => {
         const { cells } = generateComparisonCells({
           scopedRowIndices: undefined,
-        state: legacyPairwiseState(),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: legacyCompletedTargetOutputs,
-        loadedEvaluators,
-      });
+          state: legacyPairwiseState(),
+          datasetRows: createTestDataset(1),
+          completedTargetOutputs: legacyCompletedTargetOutputs,
+          loadedEvaluators,
+        });
 
         expect(cells).toHaveLength(1);
         expect(cells[0]?.evaluatorConfigs[0]?.evaluatorType).toBe(
@@ -631,11 +631,11 @@ describe("orchestrator", () => {
       it("bakes the legacy 2-slot mapping shape instead of `candidates`", () => {
         const { cells } = generateComparisonCells({
           scopedRowIndices: undefined,
-        state: legacyPairwiseState(),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: legacyCompletedTargetOutputs,
-        loadedEvaluators,
-      });
+          state: legacyPairwiseState(),
+          datasetRows: createTestDataset(1),
+          completedTargetOutputs: legacyCompletedTargetOutputs,
+          loadedEvaluators,
+        });
 
         const mappings = cells[0]?.evaluatorConfigs[0]?.mappings["dataset-1"]?.[
           "pairwise-target"
@@ -655,11 +655,11 @@ describe("orchestrator", () => {
       it("dispatches the fields a pairwise_compare judge requires, not the N-way `candidates` shape", () => {
         const { cells } = generateComparisonCells({
           scopedRowIndices: undefined,
-        state: legacyPairwiseState(),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: legacyCompletedTargetOutputs,
-        loadedEvaluators,
-      });
+          state: legacyPairwiseState(),
+          datasetRows: createTestDataset(1),
+          completedTargetOutputs: legacyCompletedTargetOutputs,
+          loadedEvaluators,
+        });
         const cell = cells[0]!;
         const evaluatorId = cell.evaluatorConfigs[0]!.id;
 
@@ -694,11 +694,11 @@ describe("orchestrator", () => {
 
         const { cells } = generateComparisonCells({
           scopedRowIndices: undefined,
-        state: legacyPairwiseState(),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: legacyCompletedTargetOutputs,
-        loadedEvaluators: healedLoadedEvaluators,
-      });
+          state: legacyPairwiseState(),
+          datasetRows: createTestDataset(1),
+          completedTargetOutputs: legacyCompletedTargetOutputs,
+          loadedEvaluators: healedLoadedEvaluators,
+        });
 
         expect(cells[0]?.evaluatorConfigs[0]?.evaluatorType).toBe(
           "langevals/select_best_compare",
@@ -766,10 +766,10 @@ describe("orchestrator", () => {
 
         const { cells } = generateComparisonCells({
           scopedRowIndices: undefined,
-        state,
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs,
-      });
+          state,
+          datasetRows: createTestDataset(1),
+          completedTargetOutputs,
+        });
 
         expect(cells).toHaveLength(1);
         expect(cells[0]?.comparison?.candidates).toHaveLength(3);
@@ -835,13 +835,13 @@ describe("orchestrator", () => {
         it("sends that field's value as the candidate text", () => {
           const { cells } = generateComparisonCells({
             scopedRowIndices: undefined,
-        state: structuredState({
+            state: structuredState({
               "target-1": ["answer"],
               "target-2": ["answer"],
             }),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: structuredOutputs,
-      });
+            datasetRows: createTestDataset(1),
+            completedTargetOutputs: structuredOutputs,
+          });
 
           expect(cells[0]?.comparison?.candidates[0]?.output).toBe("from A");
           expect(cells[0]?.comparison?.candidates[1]?.output).toBe("from B");
@@ -852,10 +852,10 @@ describe("orchestrator", () => {
         it("serializes the whole object rather than failing the run", () => {
           const { cells } = generateComparisonCells({
             scopedRowIndices: undefined,
-        state: structuredState(),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: structuredOutputs,
-      });
+            state: structuredState(),
+            datasetRows: createTestDataset(1),
+            completedTargetOutputs: structuredOutputs,
+          });
 
           const [first, second] = cells[0]?.comparison?.candidates ?? [];
           expect(typeof first?.output).toBe("string");
@@ -875,13 +875,13 @@ describe("orchestrator", () => {
         it("skips the row instead of judging the text 'null'", () => {
           const { cells, skipReasons } = generateComparisonCells({
             scopedRowIndices: undefined,
-        state: structuredState(),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: new Map([
+            state: structuredState(),
+            datasetRows: createTestDataset(1),
+            completedTargetOutputs: new Map([
               ["0:target-1", { output: null, cost: 0, duration: 1 }],
               ["0:target-2", { output: { answer: "B" }, cost: 0, duration: 1 }],
             ]) as never,
-      });
+          });
 
           expect(cells).toHaveLength(0);
           expect(skipReasons[0]?.kind).toBe("empty-output");
@@ -924,14 +924,14 @@ describe("orchestrator", () => {
         // Row 0 has both outputs; rows 1 and 2 have none. Scoped to row 0 only,
         // so the untouched rows must produce no skip reasons at all.
         const { cells, skipReasons } = generateComparisonCells({
-        state: twoRowComparisonState(),
-        datasetRows: createTestDataset(3),
-        completedTargetOutputs: new Map([
+          state: twoRowComparisonState(),
+          datasetRows: createTestDataset(3),
+          completedTargetOutputs: new Map([
             ["0:target-1", { output: { output: "A" }, cost: 0, duration: 1 }],
             ["0:target-2", { output: { output: "B" }, cost: 0, duration: 1 }],
           ]) as never,
-        scopedRowIndices: [0],
-      });
+          scopedRowIndices: [0],
+        });
 
         expect(cells).toHaveLength(1);
         expect(cells[0]?.rowIndex).toBe(0);
@@ -940,13 +940,13 @@ describe("orchestrator", () => {
 
       it("still reports the scoped row's own missing variants", () => {
         const { cells, skipReasons } = generateComparisonCells({
-        state: twoRowComparisonState(),
-        datasetRows: createTestDataset(3),
-        completedTargetOutputs: new Map([
+          state: twoRowComparisonState(),
+          datasetRows: createTestDataset(3),
+          completedTargetOutputs: new Map([
             ["1:target-1", { output: { output: "A" }, cost: 0, duration: 1 }],
           ]) as never,
-        scopedRowIndices: [1],
-      });
+          scopedRowIndices: [1],
+        });
 
         expect(cells).toHaveLength(0);
         expect(skipReasons).toHaveLength(1);
@@ -965,7 +965,11 @@ describe("orchestrator", () => {
         const state = createTestState(3, 0);
         // Turn the inline targets into saved prompts; targets 2 and 3 share the
         // "support-detailed" handle, exactly the reported duplicate-variant case.
-        const handles = ["support-concise", "support-detailed", "support-detailed"];
+        const handles = [
+          "support-concise",
+          "support-detailed",
+          "support-detailed",
+        ];
         state.targets = state.targets.map((t, i) => ({
           ...t,
           promptId: `prompt-${i + 1}`,
@@ -996,14 +1000,14 @@ describe("orchestrator", () => {
 
         const { cells, skipReasons } = generateComparisonCells({
           scopedRowIndices: undefined,
-        state,
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: // Only support-concise ran; both support-detailed variants are missing.
-          new Map([
-            ["0:target-1", { output: { output: "A" }, cost: 0, duration: 1 }],
-          ]) as never,
-        loadedPrompts,
-      });
+          state,
+          datasetRows: createTestDataset(1),
+          completedTargetOutputs: // Only support-concise ran; both support-detailed variants are missing.
+            new Map([
+              ["0:target-1", { output: { output: "A" }, cost: 0, duration: 1 }],
+            ]) as never,
+          loadedPrompts,
+        });
 
         expect(cells).toHaveLength(0);
         expect(skipReasons[0]?.kind).toBe("missing-output");
@@ -1046,10 +1050,10 @@ describe("orchestrator", () => {
       it("appends each score to that candidate's output", () => {
         const { cells } = generateComparisonCells({
           scopedRowIndices: undefined,
-        state: scoredState(),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: plainOutputs,
-        completedTargetEvaluatorScores: new Map([
+          state: scoredState(),
+          datasetRows: createTestDataset(1),
+          completedTargetOutputs: plainOutputs,
+          completedTargetEvaluatorScores: new Map([
             [
               "0:target-1",
               [
@@ -1058,7 +1062,7 @@ describe("orchestrator", () => {
               ],
             ],
           ]),
-      });
+        });
 
         const output = cells[0]?.comparison?.candidates[0]?.output as string;
         expect(output).toContain("answer from A");
@@ -1070,11 +1074,13 @@ describe("orchestrator", () => {
       it("leaves a candidate with no scores untouched", () => {
         const { cells } = generateComparisonCells({
           scopedRowIndices: undefined,
-        state: scoredState(),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: plainOutputs,
-        completedTargetEvaluatorScores: new Map([["0:target-1", [{ name: "Faithfulness", score: 0.91 }]]]),
-      });
+          state: scoredState(),
+          datasetRows: createTestDataset(1),
+          completedTargetOutputs: plainOutputs,
+          completedTargetEvaluatorScores: new Map([
+            ["0:target-1", [{ name: "Faithfulness", score: 0.91 }]],
+          ]),
+        });
 
         expect(cells[0]?.comparison?.candidates[1]?.output).toBe(
           "answer from B",
@@ -1085,10 +1091,10 @@ describe("orchestrator", () => {
       it("judges the bare outputs when no scores were collected", () => {
         const { cells } = generateComparisonCells({
           scopedRowIndices: undefined,
-        state: scoredState(),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: plainOutputs,
-      });
+          state: scoredState(),
+          datasetRows: createTestDataset(1),
+          completedTargetOutputs: plainOutputs,
+        });
 
         expect(cells[0]?.comparison?.candidates[0]?.output).toBe(
           "answer from A",
@@ -1126,11 +1132,11 @@ describe("orchestrator", () => {
         it("appends the scores to the picked field, not the whole object", () => {
           const { cells } = generateComparisonCells({
             scopedRowIndices: undefined,
-        state: structuredState(),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: structured,
-        completedTargetEvaluatorScores: scores,
-      });
+            state: structuredState(),
+            datasetRows: createTestDataset(1),
+            completedTargetOutputs: structured,
+            completedTargetEvaluatorScores: scores,
+          });
 
           expect(cells[0]?.comparison?.candidates[0]?.output).toBe(
             "from A\n\n--- Existing evaluator scores ---\n- Faithfulness: score=0.91",
@@ -1140,11 +1146,11 @@ describe("orchestrator", () => {
         it("appends the scores to the serialized object when no field is picked", () => {
           const { cells } = generateComparisonCells({
             scopedRowIndices: undefined,
-        state: scoredState(),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: structured,
-        completedTargetEvaluatorScores: scores,
-      });
+            state: scoredState(),
+            datasetRows: createTestDataset(1),
+            completedTargetOutputs: structured,
+            completedTargetEvaluatorScores: scores,
+          });
 
           const output = cells[0]?.comparison?.candidates[0]?.output as string;
           expect(output).toContain('{"answer":"from A","confidence":0.9}');
@@ -1159,14 +1165,14 @@ describe("orchestrator", () => {
         it("skips the row rather than sending a scores-only candidate", () => {
           const { cells, skipReasons } = generateComparisonCells({
             scopedRowIndices: undefined,
-        state: scoredState(),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: new Map([
+            state: scoredState(),
+            datasetRows: createTestDataset(1),
+            completedTargetOutputs: new Map([
               ["0:target-1", { output: "", cost: 0, duration: 1 }],
               ["0:target-2", { output: "answer from B", cost: 0, duration: 1 }],
             ]),
-        completedTargetEvaluatorScores: scores,
-      });
+            completedTargetEvaluatorScores: scores,
+          });
 
           expect(cells).toHaveLength(0);
           expect(skipReasons[0]?.kind).toBe("empty-output");
@@ -1183,14 +1189,14 @@ describe("orchestrator", () => {
 
           const { cells, skipReasons } = generateComparisonCells({
             scopedRowIndices: undefined,
-        state: scoredState(),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: new Map([
+            state: scoredState(),
+            datasetRows: createTestDataset(1),
+            completedTargetOutputs: new Map([
               ["0:target-1", { output: circular, cost: 0, duration: 1 }],
               ["0:target-2", { output: "answer from B", cost: 0, duration: 1 }],
             ]),
-        completedTargetEvaluatorScores: scores,
-      });
+            completedTargetEvaluatorScores: scores,
+          });
 
           expect(cells).toHaveLength(0);
           expect(skipReasons[0]?.kind).toBe("empty-output");
@@ -1360,7 +1366,9 @@ describe("orchestrator", () => {
         scopedRowIndices: undefined,
         state,
         datasetRows: createTestDataset(1),
-        completedTargetOutputs: new Map([["0:target-1", { output: { output: "answer from A" } }]]),
+        completedTargetOutputs: new Map([
+          ["0:target-1", { output: { output: "answer from A" } }],
+        ]),
       });
 
       expect(cells).toHaveLength(0);
@@ -1403,8 +1411,22 @@ describe("orchestrator", () => {
       };
 
       const loadedPrompts = new Map([
-        ["prompt-1", { handle: "candidate-a", name: "candidate-a", model: "openai/gpt-4o-mini" }],
-        ["prompt-2", { handle: "candidate-b", name: "candidate-b", model: "openai/gpt-4o-mini" }],
+        [
+          "prompt-1",
+          {
+            handle: "candidate-a",
+            name: "candidate-a",
+            model: "openai/gpt-4o-mini",
+          },
+        ],
+        [
+          "prompt-2",
+          {
+            handle: "candidate-b",
+            name: "candidate-b",
+            model: "openai/gpt-4o-mini",
+          },
+        ],
       ]) as never;
 
       const structuredOutputs = new Map([
@@ -1415,11 +1437,11 @@ describe("orchestrator", () => {
       it("skips the row with an empty-output reason naming the variant", () => {
         const { cells, skipReasons } = generateComparisonCells({
           scopedRowIndices: undefined,
-        state: stateWithPath(["renamed"]),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: structuredOutputs,
-        loadedPrompts,
-      });
+          state: stateWithPath(["renamed"]),
+          datasetRows: createTestDataset(1),
+          completedTargetOutputs: structuredOutputs,
+          loadedPrompts,
+        });
 
         expect(cells).toHaveLength(0);
         expect(skipReasons).toHaveLength(1);
@@ -1431,11 +1453,11 @@ describe("orchestrator", () => {
       it("judges the row when the picked field does exist", () => {
         const { cells, skipReasons } = generateComparisonCells({
           scopedRowIndices: undefined,
-        state: stateWithPath(["answer"]),
-        datasetRows: createTestDataset(1),
-        completedTargetOutputs: structuredOutputs,
-        loadedPrompts,
-      });
+          state: stateWithPath(["answer"]),
+          datasetRows: createTestDataset(1),
+          completedTargetOutputs: structuredOutputs,
+          loadedPrompts,
+        });
 
         expect(skipReasons).toHaveLength(0);
         expect(cells).toHaveLength(1);
