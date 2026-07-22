@@ -26,9 +26,9 @@ Feature: haven service selection
   Scenario: Up reconciles a running stack
     Given the stack is running without langy
     When the developer runs "haven up +langy"
-    Then exactly langy is started
-    And the already-running services are not bounced
+    Then the running stack is replaced in place with langy included
     And there is no refusal and no force flag
+    And a plain "haven up" on a stack that matches its selection changes nothing
 
   Scenario: Up recovers a half-dead stack without a force flag
     Given the registry says the stack is running but its launcher has died

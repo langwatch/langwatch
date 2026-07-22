@@ -91,6 +91,39 @@ func (s *Store) WriteSlugCache(worktreeDir, slug string) error {
 	return os.WriteFile(filepath.Join(worktreeDir, ".langwatch-slug"), []byte(slug+"\n"), 0o644)
 }
 
+// selectionFile is the on-disk shape of the worktree-local sticky service
+// selection (ADR-064) — .haven.json next to .langwatch-slug.
+type selectionFile struct {
+	Services domain.Selection `json:"services"`
+}
+
+func selectionPath(worktreeDir string) string {
+	return filepath.Join(worktreeDir, ".haven.json")
+}
+
+// ReadSelection reads the worktree's sticky service selection; ok is false
+// when none has been written yet (callers fall back to the lean default).
+func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
+	b, err := os.ReadFile(selectionPath(worktreeDir))
+	if err != nil {
+		return domain.Selection{}, false
+	}
+	var f selectionFile
+	if json.Unmarshal(b, &f) != nil {
+		return domain.Selection{}, false
+	}
+	return f.Services, true
+}
+
+// WriteSelection persists the worktree's sticky service selection.
+func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
+	b, err := json.MarshalIndent(selectionFile{Services: sel}, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(selectionPath(worktreeDir), append(b, '\n'), 0o644)
+}
+
 // WriteOverlay writes langwatch/.env.portless. Mode 0o600: it carries
 // LANGWATCH_API_KEY, so it must not be world-readable.
 func (s *Store) WriteOverlay(lwDir string, st domain.Stack) error {

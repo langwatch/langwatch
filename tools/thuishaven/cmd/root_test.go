@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 func TestStripFlag(t *testing.T) {
@@ -256,3 +258,22 @@ func TestProcessOnlyKnobsAreDocumented(t *testing.T) {
 		}
 	}
 }
+// @scenario "Legacy selection env vars bridge for one release"
+func TestApplyLegacySelectionEnvIsOneShot(t *testing.T) {
+	t.Setenv("LANGWATCH_SKIP_NLP", "1")
+	t.Setenv("WORKERS_IN_PROCESS", "0")
+	opts := optionsFromEnv(t.TempDir())
+	sel := applyLegacySelectionEnv(domainDefaultSelection(), &opts)
+	if sel.NLP {
+		t.Error("LANGWATCH_SKIP_NLP=1 must skip nlp for this run")
+	}
+	if !sel.Workers {
+		t.Error("WORKERS_IN_PROCESS=0 must select the standalone workers lane for this run")
+	}
+	if !opts.ShouldStartWorkers {
+		t.Error("workers themselves stay on")
+	}
+}
+
+// domainDefaultSelection keeps the domain import local to the tests that need it.
+func domainDefaultSelection() domain.Selection { return domain.DefaultSelection() }

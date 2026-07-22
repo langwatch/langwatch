@@ -170,57 +170,75 @@ func TestRestart(t *testing.T) {
 	})
 }
 
-// @scenario "Up refuses a worktree whose stack is already running"
-// @scenario "Up --force replaces the running stack"
-func TestUpAlreadyRunningGuard(t *testing.T) {
+// @scenario "Up on an already-running stack reconciles"
+// @scenario "Up recovers a half-dead stack without a force flag"
+func TestUpReconcilesRunningStack(t *testing.T) {
 	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
 
-	newFixture := func(launcherAlive bool) (*fakeSystem, *Orchestrator) {
+	newFixture := func(launcherAlive bool) (*fakeStore, *fakeSystem, *Orchestrator) {
 		store := &fakeStore{
 			stacks:    []domain.Stack{restartStack()},
 			slugCache: map[string]string{"/wt/feat-x": "feat-x"},
 		}
 		sys := &fakeSystem{alive: map[int]bool{42: launcherAlive}}
-		return sys, restartOrch(store, sys)
+		return store, sys, restartOrch(store, sys)
 	}
 
-	t.Run("given the same worktree's stack is already live", func(t *testing.T) {
-		t.Run("when up runs without force, it refuses", func(t *testing.T) {
-			sys, o := newFixture(true)
-			if err := o.replaceRunningStack(params, false); err == nil {
-				t.Error("up should refuse when the stack is already running")
+	t.Run("given the stack is live and matches the selection", func(t *testing.T) {
+		t.Run("when up runs, it is a friendly no-op — nothing terminated, nothing provisioned", func(t *testing.T) {
+			store, sys, o := newFixture(true)
+			opts := PlanOptions{Selection: domain.SelectionFromStack(store.stacks[0]), ShouldStartWorkers: true}
+			proceed, err := o.reconcileRunningStack(params, opts)
+			if err != nil {
+				t.Fatalf("reconcile: %v", err)
+			}
+			if proceed {
+				t.Error("a matching live stack must not be re-provisioned")
 			}
 			if len(sys.terminated) != 0 {
-				t.Errorf("refusing must not terminate anything, got %v", sys.terminated)
+				t.Errorf("nothing may be terminated, got %v", sys.terminated)
 			}
 		})
+	})
 
-		t.Run("when up runs with force, it terminates the old launcher and proceeds", func(t *testing.T) {
-			sys, o := newFixture(true)
-			if err := o.replaceRunningStack(params, true); err != nil {
-				t.Fatalf("forced up should proceed: %v", err)
+	t.Run("given the stack is live with a different selection", func(t *testing.T) {
+		t.Run("when up runs, the old launcher is replaced without any force flag", func(t *testing.T) {
+			store, sys, o := newFixture(true)
+			desired := domain.SelectionFromStack(store.stacks[0])
+			desired.Langy = !desired.Langy
+			proceed, err := o.reconcileRunningStack(params, PlanOptions{Selection: desired, ShouldStartWorkers: true})
+			if err != nil {
+				t.Fatalf("reconcile: %v", err)
+			}
+			if !proceed {
+				t.Error("a selection change must re-provision")
 			}
 			if len(sys.terminated) != 1 || sys.terminated[0] != 42 {
-				t.Errorf("force should terminate the old launcher, got %v", sys.terminated)
+				t.Errorf("the old launcher must be terminated, got %v", sys.terminated)
 			}
 		})
 	})
 
 	t.Run("given the registered stack's launcher already exited", func(t *testing.T) {
-		t.Run("when up runs, it proceeds without force", func(t *testing.T) {
-			sys, o := newFixture(false)
-			if err := o.replaceRunningStack(params, false); err != nil {
+		t.Run("when up runs, the stale entry is cleaned and provisioning proceeds", func(t *testing.T) {
+			store, sys, o := newFixture(false)
+			proceed, err := o.reconcileRunningStack(params, PlanOptions{ShouldStartWorkers: true})
+			if err != nil {
 				t.Fatalf("a dead launcher must not block up: %v", err)
+			}
+			if !proceed {
+				t.Error("a dead launcher must not block provisioning")
 			}
 			if len(sys.terminated) != 0 {
 				t.Errorf("nothing to terminate, got %v", sys.terminated)
+			}
+			if len(store.stacks) != 0 {
+				t.Errorf("the stale registry entry must be cleaned, got %v", store.stacks)
 			}
 		})
 	})
 }
 
-// @scenario "Down keeps the databases by default"
-// @scenario "Down drops the databases only when explicitly asked"
 // @scenario "Down keeps the databases, always"
 func TestDownKeepsDatabases(t *testing.T) {
 	ctx := context.Background()

@@ -18,7 +18,7 @@ import (
 // the plain list; a TUI is useless to them.
 func runHub(ctx context.Context, d deps) error {
 	if d.isAgent {
-		return d.orch.Status(false)
+		return d.orch.Status(false, d.worktree)
 	}
 	for {
 		dir, err := hubtui.Run(ctx, d.hubActions())

@@ -16,7 +16,7 @@ func TestNoLaneIsRed(t *testing.T) {
 
 	children := o.planChildren(
 		domain.Stack{Slug: "test"},
-		PlanOptions{ShouldStartWorkers: true},
+		PlanOptions{ShouldStartWorkers: true, Selection: domain.Selection{Workers: true, Gateway: true, NLP: true}},
 		t.TempDir(),
 		"", // langyDockerHost — not exercised here; the langy lane isn't under test
 	)

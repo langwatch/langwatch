@@ -80,6 +80,18 @@ func TestUnknownCommandSuggestsNearMisses(t *testing.T) {
 	}
 }
 
+// @scenario "A flag shorthand means one thing across the whole CLI" — the
+// --force half: it does not exist anywhere; --yes is the one confirmation.
+func TestNoForceFlagExists(t *testing.T) {
+	for _, spec := range table {
+		for _, f := range spec.flags {
+			if f.long == "--force" {
+				t.Errorf("haven %s declares --force — it was removed CLI-wide (ADR-064)", spec.name)
+			}
+		}
+	}
+}
+
 func TestParseRejectsUndeclaredFlags(t *testing.T) {
 	if _, err := parse(specByName(t, "logs"), []string{"--nope"}); err == nil {
 		t.Error("parse accepted an undeclared flag")
