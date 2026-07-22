@@ -35,6 +35,13 @@ export interface LangySuggestion {
   prompt: string;
   /** Absent means it works from a standing start. */
   requires?: SuggestionRequirement;
+  /**
+   * Offer this ask only UNTIL the project has the named thing. Setup asks are
+   * promises about a gap — "onboard your agent" to a project that already has
+   * traces is the product not knowing its own customer — so once the gap
+   * closes, the ask is withdrawn rather than topped up.
+   */
+  until?: SuggestionRequirement;
 }
 
 /**
@@ -51,12 +58,11 @@ export interface LangySuggestion {
  * capability row. It reads THIS array rather than keeping a parallel copy, so
  * home can never promise an ask the panel does not offer.
  *
- * The `requires` field is what lets the home page offer a DIFFERENT few to a
- * project that has nothing than to one that has months of runs. The panel's own
- * list below is not filtered by it: by the time someone has opened the panel
- * they have chosen to be here, and the four rows together are how they learn
- * the range. The home page is the surface that meets people who did not choose
- * it, so that is the one that has to earn every row.
+ * The `requires` field is what lets BOTH surfaces offer a DIFFERENT few to a
+ * project that has nothing than to one that has months of runs: the panel's
+ * own list is selected by the same `selectLangySuggestions` the home page
+ * uses (see logic/langyHomeSuggestions.ts), so a project with no traces is
+ * offered ways to get set up rather than four asks that can only dead-end.
  */
 export const SUGGESTIONS: LangySuggestion[] = [
   {
@@ -113,14 +119,17 @@ export const SUGGESTIONS: LangySuggestion[] = [
 export const SETUP_SUGGESTIONS: LangySuggestion[] = [
   {
     icon: ScanSearch,
-    label: "Send my first trace",
-    prompt: "How do I send my first trace to this project?",
+    label: "Onboard your agent",
+    prompt: "Help me onboard my agent and send its first trace to this project.",
+    // The first trace arriving is exactly what makes this ask obsolete.
+    until: "traces",
   },
   {
     icon: ShieldCheck,
     label: "Choose what to measure",
     prompt:
       "What should I measure about my agent, and which evaluators would you start with?",
+    until: "evaluations",
   },
   {
     icon: GitCompare,
@@ -146,17 +155,24 @@ export const SETUP_SUGGESTIONS: LangySuggestion[] = [
  * a mascot. A fresh one is picked each time the empty state mounts.
  */
 const GREETINGS = [
-  "Hey, I'm Langy. Haven't hallucinated since 1969.",
-  "I read the logs so you don't have to.",
-  "Show me where it hurts.",
+  "Hey, I'm Langy!"
 ];
 
 export function EmptyState({
   onPick,
+  suggestions,
   variant = "floating",
   panelWidth = 432,
 }: {
   onPick: (prompt: string) => void;
+  /**
+   * The asks this project can actually act on, picked by the panel via
+   * `selectLangySuggestions` from the project's reach — the same selection the
+   * home page runs, so the two surfaces can never disagree about what is
+   * honest to offer. Empty while the reach is still unknown: a row that
+   * appears and is then withdrawn is worse than a beat of nothing.
+   */
+  suggestions: LangySuggestion[];
   variant?: "floating" | "sidebar";
   /**
    * The panel's real rendered width. The floating card ranges ~340–432px with
@@ -202,7 +218,7 @@ export function EmptyState({
         marginBottom={`${metrics.heroMarginBottom}px`}
       >
         {/* The LangWatch mark, in the brand gradient — and the ONLY place it
-            appears inside the panel (the launcher is the other). Bare, no tile:
+            appears inside the panel (the minimised peek is the other). Bare, no tile:
             the orange chip that used to box it in was old-brand chrome, a
             saturated block competing with the display line right under it. It
             shrinks with the card but never below 34px, the smallest size at
@@ -234,12 +250,16 @@ export function EmptyState({
           maxWidth={`${metrics.subtitleMaxWidth}px`}
           marginTop={2}
         >
-          Ask in plain language, or start with one of these.
+          {/* "One of these" only when there are rows to point at — while the
+              project's reach is unknown the list below is empty on purpose. */}
+          {suggestions.length > 0
+            ? "Ask in plain language, or start with one of these."
+            : "Ask in plain language."}
         </Text>
       </VStack>
 
       <VStack align="stretch" gap={0.5}>
-        {sidebar ? (
+        {sidebar && suggestions.length > 0 ? (
           <Text
             textStyle="2xs"
             fontWeight="600"
@@ -252,7 +272,7 @@ export function EmptyState({
             Suggested
           </Text>
         ) : null}
-        {SUGGESTIONS.map(({ icon, label, prompt }) => (
+        {suggestions.map(({ icon, label, prompt }) => (
           <SuggestionRow
             key={label}
             icon={icon}

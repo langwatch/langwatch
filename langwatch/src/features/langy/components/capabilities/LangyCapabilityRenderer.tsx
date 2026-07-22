@@ -30,6 +30,7 @@ import {
 import { VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { digestOfToolCall } from "../../logic/langyCapabilityDigest";
+import { LangyCardBoundary } from "../LangyCardBoundary";
 import {
   isProposalOutput,
   resolveCapability,
@@ -206,13 +207,21 @@ export function LangyCapabilityRenderer({
     call: { ...call, output: result.payload },
     projectSlug,
   });
-  if (chips.length === 0) return card;
 
+  // Every capability card renders inside its own boundary: these cards eat
+  // tenant- and command-shaped payloads, and one unreadable result must cost
+  // one card, never the transcript around it.
   return (
-    <VStack align="stretch" gap={2}>
-      {card}
-      <LangyFollowUpChips chips={chips} />
-    </VStack>
+    <LangyCardBoundary scope="this card">
+      {chips.length === 0 ? (
+        card
+      ) : (
+        <VStack align="stretch" gap={2}>
+          {card}
+          <LangyFollowUpChips chips={chips} />
+        </VStack>
+      )}
+    </LangyCardBoundary>
   );
 }
 

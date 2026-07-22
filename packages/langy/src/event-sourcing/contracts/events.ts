@@ -15,7 +15,7 @@ import {
   langyJsonValueSchema,
   langyMessagePartSchema,
   langyMessageRoleSchema,
-} from "./shared";
+} from "../../json";
 
 /**
  * ConversationStarted — an explicit conversation-creation event. Sets the owner

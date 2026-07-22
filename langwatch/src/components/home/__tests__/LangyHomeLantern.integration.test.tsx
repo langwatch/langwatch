@@ -153,8 +153,11 @@ describe("<LangyHomeLantern/>", () => {
     it("stands down to a quiet line and raises no notice of its own", () => {
       renderLantern();
 
-      expect(screen.queryByTestId("hero-composer")).toBeNull();
-      expect(screen.getByText("Continue in Langy")).toBeDefined();
+      // Hidden in place, not unmounted: the slot keeps holding the composer's
+      // own height so the block never shifts when the panel opens — but a
+      // stood-down composer must not be visible or reachable.
+      expect(screen.getByTestId("hero-composer")).not.toBeVisible();
+      expect(screen.getByText("Continue your conversation")).toBeDefined();
       expect(screen.queryByRole("alert")).toBeNull();
     });
 
@@ -163,7 +166,9 @@ describe("<LangyHomeLantern/>", () => {
       renderLantern();
 
       expect(
-        askChips().filter((b) => b.textContent !== "Continue in Langy"),
+        askChips().filter(
+          (b) => !b.textContent?.startsWith("Continue your conversation"),
+        ),
       ).toHaveLength(0);
     });
   });
@@ -179,14 +184,14 @@ describe("<LangyHomeLantern/>", () => {
       renderLantern();
 
       expect(screen.queryByRole("alert")).toBeNull();
-      expect(screen.getByText("Continue in Langy")).toBeDefined();
+      expect(screen.getByText("Continue your conversation")).toBeDefined();
     });
 
     /** @scenario Continuing does not start a second conversation */
     it("takes the reader back to the conversation they already have", () => {
       renderLantern();
 
-      fireEvent.click(screen.getByText("Continue in Langy"));
+      fireEvent.click(screen.getByText("Continue your conversation"));
 
       const state = useLangyStore.getState();
       expect(state.isOpen).toBe(true);

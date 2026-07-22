@@ -58,6 +58,21 @@ interface TapeBase {
   /** Monotonic, so the view has a stable key that survives the ring dropping. */
   seq: number;
   atMs: number;
+  /**
+   * The conversation this entry belongs to, stamped AT RECORD TIME.
+   *
+   * Some lanes carry their own attribution (a freshness signal, a durable
+   * event, an outbound command's detail); everything else — chiefly stream
+   * deltas — is tagged with the store's active conversation, because the
+   * stream IS the active conversation's turn. Null only when nothing carried
+   * an id and no conversation was active yet (the first moments of a brand-new
+   * conversation, before the server adopts an id).
+   *
+   * The RECORDING stays global — switching conversations must never lose the
+   * tape — but the drawer's views and the chat panel's time travel are scoped
+   * to the open conversation via {@link tapeForConversation}.
+   */
+  conversationId: string | null;
 }
 
 export type LangyDevLogRecord =
@@ -120,6 +135,7 @@ interface LangyDevLogState {
   recordDurableEvent: (event: LangyConversationTurnWireEvent) => void;
   /** DURABLE lane — a snapshot seed (cursor + in-flight turn), the fold's start. */
   recordSnapshot: (snapshot: {
+    conversationId: string;
     cursor: LangyEventCursor | null;
     currentTurnId: string | null;
   }) => void;
@@ -147,6 +163,16 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
       };
     });
   };
+  /**
+   * The conversation an entry belongs to, resolved AT RECORD TIME: the entry's
+   * own attribution when it has one, otherwise the store's active
+   * conversation. The fallback is what tags stream deltas — the stream IS the
+   * active conversation's turn — and it reads getState() rather than
+   * subscribing, so a normal (unarmed) session still pays only the recording
+   * boolean.
+   */
+  const attributed = (explicit?: string | null): string | null =>
+    explicit ?? useLangyStore.getState().activeConversationId;
   return {
     recording: false,
     records: [],
@@ -162,6 +188,7 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
       append((seq) => ({
         seq,
         atMs: Date.now(),
+        conversationId: attributed(),
         lane: "stream",
         turnId,
         entry,
@@ -170,6 +197,15 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
       append((seq) => ({
         seq,
         atMs: Date.now(),
+        // The send/stop callers put the conversation in the detail payload;
+        // read it from there so the tag survives even when the store has not
+        // adopted the conversation yet (a stop raced against a fresh send).
+        conversationId: attributed(
+          typeof (detail as { conversationId?: unknown } | null)
+            ?.conversationId === "string"
+            ? ((detail as { conversationId: string }).conversationId)
+            : undefined,
+        ),
         lane: "outbound",
         kind,
         label,
@@ -179,14 +215,17 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
       append((seq) => ({
         seq,
         atMs: Date.now(),
+        // Every wire event names its conversation — the fold's identity.
+        conversationId: attributed(event.data.conversationId),
         lane: "durable",
         source: "tail",
         event,
       })),
-    recordSnapshot: ({ cursor, currentTurnId }) =>
+    recordSnapshot: ({ conversationId, cursor, currentTurnId }) =>
       append((seq) => ({
         seq,
         atMs: Date.now(),
+        conversationId,
         lane: "durable",
         source: "snapshot",
         cursor,
@@ -196,13 +235,34 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
       append((seq) => ({
         seq,
         atMs: Date.now(),
-        lane: "signal",
         conversationId,
+        lane: "signal",
         cursor,
       })),
     clear: () => set({ records: [], dropped: 0 }),
   };
 });
+
+/**
+ * The tape, scoped to one conversation — what the drawer's views and the chat
+ * panel's time travel render.
+ *
+ * Unattributed records (conversationId null) stay VISIBLE: they can only be
+ * recorded in the first moments of a brand-new conversation, before the server
+ * adopts an id, and dropping them would blank the tape at exactly the moment a
+ * fresh conversation is being debugged. They cannot be proven foreign; a
+ * record that names ANOTHER conversation can, and is hidden.
+ */
+export function tapeForConversation(
+  records: LangyDevLogRecord[],
+  conversationId: string | null,
+): LangyDevLogRecord[] {
+  return records.filter(
+    (record) =>
+      record.conversationId === null ||
+      record.conversationId === conversationId,
+  );
+}
 
 /** The tape at (or before) one moment — the scrubber's view of history. */
 export function tapeUpTo(

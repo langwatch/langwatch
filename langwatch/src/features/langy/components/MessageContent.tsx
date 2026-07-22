@@ -1,9 +1,17 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import type {
+  LangyChoicesBlock,
+  LangyChoiceSelection,
+  LangyCardBlock,
+  LangyChoicesTimelineEntry,
+} from "@langwatch/langy";
+import { deriveLangyChoicesLockState } from "@langwatch/langy";
 import type { UIMessage } from "ai";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import type React from "react";
 import { isInternalHref, Markdown } from "~/components/Markdown";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRouter } from "~/utils/compat/next-router";
 import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "./LangyMark";
 import { githubPrsFromToolParts } from "~/shared/langy/githubPrCard";
@@ -14,6 +22,15 @@ import {
   isSubstantiveLangyAnswer,
   parseLangyFeedbackDirective,
 } from "../logic/langyFeedbackDirective";
+import {
+  hasLangyBlockParts,
+  langyAnswerSegments,
+  type LangyAnswerSegment,
+} from "../logic/langyAnswerSegments";
+import { LangyDerivedBlockCard } from "./blocks/LangyDerivedBlockCard";
+import { StreamingAnswerWithBlocks } from "./blocks/StreamingAnswerWithBlocks";
+import { LangyFailedBlockCard } from "./blocks/LangyFailedBlockCard";
+import { LangyCardBoundary } from "./LangyCardBoundary";
 import { LangyFeedback } from "./LangyFeedback";
 import { hasLangyActivity, LangyToolActivity } from "./LangyToolActivity";
 import { LangyPlanCard } from "./LangyPlanCard";
@@ -55,6 +72,9 @@ function MessageContentImpl({
   showFeedback = false,
   shouldAskFeedback = false,
   isFeedbackPinned = false,
+  choicesTimeline,
+  onChoiceSelect,
+  onVerifyDerivedCard,
 }: {
   message: UIMessage;
   organizationId?: string | null;
@@ -80,14 +100,44 @@ function MessageContentImpl({
   shouldAskFeedback?: boolean;
   /** Pinned open — a shown card riding out refetches, or `/feedback`. */
   isFeedbackPinned?: boolean;
+  /**
+   * The ordered conversation timeline the choices lock state derives from
+   * (ADR-060 §6). Absent = every choices card renders closed (fail-closed:
+   * a question is never answerable without the record to derive that from).
+   */
+  choicesTimeline?: LangyChoicesTimelineEntry[];
+  /** Answer a choices card. Absent = read-only (time travel, shared views). */
+  onChoiceSelect?: (a: {
+    selection: LangyChoiceSelection;
+    card: LangyChoicesBlock;
+  }) => void;
+  /** Bind a derived card's verify hint. Absent = chip hidden. */
+  onVerifyDerivedCard?: (a: { card: LangyCardBlock }) => void;
 }) {
   const isUser = message.role === "user";
+  const { project } = useOrganizationTeamProject();
   const rawText = message.parts
     .filter(
       (part): part is { type: "text"; text: string } => part.type === "text",
     )
     .map((part) => part.text)
     .join("");
+
+  // The block channel (ADR-060): a settled assistant message whose parts
+  // carry stamped `langy-card` / `langy-card-failed` parts renders as an
+  // ORDERED sequence — prose, card where the block sat, prose — instead of
+  // one joined markdown body. Fence-less messages keep the joined path
+  // untouched, and the live streaming turn never has stamped parts (the
+  // preview is Phase 4's seam), so `isStreaming` rendering is unaffected.
+  // Memoized: parts are replaced wholesale on settle/rehydrate, so identity
+  // is a faithful cache key and history messages never re-split per render.
+  const blockSegments = useMemo(
+    () =>
+      !isUser && !isStreaming && hasLangyBlockParts(message.parts)
+        ? langyAnswerSegments(message.parts)
+        : null,
+    [isUser, isStreaming, message.parts],
+  );
 
   // The connect card is NOT sniffed out of the assistant's prose any more. A
   // missing GitHub connection is a structured `langy_github_not_connected` domain
@@ -164,8 +214,10 @@ function MessageContentImpl({
         text,
         hasActivity: showsActivity || Boolean(plan),
       });
+  const hasBlocks = blockSegments !== null && blockSegments.length > 0;
   const hasContent =
     displayText ||
+    hasBlocks ||
     proposals.length > 0 ||
     prs.length > 0 ||
     progressEvents.length > 0 ||
@@ -173,6 +225,7 @@ function MessageContentImpl({
     Boolean(plan);
   if (
     !displayText &&
+    !hasBlocks &&
     proposals.length === 0 &&
     prs.length === 0 &&
     progressEvents.length === 0 &&
@@ -220,29 +273,38 @@ function MessageContentImpl({
             everything else. Raw JSON is developer-mode only. Single insertion
             point; all mapping lives in LangyToolActivity. */}
         {plan ? (
-          <LangyPlanCard plan={plan} isStreaming={isStreaming} />
+          <LangyCardBoundary scope="the plan">
+            <LangyPlanCard plan={plan} isStreaming={isStreaming} />
+          </LangyCardBoundary>
         ) : (
-          <LangyToolActivity message={message} />
+          <LangyCardBoundary scope="the tool activity">
+            <LangyToolActivity message={message} />
+          </LangyCardBoundary>
         )}
         {progressEvents.length > 0 && (
-          <LangyGitHubProgressCard events={progressEvents} />
+          <LangyCardBoundary scope="the progress card">
+            <LangyGitHubProgressCard events={progressEvents} />
+          </LangyCardBoundary>
         )}
         {prs.map((pr) => (
-          <LangyGitHubPrCard
+          <LangyCardBoundary
             key={`${pr.owner}/${pr.repo}#${pr.number}`}
-            {...pr}
-          />
+            scope="this pull request card"
+          >
+            <LangyGitHubPrCard {...pr} />
+          </LangyCardBoundary>
         ))}
         {proposals.map(({ id, proposal }) => (
-          <ProposalCard
-            key={id}
-            proposal={proposal}
-            appliedOutcome={appliedOutcomes[id]}
-            isDiscarded={discardedProposals.has(id)}
-            isApplying={applyingProposals.has(id)}
-            onApply={() => void onApply(id, proposal)}
-            onDiscard={() => onDiscard(id)}
-          />
+          <LangyCardBoundary key={id} scope="this proposal">
+            <ProposalCard
+              proposal={proposal}
+              appliedOutcome={appliedOutcomes[id]}
+              isDiscarded={discardedProposals.has(id)}
+              isApplying={applyingProposals.has(id)}
+              onApply={() => void onApply(id, proposal)}
+              onDiscard={() => onDiscard(id)}
+            />
+          </LangyCardBoundary>
         ))}
         {/* Work precedes its conclusion. Rendering prose first made settled
             turns appear to run backwards: answer, then the commands that found
@@ -251,11 +313,26 @@ function MessageContentImpl({
         {/* The answer wears the theme's answer tokens (langyTheme.ts): half a
             step smaller than the user's `sm` bubble and a step dimmer than
             `fg`, so a glance separates "what I said" from "what it said". */}
-        {displayText &&
+        {blockSegments ? (
+          <AnswerWithBlocks
+            segments={blockSegments}
+            hasActivity={showsActivity || Boolean(plan)}
+            projectSlug={project?.slug ?? null}
+            choicesTimeline={choicesTimeline}
+            onChoiceSelect={onChoiceSelect}
+            onVerifyDerivedCard={onVerifyDerivedCard}
+          />
+        ) : (
+          displayText &&
           (isStreaming ? (
-            <Box fontSize="langyAnswer" color="langy.answerFg" lineHeight="1.6">
-              <StreamingText text={displayText} />
-            </Box>
+            // The live turn: prose streams as ever, and any forming
+            // ```langy-card fence previews through the SAME validation the
+            // relay stamps with at settle (ADR-060 §7). Fence-less streams
+            // take the plain path inside, unchanged.
+            <StreamingAnswerWithBlocks
+              text={displayText}
+              projectSlug={project?.slug ?? null}
+            />
           ) : (
             <Box
               css={{
@@ -272,7 +349,8 @@ function MessageContentImpl({
                 {displayText}
               </Markdown>
             </Box>
-          ))}
+          ))
+        )}
         {/* WHEN to ask is the backend's call (langy.messages `shouldAskFeedback` —
             conversation depth + a per-user quiet period), or the agent's own
             [langy:feedback] directive at a high-signal moment, or the user
@@ -307,6 +385,139 @@ function MessageContentImpl({
 
 export const MessageContent = memo(MessageContentImpl);
 MessageContent.displayName = "MessageContent";
+
+/** Everything a rendered answer segment can bind to, threaded once. */
+interface AnswerBlockContext {
+  hasActivity: boolean;
+  firstTextIndex: number;
+  projectSlug: string | null;
+  choicesTimeline?: LangyChoicesTimelineEntry[];
+  onChoiceSelect?: (a: {
+    selection: LangyChoiceSelection;
+    card: LangyChoicesBlock;
+  }) => void;
+  onVerifyDerivedCard?: (a: { card: LangyCardBlock }) => void;
+}
+
+/**
+ * The settled answer, rendered in the reply's own order (ADR-060 §1): one
+ * flat dispatch per segment type — prose, derived card, failed disclosure —
+ * mirroring the registry idiom the capability cards use. Every card sits in
+ * its own error boundary so one bad payload costs one card, never the
+ * answer.
+ */
+function AnswerWithBlocks({
+  segments,
+  ...context
+}: { segments: LangyAnswerSegment[] } & Omit<
+  AnswerBlockContext,
+  "firstTextIndex"
+>) {
+  const firstTextIndex = segments.findIndex(
+    (segment) => segment.type === "text",
+  );
+  return (
+    <VStack align="stretch" gap={2.5}>
+      {segments.map((segment, index) => (
+        <AnswerSegment
+          key={segmentKey(segment, index)}
+          segment={segment}
+          index={index}
+          context={{ ...context, firstTextIndex }}
+        />
+      ))}
+    </VStack>
+  );
+}
+
+/** Stable-enough keys: blocks by identity, prose by position. */
+function segmentKey(segment: LangyAnswerSegment, index: number): string {
+  return segment.type === "text"
+    ? `text-${index}`
+    : `${segment.type}-${segment.part.blockId}-${index}`;
+}
+
+/** One segment, one renderer — a flat exhaustive switch, nothing nested. */
+function AnswerSegment({
+  segment,
+  index,
+  context,
+}: {
+  segment: LangyAnswerSegment;
+  index: number;
+  context: AnswerBlockContext;
+}) {
+  switch (segment.type) {
+    case "text":
+      return (
+        <ProseSegment
+          text={segment.text}
+          isFirst={index === context.firstTextIndex}
+          hasActivity={context.hasActivity}
+        />
+      );
+    case "card":
+      return (
+        <LangyCardBoundary scope="this derived card">
+          <LangyDerivedBlockCard
+            card={segment.part.card}
+            hints={segment.part.hints}
+            projectSlug={context.projectSlug}
+            choicesLockState={
+              segment.part.card.kind === "choices"
+                ? deriveLangyChoicesLockState({
+                    blockId: segment.part.blockId,
+                    timeline: context.choicesTimeline ?? [],
+                  })
+                : undefined
+            }
+            onChoiceSelect={context.onChoiceSelect}
+            onVerify={context.onVerifyDerivedCard}
+          />
+        </LangyCardBoundary>
+      );
+    case "failed":
+      return (
+        <LangyCardBoundary scope="this card">
+          <LangyFailedBlockCard part={segment.part} />
+        </LangyCardBoundary>
+      );
+  }
+}
+
+/**
+ * A prose run between blocks — the same presentation transforms the joined
+ * path applies: the feedback directive never renders, and the opening
+ * narration is stripped from the first prose segment only.
+ */
+function ProseSegment({
+  text,
+  isFirst,
+  hasActivity,
+}: {
+  text: string;
+  isFirst: boolean;
+  hasActivity: boolean;
+}) {
+  const cleaned = parseLangyFeedbackDirective(text).cleanedText;
+  const display = isFirst
+    ? stripToolNarration({ text: cleaned, hasActivity })
+    : cleaned;
+  if (!display) return null;
+  return (
+    <Box
+      css={{
+        "& > div > :first-child": { marginTop: 0 },
+        "& > div > :last-child": { marginBottom: 0 },
+        "& table": { display: "block", overflowX: "auto" },
+      }}
+    >
+      <Markdown fontSize="langyAnswer" linkVariant="langy" color="langy.answerFg">
+        {display}
+      </Markdown>
+    </Box>
+  );
+}
 
 export function ProposalCard({
   proposal,

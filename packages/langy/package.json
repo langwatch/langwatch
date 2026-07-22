@@ -5,6 +5,7 @@
   "description": "Langy's shared conversation-projection contract: the event payload schemas, the pure turn fold, the turn-phase machine, and the event cursor — imported by both the LangWatch server pipeline and the browser panel so a turn renders identically on both sides (ADR-059).",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./src/index.ts",

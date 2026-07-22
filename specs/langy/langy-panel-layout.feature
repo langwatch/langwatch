@@ -114,6 +114,8 @@ Feature: Langy panel layout modes
     And the drawer's own close is the only X on screen
     So closing the drawer, not Langy, is the obvious action
 
-  Scenario: The closed-panel launcher dodges the drawer
-    Given the Langy panel is closed and a right-anchored drawer is open
-    Then the launcher orb sits in the bottom-LEFT corner, clear of the drawer and the table pager
+  # The closed state is a PEEK of the panel itself, not a separate launcher —
+  # see specs/langy/langy-peek-dock.feature for its states and geometry.
+  Scenario: The minimised peek dodges the drawer
+    Given the Langy panel is minimised in floating mode and a right-anchored drawer is open
+    Then the peek sliver rests along the bottom-LEFT edge, clear of the drawer and the table pager

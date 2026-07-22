@@ -31,6 +31,14 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: projectRef.current }),
 }));
 
+// The minimised affordance is flag-gated (LangySidecar reads
+// release_ui_langy_peek_dock_enabled). This suite is about conversation
+// threading, not the closed state, so pin the flag off (the classic
+// launcher) — the same render path this suite had before the flag landed.
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
@@ -188,6 +196,21 @@ vi.mock("~/utils/api", () => ({
     virtualKeys: {
       list: {
         useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+    },
+    // The empty state's asks are picked from the project's reach (see
+    // useProjectReach); a fully-reached project keeps the classic four rows.
+    integrationsChecks: {
+      getCheckStatus: {
+        useQuery: () => ({
+          data: {
+            firstMessage: true,
+            onlineEvaluations: 1,
+            simulations: 1,
+            datasets: 1,
+          },
+          isLoading: false,
+        }),
       },
     },
     ops: {
