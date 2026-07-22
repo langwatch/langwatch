@@ -26,7 +26,8 @@ Feature: haven lifecycle usability
   Scenario: Up on an already-running stack reconciles
     Given the stack's launcher is running
     When the developer runs "haven up" in the same worktree
-    Then the running stack is left in place and any selection delta is applied
+    Then a matching selection is a friendly no-op and the stack is left in place
+    And a changed selection replaces the stack in place with the new one
     And there is no refusal and no force flag
 
   Scenario: Restarting one service bounces only that service

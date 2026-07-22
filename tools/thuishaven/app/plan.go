@@ -63,11 +63,12 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 		// until the stack can actually handle a request.
 		ReadyProbeURL: fmt.Sprintf("http://127.0.0.1:%d/api/health", st.APIPort),
 	})
-	// In-process worker mode: the app process (start:app -> start.ts) hosts the
-	// worker stack itself when WORKERS_IN_PROCESS=1, so there is no separate
+	// In-process worker mode (the default): the app process (start:app ->
+	// start.ts) hosts the worker stack itself, so there is no separate
 	// `workers` lane below — one Node process instead of two, saving its RAM.
+	// `haven up +workers` selects the standalone lane instead.
 	apiEnv := nodeEnv()
-	if opts.ShouldRunWorkersInProcess {
+	if opts.ShouldStartWorkers && !opts.Selection.Workers {
 		apiEnv = append(apiEnv, "WORKERS_IN_PROCESS=1")
 	}
 	out = append(out, Child{
@@ -75,24 +76,24 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 		Shell: "pnpm -s run start:app",
 		Env:   apiEnv,
 	})
-	if !opts.ShouldSkipGateway {
+	if opts.Selection.Gateway {
 		out = append(out, Child{
 			Name: "gateway", Dir: opts.RepoRoot, Color: palette[2],
 			Shell: goServiceShell(opts.RepoRoot, "aigateway", opts.ShouldGoWatch),
 			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("gateway"))),
 		})
 	}
-	if !opts.ShouldSkipNLP {
+	if opts.Selection.NLP {
 		out = append(out, Child{
 			Name: "nlp", Dir: opts.RepoRoot, Color: palette[4],
 			Shell: goServiceShell(opts.RepoRoot, "nlpgo", opts.ShouldGoWatch),
 			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("nlp"))),
 		})
 	}
-	if !opts.ShouldSkipLangyAgent {
+	if opts.Selection.Langy {
 		out = append(out, o.langyChild(st, opts, base, port("langyagent"), langyDockerHost))
 	}
-	if opts.ShouldStartWorkers && !opts.ShouldRunWorkersInProcess {
+	if opts.ShouldStartWorkers && opts.Selection.Workers {
 		out = append(out, Child{
 			// green, not red: workers are a healthy background lane, and a red
 			// prefix reads as an error even on ordinary info logs. Red (palette[5])

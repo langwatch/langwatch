@@ -45,6 +45,10 @@ type Store interface {
 	TakenSlugs() map[string]bool
 	ReadSlugCache(worktreeDir string) (string, bool)
 	WriteSlugCache(worktreeDir, slug string) error
+	// The worktree-local sticky service selection (ADR-064): what `haven up`
+	// runs here, surviving terminals and reboots. ok=false means never written.
+	ReadSelection(worktreeDir string) (domain.Selection, bool)
+	WriteSelection(worktreeDir string, sel domain.Selection) error
 	WriteOverlay(lwDir string, st domain.Stack) error
 	// HMR gate marker (worktree-local): expiry in unix-ms; 0/absent means no gate.
 	WriteHMRGate(lwDir string, expiryUnixMs int64) error

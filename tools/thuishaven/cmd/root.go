@@ -57,7 +57,7 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	// driven by an agent/pipe.
 	if len(args) == 0 {
 		if isAgent {
-			return d.orch.Status(true)
+			return d.orch.Status(true, d.worktree)
 		}
 		return runHub(ctx, d)
 	}
@@ -207,18 +207,8 @@ func clickHouseLimits() domain.ClickHouseLimits {
 func optionsFromEnv(repoRoot string) app.PlanOptions {
 	return app.PlanOptions{
 		ShouldGoWatch:      os.Getenv("LANGWATCH_GO_WATCH") == "1",
-		ShouldStartWorkers: os.Getenv("START_WORKERS") != "false" && os.Getenv("START_WORKERS") != "0",
-		// Under haven the worker stack defaults to IN-PROCESS (hosted in the app
-		// process), saving the RAM of a second Node process — the sensible default on
-		// a laptop juggling several worktrees. Workers keep their own logger name
-		// ("langwatch:workers"), so their lines stay identifiable even without a
-		// separate lane. Opt back into a standalone `workers` lane with
-		// WORKERS_IN_PROCESS=0.
-		ShouldRunWorkersInProcess: os.Getenv("WORKERS_IN_PROCESS") != "0" && os.Getenv("WORKERS_IN_PROCESS") != "false",
-		ShouldSkipNLP:             os.Getenv("LANGWATCH_SKIP_NLP") == "1",
-		ShouldSkipGateway:         os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1",
-		ShouldSkipLangyAgent:      os.Getenv("LANGWATCH_SKIP_LANGYAGENT") == "1",
-		ShouldSeed:                os.Getenv("LANGWATCH_SEED") == "1",
+		ShouldStartWorkers: true,
+		ShouldSeed:         os.Getenv("LANGWATCH_SEED") == "1",
 		// The langyagent worker's local isolation posture. Default (neither flag) is
 		// the sandboxed, production-like tier: the worker runs in colima with the
 		// per-worker UID sandbox on. LANGY_UNSAFE_CONTAINER relaxes the sandbox inside
@@ -230,6 +220,36 @@ func optionsFromEnv(repoRoot string) app.PlanOptions {
 		IsStub:   os.Getenv("HAVEN_STUB") == "1",
 		RepoRoot: repoRoot,
 	}
+}
+
+// applyLegacySelectionEnv honours the pre-ADR-064 selection env vars for one
+// release as one-shot, NON-sticky overrides, each printing its sticky
+// replacement. The env vars are removed a release later.
+func applyLegacySelectionEnv(sel domain.Selection, opts *app.PlanOptions) domain.Selection {
+	warn := func(envVar, sticky string) {
+		fmt.Fprintf(os.Stderr, "haven: %s is deprecated and applies to this run only — the sticky way is `%s`\n", envVar, sticky)
+	}
+	if os.Getenv("LANGWATCH_SKIP_NLP") == "1" {
+		sel.NLP = false
+		warn("LANGWATCH_SKIP_NLP=1", "haven up -nlp")
+	}
+	if os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1" {
+		sel.Gateway = false
+		warn("LANGWATCH_SKIP_AIGATEWAY=1", "haven up -gateway")
+	}
+	if os.Getenv("LANGWATCH_SKIP_LANGYAGENT") == "1" {
+		sel.Langy = false
+		warn("LANGWATCH_SKIP_LANGYAGENT=1", "haven up -langy")
+	}
+	if v := os.Getenv("WORKERS_IN_PROCESS"); v == "0" || v == "false" {
+		sel.Workers = true
+		warn("WORKERS_IN_PROCESS=0", "haven up +workers")
+	}
+	if v := os.Getenv("START_WORKERS"); v == "false" || v == "0" {
+		opts.ShouldStartWorkers = false
+		fmt.Fprintln(os.Stderr, "haven: START_WORKERS=false is deprecated and applies to this run only (no sticky equivalent — workers are part of the app by default)")
+	}
+	return sel
 }
 
 // resolveAgent turns agent mode on for AI drivers: explicit env, NO_COLOR, or a

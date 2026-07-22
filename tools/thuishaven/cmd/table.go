@@ -182,18 +182,24 @@ var removed = map[string]string{
 // table is the whole CLI surface, in help order.
 var table = []commandSpec{
 	{
-		name:    "up",
-		summary: "start + supervise this worktree's stack (hostnames, DBs, services)",
+		name:      "up",
+		summary:   "start or reconcile this worktree's stack; +svc/-svc picks services and sticks",
+		args:      "[+svc|-svc …]",
+		maxArgs:   -1,
+		minusArgs: true,
 		flags: []flagSpec{
 			{long: "--watch", short: "-w", summary: "air hot-reload for the Go services"},
 			{long: "--detach", short: "-d", summary: "run in the background; follow with haven logs -f"},
-			{long: "--force", summary: "replace an already-running stack"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
+			sel, err := d.orch.ResolveSelection(d.worktree, inv.args)
+			if err != nil {
+				return err
+			}
+			d.opts.Selection = applyLegacySelectionEnv(sel, &d.opts)
 			if inv.has("--watch") {
 				d.opts.ShouldGoWatch = true
 			}
-			d.opts.ShouldForce = inv.has("--force")
 			if d.opts.IsStub {
 				return d.orch.UpStub(ctx, d.params, dashboard.StartEcho)
 			}
@@ -246,7 +252,7 @@ var table = []commandSpec{
 			{long: "--json", summary: "machine-readable"},
 		},
 		run: func(_ context.Context, d deps, inv invocation) error {
-			return d.orch.Status(d.isAgent || inv.has("--json"))
+			return d.orch.Status(d.isAgent || inv.has("--json"), d.worktree)
 		},
 	},
 	{

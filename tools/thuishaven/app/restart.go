@@ -79,7 +79,7 @@ func restartTargets(st domain.Stack, name string) []restartTarget {
 	for _, r := range domain.PerWorktreeServices {
 		for _, svc := range st.Services {
 			if svc.Name == r.Name && !svc.IsFallback && svc.Port != 0 {
-				all = append(all, restartTarget{Name: svc.Name, Port: svc.Port})
+				all = append(all, restartTarget{Name: domain.CLIServiceName(svc.Name), Port: svc.Port})
 			}
 		}
 	}
@@ -112,6 +112,27 @@ func restartableNames(st domain.Stack) []string {
 // ResolveSlug exposes slug resolution to the composition root (for log paths,
 // detached up).
 func (o *Orchestrator) ResolveSlug(p UpParams) (string, error) { return o.resolveSlug(p) }
+
+// ResolveSelection loads the worktree's sticky service selection (lean default
+// when none exists), applies any ±deltas, and persists the result — so the
+// choice survives terminals, reboots, and detach. The file is also written on
+// a delta-less first up, making the default visible and editable.
+func (o *Orchestrator) ResolveSelection(worktreeDir string, deltas []string) (domain.Selection, error) {
+	sel, found := o.store.ReadSelection(worktreeDir)
+	if !found {
+		sel = domain.DefaultSelection()
+	}
+	sel, err := domain.ApplySelectionDeltas(sel, deltas)
+	if err != nil {
+		return sel, err
+	}
+	if len(deltas) > 0 || !found {
+		if err := o.store.WriteSelection(worktreeDir, sel); err != nil {
+			return sel, fmt.Errorf("saving the service selection: %w", err)
+		}
+	}
+	return sel, nil
+}
 
 // restartObservability stops and re-ensures the shared LGTM stack, re-routing
 // its hostname. Telemetry starts fresh — the stack keeps no volume by design.

@@ -106,7 +106,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		// Mirror planChildren: a separate `workers` lane exists only when workers
 		// are requested AND not hosted in-process. Persist it so restart targets
 		// the workers' own group rather than the API's when they share a process.
-		HasStandaloneWorkers: opts.ShouldStartWorkers && !opts.ShouldRunWorkersInProcess,
+		HasStandaloneWorkers: opts.ShouldStartWorkers && opts.Selection.Workers,
 		LangyTier:            opts.LangyTier,
 	}
 	for i, r := range domain.PerWorktreeServices {
@@ -237,8 +237,12 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 		}
 	}
 	defer endRegistration()
-	if err := o.replaceRunningStack(p, opts.ShouldForce); err != nil {
+	proceed, err := o.reconcileRunningStack(p, opts)
+	if err != nil {
 		return err
+	}
+	if !proceed {
+		return nil
 	}
 	o.ensureDaemon(p.WorktreeDir)
 	st, cleanup, err := o.provision(ctx, p, opts, true)
@@ -247,6 +251,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	}
 	defer cleanup()
 	endRegistration()
+	fmt.Printf("  %s\n\n", opts.Selection.Describe())
 
 	// DOTENV_CONFIG_QUIET drops dotenv v17's promo line for any one-shot script
 	// that loads it via `import "dotenv/config"`; `pnpm -s` drops the lifecycle
@@ -287,11 +292,11 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	// than silently dropping to the unsafe host runner — and tell the user the
 	// explicit opt-in for host mode.
 	langyDockerHost := ""
-	if !opts.ShouldSkipLangyAgent && st.LangyTier.RunsInContainer() {
+	if opts.Selection.Langy && st.LangyTier.RunsInContainer() {
 		if dh, err := o.prepareLangyContainer(ctx, opts.RepoRoot); err != nil {
 			o.log.Warn("langyagent container unavailable — skipping it (set LANGY_UNSAFE_HOST_ACCESS=1 to run the worker on the host instead)",
 				zap.String("tier", st.LangyTier.String()), zap.Error(err))
-			opts.ShouldSkipLangyAgent = true
+			opts.Selection.Langy = false
 		} else {
 			langyDockerHost = dh
 		}
@@ -329,7 +334,10 @@ func (o *Orchestrator) prepareLangyContainer(ctx context.Context, repoRoot strin
 // dashboard -> routing chain is exercised without Postgres/ClickHouse/Redis.
 func (o *Orchestrator) UpStub(ctx context.Context, p UpParams, echo func(ports []int)) error {
 	o.ensureDaemon(p.WorktreeDir)
-	st, cleanup, err := o.provision(ctx, p, PlanOptions{}, false)
+	st, cleanup, err := o.provision(ctx, p, PlanOptions{
+		Selection:          domain.Selection{Gateway: true, NLP: true, Langy: true},
+		ShouldStartWorkers: true,
+	}, false)
 	if err != nil {
 		return err
 	}
@@ -343,27 +351,35 @@ func (o *Orchestrator) UpStub(ctx context.Context, p UpParams, echo func(ports [
 	return nil
 }
 
-// replaceRunningStack is `up`'s already-running guard: when a live launcher
-// already runs this worktree's stack it refuses (the second `up` would fight the
-// first over routes and the registry entry) unless shouldForce is set, in which
-// case the old launcher is terminated — and waited on — so the new `up` takes
-// over cleanly.
-func (o *Orchestrator) replaceRunningStack(p UpParams, shouldForce bool) error {
+// reconcileRunningStack decides what `up` does about an already-running stack
+// (ADR-064: no refusal, no force flag). Nothing registered — or a stale entry
+// whose launcher died — is cleaned up and provisioning proceeds. A live stack
+// that already matches the selection is a friendly no-op. A live stack with a
+// different selection is taken over: the old launcher is terminated and waited
+// on, and this process restarts the stack with the new selection.
+func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proceed bool, err error) {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
-		return err
+		return false, err
 	}
 	st, ok := o.stackBySlug(slug)
-	if !ok || st.LauncherPID == o.sys.Getpid() || !o.sys.ProcessAlive(st.LauncherPID) {
-		return nil
+	if !ok || st.LauncherPID == o.sys.Getpid() {
+		return true, nil
 	}
-	if !shouldForce {
-		return fmt.Errorf("stack %q is already running (launcher pid %d) — `haven restart [service]` to bounce a service, `haven down` to stop it, or `haven up --force` to replace it", slug, st.LauncherPID)
+	if !o.sys.ProcessAlive(st.LauncherPID) {
+		// A dead launcher's registry entry must never block up — clean it up.
+		o.store.RemoveStack(slug)
+		return true, nil
 	}
-	fmt.Printf("haven: stack %q is already running (pid %d) — replacing it (--force)\n", slug, st.LauncherPID)
+	if domain.SelectionFromStack(st) == opts.Selection {
+		fmt.Printf("stack %q is already running (launcher pid %d) and matches the selection — nothing to do\n", slug, st.LauncherPID)
+		fmt.Printf("  bounce a service: haven restart [service] · stop: haven down · logs: haven logs\n")
+		return false, nil
+	}
+	fmt.Printf("stack %q is running with a different selection — restarting it here with the new one\n", slug)
 	o.sys.Terminate(st.LauncherPID)
 	o.waitForProcessesDead([]int{st.LauncherPID})
-	return nil
+	return true, nil
 }
 
 // Down tears the current worktree's stack down from anywhere: it stops a live
@@ -585,16 +601,16 @@ func (o *Orchestrator) liveSeedEnv(p UpParams, retryCmd string) ([]string, error
 	return env, nil
 }
 
-// runsLocally reports whether this worktree runs the service itself (vs falling
-// back to the baseline). Only gateway and nlp are opt-out; app is always local.
+// runsLocally reports whether this worktree runs the service itself (vs
+// falling back to the baseline), per its sticky selection. app is always local.
 func runsLocally(name string, opts PlanOptions) bool {
 	switch name {
 	case "gateway":
-		return !opts.ShouldSkipGateway
+		return opts.Selection.Gateway
 	case "nlp":
-		return !opts.ShouldSkipNLP
+		return opts.Selection.NLP
 	case "langyagent":
-		return !opts.ShouldSkipLangyAgent
+		return opts.Selection.Langy
 	default:
 		return true
 	}

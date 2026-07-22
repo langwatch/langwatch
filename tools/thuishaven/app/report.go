@@ -19,7 +19,7 @@ type health struct {
 // per-service health, RAM footprint) plus the shared machinery (proxy, daemon,
 // observability, the managed database servers) in a single one-shot report.
 // asJSON is the agent-friendly form.
-func (o *Orchestrator) Status(asJSON bool) error {
+func (o *Orchestrator) Status(asJSON bool, worktreeDir string) error {
 	ctx := context.Background()
 	stacks := o.store.Stacks()
 	scheme, port := o.proxy.Endpoint()
@@ -46,6 +46,11 @@ func (o *Orchestrator) Status(asJSON bool) error {
 		servers["redis"] = health{OK: ok, Detail: detail}
 	}
 	live, rss := o.stackFootprint()
+	selection, haveSelection := o.store.ReadSelection(worktreeDir)
+	if !haveSelection && worktreeDir != "" {
+		selection = domain.DefaultSelection()
+		haveSelection = true
+	}
 
 	if asJSON {
 		enc := json.NewEncoder(os.Stdout)
@@ -59,9 +64,13 @@ func (o *Orchestrator) Status(asJSON bool) error {
 			"daemon":        daemon,
 			"servers":       servers,
 			"footprint":     map[string]any{"live": live, "rssBytes": rss},
+			"selection":     selection,
 		})
 	}
 
+	if haveSelection {
+		fmt.Printf("this worktree — %s\n\n", selection.Describe())
+	}
 	if len(stacks) == 0 {
 		fmt.Println("no stacks running — start one with `haven up` in a worktree")
 	}

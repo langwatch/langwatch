@@ -65,7 +65,8 @@ they never keep working silently.
    global. `--rebuild` means "rebuild the image" wherever it appears.
 3. **`up` is declarative and idempotent.** `haven up` means "make this
    worktree's stack match its service selection". Not running → start.
-   Already running → reconcile (bounce only what changed). There is no
+   Already running and matching → a friendly no-op. Selection changed →
+   the stack is replaced in place with the new one. There is no
    refuse-then-`--force` dance to memorise.
 4. **Everything preparatory is automatic.** Proxy install and CA trust,
    dependency install, database create/migrate/seed, database *recovery*,
@@ -131,8 +132,13 @@ haven up              whatever this worktree last selected
 
 The selection lives in a small worktree-local file (`.haven.json`, gitignored,
 next to `.langwatch-slug`), is printed by `status` and the hub, and survives
-terminals, reboots, and detach. `up` on a running stack reconciles the delta —
-adding `+langy` to a live stack starts exactly langy.
+terminals, reboots, and detach. `up` on a running stack reconciles: a matching
+selection is a friendly no-op; a changed one replaces the stack in place with
+the new selection — the current implementation restarts the whole stack (the
+old force-replace path, now automatic and delta-framed), because a genuinely
+incremental delta would need the running app's environment re-plumbed (ports,
+OPENCODE_AGENT_URL) mid-flight. Bouncing only the delta is the recorded
+follow-up optimisation.
 
 **Defaults flip to lean.** A fresh worktree runs `app` (workers in-process),
 `nlp`, and `gateway` — and *not* `langy`. langy costs a container image and a

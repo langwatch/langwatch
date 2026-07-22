@@ -20,6 +20,7 @@ type fakeStore struct {
 	removed    []string
 	slugCache  map[string]string
 	dbActivity map[string]time.Time
+	selection  map[string]domain.Selection
 	touched    []string
 }
 
@@ -60,7 +61,21 @@ func (f *fakeStore) DBActivity() map[string]time.Time {
 	}
 	return m
 }
-func (f *fakeStore) RemoveDBActivity(slug string)         { delete(f.dbActivity, slug) }
+func (f *fakeStore) RemoveDBActivity(slug string) { delete(f.dbActivity, slug) }
+func (f *fakeStore) ReadSelection(worktreeDir string) (domain.Selection, bool) {
+	if f.selection == nil {
+		return domain.Selection{}, false
+	}
+	sel, ok := f.selection[worktreeDir]
+	return sel, ok
+}
+func (f *fakeStore) WriteSelection(worktreeDir string, sel domain.Selection) error {
+	if f.selection == nil {
+		f.selection = map[string]domain.Selection{}
+	}
+	f.selection[worktreeDir] = sel
+	return nil
+}
 func (f *fakeStore) ClaimDaemon(DaemonInfo) (bool, error) { return true, nil }
 func (f *fakeStore) Daemon() (DaemonInfo, bool)           { return DaemonInfo{}, false }
 func (f *fakeStore) ClearDaemon()                         {}

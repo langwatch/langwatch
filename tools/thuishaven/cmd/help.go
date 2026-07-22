@@ -17,7 +17,7 @@ hostname through the portless proxy — predictable, no ports to juggle:
     clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB, HTTP)
 
 Postgres has no routed hostname: unlike ClickHouse (HTTP), it speaks its own
-wire protocol, which the HTTP proxy can't carry — "haven postgres url" (or
+wire protocol, which the HTTP proxy can't carry — "haven db url postgres" (or
 DATABASE_URL in .env.portless) is the real, loopback connection string.
 
 The app and its API share ONE origin: open app.<slug>.langwatch.localhost for the
@@ -47,9 +47,8 @@ ENVIRONMENT
                                  worktree directory name, cached).
     LANGWATCH_LOCAL_TLD=test     Use a different TLD (default: localhost).
     LANGWATCH_GO_WATCH=1         Hot-reload the Go services via air (else go run).
-    LANGWATCH_SKIP_NLP=1         Do not start the NLP engine.
-    LANGWATCH_SKIP_AIGATEWAY=1   Do not start the AI Gateway (its hostname then
-                                 resolves to the baseline stack, if one is up).
+    LANGWATCH_SKIP_NLP=1         DEPRECATED (this run only) — use haven up -nlp.
+    LANGWATCH_SKIP_AIGATEWAY=1   DEPRECATED (this run only) — use haven up -gateway.
     HAVEN_BASELINE=1             Mark this stack as the shared default others fall
                                  back to for services they don't run themselves.
     HAVEN_TYPECHECK_SLOTS=N      Cap concurrent "haven typecheck" runs (default:
@@ -57,11 +56,8 @@ ENVIRONMENT
     HAVEN_TYPECHECK_MAX_RSS_MB   Kill a typecheck run over this RSS (default 6144
                                  = 6 GiB) or over 10 minutes wall-clock — a
                                  runaway tsgo shouldn't sit on a slot forever.
-    START_WORKERS=false          Do not start background workers.
-    WORKERS_IN_PROCESS=1         Host the worker stack inside the app process
-                                 instead of a separate "workers" lane — one Node
-                                 process, less RAM (dev-only; what pnpm
-                                 dev:single:haven sets).
+    START_WORKERS=false          DEPRECATED (this run only) — no worker stack at all.
+    WORKERS_IN_PROCESS=0         DEPRECATED (this run only) — use haven up +workers.
     LANGWATCH_SEED=1             Seed the DB during up.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.
     HAVEN_DB_TTL=336h            Background-prune databases whose worktree has not
@@ -114,7 +110,10 @@ ENVIRONMENT
                                  — zero token waste when an AI agent drives haven.
 
 EXAMPLES
-    haven up                     # bring this worktree's stack up
+    haven up                     # bring this worktree's stack up (or apply a selection change)
+    haven up +langy              # add langy here, now and from now on
+    haven up -nlp                # stop running nlp here (hostname falls back to the baseline)
+    haven up +workers            # standalone workers lane instead of in-process
     haven pr 4913                # try PR #4913 locally in a fresh worktree
     haven                        # the hub: every stack + actions (git/down/destroy)
     haven git                    # git TUI for this worktree (haven git <slug> for another)
