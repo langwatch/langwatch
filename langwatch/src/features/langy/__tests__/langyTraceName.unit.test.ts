@@ -92,10 +92,12 @@ describe("traceDisplayName", () => {
 
 describe("useResolvedTraceName", () => {
   describe("given a trace id with no cached label", () => {
-    it("reads only the name — never the extra spans read full IO resolution costs", () => {
-      renderHook(() => useResolvedTraceName("trace-1"));
+    describe("when resolving the trace name", () => {
+      it("reads only the name — never the extra spans read full IO resolution costs", () => {
+        renderHook(() => useResolvedTraceName("trace-1"));
 
-      expect(capturedHeaderInputs.at(-1)).toMatchObject({ full: false });
+        expect(capturedHeaderInputs.at(-1)).toMatchObject({ full: false });
+      });
     });
   });
 });

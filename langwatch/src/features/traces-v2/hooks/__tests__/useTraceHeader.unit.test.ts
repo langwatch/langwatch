@@ -42,12 +42,14 @@ describe("useTraceHeader", () => {
   });
 
   describe("given the drawer's own detail read", () => {
-    it("resolves offloaded input/output in full", () => {
-      useDrawerStore.getState().openTrace("trace-1");
+    describe("when the drawer opens", () => {
+      it("resolves offloaded input/output in full", () => {
+        useDrawerStore.getState().openTrace("trace-1");
 
-      renderHook(() => useTraceHeader());
+        renderHook(() => useTraceHeader());
 
-      expect(capturedHeaderInputs.at(-1)).toMatchObject({ full: true });
+        expect(capturedHeaderInputs.at(-1)).toMatchObject({ full: true });
+      });
     });
   });
 
