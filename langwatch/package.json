@@ -255,7 +255,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/lodash-es": "^4.17.12",
     "@types/mustache": "^4.2.6",
-    "@types/node": "^26.0.1",
+    "@types/node": "^26.1.1",
     "@types/nprogress": "^0.2.3",
     "@types/numeral": "^2.0.5",
     "@types/papaparse": "^5.5.2",
