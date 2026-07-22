@@ -261,6 +261,34 @@ describe("given an oversized base64 data URL on an IO attribute", () => {
   });
 });
 
+describe("given an oversized non-base64 data URL on an IO attribute", () => {
+  describe("when the span is capped", () => {
+    it("keeps a readable text preview, not the binary placeholder", () => {
+      // A `data:` URL without the `;base64` flag carries percent-encoded/raw
+      // readable text (e.g. an inline SVG or plain-text payload), not binary
+      // content — it must get the same text preview as any other oversized
+      // string, not the size-only placeholder reserved for base64 blobs.
+      const original = `data:text/plain,${"The quick brown fox jumps. ".repeat(15_000)}`;
+      const span = makeSpan([
+        { key: "langwatch.input", value: { stringValue: original } },
+      ]);
+
+      capOversizedAttributes(span, null);
+
+      const capped = span.attributes[0]!.value.stringValue!;
+      expect(capped.startsWith("data:text/plain,The quick brown fox jumps.")).toBe(
+        true,
+      );
+      expect(capped).toContain(
+        `[truncated: showing ${previewByteLength(capped)} of ${Buffer.byteLength(original, "utf8")} bytes]`,
+      );
+      expect(previewByteLength(capped)).toBeLessThanOrEqual(
+        IO_ATTRIBUTE_PREVIEW_BYTES + 4,
+      );
+    });
+  });
+});
+
 // ---------------------------------------------------------------------------
 // valueExceeds
 // ---------------------------------------------------------------------------

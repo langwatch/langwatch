@@ -46,6 +46,14 @@ Feature: Oversized span attribute values keep a readable preview
         since arbitrary attributes are not bounded in count the way input
         and output are
 
+    Scenario: A non-base64 data URL is treated as readable text, not binary
+      Given a span whose input is an oversized "data:" URL that is not
+        base64-encoded (e.g. inline percent-encoded text or SVG markup)
+      When the span is ingested
+      Then the stored input keeps a readable partial preview of that text
+      And the stored input is not replaced by the binary-only byte-count
+        marker
+
   Rule: Binary content still has no useful partial preview
 
     Scenario: An oversized inline image is still replaced entirely

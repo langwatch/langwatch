@@ -113,15 +113,23 @@ export function utf8Preview({
 
 /**
  * Pulls a mime type out of a `data:<mime>;base64,...` URL so the placeholder
- * can name what was cut. Returns null for non-data-url strings.
+ * can name what was cut. Only matches base64-encoded data URLs — those are the
+ * only ones with no readable partial preview. A non-base64 data URL (e.g.
+ * `data:text/plain,hello` or an inline `data:image/svg+xml,<svg>...`) carries
+ * percent-encoded or raw readable text, so it must fall through to the text
+ * preview path like any other oversized string. Per RFC 2397, `;base64` is
+ * the last parameter before the comma when present. Returns null for
+ * non-data-url strings and non-base64 data URLs.
  */
 function dataUrlMimeType(value: string): string | null {
   if (!value.startsWith("data:")) return null;
   const commaIdx = value.indexOf(",");
   if (commaIdx === -1) return null;
   const header = value.slice(5, commaIdx); // strip "data:"
-  const semiIdx = header.indexOf(";");
-  const mimeType = semiIdx === -1 ? header : header.slice(0, semiIdx);
+  const segments = header.split(";");
+  const isBase64 = segments[segments.length - 1]?.toLowerCase() === "base64";
+  if (!isBase64) return null;
+  const mimeType = segments[0];
   return mimeType || null;
 }
 
