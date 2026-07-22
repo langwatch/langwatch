@@ -13,9 +13,10 @@
  *
  * The fixture is the live transport exactly as the panel receives it: opencode
  * ran the CLI through `bash`, and the server's envelope retyped the call to
- * `langwatch.trace.search` while keeping the shell payload as its input. That
- * is the turn shape behind the reported "Open in Analytics / Annotations /
- * Datasets" chips.
+ * `langwatch.trace.search` while keeping the shell payload as its input. The
+ * row it earns: a carried "Alert me on this" (the search rides to the
+ * automation drawer as its subject) and plain "Open in <surface>" chips for
+ * the destinations that cannot hold the search.
  *
  * @see specs/langy/langy-capability-cards.feature
  *      Rule: A card's links never reload the app
@@ -74,6 +75,7 @@ function PanelLayout() {
   return (
     <>
       <div data-testid="pathname">{location.pathname}</div>
+      <div data-testid="search">{location.search}</div>
       <div data-testid="langy-panel">
         <LangyCapabilityRenderer call={settledTraceSearch} />
       </div>
@@ -101,7 +103,7 @@ function renderApp() {
                 path="/demo/annotations"
                 element={<div>annotations page</div>}
               />
-              <Route path="/demo/datasets" element={<div>datasets page</div>} />
+              <Route path="/demo/traces" element={<div>traces page</div>} />
             </Route>
           </Routes>
         </MemoryRouter>
@@ -156,11 +158,26 @@ describe("a card's footer chips under the real app router", () => {
       expect(screen.getByTestId("pathname")).toHaveTextContent(
         "/demo/annotations",
       );
+    });
 
-      expect(click(chip("Open in Datasets")).defaultPrevented).toBe(true);
-      expect(screen.getByTestId("pathname")).toHaveTextContent(
-        "/demo/datasets",
+    it("the carried alert chip arrives with the automation drawer's subject prefilled", () => {
+      renderApp();
+
+      const event = click(chip("Alert me on this"));
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(screen.getByTestId("pathname")).toHaveTextContent("/demo/traces");
+      // The drawer params rode the SPA navigation: the automation drawer will
+      // open seeded with the search as its subject, through the same
+      // `drawer.*` URL channel every drawer opens from.
+      const search = screen.getByTestId("search").textContent ?? "";
+      const params = new URLSearchParams(search);
+      expect(params.get("drawer.open")).toBe("automation");
+      expect(params.get("drawer.initialFilterQuery")).toBe(
+        '"checkout failed"',
       );
+      // The panel — and the card the user just acted on — is still there.
+      expect(chip("Alert me on this")).toBeInTheDocument();
     });
   });
 
@@ -174,8 +191,8 @@ describe("a card's footer chips under the real app router", () => {
       expect(chip("Open in Annotations").getAttribute("href")).toBe(
         "/demo/annotations",
       );
-      expect(chip("Open in Datasets").getAttribute("href")).toBe(
-        "/demo/datasets",
+      expect(chip("Alert me on this").getAttribute("href")).toBe(
+        "/demo/traces?drawer.open=automation&drawer.initialSource=trace&drawer.initialFilterQuery=%22checkout+failed%22#all-traces?q=%22checkout+failed%22",
       );
     });
 

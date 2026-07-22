@@ -8,12 +8,12 @@
  * so the individual cards stay pure of app context.
  *
  * Beneath the card it also draws the follow-up suggestions the result justifies
- * — the quiet "Graph these" / "Alert me on this" chips. WHICH offers to make is
- * `cliFollowUps.ts`'s call, driven by the feature map; WHERE each lands is a
- * `traceQueryIntent` builder that recompiles the search into a destination URL.
- * An offer only becomes a chip when a builder can actually carry it out, so
- * offers with no destination (dataset / annotation / lens — no link exists yet)
- * are silently dropped rather than rendered as dead ends.
+ * — the quiet "Alert me on this" / "Open in X" chips. WHICH offers to make is
+ * `cliFollowUps.ts`'s call, driven by the feature map; WHERE each lands is
+ * `followUpChips.ts`'s, which reads the search through the same
+ * `traceExplorerLink` reader the card's own Explorer button uses and carries it
+ * where a destination can actually hold it (the automation drawer's subject).
+ * Offers nothing can carry resolve as plain "Open in <surface>" navigation.
  *
  * `hasCapabilityCard` is the shared predicate that decides whether a call
  * renders as a card at all — used both here and by LangyToolActivity to skip
