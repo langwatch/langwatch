@@ -17,7 +17,13 @@ Classify the user's intent:
 | Batch test a dataset, compare prompts or models, benchmark, create a CI quality gate | `experiments`        |
 | Score live traces or threads, monitor production quality, create a guardrail         | `online-evaluations` |
 
-If the request remains ambiguous after inspecting context, briefly explain the distinction and route to `experiments` as the safer pre-deployment default.
+If the request remains ambiguous after inspecting context — a bare "make me an eval" that names neither a dataset nor live traffic — do not create anything yet. This choice picks what gets tested, so it is the user's to make, not a default's. Ask one short question naming the two options and wait for the answer:
+
+> Should this test against a dataset before deployment (a batch experiment), or score live production traffic (an evaluator running online)?
+
+Send the question as a single line of prose. (Once the product's choice-question blocks exist, this ask ships as a `langy-card` choices block instead; until then prose is the only channel.)
+
+A rejected field value is not this kind of choice. If a create later fails with a `validation_error` whose reason names the field and an `expected` list, correct that exact field from the list and retry once — never turn a fixable slug into a question for the user.
 
 Then hand off:
 
