@@ -15,6 +15,19 @@ export interface OpsScheduledJob {
   lastSlot: string | null;
   active: boolean;
   createdAt: string;
+  /**
+   * The slot currently being worked, or null when idle.
+   *
+   * This is the closest thing to "is a lock held" the scheduler can answer. It
+   * has no lease-holder column, so a claimed slot is observable but the worker
+   * holding it is not; a row stuck here with a rising `attempts` is a job
+   * failing and retrying rather than one running long.
+   */
+  currentSlot: string | null;
+  attempts: number;
+  /** Last failure, so a stuck schedule explains itself without a log dive. */
+  lastError: string | null;
+  updatedAt: string;
 }
 
 /**
@@ -51,5 +64,9 @@ function toOpsScheduledJob(row: ScheduledJobRecord): OpsScheduledJob {
     lastSlot: row.lastSlot ? row.lastSlot.toISOString() : null,
     active: row.active,
     createdAt: row.createdAt.toISOString(),
+    currentSlot: row.currentSlot ? row.currentSlot.toISOString() : null,
+    attempts: row.attempts,
+    lastError: row.lastError ?? null,
+    updatedAt: row.updatedAt.toISOString(),
   };
 }

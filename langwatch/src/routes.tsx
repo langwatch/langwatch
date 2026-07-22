@@ -576,6 +576,7 @@ const routes: RouteObject[] = [
   { path: "/ops/queues", ...page(() => import("./pages/ops/queues")) },
   { path: "/ops/dejaview", ...page(() => import("./pages/ops/dejaview")) },
   { path: "/ops/scheduler", ...page(() => import("./pages/ops/scheduler")) },
+  { path: "/ops/blobs", ...page(() => import("./pages/ops/blobs")) },
   {
     path: "/ops/feature-flags",
     ...page(() => import("./pages/ops/feature-flags")),
