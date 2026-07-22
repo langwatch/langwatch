@@ -1,3 +1,4 @@
+import type { TriggerNotifier } from "@langwatch/automations-server/dispatch/notifier";
 import type { AlertType } from "@prisma/client";
 import { computeDefaultFrom } from "~/server/mailer/emailSender";
 import {
@@ -32,36 +33,6 @@ export type TemplateChannel = "email" | "slack" | "webhook";
 
 export const SLACK_TEMPLATE_TYPES = ["string", "block_kit"] as const;
 
-/** Sends a test-fire notification. Injected so the service is testable without
- *  hitting SES/SendGrid or a real Slack webhook. */
-export interface TriggerNotifier {
-  sendEmail(args: {
-    /** Single visible recipient (the LangWatch no-reply for production
-     *  triggers). All actual recipients ride in `bcc` so they don't see each
-     *  other and can't be enumerated by external mailing-list integrations. */
-    to: string;
-    bcc: string[];
-    subject: string;
-    html: string;
-  }): Promise<void>;
-  sendSlack(args: { webhook: string; payload: SlackPayload }): Promise<void>;
-  /** Web API (bot-token) delivery — renders the gated Block Kit blocks. */
-  sendSlackBot(args: {
-    token: string;
-    channel: string;
-    payload: SlackPayload;
-  }): Promise<void>;
-  /** ADR-040 generic HTTP delivery — the SSRF-fenced webhook sender, with
-   *  the test-fire header injected. Returns the real HTTP status so the
-   *  author sees what their endpoint answered. */
-  sendWebhook(args: {
-    url: string;
-    method: "POST" | "PUT" | "PATCH";
-    headers: Record<string, string>;
-    body: string;
-    triggerName: string;
-  }): Promise<{ status: number }>;
-}
 
 /** The four template columns, as edited in the drawer. Each may be null
  *  ("use the framework default") or omitted. */
