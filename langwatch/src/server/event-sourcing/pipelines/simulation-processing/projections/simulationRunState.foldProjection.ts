@@ -128,6 +128,14 @@ export interface SimulationRunStateData {
   ScenarioId: string;
   BatchRunId: string;
   ScenarioSetId: string;
+  /**
+   * How many runs the dispatching batch intended to queue (ADR-061). Every
+   * child of a batch carries the same value, so the batch's denominator is
+   * available from whichever row lands first rather than from a separate
+   * suite-run record. 0 means unknown — runs queued before this field existed,
+   * for which the read path counts rows instead.
+   */
+  BatchTotal: number;
   Status: string;
   Name: string | null;
   Description: string | null;
@@ -254,6 +262,7 @@ export class SimulationRunStateFoldProjection
       ScenarioId: "",
       BatchRunId: "",
       ScenarioSetId: "",
+      BatchTotal: 0,
       Status: "PENDING",
       Name: null,
       Description: null,
@@ -289,6 +298,9 @@ export class SimulationRunStateFoldProjection
       ScenarioId: event.data.scenarioId,
       BatchRunId: event.data.batchRunId,
       ScenarioSetId: event.data.scenarioSetId,
+      // Keep whichever value is known: a `queued` event redelivered without
+      // the field must not erase a denominator an earlier one established.
+      BatchTotal: event.data.batchTotal ?? state.BatchTotal,
       Name: event.data.name ?? null,
       Status: statusAfter({ state, candidate: "QUEUED" }),
       Description: event.data.description ?? null,

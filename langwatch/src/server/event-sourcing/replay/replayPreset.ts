@@ -8,8 +8,6 @@ import { createExperimentRunStateFoldStore } from "../pipelines/experiment-run-p
 import { ExperimentRunStateRepositoryClickHouse } from "../pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository";
 import { SimulationRunStateRepositoryClickHouse } from "../pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
 import { SIMULATION_PROJECTION_VERSIONS } from "../pipelines/simulation-processing/schemas/constants";
-import { SuiteRunStateRepositoryClickHouse } from "../pipelines/suite-run-processing/repositories/suiteRunState.clickhouse.repository";
-import { SUITE_RUN_PROJECTION_VERSIONS } from "../pipelines/suite-run-processing/schemas/constants";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
 import type { FoldProjectionStore } from "../projections/foldProjection.types";
 import { RepositoryFoldStore } from "../projections/repositoryFoldStore";
@@ -93,13 +91,6 @@ export function createReplayRuntime(config: {
       new RepositoryFoldStore(
         new SimulationRunStateRepositoryClickHouse(clientResolver),
         SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
-      ),
-    ],
-    [
-      "suite_run_processing",
-      new RepositoryFoldStore(
-        new SuiteRunStateRepositoryClickHouse(clientResolver),
-        SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
       ),
     ],
   ]);

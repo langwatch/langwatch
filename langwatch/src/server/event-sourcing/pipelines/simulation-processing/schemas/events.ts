@@ -24,6 +24,17 @@ export const simulationRunQueuedEventDataSchema = z.object({
     type: z.enum(["prompt", "http", "code", "workflow"]),
     referenceId: z.string(),
   }).optional(),
+  /**
+   * How many runs the dispatching batch intends to queue (ADR-061). Carried by
+   * every child so the batch's denominator is known from the first row that
+   * lands, instead of from a separate suite-run stream.
+   *
+   * Optional, and the field is additive rather than a version bump: the event
+   * version is asserted with `z.literal`, so bumping it would stop every
+   * already-committed `queued` event from parsing. Absent (pre-ADR-061 events)
+   * folds to 0, which the read path reads as "count the rows".
+   */
+  batchTotal: z.number().int().nonnegative().optional(),
 });
 export type SimulationRunQueuedEventData = z.infer<typeof simulationRunQueuedEventDataSchema>;
 

@@ -115,7 +115,6 @@ import { createCancellationBroadcastReactor } from "./pipelines/simulation-proce
 import type { ScenarioExecutionReactorHandle } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import { createScenarioExecutionReactor } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
-import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
 import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
@@ -149,10 +148,6 @@ import { createTopicClusteringProcessingPipeline } from "./pipelines/topic-clust
 import type { TopicClusteringRunHistoryData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
 import type { TopicClusteringRunStatusData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
 import type { TopicModelData } from "./pipelines/topic-clustering-processing/projections/topicModel.foldProjection";
-import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
-import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
-import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
-import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
 import { resolveLogCommandShardCount } from "./pipelines/trace-processing/commands/logCommandGroupKey";
 import { resolveSpanCommandShardCount } from "./pipelines/trace-processing/commands/spanCommandGroupKey";
 import {
@@ -273,7 +268,6 @@ function createInMemoryDeferredFallback<P>({
  * The registry consumes these directly — no ClickHouse client resolution here.
  */
 export interface PipelineRepositories {
-  suiteRunState: SuiteRunStateRepository;
   /** Primary replica for read-after-write consistency. */
   simulationRunState: SimulationRunStateRepository;
   /** Primary replica for read-after-write consistency. */
@@ -464,10 +458,8 @@ export class PipelineRegistry {
         graphActivityHandler,
       },
     });
-    const suiteRunPipeline = this.registerSuiteRunPipeline();
     const { pipeline: simulationPipeline, scenarioExecutionHandle } =
       this.registerSimulationPipeline({
-        suiteRunPipeline,
         traceSummaryStore,
         simComputeRunMetrics,
       });
@@ -494,7 +486,6 @@ export class PipelineRegistry {
       evaluations: mapCommands(evalPipeline.commands),
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
-      suiteRuns: mapCommands(suiteRunPipeline.commands),
       langy: mapCommands(langyConversationPipeline.commands),
       topicClustering: mapCommands(topicClusteringPipeline.commands),
       ...enterprisePipelines.commands,
@@ -1110,26 +1101,10 @@ export class PipelineRegistry {
     };
   }
 
-  private registerSuiteRunPipeline() {
-    return this.deps.eventSourcing.register(
-      createSuiteRunProcessingPipeline({
-        suiteRunStateFoldStore: this.cached<SuiteRunStateData>(
-          new RepositoryFoldStore<SuiteRunStateData>(
-            this.deps.repositories.suiteRunState,
-            SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
-          ),
-          "suite_runs",
-        ),
-      }),
-    );
-  }
-
   private registerSimulationPipeline({
-    suiteRunPipeline,
     traceSummaryStore,
     simComputeRunMetrics,
   }: {
-    suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
     simComputeRunMetrics: Deferred<
       CommandDispatcher<ComputeRunMetricsCommandData>
@@ -1154,12 +1129,6 @@ export class PipelineRegistry {
     });
 
     const scenarioExecutionHandle = createScenarioExecutionReactor();
-
-    const suiteRunCommands = mapCommands(suiteRunPipeline.commands);
-    const suiteRunSyncReactor = createSuiteRunSyncReactor({
-      recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
-      completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
-    });
 
     // Deferred dispatchers — resolved after pipeline registration.
     const selfComputeRunMetrics = new Deferred<
@@ -1189,7 +1158,6 @@ export class PipelineRegistry {
         snapshotUpdateBroadcastReactor,
         cancellationBroadcastReactor,
         scenarioExecutionReactor: scenarioExecutionHandle.reactor,
-        suiteRunSyncReactor,
         traceMetricsSyncReactor,
         computeRunMetricsCommand,
       }),

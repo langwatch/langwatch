@@ -50,6 +50,9 @@ const scenarioRunResponseWithPlatformUrlSchema =
 const batchSummarySchema = z.object({
   batchRunId: z.string(),
   totalCount: z.number(),
+  /** How many runs the batch set out to queue; exceeds totalCount when part
+   *  of the fan-out never reached the queue (ADR-061). */
+  expectedCount: z.number(),
   passCount: z.number(),
   failCount: z.number(),
   runningCount: z.number(),
@@ -278,6 +281,7 @@ secured.access(requires("scenarios:view")).get(
       batches: result.batches.map((b) => ({
         batchRunId: b.batchRunId,
         totalCount: b.totalCount,
+        expectedCount: b.expectedCount,
         passCount: b.passCount,
         failCount: b.failCount,
         runningCount: b.runningCount,

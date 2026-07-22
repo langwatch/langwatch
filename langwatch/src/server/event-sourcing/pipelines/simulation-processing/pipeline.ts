@@ -32,10 +32,6 @@ export interface SimulationProcessingPipelineDeps {
     SimulationProcessingEvent,
     SimulationRunStateData
   >;
-  suiteRunSyncReactor: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
   traceMetricsSyncReactor: ReactorDefinition<
     SimulationProcessingEvent,
     SimulationRunStateData
@@ -87,7 +83,6 @@ export function createSimulationProcessingPipeline(
       "cancellationBroadcast",
       deps.cancellationBroadcastReactor,
     )
-    .withReactor("simulationRunState", "suiteRunSync", deps.suiteRunSyncReactor)
     .withReactor(
       "simulationRunState",
       "traceMetricsSync",
