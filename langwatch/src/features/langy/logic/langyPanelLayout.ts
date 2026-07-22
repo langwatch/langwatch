@@ -51,6 +51,15 @@ export const PANEL_LAYOUT_TRANSITION = {
   mass: 0.82,
 } as const;
 
+/**
+ * The floating card's symmetric viewport inset (a rounded card with a small,
+ * SYMMETRIC inset on every side). One definition, shared by everything that
+ * hangs off the card's edge: the inspector drawer (so the two can't drift a
+ * pixel apart) and the minimised peek (which rests on the same horizontal
+ * position, so sinking and rising never side-step).
+ */
+export const FLOATING_PANEL_INSET = 12;
+
 /** Desktop ceiling for the floating companion. */
 export const FLOATING_PANEL_MAX_WIDTH = 432;
 
@@ -80,14 +89,6 @@ export function resolveFloatingPanelWidth(viewportWidth: number): number {
 }
 
 export const FLOATING_PANEL_CSS_WIDTH = `min(${FLOATING_PANEL_MAX_WIDTH}px, max(${FLOATING_PANEL_MIN_WIDTH}px, ${FLOATING_PANEL_VIEWPORT_SHARE * 100}vw), calc(100vw - ${FLOATING_PANEL_VIEWPORT_GUTTER}px))`;
-
-/**
- * The floating card's symmetric viewport inset: a rounded card with a small,
- * SYMMETRIC inset on every side. One definition — the panel and the inspector
- * drawer both hang their geometry off it, and a one-pixel drift between the
- * two is exactly the kind of seam the eye catches.
- */
-export const FLOATING_PANEL_INSET = 12;
 
 /** The inspector drawer's visible width. */
 export const INSPECTOR_WIDTH = 380;

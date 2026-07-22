@@ -40,6 +40,14 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: projectRef.current }),
 }));
 
+// The minimised affordance is flag-gated (LangySidecar reads
+// release_ui_langy_peek_dock_enabled). This suite is about the inline model
+// setup, not the closed state, so pin the flag off (the classic launcher) —
+// the same render path this suite had before the flag landed.
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 // The panel reads `currentDrawer` to decide whether it is riding beside a
 // drawer as the floating companion. Defaults to no drawer (the dock/floating
 // cases); the companion-header test flips it. The rest of the hook's surface is
