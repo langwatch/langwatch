@@ -104,8 +104,44 @@ export function hasRenderableAnalyticsResult(output: unknown): boolean {
  * friends group metrics in a picker, and repeating that grouping in a heading
  * tells the reader nothing they asked about.
  */
-function humanMetric(key: string | undefined): string {
+/**
+ * What the common measurements are actually called, keyed on the pair that
+ * identifies them.
+ *
+ * The fallback below titles a metric by the LEAF of its dotted key, which is
+ * right for most of them and wrong for exactly the ones people ask for most.
+ * "How many traces this week?" resolves to `metadata.trace_id` counted by
+ * `cardinality`, and titled that way the answer reads "Trace id" — the column
+ * we happen to count, not the thing counted. The two latency presets are worse
+ * than wrong: both are `performance.completion_time`, so the p95 and the mean
+ * render under one identical title and the number that distinguishes them is
+ * the aggregation nobody sees.
+ *
+ * Keyed on metric AND aggregation because that pair is what the CLI's presets
+ * resolve to (`METRIC_PRESETS` in the analytics command) — the preset name
+ * itself never reaches the card.
+ */
+const MEASUREMENT_NAMES: Record<string, string> = {
+  "metadata.trace_id·cardinality": "Traces",
+  "metadata.user_id·cardinality": "Users",
+  "performance.total_cost·sum": "Total cost",
+  "performance.completion_time·avg": "Average latency",
+  "performance.completion_time·p95": "P95 latency",
+  "performance.total_tokens·sum": "Total tokens",
+  "performance.total_tokens·avg": "Average tokens",
+  "evaluations.evaluation_pass_rate·avg": "Pass rate",
+};
+
+/** Exported for its own test — the naming rules are the interesting part. */
+export function humanMetricLabel(
+  key: string | undefined,
+  aggregation?: string | undefined,
+): string {
   if (!key) return "Metric";
+  const named = aggregation
+    ? MEASUREMENT_NAMES[`${key}·${aggregation}`]
+    : undefined;
+  if (named) return named;
   const leaf = key.split(".").pop() ?? key;
   const words = leaf.replace(/[_-]+/g, " ").trim();
   if (!words) return "Metric";
@@ -159,7 +195,7 @@ export function LangyMetricsCard({
       ? ((input as { metric?: unknown }).metric as string | undefined)
       : undefined;
   const metricKey = metric ?? metricFromInput;
-  const label = humanMetric(metricKey);
+  const label = humanMetricLabel(metricKey, aggregation);
   const money = isMoneyMetric(metricKey);
   const period = periodCaption(input);
 
@@ -167,7 +203,12 @@ export function LangyMetricsCard({
   if (latest != null) {
     metrics.push({
       value: latest,
-      label: aggregation ?? label,
+      // The NAME, not the aggregation. This read `aggregation ?? label`, so the
+      // most-asked question in the product answered with a stat labelled
+      // "cardinality" — the operation we performed, in place of the thing
+      // measured. The aggregation is already inside the name where it
+      // distinguishes anything ("P95 latency" vs "Average latency").
+      label,
       ...(money ? { format: formatMoneyShort } : {}),
     });
   }
