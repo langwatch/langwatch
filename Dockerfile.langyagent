@@ -108,6 +108,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 # both trees must be present for `workspace:*` to resolve. cli-cards is
 # source-only (its `main` points at src/index.ts) and is bundled into the binary.
 COPY packages/cli-cards ./packages/cli-cards
+# contracts is NOT a workspace member here — copy-types.sh reads its tracer and
+# filters modules by path and copies them into the SDK's generated tree
+# (ADR-063 moved them out of langwatch/src/server). Present for the generator
+# only; nothing resolves `@langwatch/contracts` in this build.
+COPY packages/contracts ./packages/contracts
 COPY typescript-sdk ./typescript-sdk
 
 WORKDIR /src/typescript-sdk
