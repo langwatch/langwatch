@@ -14,7 +14,6 @@ import { api } from "~/utils/api";
 export function useLangyConversationCommands(): {
   remove: (id: string) => Promise<void>;
   rename: (id: string, title: string) => Promise<void>;
-  fork: (id: string) => Promise<string>;
 } {
   const { project } = useOrganizationTeamProject();
   const utils = api.useUtils();
@@ -24,11 +23,6 @@ export function useLangyConversationCommands(): {
     },
   });
   const renameConversation = api.langy.renameConversation.useMutation({
-    onSuccess: (_result, variables) => {
-      void utils.langy.list.invalidate({ projectId: variables.projectId });
-    },
-  });
-  const forkConversation = api.langy.forkConversation.useMutation({
     onSuccess: (_result, variables) => {
       void utils.langy.list.invalidate({ projectId: variables.projectId });
     },
@@ -57,18 +51,5 @@ export function useLangyConversationCommands(): {
     [project?.id, renameConversation],
   );
 
-  const fork = useCallback(
-    async (id: string) => {
-      const projectId = project?.id;
-      if (!projectId) throw new Error("No project selected");
-      const conversation = await forkConversation.mutateAsync({
-        projectId,
-        conversationId: id,
-      });
-      return conversation.id;
-    },
-    [project?.id, forkConversation],
-  );
-
-  return { remove, rename, fork };
+  return { remove, rename };
 }

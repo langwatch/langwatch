@@ -207,6 +207,7 @@ import { SuiteRunService } from "./suites/suite-run.service";
 import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
 import { PrismaTopicRepository } from "./topic-clustering/repositories/topic.prisma.repository";
 import { TopicService } from "./topic-clustering/topic.service";
+import { maybeExtractSpanMedia } from "./traces/edge-media-extraction";
 import { maybeSpool } from "./traces/edge-spool";
 import { LogRecordStorageService } from "./traces/log-record-storage.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
@@ -322,11 +323,27 @@ export function initializeDefaultApp(options?: {
   );
   const spanDedup = createSpanDedupeService(redis);
 
+  // ADR-022: construct blob/IO deps and the shared span-storage repository
+  // before TraceSummaryService and SpanStorageService, so both can resolve
+  // offloaded eventref pointers (the v2 header's full=true read, and the v2
+  // spans read) from the same instances. #4888: the same factory backs the
+  // customer-facing full=true read path; the composition root passes its own
+  // ClickHouse decision/resolver so the eval-path deps stay byte-identical to
+  // the pre-#4888 inline wiring.
+  const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps({
+    clickhouseEnabled,
+    resolveClickHouseClient,
+  });
+  const spanStorageRepository = clickhouseEnabled
+    ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
+    : new NullSpanStorageRepository();
+
   const traceSummary = traced(
     new TraceSummaryService(
       clickhouseEnabled
         ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
         : new NullTraceSummaryRepository(),
+      { spanStorageRepository, blobStore, ioExtractionService },
     ),
     "TraceSummaryService",
   );
@@ -352,16 +369,6 @@ export function initializeDefaultApp(options?: {
     ),
     "TraceListService",
   );
-  // ADR-022: construct blob/IO deps before SpanStorageService so the v2 read
-  // path (spansFull / spanDetail) can resolve offloaded eventref pointers.
-  // #4888: the same factory backs the customer-facing full=true read path; the
-  // composition root passes its own ClickHouse decision/resolver so the
-  // eval-path deps stay byte-identical to the pre-#4888 inline wiring.
-  const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps({
-    clickhouseEnabled,
-    resolveClickHouseClient,
-  });
-
   // Wire the discover-cache → SSE bridge. Module-level setter keeps
   // the TraceListService constructor lean (the null/test preset below
   // doesn't need a broadcaster — refreshes that never get an SSE push
@@ -383,12 +390,10 @@ export function initializeDefaultApp(options?: {
     );
   });
   const spanStorage = traced(
-    new SpanStorageService(
-      clickhouseEnabled
-        ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
-        : new NullSpanStorageRepository(),
-      { blobStore, ioExtractionService },
-    ),
+    new SpanStorageService(spanStorageRepository, {
+      blobStore,
+      ioExtractionService,
+    }),
     "SpanStorageService",
   );
   const logRecordStorage = traced(
@@ -989,6 +994,9 @@ export function initializeDefaultApp(options?: {
     credentials: LangyCredentialService.create(prisma),
     resolveModel: getVercelAIModel,
     worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,
+    // The durable buffer backs a user Stop: reconstruct the partial answer and
+    // end the live stream (ADR-058). Null without Redis, like the stores below.
+    tokenBuffer: redis ? langyTokenBuffer : null,
     reservePermit: reserveLangyGithubPrPermit,
     releasePermit: releaseLangyGithubPrPermit,
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
@@ -1001,6 +1009,10 @@ export function initializeDefaultApp(options?: {
     admission: langyTurnAdmission,
     accessStore: redis ? createLangyTurnAccessStore({ redis }) : null,
     handoffStore: redis ? langyHandoffStore : null,
+    // A follow-up turn is told what earlier turns of the same conversation
+    // created — the agent's own worker forgets it whenever it is reaped or
+    // respawned (see `langyConversationMemory`).
+    messages: langyMessageRepository,
   });
 
   const suiteRunService = SuiteRunService.create({
@@ -1023,6 +1035,17 @@ export function initializeDefaultApp(options?: {
       // We log at warn level and return the original commandData unchanged so
       // that ingestion is never blocked by the spool path. ADR-022.
       processCommandData: async (data) => {
+        // Media extraction runs FIRST: externalizing inline media parts to
+        // the content-addressed stored-objects store usually brings the
+        // payload back under COMMAND_INLINE_THRESHOLD, so the transient
+        // whole-payload spool below rarely needs to fire. Internally
+        // fail-open (marker-gated, flag-gated, privacy-interlocked) — on any
+        // error it returns `data` unchanged and the spool proceeds as today.
+        data = await maybeExtractSpanMedia({
+          data,
+          logger: createLogger("langwatch:traces:edge-media-extraction"),
+        });
+
         // Track which stage failed so the fail-open counter carries a useful
         // reason label (flag_store vs spool/S3) for alerting (GtVrL).
         let stage: "flag_store" | "spool" = "flag_store";
@@ -1407,6 +1430,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           throw new Error("no model provider in test app");
         },
         worker: null,
+        tokenBuffer: null,
         reservePermit: async () => ({
           reserved: false,
           allowed: false,
@@ -1421,6 +1445,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         admission: new NullLangyTurnAdmissionRepository(),
         accessStore: null,
         handoffStore: null,
+        messages: new NullLangyMessageRepository(),
       }),
       messages: new LangyMessageService(
         new NullLangyMessageRepository(),

@@ -256,14 +256,70 @@ Rule: Progressive drawer loading
     Then `useOpenTraceDrawer` seeds `tracesV2.header` from the row payload
     And the URL updates to `?drawer.open=traceV2Details&drawer.traceId=abc123&drawer.t=<timestamp>`
     And `useTraceHeader` fires `tracesV2.header` (staleTime 5 min, cacheTime 30 min)
-    And `useSpanTree` fires `tracesV2.spanTree` (with the `occurredAtMs` partition-pruning hint)
+    And `useSpanTree` starts loading the span tree page by page (forwarding the `occurredAtMs` partition-pruning hint)
     And `useSpanLangwatchSignals` fires `tracesV2.spanLangwatchSignals` in parallel
     And `tracesV2.spanDetail` does NOT fire (no selected span)
 
   Scenario: Span tree returns lightweight skeleton only
     When `useSpanTree` fires
-    Then `tracesV2.spanTree` returns SpanTreeNode rows: spanId, parentSpanId, name, type, startTimeMs, endTimeMs, durationMs, status, model
+    Then the span tree is returned as SpanTreeNode rows: spanId, parentSpanId, name, type, startTimeMs, endTimeMs, durationMs, status, model
     And it does NOT return SpanAttributes, input/output, or Events (those live on `spanDetail`)
+
+  Scenario: Span tree is fetched in cursor pages, never as one response
+    Given a trace with more spans than one page
+    When `useSpanTree` fires
+    Then the client fetches the tree page by page via `tracesV2.spanTreePaginated`
+    And each page's `nextCursor` keys the next page, so concurrent ingestion cannot skip or duplicate spans
+    And already-fetched spans render in the waterfall while later pages are still loading
+    And no span endpoint returns every span of the trace in a single unbounded response
+
+  Scenario: Pagination reaches spans recorded long after the trace began
+    Given a long-running trace whose newest spans started days after its first span
+    When the client pages through the span tree
+    Then every span is returned, including those far past the trace's recorded start
+    And no page ends the walk early because of a time-window guess
+
+  Scenario: Finishing pagination never widens into an unbounded storage scan
+    Given a trace whose span count is an exact multiple of the page size
+    When the client fetches the final page
+    Then the walk terminates without an extra empty fetch
+    And the storage read never widens beyond the pages' own time bounds
+
+  Scenario: Live fallback polling fetches only what changed
+    Given an open live trace whose realtime connection is down
+    When the periodic fallback refresh fires
+    Then only spans changed since the newest already-loaded change are requested
+    And they are merged into the loaded tree in place
+    And the full page walk does not rerun on every poll
+
+  Scenario: A span that is updated in place is picked up by the live refresh
+    Given an open live trace whose realtime connection is down
+    And a span already in the loaded tree finishes, changing its duration and status
+    When the periodic fallback refresh fires
+    Then that span's new duration and status are shown
+    And this holds for the root span, which starts before every other span and ends after them
+
+  Scenario: Realtime span updates do not re-walk the whole trace
+    Given an open live trace with 100,000+ spans and a healthy realtime connection
+    When a batch of new spans is recorded
+    Then only the changed spans are requested
+    And the client does not restart the page walk
+
+  Scenario: Reconnecting picks up whatever was missed
+    Given an open live trace whose realtime connection was down and has just come back
+    When no further span is recorded
+    Then any span that changed between the last poll and the reconnect is still picked up
+
+  Scenario: A page never shows a superseded version of a span
+    Given a span was recorded twice, the newer version correcting its start time to be earlier
+    When the client pages past the point where the correction landed
+    Then the page shows the newer version of that span, never the superseded one
+
+  Scenario: A huge trace cannot exhaust server memory through per-trace span reads
+    Given a runaway trace with 100,000+ spans
+    When any per-trace read fires (span tree, signals, resource info, trace events, live deltas)
+    Then the read is bounded server-side and returns at most a fixed ceiling of rows
+    And the complete span tree remains reachable through the cursor-paged fetch
 
   Scenario: Clicking a span fetches full detail
     Given the drawer is open with a trace
@@ -512,7 +568,7 @@ Rule: Batched tRPC requests with skipBatch opt-out
 
   Scenario: Drawer open batches header and span tree by default
     When the user clicks a trace row
-    Then `tracesV2.header` and `tracesV2.spanTree` fire in the same tick
+    Then `tracesV2.header` and the first `tracesV2.spanTreePaginated` page fire in the same tick
     And they are batched into a single HTTP request unless one opts out
 
   Scenario: Heavy queries opt out of batching

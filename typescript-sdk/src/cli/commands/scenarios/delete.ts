@@ -3,8 +3,9 @@ import { createSpinner } from "../../utils/spinner";
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
-export const deleteScenarioCommand = async (id: string, options?: { format?: string }): Promise<void> => {
+export const deleteScenarioCommand = async (id: string): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new ScenariosApiService();
@@ -32,10 +33,6 @@ export const deleteScenarioCommand = async (id: string, options?: { format?: str
     deleteSpinner.succeed(
       `Archived scenario "${chalk.cyan(scenarioName)}"`,
     );
-
-    if (options?.format === "json") {
-      console.log(JSON.stringify({ id, name: scenarioName, archived: true }, null, 2));
-    }
   } catch (error) {
     failSpinner({
       spinner: deleteSpinner,
@@ -44,4 +41,11 @@ export const deleteScenarioCommand = async (id: string, options?: { format?: str
     });
     process.exit(1);
   }
+
+  return {
+    data: { id, name: scenarioName, archived: true },
+    table: () => {
+      // The spinner's success line is the human output.
+    },
+  };
 };

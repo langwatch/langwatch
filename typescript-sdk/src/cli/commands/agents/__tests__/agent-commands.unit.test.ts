@@ -99,19 +99,20 @@ describe("listAgentsCommand()", () => {
     });
   });
 
-  describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
-      const result = {
+  describe("when a machine format is requested", () => {
+    it("returns the raw listing as the payload instead of printing", async () => {
+      const listing = {
         data: [makeAgent()],
         pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
       };
-      mockList.mockResolvedValue(result);
+      mockList.mockResolvedValue(listing);
 
-      await listAgentsCommand({ format: "json" });
+      const result = await listAgentsCommand();
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(result, null, 2),
-      );
+      // The command no longer decides the format — it hands the payload to
+      // the output port, which renders json/yaml/agents/--jq from this value.
+      expect(result?.data).toEqual(listing);
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 

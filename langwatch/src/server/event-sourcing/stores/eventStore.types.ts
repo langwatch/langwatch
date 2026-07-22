@@ -47,6 +47,12 @@ export interface EventStoreReadContext<_EventType extends Event = Event> {
    * Use with caution - should not bypass security or validation.
    */
   raw?: Record<string, unknown>;
+  /**
+   * Which delivery of the job carrying this read is being processed: 1 for a
+   * fresh delivery, higher for a retry of a chain that has not acked. Absent
+   * outside the queue, e.g. during replay.
+   */
+  deliveryAttempt?: number;
 }
 
 /**

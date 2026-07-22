@@ -6,8 +6,9 @@
  * the reference's metrics statcard. Reads only — the deep link opens Analytics.
  */
 import { asJsonDocument } from "@langwatch/cli-cards";
-import { Text } from "@chakra-ui/react";
+import { Text, VStack } from "@chakra-ui/react";
 import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
+import { formatMoneyShort } from "../Money";
 import { StreamingStatCard } from "../StreamingStatCard";
 import {
   extractToolText,
@@ -94,6 +95,58 @@ export function hasRenderableAnalyticsResult(output: unknown): boolean {
   return !isUnreadable(parseAnalytics(output));
 }
 
+/**
+ * A metric key as a person would say it: `performance.total_cost` → "Total
+ * cost". The API's dotted key is a lookup path, not a title, and printing it as
+ * the card's heading made the card read like a stack trace.
+ *
+ * The namespace is dropped rather than shown — `performance.`, `metadata.` and
+ * friends group metrics in a picker, and repeating that grouping in a heading
+ * tells the reader nothing they asked about.
+ */
+function humanMetric(key: string | undefined): string {
+  if (!key) return "Metric";
+  const leaf = key.split(".").pop() ?? key;
+  const words = leaf.replace(/[_-]+/g, " ").trim();
+  if (!words) return "Metric";
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * Is this metric money? Read off the metric KEY the query names, not guessed
+ * from the payload — `performance.total_cost` declares what it measures, and
+ * rendering it as a bare `0.433` drops the one fact that makes the number
+ * legible. (Sniffing which response field holds a cost would be the other
+ * thing, and this is not that.)
+ */
+function isMoneyMetric(key: string | undefined): boolean {
+  return !!key && /cost|spend|price/i.test(key);
+}
+
+/**
+ * The window the figures cover, when the query named one. A total with no
+ * period attached invites the reader to assume it is all-time.
+ */
+function periodCaption(input: unknown): string | undefined {
+  if (!input || typeof input !== "object") return undefined;
+  const { startDate, endDate } = input as {
+    startDate?: unknown;
+    endDate?: unknown;
+  };
+  const start = asDay(startDate);
+  const end = asDay(endDate);
+  if (!start || !end) return undefined;
+  return start === end ? start : `${start} → ${end}`;
+}
+
+/** One ISO day from an epoch or a date string, or undefined if unreadable. */
+function asDay(value: unknown): string | undefined {
+  if (typeof value !== "number" && typeof value !== "string") return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString().slice(0, 10);
+}
+
 export function LangyMetricsCard({
   input,
   output,
@@ -105,11 +158,18 @@ export function LangyMetricsCard({
     input && typeof input === "object"
       ? ((input as { metric?: unknown }).metric as string | undefined)
       : undefined;
-  const label = metric ?? metricFromInput ?? "metric";
+  const metricKey = metric ?? metricFromInput;
+  const label = humanMetric(metricKey);
+  const money = isMoneyMetric(metricKey);
+  const period = periodCaption(input);
 
   const metrics: LangyTurnMetric[] = [];
   if (latest != null) {
-    metrics.push({ value: latest, label: aggregation ?? label });
+    metrics.push({
+      value: latest,
+      label: aggregation ?? label,
+      ...(money ? { format: formatMoneyShort } : {}),
+    });
   }
   if (points > 0) {
     metrics.push({ value: points, label: points === 1 ? "point" : "points" });
@@ -122,6 +182,11 @@ export function LangyMetricsCard({
       overline="Analytics"
       title={label}
       projectSlug={projectSlug}
+      // No chip. It linked to the Analytics INDEX, which is not the query that
+      // was just run — the user lands on an unrelated default view and has to
+      // rebuild the question by hand. A link that does not carry the query is
+      // worse than no link, because it looks like it would.
+      deepLink={false}
     >
       {isUnreadable(parsed) ? (
         <Text textStyle="xs" color="fg.muted">
@@ -132,7 +197,14 @@ export function LangyMetricsCard({
           No data for this period.
         </Text>
       ) : (
-        <StreamingStatCard metrics={metrics} />
+        <VStack align="stretch" gap={1.5}>
+          <StreamingStatCard metrics={metrics} />
+          {period ? (
+            <Text textStyle="2xs" color="fg.subtle">
+              {period}
+            </Text>
+          ) : null}
+        </VStack>
       )}
     </LangyCapabilityCard>
   );

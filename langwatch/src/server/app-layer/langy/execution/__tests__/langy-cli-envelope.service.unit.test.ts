@@ -197,6 +197,34 @@ describe("LangyCliEnvelopeService", () => {
       expect(frame.isError).toBe(true);
     });
 
+    it("keeps the failure document when the CLI printed one before exiting", () => {
+      const frame = service.normalizeToolFrame({
+        frame: bashFrame({
+          phase: "end",
+          input: { command: "langwatch scenario create Support --format json" },
+          output: JSON.stringify({
+            ok: false,
+            error: {
+              code: "api_key_permission_denied",
+              message: "denied",
+              httpStatus: 403,
+              meta: { permission: "scenarios:create" },
+              isHandled: true,
+            },
+          }),
+          isError: true,
+        }),
+      });
+
+      expect(JSON.parse(frame.output!)).toMatchObject({
+        ok: false,
+        error: {
+          code: "api_key_permission_denied",
+          meta: { permission: "scenarios:create" },
+        },
+      });
+    });
+
     it("computes no digest — there is no result to reference", () => {
       const frame = service.normalizeToolFrame({
         frame: bashFrame({
@@ -207,6 +235,56 @@ describe("LangyCliEnvelopeService", () => {
         }),
       });
       expect(frame.digest).toBeUndefined();
+    });
+  });
+
+  // The CLI writes `{ok:false, error:{…}}` on stdout and exits cleanly, so the
+  // worker never marks the frame as failed. Reducing that document to its
+  // sentence threw away the code, the meta and the remediation the card needs.
+  describe("given a CLI frame reporting its own failure document", () => {
+    const failure = JSON.stringify({
+      ok: false,
+      error: {
+        code: "api_key_permission_denied",
+        message: "API Key does not grant required permission: scenarios:manage",
+        httpStatus: 403,
+        meta: { permission: "scenarios:manage" },
+        isHandled: true,
+        suggestions: ["Ask an admin to raise your role"],
+        docUrl: "https://docs.langwatch.ai/api-reference/api-keys",
+      },
+    });
+
+    it("marks the frame as failed", () => {
+      const frame = service.normalizeToolFrame({
+        frame: bashFrame({
+          phase: "end",
+          input: { command: "langwatch scenario create Support --format json" },
+          output: failure,
+        }),
+      });
+      expect(frame.isError).toBe(true);
+    });
+
+    it("keeps everything the platform reported about the failure", () => {
+      const frame = service.normalizeToolFrame({
+        frame: bashFrame({
+          phase: "end",
+          input: { command: "langwatch scenario create Support --format json" },
+          output: failure,
+        }),
+      });
+
+      expect(JSON.parse(frame.output!)).toMatchObject({
+        ok: false,
+        error: {
+          code: "api_key_permission_denied",
+          httpStatus: 403,
+          meta: { permission: "scenarios:manage" },
+          suggestions: ["Ask an admin to raise your role"],
+          docUrl: "https://docs.langwatch.ai/api-reference/api-keys",
+        },
+      });
     });
   });
 

@@ -33,6 +33,18 @@
     "category": "recipe"
   },
   {
+    "id": "debug-with-langwatch",
+    "label": "Debug with langwatch",
+    "description": "Root-cause production errors and misbehaving agent runs with LangWatch. Finds errored traces, inspects spans, checks monitor and evaluator scores, then narrows to a root cause. Use when something is failing or misbehaving in production — errors, bad answers, latency spikes.",
+    "category": "recipe"
+  },
+  {
+    "id": "eval-triage",
+    "label": "Eval triage",
+    "description": "Investigate failing experiments and evaluations with LangWatch. Triage a failing experiment run to the exact rows and evaluator scores that regressed, then to a root cause. Use when an experiment fails, scores drop, or evaluations regress.",
+    "category": "recipe"
+  },
+  {
     "id": "evaluate-multimodal",
     "label": "Evaluate multimodal",
     "description": "Evaluate multimodal AI agents that process images, audio, PDFs, or other files. Sets up evaluations using LangWatch's LLM-as-judge with image inputs, Scenario's multimodal testing, and document parsing evaluation patterns. Use when your agent handles non-text inputs.",
@@ -91,6 +103,12 @@
     "description": "Test your AI agent with simulation-based scenarios. Covers writing scenario test code (Scenario SDK), creating platform scenarios via the `langwatch` CLI, and red teaming for security vulnerabilities. Auto-detects whether to use code or platform approach based on context.",
     "category": "skill",
     "userPrompt": "Add scenario tests for my agent"
+  },
+  {
+    "id": "setup-lw",
+    "label": "Setup lw",
+    "description": "Set up and troubleshoot the LangWatch CLI — login (cloud and self-hosted), endpoint configuration, project selection, and connection problems. Use when the CLI isn't authenticated, can't reach LangWatch, or talks to the wrong project.",
+    "category": "recipe"
   },
   {
     "id": "test-cli-usability",

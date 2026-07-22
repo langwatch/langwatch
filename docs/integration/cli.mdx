@@ -6,7 +6,7 @@ description: The `langwatch` CLI is a single tool that gives you—and your codi
 
 Everything in the LangWatch app is available from the CLI, it's designed to be driven by a coding assistant.
 
-Every subcommand supports `--help`, and list/get commands accept `--format json`. Run `langwatch --help` to see the full command tree.
+Every subcommand supports `--help`, and every command accepts the output-contract flags (`-o json`, `--json <fields>`, `--jq <expr>` — see [Agent usage](#agent-usage)). Run `langwatch --help` to see the full command tree.
 
 ## Install
 
@@ -23,6 +23,41 @@ npx langwatch --help
 ```
 
 `pnpm install -g langwatch` and `yarn global add langwatch` work the same way; the package is identical across all three package managers.
+
+### Standalone binary (no Node.js required)
+
+Each release also attaches a self-contained binary for Linux, macOS, and Windows — useful in containers, CI images, and anywhere you'd rather not install Node.js. Download the one for your platform from the [releases page](https://github.com/langwatch/langwatch/releases), then:
+
+```bash
+# Verify the download against the release's SHA256SUMS, then install it
+sha256sum --check --ignore-missing SHA256SUMS
+chmod +x langwatch-<version>-<platform>
+sudo mv langwatch-<version>-<platform> /usr/local/bin/langwatch
+```
+
+Every binary is published with a signed [build provenance attestation](https://docs.github.com/en/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds), so you can confirm it really was built by LangWatch's release workflow from this repository:
+
+```bash
+gh attestation verify langwatch-<version>-<platform> --repo langwatch/langwatch
+```
+
+#### macOS: clearing Gatekeeper
+
+<Warning>
+The macOS binaries are **not yet codesigned or notarized**. Gatekeeper will refuse to run them with *"langwatch cannot be opened because the developer cannot be verified"*.
+</Warning>
+
+macOS attaches a `com.apple.quarantine` attribute to anything downloaded from the internet. After verifying the checksum above, remove it:
+
+```bash
+xattr -d com.apple.quarantine langwatch-<version>-darwin-arm64
+```
+
+Then run the binary as normal. (If `xattr` reports *"No such xattr"*, the attribute was never set — nothing to do.)
+
+<Note>
+Only clear quarantine on a binary whose checksum you have verified against the release's `SHA256SUMS`. Signing and notarization are tracked as follow-up work; until then, `npm install -g langwatch` avoids Gatekeeper entirely and is the smoother path on macOS.
+</Note>
 
 ## Authenticate
 
@@ -453,6 +488,100 @@ Required token permissions map onto the [RBAC](/ai-gateway/rbac) grants:
 | `cache-rules *` | `gatewayCacheRules:*` |
 
 See the [public REST API reference](/ai-gateway/api/chat-completions) for direct HTTP calls that don't require Node.
+
+## Agent usage
+
+The CLI is human-first (tables, colour, spinners in a terminal) and agent-perfect: driven by an AI coding assistant it switches to machine output automatically. Everything an agent needs to know is also built into the CLI itself — `langwatch help agent-mode` prints the condensed version of this section.
+
+### Agent mode
+
+`--agent` on any command — or auto-detection from the environment (`CLAUDECODE`, `CLAUDE_CODE`, `CURSOR_AGENT`, `GITHUB_COPILOT`, `AMAZON_Q`, `LW_AGENT_MODE`, `LANGWATCH_AGENT_MODE`) — switches output to compact single-line JSON and turns colour and spinners off:
+
+```bash
+langwatch trace search --agent
+LW_AGENT_MODE=1 langwatch monitor list
+```
+
+### Output contract
+
+Every command accepts the same output flags (with a few documented exceptions:
+`trace export -o` is an output *file*, the coding-assistant wrappers pass flags
+through to the wrapped tool, and `dataset records add/update --json` takes a
+record *payload*):
+
+| Flag | Meaning |
+|---|---|
+| `-o, --output <format>` | `table` (human default), `json`, `agents` (compact single-line JSON), `yaml` |
+| `--json <fields>` | JSON with only the given comma-separated fields |
+| `--jq <expr>` | Project the result before printing — dot paths, `.items[]`, `.items[].field`, `\| length` |
+
+```bash
+langwatch trace search --jq '.traces[].traceId'
+langwatch evaluator list --json id,name,slug
+langwatch monitor list -o yaml
+```
+
+The legacy `-f/--format json` spelling keeps working and maps onto the same contract. The contract is fully wired for traces, evaluators, monitors, status, skills, `commands`, and `help-tree`; on the remaining resource commands the flags parse but machine output is still rolling out — those commands keep their legacy `-f json` behavior until migrated.
+
+### Structured errors
+
+A failed command prints one JSON document on **stdout** — `{ "ok": false, "error": { "code", "message", "httpStatus", "suggestions", "docUrl", "traceId", ... } }` — keeps the human-readable block on **stderr**, and exits non-zero. Never merge the streams (`2>&1`) when parsing output; hints and error prose live on stderr by design so stdout stays parseable.
+
+### Discovery
+
+An agent can learn the whole CLI without reading these docs:
+
+```bash
+langwatch commands --flat --jq '.commands[].path'   # machine catalog: args, flags, hints, token costs
+langwatch help-tree                                  # compact annotated tree for context injection
+langwatch help agent-mode                            # the agent-mode guide, from the CLI itself
+langwatch status                                     # project overview + what needs attention
+```
+
+### Skills
+
+The CLI carries LangWatch's agent skills and installs them into `~/.agents/skills` (or the project-level `.agents/skills` with `--dir .`):
+
+```bash
+langwatch skills list                  # bundled skills + installed state
+langwatch skills install --all         # install everything (use --dry-run to preview)
+langwatch skills get tracing           # raw SKILL.md on stdout, for piping into context
+```
+
+See the [Skills Directory](/skills/directory) for what each skill covers.
+
+### Daemon note
+
+Non-TTY invocations (agents, pipes, CI) are served by the background daemon described below — output is identical, just fast. `LANGWATCH_NO_DAEMON=1` opts out per invocation.
+
+## The background daemon
+
+Non-interactive invocations — an agent piping output, CI, any call whose stdin/stdout/stderr is not a TTY — are served by a warm background daemon instead of paying node's cold start on every call. Interactive (terminal) invocations always run in-process and are unaffected, as are commands that mutate auth or take over stdio (`login`, `logout`, `config`, `open`, `request-increase`, `init-shell`, the `claude`/`codex`/`cursor`/`gemini`/`opencode` wrappers, `daemon` itself) and long-running flags (`--follow`, `--watch`). Windows is excluded too — the daemon is not supported there, so on Windows every invocation runs in-process.
+
+What to know:
+
+- **One daemon per identity.** The socket name is a hash of endpoint + API key + uid + config path, so two projects with different keys never share a daemon. The socket lives in `$XDG_RUNTIME_DIR` (or the temp dir) with `0600` permissions inside a `0700` directory, and the daemon self-exits after 10 idle minutes.
+- **Always optional.** If no daemon is reachable — or it is stale, or from an older CLI build — the command simply runs in-process, and a daemon is auto-spawned in the background for next time. Set `LANGWATCH_DAEMON_NO_SPAWN=1` to disable the auto-spawn.
+- **Buffered output.** A daemon-served command's output is buffered and flushed when it exits, so a mid-command daemon failure can retry in-process without duplicating output. Piped callers therefore see output at exit, not progressively (beyond an 8MB buffer it starts streaming early).
+- **Timeouts and cancellation.** A command that hangs is abandoned after a per-request timeout (default 10 minutes, override with `LANGWATCH_DAEMON_REQUEST_TIMEOUT_MS`) with exit code 124; the clock starts when the daemon accepts the request, so time spent queued behind another caller's working directory counts against it. Ctrl-C on the client cancels the server-side command with exit code 130.
+- **Environment hygiene.** The daemon does not inherit the spawning shell's environment — only process essentials (PATH, HOME, locale, …), the pinned identity variables, and the spawner's allowlisted output/proxy knobs (`FORCE_COLOR`, `NO_COLOR`, `HTTPS_PROXY`, …). Those allowlisted values from the *spawning* caller persist in the daemon's baseline and are visible to later callers that don't set them; secrets are never in the allowlist. Per request, the caller's own `.env` is applied scoped to `LANGWATCH_*` keys only.
+
+Manage it explicitly:
+
+```bash
+langwatch daemon status          # pid, uptime, served/in-flight counts (--json supported)
+langwatch daemon start           # start in the background (normally automatic)
+langwatch daemon stop            # stop and remove the socket
+```
+
+Opt out:
+
+```bash
+LANGWATCH_NO_DAEMON=1 langwatch trace list   # per-invocation
+langwatch config set daemon off              # persistent, user-global (~/.langwatch/config.json)
+```
+
+`config set daemon off` doesn't stop an already-running daemon — clients simply stop dialling it, and it idles out on its own within 10 minutes (`langwatch daemon stop` kills it immediately).
 
 ## Use the CLI as your agent's control plane
 

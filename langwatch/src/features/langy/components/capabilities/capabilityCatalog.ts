@@ -43,6 +43,7 @@ export const CAPABILITY_SURFACES = [
   "prompts",
   "dashboards",
   "simulations",
+  "scenarios",
   "agents",
   "automations",
   "workflows",
@@ -67,7 +68,13 @@ export type CapabilitySurface = (typeof CAPABILITY_SURFACES)[number];
  *   - `diff`  — name/version header plus the fields that changed.
  *   - `text`  — the plain summary-lines fallback.
  */
-export type CapabilityBodyWidget = "stats" | "rows" | "facts" | "diff" | "text";
+export type CapabilityBodyWidget =
+  | "stats"
+  | "rows"
+  | "facts"
+  | "diff"
+  | "text"
+  | "chart";
 
 /**
  * Icon overrides a catalog row may name when the surface's own icon is wrong
@@ -161,7 +168,7 @@ export const CAPABILITY_CATALOG = {
     noun: { singular: "monitor", plural: "monitors" },
   },
   scenario: {
-    surface: "simulations",
+    surface: "scenarios",
     digestStrategy: "id-ref",
     noun: { singular: "scenario", plural: "scenarios" },
   },

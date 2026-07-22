@@ -2,7 +2,7 @@ import { chakra, HStack, Text } from "@chakra-ui/react";
 import { Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState, type MouseEvent } from "react";
-import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
+import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
@@ -70,7 +70,9 @@ export function QuietHeadline() {
   // longer implies Langy (spec: specs/home/signal-focused-home-rollout.feature).
   // Without Langy, the typed phrase opens the feature surface instead of a
   // conversation, and the hand-to-Langy action disappears.
-  const showLangy = useShowLangy();
+  // The headline's action AUTO-SENDS, so it needs the grant that starts a turn,
+  // not the one that opens the panel. See `useCanAskLangy`.
+  const canAsk = useCanAskLangy();
 
   // One tiny state machine: grow to the full phrase, hold, shrink to zero,
   // step to the next phrase. Each transition schedules exactly one timeout,
@@ -120,7 +122,7 @@ export function QuietHeadline() {
   // it, otherwise open the surface that teaches the step — the phrase is
   // never a dead control.
   const onPhrase = () => {
-    if (showLangy) {
+    if (canAsk) {
       askLangy(action.ask);
     } else if (project) {
       void router.push(action.href(project.slug));
@@ -145,7 +147,7 @@ export function QuietHeadline() {
           type="button"
           onClick={onPhrase}
           aria-label={
-            showLangy
+            canAsk
               ? `Ask Langy: ${action.phrase}`
               : `Learn more: ${action.phrase}`
           }
@@ -194,7 +196,7 @@ export function QuietHeadline() {
         >
           Learn more →
         </chakra.a>
-        {showLangy ? (
+        {canAsk ? (
           <chakra.button
             type="button"
             onClick={() => askLangy(action.ask)}

@@ -3,6 +3,8 @@ import type { Evaluator } from "@prisma/client";
 import { ArrowUp, CheckSquare, Clock, Code, Copy, MoreVertical, RefreshCw, Workflow } from "lucide-react";
 import { useState } from "react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { evaluationContextChip } from "~/features/langy/logic/langyContextChips";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { Menu } from "../ui/menu";
@@ -68,6 +70,17 @@ export function EvaluatorCard({
 
   return (
     <>
+      {/* Armed, the card can be handed to Langy. The chip id is keyed on the
+          evaluator id — the same key the evaluator drawer and the
+          `/evaluators/<id>` route derive — so opening the one you just pointed
+          at yields one chip, not two. */}
+      <LangyContextTarget
+        target={evaluationContextChip({
+          evaluationId: evaluator.id,
+          name: evaluator.name,
+          noun: "evaluator",
+        })}
+      >
       <Card.Root
         variant="elevated"
         onClick={onClick}
@@ -200,6 +213,7 @@ export function EvaluatorCard({
           </VStack>
         </Card.Body>
       </Card.Root>
+      </LangyContextTarget>
 
       {/* API Usage Dialog - rendered outside Card to prevent click propagation */}
       <EvaluatorApiUsageDialog

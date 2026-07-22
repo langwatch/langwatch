@@ -8,6 +8,7 @@ import {
   BLOB_LEASE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
 } from "./blobConstants";
+import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -418,13 +419,17 @@ end
 // its lease in the same eval as the staged value becomes visible. A squash
 // transfers the displaced lease atomically with that replacement. Releases
 // never delete content-addressed blobs: Redis TTL and the durable-store
-// lifecycle sweep are the only reclaim paths.
+// lifecycle sweep are the only reclaim paths. Retiring the LAST lease does
+// shorten the Redis-tier blob's expiry to the release grace window, which any
+// later take re-arms — see `blobGraceLua.ts`.
 //
 // Envelope lease parse mirrors the TS readEnvelopeLease: "GQ2|<len>|<headerJson>"
 // with header.ref = {tier, projectId, hash} and header.h = the lease holder id.
 // GQ1 values ("GQ1|", header.r = blob id) are private — their blob is
 // UNLINKed directly. Legacy bare-JSON / inline values carry no blob at all.
-const BLOB_LEASE_HELPER_LUA = `
+const BLOB_LEASE_HELPER_LUA =
+  GQ_BLOB_GRACE_LUA +
+  `
 local function gqTenantOf(groupId)
   local slashPos = string.find(groupId, "/", 1, true)
   if slashPos and slashPos > 1 then return string.sub(groupId, 1, slashPos - 1) end
@@ -503,9 +508,16 @@ local function gqSquashTransferLeases(keyPrefix, tenant, newValue, oldValue)
   local oldLeaseKey = keyPrefix .. "blobleases:" .. oldLease.projectId .. "/" .. oldLease.hash
   redis.call("ZREM", oldLeaseKey, oldLease.holderId)
   redis.call("ZREMRANGEBYSCORE", oldLeaseKey, "-inf", nowMs)
-  if redis.call("ZCARD", oldLeaseKey) == 0 then redis.call("DEL", oldLeaseKey) end
   local oldLegacyKey = keyPrefix .. "blobholders:" .. oldLease.projectId .. "/" .. oldLease.hash
   redis.call("SREM", oldLegacyKey, oldLease.holderId)
+  -- Same grace window the standalone release eval applies: a displaced blob
+  -- nothing leases any more must not sit on the full backstop.
+  local oldBlobKey = ""
+  if oldLease.tier == "redis" then
+    oldBlobKey = keyPrefix .. "blob:" .. oldLease.projectId .. "/" .. oldLease.hash
+  end
+  gqGraceExpireIfUnleased(oldLeaseKey, oldLegacyKey, oldBlobKey)
+  if redis.call("ZCARD", oldLeaseKey) == 0 then redis.call("DEL", oldLeaseKey) end
   return 0
 end
 
@@ -1530,6 +1542,42 @@ export function readClaimStrikeThreshold(): number {
 }
 
 /**
+ * Default consecutive-failure count that quarantines (blocks) a group.
+ *
+ * Deliberately high: a single group failing this many times inside the TTL
+ * window with ZERO interleaved successes is unambiguously a runaway — a producer
+ * minting fresh jobs for one group faster than they drain — not a healthy group
+ * riding out a transient downstream blip. Prod incident 2026-07-20: one trace's
+ * span-sync group churned ~5 fresh jobs/min for 14h against an unmet
+ * precondition, taking ~a quarter of the shared queue, yet never tripped the
+ * per-JOB `maxAttempts` cap because every failure was a NEW attempt-1 job. This
+ * breaker counts failures ACROSS a group's jobs so the group itself terminates.
+ */
+export const DEFAULT_GROUP_QUARANTINE_THRESHOLD = 500;
+
+/**
+ * The failure streak self-expires so a group that fails sparsely (well below its
+ * success rate) never accumulates to the threshold from blips hours apart.
+ * Refreshed on every failure, so an actively-churning group keeps its count; the
+ * group's next success clears it outright.
+ */
+export const GROUP_QUARANTINE_TTL_SECONDS = 15 * 60;
+
+/**
+ * Read the group-quarantine failure-streak threshold from the environment.
+ * Mirrors {@link readClaimStrikeThreshold}:
+ *   - unset / empty / non-numeric / negative → DEFAULT_GROUP_QUARANTINE_THRESHOLD
+ *   - "0" → 0 (explicit kill switch — the breaker is disabled)
+ *   - positive integer → that integer
+ */
+export function readGroupQuarantineThreshold(): number {
+  return readNonNegativeIntEnv({
+    name: "LANGWATCH_GQ_QUARANTINE_FAILSTREAK_THRESHOLD",
+    fallback: DEFAULT_GROUP_QUARANTINE_THRESHOLD,
+  });
+}
+
+/**
  * Global in-flight budget for the dynamic water-level cap (option C, 2026-05-29).
  * 0 (the default) disables the dynamic cap: dispatch falls back to the fixed
  * per-tenant `readTenantCap()` and behaves exactly as before — the feature ships
@@ -2113,6 +2161,35 @@ export class GroupStagingScripts {
     const raw = await this.redis.get(this.claimStrikesKey(groupId));
     const n = raw === null ? 0 : Number.parseInt(raw, 10);
     return Number.isFinite(n) ? n : 0;
+  }
+
+  private failStreakKey(groupId: string): string {
+    return `${this.keyPrefix}group:${groupId}:failstreak`;
+  }
+
+  /**
+   * Group-quarantine failure streak (specs/event-sourcing/poison-group-park-guard.feature).
+   * INCR'd on every RETRYABLE job failure in a group and cleared on the group's
+   * next success (see {@link clearGroupFailures}), so it counts consecutive
+   * failures ACROSS a group's jobs — the runaway signal the per-job `maxAttempts`
+   * cap misses when each failure is a fresh attempt-1 job. The TTL keeps a
+   * sparsely-failing group from accumulating a count from blips hours apart.
+   *
+   * @returns the streak count including this failure
+   */
+  async recordGroupFailure(groupId: string): Promise<number> {
+    const key = this.failStreakKey(groupId);
+    const results = await this.redis
+      .multi()
+      .incr(key)
+      .expire(key, GROUP_QUARANTINE_TTL_SECONDS)
+      .exec();
+    const count = results?.[0]?.[1];
+    return typeof count === "number" ? count : 0;
+  }
+
+  async clearGroupFailures(groupId: string): Promise<void> {
+    await this.redis.del(this.failStreakKey(groupId));
   }
 
   /**

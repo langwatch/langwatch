@@ -3,7 +3,7 @@ import { useTheme } from "next-themes";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
-import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
+import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -166,9 +166,10 @@ export function CommandBar() {
   const resultsRef = useRef<HTMLDivElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  // Langy activation: whether to offer "Ask Langy" (same gate as the panel), the
-  // store hand-off, and the local Langy-mode state the bar flips into on activation.
-  const langyEnabled = useShowLangy();
+  // Langy activation. Gated on the grant that STARTS a turn, not the one that
+  // opens the panel: the hand-off queues a prompt that auto-sends, so offering
+  // it to someone holding only `langy:view` would be inviting them into a 403.
+  const langyEnabled = useCanAskLangy();
   const askLangy = useLangyStore((s) => s.askLangy);
   const reduceMotion = useReducedMotion();
   const [langyMode, setLangyMode] = useState(false);

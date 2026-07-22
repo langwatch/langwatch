@@ -6,9 +6,10 @@
  * hand-built; everything else lands here: the write fall-throughs (created /
  * updated / removed), the generic reads, the prompt diff, and the version-skew
  * fallback for a command this UI has never heard of. The widget vocabulary is
- * the catalog's (`stats` / `rows` / `facts` / `diff` / `text`), and each widget
- * reads the already-parsed card payload from the shared `@langwatch/cli-cards`
- * contract.
+ * the catalog's (`stats` / `rows` / `facts` / `diff` / `text` / `chart`), and
+ * each widget reads the already-parsed card payload from the shared
+ * `@langwatch/cli-cards` contract — parsed against the card the result was
+ * DECIDED to be, not one re-derived from the command's name here.
  *
  * Honesty rule (same as the trace cards): output that cannot be read renders
  * as "couldn't read this result" with the deep link kept — never as a
@@ -16,7 +17,7 @@
  * a real answer and says so in real words.
  */
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
-import { parseCliResult, type CliResultDigest } from "@langwatch/cli-cards";
+import { parseCardResult, type CliResultDigest } from "@langwatch/cli-cards";
 import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
 import {
   useCapabilityData,
@@ -40,6 +41,7 @@ import {
   CapabilityRowSkeletons,
   LangyCapabilityCard,
 } from "./LangyCapabilityCard";
+import { isPlottable, TimeseriesPlot } from "./LangyTimeseriesCard";
 
 const MAX_ROWS = 5;
 const MAX_FACTS = 6;
@@ -141,6 +143,11 @@ function statsOf(document: unknown): LangyTurnMetric[] {
   const rows = collectionOf(document);
   if (rows) {
     const total = totalOf(document) ?? rows.length;
+    // Just the count. Summing a "cost" stat here would mean guessing which key
+    // holds the money (`cost`? `totalCost`? `costUsd`?) across every collection
+    // the CLI can return — the payload-sniffing this renderer exists to avoid.
+    // When money is the answer, the agent says so by emitting a card that names
+    // it; the generic renderer does not infer it.
     return [{ value: total, label: total === 1 ? "result" : "results" }];
   }
   if (!document || typeof document !== "object") return [];
@@ -426,6 +433,14 @@ function writeSentence(tone: CapabilityDescriptor["tone"]): string {
   }
 }
 
+/**
+ * (`isUnconfirmedCreate` lived here. It is gone, and so is the "Couldn't
+ * confirm the resource was created" card it drew: a create whose result names
+ * nothing now renders no card at all, decided once at the selection boundary in
+ * `hasCapabilityCard`. Owning the doubt in a card was still a card about
+ * nothing, and it appeared beside the error card for the same operation.)
+ */
+
 export function LangyDeclarativeCard({
   descriptor,
   input,
@@ -434,7 +449,7 @@ export function LangyDeclarativeCard({
   projectSlug: rawProjectSlug,
 }: CapabilityCardInput) {
   const projectSlug = rawProjectSlug ?? null;
-  const { command, tone, body, noun } = descriptor;
+  const { tone, body, noun } = descriptor;
 
   // Hydration is for COLLECTION reads: fresh names and links for the entities
   // the result referenced. Facts/stats/diff keep the stored structure (the
@@ -443,11 +458,11 @@ export function LangyDeclarativeCard({
     digest: tone === "read" && body === "rows" ? (digest ?? null) : null,
   });
 
-  const parsed = parseCliResult({
-    resource: command.resource,
-    verb: command.verb,
-    output,
-  });
+  // Read against the card that was DECIDED, never a kind re-derived from the
+  // command's name here — that is a second decision point, and a promoted
+  // result would be read by the schema of the card it did not get. See
+  // ADR-059 §1.
+  const parsed = parseCardResult({ kind: descriptor.render, output });
   const document = parsed.ok ? parsed.card : null;
 
   if (hydration.status !== "idle") {
@@ -626,6 +641,21 @@ function WidgetBody({
       }
       return <SummaryLinesBody lines={lines} />;
     }
+    // The same plot the timeseries card draws, not a second one. A document
+    // with nothing plottable in it is not a chart, whatever the catalog asked
+    // for, and its figures are the next most honest reading of it.
+    case "chart":
+      return isPlottable(document) ? (
+        <TimeseriesPlot payload={document} />
+      ) : (
+        <StatsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />
+      );
+    // A widget the catalog grows before this switch does. Falling off the end
+    // of the switch returned `undefined` — a card with no body at all, which
+    // is how a registered `chart` widget rendered nothing for as long as it
+    // existed. Facts read every document, so they are the safe floor.
+    default:
+      return <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
   }
 }
 

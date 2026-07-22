@@ -21,10 +21,14 @@ import { LANGY_RELEASE_FLAG } from "~/utils/langyReleaseFlag";
  *    rather than this hook.
  * 3. Rollout — the `release_langy_enabled` flag must be on for this user.
  *    Defaults off in the registry, so everyone is dark until explicitly
- *    opted in; there is no identity-based bypass. This is UI hiding only;
- *    the authoritative check is the server-side `hasLangyAccess` gate on the
- *    Langy tRPC routers. Both read the same `LANGY_RELEASE_FLAG` key so the
- *    panel can't render against procedures that would 404 anyway.
+ *    opted in; there is no identity-based bypass. The flag is resolved with
+ *    the same project *and* organization context the server gate uses, so a
+ *    rollout targeted at the whole org reveals the panel too — not only a
+ *    per-project rule. This is UI hiding only; the authoritative check is the
+ *    server-side `hasLangyAccess` gate on the Langy tRPC routers. Both read the
+ *    same `LANGY_RELEASE_FLAG` key with the same context, so the panel can't
+ *    render against procedures that would 404 — nor stay hidden while those
+ *    procedures would happily answer.
  *
  * Consumed by ProjectLangyLayout (mounts the panel) and HomePageBanners
  * (picks the Langy activation banner over the promo teaser) — one gate,
@@ -32,7 +36,7 @@ import { LANGY_RELEASE_FLAG } from "~/utils/langyReleaseFlag";
  */
 export function useShowLangy(): boolean {
   const { data: session } = useRequiredSession();
-  const { team, project, organizationRole, hasPermission } =
+  const { team, project, organization, organizationRole, hasPermission } =
     useOrganizationTeamProject({
       redirectToOnboarding: false,
       redirectToProjectOnboarding: false,
@@ -53,9 +57,14 @@ export function useShowLangy(): boolean {
     userIsPartOfTeam && !isDemoProject && hasPermission("langy:view");
 
   // Skip the flag query entirely for callers who are already excluded; the
-  // answer is decided without a round-trip.
+  // answer is decided without a round-trip. Forward BOTH project and org ids,
+  // exactly like the server-side `hasLangyAccess` gate: a targeting rule scoped
+  // to an organization only matches when organizationId is in the evaluation
+  // context, so omitting it would hide the panel for an org that has actually
+  // been rolled out.
   const { enabled: releaseLangy } = useFeatureFlag(LANGY_RELEASE_FLAG, {
     projectId: project?.id,
+    organizationId: organization?.id,
     enabled: mayReadLangy,
   });
 

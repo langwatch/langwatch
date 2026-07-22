@@ -16,6 +16,7 @@ type Row = {
   title: string | null;
   isShared: boolean;
   status: string;
+  currentTurnId: string | null;
   lastError: string | null;
   messageCount: number;
   lastActivityAtMs: number;
@@ -68,6 +69,7 @@ const row = (o: Partial<Row> = {}): Row => ({
   title: null,
   isShared: false,
   status: "active",
+  currentTurnId: null,
   lastError: null,
   messageCount: 0,
   lastActivityAtMs: 0,

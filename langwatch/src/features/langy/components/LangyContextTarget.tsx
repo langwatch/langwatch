@@ -7,12 +7,12 @@ import type { LangyContextTarget as LangyContextTargetDescriptor } from "../stor
  * Declare a thing on the page as something Langy can be pointed at — the
  * one-wrapper version of `useLangyContextTarget`.
  *
- * Wrap the element that IS the thing. While the Langy panel is open, moving the
- * pointer near it picks up a quiet outline, and hovering it floats an "Absorb
- * context" button over it which takes the resource into Langy's context. The
- * element's OWN click is never touched — a card that opens an editor still
- * opens its editor. While the panel is closed the child is handed straight
- * back, untouched: no clone, no merged props, no wrapper node.
+ * Wrap the element that IS the thing. Nothing changes until the user arms the
+ * page (`#`, or a held Shift); armed, it picks up a quiet outline and a click
+ * or a drag onto the panel takes the resource into Langy's context. Disarmed —
+ * which is almost always — the child is handed straight back, untouched: no
+ * clone, no merged props, no wrapper node, and the element's own click does
+ * exactly what it always did.
  *
  *   <LangyContextTarget target={traceContextChip(trace.id, trace.traceName ?? trace.name)}>
  *     <Card.Root onClick={open}>…</Card.Root>
@@ -51,11 +51,11 @@ export function LangyContextTarget({
 }) {
   const { targetProps, isActive } = useLangyContextTarget(target);
 
-  // Langy is closed (or there's nothing to offer): hand the child back exactly
-  // as it came in. Not a clone with empty props — the same element. This is the
-  // "zero cost when closed" guarantee made structural: there is no code path
-  // here that can touch the page.
-  if (!isActive) return children;
+  // Nothing to offer, or nothing armed: hand the child back exactly as it came
+  // in. Not a clone with empty props — the same element. This is the "zero cost
+  // when disarmed" guarantee made structural: there is no code path here that
+  // can touch the page.
+  if (!isActive || !targetProps["data-langy-target"]) return children;
 
   // Merge, never clobber. The child keeps its own className and style; Langy's
   // ring class and sheen-phase variable are added alongside them.

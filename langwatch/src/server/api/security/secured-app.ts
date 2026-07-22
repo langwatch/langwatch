@@ -12,6 +12,7 @@ import {
   type OrgAuthMiddlewareVariables,
   orgAuthMiddleware,
   requireOrgPermission,
+  requireProjectPermission,
 } from "~/app/api/middleware/org-auth";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
@@ -99,10 +100,7 @@ export class SecuredApp<E extends Env> {
   private readonly family: string;
   private readonly strategy: AuthStrategy;
 
-  constructor(args: {
-    basePath: string;
-    strategy: AuthStrategy;
-  }) {
+  constructor(args: { basePath: string; strategy: AuthStrategy }) {
     this.basePath = args.basePath;
     this.family = familyFromBasePath(args.basePath);
     this.strategy = args.strategy;
@@ -221,6 +219,14 @@ const orgStrategy: AuthStrategy = {
     switch (policy.kind) {
       case "permission":
         return [orgAuthMiddleware, requireOrgPermission(policy.permission)];
+      case "projectPermission":
+        return [
+          orgAuthMiddleware,
+          requireProjectPermission({
+            permission: policy.permission,
+            param: policy.param,
+          }),
+        ];
       case "anyAuthenticated":
         return [orgAuthMiddleware];
       default:

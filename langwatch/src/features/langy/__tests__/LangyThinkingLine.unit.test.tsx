@@ -1,24 +1,25 @@
 /**
  * @vitest-environment jsdom
  *
- * The thinking line with live reasoning: a periodic GLIMPSE of the latest
- * complete thought — never a ticker — and a click-to-expand full scrollback.
- * The line stays a plain, non-interactive status line when no reasoning flows.
+ * The thinking line is a plain, non-interactive status line. Reasoning reaches
+ * it as a BOOLEAN and nothing more: it changes the words ("Thinking…" instead of
+ * a false escalation toward "stuck") and never becomes a surface. The model's
+ * private thinking is not shown to the user — no glimpse, no expander, no
+ * scrollback.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { UIMessage } from "ai";
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LangyThinkingLine } from "../components/LangyThinkingLine";
-import { GLIMPSE_PERIOD_MS } from "../logic/langyReasoningGlimpse";
 
-const REASONING =
+const REASONING_TEXT =
   "The p95 spike is confined to one window. Checking whether the slow traces share anything.";
 
-function renderLine({ reasoning }: { reasoning: string | null }) {
+function renderLine({ hasLiveReasoning }: { hasLiveReasoning: boolean }) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <LangyThinkingLine messages={[]} reasoning={reasoning} />
+      <LangyThinkingLine messages={[]} hasLiveReasoning={hasLiveReasoning} />
     </ChakraProvider>,
   );
 }
@@ -31,15 +32,15 @@ afterEach(() => {
 });
 
 describe("LangyThinkingLine", () => {
-  describe("when no reasoning is flowing", () => {
+  describe("given no reasoning is flowing", () => {
     it("renders a plain status line with nothing to expand", () => {
-      renderLine({ reasoning: null });
+      renderLine({ hasLiveReasoning: false });
       expect(screen.getByRole("status")).toBeDefined();
       expect(screen.queryByRole("button")).toBeNull();
     });
   });
 
-  describe("when a running tool carries a long line", () => {
+  describe("given a running tool carries a long line", () => {
     it("keeps the whole skill summary on one clamped status line", () => {
       // The exact overflow case: the github skill's line is its title plus its
       // full summary — "Using the GitHub skill — Open a real pull request …" —
@@ -69,72 +70,35 @@ describe("LangyThinkingLine", () => {
                 },
               ] as unknown as UIMessage[]
             }
-            reasoning={null}
           />
         </ChakraProvider>,
       );
       const status = screen.getByRole("status");
       expect(status.textContent).toContain("Using the GitHub skill");
       expect(status.textContent).toContain("Open a real pull request");
-      // Non-interactive: no reasoning stream, so nothing to expand.
       expect(screen.queryByRole("button")).toBeNull();
     });
   });
 
-  describe("when reasoning streams on a live turn", () => {
-    it("surfaces a glimpse of the latest complete thought after the first beat", () => {
-      renderLine({ reasoning: REASONING });
-      act(() => {
-        vi.advanceTimersByTime(1_700);
-      });
-      // The latest complete clause ends at "…share anything." — the glimpse
-      // shows its freshest words, never the raw stream.
-      expect(screen.getByText(/share anything\./)).toBeDefined();
+  describe("given reasoning is streaming on a live turn", () => {
+    it("says Thinking, so a working turn never reads as a silent one", () => {
+      // The escalation ladder itself is pinned on the pure logic
+      // (`langyThinkingLine.unit.test.ts`); what matters here is that the
+      // component forwards the boolean at all.
+      renderLine({ hasLiveReasoning: true });
+      const status = screen.getByRole("status");
+      expect(status.textContent).toContain("Thinking");
     });
 
-    it("keeps surfacing glimpses on the quiet period", () => {
-      renderLine({ reasoning: REASONING });
+    it("stays a non-interactive line with no reasoning surface", () => {
+      renderLine({ hasLiveReasoning: true });
       act(() => {
-        vi.advanceTimersByTime(1_700 + GLIMPSE_PERIOD_MS);
+        vi.advanceTimersByTime(30_000);
       });
-      expect(screen.getByText(/share anything\./)).toBeDefined();
-    });
-
-    it("expands to the full reasoning on click and collapses on a second click", () => {
-      renderLine({ reasoning: REASONING });
-      const line = screen.getByRole("button");
-      expect(line.getAttribute("aria-expanded")).toBe("false");
-
-      act(() => {
-        line.click();
-      });
-      expect(line.getAttribute("aria-expanded")).toBe("true");
-      expect(screen.getByText(REASONING)).toBeDefined();
-
-      act(() => {
-        line.click();
-      });
-      expect(line.getAttribute("aria-expanded")).toBe("false");
-      expect(screen.queryByText(REASONING)).toBeNull();
-    });
-
-    it("collapses and clears the glimpse when the turn settles", () => {
-      const view = renderLine({ reasoning: REASONING });
-      const line = screen.getByRole("button");
-      act(() => {
-        line.click();
-        vi.advanceTimersByTime(1_700);
-      });
-      expect(line.getAttribute("aria-expanded")).toBe("true");
-
-      // The store clears `reasoning` when the turn settles.
-      view.rerender(
-        <ChakraProvider value={defaultSystem}>
-          <LangyThinkingLine messages={[]} reasoning={null} />
-        </ChakraProvider>,
-      );
+      // No expander, and nothing the user can open to read the model's
+      // thinking — the whole point of hiding reasoning.
       expect(screen.queryByRole("button")).toBeNull();
-      expect(screen.queryByText(/share anything\./)).toBeNull();
+      expect(screen.queryByText(REASONING_TEXT)).toBeNull();
     });
   });
 });

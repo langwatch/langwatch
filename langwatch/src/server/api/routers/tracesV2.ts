@@ -1,10 +1,10 @@
 import { on } from "node:events";
+import { ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getVisibilityCutoffMsForProject } from "~/server/api/utils";
 import { getApp } from "~/server/app-layer/app";
-import { ValidationError } from "@langwatch/handled-error";
 import {
   generateTraceAction,
   generateTraceQueryFromPrompt,
@@ -13,7 +13,10 @@ import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-cost-span-preview.service";
-import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import type {
+  SpanSummaryPage,
+  SpanSummaryRow,
+} from "~/server/app-layer/traces/repositories/span-storage.repository";
 import {
   traceMetadataUpdateSchema,
   updateTraceMetadata,
@@ -53,6 +56,10 @@ import {
   redactObject,
 } from "~/server/traces/mappers/redaction";
 import type { CategoryVisibility } from "~/server/traces/protections";
+import {
+  RESERVED_INPUT_MEDIA_REFS,
+  RESERVED_OUTPUT_MEDIA_REFS,
+} from "~/shared/traces/media-refs";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
@@ -60,10 +67,12 @@ import type {
   ContentPrivacy,
   SpanDetail,
   SpanLangwatchSignals,
+  SpanTreeCursor,
   SpanTreeNode,
   TraceHeader,
   TraceResourceInfoDto,
 } from "./tracesV2.schemas";
+import { spanTreeCursorSchema } from "./tracesV2.schemas";
 
 // ---------------------------------------------------------------------------
 // Shared input fragments
@@ -171,6 +180,33 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
   };
 }
 
+/**
+ * Maps one repository span-summary page onto the wire shape of
+ * `tracesV2.spanTreePaginated`. `nextCursor` comes from the repository's
+ * over-fetch-derived `hasMore` — never from comparing the page length to the
+ * requested limit, which would misread a repository-clamped page as final.
+ */
+export function mapSpanSummaryPage(page: SpanSummaryPage): {
+  nodes: SpanTreeNode[];
+  nextCursor: SpanTreeCursor | null;
+} {
+  const last = page.hasMore ? page.rows.at(-1) : undefined;
+  if (page.hasMore && !last) {
+    // A null cursor here would read as end-of-trace and silently drop every
+    // remaining span — fail loudly instead if a repository ever breaks the
+    // "hasMore implies rows" invariant.
+    throw new Error(
+      "span-summary page reported hasMore without any rows to key the cursor from",
+    );
+  }
+  return {
+    nodes: page.rows.map(mapSpanSummaryToTreeNode),
+    nextCursor: last
+      ? { startTimeMs: last.startTimeMs, spanId: last.spanId }
+      : null,
+  };
+}
+
 function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
   let status: SpanTreeNode["status"] = "unset";
   if (row.statusCode === 2) status = "error";
@@ -191,6 +227,7 @@ function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
     outputTokens: row.outputTokens,
     cacheReadTokens: row.cacheReadTokens,
     cacheCreationTokens: row.cacheCreationTokens,
+    updatedAtMs: row.updatedAtMs,
   };
 }
 
@@ -531,6 +568,8 @@ export function redactV2Content<
     outputRedacted?: boolean | null;
     inputVisibleTo?: string | null;
     outputVisibleTo?: string | null;
+    inputMediaRefs?: unknown;
+    outputMediaRefs?: unknown;
     attributes?: Record<string, string>;
     params?: Record<string, unknown> | null;
   },
@@ -568,6 +607,18 @@ export function redactV2Content<
       ? (protections.capturedOutputVisibleTo ?? null)
       : null,
   };
+  // Media refs point at the exact content that was just redacted, and the
+  // /api/files URLs they carry are fetchable on their own — so the parsed ref
+  // fields AND their reserved-attribute copies must be dropped alongside the
+  // text, never just hidden by the UI.
+  if (inputRedacted) delete redacted.inputMediaRefs;
+  if (outputRedacted) delete redacted.outputMediaRefs;
+  if ((inputRedacted || outputRedacted) && redacted.attributes) {
+    const attributes = { ...redacted.attributes };
+    if (inputRedacted) delete attributes[RESERVED_INPUT_MEDIA_REFS];
+    if (outputRedacted) delete attributes[RESERVED_OUTPUT_MEDIA_REFS];
+    redacted.attributes = attributes;
+  }
   // Custom attribute rules with a restrict disposition, plus the standalone
   // system/tools attribute keys when those categories are hidden: replace the
   // matched attribute values (header attributes, span params, span-event
@@ -1048,6 +1099,10 @@ export const tracesV2Router = createTRPCRouter({
           visibilityCutoffMs: await getVisibilityCutoffMsForProject(
             input.projectId,
           ),
+          // Single-trace read (the drawer opening) — resolve any offloaded
+          // (ADR-022) input/output in full, matching legacy traces.getById's
+          // unconditional { full: true }. Never set this for a list/page read.
+          full: true,
         },
       );
       if (!summary) {
@@ -1220,40 +1275,56 @@ export const tracesV2Router = createTRPCRouter({
       );
     }),
 
+  /**
+   * One page of the span tree in `(startTimeMs, spanId)` order. This is the
+   * only fetch path the frontend uses for span trees — traces can carry
+   * 20k–100k+ spans, so the client assembles the tree page by page (see
+   * `spanTreePagedQuery.ts`) instead of ever pulling it in one response.
+   * `nextCursor` is null on the final page.
+   */
   spanTreePaginated: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         traceId: z.string(),
         limit: z.number().int().min(1).max(1000).default(200),
-        offset: z.number().int().min(0).default(0),
+        cursor: spanTreeCursorSchema.optional(),
         ...spanReadHintShape,
       }),
     )
     .use(checkProjectPermission("traces:view"))
     .query(
-      async ({ input }): Promise<{ nodes: SpanTreeNode[]; total: number }> => {
+      async ({
+        input,
+      }): Promise<{
+        nodes: SpanTreeNode[];
+        nextCursor: SpanTreeCursor | null;
+      }> => {
         const app = getApp();
-        const result = await app.traces.spans.getSpanSummariesPaginated({
+        const page = await app.traces.spans.getSpanSummariesPage({
           tenantId: input.projectId,
           traceId: input.traceId,
           limit: input.limit,
-          offset: input.offset,
+          cursor: input.cursor,
           ...occurredAtFromInput(input),
         });
-        return {
-          nodes: result.rows.map(mapSpanSummaryToTreeNode),
-          total: result.total,
-        };
+        return mapSpanSummaryPage(page);
       },
     ),
 
+  /**
+   * Spans of a live trace whose row version is newer than `sinceUpdatedAtMs`.
+   * Keyed on the row version rather than the span start so an in-place update
+   * (end time, duration, status, cost) is picked up too — the root span
+   * starts first and ends last, so a start-keyed delta left its duration, and
+   * with it the waterfall's time scale, frozen at first projection.
+   */
   spanTreeDelta: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         traceId: z.string(),
-        sinceStartTimeMs: z.number(),
+        sinceUpdatedAtMs: z.number().int().min(0),
         ...spanReadHintShape,
       }),
     )
@@ -1263,12 +1334,20 @@ export const tracesV2Router = createTRPCRouter({
       const rows = await app.traces.spans.getSpanSummariesSince({
         tenantId: input.projectId,
         traceId: input.traceId,
-        sinceStartTimeMs: input.sinceStartTimeMs,
+        sinceUpdatedAtMs: input.sinceUpdatedAtMs,
         ...occurredAtFromInput(input),
       });
       return rows.map(mapSpanSummaryToTreeNode);
     }),
 
+  /**
+   * Whole-tree read in one response. The frontend no longer fetches through
+   * this — `useSpanTree` pages via `spanTreePaginated` under the same React
+   * Query key, and this procedure remains as that cache entry's type/key
+   * anchor (preview seeding, SSE invalidation, cancel). The underlying read
+   * is bounded (`MAX_LIGHT_SPAN_READ_ROWS`) so a direct call can never
+   * materialize a 100k-span trace in one shot.
+   */
   spanTree: protectedProcedure
     .input(
       z.object({

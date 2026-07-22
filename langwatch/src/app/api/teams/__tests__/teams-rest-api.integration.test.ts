@@ -161,7 +161,7 @@ describe("Feature: Teams REST API", () => {
       expect(res.status).toBe(422);
 
       const body = await res.json();
-      expect(body.error).toBe("Unprocessable Entity");
+      expect(body.error).toBe("validation_error");
     });
 
     /** @scenario Rejects create when name is empty */

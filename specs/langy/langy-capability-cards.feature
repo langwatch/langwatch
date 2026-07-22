@@ -194,3 +194,128 @@ Feature: Langy renders domain-capability cards for tool calls
     Then the card says it could not read the result
     And it does not show made-up names or numbers
     And the card still offers the way into its surface when one exists
+
+  # A create card is a CLAIM: "this exists now, here is the way to it". A result
+  # that names nothing created cannot support that claim, and the link it offers
+  # goes nowhere. This is the failure a plan limit produced — the create was
+  # refused, the agent re-attempted it with different arguments, the second
+  # attempt returned nothing at all, and the panel drew a card for it anyway.
+  #
+  # Owning the doubt in a card ("Couldn't confirm the scenario was created") was
+  # the first fix and it was still wrong: it put a SECOND card next to the
+  # failure card for the same operation, telling the same event again in weaker
+  # words. If we are not sure something happened, we do not draw a card about it.
+  # The call still appears in the turn's completed-steps receipt, and the failure
+  # card says what actually happened.
+  Rule: A write card never claims success on a result that names nothing
+
+    @integration
+    Scenario: A create whose result names nothing renders no card at all
+      When Langy runs a create action and its result names nothing that was created
+      Then no result card is shown for that action
+      And nothing claims the resource was created
+      And nothing links to a resource that was never made
+
+    @integration
+    Scenario: The step is still accounted for in the turn
+      When Langy runs a create action and its result names nothing that was created
+      Then the action still appears among the turn's completed steps
+
+    @unit
+    Scenario: An empty create result is not a created-resource card
+      When the CLI result for a create names no resource
+      Then reading it as a created-resource card fails
+      And the recorded result marks the outcome as unconfirmed
+
+    @unit
+    Scenario: A create that names the resource is still a created-resource card
+      When the CLI result for a create names the resource it created
+      Then reading it as a created-resource card succeeds
+      And the recorded result does not mark the outcome as unconfirmed
+
+    @unit
+    Scenario: A genuinely empty read still earns its card
+      When Langy runs a read action and it genuinely matched nothing
+      Then the card is still shown, because empty is a real answer
+
+  # "Open in Scenarios" reloaded the whole product. A card's links are inside a
+  # live conversation, and a real browser navigation takes the panel, the
+  # conversation and any streaming turn with it.
+  Rule: A card's links never reload the app
+
+    @integration
+    Scenario: Following a card's link keeps the conversation alive
+      When I follow a link on a capability card to somewhere in LangWatch
+      Then the app takes me there without reloading
+      And the Langy panel and my conversation are still there
+
+    @integration
+    Scenario: A card's links behave like links
+      When I command-click or middle-click a link on a capability card
+      Then it opens the way the browser would open any link
+      And I can still copy its address from the context menu
+
+    @integration
+    Scenario: A link out of LangWatch is left alone
+      When a card links somewhere outside LangWatch
+      Then following it behaves as leaving the app, as it should
+
+  # A turn is a sequence of events, and the panel has to read like one. The
+  # transcript grouped its blocks by KIND — every failure, then the running
+  # steps, then the completed-steps receipt, then the result cards — so a
+  # failure on the last call of a turn drew above the summary of the three calls
+  # that ran before it, and the panel said the turn broke before it said
+  # anything had happened.
+  Rule: The transcript reads in the order the turn happened
+
+    @integration
+    Scenario: A failure appears where it happened
+      Given Langy ran two steps successfully and the third one failed
+      Then the failure is shown after the summary of the steps that preceded it
+
+    @integration
+    Scenario: A turn that failed immediately still leads with the failure
+      Given the first thing Langy did in a turn failed
+      Then the failure is the first thing in the transcript
+
+  # The scenario library lives under Simulations, and a scenario's own page is
+  # the library with that scenario open. Pointing at the Simulations index sent
+  # the user to the run history instead, where the scenario they just made is
+  # nowhere to be seen.
+  Rule: A scenario card links to the scenario, not to the run history
+
+    @unit
+    Scenario: A scenario card links to the scenario library
+      When Langy shows a card for a scenario
+      Then the card's surface link opens the scenario library
+
+    @unit
+    Scenario: A scenario card with an id opens that scenario
+      When Langy shows a card for one named scenario
+      Then the card's link opens that scenario in the library
+
+  # WHICH card a result renders in is decided once, at the command boundary,
+  # from the command's name and the result's own shape together (ADR-059). The
+  # panel then re-derived the card from the NAME alone and dropped any result
+  # whose card disagreed — so a result that had earned a RICHER card was the one
+  # case guaranteed to disagree, and shape-driven promotion could only ever make
+  # a card vanish, never improve one. The chart below is what that cost: the
+  # card, the shape mapper and the plot all existed and none of them ever drew.
+  Rule: The card a result was stamped with is the card that renders
+
+    @integration
+    Scenario: A cost question over time renders as a chart
+      When Langy asks the platform for cost over the last week
+      Then Langy shows the trend as a plot rather than as a single figure
+      And the plot names the period it compares against
+
+    @integration
+    Scenario: A result that earned a richer card than its name implies still renders
+      When Langy runs a LangWatch action whose result was recorded as a richer card
+      Then Langy shows that richer card
+      And the result does not disappear from the conversation
+
+    @integration
+    Scenario: A result that earned nothing richer keeps the card its name gave it
+      When Langy lists a resource whose result carries neither a trend nor a total
+      Then Langy shows the same result card it has always shown

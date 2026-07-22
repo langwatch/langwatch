@@ -6,6 +6,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Plus, Workflow } from "lucide-react";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { workflowContextChip } from "~/features/langy/logic/langyContextChips";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { NoDataInfoBlock } from "../../components/NoDataInfoBlock";
 import { PageLayout } from "../../components/ui/layouts/PageLayout";
@@ -65,9 +67,19 @@ function Workflows() {
                 <Skeleton key={index} height="200px" />
               ))}
             {workflows.data?.map((workflow) => (
+              // Armed, the card can be handed to Langy; the link still opens the
+              // studio exactly as before. The chip id matches the one
+              // `/studio/<id>` derives, so pointing at a card and then opening
+              // it is one chip.
+              <LangyContextTarget
+                key={workflow.id}
+                target={workflowContextChip({
+                  workflowId: workflow.id,
+                  name: workflow.name,
+                })}
+              >
               <Link
                 href={`/${project?.slug}/studio/${workflow.id}`}
-                key={workflow.id}
                 display="block"
                 asChild
               >
@@ -89,6 +101,7 @@ function Workflows() {
                   }}
                 />
               </Link>
+              </LangyContextTarget>
             ))}
           </Grid>
         </VStack>

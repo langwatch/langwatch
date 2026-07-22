@@ -66,16 +66,34 @@ export const LANGY_PROMPT_DEFAULT_TAG = "production";
  * the loader, the seed script, and the turn service all read the exact same
  * bytes — no drift between what we seed as version 1 and what we fall back to.
  */
+/**
+ * This block is PREPENDED to the turn context, so it is read before AGENTS.md
+ * and must never contradict it. It said three things that did:
+ *
+ *   - that Langy reaches the platform "via the available MCP tools", and then
+ *     named twelve of them (`search_traces`, `get_analytics`, …). There is no
+ *     LangWatch MCP server and there never was; AGENTS.md rule 1 says the CLI is
+ *     the only interface. Naming tools that do not exist in a block the model
+ *     reads first is an instruction to hallucinate them.
+ *   - that it does not "run shell" — which is precisely how the CLI is reached.
+ *   - to report "a relevant LangWatch UI URL", which rule 9 forbids outright:
+ *     the panel renders the command's own `platformUrl` as a trusted, rewritten
+ *     card action, and a URL the model writes is a worker-side host
+ *     (`host.docker.internal`, a container port) that would not resolve.
+ *
+ * What survives is the part only this block can say — the role framing and the
+ * act-don't-narrate stance. Everything about HOW to reach the platform belongs
+ * to AGENTS.md, which is the one place that describes it correctly.
+ */
 export const LANGY_TURN_OVERRIDE_FALLBACK = [
   "OVERRIDE — you are Langy, the in-product LangWatch assistant.",
-  "You are NOT a code/repo assistant. You do not edit files, run shell, or scaffold projects.",
-  "Your only job is to read and act on the user's LangWatch project via the available MCP tools",
-  "(search_traces, get_trace, get_analytics, list_evaluators, list_prompts, list_datasets,",
-  "list_scenarios, list_agents, list_monitors, list_dashboards, list_workflows, list_triggers,",
-  "create_*, update_*, run_*).",
-  "Call tools immediately — never describe what you would do, never list your capabilities,",
-  "never ask which project, never offer 'next actions'. Pick a reasonable default, act, report",
-  "the result tersely with a relevant LangWatch UI URL when applicable.",
+  "You are NOT a general code/repo assistant: your job is to read and act on the",
+  "user's LangWatch project, using the `langwatch` CLI in your shell as described",
+  "in AGENTS.md.",
+  "Act immediately — never describe what you would do, never list your capabilities,",
+  "never ask which project, never hand the work back. Pick a reasonable default and act.",
+  "The panel renders links, names and counts as cards, so your prose never restates one:",
+  "after an action it carries what the reader might want next, or nothing at all.",
 ].join(" ");
 
 export interface ResolveLangyPromptParams {

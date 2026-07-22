@@ -50,6 +50,14 @@ export interface LangyChatTransportDeps {
   onSignal: (signal: LangyTurnSignalEntry) => void;
   /** Fired when a turn stream terminates — the reconcile trigger. */
   onTurnSettled?: (info: { reason: LangyTurnSettleReason }) => void;
+  /**
+   * Every wire entry, unfiltered and before any interpretation — the tap the
+   * developer drawer's tape records from. Deliberately a plain observer: it
+   * cannot alter dispatch, and it runs on entries this transport otherwise
+   * swallows (status, milestone), because "the UI showed nothing" and "the
+   * server sent nothing" are the two answers it exists to tell apart.
+   */
+  onWireEntry?: (entry: LangyStreamEntry, turnId: string) => void;
 }
 
 /** The turn-start response the create/continue mutations return (ids, no stream). */
@@ -134,6 +142,7 @@ export function createLangyChatTransport(
         turnId,
         onSignal: deps.onSignal,
         onSettled: deps.onTurnSettled,
+        ...(deps.onWireEntry ? { onWireEntry: deps.onWireEntry } : {}),
         abortSignal: options.abortSignal,
       });
     },
@@ -157,6 +166,7 @@ function subscribeTurnStream({
   turnId,
   onSignal,
   onSettled,
+  onWireEntry,
   abortSignal,
 }: {
   projectId: string;
@@ -164,6 +174,7 @@ function subscribeTurnStream({
   turnId: string;
   onSignal: (signal: LangyTurnSignalEntry) => void;
   onSettled?: (info: { reason: LangyTurnSettleReason }) => void;
+  onWireEntry?: (entry: LangyStreamEntry, turnId: string) => void;
   abortSignal?: AbortSignal;
 }): ReadableStream<UIMessageChunk> {
   let sub: Unsubscribable | undefined;
@@ -202,10 +213,17 @@ function subscribeTurnStream({
 
       const onEntry = (entry: LangyStreamEntry) => {
         if (closed) return;
+        // The tape sees it first, and sees ALL of it — including the entries the
+        // switch below deliberately drops on the floor.
+        onWireEntry?.(entry, turnId);
         switch (entry.type) {
           case "delta":
             clearColdStartStatus();
-            controller.enqueue({ type: "text-delta", id: textId, delta: entry.text });
+            controller.enqueue({
+              type: "text-delta",
+              id: textId,
+              delta: entry.text,
+            });
             return;
           case "tool":
             clearColdStartStatus();
@@ -258,7 +276,8 @@ function subscribeTurnStream({
             if (closed) return;
             controller.enqueue({
               type: "error",
-              errorText: err instanceof Error ? err.message : "Langy stream error",
+              errorText:
+                err instanceof Error ? err.message : "Langy stream error",
             });
             finish("error");
           },

@@ -3,7 +3,6 @@ import {
   Grid,
   HStack,
   Progress,
-  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -25,6 +24,11 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { HomeCard } from "./HomeCard";
+import {
+  HOME_SECTION_GAP,
+  HOME_SECTION_PADDING,
+  HomeSectionHeader,
+} from "./HomeSectionHeader";
 
 export type OnboardingStepKey =
   | "createProject"
@@ -297,21 +301,14 @@ export function OnboardingProgress() {
     <HomeCard
       cursor="default"
       width="full"
-      padding={3}
-      gap={2}
+      padding={HOME_SECTION_PADDING}
+      gap={HOME_SECTION_GAP}
       _hover={{ boxShadow: "xs" }}
     >
-      {/* Header with progress */}
-      <HStack justify="space-between" align="center" width="full">
-        <HStack gap={3}>
-          <Text fontSize="sm" fontWeight="medium" color="fg">
-            Get started with LangWatch
-          </Text>
-        </HStack>
-        <Spacer />
-        <Text fontSize="xs" color="fg.muted">
-          {completionPercentage}% completed
-        </Text>
+      <HomeSectionHeader
+        title="Get started with LangWatch"
+        qualifier={`${completionPercentage}% done`}
+      >
         <Box width="80px">
           <Progress.Root
             value={completionPercentage}
@@ -323,7 +320,7 @@ export function OnboardingProgress() {
             </Progress.Track>
           </Progress.Root>
         </Box>
-      </HStack>
+      </HomeSectionHeader>
 
       {/* Steps in columns */}
       <Grid

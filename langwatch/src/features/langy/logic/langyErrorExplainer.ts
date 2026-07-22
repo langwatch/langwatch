@@ -20,7 +20,14 @@ import { type HandledErrorShape, readHandledError } from "~/features/errors";
  * gets one calm generic message plus a trace id.
  */
 
-export type LangyErrorRender = "card" | "inline" | "suppress";
+export type LangyErrorRender =
+  | "card"
+  | "inline"
+  | "suppress"
+  // A transient composer-level notice, not a message-history card: rendered as a
+  // dismissable box attached above the composer, leaving the user's draft in
+  // place (ADR-058). Used for "one turn at a time" — a wait, not a turn failure.
+  | "composer-notice";
 
 export interface LangyErrorAction {
   label: string;
@@ -42,6 +49,16 @@ export interface LangyErrorPresentation {
   action?: LangyErrorAction;
   /** Present for unknown/unhandled errors so support can correlate. */
   traceId?: string;
+  /**
+   * The raw domain code, shown under the message on the GENERIC cards only.
+   *
+   * A card that says "Something went wrong" and nothing else is unactionable
+   * for everyone: support cannot correlate it and a developer cannot tell
+   * `clickhouse_unavailable` (your local stack is down) from a genuine bug.
+   * The bespoke cases do not set this — their copy already names the problem,
+   * and a code under prose that already explains itself is just noise.
+   */
+  code?: string;
   /** Renderable domain metadata, surfaced under the message when present. */
   meta?: Record<string, unknown>;
   /** The reason chain, surfaced under the message for debugging when present. */
@@ -406,12 +423,14 @@ export function explainLangyError(
     case "langy_turn_in_progress":
       // One turn at a time per conversation. A retry would just 409 again, so
       // there's no retry action — the answer is to wait for the reply to finish.
+      // It is a WAIT, not a turn failure, so it rides above the composer as a
+      // dismissable notice that keeps the user's draft — not a red history card.
       return {
         kind: domain.code,
         title: "Langy is still replying",
         description:
           "There's already a response in progress for this conversation. Wait for it to finish before sending another message.",
-        render: "card",
+        render: "composer-notice",
         ...debug,
       };
 
@@ -420,10 +439,11 @@ export function explainLangyError(
         kind: "unknown",
         title: "Something went wrong",
         description:
-          "Langy hit an unexpected error. Try again — if it keeps happening, share the id below with support.",
+          "Langy hit an unexpected error. Try again — if it keeps happening, share the details below with support.",
         render: "card",
         action: { label: "Try again", kind: "retry" },
         traceId: domain.traceId,
+        code: domain.code,
         ...debug,
       };
 
@@ -444,6 +464,7 @@ export function explainLangyError(
         render: "card",
         action: { label: "Try again", kind: "retry" },
         traceId: domain.traceId,
+        code: domain.code,
         ...debug,
       };
     }

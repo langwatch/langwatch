@@ -9,7 +9,7 @@
  * - GET  /api/experiments/runs/:runId (poll run status)
  * - GET  /api/experiments/runs/:runId/results (per-row results)
  */
-import { zValidator } from "@hono/zod-validator";
+import { validator as zValidator } from "~/server/api/validation";
 import { createLogger } from "@langwatch/observability";
 import { ExperimentType } from "@prisma/client";
 import { Hono } from "hono";

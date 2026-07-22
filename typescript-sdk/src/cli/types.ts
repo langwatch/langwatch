@@ -1,4 +1,11 @@
-import { z } from "zod";
+// NOTE: this module must stay ZOD-FREE. It is imported by `program.ts`, the
+// always-loaded cold-start path of every CLI invocation, and zod costs ~39ms
+// to load. The zod-based local prompt config schema lives in
+// `types-prompt.ts`, which only the (lazy-loaded) prompt commands pull in.
+
+// Type-only re-export, so existing `import type { LocalPromptConfig } from
+// ".../types"` callers keep working without a runtime edge to zod.
+export type { LocalPromptConfig } from "./types-prompt";
 
 export type PromptDependency =
   | string
@@ -12,33 +19,6 @@ export type PromptsConfig = {
 };
 
 export type RuntimeParameters = Record<string, unknown>;
-
-// Zod schema for local prompt config with permissive validation
-export const localPromptConfigSchema = z
-  .object({
-    model: z.string().min(1, "Model is required"),
-    modelParameters: z
-      .object({
-        temperature: z.number().optional(),
-        max_tokens: z.number().optional(),
-      })
-      .loose()
-      .optional(),
-    messages: z
-      .array(
-        z
-          .object({
-            role: z.enum(["system", "user", "assistant"]),
-            content: z.string().min(1, "Message content cannot be empty"),
-          })
-          .loose(),
-      )
-      .min(1, "At least one message is required"),
-    parameters: z.record(z.string(), z.unknown()).optional().default({}),
-  })
-  .loose();
-
-export type LocalPromptConfig = z.infer<typeof localPromptConfigSchema>;
 
 export type MaterializedPrompt = {
   id: string;

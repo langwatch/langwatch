@@ -1,68 +1,13 @@
 /**
- * @vitest-environment jsdom
+ * @vitest-environment node
+ *
+ * Pure clamp-geometry helper for the IO preview's newline markers. The
+ * rendered behavior (markers in the DOM, media badges) lives in
+ * IOPreview.integration.test.tsx — this file only covers logic with no
+ * component tree.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
-import { IOPreview, shouldHideBreakMarker } from "../IOPreview";
-
-// Compact vs comfortable is gated by the density store; force compact so
-// the row path under test is the one in the screenshot.
-vi.mock("../../../stores/densityStore", () => ({
-  useDensityStore: (selector: (s: { density: string }) => unknown) =>
-    selector({ density: "compact" }),
-  getDrawerDensityTokens: () => ({}),
-}));
-
-vi.mock("../../../hooks/useDensityTokens", () => ({
-  useDensityTokens: () => ({ ioFontSize: "11px" }),
-}));
-
-function renderPreview(input: string | null, output: string | null) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <IOPreview input={input} output={output} />
-    </ChakraProvider>,
-  );
-}
-
-describe("IOPreview newline marker", () => {
-  describe("given preview text with a hard line break", () => {
-    describe("when the preview renders", () => {
-      /** @scenario The newline marker is not part of the selectable text */
-      it("keeps the ↵ glyph out of the DOM text content so it can't be copied", () => {
-        const { container } = renderPreview(
-          "**Scope:**\nDate range: 2026-04-25 to 2026-05-24",
-          null,
-        );
-        // The glyph is painted via a ::after pseudo-element, so it never
-        // appears in textContent (which is what a selection copies).
-        expect(container.textContent).not.toContain("↵");
-        expect(container.textContent).toContain("Scope:");
-        expect(container.textContent).toContain("Date range");
-      });
-
-      /** @scenario The newline marker sits at the end of the line that was broken */
-      it("emits a zero-width, non-selectable marker span between the two lines", () => {
-        const { container } = renderPreview("first line\nsecond line", null);
-        const marker = container.querySelector("[data-newline-marker]");
-        expect(marker).not.toBeNull();
-        // user-select:none belt over the pseudo-element suspenders.
-        expect(getComputedStyle(marker!).userSelect).toBe("none");
-      });
-    });
-  });
-
-  describe("given single-line preview text", () => {
-    describe("when the preview renders", () => {
-      /** @scenario A single-line preview renders no newline marker */
-      it("emits no marker span", () => {
-        const { container } = renderPreview("just one line", null);
-        expect(container.querySelector("[data-newline-marker]")).toBeNull();
-      });
-    });
-  });
-});
+import { describe, expect, it } from "vitest";
+import { shouldHideBreakMarker } from "../IOPreview";
 
 describe("shouldHideBreakMarker", () => {
   // The clamp shows 2 lines, so a 40px clamped box is two 20px lines: the
