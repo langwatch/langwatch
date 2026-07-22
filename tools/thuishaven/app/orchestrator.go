@@ -108,6 +108,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		// the workers' own group rather than the API's when they share a process.
 		HasStandaloneWorkers: opts.ShouldStartWorkers && opts.Selection.Workers,
 		LangyTier:            opts.LangyTier,
+		LangyImage:           opts.langyImageTag,
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
@@ -219,6 +220,17 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err != nil {
 		return err
 	}
+	// Resolve the langy image tag before anything else: it is pure file hashing,
+	// and the reconcile guard needs it to notice a source edit under an
+	// unchanged selection (same services, new bytes — still a restart).
+	if opts.Selection.Langy && opts.LangyTier.RunsInContainer() {
+		if tag, err := langyImageTag(opts.RepoRoot); err == nil {
+			opts.langyImageTag = tag
+		} else {
+			o.log.Warn("could not derive the langy image tag — using the plain dev tag", zap.Error(err))
+			opts.langyImageTag = langyImage
+		}
+	}
 	// Serialize `up` per slug: two concurrent runs could both pass the
 	// already-running guard and then both register the same slug. The lock is
 	// held only through guard + registration — holding it across supervision
@@ -293,7 +305,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	// explicit opt-in for host mode.
 	langyDockerHost := ""
 	if opts.Selection.Langy && st.LangyTier.RunsInContainer() {
-		if dh, err := o.prepareLangyContainer(ctx, opts.RepoRoot); err != nil {
+		if dh, err := o.prepareLangyContainer(ctx, opts.RepoRoot, st.LangyImage, opts.ShouldRebuildImages); err != nil {
 			o.log.Warn("langyagent container unavailable — skipping it (set LANGY_UNSAFE_HOST_ACCESS=1 to run the worker on the host instead)",
 				zap.String("tier", st.LangyTier.String()), zap.Error(err))
 			opts.Selection.Langy = false
@@ -305,25 +317,26 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	return nil
 }
 
-// prepareLangyContainer brings colima up and ensures the langyagent image exists
-// on it, returning the docker socket the worker container should run against. The
-// image is built only when missing (or when HAVEN_LANGY_REBUILD=1 forces it) — the
-// first build takes minutes, every `up` after is a no-op check.
-func (o *Orchestrator) prepareLangyContainer(ctx context.Context, repoRoot string) (string, error) {
+// prepareLangyContainer brings colima up and ensures the stack's
+// content-addressed langy image exists on it, returning the docker socket the
+// worker container should run against. Unchanged inputs → the tag already
+// exists and this is a sub-second check; a configured registry may satisfy a
+// new tag with a pull; otherwise it builds once, until the inputs change again.
+func (o *Orchestrator) prepareLangyContainer(ctx context.Context, repoRoot, image string, forceRebuild bool) (string, error) {
 	if o.container == nil {
 		return "", fmt.Errorf("no container runtime configured")
+	}
+	if image == "" {
+		image = langyImage
 	}
 	dockerHost, err := o.container.Ensure(ctx)
 	if err != nil {
 		return "", fmt.Errorf("colima (%s): %w", o.container.Profile(), err)
 	}
-	// Local `up` must reflect the checked-out agent code. Opt out explicitly for
-	// a fast restart with HAVEN_LANGY_REBUILD=0; the old opt-in default caused
-	// stale worker images to survive source edits.
-	shell := langyImageEnsureShell(langyImage, os.Getenv("HAVEN_LANGY_REBUILD") != "0")
-	fmt.Printf("  langyagent: ensuring container image %s (first build can take a few minutes)…\n", langyImage)
+	shell := langyImageEnsureShell(image, forceRebuild, langyImagePullRef(image))
+	fmt.Printf("  langyagent: ensuring container image %s (a first build can take a few minutes)…\n", image)
 	if err := o.sup.RunOnce(ctx, "langy-image", repoRoot, shell, []string{"DOCKER_HOST=" + dockerHost}); err != nil {
-		return "", fmt.Errorf("build %s: %w", langyImage, err)
+		return "", fmt.Errorf("build %s: %w", image, err)
 	}
 	return dockerHost, nil
 }
@@ -371,7 +384,7 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 		o.store.RemoveStack(slug)
 		return true, nil
 	}
-	if domain.SelectionFromStack(st) == opts.Selection {
+	if domain.SelectionFromStack(st) == opts.Selection && st.LangyImage == opts.langyImageTag {
 		fmt.Printf("stack %q is already running (launcher pid %d) and matches the selection — nothing to do\n", slug, st.LauncherPID)
 		fmt.Printf("  bounce a service: haven restart [service] · stop: haven down · logs: haven logs\n")
 		return false, nil

@@ -98,6 +98,9 @@ ENVIRONMENT
     LANGWATCH_HAVEN_OBS=0        Skip starting the observability stack on "up".
                                  On by default: it shares ClickHouse's colima VM,
                                  which is already paying for itself.
+    HAVEN_LANGY_IMAGE_REGISTRY   Registry ref (e.g. ghcr.io/langwatch/langyagent)
+                                 to pull a CI-published langy image for the
+                                 current content hash instead of building.
     HAVEN_COLIMA_PROFILE=name    colima profile ClickHouse + observability run on
                                  (default: default). A profile haven creates is
                                  capped; one that already exists is never resized.
