@@ -9,7 +9,10 @@ import {
   parseConversationTurnKey,
   type LangyConversationTurnData,
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
-import { LANGY_TURN_TOOL_CALL_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+import {
+  LANGY_CONVERSATION_TURN_STATUS,
+  LANGY_TURN_TOOL_CALL_STATUS,
+} from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
 import { langyPlanItemSchema } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import {
   langyJsonValueSchema,
@@ -81,6 +84,23 @@ function fromRow(row: Row): StoredProjection<LangyConversationTurnData> {
 }
 
 /** Postgres row I/O for the type-aware turn projection. */
+/**
+ * The status values this column accepts, derived from the ONE definition rather
+ * than restated here.
+ *
+ * `status` is TEXT in the database — see the schema comment — so this parse is
+ * what the Postgres enum used to do. It is deliberately at the write boundary
+ * and not in the fold: the fold is already typed, and a guard that only repeats
+ * a type it trusts catches nothing. What this catches is the case the type
+ * cannot see — a projection replayed from an event written by a newer version
+ * of the fold, carrying a status this deployment has never heard of. Failing
+ * the write is right there: a silently stored unknown status would be read back
+ * as one, and every consumer would have to guess.
+ */
+const turnStatusSchema = z.enum(
+  Object.values(LANGY_CONVERSATION_TURN_STATUS) as [string, ...string[]],
+);
+
 export class PrismaLangyConversationTurnProjectionRepository implements StateProjectionStore<LangyConversationTurnData> {
   constructor(
     private readonly prisma: ConversationTurnProjectionPrismaClient,
@@ -124,6 +144,10 @@ export class PrismaLangyConversationTurnProjectionRepository implements StatePro
       Plan,
       ...state
     } = projection.state;
+    // Parsed, not asserted: `state` comes off a replayed projection, so this is
+    // the boundary where an unrecognised status must stop rather than land in a
+    // column that will happily hold it.
+    turnStatusSchema.parse(state.Status);
     const data = {
       ...state,
       ConversationId,
