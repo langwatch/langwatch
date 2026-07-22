@@ -20,21 +20,16 @@
  */
 
 import { Box, HStack, IconButton, Spacer } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
 import { Check, Clipboard, Eye, EyeOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
+import {
+  LW_RAINBOW_DURATION,
+  LW_RAINBOW_GRADIENT,
+  lwRainbowScroll,
+} from "~/components/brand/rainbow";
 import { copyToClipboard } from "~/features/onboarding/components/sections/shared/copy-to-clipboard";
 import { codeToHtml } from "~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter";
-
-// PostHog's rainbow-scroll keyframes, defined via Emotion's `keyframes`
-// helper so the animation name is hoisted to a global stylesheet (Chakra's
-// `css` prop doesn't reliably hoist nested `@keyframes`).
-// Source: posthog/frontend/src/styles/base.scss:2100-2108
-const lwRainbowScroll = keyframes`
-  0% { background-position-x: 0%; }
-  100% { background-position-x: 200%; }
-`;
 
 // ---------------------------------------------------------------------------
 // Component props
@@ -307,13 +302,12 @@ export function ShikiCommandBox({
             },
             ...(rainbowOn && {
               color: "transparent",
-              backgroundImage:
-                "linear-gradient(90deg, #0143cb 0%, #2b6ff4 24%, #d23401 47%, #ff651f 66%, #fba000 83%, #0143cb 100%)",
+              backgroundImage: LW_RAINBOW_GRADIENT,
               backgroundClip: "text",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundSize: "200% 100%",
-              animation: `${lwRainbowScroll} 3s linear infinite`,
+              animation: `${lwRainbowScroll} ${LW_RAINBOW_DURATION} linear infinite`,
               // Force nested elements to inherit the transparent text-fill
               // so Shiki's inline per-token colours don't paint over the
               // wrapper's gradient text-fill. `!important` is required to

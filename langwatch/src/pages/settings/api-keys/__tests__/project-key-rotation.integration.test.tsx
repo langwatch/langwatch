@@ -224,7 +224,7 @@ describe("<ApiKeysSection /> project base key rotation", () => {
         );
 
         // TokenCreatedDialog opens and the new key appears in at least one snippet
-        expect(await screen.findByText("Token Created")).toBeInTheDocument();
+        expect(await screen.findByText("Secret key created")).toBeInTheDocument();
         const keyElements = await screen.findAllByText(
           /sk-lw-newrotatedkey1234/,
         );

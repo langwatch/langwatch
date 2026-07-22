@@ -1,11 +1,18 @@
 /**
- * TokenCreatedDialog — shown immediately after an API key is minted.
+ * TokenCreatedDialog — shown immediately after a secret key is minted.
  *
- * Renders four sections:
- *  1. "Use in Code" tabs (.env / Bearer / Basic Auth) — ShikiCommandBox
+ * The key leads. This is the only moment it is ever readable, so it gets its
+ * own row at the top with reveal and copy, rather than being reachable only by
+ * reading it back out of a `.env` line further down. Everything under it is
+ * about where to *put* the key:
+ *
+ *  1. "Use in code" tabs (.env / Bearer / Basic Auth) — ShikiCommandBox
  *  2. Amber "Copy this token now" warning
- *  3. "Use with Code Assistants" tabs (Claude Code / Codex) — ShikiCommandBox
+ *  3. "Use with code assistants" tabs (Claude Code / Codex) — ShikiCommandBox
  *  4. "Or paste into your config file" — existing JsonHighlight (no change)
+ *
+ * The project selector sits above all of them because it rewrites every
+ * snippet in the dialog, not just the tab group it used to live inside.
  *
  * ShikiCommandBox is lazy-loaded via dynamic() (ssr:false) so the settings
  * page never statically imports the ~hundreds-of-KB Shiki bundle at page load.
@@ -17,13 +24,18 @@ import type React from "react";
 import {
   Alert,
   Box,
+  Button,
   createListCollection,
   HStack,
+  IconButton,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Clipboard, Eye, EyeOff } from "lucide-react";
 import { useMemo, useState } from "react";
+import { RAINBOW_SURFACE_CSS } from "../../../components/brand/rainbow";
 import { Dialog } from "../../../components/ui/dialog";
+import { Tooltip } from "../../../components/ui/tooltip";
 import { Select } from "../../../components/ui/select";
 import { maskApiKey } from "../../../features/onboarding/components/sections/shared/api-key-utils";
 import {
@@ -61,6 +73,80 @@ const EDITOR_PATHS = [
     path: "~/Library/Application Support/Claude/claude_desktop_config.json",
   },
 ];
+
+/**
+ * One tab strip, used by both groups so they read as the same control rather
+ * than two similar-but-not-identical pills stacked down the dialog.
+ */
+function TabStrip({ children }: { children: React.ReactNode }) {
+  return (
+    <HStack
+      gap={1}
+      padding={1}
+      borderRadius="lg"
+      border="1px solid"
+      borderColor="border.subtle"
+      bg="bg.muted/50"
+      width="fit-content"
+    >
+      {children}
+    </HStack>
+  );
+}
+
+/**
+ * The key, on its own, once.
+ *
+ * Masked until asked for — the dialog is frequently open on a shared screen —
+ * and the rainbow rides its top edge, the same gradient at the same tempo as
+ * the install commands below, so the one un-repeatable thing in the dialog is
+ * also the one that moves.
+ */
+function SecretKeyRow({ token }: { token: string }) {
+  const [revealed, setRevealed] = useState(false);
+
+  return (
+    <Box
+      borderRadius="xl"
+      overflow="hidden"
+      border="1px solid"
+      borderColor="border.subtle"
+      bg="bg.panel/70"
+      boxShadow="xs"
+    >
+      <Box height="2px" css={RAINBOW_SURFACE_CSS} aria-hidden="true" />
+      <HStack gap={1} paddingX={3} paddingY={2}>
+        <Text
+          flex={1}
+          minWidth={0}
+          truncate
+          fontFamily="'Geist Mono', 'IBM Plex Mono', Menlo, monospace"
+          fontSize="13px"
+          letterSpacing="-0.01em"
+          color="fg"
+        >
+          {revealed ? token : maskApiKey(token)}
+        </Text>
+        <Tooltip
+          content={revealed ? "Hide secret key" : "Show secret key"}
+          openDelay={0}
+          showArrow
+        >
+          <IconButton
+            size="xs"
+            variant="ghost"
+            borderRadius="lg"
+            aria-label={revealed ? "Hide secret key" : "Show secret key"}
+            onClick={() => setRevealed((current) => !current)}
+          >
+            {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
+          </IconButton>
+        </Tooltip>
+        <InlineCopyButton text={token} label="Secret key" />
+      </HStack>
+    </Box>
+  );
+}
 
 export function TokenCreatedDialog({
   newToken,
@@ -170,74 +256,66 @@ export function TokenCreatedDialog({
     >
       <Dialog.Content bg="bg">
         <Dialog.Header>
-          <Dialog.Title>Token Created</Dialog.Title>
+          <Dialog.Title>Secret key created</Dialog.Title>
         </Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body paddingBottom={6}>
           <VStack gap={6} align="stretch">
-            {/* ── Section 1: Use in Code ── */}
-            <VStack gap={3} align="stretch">
-              <HStack gap={4} align="start">
-                <VStack gap={2} align="start" flex={1}>
-                  <Text fontWeight="700" fontSize="sm">
-                    Use in Code
-                  </Text>
-                  <HStack
-                    gap={1}
-                    px={1.5}
-                    py={1.5}
-                    borderRadius="xl"
-                    border="1px solid"
-                    borderColor="border.subtle"
-                    bg="bg.panel/70"
-                    boxShadow="sm"
-                    width="fit-content"
-                  >
-                    <TabButton
-                      label=".env"
-                      active={codeTab === "env"}
-                      onClick={() => setCodeTab("env")}
-                    />
-                    <TabButton
-                      label="Bearer"
-                      active={codeTab === "bearer"}
-                      onClick={() => setCodeTab("bearer")}
-                    />
-                    <TabButton
-                      label="Basic Auth"
-                      active={codeTab === "basic"}
-                      onClick={() => setCodeTab("basic")}
-                    />
-                  </HStack>
-                </VStack>
-                {orgProjects.length > 1 && (
-                  <VStack gap={2} align="start" width="200px" flexShrink={0}>
-                    <Text fontWeight="700" fontSize="sm">
-                      Project
-                    </Text>
-                    <Select.Root
-                      collection={projectCollection}
-                      value={activeProjectId ? [activeProjectId] : []}
-                      onValueChange={(details) => {
-                        setSelectedProjectId(details.value[0] ?? "");
-                      }}
-                      size="sm"
-                      width="full"
-                    >
-                      <Select.Trigger background="bg" borderRadius="lg">
-                        <Select.ValueText placeholder="Select project" />
-                      </Select.Trigger>
-                      <Select.Content>
-                        {projectCollection.items.map((item) => (
-                          <Select.Item key={item.value} item={item}>
-                            {item.label}
-                          </Select.Item>
-                        ))}
-                      </Select.Content>
-                    </Select.Root>
-                  </VStack>
-                )}
+            {/* ── The key itself, before anything that consumes it ── */}
+            {newToken && <SecretKeyRow token={newToken} />}
+
+            {/* The project rewrites every snippet below, so it is chosen once
+                here rather than from inside the first tab group. */}
+            {orgProjects.length > 1 && (
+              <HStack gap={2.5} justify="flex-end" width="full">
+                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                  Project
+                </Text>
+                <Select.Root
+                  collection={projectCollection}
+                  value={activeProjectId ? [activeProjectId] : []}
+                  onValueChange={(details) => {
+                    setSelectedProjectId(details.value[0] ?? "");
+                  }}
+                  size="sm"
+                  width="240px"
+                >
+                  <Select.Trigger background="bg" borderRadius="lg">
+                    <Select.ValueText placeholder="Select project" />
+                  </Select.Trigger>
+                  <Select.Content>
+                    {projectCollection.items.map((item) => (
+                      <Select.Item key={item.value} item={item}>
+                        {item.label}
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
               </HStack>
+            )}
+
+            {/* ── Section 1: Use in code ── */}
+            <VStack gap={3} align="stretch">
+              <Text fontWeight="700" fontSize="sm">
+                Use in code
+              </Text>
+              <TabStrip>
+                <TabButton
+                  label=".env"
+                  active={codeTab === "env"}
+                  onClick={() => setCodeTab("env")}
+                />
+                <TabButton
+                  label="Bearer"
+                  active={codeTab === "bearer"}
+                  onClick={() => setCodeTab("bearer")}
+                />
+                <TabButton
+                  label="Basic Auth"
+                  active={codeTab === "basic"}
+                  onClick={() => setCodeTab("basic")}
+                />
+              </TabStrip>
 
               {/* .env — ini-highlighted */}
               {codeTab === "env" && newToken && (
@@ -290,23 +368,13 @@ export function TokenCreatedDialog({
               </Alert.Title>
             </Alert.Root>
 
-            {/* ── Section 2: Use with Code Assistants ── */}
+            {/* ── Section 2: Use with code assistants ── */}
             <VStack gap={3} align="stretch">
               <Text fontWeight="700" fontSize="sm">
-                Use with Code Assistants
+                Use with code assistants
               </Text>
 
-              <HStack
-                gap={1}
-                px={1.5}
-                py={1.5}
-                borderRadius="xl"
-                border="1px solid"
-                borderColor="border.subtle"
-                bg="bg.panel/70"
-                boxShadow="sm"
-                width="fit-content"
-              >
+              <TabStrip>
                 <TabButton
                   label="Claude Code"
                   active={assistantTab === "claude-code"}
@@ -317,7 +385,7 @@ export function TokenCreatedDialog({
                   active={assistantTab === "codex"}
                   onClick={() => setAssistantTab("codex")}
                 />
-              </HStack>
+              </TabStrip>
 
               {/* Claude Code terminal command — bash-highlighted with >_ prompt */}
               {assistantTab === "claude-code" && newToken && (
@@ -380,50 +448,66 @@ export function TokenCreatedDialog({
                     </Box>
                   </Box>
 
-                  <HStack gap={2} flexWrap="wrap" align="center">
-                    <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-                      Config path:
+                  {/* Each editor keeps this config somewhere different, so
+                      these copy the path rather than naming it: five paths
+                      spelled out inline would outweigh the block above. The
+                      row scrolls instead of wrapping into ragged rows. */}
+                  <VStack align="stretch" gap={1.5}>
+                    <Text fontSize="xs" color="fg.muted">
+                      Copy the config path for your editor
                     </Text>
-                    {EDITOR_PATHS.map((ep) => (
-                      <HStack
-                        key={ep.editor}
-                        asChild
-                        gap={1}
-                        px={2}
-                        py={0.5}
-                        borderRadius="md"
-                        bg="bg.panel/60"
-                        border="1px solid"
-                        borderColor="border.subtle"
-                        cursor="pointer"
-                        transition="all 0.15s ease"
-                        _hover={{
-                          borderColor: "orange.emphasized",
-                          bg: "bg.panel",
-                        }}
-                        onClick={() => {
-                          void copyToClipboard({
-                            text: ep.path,
-                            successMessage: `${ep.editor} config path copied`,
-                          });
-                        }}
-                      >
-                        <button
-                          type="button"
-                          aria-label={`Copy ${ep.editor} config path`}
+                    <HStack
+                      gap={1.5}
+                      overflowX="auto"
+                      paddingBottom={1}
+                      css={{ scrollbarWidth: "thin" }}
+                    >
+                      {EDITOR_PATHS.map((ep) => (
+                        <Tooltip
+                          key={ep.editor}
+                          content={ep.path}
+                          openDelay={200}
+                          showArrow
                         >
-                          <Text fontSize="2xs" fontWeight="medium" color="fg">
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            borderRadius="full"
+                            flexShrink={0}
+                            gap={1.5}
+                            fontWeight="medium"
+                            color="fg"
+                            aria-label={`Copy ${ep.editor} config path`}
+                            _hover={{
+                              borderColor: "orange.emphasized",
+                              bg: "bg.panel",
+                            }}
+                            onClick={() => {
+                              void copyToClipboard({
+                                text: ep.path,
+                                successMessage: `${ep.editor} config path copied`,
+                              });
+                            }}
+                          >
+                            <Clipboard size={11} />
                             {ep.editor}
-                          </Text>
-                        </button>
-                      </HStack>
-                    ))}
-                  </HStack>
+                          </Button>
+                        </Tooltip>
+                      ))}
+                    </HStack>
+                  </VStack>
                 </VStack>
               )}
             </VStack>
           </VStack>
         </Dialog.Body>
+        {/* Dismissing this is the point of no return for the key, so it gets a
+            deliberate control rather than only the corner ✕. */}
+        <Dialog.Footer>
+          <Button colorPalette="orange" onClick={onClose}>
+            Done
+          </Button>
+        </Dialog.Footer>
       </Dialog.Content>
     </Dialog.Root>
   );

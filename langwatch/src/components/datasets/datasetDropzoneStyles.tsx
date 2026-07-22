@@ -5,7 +5,6 @@
  * and the rainbow "loading" text sheen used while a file prepares.
  */
 import { Box, Text, VStack } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
 import { CloudUpload } from "lucide-react";
 
 // Dotted-grid surface for the empty dropzone. Raw CSS (not a Chakra token) so
@@ -40,27 +39,6 @@ export const dropzoneSurfaceProps = (isActive: boolean) => ({
   },
 });
 
-// PostHog's rainbow-scroll text sheen (same recipe as ShikiCommandBox): a
-// gradient clipped to the text whose background-position scrolls to animate.
-// Applied to a name/status while it uploads — one continuous "loading" tell.
-const lwRainbowScroll = keyframes`
-  0% { background-position-x: 0%; }
-  100% { background-position-x: 200%; }
-`;
-
-const LW_RAINBOW_GRADIENT =
-  "linear-gradient(90deg, #0143cb 0%, #2b6ff4 24%, #d23401 47%, #ff651f 66%, #fba000 83%, #0143cb 100%)";
-
-export const RAINBOW_TEXT_CSS = {
-  color: "transparent",
-  backgroundImage: LW_RAINBOW_GRADIENT,
-  backgroundClip: "text",
-  WebkitBackgroundClip: "text",
-  WebkitTextFillColor: "transparent",
-  backgroundSize: "200% 100%",
-  animation: `${lwRainbowScroll} 3s linear infinite`,
-  "@media (prefers-reduced-motion: reduce)": { animation: "none" },
-} as const;
 
 /**
  * Empty-state contents of the dropzone: an upload illustration, the primary

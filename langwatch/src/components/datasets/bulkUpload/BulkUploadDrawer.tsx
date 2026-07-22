@@ -62,8 +62,8 @@ import {
   DROPZONE_DOTTED_STYLE,
   DropzonePrompt,
   dropzoneSurfaceProps,
-  RAINBOW_TEXT_CSS,
 } from "../datasetDropzoneStyles";
+import { RAINBOW_TEXT_CSS } from "~/components/brand/rainbow";
 import { reorderColumnsBySourceHeader } from "./columnReorder";
 import { invalidColumnNameKeys } from "./columnValidation";
 import { type BulkFile, useBulkUpload } from "./useBulkUpload";
