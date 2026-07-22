@@ -116,7 +116,10 @@ import { NullLangyTurnAdmissionRepository } from "./langy/repositories/langy-tur
 import { ClickHouseLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.clickhouse.repository";
 import { NullLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.repository";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
-import { PrismaProcessStore } from "../event-sourcing/process-manager";
+import {
+  InMemoryProcessStore,
+  PrismaProcessStore,
+} from "../event-sourcing/process-manager";
 import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
 import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
 import { PrismaTopicModelProjectionRepository } from "./topic-clustering/repositories/topic-model-projection.prisma.repository";
@@ -179,6 +182,7 @@ import { NullCanonicalLogRecordRepository } from "./logs/repositories/canonical-
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { EventExplorerService } from "./ops/event-explorer.service";
+import { ManagerExplorerService } from "./ops/manager-explorer.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
 import { QueueService } from "./ops/queue.service";
 import { SchedulerOpsService } from "./ops/scheduler-ops.service";
@@ -1190,6 +1194,7 @@ export function initializeDefaultApp(options?: {
       new PrismaScheduledJobRepository(prisma),
     ),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
+    managerExplorer: new ManagerExplorerService(repositories.processStore),
     replay: new ReplayService(replayRepo),
     blobStore: new BlobStoreService(
       redis
@@ -1494,6 +1499,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
       ),
+      managerExplorer: new ManagerExplorerService(new InMemoryProcessStore()),
       replay: new ReplayService(new NullReplayRepository()),
       blobStore: new BlobStoreService(new NullBlobStoreRepository()),
       metricsCollector: null,

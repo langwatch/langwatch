@@ -14,9 +14,9 @@ import {
   TABLE_TTL_CONFIG,
 } from "~/server/clickhouse/ttlReconciler";
 import {
+  getEventSubscriberMetadata,
   getKillSwitchDescriptors,
   getProjectionMetadata,
-  getReactorMetadata,
 } from "~/server/event-sourcing/pipelineRegistry";
 import {
   getFeatureFlagStore,
@@ -349,9 +349,32 @@ export const opsRouter = createTRPCRouter({
   listProjections: protectedProcedure.use(opsViewPermission).query(() => {
     return {
       projections: getProjectionMetadata(),
-      reactors: getReactorMetadata(),
+      eventSubscribers: getEventSubscriberMetadata(),
     };
   }),
+
+  /**
+   * The per-aggregate process-manager state machines for one aggregate: each
+   * machine's definition (triggers, intents, wake) joined to this aggregate's
+   * current instance state and the intents it has emitted. Scheduled singletons
+   * are excluded — they are not keyed by aggregate id.
+   */
+  getAggregateProcessManagers: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        aggregateType: z.string().min(1).max(200),
+        tenantId: z.string().min(1).max(200),
+        aggregateId: z.string().min(1).max(500),
+      }),
+    )
+    .query(async ({ input }) => {
+      return requireOps().managerExplorer.getForAggregate({
+        aggregateType: input.aggregateType,
+        projectId: input.tenantId,
+        aggregateId: input.aggregateId,
+      });
+    }),
 
   discoverAggregates: protectedProcedure
     .use(opsViewPermission)

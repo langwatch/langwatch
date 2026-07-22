@@ -17,6 +17,7 @@ import type { DspyStepService } from "./dspy-steps/dspy-step.service";
 import type { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import type { EventExplorerService } from "./ops/event-explorer.service";
+import type { ManagerExplorerService } from "./ops/manager-explorer.service";
 import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { QueueService } from "./ops/queue.service";
 import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
@@ -65,6 +66,7 @@ export interface OpsDependencies {
   queues: QueueService;
   scheduler: SchedulerOpsService;
   eventExplorer: EventExplorerService;
+  managerExplorer: ManagerExplorerService;
   replay: ReplayService;
   blobStore: BlobStoreService;
   metricsCollector: OpsMetricsCollector | null;
