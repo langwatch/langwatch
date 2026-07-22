@@ -5,11 +5,15 @@
  *
  * Drives the requestAnimationFrame-based probe with a manually-controlled
  * fake queue (explicit timestamps per frame) rather than a synchronous
- * "run immediately" stub — the provider's `tick` re-schedules itself via
- * `requestAnimationFrame(tick)`, so a synchronous stub would recurse
- * infinitely. Full control over simulated elapsed time is also what makes
- * "N frames over a window" deterministic instead of depending on real
- * wall-clock speed.
+ * "run immediately" stub — the provider's `measureFrame` re-schedules
+ * itself via `requestAnimationFrame(measureFrame)` during an active window,
+ * so a synchronous stub would recurse infinitely. Full control over
+ * simulated elapsed time is also what makes "N frames over a window"
+ * deterministic instead of depending on real wall-clock speed.
+ *
+ * The idle gap *between* windows (and the hidden-tab retry poll) is a real
+ * `setTimeout`, not part of the rAF chain — vitest's fake timers drive that
+ * half deterministically via `vi.advanceTimersByTime`.
  *
  * @see specs/components/adaptive-graphics-quality.feature
  */
@@ -30,24 +34,25 @@ function fireFrame(time: number) {
 }
 
 /**
- * Simulates one sample window: a start frame at `startAt`, then `frames`
- * more frames evenly spaced across `windowMs` — the last of which lands
- * exactly on the window boundary, closing it. `frames` over `windowMs`
- * is the simulated frame rate for this window.
+ * Simulates one sample window: a start frame at t=0, then `frames` more
+ * frames evenly spaced across `windowMs` — the last of which lands exactly
+ * on the window boundary, closing it. `frames` over `windowMs` is the
+ * simulated frame rate for this window. Each window is timed relative to
+ * its own start — the provider no longer ties window boundaries to a
+ * shared rAF timestamp axis, so there's nothing to offset between calls.
  */
-function runWindow({
-  startAt,
-  windowMs,
-  frames,
-}: {
-  startAt: number;
-  windowMs: number;
-  frames: number;
-}) {
-  fireFrame(startAt);
+function runWindow({ windowMs, frames }: { windowMs: number; frames: number }) {
+  fireFrame(0);
   for (let i = 1; i <= frames; i++) {
-    fireFrame(startAt + (windowMs / frames) * i);
+    fireFrame((windowMs / frames) * i);
   }
+}
+
+/** Advances the fake setTimeout clock that drives the idle gap between windows. */
+function advanceIdleGap(ms: number) {
+  act(() => {
+    vi.advanceTimersByTime(ms);
+  });
 }
 
 function setDocumentHidden(hidden: boolean) {
@@ -67,6 +72,7 @@ describe("<GraphicsQualityProvider/>", () => {
   beforeEach(() => {
     pendingCallback = null;
     rafCallCount = 0;
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       pendingCallback = cb;
       return ++rafCallCount;
@@ -78,6 +84,7 @@ describe("<GraphicsQualityProvider/>", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     document.documentElement.removeAttribute("data-reduced-graphics");
     Object.defineProperty(document, "hidden", {
@@ -102,11 +109,9 @@ describe("<GraphicsQualityProvider/>", () => {
 
       // 2 frames over 1000ms => ~2fps, well below the 50fps floor, twice in
       // a row — the confirmation the debounce requires before degrading.
-      // The second window starts at 2000 (not 1000): the first window's
-      // close pushes the next allowed sample start to
-      // close(1000) + resampleIntervalMs(1000).
-      runWindow({ startAt: 0, windowMs: 1000, frames: 2 });
-      runWindow({ startAt: 2000, windowMs: 1000, frames: 2 });
+      runWindow({ windowMs: 1000, frames: 2 });
+      advanceIdleGap(1000);
+      runWindow({ windowMs: 1000, frames: 2 });
 
       expect(
         document.documentElement.getAttribute("data-reduced-graphics"),
@@ -122,7 +127,7 @@ describe("<GraphicsQualityProvider/>", () => {
       );
 
       // 90 frames over 1000ms => ~90fps, comfortably above the floor.
-      runWindow({ startAt: 0, windowMs: 1000, frames: 90 });
+      runWindow({ windowMs: 1000, frames: 90 });
 
       expect(
         document.documentElement.hasAttribute("data-reduced-graphics"),
@@ -144,11 +149,32 @@ describe("<GraphicsQualityProvider/>", () => {
 
       // One bad window (e.g. a one-off GC pause) followed by a clean one —
       // the streak resets, so this alone must not flip the fallback on.
-      runWindow({ startAt: 0, windowMs: 1000, frames: 2 });
+      runWindow({ windowMs: 1000, frames: 2 });
       expect(screen.getByTestId("consumer").textContent).toBe("false");
 
-      runWindow({ startAt: 2000, windowMs: 1000, frames: 90 });
+      advanceIdleGap(1000);
+      runWindow({ windowMs: 1000, frames: 90 });
       expect(screen.getByTestId("consumer").textContent).toBe("false");
+    });
+
+    it("does not run the frame-rate probe during the idle gap between windows", () => {
+      render(
+        <GraphicsQualityProvider
+          sampleWindowMs={1000}
+          resampleIntervalMs={60_000}
+          minFps={50}
+        >
+          <Consumer />
+        </GraphicsQualityProvider>,
+      );
+
+      // Close the first window — this is where the idle gap begins.
+      runWindow({ windowMs: 1000, frames: 90 });
+
+      // No rAF should be pending while waiting out the 60s resample
+      // interval — the wait is a setTimeout sleep, not a rescheduled rAF
+      // chain that fires on every paint for no reason.
+      expect(pendingCallback).toBeNull();
     });
   });
 
@@ -167,12 +193,14 @@ describe("<GraphicsQualityProvider/>", () => {
       );
 
       // Two struggling windows in a row to enter reduced-graphics mode.
-      runWindow({ startAt: 0, windowMs: 1000, frames: 2 });
-      runWindow({ startAt: 2000, windowMs: 1000, frames: 2 });
+      runWindow({ windowMs: 1000, frames: 2 });
+      advanceIdleGap(1000);
+      runWindow({ windowMs: 1000, frames: 2 });
       expect(screen.getByTestId("consumer").textContent).toBe("true");
 
       // Recovery only needs one smooth window.
-      runWindow({ startAt: 4000, windowMs: 1000, frames: 90 });
+      advanceIdleGap(1000);
+      runWindow({ windowMs: 1000, frames: 90 });
 
       expect(
         document.documentElement.hasAttribute("data-reduced-graphics"),
@@ -188,6 +216,7 @@ describe("<GraphicsQualityProvider/>", () => {
         <GraphicsQualityProvider
           sampleWindowMs={1000}
           minFps={50}
+          hiddenRetryMs={100}
           consecutiveStrugglingSamples={1}
         >
           <Consumer />
@@ -207,10 +236,12 @@ describe("<GraphicsQualityProvider/>", () => {
       fireFrame(30_000);
       expect(screen.getByTestId("consumer").textContent).toBe("false");
 
-      // Tab becomes visible again — probe should start a clean window, not
-      // conclude the straddled gap was a struggling sample.
+      // Tab becomes visible again. The provider falls back to a cheap
+      // setTimeout poll while hidden rather than spinning rAF — advance
+      // that to let it notice and restart a clean window.
       setDocumentHidden(false);
-      runWindow({ startAt: 31_000, windowMs: 1000, frames: 90 });
+      advanceIdleGap(100);
+      runWindow({ windowMs: 1000, frames: 90 });
 
       expect(
         document.documentElement.hasAttribute("data-reduced-graphics"),
@@ -244,8 +275,9 @@ describe("<GraphicsQualityProvider/>", () => {
         </GraphicsQualityProvider>,
       );
 
-      runWindow({ startAt: 0, windowMs: 1000, frames: 2 });
-      runWindow({ startAt: 2000, windowMs: 1000, frames: 2 });
+      runWindow({ windowMs: 1000, frames: 2 });
+      advanceIdleGap(1000);
+      runWindow({ windowMs: 1000, frames: 2 });
 
       expect(screen.getByTestId("consumer").textContent).toBe("true");
     });
