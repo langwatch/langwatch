@@ -1,23 +1,21 @@
 Feature: Langy minimised peek
 
-  Minimising Langy no longer collapses it to a corner orb. The panel sinks to
-  a PEEK: in floating mode the card slips below the bottom viewport edge with
-  just a sliver of its header lip showing, bottom-right where the card lives;
-  in sidebar mode the dock's spine peeks in from the right edge as a thin
-  vertical sliver, mid-height. The peek is the SAME creature at rest — it
-  wears the panel's surface, hairline and brand seam, and rises on the
-  panel's own motion curve — so minimise reads as the card sinking out of
-  the way, not as the panel being swapped for a button.
+  Minimising Langy does not hide the panel and put something else in its
+  place. The PANEL ITSELF slides down (floating) or right (sidebar) until only
+  a sliver of its own header shows, and slides back when you open it. One
+  element, one continuous motion — what peeks is literally the top of the
+  panel, its own header and surface and hairline, not a stand-in that looks
+  like it. Two elements trading places can never read as one object moving;
+  that swap is what made the old shape look like something popping in and out.
 
-  Three states, one direction of travel:
-    rest       a small sliver at the viewport edge; overlays the page, never
+  Three positions on one axis:
+    rest       a thin sliver at the viewport edge; overlays the page, never
                reserves room, never shifts layout.
-    proximity  the pointer nears the peek's edge region (or the peek takes
-               keyboard focus): it rises a little further — an invitation,
-               not an opening.
-    open       a click, Enter/Space on the focused peek, or the existing
-               Cmd/Ctrl+I activation: the panel opens fully on its existing
-               spring; the peek stands down.
+    proximity  the pointer nears the sliver (or it takes keyboard focus): the
+               same element travels a little further — an invitation, not an
+               opening.
+    open       a click, Enter/Space, or the existing Cmd/Ctrl+I: the panel
+               finishes the same journey and is simply itself again.
 
   # Rollout: the peek replaces the corner launcher orb behind
   # release_ui_langy_peek_dock_enabled. Flag off keeps the orb; exactly one
@@ -32,7 +30,8 @@ Feature: Langy minimised peek
   Scenario: Minimising the floating panel sinks it to a bottom peek
     Given the Langy panel is open in floating mode
     When I minimise the panel
-    Then a sliver of the card's header lip rests above the bottom viewport edge, bottom-right
+    Then the panel slides down until only a sliver of its own header shows above the bottom viewport edge
+    And it is the same element that was open — nothing was swapped in for it
     And the conversation, draft and layout choice are untouched underneath
     And the page shifts by nothing — the peek overlays, it never pushes
 
@@ -40,19 +39,20 @@ Feature: Langy minimised peek
     Given the Langy panel is open in sidebar mode
     When I minimise the panel
     Then the dock's room is released and page content reclaims the full width
-    And a thin vertical sliver of the dock's spine peeks in from the right edge, mid-height
+    And the dock slides right until only a thin sliver of its own spine shows at the right edge
 
-  Scenario: The peek pops closer as the pointer approaches
+  Scenario: The peek rises as the pointer approaches
     Given the Langy panel is minimised
     When the pointer nears the peek's edge region
-    Then the peek rises further into view, inviting the click
+    Then the same element travels a little further into view, inviting the click
     And it settles back to its resting sliver when the pointer moves away
 
   Scenario: Clicking the peek opens the panel
     Given the Langy panel is minimised
     When I click the peek
-    Then the panel opens fully in whichever layout I use
-    And the open rides the panel's existing motion, rising from where the peek rested
+    Then the panel finishes the same slide and is fully open in whichever layout I use
+    And it is the same element throughout — it is never unmounted and remounted
+    And nothing of the peek's offset is left behind once it is open
 
   Scenario: The peek is a keyboard citizen
     Given the Langy panel is minimised
@@ -65,26 +65,43 @@ Feature: Langy minimised peek
     When I press the Langy keyboard activation
     Then the panel opens fully, exactly as it does from the peek's own click
 
-  Scenario: Reduced motion trades the pop for a plain hover state
+  Scenario: Reduced motion drops the travel, not the affordance
     Given I prefer reduced motion
     And the Langy panel is minimised
     Then no pointer-proximity tracking runs at all
-    And hovering or focusing the peek itself swaps it to the raised state without animation
-    And minimise and open cross-fade instead of sliding
+    And hovering or focusing the peek moves it to the raised position without animating
+    And minimising and opening arrive at their positions without an eased slide
 
   Scenario: The peek shows the turn still running under it
     Given a Langy turn is in flight
     When I minimise the panel
-    Then the peek's brand seam breathes quietly until the turn settles
+    Then the sliver's brand seam breathes quietly until the turn settles
     So the work I walked away from is visibly still alive
 
   Scenario: A drawer moves the floating peek out of its way
     Given the Langy panel is minimised in floating mode
     When a right-anchored drawer opens
-    Then the peek rests along the bottom-LEFT edge, clear of the drawer and the table pager
+    Then the peeking panel rests along the bottom-LEFT edge, clear of the drawer and the table pager
 
   Scenario: The sidebar peek holds the right edge above an open drawer
     Given the Langy panel is minimised in sidebar mode
     When a right-anchored drawer opens
     Then the sliver stays on the right edge, riding above the drawer's card
     And at rest it is thin enough to sit on the drawer's rim without hiding content
+
+  # The panel is mounted whether it is open, peeking or hidden — that is what
+  # keeps an in-flight answer alive when you minimise. Peeking must therefore
+  # not become a way to leave a live panel on screen doing work you cannot see.
+
+  Scenario: A peeking panel is inert behind its edge
+    Given the Langy panel is minimised
+    Then the only thing I can reach in it is the control that opens it
+    And Tab does not walk into the composer or the conversation behind the edge
+    And a screen reader is not read a conversation that is not on screen
+
+  Scenario: The rollout flag falls back to the launcher orb
+    Given the Langy peek rollout flag is disabled for me
+    When I minimise the panel
+    Then the panel is hidden outright, as it always was
+    And the corner launcher orb is what opens it again
+    And exactly one minimised affordance is ever on screen

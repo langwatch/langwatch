@@ -4,55 +4,57 @@ import {
 } from "./langyPanelLayout";
 
 /**
- * The minimised peek's geometry and proximity maths — all of it pure, all of
- * it here, so the component only ever renders what these functions resolve.
+ * The minimised peek — the PANEL ITSELF, slid down (or right) until only a
+ * sliver of its own header shows.
  *
- * Minimising Langy used to swap the panel for a corner orb. Now the panel
- * sinks to a PEEK of itself: floating mode leaves a sliver of the card's
- * header lip above the bottom viewport edge; sidebar mode leaves a thin
- * vertical sliver of the dock's spine on the right edge. Three states:
+ * There is no separate peek element, and there was never a good reason for
+ * one: the panel already stays mounted while closed (unmounting would tear
+ * down an in-flight stream), so minimising is a change of TRANSFORM on the one
+ * node, not a swap between two. A swap is exactly what read as "popping in and
+ * out" — two elements trading places can never look like one object moving.
+ * What you see peeking is literally the top of the panel: its own header, its
+ * own surface, its own hairline and rounded corners.
  *
- *   rest   — the sliver. Deliberately subtler than a title bar: present
- *            enough to find, quiet enough to forget.
- *   near   — the pointer is approaching the peek's edge region (or the peek
- *            holds keyboard focus): it rises a little further. An invitation,
- *            not an opening.
- *   open   — the panel is open; the peek stands down entirely (the component
- *            renders nothing — LangyPanel owns the open surface).
+ * Three positions on one continuous axis:
+ *
+ *   rest   — the panel is down, leaving a thin sliver of its header lip.
+ *            Deliberately subtler than a title bar: present enough to find,
+ *            quiet enough to forget.
+ *   near   — the pointer is approaching (or the peek holds keyboard focus):
+ *            the SAME element rises a little further, enough to read the
+ *            header line. An invitation, not an opening.
+ *   open   — the translate resolves to nothing and the panel is simply itself.
+ *
+ * Driven through the CSS `translate` property rather than `transform`, for one
+ * specific reason: `transform` on this node is already owned by framer (the
+ * layout morph between dock and floating card, plus the open/close variant).
+ * `translate` is a separate, independently-animatable property that composes
+ * with it instead of fighting it — and, unlike framer's numeric values, it
+ * takes `calc(100% - Npx)` natively, so the sliver is exact without anyone
+ * having to measure the panel's height.
  *
  * Spec: specs/langy/langy-peek-dock.feature
  */
 
 export type LangyPeekPhase = "rest" | "near";
 
-// ── Floating mode: the card sinks below the bottom edge ────────────────────
+// ── How much of the panel stays visible, per mode and phase ────────────────
 /**
- * The sunk card's total height. Tall enough that its side hairlines visibly
- * run OFF the bottom of the viewport — which is what sells "the card sank"
- * rather than "a chip appeared" — and no taller, because everything below
- * the sliver is paint nobody sees.
+ * Floating: px of the panel's own header visible above the bottom viewport
+ * edge. The card is bottom-anchored on `FLOATING_PANEL_INSET`, so that inset
+ * is already visible and is subtracted out in `resolvePeekTranslate` — the
+ * number here is the sliver you actually see.
  */
-export const FLOATING_PEEK_CARD_HEIGHT = 76;
-/** Sliver above the bottom edge at rest — the card's rounded top lip. */
-export const FLOATING_PEEK_REST_PX = 10;
-/** Risen height on proximity/focus — the full header line reads. */
-export const FLOATING_PEEK_NEAR_PX = 36;
+export const FLOATING_PEEK_REST_PX = 18;
+/** Risen far enough that the header's line — mark, title — reads. */
+export const FLOATING_PEEK_NEAR_PX = 44;
 
-// ── Sidebar mode: the dock's spine peeks from the right edge ───────────────
-/** The sliver card's full width (mostly offscreen right). */
-export const SIDEBAR_PEEK_CARD_WIDTH = 44;
-/** Visible spine at rest — a rim, not a control. */
-export const SIDEBAR_PEEK_REST_PX = 6;
-/** Risen width on proximity/focus — enough to show the mark. */
-export const SIDEBAR_PEEK_NEAR_PX = 20;
-/** The sliver's height, centred on the viewport's vertical middle. */
-export const SIDEBAR_PEEK_HEIGHT = 128;
+/** Sidebar: px of the dock's spine visible at the right edge. A rim, not a control. */
+export const SIDEBAR_PEEK_REST_PX = 8;
+/** Risen far enough to show the header's leading edge. */
+export const SIDEBAR_PEEK_NEAR_PX = 26;
 
-/**
- * How many px of the peek are visible above/inside the viewport edge for a
- * phase. One lookup, so the transform and the proximity hit zone can never
- * disagree about where the peek is.
- */
+/** How much of the panel shows for a given mode + phase. */
 export function resolvePeekVisiblePx({
   mode,
   phase,
@@ -67,13 +69,12 @@ export function resolvePeekVisiblePx({
 }
 
 /**
- * The CSS transform for a phase. The peek is laid out fully visible at the
- * viewport edge and TRANSLATED off it — transforms animate on the compositor,
- * and the same element slides between all three positions (entrance, rest,
- * near) on one property. Sidebar carries its own -50% Y centring so the
- * caller never has to compose transforms.
+ * The CSS `translate` value that puts the panel at a peek position.
+ *
+ * Floating slides down its own full height (`100%`) less the part that should
+ * stay showing. Sidebar is the same idea on X, against the dock's own width.
  */
-export function resolvePeekTransform({
+export function resolvePeekTranslate({
   mode,
   phase,
 }: {
@@ -82,24 +83,18 @@ export function resolvePeekTransform({
 }): string {
   const visible = resolvePeekVisiblePx({ mode, phase });
   if (mode === "floating") {
-    return `translateY(${FLOATING_PEEK_CARD_HEIGHT - visible}px)`;
+    // Whatever the bottom inset already shows is not travel we need to undo.
+    const travel = Math.max(0, visible - FLOATING_PANEL_INSET);
+    return `0 calc(100% - ${travel}px)`;
   }
-  return `translate(${SIDEBAR_PEEK_CARD_WIDTH - visible}px, -50%)`;
-}
-
-/** Where the peek starts from (fully sunk) so its entrance can slide to rest. */
-export function resolvePeekHiddenTransform(mode: "floating" | "sidebar"): string {
-  if (mode === "floating") {
-    return `translateY(${FLOATING_PEEK_CARD_HEIGHT}px)`;
-  }
-  return `translate(${SIDEBAR_PEEK_CARD_WIDTH}px, -50%)`;
+  return `calc(100% - ${visible}px) 0`;
 }
 
 // ── Proximity ───────────────────────────────────────────────────────────────
 /**
  * The pop arms when the pointer comes within ENTER px of the resting sliver,
  * and disarms only past EXIT px — hysteresis, so a pointer hovering right on
- * the boundary can't strobe the peek up and down.
+ * the boundary can't strobe the panel up and down.
  */
 export const PEEK_PROXIMITY_ENTER_PX = 140;
 export const PEEK_PROXIMITY_EXIT_PX = 200;
@@ -110,17 +105,17 @@ interface PeekProximityInput {
   viewportWidth: number;
   viewportHeight: number;
   mode: "floating" | "sidebar";
-  /** Floating only: a right-anchored drawer holds the corner, peek went left. */
+  /** Floating only: a right-anchored drawer holds the corner, panel went left. */
   dodgeLeft: boolean;
   /** The previous verdict — what the hysteresis pivots on. */
   wasNear: boolean;
 }
 
 /**
- * Is the pointer near the peek? Pure — the hook feeds it pointer + viewport
- * and the previous verdict; distance is measured to the RESTING sliver's
- * rectangle (the thing the user is aiming at), not to the risen one, so the
- * zone doesn't grow the moment the peek rises.
+ * Is the pointer near the peeking panel? Pure — the hook feeds it pointer +
+ * viewport and the previous verdict. Distance is measured to the RESTING
+ * sliver's rectangle (the thing the user is aiming at), not the risen one, so
+ * the zone doesn't grow the moment the panel rises.
  */
 export function resolvePeekProximity({
   pointerX,
@@ -168,10 +163,11 @@ function restingPeekRect({
       bottom: viewportHeight,
     };
   }
+  // The dock runs the full height, so its whole right edge is the target.
   return {
     left: viewportWidth - SIDEBAR_PEEK_REST_PX,
     right: viewportWidth,
-    top: viewportHeight / 2 - SIDEBAR_PEEK_HEIGHT / 2,
-    bottom: viewportHeight / 2 + SIDEBAR_PEEK_HEIGHT / 2,
+    top: 0,
+    bottom: viewportHeight,
   };
 }

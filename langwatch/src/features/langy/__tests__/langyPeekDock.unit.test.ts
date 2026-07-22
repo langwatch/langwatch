@@ -1,15 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { FLOATING_PANEL_INSET } from "../logic/langyPanelLayout";
 import {
-  FLOATING_PEEK_CARD_HEIGHT,
-  FLOATING_PEEK_NEAR_PX,
   FLOATING_PEEK_REST_PX,
   PEEK_PROXIMITY_ENTER_PX,
   PEEK_PROXIMITY_EXIT_PX,
-  resolvePeekHiddenTransform,
   resolvePeekProximity,
-  resolvePeekTransform,
+  resolvePeekTranslate,
   resolvePeekVisiblePx,
-  SIDEBAR_PEEK_CARD_WIDTH,
   SIDEBAR_PEEK_NEAR_PX,
   SIDEBAR_PEEK_REST_PX,
 } from "../logic/langyPeekDock";
@@ -20,48 +17,49 @@ import {
  * hysteresis. Spec: specs/langy/langy-peek-dock.feature
  */
 describe("langyPeekDock geometry", () => {
-  describe("given the floating card is minimised", () => {
+  describe("given the floating panel is minimised", () => {
     it("rests as a subtler sliver than it rises to", () => {
       const rest = resolvePeekVisiblePx({ mode: "floating", phase: "rest" });
       const near = resolvePeekVisiblePx({ mode: "floating", phase: "near" });
       expect(rest).toBeLessThan(near);
-      // The whole point of "more hidden than the screenshot": the resting
-      // sliver is a lip, not a title bar.
+      // "More hidden than the screenshot": the resting sliver is a lip, not a
+      // title bar. The screenshot's title-bar peek is the RISEN state.
       expect(rest).toBeLessThan(near / 2);
     });
 
-    it("translates the sunk card so exactly the sliver stays above the edge", () => {
-      expect(resolvePeekTransform({ mode: "floating", phase: "rest" })).toBe(
-        `translateY(${FLOATING_PEEK_CARD_HEIGHT - FLOATING_PEEK_REST_PX}px)`,
-      );
-      expect(resolvePeekTransform({ mode: "floating", phase: "near" })).toBe(
-        `translateY(${FLOATING_PEEK_CARD_HEIGHT - FLOATING_PEEK_NEAR_PX}px)`,
+    it("slides the panel down its own height, less the sliver that stays", () => {
+      // The card already rests FLOATING_PANEL_INSET above the viewport edge,
+      // so only the remainder is travel.
+      const travel = FLOATING_PEEK_REST_PX - FLOATING_PANEL_INSET;
+      expect(resolvePeekTranslate({ mode: "floating", phase: "rest" })).toBe(
+        `0 calc(100% - ${travel}px)`,
       );
     });
 
-    it("starts its entrance fully sunk below the edge", () => {
-      expect(resolvePeekHiddenTransform("floating")).toBe(
-        `translateY(${FLOATING_PEEK_CARD_HEIGHT}px)`,
-      );
+    it("rises by translating less, on the same axis — not by swapping states", () => {
+      const rest = resolvePeekTranslate({ mode: "floating", phase: "rest" });
+      const near = resolvePeekTranslate({ mode: "floating", phase: "near" });
+      // Both are the same kind of value on the same property: one continuous
+      // motion, which is what stops it reading as a pop.
+      expect(rest.startsWith("0 calc(100% - ")).toBe(true);
+      expect(near.startsWith("0 calc(100% - ")).toBe(true);
+      expect(rest).not.toBe(near);
     });
   });
 
-  describe("given the sidebar dock is minimised", () => {
+  describe("given the docked panel is minimised", () => {
     it("rests as a thinner sliver than it rises to", () => {
       const rest = resolvePeekVisiblePx({ mode: "sidebar", phase: "rest" });
       const near = resolvePeekVisiblePx({ mode: "sidebar", phase: "near" });
       expect(rest).toBeLessThan(near);
     });
 
-    it("translates off the right edge and keeps its own vertical centring", () => {
-      expect(resolvePeekTransform({ mode: "sidebar", phase: "rest" })).toBe(
-        `translate(${SIDEBAR_PEEK_CARD_WIDTH - SIDEBAR_PEEK_REST_PX}px, -50%)`,
+    it("slides the dock right by its own width, less the visible spine", () => {
+      expect(resolvePeekTranslate({ mode: "sidebar", phase: "rest" })).toBe(
+        `calc(100% - ${SIDEBAR_PEEK_REST_PX}px) 0`,
       );
-      expect(resolvePeekTransform({ mode: "sidebar", phase: "near" })).toBe(
-        `translate(${SIDEBAR_PEEK_CARD_WIDTH - SIDEBAR_PEEK_NEAR_PX}px, -50%)`,
-      );
-      expect(resolvePeekHiddenTransform("sidebar")).toBe(
-        `translate(${SIDEBAR_PEEK_CARD_WIDTH}px, -50%)`,
+      expect(resolvePeekTranslate({ mode: "sidebar", phase: "near" })).toBe(
+        `calc(100% - ${SIDEBAR_PEEK_NEAR_PX}px) 0`,
       );
     });
   });
@@ -144,10 +142,21 @@ describe("langyPeekDock proximity", () => {
       ).toBe(true);
     });
 
-    it("stays at rest for a pointer at the right edge's far corners", () => {
-      // Same edge, but far above the sliver's band — nowhere near the peek.
+    it("pops anywhere along that edge — the dock is full-height", () => {
+      // The peek IS the dock, which runs top to bottom, so its whole right
+      // edge is the target. (The retired stand-in was a short mid-height card,
+      // which is why this used to be a dead zone.)
       expect(
         resolvePeekProximity({ ...base, pointerX: 1430, pointerY: 40 }),
+      ).toBe(true);
+      expect(
+        resolvePeekProximity({ ...base, pointerX: 1430, pointerY: 860 }),
+      ).toBe(true);
+    });
+
+    it("stays at rest for a pointer working out in the page", () => {
+      expect(
+        resolvePeekProximity({ ...base, pointerX: 500, pointerY: 450 }),
       ).toBe(false);
     });
   });
