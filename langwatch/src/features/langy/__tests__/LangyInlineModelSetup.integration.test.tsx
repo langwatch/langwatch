@@ -205,9 +205,6 @@ vi.mock("~/utils/api", () => ({
       renameConversation: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
       },
-      stopTurn: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
       list: {
         useInfiniteQuery: () => ({
           data: { pages: [{ items: [], nextCursor: null }] },
