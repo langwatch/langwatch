@@ -25,7 +25,6 @@ const baseClickHouseRun: ClickHouseExperimentRunRow = {
   Progress: 5,
   CompletedCount: 4,
   FailedCount: 1,
-  TotalCost: 0.5,
   TotalDurationMs: 1200,
   AvgScoreBps: 8500,
   PassRateBps: 9000,

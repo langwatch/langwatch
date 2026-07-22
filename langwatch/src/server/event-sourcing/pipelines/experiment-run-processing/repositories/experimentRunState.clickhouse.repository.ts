@@ -38,7 +38,6 @@ interface ClickHouseExperimentRunRecord {
   Progress: number;
   CompletedCount: number;
   FailedCount: number;
-  TotalCost: number | null;
   TotalDurationMs: string | null;
   AvgScoreBps: number | null;
   PassRateBps: number | null;
@@ -79,7 +78,6 @@ export class ExperimentRunStateRepositoryClickHouse<
       Progress: record.Progress,
       CompletedCount: record.CompletedCount,
       FailedCount: record.FailedCount,
-      TotalCost: record.TotalCost,
       TotalDurationMs: record.TotalDurationMs
         ? parseInt(record.TotalDurationMs, 10)
         : null,
@@ -96,7 +94,6 @@ export class ExperimentRunStateRepositoryClickHouse<
       PassedCount: record.PassedCount ?? 0,
       GradedCount: record.GradedCount ?? 0,
       LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
-      TraceMetrics: {},
     };
   }
 
@@ -119,7 +116,6 @@ export class ExperimentRunStateRepositoryClickHouse<
       Progress: data.Progress,
       CompletedCount: data.CompletedCount,
       FailedCount: data.FailedCount,
-      TotalCost: data.TotalCost,
       TotalDurationMs: data.TotalDurationMs?.toString() ?? null,
       AvgScoreBps: data.AvgScoreBps,
       PassRateBps: data.PassRateBps,
@@ -169,7 +165,6 @@ export class ExperimentRunStateRepositoryClickHouse<
             t.WorkflowVersionId AS WorkflowVersionId, t.Version AS Version,
             t.Total AS Total, t.Progress AS Progress,
             t.CompletedCount AS CompletedCount, t.FailedCount AS FailedCount,
-            t.TotalCost AS TotalCost,
             toString(t.TotalDurationMs) AS TotalDurationMs,
             t.AvgScoreBps AS AvgScoreBps, t.PassRateBps AS PassRateBps,
             t.Targets AS Targets,
