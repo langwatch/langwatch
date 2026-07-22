@@ -89,19 +89,33 @@ Feature: Codex, the sign-in-with-OpenAI model provider
   Scenario: Codex models exist only on the allowed surfaces
     Given Codex is connected
     Then codex models are offered in Langy's model picker
-    And in the default-model slots for the tiny assists (Ask AI search, title and commit generation)
+    And in the default-model slots of the fast assists (search, titles, autocomplete, translations, generators)
     But not in the prompt playground, evaluations, workflows or any other model picker
 
   Scenario: The server refuses Codex outside the allowed surfaces
     Given Codex is connected
-    When an execution path other than Langy or a tiny assist requests a codex model
+    When an execution path other than Langy or a fast assist requests a codex model
     Then the request is rejected with a clear "not allowed for this feature" error
 
-  Scenario: Setting up Codex for Langy also covers the tiny assists
+  # Langy has its own top-level slot in the default-models settings, beside
+  # Default, Fast and Embeddings — so an org can point Langy at one model
+  # without touching what the playground or evaluations run on.
+  Scenario: Langy is its own section in the default-model settings
+    When I open the default models configuration
+    Then I see Default, Fast, Langy and Embeddings sections
+    And the Langy section governs the model Langy chats and works with
+
+  Scenario: Setting up Codex for Langy covers Langy and the fast assists
     When I connect Codex from Langy's model setup
-    Then Langy's default model becomes the codex model
-    And the tiny assists default to it as well
+    Then the Langy default becomes the codex model
+    And the Fast default becomes the codex model as well
     And evaluations, playground and workflows keep their existing defaults
+
+  Scenario: Connecting Codex from settings asks before touching defaults
+    When I connect Codex from the model-providers settings page
+    Then a dialog asks whether Codex should become the default for Langy and the fast assists
+    And accepting applies the same Langy and Fast defaults the Langy setup writes
+    And declining leaves every default untouched
 
   # The tiny assists set a sampling temperature the wider Responses API accepts
   # but the codex backend refuses with a 400. The gateway drops those options so

@@ -2,9 +2,9 @@
  * Feature registry — the single source of truth for every AI-powered
  * surface in the platform that needs a model.
  *
- * Each entry binds a stable feature key to one of the three model roles
- * (DEFAULT / FAST / EMBEDDINGS) and supplies the copy the UI renders when
- * surfacing the role expansion list or the missing-model popup.
+ * Each entry binds a stable feature key to one of the model roles
+ * (DEFAULT / FAST / LANGY / EMBEDDINGS) and supplies the copy the UI renders
+ * when surfacing the role expansion list or the missing-model popup.
  *
  * Rules:
  *   - Keys are snake_case, area-prefixed, and STABLE FOREVER. We deprecate,
@@ -21,7 +21,7 @@
  * resolution semantics and the contract this file underpins.
  */
 
-export const MODEL_ROLES = ["DEFAULT", "FAST", "EMBEDDINGS"] as const;
+export const MODEL_ROLES = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"] as const;
 export type ModelRole = (typeof MODEL_ROLES)[number];
 
 export interface FeatureDescriptor {
@@ -39,13 +39,17 @@ export interface FeatureDescriptor {
 }
 
 const REGISTRY: FeatureDescriptor[] = [
-  // DEFAULT — heavy / user-content-creating surfaces.
+  // LANGY — the assistant's own conversation model. Its own role (not
+  // DEFAULT) so an org can run Langy on a subscription-billed model (codex)
+  // while the playground and evaluations stay on an API-key provider.
   {
     key: "langy.chat",
-    role: "DEFAULT",
+    role: "LANGY",
     displayName: "Langy",
     description: "The model Langy chats and works with.",
   },
+
+  // DEFAULT — heavy / user-content-creating surfaces.
   {
     key: "prompt.create_default",
     role: "DEFAULT",

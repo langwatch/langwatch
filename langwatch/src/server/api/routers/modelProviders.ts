@@ -6,10 +6,7 @@ import {
 import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
 import { auditLog } from "../../auditLog";
 import { CodexAccountService } from "../../modelProviders/codexAccount.service";
-import {
-  CODEX_ALLOWED_FEATURE_KEYS,
-  CODEX_DEFAULT_MODEL,
-} from "../../modelProviders/codexRestrictions";
+import { CODEX_DEFAULT_MODEL } from "../../modelProviders/codexRestrictions";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
 import {
   featureByKey,
@@ -303,17 +300,21 @@ export const modelProviderRouter = createTRPCRouter({
             scope.scopeId,
           );
         }
-        // The widest selected scope carries the defaults; feature overrides
+        // The widest selected scope carries the defaults; role values
         // cascade down from it. One scope is the norm (the sign-in surfaces
         // pick the widest manageable), so this is scopes[0] in practice.
+        // ROLE-level writes, not per-feature: Langy's own role plus the
+        // Fast tier — the two roles whose whole feature set is
+        // codex-licensed. The Default role (playground, evaluators,
+        // workflows) is deliberately untouched.
         const scope = input.scopes[0]!;
-        for (const featureKey of CODEX_ALLOWED_FEATURE_KEYS) {
-          await setFeatureAtScope(
+        for (const role of ["LANGY", "FAST"] as const) {
+          await setRoleAtScope(
             { prisma: ctx.prisma },
             {
               scopeType: scope.scopeType,
               scopeId: scope.scopeId,
-              featureKey,
+              role,
               model: CODEX_DEFAULT_MODEL,
               authorId: ctx.session?.user?.id ?? null,
             },
@@ -343,6 +344,50 @@ export const modelProviderRouter = createTRPCRouter({
         email: poll.keys.CODEX_EMAIL,
         plan: poll.keys.CODEX_PLAN,
       };
+    }),
+
+  /**
+   * Point the coding-assistant roles (LANGY + FAST) at the codex model,
+   * after the fact. The settings-page connect flow doesn't write defaults
+   * during sign-in; it asks with a dialog once connected and calls this on
+   * "yes" — the same role writes the Langy/onboarding flows perform inline.
+   */
+  codexApplyCodingDefaults: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        scopes: z.array(scopeAssignmentSchema).min(1),
+      }),
+    )
+    .use(checkProjectPermission("project:update"))
+    .mutation(async ({ input, ctx }) => {
+      for (const scope of input.scopes) {
+        await assertCanWriteScope(
+          { prisma: ctx.prisma, session: ctx.session },
+          scope.scopeType,
+          scope.scopeId,
+        );
+      }
+      const scope = input.scopes[0]!;
+      for (const role of ["LANGY", "FAST"] as const) {
+        await setRoleAtScope(
+          { prisma: ctx.prisma },
+          {
+            scopeType: scope.scopeType,
+            scopeId: scope.scopeId,
+            role,
+            model: CODEX_DEFAULT_MODEL,
+            authorId: ctx.session?.user?.id ?? null,
+          },
+        );
+      }
+      void auditLog({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+        action: "modelProvider.codexApplyCodingDefaults",
+        args: { scopes: input.scopes },
+      });
+      return { applied: true as const };
     }),
 
   /**

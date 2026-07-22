@@ -117,7 +117,7 @@ function sanitizeConfig(raw: Record<string, unknown>): Record<string, string> {
     // Restricted models (codex) are rejected loudly, not dropped: a save
     // that silently loses a key would read as "worked" in the drawer.
     const allowed = roleKeys.has(key)
-      ? isModelAllowedAsRoleDefault(value)
+      ? isModelAllowedAsRoleDefault(value, key as ModelRole)
       : isModelAllowedForFeature({ modelId: value, featureKey: key });
     if (!allowed) {
       throw new Error(
@@ -267,7 +267,10 @@ export async function setRoleAtScope(
   if (!valid.has(params.role)) {
     throw new Error(`Unknown role: "${params.role}".`);
   }
-  if (params.model !== null && !isModelAllowedAsRoleDefault(params.model)) {
+  if (
+    params.model !== null &&
+    !isModelAllowedAsRoleDefault(params.model, params.role)
+  ) {
     throw new Error(
       `"${params.model}" serves the coding-assistant surfaces only and cannot be a ${params.role} role default.`,
     );

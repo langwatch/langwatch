@@ -14,7 +14,7 @@ import {
   isModelAllowedForFeature,
   LANGY_CHAT_FEATURE_KEY,
 } from "../codexRestrictions";
-import { allFeatures, featureByKey } from "../featureRegistry";
+import { allFeatures, featureByKey, featuresByRole } from "../featureRegistry";
 
 describe("codexRestrictions", () => {
   it("recognises codex model ids by provider prefix", () => {
@@ -23,33 +23,36 @@ describe("codexRestrictions", () => {
     expect(isCodexModel("anthropic/claude-sonnet-5")).toBe(false);
   });
 
-  it("registers every allowed feature key, including langy.chat", () => {
+  it("registers every allowed feature key, with langy.chat on its own role", () => {
     for (const key of CODEX_ALLOWED_FEATURE_KEYS) {
       expect(featureByKey(key), `feature "${key}" must exist`).toBeTruthy();
     }
-    expect(featureByKey(LANGY_CHAT_FEATURE_KEY)?.role).toBe("DEFAULT");
+    expect(featureByKey(LANGY_CHAT_FEATURE_KEY)?.role).toBe("LANGY");
   });
 
-  it("allows codex only on the coding-assistant surfaces", () => {
+  it("allows codex on Langy and the fast assists, nowhere else", () => {
     expect(
       isModelAllowedForFeature({
         modelId: CODEX_DEFAULT_MODEL,
         featureKey: LANGY_CHAT_FEATURE_KEY,
       }),
     ).toBe(true);
-    expect(
-      isModelAllowedForFeature({
-        modelId: CODEX_DEFAULT_MODEL,
-        featureKey: "traces.ai_search",
-      }),
-    ).toBe(true);
+    for (const fast of featuresByRole("FAST")) {
+      expect(
+        isModelAllowedForFeature({
+          modelId: CODEX_DEFAULT_MODEL,
+          featureKey: fast.key,
+        }),
+        `${fast.key} is a fast assist and must accept codex`,
+      ).toBe(true);
+    }
     for (const forbidden of [
       "prompt.create_default",
       "evaluator.create_default",
       "workflows.create_default",
       "scenarios.judge",
       "scenarios.user_simulator",
-      "datasets.generator",
+      "analytics.topic_clustering_embeddings",
     ]) {
       expect(
         isModelAllowedForFeature({
@@ -61,9 +64,20 @@ describe("codexRestrictions", () => {
     }
   });
 
-  it("never allows codex as a role-level default", () => {
-    expect(isModelAllowedAsRoleDefault(CODEX_DEFAULT_MODEL)).toBe(false);
-    expect(isModelAllowedAsRoleDefault("openai/gpt-5-mini")).toBe(true);
+  it("allows codex as a role default only for LANGY and FAST", () => {
+    expect(isModelAllowedAsRoleDefault(CODEX_DEFAULT_MODEL, "LANGY")).toBe(
+      true,
+    );
+    expect(isModelAllowedAsRoleDefault(CODEX_DEFAULT_MODEL, "FAST")).toBe(true);
+    expect(isModelAllowedAsRoleDefault(CODEX_DEFAULT_MODEL, "DEFAULT")).toBe(
+      false,
+    );
+    expect(isModelAllowedAsRoleDefault(CODEX_DEFAULT_MODEL, "EMBEDDINGS")).toBe(
+      false,
+    );
+    expect(isModelAllowedAsRoleDefault("openai/gpt-5-mini", "DEFAULT")).toBe(
+      true,
+    );
   });
 
   it("leaves unrestricted providers untouched on every feature", () => {
@@ -77,9 +91,10 @@ describe("codexRestrictions", () => {
     }
   });
 
-  it("keeps the allowed set to coding-assistant surfaces only", () => {
-    // The ToC line: Langy plus the tiny assists. Anything appearing here
-    // beyond that set needs the same scrutiny the original list got.
+  it("pins the allowed set: langy.chat plus exactly the FAST tier", () => {
+    // The rule is derived (Langy + every FAST feature); this pin makes any
+    // widening of it — a feature moving into FAST, a new fast assist — show
+    // up in review rather than land silently.
     expect([...CODEX_ALLOWED_FEATURE_KEYS].sort()).toEqual(
       [
         "langy.chat",
@@ -88,6 +103,9 @@ describe("codexRestrictions", () => {
         "traces.ai_search",
         "translate.text",
         "workflows.commit_message",
+        "scenarios.generator",
+        "datasets.generator",
+        "analytics.topic_clustering_llm",
       ].sort(),
     );
     expect(isCodexAllowedFeature("prompt.create_default")).toBe(false);

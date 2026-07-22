@@ -1,9 +1,10 @@
 /**
  * Codex gating for the Default Models drawer's pickers (spec:
  * specs/model-providers/codex-account-provider.feature, "Where Codex may
- * be used"). Role-level defaults apply across every feature in the role,
- * so restricted (codex) models are never offered there; a feature-override
- * row re-admits them only when its own feature key is licensed.
+ * be used"). A role-level default applies across every feature in the
+ * role, so restricted (codex) models are offered only for the
+ * coding-assistant roles (Langy, Fast); a feature-override row re-admits
+ * them only when its own feature key is licensed.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -19,18 +20,30 @@ const POOL = [
 
 describe("roleSelectModelOptions()", () => {
   describe("when the pool contains codex models", () => {
-    it("excludes them from role-level selects", () => {
-      expect(roleSelectModelOptions(POOL)).toEqual([
-        "openai/gpt-5-mini",
-        "anthropic/claude-sonnet-5",
-      ]);
+    it("excludes them for the Default and Embeddings roles", () => {
+      for (const role of ["DEFAULT", "EMBEDDINGS"] as const) {
+        expect(roleSelectModelOptions({ options: POOL, role })).toEqual([
+          "openai/gpt-5-mini",
+          "anthropic/claude-sonnet-5",
+        ]);
+      }
+    });
+
+    it("keeps them for the Langy and Fast roles", () => {
+      for (const role of ["LANGY", "FAST"] as const) {
+        expect(roleSelectModelOptions({ options: POOL, role })).toEqual(POOL);
+      }
     });
   });
 
   describe("when the pool has no codex models", () => {
-    it("returns the pool untouched", () => {
+    it("returns the pool untouched for every role", () => {
       const unrestricted = ["openai/gpt-5-mini", "anthropic/claude-sonnet-5"];
-      expect(roleSelectModelOptions(unrestricted)).toEqual(unrestricted);
+      for (const role of ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"] as const) {
+        expect(roleSelectModelOptions({ options: unrestricted, role })).toEqual(
+          unrestricted,
+        );
+      }
     });
   });
 });

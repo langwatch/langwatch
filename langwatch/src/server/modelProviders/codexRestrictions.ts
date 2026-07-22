@@ -3,10 +3,9 @@
  *
  * The Codex provider bills the user's ChatGPT plan through OpenAI's codex
  * backend, whose terms license it for coding-assistant harnesses and light
- * AI assists — not general inference. This list is the single definition of
- * "allowed": Langy itself plus the small assists around the UI. Everything
- * else (prompt playground, evaluations, workflows, scenario/dataset
- * generation, batch runs) must neither offer nor accept a codex model.
+ * AI assists — not general inference. The rule: Langy itself plus the FAST
+ * tier's assists. Everything else (prompt playground, evaluations,
+ * workflows, batch runs) must neither offer nor accept a codex model.
  *
  * Consumed by:
  *   - the provider registry entry (`restrictedToFeatureKeys`),
@@ -18,24 +17,25 @@
  * Spec: specs/model-providers/codex-account-provider.feature
  */
 
+import { featuresByRole, type ModelRole } from "./featureRegistry";
+
 /** Langy's own conversation model. */
 export const LANGY_CHAT_FEATURE_KEY = "langy.chat";
 
-export const CODEX_ALLOWED_FEATURE_KEYS = [
+/**
+ * The rule, not a hand-kept list: Langy itself plus every FAST-role assist.
+ * The fast tier IS the "light AI assists" the codex terms cover, so a new
+ * fast feature is codex-allowed by construction — while DEFAULT (playground,
+ * evaluators, workflows) and EMBEDDINGS stay out. A test pins the expansion
+ * so the set never widens silently.
+ */
+export const CODEX_ALLOWED_FEATURE_KEYS: readonly string[] = [
   LANGY_CHAT_FEATURE_KEY,
-  // The tiny assists around the UI.
-  "traces.ai_search",
-  "langy.conversation_title",
-  "workflows.commit_message",
-  "studio.autocomplete",
-  "translate.text",
-] as const;
-
-export type CodexAllowedFeatureKey =
-  (typeof CODEX_ALLOWED_FEATURE_KEYS)[number];
+  ...featuresByRole("FAST").map((f) => f.key),
+];
 
 export function isCodexAllowedFeature(featureKey: string): boolean {
-  return (CODEX_ALLOWED_FEATURE_KEYS as readonly string[]).includes(featureKey);
+  return CODEX_ALLOWED_FEATURE_KEYS.includes(featureKey);
 }
 
 /** Model ids belonging to the codex provider ("openai_codex/..."). */
@@ -50,9 +50,7 @@ export const CODEX_DEFAULT_MODEL = "openai_codex/gpt-5.6-terra";
  * The one model-vs-feature gate every enforcement point calls: the cascade
  * resolver (skips disallowed values), the defaults write paths (reject
  * saving them), the litellm-params builder (rejects execution), and the
- * pickers (hide the options). Codex is the only restricted provider today;
- * kept here (not derived from the registry) so this module stays
- * import-cycle-free and client-safe.
+ * pickers (hide the options). Codex is the only restricted provider today.
  */
 export function isModelAllowedForFeature({
   modelId,
@@ -65,8 +63,16 @@ export function isModelAllowedForFeature({
   return isCodexAllowedFeature(featureKey);
 }
 
-/** Roles apply across many features at once, so a restricted model can
- *  never be a role-level default. */
-export function isModelAllowedAsRoleDefault(modelId: string): boolean {
-  return !isCodexModel(modelId);
+/**
+ * Role-level defaults apply across every feature in the role at once, so a
+ * restricted model may only sit on a role whose ENTIRE feature set is
+ * codex-allowed: LANGY (Langy's own role) and FAST (the assists). DEFAULT
+ * and EMBEDDINGS carry general-inference surfaces and stay closed.
+ */
+export function isModelAllowedAsRoleDefault(
+  modelId: string,
+  role: ModelRole,
+): boolean {
+  if (!isCodexModel(modelId)) return true;
+  return role === "LANGY" || role === "FAST";
 }
