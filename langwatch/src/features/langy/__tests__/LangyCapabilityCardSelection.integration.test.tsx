@@ -62,8 +62,13 @@ vi.mock("recharts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("recharts")>();
   return {
     ...actual,
-    ResponsiveContainer: ({ children }: { children: ReactElement }) =>
-      cloneElement(children, { width: 640, height: 200 }),
+    // Typed with the props being injected: a bare `ReactElement` has unknown
+    // props, so `cloneElement` has no overload that accepts these.
+    ResponsiveContainer: ({
+      children,
+    }: {
+      children: ReactElement<{ width?: number; height?: number }>;
+    }) => cloneElement(children, { width: 640, height: 200 }),
   };
 });
 

@@ -193,11 +193,12 @@ secured.access(requires("evaluations:view")).get(
 );
 
 // ── Create Monitor ──────────────────────────────────────────
-// Creating asks for `evaluations:create`, not `evaluations:manage`. `:manage`
-// still implies `:create` through the RBAC hierarchy, so every role and key
-// that could create a monitor yesterday still can; a viewer holds only
-// `evaluations:view` and is declined exactly as before.
-secured.access(requires("evaluations:create")).post(
+// `:manage`, not `:create`. A monitor is not a definition sitting inert until
+// someone runs it: `executionMode` defaults to ON_MESSAGE, so the moment it
+// exists it evaluates every trace the project ingests, on its own, indefinitely.
+// Creating one is standing up a process, which is administration. The evaluator
+// routes keep `:create`, because an evaluator IS the inert definition.
+secured.access(requires("evaluations:manage")).post(
   "/",
   resourceLimitMiddleware("onlineEvaluations"),
   describeRoute({
