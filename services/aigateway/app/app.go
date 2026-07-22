@@ -119,8 +119,14 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 	}
 
 	if len(cfg.AllowedModels) > 0 {
+		// AllowedModels is a bare ID list with no provider association of
+		// its own (unlike aliases and discovered models). Only attribute a
+		// provider when the bundle's credential chain is unambiguous —
+		// guessing among multiple candidate providers would be more
+		// misleading than reporting none.
+		providerID := soleCredentialProviderID(bundle.Credentials)
 		for _, id := range cfg.AllowedModels {
-			add(domain.Model{ID: id, Name: id})
+			add(domain.Model{ID: id, Name: id, ProviderID: providerID})
 		}
 	} else if a.providers != nil {
 		discovered, err := a.providers.ListModels(ctx, bundle.Credentials)
@@ -132,18 +138,38 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 		}
 	}
 
-	models = filterModelsByPolicy(models, cfg.PolicyRules)
+	models = filterModelsByPolicy(models, cfg.PolicyRules, a.logger)
 	sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
 	return models, nil
+}
+
+// soleCredentialProviderID returns the credential chain's provider when
+// every credential shares one, and "" when the chain is empty or spans
+// more than one provider (nothing to unambiguously attribute to).
+func soleCredentialProviderID(creds []domain.Credential) domain.ProviderID {
+	var providerID domain.ProviderID
+	for i, cred := range creds {
+		if i == 0 {
+			providerID = cred.ProviderID
+			continue
+		}
+		if cred.ProviderID != providerID {
+			return ""
+		}
+	}
+	return providerID
 }
 
 // filterModelsByPolicy mirrors dispatch-time model policy: models matching
 // a deny rule are dropped, and when any allow rule targets models, only
 // models matching one survive (the policy matcher rejects the rest with
-// "is not in allowlist"). Invalid patterns are skipped: the list is
-// discovery, not enforcement — dispatch-time evaluation remains the
-// authority.
-func filterModelsByPolicy(models []domain.Model, rules []domain.PolicyRule) []domain.Model {
+// "is not in allowlist"). Invalid patterns are skipped (not failed
+// closed, unlike dispatch-time Matcher.Check): the list is discovery, not
+// enforcement — dispatch-time evaluation remains the authority and would
+// still reject a request against a listed model if its pattern is bad.
+// The skip is logged so a typo'd rule doesn't silently fail to hide a
+// model from the list without a trace anywhere.
+func filterModelsByPolicy(models []domain.Model, rules []domain.PolicyRule, logger *zap.Logger) []domain.Model {
 	var deny, allow []*regexp.Regexp
 	for _, r := range rules {
 		if r.Target != domain.PolicyTargetModel {
@@ -151,6 +177,10 @@ func filterModelsByPolicy(models []domain.Model, rules []domain.PolicyRule) []do
 		}
 		re, err := regexp.Compile(r.Pattern)
 		if err != nil {
+			if logger != nil {
+				logger.Warn("model policy rule has invalid pattern, skipping for listing",
+					zap.String("pattern", r.Pattern), zap.Error(err))
+			}
 			continue
 		}
 		switch r.Type {

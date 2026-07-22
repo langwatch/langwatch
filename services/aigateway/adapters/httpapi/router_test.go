@@ -718,8 +718,9 @@ func TestRouter_ModelsEndpoint_EmitsOpenAIListShape(t *testing.T) {
 	var parsed struct {
 		Object string `json:"object"`
 		Data   []struct {
-			ID     string `json:"id"`
-			Object string `json:"object"`
+			ID      string `json:"id"`
+			Object  string `json:"object"`
+			OwnedBy string `json:"owned_by"`
 		} `json:"data"`
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &parsed))
@@ -727,9 +728,13 @@ func TestRouter_ModelsEndpoint_EmitsOpenAIListShape(t *testing.T) {
 	require.NotNil(t, parsed.Data, "data must be an array, never null")
 
 	ids := make(map[string]string, len(parsed.Data))
+	ownedBy := make(map[string]string, len(parsed.Data))
 	for _, m := range parsed.Data {
 		ids[m.ID] = m.Object
+		ownedBy[m.ID] = m.OwnedBy
 	}
 	assert.Equal(t, "model", ids["chat"], `response must include {"id": "chat", "object": "model"}`)
 	assert.Equal(t, "model", ids["gpt-5-mini"], `response must include {"id": "gpt-5-mini", "object": "model"}`)
+	assert.Equal(t, "openai", ownedBy["gpt-5-mini"],
+		"the bundle's sole credential provider must be attributed to a plain allowlist entry")
 }

@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -100,6 +102,37 @@ func TestListModels_FiltersDeniedModels(t *testing.T) {
 	assert.ElementsMatch(t, []string{"gpt-5-mini"}, modelIDs(models))
 }
 
+// Allowlisted models carry no provider of their own (unlike aliases and
+// discovered models), so an unambiguous single-credential bundle attributes
+// them to that one provider; a bundle with more than one candidate provider
+// reports no provider rather than guessing wrong.
+func TestListModels_AllowlistProviderAttribution(t *testing.T) {
+	application := New(WithLogger(zap.NewNop()), WithProviders(&mockProvider{}))
+
+	t.Run("single credential provider is attributed", func(t *testing.T) {
+		models, err := application.ListModels(context.Background(), &domain.Bundle{
+			Credentials: []domain.Credential{{ID: "cred-1", ProviderID: domain.ProviderOpenAI}},
+			Config:      domain.BundleConfig{AllowedModels: []string{"gpt-5-mini"}},
+		})
+		require.NoError(t, err)
+		require.Len(t, models, 1)
+		assert.Equal(t, domain.ProviderOpenAI, models[0].ProviderID)
+	})
+
+	t.Run("ambiguous multi-provider chain reports no provider", func(t *testing.T) {
+		models, err := application.ListModels(context.Background(), &domain.Bundle{
+			Credentials: []domain.Credential{
+				{ID: "cred-1", ProviderID: domain.ProviderOpenAI},
+				{ID: "cred-2", ProviderID: domain.ProviderAnthropic},
+			},
+			Config: domain.BundleConfig{AllowedModels: []string{"some-model"}},
+		})
+		require.NoError(t, err)
+		require.Len(t, models, 1)
+		assert.Equal(t, domain.ProviderID(""), models[0].ProviderID)
+	})
+}
+
 // Duplicate IDs across aliases and discovery collapse to one entry, and the
 // result is sorted so pagination-less clients get a stable list.
 func TestListModels_DedupesAndSorts(t *testing.T) {
@@ -149,4 +182,32 @@ func TestListModels_FiltersModelsOutsideAllowRules(t *testing.T) {
 
 	assert.ElementsMatch(t, []string{"qwen3-14b"}, modelIDs(models),
 		"gpt-4o is outside the model allow pattern; dispatch would 403 it")
+}
+
+// A typo'd policy pattern is skipped rather than failing the whole list
+// (dispatch-time evaluation remains the enforcement authority), but the
+// skip must be observable — a silently-dropped deny rule means a model
+// stays listed even though the intent was to hide it.
+func TestListModels_InvalidPolicyPatternLogsWarning(t *testing.T) {
+	core, logs := observer.New(zapcore.DebugLevel)
+	application := New(
+		WithLogger(zap.New(core)),
+		WithProviders(&mockProvider{}),
+	)
+
+	models, err := application.ListModels(context.Background(), &domain.Bundle{
+		Config: domain.BundleConfig{
+			AllowedModels: []string{"gpt-5-mini"},
+			PolicyRules: []domain.PolicyRule{
+				{Pattern: "(unterminated", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel},
+			},
+		},
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"gpt-5-mini"}, modelIDs(models),
+		"an invalid pattern must not fail the whole list")
+
+	entries := logs.FilterMessage("model policy rule has invalid pattern, skipping for listing").All()
+	require.Len(t, entries, 1, "the skipped pattern must be logged, not silently dropped")
+	assert.Equal(t, zapcore.WarnLevel, entries[0].Level)
 }
