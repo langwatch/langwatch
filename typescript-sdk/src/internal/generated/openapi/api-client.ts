@@ -1623,7 +1623,7 @@ export interface paths {
                                 evaluation_id?: string;
                                 /** @example Ragas Answer Relevancy */
                                 name?: string;
-                                /** @example ragas/answer_relevancy */
+                                /** @example ragas/response_relevancy */
                                 type?: string;
                                 /** @example trace_BKZL_X0TKSD4oa1aBJTc_ */
                                 trace_id?: string;

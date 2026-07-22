@@ -1842,11 +1842,16 @@ function LangyPanel({
         // here before whatever rendered it can act on the click.
         {...externalLinkGuard.guardProps}
         className="langy-root"
-        // `layout` morphs the same mounted surface between placements without a
-        // teleport: dock to floating card, and dock/floating to the drawer
-        // companion. The panel grows taller and lifts above content in place,
-        // rather than sliding off-screen and back.
-        layout
+        // `layout="position"` morphs the same mounted surface between
+        // placements without a teleport: dock to floating card, and
+        // dock/floating to the drawer companion. POSITION, never the full
+        // FLIP: framer's size half animates a box delta as scaleX/scaleY, and
+        // on the peek→open expansion that squashed the panel's whole content
+        // — text and cards visibly stretching, then snapping to true layout.
+        // Position deltas still travel; size changes ease as REAL layout (the
+        // width/min-height/max-height transitions in `css` below), so content
+        // is always laid out at its final size while the box grows.
+        layout="position"
         position="fixed"
         // The dock is deliberately slimmer than the floating card — see
         // SIDEBAR_PANEL_WIDTH. The drawer companion keeps the dock width.
@@ -1948,7 +1953,12 @@ function LangyPanel({
                 ...(reduceMotion
                   ? {}
                   : {
-                      transition: `min-height 340ms cubic-bezier(0.32, 0.72, 0, 1), max-height 340ms cubic-bezier(0.32, 0.72, 0, 1), translate ${LANGY_TRANSITION}`,
+                      // `width` rides along for the dock ↔ floating morph:
+                      // with the framer layout animation position-only (see
+                      // `layout="position"` above), the size change eases as
+                      // genuine layout — content reflows at its real size —
+                      // instead of a scale that squashes it.
+                      transition: `min-height 340ms cubic-bezier(0.32, 0.72, 0, 1), max-height 340ms cubic-bezier(0.32, 0.72, 0, 1), width 340ms cubic-bezier(0.32, 0.72, 0, 1), translate ${LANGY_TRANSITION}`,
                     }),
                 // The capped silhouette is handsome on a normal display, but on a
                 // short split terminal/browser it leaves no actual conversation
@@ -1960,11 +1970,13 @@ function LangyPanel({
                   maxHeight: "calc(100dvh - 24px)",
                 },
               }
-            : // The dock peeks on X, and needs the same eased travel. (It has
-              // no size-floor transition to share the declaration with.)
+            : // The dock peeks on X, and needs the same eased travel. `width`
+              // rides along for the dock ↔ floating morph (see above).
               reduceMotion
               ? undefined
-              : { transition: `translate ${LANGY_TRANSITION}` }
+              : {
+                  transition: `translate ${LANGY_TRANSITION}, width 340ms cubic-bezier(0.32, 0.72, 0, 1)`,
+                }
         }
         {...(isDrawerCompanion
           ? {

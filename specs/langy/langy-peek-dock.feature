@@ -54,6 +54,12 @@ Feature: Langy minimised peek
     And it is the same element throughout — it is never unmounted and remounted
     And nothing of the peek's offset is left behind once it is open
 
+  Scenario: Opening from the peek grows the panel without distorting its content
+    Given the Langy panel is minimised to its peek
+    When I open it
+    Then the panel expands by moving and resizing, with its content laid out at final size throughout
+    And nothing inside the panel stretches, squashes, or snaps into place after the motion
+
   Scenario: The peek is a keyboard citizen
     Given the Langy panel is minimised
     When I Tab to the peek
