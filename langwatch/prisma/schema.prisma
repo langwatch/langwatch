@@ -1262,6 +1262,9 @@ enum LangyProjectionTurnStatus {
   running
   completed
   failed
+  /// A turn the user stopped. Terminal, and distinct from `failed`: it carries
+  /// the partial answer and leaves the conversation continuable (ADR-058).
+  stopped
 }
 
 model ProjectSecret {
