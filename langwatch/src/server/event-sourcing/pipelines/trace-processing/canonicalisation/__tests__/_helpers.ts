@@ -1,4 +1,4 @@
-import type { NormalizedSpan } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 
 type StubSpanShape = Pick<
   NormalizedSpan,

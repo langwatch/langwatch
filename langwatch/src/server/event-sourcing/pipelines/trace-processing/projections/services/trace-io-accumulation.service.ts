@@ -2,7 +2,7 @@ import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import {
   extractAssistantTextFromResponseBody,
   isConversationalQuerySource,
-} from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
+} from "~/server/event-sourcing/pipelines/trace-processing/canonicalisation/extractors/claudeCode";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import {

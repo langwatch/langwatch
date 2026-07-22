@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedEvent } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
 import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import { makeStubSpan } from "./_helpers";

@@ -1,4 +1,4 @@
-import type { NormalizedEvent } from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 
 export class EventBag {
   private readonly events: NormalizedEvent[];

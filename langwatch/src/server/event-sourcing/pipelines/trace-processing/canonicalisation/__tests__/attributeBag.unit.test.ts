@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { NormalizedAttributes } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { AttributeBag } from "../attributeBag";
 
 describe("AttributeBag", () => {

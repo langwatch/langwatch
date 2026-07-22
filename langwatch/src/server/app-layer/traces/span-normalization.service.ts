@@ -15,7 +15,7 @@ import type {
 import { IdUtils } from "../../event-sourcing/pipelines/trace-processing/utils/id.utils";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import { EventUtils } from "../../event-sourcing/utils/event.utils";
-import type { CanonicalizeSpanAttributesService } from "./canonicalisation";
+import type { CanonicalizeSpanAttributesService } from "~/server/event-sourcing/pipelines/trace-processing/canonicalisation";
 import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 
 export class SpanNormalizationPipelineService {

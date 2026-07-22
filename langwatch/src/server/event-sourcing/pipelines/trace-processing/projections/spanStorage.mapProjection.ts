@@ -1,4 +1,4 @@
-import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import { CanonicalizeSpanAttributesService } from "~/server/event-sourcing/pipelines/trace-processing/canonicalisation";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,

@@ -10,17 +10,17 @@
  * canonicalisation/extractors/.
  */
 
-import { LogRecordDataBag } from "../../../../../app-layer/traces/canonicalisation/logRecordDataBag";
+import { LogRecordDataBag } from "~/server/event-sourcing/pipelines/trace-processing/canonicalisation/logRecordDataBag";
 import {
   ClaudeCodeExtractor,
   CodexExtractor,
   GenAIExtractor,
   SpringAIExtractor,
-} from "../../../../../app-layer/traces/canonicalisation/extractors";
+} from "~/server/event-sourcing/pipelines/trace-processing/canonicalisation/extractors";
 import type {
   CanonicalAttributesExtractor,
   LogExtractorContext,
-} from "../../../../../app-layer/traces/canonicalisation/extractors/_types";
+} from "~/server/event-sourcing/pipelines/trace-processing/canonicalisation/extractors/_types";
 import type { NormalizedAttributes } from "../../schemas/spans";
 import type { LogRecordReceivedEventData } from "../../schemas/events";
 

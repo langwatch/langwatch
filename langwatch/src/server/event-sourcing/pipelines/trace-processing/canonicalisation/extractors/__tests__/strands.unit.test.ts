@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { NormalizedAttributes } from "../../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { SpanDataBag } from "../../spanDataBag";
 import { toAttrValue } from "../../utils";
 import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";

@@ -1,7 +1,7 @@
 import type {
   NormalizedAttributes,
   NormalizedSpan,
-} from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { AttributeBag } from "./attributeBag";
 import { EventBag } from "./eventBag";
 

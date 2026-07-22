@@ -9,7 +9,7 @@
 import type {
   NormalizedAttributes,
   NormalizedSpan,
-} from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { LogRecordDataBag } from "../logRecordDataBag";
 import type { SpanDataBag } from "../spanDataBag";
 

@@ -5,7 +5,7 @@ import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import {
   extractLastUserMessageText,
   extractMessageContentText,
-} from "./canonicalisation/extractors/_messages";
+} from "~/server/event-sourcing/pipelines/trace-processing/canonicalisation/extractors/_messages";
 
 /**
  * Service for extracting input/output text from spans using tree traversal

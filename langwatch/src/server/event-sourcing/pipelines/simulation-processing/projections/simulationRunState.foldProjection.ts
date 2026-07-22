@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { isRecord } from "~/server/app-layer/traces/canonicalisation/extractors/_guards";
+import { isRecord } from "~/server/event-sourcing/pipelines/trace-processing/canonicalisation/extractors/_guards";
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
 import type { Projection } from "../../../";
 import {

@@ -81,7 +81,7 @@ import {
   collectToolResultsFromRequestBody,
   extractAssistantOutputFromResponseBody,
   isConversationalQuerySource,
-} from "./canonicalisation/extractors/claudeCode";
+} from "~/server/event-sourcing/pipelines/trace-processing/canonicalisation/extractors/claudeCode";
 
 export const CLAUDE_CODE_EVENT_SCOPE = "com.anthropic.claude_code.events";
 

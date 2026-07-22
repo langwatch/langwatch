@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   type ClaudeCodeLogRecordInput,
   convertClaudeCodeLogsToSpans,
-} from "../../claude-code-log-to-span";
+} from "~/server/app-layer/traces/claude-code-log-to-span";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
 import type {
   NormalizedAttributes,
   NormalizedEvent,
-} from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
-import type { OtlpKeyValue } from "../../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { OtlpKeyValue } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import type { ExtractorContext } from "../extractors/_types";
 
 import claudeBLogs from "./fixtures/claude-B.logs.json";

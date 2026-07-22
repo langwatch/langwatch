@@ -1,4 +1,4 @@
-import type { NormalizedAttributes } from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { AttributeBag } from "./attributeBag";
 
 /**
