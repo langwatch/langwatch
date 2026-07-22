@@ -20,11 +20,11 @@ import {
   LuArrowLeft,
   LuArrowRight,
   LuMic,
-  LuSparkles,
   LuX,
   LuZap,
 } from "react-icons/lu";
 import { SERIF } from "~/features/asaplangy";
+import { LangyMark } from "~/features/langy/components/LangyMark";
 import { getIsMac } from "~/features/command-bar/utils/platform";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
@@ -42,6 +42,51 @@ import { Tooltip } from "../ui/tooltip";
  */
 const LANTERN_COLORS = ["#f56b1a", "#ffb380", "#6e57d2"];
 const LANTERN_COLORS_DARK = ["#a8480d", "#f56b1a", "#5b41c2"];
+
+/**
+ * The Langy mark as the homebar announcement's identity — its own instance,
+ * deliberately NOT the panel's.
+ *
+ * Different colour: the site's violet brand ramp, not the panel's
+ * orange→purple AI gradient, so the homebar reads as the site announcing
+ * Langy rather than the panel leaking into the page. Own paint-server id for
+ * the same reason the launcher has one — duplicate SVG gradient ids resolve
+ * to whichever comes first in the DOM.
+ *
+ * Same footprint as every other slide's glyph — 14px, bare. The mark's
+ * wireframe reads softer this small, but a bigger tile made the banner row
+ * change height whenever this slide was the active one, and a row that
+ * breathes per-slide costs more than a crisper mark buys. The violet
+ * gradient stays: that is what says Langy at any size.
+ */
+const LANGY_HOMEBAR_MARK_GRADIENT_ID = "langy-homebar-mark-grad";
+
+function LangyHomebarMark() {
+  return (
+    <Box display="inline-flex" alignItems="center">
+      <svg
+        width="0"
+        height="0"
+        aria-hidden
+        style={{ position: "absolute", pointerEvents: "none" }}
+      >
+        <defs>
+          <linearGradient
+            id={LANGY_HOMEBAR_MARK_GRADIENT_ID}
+            x1="0%"
+            y1="100%"
+            x2="100%"
+            y2="0%"
+          >
+            <stop offset="0%" stopColor="#5b41c2" />
+            <stop offset="100%" stopColor="#8a76de" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <LangyMark size={14} gradientId={LANGY_HOMEBAR_MARK_GRADIENT_ID} />
+    </Box>
+  );
+}
 
 /**
  * The Langy announcement, carried only by the Langy home.
@@ -65,7 +110,10 @@ const LANGY_SLIDE: Slide = {
     offsetY: 0.16,
     rotation: 42,
   },
-  Icon: LuSparkles,
+  // Langy's own face, not a stock sparkle: the mark on its own violet tile,
+  // so the Langy announcement is recognisably HIM against the orange chrome
+  // every other slide shares. See LangyHomebarMark.
+  iconNode: <LangyHomebarMark />,
   heading: "Langy can ship the fix, not just find it",
   badge: "New",
   subtitle: (
