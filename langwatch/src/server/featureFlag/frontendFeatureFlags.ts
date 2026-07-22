@@ -71,6 +71,15 @@ export const FRONTEND_FEATURE_FLAGS = [
   // sheet's hand-to-Langy affordances. See useShowSignalFocusedHome.
   "release_ui_home_signal_focused_enabled",
   "release_webhook_automations",
+  // Pins the Ops section into the main sidebar for a user who already has ops
+  // access, so it shows on every route instead of only under /ops. Deliberately
+  // NOT a PostHog flag — it resolves false server-side (unknown flag) and is
+  // meant to be forced On locally from the hidden Feature Flags (Dev) drawer,
+  // persisting in that browser via the local override. It never widens who can
+  // see ops: the sidebar still gates on ops access, so a non-ops user forcing
+  // it On sees nothing. Env `SHOW_OPS_IN_MAIN_SIDEBAR` remains the fleet-wide
+  // allowlist; this is the per-browser convenience that needs no server change.
+  "ops_ui_ops_menu_pinned",
 ] as const;
 
 /**

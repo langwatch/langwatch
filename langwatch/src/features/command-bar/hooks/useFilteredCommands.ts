@@ -1,4 +1,4 @@
-import { ToggleLeft } from "lucide-react";
+import { Pin, PinOff, ToggleLeft } from "lucide-react";
 import { useMemo } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 import type { Command } from "../types";
@@ -100,6 +100,44 @@ export function useFilteredCommands(
     });
   }, [isDevMode, featureFlagOverrides]);
 
+  // A per-browser pin for the Ops sidebar section, offered only to users who
+  // already have ops access. Unlike the dev-only feature-flag toggles above,
+  // this is available in every environment — it is the admin-facing way to
+  // flip `ops_ui_ops_menu_pinned` without a dev build or a settings page. The
+  // pin only affects visibility, and the sidebar still gates on ops access, so
+  // exposing it here widens nothing.
+  const opsPinCommand = useMemo<Command[]>(() => {
+    if (!hasOpsAccess) return [];
+    const pinned = featureFlagOverrides.ops_ui_ops_menu_pinned === true;
+    return [
+      {
+        id: "action-toggle-ops-pin",
+        label: pinned ? "Unpin Ops from sidebar" : "Pin Ops in sidebar",
+        description: pinned
+          ? "Stop keeping the Ops section in the sidebar on every page (this browser)"
+          : "Always keep the Ops section in the sidebar (this browser)",
+        icon: pinned ? PinOff : Pin,
+        category: "actions",
+        keywords: [
+          "ops",
+          "pin",
+          "sidebar",
+          "always",
+          "show",
+          "operations",
+          "menu",
+        ],
+        action: () => {
+          // Clearing the override (undefined) unpins; setting true pins.
+          setFeatureFlagOverride(
+            "ops_ui_ops_menu_pinned",
+            pinned ? undefined : true,
+          );
+        },
+      },
+    ];
+  }, [hasOpsAccess, featureFlagOverrides]);
+
   const availableActionCommands = useMemo(() => {
     let commands = hasOpsAccess
       ? actionCommands
@@ -107,8 +145,8 @@ export function useFilteredCommands(
     if (!isDevMode) {
       commands = commands.filter((cmd) => cmd.id !== "action-feature-flags");
     }
-    return [...commands, ...featureFlagToggleCommands];
-  }, [hasOpsAccess, isDevMode, featureFlagToggleCommands]);
+    return [...commands, ...featureFlagToggleCommands, ...opsPinCommand];
+  }, [hasOpsAccess, isDevMode, featureFlagToggleCommands, opsPinCommand]);
 
   const filteredActions = useMemo(() => {
     if (!query.trim()) return [];
