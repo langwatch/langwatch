@@ -107,8 +107,10 @@ export function HandledErrorAlert({
               color="fg.muted"
               paddingLeft={4}
             >
-              {tips.map((tip) => (
-                <List.Item key={tip}>{tip}</List.Item>
+              {/* Index key: tips are server-supplied prose, so two can be
+                  identical and collide as keys. Their order is fixed. */}
+              {tips.map((tip, index) => (
+                <List.Item key={index}>{tip}</List.Item>
               ))}
             </List.Root>
           )}
